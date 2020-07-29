@@ -11,10 +11,6 @@ import (
 
 // BLS tests
 func TestBLSBLS12381(t *testing.T) {
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
-	require.NoError(t, err)
 	halg := NewBLSKMAC("test tag")
 	// test the consistency with different inputs
 	testGenSignVerify(t, BLSBLS12381, halg)
@@ -55,4 +51,10 @@ func TestBLSUtils(t *testing.T) {
 	testKeysAlgorithm(t, sk, BLSBLS12381)
 	// test Size()
 	testKeySize(t, sk, PrKeyLenBLSBLS12381, PubKeyLenBLSBLS12381)
+}
+
+// BLS Proof of Possession test
+func TestBLSPOP(t *testing.T) {
+	kmac := NewBLSKMAC("POP test tag")
+	testPOP(t, BLSBLS12381, kmac)
 }
