@@ -564,3 +564,19 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     }
     return RLC_OK;
 }
+
+// computes the sum of the array elements x and writes the sum in jointx
+// the sum is computed in Zr
+void bn_sum_vector(bn_t jointx, bn_st* x, int len) {
+    bn_t r;
+    bn_new(r); 
+    g2_get_ord(r);
+    bn_set_dig(jointx, 0);
+    bn_new_size(jointx, BITS_TO_DIGITS(Fr_BITS+1));
+    for (int i=0; i<len; i++) {
+        bn_add(jointx, jointx, &x[i]);
+        if (bn_cmp(jointx, r) == RLC_GT) 
+            bn_sub(jointx, jointx, r);
+    }
+    bn_free(r);
+}
