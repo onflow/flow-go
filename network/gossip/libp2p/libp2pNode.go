@@ -34,6 +34,9 @@ const (
 
 	// Maximum time to wait for a ping reply from a remote node
 	PingTimeoutSecs = time.Second * 4
+
+	// Specifies GossipSub protocol version 1.1
+	GossipSubID_v11 = protocol.ID("meshsub/1.1.0")
 )
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
@@ -105,10 +108,25 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	p.libP2PHost = host
 
-	host.SetStreamHandler(p.flowLibP2PProtocolID, handler)
+	host.SetStreamHandlDefaultDecayIntervalDefaultDecayIntervaler(p.flowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
-	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
+	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...,
+		// Enables GossipSub  Peer Scoring within the PubSub instance
+		// No idea if this works lol
+		WithPeerScore(
+			&PeerScoreParams{		// These Parameters are taken from an example and should be tuned
+				AppSpecificScore:	func(peer.ID) float64 { return 0 },
+				BehaviourPenaltyWeight:	-1,
+				BehaviourPenaltyDecay:	ScoreParameterDecay(time.Minute),
+				DecayInterval:		DefaultDecayInterval,
+				DecayToZero:		DefaultDecayToZero,
+			},
+			&PeerScoreThersholds{		// Same as the above comment
+				GossipThreshold:	-100,
+				PublishThreshold:	-500,
+				GraylistThreshold:	-1000,
+			}))
 	if err != nil {
 		return fmt.Errorf("could not create libp2p pubsub: %w", err)
 	}
@@ -419,3 +437,4 @@ func MultiaddressStr(address NodeAddress) string {
 func generateProtocolID(rootBlockID string) protocol.ID {
 	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
 }
+
