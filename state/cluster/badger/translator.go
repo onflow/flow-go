@@ -4,18 +4,18 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Translator is a translation layer that determines the reference block on
 // the main chain for a given cluster block, using the reference block from
 // the cluster block's payload.
 type Translator struct {
-	payloads *storage.ClusterPayloads
+	payloads storage.ClusterPayloads
 }
 
 // NewTranslator returns a new block ID translator.
-func NewTranslator(payloads *storage.ClusterPayloads) *Translator {
+func NewTranslator(payloads storage.ClusterPayloads) *Translator {
 	translator := &Translator{
 		payloads: payloads,
 	}

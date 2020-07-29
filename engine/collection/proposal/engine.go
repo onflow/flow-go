@@ -10,23 +10,33 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/dapperlabs/flow-go/consensus/recovery/cluster"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/cluster"
+	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/indices"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	metricsconsumer "github.com/dapperlabs/flow-go/module/metrics/hotstuff"
+	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster"
+	bclusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -73,6 +83,7 @@ func New(
 	colMetrics module.CollectionMetrics,
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
+	tracer module.Tracer,
 	protoState protocol.State,
 	clusterState clusterkv.State,
 	pool mempool.Transactions,
@@ -81,21 +92,61 @@ func New(
 	payloads storage.ClusterPayloads,
 	cache module.PendingClusterBlockBuffer,
 	sync module.BlockRequester,
-	push network.Engine,
+	build module.Builder,
+	finalize module.Finalizer,
 	persist hotstuff.Persister,
-	rootHeader *flow.Header,
-	rootQC *model.QuorumCertificate,
-	builderOpts []builder.Opt,
+	clusterRootHeader *flow.Header,
+	clusterRootQC *model.QuorumCertificate,
+	mainChainRootQC *model.QuorumCertificate,
 	hotstuffOpts []consensus.Option,
 ) (*Engine, error) {
 
-	participants, _, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
+	// determine the participants in our cluster
+	participants, clusterIndex, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not get cluster participants: %w", err)
 	}
+	clusterID := protocol.ChainIDForCluster(participants)
 
-	// TODO instantiate HotStuff
+	hotstuffMetrics := metrics.NewHotstuffCollector(clusterID)
 
+	// set up the leader selection
+	inds := indices.ProtocolCollectorClusterLeaderSelection(uint32(clusterIndex))
+	seed, err := protocol.SeedFromParentSignature(inds, mainChainRootQC.SigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not compute seed for leader selection: %w", err)
+	}
+	selection, err := committee.ComputeLeaderSelectionFromSeed(
+		clusterRootHeader.View,
+		seed,
+		leader.EstimatedSixMonthOfViews,
+		participants,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not compute leader selection: %w", err)
+	}
+
+	// create the consensus committee
+	translator := bclusterkv.NewTranslator(payloads)
+	com := committee.New(
+		protoState,
+		translator,
+		me.NodeID(),
+		filter.And(filter.In(participants), filter.HasStake(true)),
+		participants.NodeIDs(),
+		selection,
+	)
+
+	// create signer/verifier
+	staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, me)
+	signer := verification.NewSingleSigner(com, staking, me.NodeID())
+
+	// create the HotStuff log/metric notifier
+	notifier := pubsub.NewDistributor()
+	notifier.AddConsumer(notifications.NewLogConsumer(log))
+	notifier.AddConsumer(metricsconsumer.NewMetricsConsumer(hotstuffMetrics))
+
+	// create the proposal engine
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "proposal").Logger(),
@@ -115,6 +166,39 @@ func New(
 		hotstuff:       nil,
 	}
 
+	// recover the pending state
+	finalized, pending, err := recovery.FindLatest(clusterState, headers)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve finalized/pending headers: %w", err)
+	}
+
+	// create the HotStuff instance
+	hot, err := consensus.NewParticipant(
+		log,
+		tracer,
+		notifier,
+		hotstuffMetrics,
+		headers,
+		com,
+		build,
+		finalize,
+		persist,
+		signer,
+		e,
+		clusterRootHeader,
+		clusterRootQC,
+		finalized,
+		pending,
+		hotstuffOpts...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create hotstuff participant: %w", err)
+	}
+
+	// attach hotstuff to the proposal engine
+	e.hotstuff = hot
+
+	// log the mempool size off the bat
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 
 	con, err := net.Register(engine.ConsensusCluster, e)
@@ -275,7 +359,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Msg("broadcast proposal from hotstuff")
 
 		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
-		block := &cluster.Block{
+		block := &clustermodel.Block{
 			Header:  header,
 			Payload: payload,
 		}
@@ -467,7 +551,7 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 
 	// extend the state with the proposal -- if it is an invalid extension,
 	// we will throw an error here
-	block := &cluster.Block{
+	block := &clustermodel.Block{
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
