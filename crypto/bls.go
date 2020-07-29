@@ -20,7 +20,7 @@ package crypto
 //  - membership checks in G1 and G2 are using a naive scalar multiplication with the group order
 
 // future features:
-//  - multi signature and batch verification
+//  - multi-signature and batch verification
 //  - membership checks in G1 and G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
