@@ -183,15 +183,39 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
-func (s *Snapshot) Counter() (uint64, error) {
+func (s *Snapshot) Pending() ([]flow.Identifier, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.pending(s.blockID)
+}
+
+func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
+
+	var pendingIDs []flow.Identifier
+	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
+	if err != nil {
+		return nil, fmt.Errorf("could not get pending children: %w", err)
+	}
+
+	for _, pendingID := range pendingIDs {
+		additionalIDs, err := s.pending(pendingID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
+		}
+		pendingIDs = append(pendingIDs, additionalIDs...)
+	}
+	return pendingIDs, nil
+}
+
+func (s *Snapshot) Epoch() (uint64, error) {
 	if s.err != nil {
 		return 0, s.err
 	}
 
 	// Retrieve the current header to get its view, as well as the current
 	// epoch counter as a starting point.
-	var header flow.Header
-	err := s.state.db.View(operation.RetrieveHeader(s.blockID, &header))
+	header, err := s.state.headers.ByBlockID(s.blockID)
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve snapshot header: %w", err)
 	}
@@ -246,29 +270,4 @@ func (s *Snapshot) Counter() (uint64, error) {
 	}
 
 	return counter, nil
-}
-
-func (s *Snapshot) Pending() ([]flow.Identifier, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	return s.pending(s.blockID)
-}
-
-func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
-
-	var pendingIDs []flow.Identifier
-	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
-	if err != nil {
-		return nil, fmt.Errorf("could not get pending children: %w", err)
-	}
-
-	for _, pendingID := range pendingIDs {
-		additionalIDs, err := s.pending(pendingID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
-		}
-		pendingIDs = append(pendingIDs, additionalIDs...)
-	}
-	return pendingIDs, nil
 }

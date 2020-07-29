@@ -58,8 +58,8 @@ func (_m *Snapshot) Commit() ([]byte, error) {
 	return r0, r1
 }
 
-// Counter provides a mock function with given fields:
-func (_m *Snapshot) Counter() (uint64, error) {
+// Epoch provides a mock function with given fields:
+func (_m *Snapshot) Epoch() (uint64, error) {
 	ret := _m.Called()
 
 	var r0 uint64

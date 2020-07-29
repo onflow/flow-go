@@ -30,13 +30,13 @@ func (_m *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	return r0
 }
 
-// AtEpoch provides a mock function with given fields: counter
-func (_m *State) AtEpoch(counter uint64) protocol.Snapshot {
-	ret := _m.Called(counter)
+// AtEpoch provides a mock function with given fields: epoch
+func (_m *State) AtEpoch(epoch uint64) protocol.Snapshot {
+	ret := _m.Called(epoch)
 
 	var r0 protocol.Snapshot
 	if rf, ok := ret.Get(0).(func(uint64) protocol.Snapshot); ok {
-		r0 = rf(counter)
+		r0 = rf(epoch)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocol.Snapshot)
@@ -60,27 +60,6 @@ func (_m *State) AtHeight(height uint64) protocol.Snapshot {
 	}
 
 	return r0
-}
-
-// ChainID provides a mock function with given fields:
-func (_m *State) ChainID() (flow.ChainID, error) {
-	ret := _m.Called()
-
-	var r0 flow.ChainID
-	if rf, ok := ret.Get(0).(func() flow.ChainID); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(flow.ChainID)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // Final provides a mock function with given fields:
@@ -115,27 +94,20 @@ func (_m *State) Mutate() protocol.Mutator {
 	return r0
 }
 
-// Root provides a mock function with given fields:
-func (_m *State) Root() (*flow.Header, error) {
+// Params provides a mock function with given fields:
+func (_m *State) Params() protocol.Params {
 	ret := _m.Called()
 
-	var r0 *flow.Header
-	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+	var r0 protocol.Params
+	if rf, ok := ret.Get(0).(func() protocol.Params); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
+			r0 = ret.Get(0).(protocol.Params)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // Sealed provides a mock function with given fields:
