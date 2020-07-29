@@ -649,6 +649,8 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	// protocol state to go to the next epoch when needed. In cases where there
 	// is a bug in the smart contract, it could be that this happens too late
 	// and the chain finalization should halt.
+	// We also map the epoch to the height of its last finalized block; this is
+	// important in order to efficiently be able to look up epoch snapshots.
 
 	var counter uint64
 	err = m.state.db.View(operation.RetrieveEpochCounter(&counter))
@@ -668,7 +670,11 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		if !didSetup || !didCommit {
 			return fmt.Errorf("missing epoch transition event(s)!")
 		}
-		ops = append(ops, operation.UpdateEpochCounter(counter+1))
+		counter = counter + 1
+		ops = append(ops, operation.UpdateEpochCounter(counter))
+		ops = append(ops, operation.InsertEpochHeight(counter, header.Height))
+	} else {
+		ops = append(ops, operation.UpdateEpochHeight(counter, header.Height))
 	}
 
 	// FINALLY: A block inserted into the protocol state is already a valid

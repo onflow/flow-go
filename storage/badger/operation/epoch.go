@@ -17,6 +17,18 @@ func RetrieveEpochCounter(counter *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeEpochCounter), counter)
 }
 
+func InsertEpochHeight(counter uint64, height uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeEpochHeight, counter), height)
+}
+
+func UpdateEpochHeight(counter uint64, height uint64) func(*badger.Txn) error {
+	return update(makePrefix(codeEpochHeight, counter), height)
+}
+
+func RetrieveEpochHeight(counter uint64, height *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeEpochHeight, counter), height)
+}
+
 func IndexEpochStart(counter uint64, view uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeEpochStart, counter), view)
 }

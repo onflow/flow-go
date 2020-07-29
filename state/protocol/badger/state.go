@@ -81,6 +81,18 @@ func (s *State) ChainID() (flow.ChainID, error) {
 	return root.ChainID, nil
 }
 
+func (s *State) AtEpoch(counter uint64) protocol.Snapshot {
+
+	// get the block height associated with the given epoch
+	var height uint64
+	err := s.db.View(operation.RetrieveEpochHeight(counter, &height))
+	if err != nil {
+		return &Snapshot{err: fmt.Errorf("could not retrieve epoch height: %w", err)}
+	}
+
+	return s.AtHeight(height)
+}
+
 func (s *State) Sealed() protocol.Snapshot {
 
 	// retrieve the latest sealed height

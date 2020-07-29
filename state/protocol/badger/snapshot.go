@@ -183,6 +183,71 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
+func (s *Snapshot) Counter() (uint64, error) {
+	if s.err != nil {
+		return 0, s.err
+	}
+
+	// Retrieve the current header to get its view, as well as the current
+	// epoch counter as a starting point.
+	var header flow.Header
+	err := s.state.db.View(operation.RetrieveHeader(s.blockID, &header))
+	if err != nil {
+		return 0, fmt.Errorf("could not retrieve snapshot header: %w", err)
+	}
+	var counter uint64
+	err = s.state.db.View(operation.RetrieveEpochCounter(&counter))
+	if err != nil {
+		return 0, fmt.Errorf("could not retrieve epoch counter: %w", err)
+	}
+
+	// If the header's view is after the current epoch's view, we are dealing
+	// with a header for the next epoch (it could be pending). We should never
+	// have pending headers from two epochs in the future, so it's safe to
+	// return here.
+	var setup flow.EpochSetup
+	err = s.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
+	if err != nil {
+		return 0, fmt.Errorf("could not retrieve epoch setup: %w", err)
+	}
+	if header.View > setup.FinalView {
+		return counter + 1, nil
+	}
+
+	// We can now iterate backwards through the epoch's as long as the header's
+	// view is higher than the start of a given period. As soon as we find an
+	// epoch that has a start lower than the current header's view, it means
+	// the header falls in the epoch following that one.
+	var start uint64
+	for {
+
+		// we have reached the first epoch, which this header has to be part of thus
+		if counter == 0 {
+			break
+		}
+
+		// get the start view of the epoch
+		err = s.state.db.View(operation.LookupEpochStart(counter, &start))
+		if err != nil {
+			return 0, fmt.Errorf("could not look up epoch start (counter: %d): %w", counter, err)
+		}
+
+		// if start is bigger than the header view, it means the header is definitely not part
+		// of the epoch; as the check still passed for the previous one, the header is thus
+		// definitely part of the previously checked (next) period
+		if start > header.View {
+			counter++
+			break
+		}
+
+		// the header still falls into the currently checked epoch; step back to the previous
+		// one until we found one that the header doesn't belong to
+		counter--
+	}
+
+	return counter, nil
+}
+
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 	if s.err != nil {
 		return nil, s.err

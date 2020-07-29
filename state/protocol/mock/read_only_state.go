@@ -30,6 +30,22 @@ func (_m *ReadOnlyState) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	return r0
 }
 
+// AtEpoch provides a mock function with given fields: counter
+func (_m *ReadOnlyState) AtEpoch(counter uint64) protocol.Snapshot {
+	ret := _m.Called(counter)
+
+	var r0 protocol.Snapshot
+	if rf, ok := ret.Get(0).(func(uint64) protocol.Snapshot); ok {
+		r0 = rf(counter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.Snapshot)
+		}
+	}
+
+	return r0
+}
+
 // AtHeight provides a mock function with given fields: height
 func (_m *ReadOnlyState) AtHeight(height uint64) protocol.Snapshot {
 	ret := _m.Called(height)

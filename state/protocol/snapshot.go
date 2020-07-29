@@ -51,7 +51,12 @@ type Snapshot interface {
 	// In order to deterministically derive task specific seeds, indices must
 	// be specified.
 	// Refer to module/indices/rand.go for different indices.
+	// NOTE: not to be confused with the epoch seed.
 	Seed(indices ...uint32) ([]byte, error)
+
+	// Counter will return the counter of the epoch at the given snapshot
+	// height.
+	Counter() (uint64, error)
 }
 
 // SeedFromParentSignature reads the raw random seed from a combined signature.
