@@ -16,15 +16,17 @@ const versionPrefix = "FLOW-V0.0-"
 
 var (
 	// RandomBeaconTag is used for threshold signatures in the random beacon
-	RandomBeaconTag = tag("RandomBeacon")
+	RandomBeaconTag = tag("Random Beacon")
 	// ConsensusVoteTag is used for Consensus Hotstuff votes
-	ConsensusVoteTag = tag("ConsensusVote")
+	ConsensusVoteTag = tag("Consensus Vote")
 	// CollectorVoteTag is used for Collection Hotstuff votes
-	CollectorVoteTag = tag("CollectorVote")
+	CollectorVoteTag = tag("Collector Vote")
 	// ExecutionReceiptTag is used for execution receipts
-	ExecutionReceiptTag = tag("ExecutionReceipt")
+	ExecutionReceiptTag = tag("Execution Receipt")
 	// ResultApprovalTag is used for result approvals
-	ResultApprovalTag = tag("ResultApproval")
+	ResultApprovalTag = tag("Result Approval")
 	// SPOCKTag is used to generate SPoCK proofs
 	SPOCKTag = tag("SPoCK")
+	// POPTag is used to generate proofs of possessions of the private key
+	POPTag = tag("Proof of Possession")
 )

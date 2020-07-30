@@ -217,11 +217,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 
 	ctx.executionState.
 		On(
-			"PersistExecutionResult",
+			"PersistExecutionReceipt",
 			mock.Anything,
-			executableBlock.Block.ID(),
-			mock.MatchedBy(func(er flow.ExecutionResult) bool {
-				return er.BlockID == executableBlock.Block.ID() && er.PreviousResultID == previousExecutionResultID
+			mock.MatchedBy(func(receipt *flow.ExecutionReceipt) bool {
+				return receipt.ExecutionResult.BlockID == executableBlock.Block.ID() && receipt.ExecutionResult.PreviousResultID == previousExecutionResultID
 			}),
 		).
 		Return(nil)
@@ -288,10 +287,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	execState.
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
 		Return(previousExecutionResultID, nil)
-
-	execState.
-		On("PersistExecutionResult", mock.Anything, executableBlock.Block.ID(), mock.Anything).
-		Return(nil)
 
 	er, err := e.generateExecutionResultForBlock(context.Background(), executableBlock.Block, nil, endState)
 	assert.NoError(t, err)
@@ -440,6 +435,8 @@ func Test_SPOCKGeneration(t *testing.T) {
 				SpockSecret: unittest.RandomBytes(100),
 			},
 		}
+
+		ctx.executionState.On("PersistExecutionReceipt", mock.Anything, mock.Anything).Return(nil)
 
 		executionReceipt, err := ctx.engine.generateExecutionReceipt(
 			context.Background(),
