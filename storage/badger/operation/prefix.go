@@ -26,13 +26,14 @@ const (
 	codeRootHeight      = 24 // the height of the first loaded block
 
 	// codes for single entity storage
-	codeHeader          = 30
-	codeIdentity        = 31
-	codeGuarantee       = 32
-	codeSeal            = 33
-	codeTransaction     = 34
-	codeCollection      = 35
-	codeExecutionResult = 36
+	codeHeader               = 30
+	codeIdentity             = 31
+	codeGuarantee            = 32
+	codeSeal                 = 33
+	codeTransaction          = 34
+	codeCollection           = 35
+	codeExecutionResult      = 36
+	codeExecutionReceiptMeta = 36
 
 	// codes for indexing single identifier by identifier
 	codeHeightToBlock       = 40 // index mapping height to block ID
@@ -41,11 +42,12 @@ const (
 	codeBlockValidity       = 43 // validity of block per HotStuff
 
 	// codes for indexing multiple identifiers by identifier
-	codeBlockChildren     = 50 // index mapping block ID to children blocks
-	codePayloadIdentities = 51 // index mapping block ID to payload identities
-	codePayloadGuarantees = 52 // index mapping block ID to payload guarantees
-	codePayloadSeals      = 53 // index mapping block ID to payload seals
-	codeCollectionBlock   = 54 // index mapping collection ID to block ID
+	codeBlockChildren         = 50 // index mapping block ID to children blocks
+	codePayloadIdentities     = 51 // index mapping block ID to payload identities
+	codePayloadGuarantees     = 52 // index mapping block ID to payload guarantees
+	codePayloadSeals          = 53 // index mapping block ID to payload seals
+	codeCollectionBlock       = 54 // index mapping collection ID to block ID
+	codeBlockExecutionReceipt = 55 // index mapping block ID to execution receipt ID
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

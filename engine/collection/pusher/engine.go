@@ -1,10 +1,9 @@
-// Package provider implements an engine for providing access to resources held
+// Package pusher implements an engine for providing access to resources held
 // by the collection node, including collections, collection guarantees, and
 // transactions.
-package provider
+package pusher
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -22,15 +21,14 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine is the collection provider engine, which provides access to resources
+// Engine is the collection pusher engine, which provides access to resources
 // held by the collection node.
-// TODO consolidate with common resource provider engine (4148)
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
 	colMetrics   module.CollectionMetrics
-	con          network.Conduit
+	push         network.Conduit
 	me           module.Local
 	state        protocol.State
 	pool         mempool.Transactions
@@ -41,7 +39,7 @@ type Engine struct {
 func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
 		unit:         engine.NewUnit(),
-		log:          log.With().Str("engine", "provider").Logger(),
+		log:          log.With().Str("engine", "pusher").Logger(),
 		engMetrics:   engMetrics,
 		colMetrics:   colMetrics,
 		me:           me,
@@ -51,12 +49,11 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, engMetric
 		transactions: transactions,
 	}
 
-	con, err := net.Register(engine.CollectionProvider, e)
+	push, err := net.Register(engine.PushGuarantees, e)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine: %w", err)
+		return nil, fmt.Errorf("could not register for push protocol: %w", err)
 	}
-
-	e.con = con
+	e.push = push
 
 	return e, nil
 }
@@ -102,17 +99,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// process processes events for the provider engine on the collection node.
+// process processes events for the pusher engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *messages.SubmitCollectionGuarantee:
 		e.engMetrics.MessageReceived(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
 		defer e.engMetrics.MessageHandled(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
 		return e.onSubmitCollectionGuarantee(originID, ev)
-	case *messages.CollectionRequest:
-		e.engMetrics.MessageReceived(metrics.EngineCollectionProvider, metrics.MessageCollectionRequest)
-		defer e.engMetrics.MessageHandled(metrics.EngineCollectionProvider, metrics.MessageCollectionRequest)
-		return e.onCollectionRequest(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -128,41 +121,6 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
 
-func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.CollectionRequest) error {
-
-	log := e.log.With().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("collection_id", logging.ID(req.ID)).
-		Logger()
-
-	log.Debug().Msg("received collection request")
-
-	coll, err := e.collections.ByID(req.ID)
-	// we don't have the collection requested by other node
-	if errors.Is(err, storage.ErrNotFound) {
-		log.Warn().Err(err).Msg("requested collection not found")
-		return nil
-	}
-
-	if err != nil {
-		// running into some exception
-		return fmt.Errorf("could not retrieve requested collection: %w", err)
-	}
-
-	res := &messages.CollectionResponse{
-		Collection: *coll,
-		Nonce:      req.Nonce,
-	}
-	err = e.con.Submit(res, originID)
-	if err != nil {
-		return fmt.Errorf("could not respond to collection requester: %w", err)
-	}
-
-	e.engMetrics.MessageSent(metrics.EngineCollectionProvider, metrics.MessageCollectionResponse)
-
-	return nil
-}
-
 // SubmitCollectionGuarantee submits the collection guarantee to all
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
@@ -172,12 +130,18 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 		return fmt.Errorf("could not get consensus nodes: %w", err)
 	}
 
-	err = e.con.Submit(guarantee, consensusNodes.NodeIDs()...)
+	// TODO: We actually only need to send to a small subset of consensus engines, as
+	// they propagate the guarantee within the consensus committee. We can reduce
+	// network usage significantly by implementing a simple retry mechanism here and
+	// only sending to a single consensus node.
+	// => https://github.com/dapperlabs/flow-go/issues/4358
+	err = e.push.Submit(guarantee, consensusNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
 
 	e.engMetrics.MessageSent(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
+
 	e.log.Debug().
 		Hex("guarantee_id", logging.ID(guarantee.ID())).
 		Hex("ref_block_id", logging.ID(guarantee.ReferenceBlockID)).

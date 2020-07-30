@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"time"
 
@@ -22,11 +21,13 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/consensus/recovery/cluster"
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
-	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/collection/pusher"
 	colsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+	"github.com/dapperlabs/flow-go/engine/common/provider"
 	consync "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
@@ -48,6 +49,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
 	storagekv "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/io"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -83,7 +85,7 @@ func main() {
 		clusterBlock *clustermodel.Block              // root block for the cluster
 		clusterQC    *hotstuffmodel.QuorumCertificate // root QC for the cluster
 
-		prov              *provider.Engine
+		push              *pusher.Engine
 		ing               *ingest.Engine
 		clusterSyncCore   *synchronization.Core
 		mainChainSyncCore *synchronization.Core
@@ -221,7 +223,6 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handling updating the protocol
@@ -332,7 +333,18 @@ func main() {
 			return server, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(
+			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
+				coll, err := node.Storage.Collections.ByID(collID)
+				return coll, err
+			}
+			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+				engine.ProvideCollections,
+				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+				retrieve,
+			)
+		}).
+		Component("pusher engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			push, err = pusher.New(
 				node.Logger,
 				node.Network,
 				node.State,
@@ -343,14 +355,14 @@ func main() {
 				node.Storage.Collections,
 				node.Storage.Transactions,
 			)
-			return prov, err
+			return push, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			builder := builder.NewBuilder(node.DB, colHeaders, colPayloads, pool,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
-			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, colMetrics, clusterID)
+			finalizer := colfinalizer.NewFinalizer(node.DB, pool, push, colMetrics, clusterID)
 
 			proposalEng, err = proposal.New(
 				node.Logger,
@@ -466,7 +478,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 
 func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block, error) {
 	filename := fmt.Sprintf(bootstrap.PathRootClusterBlock, clusterID)
-	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+	data, err := io.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +493,7 @@ func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block,
 
 func loadClusterQC(path string, clusterID flow.ChainID) (*hotstuffmodel.QuorumCertificate, error) {
 	filename := fmt.Sprintf(bootstrap.PathRootClusterQC, clusterID)
-	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+	data, err := io.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
 	}

@@ -72,8 +72,8 @@ func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash
 	if currentIndex >= size || currentIndex < 0 {
 		return nil, fmt.Errorf("The current index must be between 0 and %d", size-1)
 	}
-	if threshold >= size-1 || threshold < 1 {
-		return nil, fmt.Errorf("The threshold must be between 1 and %d", size-2)
+	if threshold >= size || threshold < 0 {
+		return nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
 	}
 
 	// initialize BLS settings
@@ -266,8 +266,8 @@ func ReconstructThresholdSignature(size int, threshold int,
 		return nil, fmt.Errorf("size should be between %d and %d",
 			ThresholdMinSize, ThresholdMaxSize)
 	}
-	if threshold >= size-1 || threshold < 1 {
-		return nil, fmt.Errorf("The threshold must be between 1 and %d", size-2)
+	if threshold >= size || threshold < 0 {
+		return nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
 	}
 
 	if len(shares) != len(signers) {
@@ -315,8 +315,8 @@ func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, nil, nil, fmt.Errorf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)
 	}
-	if threshold >= size-1 || threshold < 1 {
-		return nil, nil, nil, fmt.Errorf("The threshold must be between 1 and %d", size-2)
+	if threshold >= size || threshold < 0 {
+		return nil, nil, nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
 	}
 	// initialize BLS settings
 	_ = newBLSBLS12381()
