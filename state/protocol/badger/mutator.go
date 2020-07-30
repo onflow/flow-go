@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/storage"
@@ -47,17 +48,17 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 		var services []interface{}
 		for _, event := range seal.ServiceEvents {
-			service, err := flow.ServiceEvent(event)
+			service, err := epoch.ServiceEvent(event)
 			if err != nil {
 				return fmt.Errorf("could not decode service event: %w", err)
 			}
 			services = append(services, service)
 		}
-		setup, valid := services[0].(*flow.EpochSetup)
+		setup, valid := services[0].(*epoch.Setup)
 		if !valid {
 			return fmt.Errorf("first service event should be epoch setup (%T)", services[0])
 		}
-		commit, valid := services[1].(*flow.EpochCommit)
+		commit, valid := services[1].(*epoch.Commit)
 		if !valid {
 			return fmt.Errorf("second event should be epoch commit (%T)", services[1])
 		}
@@ -72,7 +73,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("invalid epoch setup event: %w", err)
 		}
-		err = validCommit(commit)
+		err = validCommit(commit, setup.Participants)
 		if err != nil {
 			return fmt.Errorf("invalid epoch commit event: %w", err)
 		}
@@ -407,20 +408,10 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch counter: %w", err)
 	}
-	var start uint64
-	err = m.state.db.View(operation.LookupEpochStart(counter, &start))
-	if err != nil {
-		return fmt.Errorf("could not retrieve epoch start: %w", err)
-	}
-	var setup flow.EpochSetup
-	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
+	var activeSetup epoch.Setup
+	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &activeSetup))
 	if err != nil {
 		return fmt.Errorf("could not retrieve current epoch setup: %w", err)
-	}
-	var commit flow.EpochCommit
-	err = m.state.db.View(operation.RetrieveEpochCommit(counter, &commit))
-	if err != nil {
-		return fmt.Errorf("could not retrieve current epoch commit: %w", err)
 	}
 
 	// Let's first establish the status quo of the current epoch. This function
@@ -445,14 +436,14 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			// network nicely, as a slice of interfaces needs additional
 			// meta information, and having two nil fields for most seals
 			// is ugly.
-			service, err := flow.ServiceEvent(event)
+			service, err := epoch.ServiceEvent(event)
 			if err != nil {
 				return fmt.Errorf("could not decode service event: %w", err)
 			}
 
 			switch ev := service.(type) {
 
-			case *flow.EpochSetup:
+			case *epoch.Setup:
 
 				// We should only have a single epoch setup event per epoch.
 				if didSetup {
@@ -466,30 +457,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 				// The final view needs to be after the current epoch final view.
 				// NOTE: This kind of operates as an overflow check for the other checks.
-				if ev.FinalView <= setup.FinalView {
-					return fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, setup.FinalView)
-				}
-
-				// The total length of the epoch must be longer than the auction window plus twice the grace period.
-				// This leaves at least one grace period for the actual processing of the events.
-				length := setup.FinalView - ev.FinalView
-				minimum := m.state.cfg.auctionWindow + 2*m.state.cfg.gracePeriod
-				if length < minimum {
-					return fmt.Errorf("next epoch has insufficient length (%d < %d)", length, minimum)
-				}
-
-				// The setup event can not happen until after the auction window.
-				auction := start + m.state.cfg.auctionWindow
-				if candidate.Header.View <= auction {
-					return fmt.Errorf("next epoch setup inside auction window (%d <= %d)", candidate.Header.View, auction)
-				}
-
-				// The setup event can not happen after the current epoch end minus the grace period.
-				// NOTE: This is a sanity check; at this point, the chain should have halted anyway, as
-				// we can't make progress unless the next epoch is set up on time.
-				grace := setup.FinalView - m.state.cfg.gracePeriod
-				if candidate.Header.View >= grace {
-					return fmt.Errorf("next epoch setup inside grace peried (%d >= %d)", candidate.Header.View, grace)
+				if ev.FinalView <= activeSetup.FinalView {
+					return fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
 				}
 
 				// Finally, the epoch setup event must contain all necessary information.
@@ -501,7 +470,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				// Make sure to disallow multiple commit events per payload.
 				didSetup = true
 
-			case *flow.EpochCommit:
+			case *epoch.Commit:
 
 				// We should only have a single epoch commit event per epoch.
 				if didCommit {
@@ -518,24 +487,13 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 					return fmt.Errorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
 				}
 
-				// The commit event can not happen until after the auction window.
-				// NOTE: This is a sanity check; as the commit event can't happen before the setup event,
-				// the auction period must have passed anyway.
-				auction := start + m.state.cfg.auctionWindow
-				if candidate.Header.View <= auction {
-					return fmt.Errorf("next epoch commit inside auction window (%d <= %d)", candidate.Header.View, auction)
-				}
-
-				// The commit event can not happen after the current epoch end minus the grace period.
-				// NOTE: This is a sanity check; at this point, the chain should have halted anyway, as
-				// we can't make progress unless the next epoch is set up on time.
-				grace := setup.FinalView - m.state.cfg.gracePeriod
-				if candidate.Header.View >= grace {
-					return fmt.Errorf("next epoch commit inside grace peried (%d >= %d)", candidate.Header.View, grace)
-				}
-
 				// Finally, the commit should commit all the necessary information.
-				err = validCommit(ev)
+				var setup epoch.Setup
+				err = m.state.db.View(operation.RetrieveEpochSetup(ev.Counter, &setup))
+				if err != nil {
+					return fmt.Errorf("could not retrieve next epoch setup: %w", err)
+				}
+				err = validCommit(ev, setup.Participants)
 				if err != nil {
 					return fmt.Errorf("invalid epoch commit: %w", err)
 				}
@@ -630,14 +588,14 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	var ops []func(*badger.Txn) error
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
-			service, err := flow.ServiceEvent(event)
+			service, err := epoch.ServiceEvent(event)
 			if err != nil {
 				return fmt.Errorf("could not decode service event: %w", err)
 			}
 			switch ev := service.(type) {
-			case *flow.EpochSetup:
+			case *epoch.Setup:
 				ops = append(ops, operation.InsertEpochSetup(ev.Counter, ev))
-			case *flow.EpochCommit:
+			case *epoch.Commit:
 				ops = append(ops, operation.InsertEpochCommit(ev.Counter, ev))
 			default:
 				return fmt.Errorf("invalid service event type in payload (%s)", event.Type)
@@ -649,13 +607,15 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	// protocol state to go to the next epoch when needed. In cases where there
 	// is a bug in the smart contract, it could be that this happens too late
 	// and the chain finalization should halt.
+	// We also map the epoch to the height of its last finalized block; this is
+	// important in order to efficiently be able to look up epoch snapshots.
 
 	var counter uint64
 	err = m.state.db.View(operation.RetrieveEpochCounter(&counter))
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch counter: %w", err)
 	}
-	var setup flow.EpochSetup
+	var setup epoch.Setup
 	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch setup: %w", err)
@@ -668,7 +628,11 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		if !didSetup || !didCommit {
 			return fmt.Errorf("missing epoch transition event(s)!")
 		}
-		ops = append(ops, operation.UpdateEpochCounter(counter+1))
+		counter = counter + 1
+		ops = append(ops, operation.UpdateEpochCounter(counter))
+		ops = append(ops, operation.InsertEpochHeight(counter, header.Height))
+	} else {
+		ops = append(ops, operation.UpdateEpochHeight(counter, header.Height))
 	}
 
 	// FINALLY: A block inserted into the protocol state is already a valid
@@ -805,7 +769,7 @@ func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool,
 }
 
 func (m *Mutator) setupFinalized(counter uint64) (bool, error) {
-	err := m.state.db.View(operation.RetrieveEpochSetup(counter, &flow.EpochSetup{}))
+	err := m.state.db.View(operation.RetrieveEpochSetup(counter, &epoch.Setup{}))
 	if err == nil {
 		return true, nil
 	}
@@ -816,7 +780,7 @@ func (m *Mutator) setupFinalized(counter uint64) (bool, error) {
 }
 
 func (m *Mutator) commitFinalized(counter uint64) (bool, error) {
-	err := m.state.db.View(operation.RetrieveEpochCommit(counter, &flow.EpochCommit{}))
+	err := m.state.db.View(operation.RetrieveEpochCommit(counter, &epoch.Commit{}))
 	if err == nil {
 		return true, nil
 	}

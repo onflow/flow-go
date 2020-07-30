@@ -16,11 +16,11 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
@@ -33,7 +33,7 @@ type Participant struct {
 }
 
 type ParticipantData struct {
-	DKGState     dkg.State
+	Commit       *epoch.Commit
 	Participants []Participant
 }
 
@@ -82,10 +82,7 @@ func GenerateRootQC(participantData ParticipantData, block *flow.Block) (*model.
 func createValidators(ps protocol.State, participantData ParticipantData, block *flow.Block) ([]hotstuff.Validator, []hotstuff.Signer, error) {
 	n := len(participantData.Participants)
 
-	groupSize, err := participantData.DKGState.GroupSize()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get DKG group size: %w", err)
-	}
+	groupSize := uint(len(participantData.Commit.DKGParticipants))
 	if groupSize < uint(n) {
 		return nil, nil, fmt.Errorf("need at least as many signers as DKG participants, got %v and %v", groupSize, n)
 	}
@@ -116,10 +113,12 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 		}
 
 		// create signer
+		// TODO: The DKG data is now included in the epoch commit event, which is in turn included in the root seal. If
+		// we want to properly sign the block QC, we will have to untangle all of this logic here.
 		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
 		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner()
-		signer := verification.NewCombinedSigner(committee, participantData.DKGState, stakingSigner, beaconSigner, merger, participant.NodeID)
+		signer := verification.NewCombinedSigner(committee, stakingSigner, beaconSigner, merger, participant.NodeID)
 		signers[i] = signer
 
 		// create validator

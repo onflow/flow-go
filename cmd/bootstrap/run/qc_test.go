@@ -8,10 +8,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/dkg"
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -46,20 +45,23 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 		signature.RandomBeaconThreshold(n), seed)
 	require.NoError(t, err)
 
-	pubData := dkg.PublicData{
-		GroupPubKey:     groupKey,
-		IDToParticipant: make(map[flow.Identifier]*dkg.Participant),
+	// TODO: This is now stored as part of the epoch commit event, which is
+	// in turn stored as part of the block seal. Generate it accordingly.
+	commit := epoch.Commit{
+		// MISSING: counter, cluster QCs
+		DKGGroupKey:     groupKey,
+		DKGParticipants: make(map[flow.Identifier]epoch.Participant),
 	}
 	for i, identity := range identities {
-		participant := dkg.Participant{
-			Index:          uint(i),
-			PublicKeyShare: randomBPKs[i],
+		participant := epoch.Participant{
+			Index:    uint(i),
+			KeyShare: randomBPKs[i],
 		}
-		pubData.IDToParticipant[identity.NodeID] = &participant
+		commit.DKGParticipants[identity.NodeID] = participant
 	}
 
 	participantData := ParticipantData{
-		DKGState:     wrapper.NewState(&pubData),
+		Commit:       &commit,
 		Participants: make([]Participant, n),
 	}
 
