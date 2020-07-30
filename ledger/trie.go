@@ -212,9 +212,9 @@ func (p *TrieProof) String() string {
 	proofStr += fmt.Sprintf("\t path: %v payload: %v\n", p.Path, p.Payload)
 
 	if p.Inclusion {
-		proofStr += fmt.Sprint("\t inclusion proof:\n")
+		proofStr += "\t inclusion proof:\n"
 	} else {
-		proofStr += fmt.Sprint("\t noninclusion proof:\n")
+		proofStr += "\t noninclusion proof:\n"
 	}
 	interimIndex := 0
 	for j := 0; j < int(p.Steps); j++ {

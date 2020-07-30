@@ -121,7 +121,7 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 		for j := 0; j < 10; j++ {
 			rinfo, err := GetPeerInfo(address)
 			require.NoError(l.Suite.T(), err)
-			assert.True(l.Suite.T(), rinfo.String() == info.String(), fmt.Sprintf("inconsistent id generated"))
+			assert.True(l.Suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
 		}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/libp2p/go-libp2p-core/helpers"
@@ -233,23 +234,18 @@ func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.I
 // sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
 func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) error {
 
-	// get an identity to connect to. The identity provides the destination TCP address.
-	idsMap, err := m.ov.Identity()
+	targetAddress, err := m.nodeAddressFromID(targetID)
 	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-	flowIdentity, found := idsMap[targetID]
-	if !found {
-		return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
+		return err
 	}
 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the the receiver
-	stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
+	stream, err := m.libP2PNode.CreateStream(m.ctx, targetAddress)
 	if err != nil {
-		return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to create stream for %s :%w", targetAddress.Name, err)
 	}
 
 	// create a gogo protobuf writer
@@ -285,31 +281,37 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 	return nil
 }
 
-// connect creates a new stream
-func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey) (libp2pnetwork.Stream, error) {
+// nodeAddressFromID returns the libp2p.NodeAddress for the given flow.id.
+func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) {
 
-	ip, port, err := net.SplitHostPort(address)
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
 	if err != nil {
-		return nil, fmt.Errorf("could not parse address %s: %w", address, err)
+		return NodeAddress{}, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// retrieve the flow.Identity for the give flow.ID
+	flowIdentity, found := idsMap[id]
+	if !found {
+		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
+	}
+
+	// split the node address into ip and port
+	ip, port, err := net.SplitHostPort(flowIdentity.Address)
+	if err != nil {
+		return NodeAddress{}, fmt.Errorf("could not parse address %s: %w", flowIdentity.Address, err)
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := PublicKey(key)
+	lkey, err := PublicKey(flowIdentity.NetworkPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
+		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
 
-	// Create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port, PubKey: lkey}
+	// create a new NodeAddress
+	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
 
-	// Create a stream for it
-	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stream for %s :%w", nodeAddress.Name, err)
-	}
-
-	m.log.Info().Str("target_id", flowID).Str("address", address).Msg("stream created")
-	return stream, nil
+	return nodeAddress, nil
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -457,4 +459,14 @@ func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
 
 func (m *Middleware) reportInboundMsgSize(size int, channel string) {
 	m.metrics.NetworkMessageReceived(size, channel)
+}
+
+// Ping pings the target node and returns the ping RTT or an error
+func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
+	nodeAddress, err := m.nodeAddressFromID(targetID)
+	if err != nil {
+		return -1, err
+	}
+
+	return m.libP2PNode.Ping(m.ctx, nodeAddress)
 }
