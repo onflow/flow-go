@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
@@ -50,7 +51,9 @@ func New(log zerolog.Logger,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
-	chainID flow.ChainID) *Engine {
+	chainID flow.ChainID,
+	transactionMetrics module.TransactionMetrics,
+) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -70,7 +73,7 @@ func New(log zerolog.Logger,
 	eng := &Engine{
 		log:        log,
 		unit:       engine.NewUnit(),
-		handler:    handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID),
+		handler:    handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID, transactionMetrics),
 		grpcServer: grpcServer,
 		httpServer: httpServer,
 		config:     config,

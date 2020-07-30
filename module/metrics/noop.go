@@ -98,4 +98,7 @@ func (nc *NoopCollector) ExecutionCollectionRequestRetried()                    
 func (nc *NoopCollector) TransactionParsed(dur time.Duration)                       {}
 func (nc *NoopCollector) TransactionChecked(dur time.Duration)                      {}
 func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)                  {}
+func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)  {}
+func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time) {}
+func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)  {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                   {}
