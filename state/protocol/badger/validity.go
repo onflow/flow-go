@@ -79,16 +79,21 @@ func validSetup(setup *epoch.Setup) error {
 func validCommit(commit *epoch.Commit, participants flow.IdentityList) error {
 
 	// make sure we have a valid DKG public key
-	if commit.DKGData.GroupPubKey == nil {
+	if commit.DKGGroupKey == nil {
 		return fmt.Errorf("missing DKG public group key")
 	}
 
 	// make sure each participant of the epoch has a DKG entry
 	for _, participant := range participants {
-		_, exists := commit.DKGData.IDToParticipant[participant.NodeID]
+		_, exists := commit.DKGParticipants[participant.NodeID]
 		if !exists {
 			return fmt.Errorf("missing DKG participant data (%x)", participant.NodeID)
 		}
+	}
+
+	// make sure that there is no extra data
+	if len(participants) != len(commit.DKGParticipants) {
+		return fmt.Errorf("DKG data contains extra entries")
 	}
 
 	return nil

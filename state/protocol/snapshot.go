@@ -56,6 +56,9 @@ type Snapshot interface {
 
 	// Epoch will return the counter of the epoch for the given snapshot.
 	Epoch() (uint64, error)
+
+	// DKG provides access to DKG information for the selected snapshot.
+	DKG() DKG
 }
 
 // SeedFromParentSignature reads the raw random seed from a combined signature.

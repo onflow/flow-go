@@ -3,9 +3,8 @@ package cmd
 import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/dkg"
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 )
 
 func constructRootQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
@@ -35,14 +34,14 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData
 
 	sd := run.ParticipantData{}
 
-	participantLookup := make(map[flow.Identifier]*dkg.Participant)
+	participantLookup := make(map[flow.Identifier]epoch.Participant)
 
 	// the QC will be signed by everyone in internalNodes
 	for i, node := range internalNodes {
 		// assign a node to a DGKdata entry, using the canonical ordering
-		participantLookup[node.NodeID] = &dkg.Participant{
-			PublicKeyShare: dkgData.PubKeyShares[i],
-			Index:          uint(i),
+		participantLookup[node.NodeID] = epoch.Participant{
+			KeyShare: dkgData.PubKeyShares[i],
+			Index:    uint(i),
 		}
 
 		if node.NodeID == flow.ZeroID {
@@ -62,16 +61,18 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData
 	for i := len(internalNodes); i < len(allNodes); i++ {
 		// assign a node to a DGKdata entry, using the canonical ordering
 		node := allNodes[i]
-		participantLookup[node.NodeID] = &dkg.Participant{
-			PublicKeyShare: dkgData.PubKeyShares[i],
-			Index:          uint(i),
+		participantLookup[node.NodeID] = epoch.Participant{
+			KeyShare: dkgData.PubKeyShares[i],
+			Index:    uint(i),
 		}
 	}
 
-	sd.DKGState = wrapper.NewState(&dkg.PublicData{
-		GroupPubKey:     dkgData.PubGroupKey,
-		IDToParticipant: participantLookup,
-	})
+	// TODO: We probably don't want to store the whole epoch commit here, so we
+	// have to untangle this somehow.
+	sd.Commit = &epoch.Commit{
+		DKGGroupKey:     dkgData.PubGroupKey,
+		DKGParticipants: participantLookup,
+	}
 
 	return sd
 }

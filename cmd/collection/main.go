@@ -253,7 +253,7 @@ func main() {
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
 			// use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()

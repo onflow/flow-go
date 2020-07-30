@@ -276,3 +276,7 @@ func (s *Snapshot) Epoch() (uint64, error) {
 
 	return counter, nil
 }
+
+func (s *Snapshot) DKG() protocol.DKG {
+	return &DKG{snapshot: s}
+}
