@@ -135,7 +135,7 @@ transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
       let account = AuthAccount(payer: signer)
       account.addPublicKey(publicKey)
 
-	  let receiver = recipient.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
+	  let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
 		?? panic("Could not borrow receiver reference to the recipient's Vault")
 
       receiver.deposit(from: <-vault.withdraw(amount: initialTokenAmount))
