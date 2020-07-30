@@ -211,7 +211,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	final := finalizer.NewFinalizer(db, headersDB, state)
 
 	// initialize the persister
-	persist := persister.New(db)
+	persist := persister.New(db, rootHeader.ChainID)
 
 	prov := &networkmock.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)

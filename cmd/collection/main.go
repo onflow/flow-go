@@ -397,7 +397,7 @@ func main() {
 			// initialize logging notifier for hotstuff
 			notifier := createNotifier(node.Logger, clusterMetrics)
 
-			persist := persister.New(node.DB)
+			persist := persister.New(node.DB, clusterID)
 
 			finalized, pending, err := cluster.FindLatest(clusterState, colHeaders)
 			if err != nil {
