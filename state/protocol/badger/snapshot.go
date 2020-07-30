@@ -45,6 +45,10 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
 	}
 
+	// TODO: We currently don't slash any nodes. However, once we receive
+	// slashing events, we need a smart way to progressively store a growing
+	// list of stake modifications per epoch, which should be applied here.
+
 	// apply the filter to the identities
 	identities := event.Identities.Filter(selector)
 

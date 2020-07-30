@@ -470,28 +470,6 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 					return fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, setup.FinalView)
 				}
 
-				// The total length of the epoch must be longer than the auction window plus twice the grace period.
-				// This leaves at least one grace period for the actual processing of the events.
-				length := setup.FinalView - ev.FinalView
-				minimum := m.state.cfg.auctionWindow + 2*m.state.cfg.gracePeriod
-				if length < minimum {
-					return fmt.Errorf("next epoch has insufficient length (%d < %d)", length, minimum)
-				}
-
-				// The setup event can not happen until after the auction window.
-				auction := start + m.state.cfg.auctionWindow
-				if candidate.Header.View <= auction {
-					return fmt.Errorf("next epoch setup inside auction window (%d <= %d)", candidate.Header.View, auction)
-				}
-
-				// The setup event can not happen after the current epoch end minus the grace period.
-				// NOTE: This is a sanity check; at this point, the chain should have halted anyway, as
-				// we can't make progress unless the next epoch is set up on time.
-				grace := setup.FinalView - m.state.cfg.gracePeriod
-				if candidate.Header.View >= grace {
-					return fmt.Errorf("next epoch setup inside grace peried (%d >= %d)", candidate.Header.View, grace)
-				}
-
 				// Finally, the epoch setup event must contain all necessary information.
 				err = validSetup(ev)
 				if err != nil {
@@ -516,22 +494,6 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				// The commit event should have the counter increased by one.
 				if ev.Counter != counter+1 {
 					return fmt.Errorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
-				}
-
-				// The commit event can not happen until after the auction window.
-				// NOTE: This is a sanity check; as the commit event can't happen before the setup event,
-				// the auction period must have passed anyway.
-				auction := start + m.state.cfg.auctionWindow
-				if candidate.Header.View <= auction {
-					return fmt.Errorf("next epoch commit inside auction window (%d <= %d)", candidate.Header.View, auction)
-				}
-
-				// The commit event can not happen after the current epoch end minus the grace period.
-				// NOTE: This is a sanity check; at this point, the chain should have halted anyway, as
-				// we can't make progress unless the next epoch is set up on time.
-				grace := setup.FinalView - m.state.cfg.gracePeriod
-				if candidate.Header.View >= grace {
-					return fmt.Errorf("next epoch commit inside grace peried (%d >= %d)", candidate.Header.View, grace)
 				}
 
 				// Finally, the commit should commit all the necessary information.
