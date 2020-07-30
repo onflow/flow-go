@@ -47,9 +47,9 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, ledger state.Ledger) error {
 	ctx = NewContextFromParent(
 		ctx,
-		WithTransactionProcessors([]TransactionProcessor{
+		WithTransactionProcessors(
 			NewTransactionInvocator(),
-		}),
+		),
 	)
 
 	err := vm.Run(ctx, tx, ledger)
