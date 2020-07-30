@@ -146,12 +146,3 @@ int verifyshare(const bn_t x, const ep2_t y) {
     g2_mul_gen(res, (bn_st*)x);
     return (ep2_cmp(res, (ep2_st*)y) == RLC_EQ);
 }
-
-// computes the sum of the G2 array elements y and writes the sum in jointy
-void ep2_sum_vector(ep2_t jointy, ep2_st* y, int len){
-    ep2_set_infty(jointy);
-    for (int i=0; i<len; i++){
-        ep2_add_projc(jointy, jointy, &y[i]);
-    }
-    ep2_norm(jointy, jointy);
-}

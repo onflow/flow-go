@@ -15,6 +15,5 @@ void G2_polynomialImages(ep2_t y, const int len_y, const ep2_st* A, const int le
 void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len);
 int  ep2_vector_read_bin(ep2_st* A, const byte* src, const int len);
 int  verifyshare(const bn_t x, const ep2_t y);
-void ep2_sum_vector(ep2_t jointx, ep2_st* x, int len);
 
 #endif
