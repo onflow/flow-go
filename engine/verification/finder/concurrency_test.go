@@ -204,9 +204,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	}
 
 	// waits for all receipts to be sent to verification node
-	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second,
+		"finder engine process")
 	// waits for all distinct execution results sent to matching engine of verification node
-	unittest.RequireReturnsBefore(t, matchEngWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, matchEngWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second,
+		"match engine process")
 
 	// sleeps to make sure that the cleaning of processed execution receipts
 	// happens. This sleep is necessary since we are evaluating cleanup right after the sleep.

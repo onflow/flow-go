@@ -52,25 +52,31 @@ func New(
 	protoState protocol.State,
 	vm VirtualMachine,
 	vmCtx fvm.Context,
-) *Manager {
+) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
-	e := Manager{
-		log:        log,
-		me:         me,
-		protoState: protoState,
-		vm:         vm,
-		vmCtx:      vmCtx,
-		blockComputer: computer.NewBlockComputer(
-			vm,
-			vmCtx,
-			metrics,
-			tracer,
-			log.With().Str("component", "block_computer").Logger(),
-		),
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		vmCtx,
+		metrics,
+		tracer,
+		log.With().Str("component", "block_computer").Logger(),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
-	return &e
+	e := Manager{
+		log:           log,
+		me:            me,
+		protoState:    protoState,
+		vm:            vm,
+		vmCtx:         vmCtx,
+		blockComputer: blockComputer,
+	}
+
+	return &e, nil
 }
 
 func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {

@@ -82,13 +82,18 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	// complete ER counter example
 	completeER := utils.CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain())
-	chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(0))
-	assert.True(t, ok)
 
 	// assigner and assignment
 	assigner := &mock.ChunkAssigner{}
 	assignment := chmodel.NewAssignment()
-	assignment.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+		assignees := make([]flow.Identifier, 0)
+		if verification.IsAssigned(chunk.Index, len(completeER.Receipt.ExecutionResult.Chunks)) {
+			assignees = append(assignees, verIdentity.NodeID)
+		}
+		assignment.Add(chunk, assignees)
+	}
+
 	assigner.On("Assign",
 		testifymock.Anything,
 		completeER.Receipt.ExecutionResult.Chunks,
@@ -147,7 +152,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
-	unittest.RequireReturnsBefore(t, conWG.Wait, 5*time.Second)
+	unittest.RequireReturnsBefore(t, conWG.Wait, 5*time.Second, "consensus nodes process")
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
