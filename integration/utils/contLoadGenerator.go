@@ -122,8 +122,8 @@ func (lg *ContLoadGenerator) Stop() {
 }
 
 const createAccountsTransactionTemplate = `
-import FungibleToken from %s
-import FlowToken from %s
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
 
 transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
   prepare(signer: AuthAccount) {
