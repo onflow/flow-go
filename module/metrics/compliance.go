@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -8,12 +10,14 @@ import (
 )
 
 type ComplianceCollector struct {
-	finalizedHeight  prometheus.Gauge
-	sealedHeight     prometheus.Gauge
-	finalizedBlocks  prometheus.Counter
-	sealedBlocks     prometheus.Counter
-	finalizedPayload *prometheus.CounterVec
-	sealedPayload    *prometheus.CounterVec
+	finalizedHeight          prometheus.Gauge
+	sealedHeight             prometheus.Gauge
+	finalizedBlocks          prometheus.Counter
+	sealedBlocks             prometheus.Counter
+	finalizedPayload         *prometheus.CounterVec
+	sealedPayload            *prometheus.CounterVec
+	lastBlockFinalizedAt     time.Time
+	finalizedBlocksPerSecond prometheus.Summary
 }
 
 func NewComplianceCollector() *ComplianceCollector {
@@ -61,6 +65,23 @@ func NewComplianceCollector() *ComplianceCollector {
 			Subsystem: subsystemCompliance,
 			Help:      "the number of resources in sealed blocks",
 		}, []string{LabelResource}),
+
+		finalizedBlocksPerSecond: promauto.NewSummary(prometheus.SummaryOpts{
+			Name:      "finalized_blocks_per_second",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the number of finalized blocks per second/the finalized block rate",
+			Objectives: map[float64]float64{
+				0.01: 0.001,
+				0.1:  0.01,
+				0.5:  0.05,
+				0.9:  0.01,
+				0.99: 0.001,
+			},
+			MaxAge:     10 * time.Minute,
+			AgeBuckets: 5,
+			BufCap:     500,
+		}),
 	}
 
 	return cc
@@ -73,6 +94,12 @@ func (cc *ComplianceCollector) FinalizedHeight(height uint64) {
 
 // BlockFinalized reports metrics about finalized blocks.
 func (cc *ComplianceCollector) BlockFinalized(block *flow.Block) {
+	now := time.Now()
+	if !cc.lastBlockFinalizedAt.IsZero() {
+		cc.finalizedBlocksPerSecond.Observe(1 / now.Sub(cc.lastBlockFinalizedAt).Seconds())
+	}
+	cc.lastBlockFinalizedAt = now
+
 	cc.finalizedBlocks.Inc()
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceIdentity}).Add(float64(len(block.Payload.Identities)))
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))

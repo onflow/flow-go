@@ -97,11 +97,16 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap finalize --root-chain main --root-height 0
---root-parent 0000000000000000000000000000000000000000000000000000000000000000
---root-commitment 4b8d01975cf0cd23e046b1fae36518e542f92a6e35bedd627c43da30f4ae761a \
---config ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos \
---partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json -o ./bootstrap/root-infos
+go run -tags relic ./cmd/bootstrap finalize
+ --fast-kg \
+  --root-chain main \
+  --root-height 0 \
+  --root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
+  --root-commit 4b8d01975cf0cd23e046b1fae36518e542f92a6e35bedd627c43da30f4ae761a \
+  --config ./cmd/bootstrap/example_files/node-config.json \
+  --partner-dir ./cmd/bootstrap/example_files/partner-node-infos \
+  --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json \
+  -o ./bootstrap/root-infos
 ```
 
 #### Generated output files

@@ -273,6 +273,19 @@ type ExecutionMetrics interface {
 	ExecutionCollectionRequestRetried()
 }
 
+type TransactionMetrics interface {
+	// TransactionReceived starts tracking of transaction execution/finalization/sealing
+	TransactionReceived(txID flow.Identifier, when time.Time)
+
+	// TransactionFinalized reports the time spent between the transaction being received and finalized. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionFinalized(txID flow.Identifier, when time.Time)
+
+	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionExecuted(txID flow.Identifier, when time.Time)
+}
+
 type PingMetrics interface {
 	NodeReachable(nodeID flow.Identifier, reachable bool)
 }

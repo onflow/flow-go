@@ -357,6 +357,9 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--ingress-addr=collection_1:%d", RPCPort),
 		fmt.Sprintf("--script-addr=execution_1:%d", RPCPort),
+		"--log-tx-time-to-finalized",
+		"--log-tx-time-to-executed",
+		"--log-tx-time-to-finalized-executed",
 	}...)
 
 	service.Ports = []string{

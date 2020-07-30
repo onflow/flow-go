@@ -17,14 +17,17 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	accessmock "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
+	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -37,6 +40,7 @@ type Suite struct {
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
 	log        zerolog.Logger
+	net        *mockmodule.Network
 	request    *mockmodule.Requester
 	collClient *accessmock.AccessAPIClient
 	execClient *accessmock.ExecutionAPIClient
@@ -52,6 +56,7 @@ func TestAccess(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
+	suite.net = new(mockmodule.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -77,7 +82,9 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions, suite.chainID)
+		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections,
+			transactions, suite.chainID, metrics)
+
 		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.snapshot, nil)
 		suite.snapshot.On("Head").Return(&referenceBlock, nil).Once()
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
@@ -109,7 +116,8 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities,
+		_ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
 		// test block2 get by height
@@ -123,7 +131,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil, suite.chainID)
+		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil,
+			suite.chainID, metrics.NewNoopCollector())
 
 		assertHeaderResp := func(resp *access.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
@@ -200,6 +209,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
+		conduit := new(networkmock.Conduit)
+		suite.net.On("Register", uint8(engine.ReceiveReceipts), mock.Anything).Return(conduit, nil).
+			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
@@ -214,15 +226,24 @@ func (suite *Suite) TestGetSealedTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
+		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		blocksToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
 
-		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, suite.chainID)
+		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
+			suite.chainID, metrics)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.state, suite.me, suite.request, blocks, headers, collections, transactions, rpcEng)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
+			transactions, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
-		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, collections, transactions, suite.chainID)
+		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers,
+			collections, transactions, suite.chainID, metrics)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
@@ -280,7 +301,8 @@ func (suite *Suite) TestExecuteScript() {
 
 		ctx := context.Background()
 
-		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, nil, nil, suite.chainID)
+		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, nil,
+			nil, suite.chainID, metrics.NewNoopCollector())
 
 		script := []byte("dummy script")
 
