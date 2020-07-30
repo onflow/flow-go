@@ -207,6 +207,7 @@ func main() {
 				node.State,
 				node.Me,
 				pingEnabled,
+				node.Middleware,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create ping engine: %w", err)

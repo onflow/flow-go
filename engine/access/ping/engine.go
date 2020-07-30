@@ -21,7 +21,7 @@ type Engine struct {
 
 	pingEnabled  bool
 	pingInterval time.Duration
-	middleware   libp2p.Middleware
+	middleware   *libp2p.Middleware
 }
 
 func New(
@@ -29,7 +29,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	pingEnabled bool,
-	mw libp2p.Middleware,
+	mw *libp2p.Middleware,
 ) (*Engine, error) {
 	eng := &Engine{
 		unit:         engine.NewUnit(),
