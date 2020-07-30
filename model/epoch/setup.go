@@ -5,9 +5,9 @@ import (
 )
 
 type Setup struct {
-	Counter     uint64
-	FinalView   uint64
-	Identities  flow.IdentityList
-	Assignments flow.AssignmentList
-	Seed        []byte
+	Counter      uint64
+	FinalView    uint64
+	Participants flow.IdentityList
+	Assignments  flow.AssignmentList
+	Seed         []byte
 }

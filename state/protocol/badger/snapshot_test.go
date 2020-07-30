@@ -70,7 +70,7 @@ func TestIdentities(t *testing.T) {
 		counter := uint64(1337)
 		blockID := unittest.IdentifierFixture()
 		identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleCollection))
-		event := &epoch.Setup{Identities: identities}
+		event := &epoch.Setup{Participants: identities}
 
 		err := db.Update(operation.InsertRootHeight(0))
 		require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestClusters(t *testing.T) {
 		counter := uint64(1337)
 		blockID := unittest.IdentifierFixture()
 		identities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleCollection))
-		event := &epoch.Setup{Identities: identities}
+		event := &epoch.Setup{Participants: identities}
 
 		err := db.Update(operation.InsertRootHeight(0))
 		require.NoError(t, err)

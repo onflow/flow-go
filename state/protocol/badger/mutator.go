@@ -73,7 +73,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("invalid epoch setup event: %w", err)
 		}
-		err = validCommit(setup, commit)
+		err = validCommit(commit, setup.Participants)
 		if err != nil {
 			return fmt.Errorf("invalid epoch commit event: %w", err)
 		}
@@ -493,7 +493,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				if err != nil {
 					return fmt.Errorf("could not retrieve next epoch setup: %w", err)
 				}
-				err = validCommit(&setup, ev)
+				err = validCommit(ev, setup.Participants)
 				if err != nil {
 					return fmt.Errorf("invalid epoch commit: %w", err)
 				}

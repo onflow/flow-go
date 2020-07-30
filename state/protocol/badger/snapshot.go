@@ -51,9 +51,9 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	// list of stake modifications per epoch, which should be applied here.
 
 	// apply the filter to the identities
-	identities := event.Identities.Filter(selector)
+	identities := event.Participants.Filter(selector)
 
-	// apply a deterministic sort to the identities
+	// apply a deterministic sort to the participants
 	sort.Slice(identities, func(i int, j int) bool {
 		return order.ByNodeIDAsc(identities[i], identities[j])
 	})
@@ -121,7 +121,7 @@ func (s *Snapshot) Clusters() (flow.ClusterList, error) {
 	// create the list of clusters
 	clusters, err := flow.NewClusterList(
 		setup.Assignments,
-		setup.Identities.Filter(filter.HasRole(flow.RoleCollection)),
+		setup.Participants.Filter(filter.HasRole(flow.RoleCollection)),
 	)
 
 	return clusters, nil

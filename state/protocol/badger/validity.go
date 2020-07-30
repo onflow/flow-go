@@ -14,35 +14,35 @@ func validSetup(setup *epoch.Setup) error {
 
 	// there should be no duplicate node IDs
 	identLookup := make(map[flow.Identifier]struct{})
-	for _, identity := range setup.Identities {
-		_, ok := identLookup[identity.NodeID]
+	for _, participant := range setup.Participants {
+		_, ok := identLookup[participant.NodeID]
 		if ok {
-			return fmt.Errorf("duplicate node identifier (%x)", identity.NodeID)
+			return fmt.Errorf("duplicate node identifier (%x)", participant.NodeID)
 		}
-		identLookup[identity.NodeID] = struct{}{}
+		identLookup[participant.NodeID] = struct{}{}
 	}
 
 	// there should be no duplicate node addresses
 	addrLookup := make(map[string]struct{})
-	for _, identity := range setup.Identities {
-		_, ok := addrLookup[identity.Address]
+	for _, participant := range setup.Participants {
+		_, ok := addrLookup[participant.Address]
 		if ok {
-			return fmt.Errorf("duplicate node address (%x)", identity.Address)
+			return fmt.Errorf("duplicate node address (%x)", participant.Address)
 		}
-		addrLookup[identity.Address] = struct{}{}
+		addrLookup[participant.Address] = struct{}{}
 	}
 
 	// there should be no nodes with zero stake
-	for _, identity := range setup.Identities {
-		if identity.Stake == 0 {
-			return fmt.Errorf("node with zero stake (%x)", identity.NodeID)
+	for _, participant := range setup.Participants {
+		if participant.Stake == 0 {
+			return fmt.Errorf("node with zero stake (%x)", participant.NodeID)
 		}
 	}
 
 	// we need at least one node of each role
 	roles := make(map[flow.Role]uint)
-	for _, identity := range setup.Identities {
-		roles[identity.Role]++
+	for _, participant := range setup.Participants {
+		roles[participant.Role]++
 	}
 	if roles[flow.RoleConsensus] < 1 {
 		return fmt.Errorf("need at least one consensus node")
@@ -63,7 +63,7 @@ func validSetup(setup *epoch.Setup) error {
 	}
 
 	// the collection cluster assignments need to be valid
-	_, err := flow.NewClusterList(setup.Assignments, setup.Identities.Filter(filter.HasRole(flow.RoleCollection)))
+	_, err := flow.NewClusterList(setup.Assignments, setup.Participants.Filter(filter.HasRole(flow.RoleCollection)))
 	if err != nil {
 		return fmt.Errorf("invalid cluster assignments: %w", err)
 	}
@@ -76,7 +76,20 @@ func validSetup(setup *epoch.Setup) error {
 	return nil
 }
 
-func validCommit(setup *epoch.Setup, commit *epoch.Commit) error {
+func validCommit(commit *epoch.Commit, participants flow.IdentityList) error {
+
+	// make sure we have a valid DKG public key
+	if commit.DKGData.GroupPubKey == nil {
+		return fmt.Errorf("missing DKG public group key")
+	}
+
+	// make sure each participant of the epoch has a DKG entry
+	for _, participant := range participants {
+		_, exists := commit.DKGData.IDToParticipant[participant.NodeID]
+		if !exists {
+			return fmt.Errorf("missing DKG participant data (%x)", participant.NodeID)
+		}
+	}
 
 	return nil
 }
