@@ -42,7 +42,7 @@ type Engine struct {
 	headers        storage.Headers
 	payloads       storage.ClusterPayloads
 	pending        module.PendingClusterBlockBuffer // pending block cache
-	participants   flow.IdentityList                // consensus participants in our cluster
+	cluster        flow.IdentityList                // consensus participants in our cluster
 
 	sync     module.BlockRequester
 	hotstuff module.HotStuff
@@ -66,9 +66,14 @@ func New(
 	sync module.BlockRequester,
 ) (*Engine, error) {
 
-	participants, _, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
+	clusters, err := protoState.Final().Clusters()
 	if err != nil {
-		return nil, fmt.Errorf("could not get cluster participants: %w", err)
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	cluster, _, found := clusters.ByNodeID(me.NodeID())
+	if !found {
+		return nil, fmt.Errorf("could not find cluster for self")
 	}
 
 	e := &Engine{
@@ -85,7 +90,7 @@ func New(
 		headers:        headers,
 		payloads:       payloads,
 		pending:        cache,
-		participants:   participants,
+		cluster:        cluster,
 		sync:           sync,
 		hotstuff:       nil, // use WithHotStuff
 	}
@@ -232,7 +237,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := e.protoState.Final().Identities(filter.And(
-		filter.In(e.participants),
+		filter.In(e.cluster),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {

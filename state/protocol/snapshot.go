@@ -51,12 +51,19 @@ type Snapshot interface {
 	// In order to deterministically derive task specific seeds, indices must
 	// be specified.
 	// Refer to module/indices/rand.go for different indices.
+	// NOTE: not to be confused with the epoch seed.
 	Seed(indices ...uint32) ([]byte, error)
+
+	// Epoch will return the counter of the epoch for the given snapshot.
+	Epoch() (uint64, error)
+
+	// DKG provides access to DKG information for the selected snapshot.
+	DKG() DKG
 }
 
 // SeedFromParentSignature reads the raw random seed from a combined signature.
-// the combinedSig must be from a QuorumCertificate.
-// the indices is for generating task specific random seed
+// the combinedSig must be from a QuorumCertificate. The indices can be used to
+// generate task-specific seeds from the same signature.
 func SeedFromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
 	if len(indices)*4 > hash.KmacMaxParamsLen {
 		return nil, fmt.Errorf("unsupported number of indices")

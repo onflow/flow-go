@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/dkg"
 )
 
 // CombinedSigner is a signer capable of creating two signatures for each signing
@@ -20,7 +19,6 @@ import (
 // be used to reconstruct a threshold signature.
 type CombinedSigner struct {
 	*CombinedVerifier
-	dkg      dkg.State
 	staking  module.AggregatingSigner
 	beacon   module.ThresholdSigner
 	merger   module.Merger
@@ -33,10 +31,9 @@ type CombinedSigner struct {
 // - the staking signer is used to create aggregatable signatures for the first signature part;
 // - the threshold signer is used to create threshold signture shres for the second signature part;
 // - the merger is used to join and split the two signature parts on our models;
-func NewCombinedSigner(committee hotstuff.Committee, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, signerID flow.Identifier) *CombinedSigner {
+func NewCombinedSigner(committee hotstuff.Committee, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, signerID flow.Identifier) *CombinedSigner {
 	sc := &CombinedSigner{
-		CombinedVerifier: NewCombinedVerifier(committee, dkg, staking, beacon, merger),
-		dkg:              dkg,
+		CombinedVerifier: NewCombinedVerifier(committee, staking, beacon, merger),
 		staking:          staking,
 		beacon:           beacon,
 		merger:           merger,
@@ -99,7 +96,8 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 	}
 
 	// get the DKG group size
-	groupSize, err := c.dkg.GroupSize()
+	blockID := votes[0].BlockID
+	groupSize, err := c.committee.DKGSize(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get DKG group size: %w", err)
 	}
@@ -132,7 +130,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 		beaconShare := splitSigs[1]
 
 		// get the dkg index from the dkg state
-		dkgIndex, err := c.dkg.ParticipantIndex(vote.SignerID)
+		dkgIndex, err := c.committee.DKGIndex(vote.BlockID, vote.SignerID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get dkg index (signer: %x): %w", vote.SignerID, err)
 		}

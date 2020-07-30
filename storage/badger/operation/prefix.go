@@ -40,6 +40,7 @@ const (
 	codeBlockToSeal         = 41 // index mapping a block its last payload seal
 	codeCollectionReference = 42 // index reference block ID for collection
 	codeBlockValidity       = 43 // validity of block per HotStuff
+	codeEpochHeight         = 44 // index mapping epoch to latest finalized block
 
 	// codes for indexing multiple identifiers by identifier
 	// 51 was used for identity indexes before epochs

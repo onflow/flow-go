@@ -10,11 +10,8 @@ import (
 // obtain snapshots of the state at any point of the protocol state history.
 type ReadOnlyState interface {
 
-	// Root returns the root header of the current consensus state.
-	Root() (*flow.Header, error)
-
-	// ChainID returns the chain ID for the current consensus state.
-	ChainID() (flow.ChainID, error)
+	// Params gives access to a number of stable parameters of the protocol state.
+	Params() Params
 
 	// Final returns the snapshot of the persistent protocol state at the latest
 	// finalized block, and the returned snapshot is therefore immutable over
@@ -26,12 +23,17 @@ type ReadOnlyState interface {
 	// over time.
 	Sealed() Snapshot
 
+	// AtEpoch returns a snapshot of the persistent protocol state at the given
+	// epoch counter. It will use the latest finalized state from the epoch in
+	// order to apply changes that happened during the epoch.
+	AtEpoch(epoch uint64) Snapshot
+
 	// AtHeight returns the snapshot of the persistent protocol state at the
 	// given block number. It is only available for finalized blocks and the
 	// returned snapshot is therefore immutable over time.
 	AtHeight(height uint64) Snapshot
 
-	// AtBlockID will return the snapshot of the persistent protocol state at the
+	// AtBlockID returns the snapshot of the persistent protocol state at the
 	// given block ID. It is available for any block that was introduced into
 	// the protocol state, and can thus represent an ambiguous state that was or
 	// will never be finalized.

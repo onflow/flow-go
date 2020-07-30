@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -43,6 +44,18 @@ type Committee interface {
 	//       Ideally, we would move the method for checking whether an Identifier refers to this node to the signer.
 	//       This would require some refactoring of EventHandler (postponed to later)
 	Self() flow.Identifier
+
+	// DKGSize returns the group size of DKG at the given block ID.
+	DKGSize(blockID flow.Identifier) (uint, error)
+
+	// DKGGroupKey returns the DKG group public key.
+	DKGGroupKey(blockID flow.Identifier) (crypto.PublicKey, error)
+
+	// DKGIndex returns the DKG index of the node with the given ID at the given block ID.
+	DKGIndex(blockID flow.Identifier, nodeID flow.Identifier) (uint, error)
+
+	// DKGKeyShare returns the DKG public key share of the node with the given ID at the given block.
+	DKGKeyShare(blockID flow.Identifier, nodeID flow.Identifier) (crypto.PublicKey, error)
 }
 
 // ComputeStakeThresholdForBuildingQC returns the stake that is minimally required for building a QC

@@ -293,7 +293,6 @@ func main() {
 			var signer hotstuff.Signer
 			signer = verification.NewCombinedSigner(
 				committee,
-				node.DKGState,
 				staking,
 				beacon,
 				merger,

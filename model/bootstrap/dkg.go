@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -53,21 +52,4 @@ func (dd *DKGData) Public(nodes []NodeInfo) EncodableDKGDataPub {
 	}
 
 	return pub
-}
-
-// ForHotStuff converts DKG data for use in HotStuff.
-func (pub *EncodableDKGDataPub) ForHotStuff() *dkg.PublicData {
-
-	participantLookup := make(map[flow.Identifier]*dkg.Participant)
-	for _, participant := range pub.Participants {
-		participantLookup[participant.NodeID] = &dkg.Participant{
-			PublicKeyShare: participant.RandomBeaconPubKey,
-			Index:          uint(participant.GroupIndex),
-		}
-	}
-
-	return &dkg.PublicData{
-		GroupPubKey:     pub.PubGroupKey,
-		IDToParticipant: participantLookup,
-	}
 }

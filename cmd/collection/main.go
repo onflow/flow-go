@@ -137,11 +137,15 @@ func main() {
 			return err
 		}).
 		Module("collection cluster ID", func(node *cmd.FlowNodeBuilder) error {
-			myCluster, _, err = protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
+			clusters, err := node.State.Final().Clusters()
 			if err != nil {
-				return fmt.Errorf("could not get my cluster: %w", err)
+				return fmt.Errorf("could not get clusters: %w", err)
 			}
-			clusterID = protocol.ChainIDForCluster(myCluster)
+			cluster, _, found := clusters.ByNodeID(node.Me.NodeID())
+			if !found {
+				return fmt.Errorf("could not find cluster for self")
+			}
+			clusterID = protocol.ChainIDForCluster(cluster)
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
@@ -249,7 +253,7 @@ func main() {
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
 			// use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()
@@ -460,9 +464,13 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 	// create a filter for consensus members for our cluster
 	// TODO: the cluster index from the latest finalized state. For now, it's identical to the one from the genesis state.
 	// we need to double check if this assumption still holds when implementing epoch switchover.
-	cluster, clusterIndex, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
+	clusters, err := node.State.Final().Clusters()
 	if err != nil {
-		return nil, fmt.Errorf("could not get cluster members for node %x: %w", node.Me.NodeID(), err)
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+	cluster, clusterIndex, found := clusters.ByNodeID(node.Me.NodeID())
+	if !found {
+		return nil, fmt.Errorf("could not get cluster for self: %w", err)
 	}
 	selector := filter.And(filter.In(cluster), filter.HasStake(true))
 

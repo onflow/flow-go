@@ -20,7 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -30,7 +29,6 @@ import (
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
-	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
 	storerr "github.com/dapperlabs/flow-go/storage"
@@ -115,7 +113,6 @@ type FlowNodeBuilder struct {
 	DB                *badger.DB
 	Storage           Storage
 	State             *protocol.State
-	DKGState          *wrapper.State
 	Network           *libp2p.Network
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
@@ -399,13 +396,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		err = state.Mutate().Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 
-		// load the DKG public data from bootstrap files
-		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load public DKG data")
-
-		// bootstrap the DKG state with the loaded data
-		fnb.DKGState = wrapper.NewState(dkgPubData)
-
 		fnb.Logger.Info().
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState).
@@ -446,20 +436,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		// load the root block seal from bootstrap files
 		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root seal")
-
-		// load the DKG public data from bootstrap files
-		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load public DKG data")
-
-		fnb.Logger.Info().
-			Hex("root_result_id", logging.Entity(fnb.RootResult)).
-			Hex("root_state_commitment", fnb.RootSeal.FinalState).
-			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
-			Uint64("root_block_height", fnb.RootBlock.Header.Height).
-			Msg("root block loaded")
-
-		// bootstrap the DKG state with the loaded data
-		fnb.DKGState = wrapper.NewState(dkgPubData)
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
@@ -752,16 +728,6 @@ func loadRootSeal(dir string) (*flow.Seal, error) {
 	var seal flow.Seal
 	err = json.Unmarshal(data, &seal)
 	return &seal, err
-}
-
-func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
-	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathDKGDataPub))
-	if err != nil {
-		return nil, err
-	}
-	dkgPubData := &bootstrap.EncodableDKGDataPub{}
-	err = json.Unmarshal(data, dkgPubData)
-	return dkgPubData.ForHotStuff(), err
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
