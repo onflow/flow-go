@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/storage"
@@ -47,17 +48,17 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 		var services []interface{}
 		for _, event := range seal.ServiceEvents {
-			service, err := flow.ServiceEvent(event)
+			service, err := epoch.ServiceEvent(event)
 			if err != nil {
 				return fmt.Errorf("could not decode service event: %w", err)
 			}
 			services = append(services, service)
 		}
-		setup, valid := services[0].(*flow.EpochSetup)
+		setup, valid := services[0].(*epoch.Setup)
 		if !valid {
 			return fmt.Errorf("first service event should be epoch setup (%T)", services[0])
 		}
-		commit, valid := services[1].(*flow.EpochCommit)
+		commit, valid := services[1].(*epoch.Commit)
 		if !valid {
 			return fmt.Errorf("second event should be epoch commit (%T)", services[1])
 		}
@@ -72,7 +73,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("invalid epoch setup event: %w", err)
 		}
-		err = validCommit(commit)
+		err = validCommit(setup, commit)
 		if err != nil {
 			return fmt.Errorf("invalid epoch commit event: %w", err)
 		}
@@ -407,20 +408,10 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch counter: %w", err)
 	}
-	var start uint64
-	err = m.state.db.View(operation.LookupEpochStart(counter, &start))
-	if err != nil {
-		return fmt.Errorf("could not retrieve epoch start: %w", err)
-	}
-	var setup flow.EpochSetup
-	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
+	var activeSetup epoch.Setup
+	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &activeSetup))
 	if err != nil {
 		return fmt.Errorf("could not retrieve current epoch setup: %w", err)
-	}
-	var commit flow.EpochCommit
-	err = m.state.db.View(operation.RetrieveEpochCommit(counter, &commit))
-	if err != nil {
-		return fmt.Errorf("could not retrieve current epoch commit: %w", err)
 	}
 
 	// Let's first establish the status quo of the current epoch. This function
@@ -445,14 +436,14 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			// network nicely, as a slice of interfaces needs additional
 			// meta information, and having two nil fields for most seals
 			// is ugly.
-			service, err := flow.ServiceEvent(event)
+			service, err := epoch.ServiceEvent(event)
 			if err != nil {
 				return fmt.Errorf("could not decode service event: %w", err)
 			}
 
 			switch ev := service.(type) {
 
-			case *flow.EpochSetup:
+			case *epoch.Setup:
 
 				// We should only have a single epoch setup event per epoch.
 				if didSetup {
@@ -466,8 +457,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 				// The final view needs to be after the current epoch final view.
 				// NOTE: This kind of operates as an overflow check for the other checks.
-				if ev.FinalView <= setup.FinalView {
-					return fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, setup.FinalView)
+				if ev.FinalView <= activeSetup.FinalView {
+					return fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
 				}
 
 				// Finally, the epoch setup event must contain all necessary information.
@@ -479,7 +470,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				// Make sure to disallow multiple commit events per payload.
 				didSetup = true
 
-			case *flow.EpochCommit:
+			case *epoch.Commit:
 
 				// We should only have a single epoch commit event per epoch.
 				if didCommit {
@@ -497,7 +488,12 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				}
 
 				// Finally, the commit should commit all the necessary information.
-				err = validCommit(ev)
+				var setup epoch.Setup
+				err = m.state.db.View(operation.RetrieveEpochSetup(ev.Counter, &setup))
+				if err != nil {
+					return fmt.Errorf("could not retrieve next epoch setup: %w", err)
+				}
+				err = validCommit(&setup, ev)
 				if err != nil {
 					return fmt.Errorf("invalid epoch commit: %w", err)
 				}
@@ -592,14 +588,14 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	var ops []func(*badger.Txn) error
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
-			service, err := flow.ServiceEvent(event)
+			service, err := epoch.ServiceEvent(event)
 			if err != nil {
 				return fmt.Errorf("could not decode service event: %w", err)
 			}
 			switch ev := service.(type) {
-			case *flow.EpochSetup:
+			case *epoch.Setup:
 				ops = append(ops, operation.InsertEpochSetup(ev.Counter, ev))
-			case *flow.EpochCommit:
+			case *epoch.Commit:
 				ops = append(ops, operation.InsertEpochCommit(ev.Counter, ev))
 			default:
 				return fmt.Errorf("invalid service event type in payload (%s)", event.Type)
@@ -619,7 +615,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch counter: %w", err)
 	}
-	var setup flow.EpochSetup
+	var setup epoch.Setup
 	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch setup: %w", err)
@@ -773,7 +769,7 @@ func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool,
 }
 
 func (m *Mutator) setupFinalized(counter uint64) (bool, error) {
-	err := m.state.db.View(operation.RetrieveEpochSetup(counter, &flow.EpochSetup{}))
+	err := m.state.db.View(operation.RetrieveEpochSetup(counter, &epoch.Setup{}))
 	if err == nil {
 		return true, nil
 	}
@@ -784,7 +780,7 @@ func (m *Mutator) setupFinalized(counter uint64) (bool, error) {
 }
 
 func (m *Mutator) commitFinalized(counter uint64) (bool, error) {
-	err := m.state.db.View(operation.RetrieveEpochCommit(counter, &flow.EpochCommit{}))
+	err := m.state.db.View(operation.RetrieveEpochCommit(counter, &epoch.Commit{}))
 	if err == nil {
 		return true, nil
 	}

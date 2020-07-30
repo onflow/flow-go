@@ -1,7 +1,7 @@
 package operation
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dgraph-io/badger/v2"
 )
 
@@ -37,18 +37,18 @@ func LookupEpochStart(counter uint64, view *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeEpochStart, counter), view)
 }
 
-func InsertEpochSetup(counter uint64, event *flow.EpochSetup) func(*badger.Txn) error {
+func InsertEpochSetup(counter uint64, event *epoch.Setup) func(*badger.Txn) error {
 	return insert(makePrefix(codeEpochSetup, counter), event)
 }
 
-func RetrieveEpochSetup(counter uint64, event *flow.EpochSetup) func(*badger.Txn) error {
+func RetrieveEpochSetup(counter uint64, event *epoch.Setup) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeEpochSetup, counter), event)
 }
 
-func InsertEpochCommit(counter uint64, event *flow.EpochCommit) func(*badger.Txn) error {
+func InsertEpochCommit(counter uint64, event *epoch.Commit) func(*badger.Txn) error {
 	return insert(makePrefix(codeEpochCommit, counter), event)
 }
 
-func RetrieveEpochCommit(counter uint64, event *flow.EpochCommit) func(*badger.Txn) error {
+func RetrieveEpochCommit(counter uint64, event *epoch.Commit) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeEpochCommit, counter), event)
 }

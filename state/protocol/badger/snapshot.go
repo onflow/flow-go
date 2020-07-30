@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
@@ -39,7 +40,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	}
 
 	// retrieve the identities for the epoch
-	var event flow.EpochSetup
+	var event epoch.Setup
 	err = s.state.db.View(operation.RetrieveEpochSetup(counter, &event))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
@@ -111,7 +112,7 @@ func (s *Snapshot) Clusters() (flow.ClusterList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch counter: %w", err)
 	}
-	var setup flow.EpochSetup
+	var setup epoch.Setup
 	err = s.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch setup: %w", err)
@@ -233,7 +234,7 @@ func (s *Snapshot) Epoch() (uint64, error) {
 	// with a header for the next epoch (it could be pending). We should never
 	// have pending headers from two epochs in the future, so it's safe to
 	// return here.
-	var setup flow.EpochSetup
+	var setup epoch.Setup
 	err = s.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve epoch setup: %w", err)
