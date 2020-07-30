@@ -1,0 +1,7 @@
+{
+  "Role": "access",
+  "Address": "access-001.benchmarknet2.nodes.onflow.org:3569",
+  "NodeID": "204b72bfb40d0dae1b4214a6247ff28ff6cecc901af1e49170f0f9e5368c6d03",
+  "NetworkPrivKey": "dLyiq0/+kaa8z9zbMNdGwCLdPhm/QWxanBF67ui6fpk=",
+  "StakingPrivKey": "KuT6wxIVFR7y2B0i9vyi83tJ9im+9VZn4ho/euY3Irw="
+}

@@ -1,0 +1,7 @@
+{
+  "Role": "verification",
+  "Address": "verification-001.benchmarknet2.nodes.onflow.org:3569",
+  "NodeID": "4a6f7264616e20536368616c6d0052411011beda9ba2dfc98631317b4b81cac3",
+  "NetworkPrivKey": "fKg+v/PBYtNSpfwFL5N7C+R6lqNtGi322t8RRm9gfXs=",
+  "StakingPrivKey": "FE+hHAqaa9MYqglAF8G62/ts8cizQjQlE7e6FOrnmPg="
+}
