@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	initialRuntime "github.com/onflow/cadence-initial/runtime"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
@@ -85,9 +86,16 @@ func (i *TransactionInvocator) Process(
 	env := newEnvironment(ctx, ledger)
 	env.setTransaction(vm, proc.Transaction)
 
-	location := runtime.TransactionLocation(proc.ID[:])
+	var err error
+	if vm.InitialRuntime != nil {
+		location := initialRuntime.TransactionLocation(proc.ID[:])
+		err = vm.InitialRuntime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	} else if vm.Runtime != nil {
+		env2 := &hostEnvForCurrentCadence{env}
+		location := runtime.TransactionLocation(proc.ID[:])
 
-	err := vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+		err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env2, location)
+	}
 	if err != nil {
 		return err
 	}

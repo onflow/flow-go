@@ -75,7 +75,9 @@ func (i ScriptInvocator) Process(
 
 	location := runtime.ScriptLocation(proc.ID[:])
 
-	value, err := vm.Runtime.ExecuteScript(proc.Script, proc.Arguments, env, location)
+	env2 := &hostEnvForCurrentCadence{env}
+
+	value, err := vm.Runtime.ExecuteScript(proc.Script, proc.Arguments, env2, location)
 	if err != nil {
 		return err
 	}

@@ -29,6 +29,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.0
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/onflow/cadence v0.6.0
+	github.com/onflow/cadence-initial v0.0.0
 	github.com/onflow/flow-go-sdk v0.8.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/opentracing/opentracing-go v1.1.0
@@ -62,3 +63,5 @@ replace github.com/dapperlabs/flow-go/crypto => ./crypto
 replace github.com/dapperlabs/flow-go/protobuf => ./protobuf
 
 replace github.com/dapperlabs/flow-go/integration => ./integration
+
+replace github.com/onflow/cadence-initial => ./cadence/initial

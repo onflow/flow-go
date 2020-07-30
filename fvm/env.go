@@ -15,10 +15,14 @@ import (
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
+	initialCadence "github.com/onflow/cadence-initial"
+	initialJsoncdc "github.com/onflow/cadence-initial/encoding/json"
+	initialRuntime "github.com/onflow/cadence-initial/runtime"
+	initialAst "github.com/onflow/cadence-initial/runtime/ast"
 )
 
-var _ runtime.Interface = &hostEnv{}
-var _ runtime.HighLevelStorage = &hostEnv{}
+var _ runtime.Interface = &hostEnvForCurrentCadence{}
+var _ runtime.HighLevelStorage = &hostEnvForCurrentCadence{}
 
 type hostEnv struct {
 	ctx           Context
@@ -33,6 +37,115 @@ type hostEnv struct {
 
 	transactionEnv *transactionEnv
 	rng            *rand.Rand
+}
+
+type hostEnvForCurrentCadence struct {
+	*hostEnv
+}
+
+func (e *hostEnvForCurrentCadence) GetValue(owner, key []byte) ([]byte, error) {
+	return e.hostEnv.GetValue(owner, nil, key)
+}
+
+func (e *hostEnvForCurrentCadence) SetValue(owner, key, value []byte) error {
+	return e.hostEnv.SetValue(owner, nil, key, value)
+}
+
+func (e *hostEnvForCurrentCadence) ValueExists(owner, key []byte) (exists bool, err error) {
+	return e.hostEnv.ValueExists(owner, nil, key)
+}
+
+func (e *hostEnvForCurrentCadence) AddAccountKey(address runtime.Address, publicKey []byte) error {
+	if e.transactionEnv == nil {
+		panic("AddAccountKey is not supported by this environment")
+	}
+
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.transactionEnv.AddAccountKey(address, publicKey)
+}
+
+func (e *hostEnvForCurrentCadence) CacheProgram(location ast.Location, program *ast.Program) error {
+	if e.ctx.ASTCache == nil {
+		return nil
+	}
+
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.ctx.ASTCache.SetProgram(location, program)
+}
+
+func (e *hostEnvForCurrentCadence) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+	if e.transactionEnv == nil {
+		panic("CreateAccount is not supported by this environment")
+	}
+
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.transactionEnv.CreateAccount(payer)
+}
+
+func (e *hostEnvForCurrentCadence) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
+	return jsoncdc.Decode(b)
+}
+
+func (e *hostEnvForCurrentCadence) EmitEvent(event cadence.Event) {
+	e.events = append(e.events, event)
+}
+
+func (e *hostEnvForCurrentCadence) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
+	atHeight, t, b, err := e.hostEnv.GetBlockAtHeight(height)
+
+	return runtime.BlockHash(atHeight), t, b, err
+}
+
+func (e *hostEnvForCurrentCadence) GetCachedProgram(location ast.Location) (*ast.Program, error) {
+	return nil, nil
+}
+
+func (e *hostEnvForCurrentCadence) GetSigningAccounts() []runtime.Address {
+	if e.transactionEnv == nil {
+		panic("GetSigningAccounts is not supported by this environment")
+	}
+
+	return e.transactionEnv.GetSigningAccounts()
+}
+
+func (e *hostEnvForCurrentCadence) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+	if e.transactionEnv == nil {
+		panic("RemoveAccountKey is not supported by this environment")
+	}
+
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.transactionEnv.RemoveAccountKey(address, index)
+}
+
+func (e *hostEnvForCurrentCadence) ResolveImport(location runtime.Location) ([]byte, error) {
+	addressLocation, ok := location.(runtime.AddressLocation)
+	if !ok {
+		return nil, nil
+	}
+
+	address := flow.BytesToAddress(addressLocation)
+
+	code, err := e.accounts.GetCode(address)
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
+	}
+
+	if code == nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("no code deployed at address %s", address)
+	}
+
+	return code, nil
+}
+
+func (e *hostEnvForCurrentCadence) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
+	if e.transactionEnv == nil {
+		panic("UpdateAccountCode is not supported by this environment")
+	}
+
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.transactionEnv.UpdateAccountCode(address, code)
 }
 
 func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
@@ -86,21 +199,21 @@ func (e *hostEnv) getLogs() []string {
 	return e.logs
 }
 
-func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
+func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
 
 	v, _ := e.ledger.Get(
 		string(owner),
-		"", // TODO: Remove empty controller key
+		string(controller), // TODO: Remove empty controller key
 		string(key),
 	)
 	return v, nil
 }
 
-func (e *hostEnv) SetValue(owner, key, value []byte) error {
+func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
 
 	e.ledger.Set(
 		string(owner),
-		"", // TODO: Remove empty controller key
+		string(controller), // TODO: Remove empty controller key
 		string(key),
 		value,
 	)
@@ -108,8 +221,8 @@ func (e *hostEnv) SetValue(owner, key, value []byte) error {
 	return nil
 }
 
-func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
-	v, err := e.GetValue(owner, key)
+func (e *hostEnv) ValueExists(owner, controller, key []byte) (exists bool, err error) {
+	v, err := e.GetValue(owner, controller, key)
 	if err != nil {
 		return false, err
 	}
@@ -117,8 +230,8 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	return len(v) > 0, nil
 }
 
-func (e *hostEnv) ResolveImport(location runtime.Location) ([]byte, error) {
-	addressLocation, ok := location.(runtime.AddressLocation)
+func (e *hostEnv) ResolveImport(location initialRuntime.Location) ([]byte, error) {
+	addressLocation, ok := location.(initialRuntime.AddressLocation)
 	if !ok {
 		return nil, nil
 	}
@@ -139,40 +252,33 @@ func (e *hostEnv) ResolveImport(location runtime.Location) ([]byte, error) {
 	return code, nil
 }
 
-func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) {
-	if e.ctx.ASTCache == nil {
-		return nil, nil
-	}
-
-	program, err := e.ctx.ASTCache.GetProgram(location)
-	if program != nil {
-		// Program was found within cache, do an explicit ledger register touch
-		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(runtime.AddressLocation); ok {
-			address := flow.BytesToAddress(addressLocation)
-			e.accounts.TouchCode(address)
-		}
-	}
-
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return program, err
+func (e *hostEnv) GetCachedProgram(location initialAst.Location) (*initialAst.Program, error) {
+	return nil, nil
 }
 
-func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) error {
-	if e.ctx.ASTCache == nil {
-		return nil
-	}
-
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.ctx.ASTCache.SetProgram(location, program)
+func (e *hostEnv) CacheProgram(location initialAst.Location, program *initialAst.Program) error {
+	return nil
 }
 
 func (e *hostEnv) Log(message string) {
 	e.logs = append(e.logs, message)
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) {
-	e.events = append(e.events, event)
+func (e *hostEnv) EmitEvent(event initialCadence.Event) {
+
+	// we dont care about events here
+
+	//e := cadence.Event{
+	//	EventType: cadence.EventType{
+	//		TypeID:      "",
+	//		Identifier:  "",
+	//		Fields:      nil,
+	//		Initializer: nil,
+	//	},
+	//	Fields: nil,
+	//}
+	//
+	//e.events = append(e.events, n)
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
@@ -193,8 +299,8 @@ func (e *hostEnv) GetComputationLimit() uint64 {
 	return e.ctx.GasLimit
 }
 
-func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
-	return jsoncdc.Decode(b)
+func (e *hostEnv) DecodeArgument(b []byte, t initialCadence.Type) (initialCadence.Value, error) {
+	return initialJsoncdc.Decode(b)
 }
 
 func (e *hostEnv) Events() []cadence.Event {
@@ -263,7 +369,7 @@ func (e *hostEnv) UnsafeRandom() uint64 {
 }
 
 // GetBlockAtHeight returns the block at the given height.
-func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
+func (e *hostEnv) GetBlockAtHeight(height uint64) (hash initialRuntime.BlockHash, timestamp int64, exists bool, err error) {
 	if e.ctx.Blocks == nil {
 		panic("GetBlockAtHeight is not supported by this environment")
 	}
@@ -271,61 +377,69 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, times
 	block, err := e.ctx.Blocks.ByHeight(height)
 	// TODO: remove dependency on storage
 	if errors.Is(err, storage.ErrNotFound) {
-		return runtime.BlockHash{}, 0, false, nil
+		return initialRuntime.BlockHash{}, 0, false, nil
 	} else if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return runtime.BlockHash{}, 0, false, fmt.Errorf(
+		return initialRuntime.BlockHash{}, 0, false, fmt.Errorf(
 			"unexpected failure of GetBlockAtHeight, height %v: %w", height, err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
+	return initialRuntime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
 }
 
 // Transaction Environment Functions
 
-func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+func (e *hostEnv) CreateAccount(payer initialRuntime.Address) (address initialRuntime.Address, err error) {
 	if e.transactionEnv == nil {
 		panic("CreateAccount is not supported by this environment")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.CreateAccount(payer)
+	account, err := e.transactionEnv.CreateAccount(runtime.Address(payer))
+	return initialRuntime.Address(account), err
 }
 
-func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error {
+func (e *hostEnv) AddAccountKey(address initialRuntime.Address, publicKey []byte) error {
 	if e.transactionEnv == nil {
 		panic("AddAccountKey is not supported by this environment")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.AddAccountKey(address, publicKey)
+	return e.transactionEnv.AddAccountKey(runtime.Address(address), publicKey)
 }
 
-func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+func (e *hostEnv) RemoveAccountKey(address initialRuntime.Address, index int) (publicKey []byte, err error) {
 	if e.transactionEnv == nil {
 		panic("RemoveAccountKey is not supported by this environment")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.RemoveAccountKey(address, index)
+	return e.transactionEnv.RemoveAccountKey(runtime.Address(address), index)
 }
 
-func (e *hostEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
+func (e *hostEnv) UpdateAccountCode(address initialRuntime.Address, code []byte) (err error) {
 	if e.transactionEnv == nil {
 		panic("UpdateAccountCode is not supported by this environment")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.UpdateAccountCode(address, code)
+	return e.transactionEnv.UpdateAccountCode(runtime.Address(address), code)
 }
 
-func (e *hostEnv) GetSigningAccounts() []runtime.Address {
+func (e *hostEnv) GetSigningAccounts() []initialRuntime.Address {
 	if e.transactionEnv == nil {
 		panic("GetSigningAccounts is not supported by this environment")
 	}
 
-	return e.transactionEnv.GetSigningAccounts()
+	accounts := e.transactionEnv.GetSigningAccounts()
+
+	intialAccount := make([]initialRuntime.Address, len(accounts))
+	for i, a := range accounts {
+		intialAccount[i] = initialRuntime.Address(a)
+	}
+
+	return intialAccount
 }
 
 // Transaction Environment

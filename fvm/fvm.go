@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
+	initialRuntime "github.com/onflow/cadence-initial/runtime"
 )
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
@@ -14,13 +15,20 @@ type Procedure interface {
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
-	Runtime runtime.Runtime
+	Runtime        runtime.Runtime
+	InitialRuntime initialRuntime.Runtime
 }
 
 // New creates a new virtual machine instance with the provided runtime.
 func New(rt runtime.Runtime) *VirtualMachine {
 	return &VirtualMachine{
 		Runtime: rt,
+	}
+}
+
+func NewWithInitial(rt initialRuntime.Runtime) *VirtualMachine {
+	return &VirtualMachine{
+		InitialRuntime: rt,
 	}
 }
 

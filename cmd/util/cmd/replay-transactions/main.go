@@ -8,7 +8,6 @@ import (
 	"reflect"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/onflow/cadence/runtime"
 	"github.com/r3labs/diff"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -30,6 +29,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+	initialRuntime "github.com/onflow/cadence-initial/runtime"
 )
 
 type Update struct {
@@ -413,9 +413,11 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 
 	updates := l.findUpdates(blockData)
 
-	rt := runtime.NewInterpreterRuntime()
+	//rt := runtime.NewInterpreterRuntime()
 
-	vm := fvm.New(rt)
+	initialRT := initialRuntime.NewInterpreterRuntime()
+
+	vm := fvm.NewWithInitial(initialRT)
 
 	for i := start; i <= end; i++ {
 
@@ -473,8 +475,12 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 				if err != nil {
 					log.Fatal().Err(err).Str("block_id", computedBlock.ID().String()).Msg("cannot compare results")
 				}
-				fmt.Println("Tx results diff")
-				spew.Dump(changelog)
+				if changelog == nil {
+					fmt.Println("Tx results equal!")
+				} else {
+					fmt.Println("Tx results differ")
+					spew.Dump(changelog)
+				}
 
 				//	log.Info().Msg("Reads")
 				//	spew.Dump(readMappings)
@@ -490,11 +496,11 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 				originalSnapshot := computedBlock.Updates[i].Snapshot
 
 				if originalSnapshot == nil {
-					log.Info().Msgf("Original snapshot %d does not exist", i)
+					log.Fatal().Msgf("Original snapshot %d does not exist", i)
 					spew.Dump(computedBlock)
 				}
 				if calculatedSnapshot == nil {
-					log.Info().Msgf("Calculated snapshot %d does not exist", i)
+					log.Fatal().Msgf("Calculated snapshot %d does not exist", i)
 				}
 
 				calculatedDelta := calculatedSnapshot.Delta
@@ -522,7 +528,15 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 						} else {
 							fmt.Printf("Changed key - %s '%x' '%x' '%s' => %s \n", change.Type, fullKey.Owner, fullKey.Controller, fullKey.Key, change.From)
 						}
+					}
 
+					if len(changelog) > 1 {
+						for _, c := range computedBlock.CompleteCollections {
+							for _, tx := range c.Transactions {
+								fmt.Println("tx in block")
+								fmt.Println(string(tx.Script))
+							}
+						}
 					}
 
 					//spew.Dump(changelog)
