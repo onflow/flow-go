@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/rs/zerolog"
 )
@@ -20,6 +21,7 @@ type Engine struct {
 
 	pingEnabled  bool
 	pingInterval time.Duration
+	middleware   libp2p.Middleware
 }
 
 func New(
@@ -27,6 +29,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	pingEnabled bool,
+	mw libp2p.Middleware,
 ) (*Engine, error) {
 	eng := &Engine{
 		unit:         engine.NewUnit(),
@@ -35,6 +38,7 @@ func New(
 		me:           me,
 		pingEnabled:  pingEnabled,
 		pingInterval: time.Minute,
+		middleware:   mw,
 	}
 
 	return eng, nil
@@ -78,15 +82,20 @@ func (e *Engine) startPing() {
 
 // send ping to a given node and report the reachable result to metrics
 func (e *Engine) pingNode(peer *flow.Identity) {
-	reachable := e.pingAddress(peer.Address)
+	reachable := e.pingAddress(peer.ID())
 	e.metrics.NodeReachable(peer.ID(), reachable)
 }
 
 // pingAddress sends a ping request to the given address, and block until either receive
 // a ping respond then return true, or hitting a timeout and return false.
 // if there is other unknown error, return false
-func (e *Engine) pingAddress(addr string) bool {
-	noImpl := 50 * time.Millisecond
-	<-time.After(noImpl)
+func (e *Engine) pingAddress(target flow.Identifier) bool {
+	// ignore the ping duration for now
+	// ping will timeout in libp2p.PingTimeoutSecs seconds
+	_, err := e.middleware.Ping(target)
+	if err != nil {
+		e.log.Err(err).Str("target", target.String()).Msg("failed to ping")
+		return false
+	}
 	return true
 }
