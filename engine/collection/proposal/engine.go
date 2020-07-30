@@ -42,14 +42,18 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+// all the stuff we need to re-instantiate HotStuff for a new epoch
 type EpochLifecycle struct {
-	builder    *builder.Builder
-	finalizer  *finalizer.Finalizer
-	notifer    hotstuff.Consumer
-	persist    *persister.Persister
-	signer     *verification.SingleSigner
-	rootHeader *flow.Header
-	rootQC     *model.QuorumCertificate
+	builder   *builder.Builder           // can be the same object across epochs
+	finalizer *finalizer.Finalizer       // can be the same object across epochs
+	signer    *verification.SingleSigner // can be the same object across epochs
+
+	notifer hotstuff.Consumer    // needs to be different across epochs (diff. cluster ID)
+	persist *persister.Persister // needs to be different across epochs (at least reset)
+
+	clusterRootHeader *flow.Header             // will be in the service events
+	clusterRootQC     *model.QuorumCertificate // will be in the service events
+	seed              []byte                   // either QC for first block of epoch, or seed from service event
 }
 
 // Engine is the collection proposal engine, which packages pending
@@ -75,6 +79,18 @@ type Engine struct {
 	hotstuff module.HotStuff
 }
 
+/*
+TODO parameters needed for HotStuff
+
+build module.Builder,
+	finalize module.Finalizer,
+	persist hotstuff.Persister,
+	clusterRootHeader *flow.Header,
+	clusterRootQC *model.QuorumCertificate,
+	mainChainRootQC *model.QuorumCertificate,
+	hotstuffOpts []consensus.Option,
+*/
+
 // New returns a new collection proposal engine.
 func New(
 	log zerolog.Logger,
@@ -92,13 +108,7 @@ func New(
 	payloads storage.ClusterPayloads,
 	cache module.PendingClusterBlockBuffer,
 	sync module.BlockRequester,
-	build module.Builder,
-	finalize module.Finalizer,
-	persist hotstuff.Persister,
-	clusterRootHeader *flow.Header,
-	clusterRootQC *model.QuorumCertificate,
-	mainChainRootQC *model.QuorumCertificate,
-	hotstuffOpts []consensus.Option,
+	hot module.HotStuff,
 ) (*Engine, error) {
 
 	// determine the participants in our cluster
