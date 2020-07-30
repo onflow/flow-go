@@ -108,24 +108,24 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	p.libP2PHost = host
 
-	host.SetStreamHandlDefaultDecayIntervalDefaultDecayIntervaler(p.flowLibP2PProtocolID, handler)
+	host.SetStreamHandler(p.flowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
-	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...,
+	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost,
 		// Enables GossipSub  Peer Scoring within the PubSub instance
 		// No idea if this works lol
-		WithPeerScore(
-			&PeerScoreParams{		// These Parameters are taken from an example and should be tuned
-				AppSpecificScore:	func(peer.ID) float64 { return 0 },
+		pubsub.WithPeerScore(
+			&pubsub.PeerScoreParams{		// These Parameters are taken from an example and should be tuned
+				AppSpecificScore:		func(peer.ID) float64 { return 0 },
 				BehaviourPenaltyWeight:	-1,
-				BehaviourPenaltyDecay:	ScoreParameterDecay(time.Minute),
-				DecayInterval:		DefaultDecayInterval,
-				DecayToZero:		DefaultDecayToZero,
+				BehaviourPenaltyDecay:	pubsub.ScoreParameterDecay(time.Minute),
+				DecayInterval:			pubsub.DefaultDecayInterval,
+				DecayToZero:			pubsub.DefaultDecayToZero,
 			},
-			&PeerScoreThersholds{		// Same as the above comment
-				GossipThreshold:	-100,
-				PublishThreshold:	-500,
-				GraylistThreshold:	-1000,
+			&pubsub.PeerScoreThresholds{	// Same as the above comment
+				GossipThreshold:		-100,
+				PublishThreshold:		-500,
+				GraylistThreshold:		-1000,
 			}))
 	if err != nil {
 		return fmt.Errorf("could not create libp2p pubsub: %w", err)
