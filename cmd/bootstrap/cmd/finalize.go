@@ -13,19 +13,16 @@ import (
 )
 
 var (
-	flagConfig                                       string
-	flagCollectionClusters                           uint
-	flagGeneratedCollectorAddressTemplate            string
-	flagGeneratedCollectorStake                      uint64
-	flagPartnerNodeInfoDir                           string
-	flagPartnerStakes                                string
-	flagCollectorGenerationMaxHashGrindingIterations uint
-	flagFastKG                                       bool
-	flagRootChain                                    string
-	flagRootParent                                   string
-	flagRootHeight                                   uint64
-	flagRootTimestamp                                string
-	flagRootCommit                                   string
+	flagConfig             string
+	flagCollectionClusters uint
+	flagPartnerNodeInfoDir string
+	flagPartnerStakes      string
+	flagFastKG             bool
+	flagRootChain          string
+	flagRootParent         string
+	flagRootHeight         uint64
+	flagRootTimestamp      string
+	flagRootCommit         string
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -131,13 +128,6 @@ func init() {
 	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2,
 		"number of collection clusters")
-	finalizeCmd.Flags().StringVar(&flagGeneratedCollectorAddressTemplate, "generated-collector-address-template",
-		"collector-%v.example.com", "address template for collector nodes that will be generated (%v "+
-			"will be replaced by an index)")
-	finalizeCmd.Flags().Uint64Var(&flagGeneratedCollectorStake, "generated-collector-stake", 100,
-		"stake for collector nodes that will be generated")
-	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
-		"max hash grinding iterations for collector generation")
 	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation "+
 		"instead of DKG")
 
