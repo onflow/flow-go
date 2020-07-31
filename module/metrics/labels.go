@@ -54,6 +54,8 @@ const (
 	ResourcePendingBlock             = "pending_block"                // verification node, match engine
 	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
 	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
+	ResourceEpochSetup               = "epoch_setup"
+	ResourceEpochCommit              = "epoch_commit"
 )
 
 const (

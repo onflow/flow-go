@@ -4,6 +4,8 @@ package mock
 
 import (
 	flow "github.com/dapperlabs/flow-go/model/flow"
+	badger "github.com/dgraph-io/badger/v2"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -104,6 +106,22 @@ func (_m *Blocks) Store(block *flow.Block) error {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// StoreTx provides a mock function with given fields: block
+func (_m *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
+	ret := _m.Called(block)
+
+	var r0 func(*badger.Txn) error
+	if rf, ok := ret.Get(0).(func(*flow.Block) func(*badger.Txn) error); ok {
+		r0 = rf(block)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(func(*badger.Txn) error)
+		}
 	}
 
 	return r0

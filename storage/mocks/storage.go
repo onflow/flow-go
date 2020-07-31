@@ -6,6 +6,7 @@ package mocks
 
 import (
 	flow "github.com/dapperlabs/flow-go/model/flow"
+	v2 "github.com/dgraph-io/badger/v2"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -104,6 +105,20 @@ func (m *MockBlocks) Store(arg0 *flow.Block) error {
 func (mr *MockBlocksMockRecorder) Store(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockBlocks)(nil).Store), arg0)
+}
+
+// StoreTx mocks base method
+func (m *MockBlocks) StoreTx(arg0 *flow.Block) func(*v2.Txn) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreTx", arg0)
+	ret0, _ := ret[0].(func(*v2.Txn) error)
+	return ret0
+}
+
+// StoreTx indicates an expected call of StoreTx
+func (mr *MockBlocksMockRecorder) StoreTx(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreTx", reflect.TypeOf((*MockBlocks)(nil).StoreTx), arg0)
 }
 
 // MockPayloads is a mock of Payloads interface

@@ -6,7 +6,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
@@ -17,7 +16,7 @@ func withLimit(limit uint) func(*Cache) {
 	}
 }
 
-type storeFunc func(flow.Identifier, interface{}) func(*badger.Txn) error
+type storeFunc func(key interface{}, val interface{}) func(*badger.Txn) error
 
 func withStore(store storeFunc) func(*Cache) {
 	return func(c *Cache) {
@@ -25,13 +24,13 @@ func withStore(store storeFunc) func(*Cache) {
 	}
 }
 
-func noStore(flow.Identifier, interface{}) func(*badger.Txn) error {
+func noStore(key interface{}, val interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
 }
 
-type retrieveFunc func(flow.Identifier) func(*badger.Txn) (interface{}, error)
+type retrieveFunc func(key interface{}) func(*badger.Txn) (interface{}, error)
 
 func withRetrieve(retrieve retrieveFunc) func(*Cache) {
 	return func(c *Cache) {
@@ -39,7 +38,7 @@ func withRetrieve(retrieve retrieveFunc) func(*Cache) {
 	}
 }
 
-func noRetrieve(flow.Identifier) func(*badger.Txn) (interface{}, error) {
+func noRetrieve(key interface{}) func(*badger.Txn) (interface{}, error) {
 	return func(tx *badger.Txn) (interface{}, error) {
 		return nil, fmt.Errorf("no retrieve function for cache get available")
 	}
@@ -78,11 +77,11 @@ func newCache(collector module.CacheMetrics, options ...func(*Cache)) *Cache {
 
 // Get will try to retrieve the resource from cache first, and then from the
 // injected
-func (c *Cache) Get(entityID flow.Identifier) func(*badger.Txn) (interface{}, error) {
+func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 	return func(tx *badger.Txn) (interface{}, error) {
 
 		// check if we have it in the cache
-		resource, cached := c.cache.Get(entityID)
+		resource, cached := c.cache.Get(key)
 		if cached {
 			c.metrics.CacheHit(c.resource)
 			return resource, nil
@@ -90,13 +89,13 @@ func (c *Cache) Get(entityID flow.Identifier) func(*badger.Txn) (interface{}, er
 
 		// get it from the database
 		c.metrics.CacheMiss(c.resource)
-		resource, err := c.retrieve(entityID)(tx)
+		resource, err := c.retrieve(key)(tx)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve resource: %w", err)
 		}
 
 		// cache the resource and eject least recently used one if we reached limit
-		evicted := c.cache.Add(entityID, resource)
+		evicted := c.cache.Add(key, resource)
 		if !evicted {
 			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
 		}
@@ -106,17 +105,17 @@ func (c *Cache) Get(entityID flow.Identifier) func(*badger.Txn) (interface{}, er
 }
 
 // Put will add an resource to the cache with the given ID.
-func (c *Cache) Put(entityID flow.Identifier, resource interface{}) func(*badger.Txn) error {
+func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// try to store the resource
-		err := c.store(entityID, resource)(tx)
+		err := c.store(key, resource)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}
 
 		// cache the resource and eject least recently used one if we reached limit
-		evicted := c.cache.Add(entityID, resource)
+		evicted := c.cache.Add(key, resource)
 		if !evicted {
 			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
 		}

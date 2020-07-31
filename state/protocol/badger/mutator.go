@@ -96,7 +96,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		// SECOND: insert the initial protocol state data into the database
 
 		// 1) insert the root block with its payload into the state and index it
-		err = m.state.blocks.Store(root)
+		err = m.state.blocks.StoreTx(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root block: %w", err)
 		}
@@ -408,8 +408,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch counter: %w", err)
 	}
-	var activeSetup epoch.Setup
-	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &activeSetup))
+	activeSetup, err := m.state.setups.ByCounter(counter)
 	if err != nil {
 		return fmt.Errorf("could not retrieve current epoch setup: %w", err)
 	}
@@ -488,8 +487,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				}
 
 				// Finally, the commit should commit all the necessary information.
-				var setup epoch.Setup
-				err = m.state.db.View(operation.RetrieveEpochSetup(ev.Counter, &setup))
+				setup, err := m.state.setups.ByCounter(ev.Counter)
 				if err != nil {
 					return fmt.Errorf("could not retrieve next epoch setup: %w", err)
 				}
@@ -514,13 +512,15 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
-	err = m.state.blocks.Store(candidate)
-	if err != nil {
-		return fmt.Errorf("could not store candidate block: %w", err)
-	}
-	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
-		err := operation.IndexBlockSeal(blockID, last.ID())(tx)
+		// insert the block into the database AND cache
+		err := m.state.blocks.StoreTx(candidate)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store candidate block: %w", err)
+		}
+		// index the block seal for this block
+		blockID := candidate.ID()
+		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
@@ -594,9 +594,9 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 			}
 			switch ev := service.(type) {
 			case *epoch.Setup:
-				ops = append(ops, operation.InsertEpochSetup(ev.Counter, ev))
+				ops = append(ops, m.state.setups.StoreTx(ev))
 			case *epoch.Commit:
-				ops = append(ops, operation.InsertEpochCommit(ev.Counter, ev))
+				ops = append(ops, m.state.commits.StoreTx(ev))
 			default:
 				return fmt.Errorf("invalid service event type in payload (%s)", event.Type)
 			}
@@ -615,8 +615,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch counter: %w", err)
 	}
-	var setup epoch.Setup
-	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
+	setup, err := m.state.setups.ByCounter(counter)
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch setup: %w", err)
 	}
@@ -769,7 +768,7 @@ func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool,
 }
 
 func (m *Mutator) setupFinalized(counter uint64) (bool, error) {
-	err := m.state.db.View(operation.RetrieveEpochSetup(counter, &epoch.Setup{}))
+	_, err := m.state.setups.ByCounter(counter)
 	if err == nil {
 		return true, nil
 	}
@@ -780,7 +779,7 @@ func (m *Mutator) setupFinalized(counter uint64) (bool, error) {
 }
 
 func (m *Mutator) commitFinalized(counter uint64) (bool, error) {
-	err := m.state.db.View(operation.RetrieveEpochCommit(counter, &epoch.Commit{}))
+	_, err := m.state.commits.ByCounter(counter)
 	if err == nil {
 		return true, nil
 	}

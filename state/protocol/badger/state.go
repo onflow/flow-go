@@ -23,12 +23,18 @@ type State struct {
 	index      storage.Index
 	payloads   storage.Payloads
 	blocks     storage.Blocks
+	setups     storage.EpochSetups
+	commits    storage.EpochCommits
 	cfg        Config
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func NewState(metrics module.ComplianceMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, index storage.Index, payloads storage.Payloads, blocks storage.Blocks) (*State, error) {
+func NewState(
+	metrics module.ComplianceMetrics, db *badger.DB,
+	headers storage.Headers, seals storage.Seals, index storage.Index, payloads storage.Payloads, blocks storage.Blocks,
+	setups storage.EpochSetups, commits storage.EpochCommits,
+) (*State, error) {
 
 	s := &State{
 		metrics:  metrics,
@@ -38,6 +44,8 @@ func NewState(metrics module.ComplianceMetrics, db *badger.DB, headers storage.H
 		index:    index,
 		payloads: payloads,
 		blocks:   blocks,
+		setups:   setups,
+		commits:  commits,
 		cfg:      DefaultConfig(),
 	}
 

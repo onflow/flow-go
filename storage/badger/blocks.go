@@ -27,7 +27,7 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) storeTx(block *flow.Block) func(*badger.Txn) error {
+func (b *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		err := b.headers.storeTx(block.Header)(tx)
 		if err != nil {
@@ -60,7 +60,7 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 }
 
 func (b *Blocks) Store(block *flow.Block) error {
-	return operation.RetryOnConflict(b.db.Update, b.storeTx(block))
+	return operation.RetryOnConflict(b.db.Update, b.StoreTx(block))
 }
 
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {

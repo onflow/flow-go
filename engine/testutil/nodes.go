@@ -71,8 +71,10 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	index := storage.NewIndex(metrics, db)
 	payloads := storage.NewPayloads(db, index, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
+	setups := storage.NewEpochSetups(metrics, db)
+	commits := storage.NewEpochCommits(metrics, db)
 
-	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks)
+	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits)
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(participants, chainID)
