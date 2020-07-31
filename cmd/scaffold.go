@@ -76,6 +76,8 @@ type Storage struct {
 	Blocks       storage.Blocks
 	Transactions storage.Transactions
 	Collections  storage.Collections
+	Setups       storage.EpochSetups
+	Commits      storage.EpochCommits
 }
 
 type namedModuleFunc struct {
@@ -339,6 +341,8 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
+	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
+	commits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:      headers,
@@ -349,6 +353,8 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Blocks:       blocks,
 		Transactions: transactions,
 		Collections:  collections,
+		Setups:       setups,
+		Commits:      commits,
 	}
 }
 
@@ -362,6 +368,8 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Index,
 		fnb.Storage.Payloads,
 		fnb.Storage.Blocks,
+		fnb.Storage.Setups,
+		fnb.Storage.Commits,
 	)
 
 	fnb.MustNot(err).Msg("could not initialize flow state")
@@ -441,7 +449,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
-	rootBlockHeader, err := state.Root()
+	rootBlockHeader, err := state.Params().Root()
 	fnb.MustNot(err).Msg("could not get root block from protocol state")
 
 	// this happens when the bootstrap root block is updated (because of new spork),

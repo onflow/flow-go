@@ -131,8 +131,10 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	indexDB := storage.NewIndex(metrics, db)
 	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
+	setupsDB := storage.NewEpochSetups(metrics, db)
+	commitsDB := storage.NewEpochCommits(metrics, db)
 
-	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB)
+	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB)
 	require.NoError(t, err)
 
 	result := bootstrap.Result(rootBlock, unittest.GenesisStateCommitment)
