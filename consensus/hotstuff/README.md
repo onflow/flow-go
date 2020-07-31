@@ -84,7 +84,7 @@ They are responsible for relaying HotStuff messages and validating block payload
 * `EventHandler` orchestrates all HotStuff components and implements [HotStuff's state machine](/docs/StateMachine.png).
 The event handler is designed to be executed single-threaded. 
 * `Communicator` relays outgoing HotStuff messages (votes and block proposals)
-* `Pacemaker` is a basic PaceMaker for keeping the majority of committee replicas in the same view
+* `Pacemaker` is a basic PaceMaker to ensure liveness by keeping the majority of committee replicas in the same view
 * `Forks` maintains an in-memory representation of all blocks `b`, whose view is larger or equal to the view of the latest finalized block (known to this specific replica).
 As blocks with missing ancestors are cached outside of HotStuff (by the Chain Compliance Layer), 
 all blocks stored in `Forks` are guaranteed to be connected to the genesis block 
@@ -170,4 +170,3 @@ Many HotStuff data models are built on top of basic data models defined in `/mod
 * include Epochs 
 * upgrade PaceMaker to include Timeout Certificates 
 * refactor crypto integration (code in `verification` and dependent modules) for better auditability
-
