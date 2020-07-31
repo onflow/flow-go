@@ -47,6 +47,10 @@ and block seal.`,
 		internalNodes := genNetworkAndStakingKeys(partnerNodes)
 		log.Info().Msg("")
 
+		log.Info().Msg("checking constraints on consensus/cluster nodes")
+		checkConstraints(partnerNodes, internalNodes)
+		log.Info().Msg("")
+
 		log.Info().Msg("assembling network and staking keys")
 		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
 		writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
