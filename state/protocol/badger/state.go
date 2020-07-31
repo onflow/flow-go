@@ -54,7 +54,7 @@ func (s *State) Sealed() protocol.Snapshot {
 	var sealed uint64
 	err := s.db.View(operation.RetrieveSealedHeight(&sealed))
 	if err != nil {
-		return &Snapshot{err: fmt.Errorf("could not retrieve sealed height: %w", err)}
+		return &BlockSnapshot{err: fmt.Errorf("could not retrieve sealed height: %w", err)}
 	}
 
 	return s.AtHeight(sealed)
@@ -66,22 +66,10 @@ func (s *State) Final() protocol.Snapshot {
 	var finalized uint64
 	err := s.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
-		return &Snapshot{err: fmt.Errorf("could not retrieve finalized height: %w", err)}
+		return &BlockSnapshot{err: fmt.Errorf("could not retrieve finalized height: %w", err)}
 	}
 
 	return s.AtHeight(finalized)
-}
-
-func (s *State) AtEpoch(counter uint64) protocol.Snapshot {
-
-	// get the block height associated with the given epoch
-	var height uint64
-	err := s.db.View(operation.RetrieveEpochHeight(counter, &height))
-	if err != nil {
-		return &Snapshot{err: fmt.Errorf("could not retrieve epoch height: %w", err)}
-	}
-
-	return s.AtHeight(height)
 }
 
 func (s *State) AtHeight(height uint64) protocol.Snapshot {
@@ -90,16 +78,24 @@ func (s *State) AtHeight(height uint64) protocol.Snapshot {
 	var blockID flow.Identifier
 	err := s.db.View(operation.LookupBlockHeight(height, &blockID))
 	if err != nil {
-		return &Snapshot{err: fmt.Errorf("could not look up block by height: %w", err)}
+		return &BlockSnapshot{err: fmt.Errorf("could not look up block by height: %w", err)}
 	}
 
 	return s.AtBlockID(blockID)
 }
 
 func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
-	snapshot := &Snapshot{
+	snapshot := &BlockSnapshot{
 		state:   s,
 		blockID: blockID,
+	}
+	return snapshot
+}
+
+func (s *State) AtEpoch(counter uint64) protocol.Snapshot {
+	snapshot := &EpochSnapshot{
+		state:   s,
+		counter: counter,
 	}
 	return snapshot
 }
