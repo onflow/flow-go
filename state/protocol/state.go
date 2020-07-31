@@ -23,11 +23,6 @@ type ReadOnlyState interface {
 	// over time.
 	Sealed() Snapshot
 
-	// AtEpoch returns a snapshot of the persistent protocol state at the given
-	// epoch counter. It will use the latest finalized state from the epoch in
-	// order to apply changes that happened during the epoch.
-	AtEpoch(epoch uint64) Snapshot
-
 	// AtHeight returns the snapshot of the persistent protocol state at the
 	// given block number. It is only available for finalized blocks and the
 	// returned snapshot is therefore immutable over time.
@@ -38,6 +33,11 @@ type ReadOnlyState interface {
 	// the protocol state, and can thus represent an ambiguous state that was or
 	// will never be finalized.
 	AtBlockID(blockID flow.Identifier) Snapshot
+
+	// AtEpoch returns a snapshot of the persistent protocol state at the given
+	// epoch counter. If the epoch with the given counter does not have any blocks
+	// yet, some of the snapshot functions will return errors.
+	AtEpoch(epoch uint64) Snapshot
 }
 
 // State allows, in addition to ReadOnlyState,  mutating the protocol state in a consistent manner.

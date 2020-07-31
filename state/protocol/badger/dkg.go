@@ -10,7 +10,7 @@ import (
 )
 
 type DKG struct {
-	snapshot *Snapshot
+	snapshot *EpochSnapshot
 }
 
 func (d *DKG) Size() (uint, error) {
@@ -18,9 +18,11 @@ func (d *DKG) Size() (uint, error) {
 		return 0, d.snapshot.err
 	}
 
-	commit, err := d.commit()
+	// get the current epoch commit
+	var commit epoch.Commit
+	err := d.snapshot.state.db.View(operation.RetrieveEpochCommit(d.snapshot.counter, &commit))
 	if err != nil {
-		return 0, fmt.Errorf("could not get commit: %w", err)
+		return 0, fmt.Errorf("could not get epoch commit: %w", err)
 	}
 
 	return uint(len(commit.DKGParticipants)), nil
@@ -31,9 +33,11 @@ func (d *DKG) GroupKey() (crypto.PublicKey, error) {
 		return nil, d.snapshot.err
 	}
 
-	commit, err := d.commit()
+	// get the current epoch commit
+	var commit epoch.Commit
+	err := d.snapshot.state.db.View(operation.RetrieveEpochCommit(d.snapshot.counter, &commit))
 	if err != nil {
-		return nil, fmt.Errorf("could not get commit: %w", err)
+		return nil, fmt.Errorf("could not get epoch commit: %w", err)
 	}
 
 	return commit.DKGGroupKey, nil
@@ -44,9 +48,11 @@ func (d *DKG) Index(nodeID flow.Identifier) (uint, error) {
 		return 0, d.snapshot.err
 	}
 
-	commit, err := d.commit()
+	// get the current epoch commit
+	var commit epoch.Commit
+	err := d.snapshot.state.db.View(operation.RetrieveEpochCommit(d.snapshot.counter, &commit))
 	if err != nil {
-		return 0, fmt.Errorf("could not get commit: %w", err)
+		return 0, fmt.Errorf("could not get epoch commit: %w", err)
 	}
 
 	participant, found := commit.DKGParticipants[nodeID]
@@ -62,9 +68,11 @@ func (d *DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 		return nil, d.snapshot.err
 	}
 
-	commit, err := d.commit()
+	// get the current epoch commit
+	var commit epoch.Commit
+	err := d.snapshot.state.db.View(operation.RetrieveEpochCommit(d.snapshot.counter, &commit))
 	if err != nil {
-		return nil, fmt.Errorf("could not get commit: %w", err)
+		return nil, fmt.Errorf("could not get epoch commit: %w", err)
 	}
 
 	participant, found := commit.DKGParticipants[nodeID]
@@ -73,22 +81,4 @@ func (d *DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	}
 
 	return participant.KeyShare, nil
-}
-
-func (d *DKG) commit() (*epoch.Commit, error) {
-
-	// get the current epoch counter
-	counter, err := d.snapshot.Epoch()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch counter: %w", err)
-	}
-
-	// get the current epoch commit
-	var commit epoch.Commit
-	err = d.snapshot.state.db.View(operation.RetrieveEpochCommit(counter, &commit))
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch commit: %w", err)
-	}
-
-	return &commit, nil
 }

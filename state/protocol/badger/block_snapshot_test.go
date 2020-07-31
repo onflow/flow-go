@@ -168,7 +168,7 @@ func TestSeed(t *testing.T) {
 			err := state.Mutate().Bootstrap(block, result, seal)
 			require.NoError(t, err)
 
-			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
+			_, err = state.Final().(*protocol.BlockSnapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
 			assert.Error(t, err)
 		})
@@ -201,7 +201,7 @@ func TestSeed(t *testing.T) {
 			err = state.Mutate().Extend(&unvalidatedChild)
 			assert.Nil(t, err)
 
-			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
+			_, err = state.Final().(*protocol.BlockSnapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
 			assert.Error(t, err)
 		})
