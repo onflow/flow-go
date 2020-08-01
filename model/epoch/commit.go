@@ -3,19 +3,20 @@ package epoch
 import (
 	"encoding/binary"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// TODO docs
 type Commit struct {
 	Counter         uint64
-	ClusterQCs      []*model.QuorumCertificate
+	ClusterQCs      []*hotstuff.QuorumCertificate
 	DKGGroupKey     crypto.PublicKey
-	DKGParticipants map[flow.Identifier]Participant
+	DKGParticipants map[flow.Identifier]DKGParticipant
 }
 
-type Participant struct {
+type DKGParticipant struct {
 	Index    uint
 	KeyShare crypto.PublicKey
 }

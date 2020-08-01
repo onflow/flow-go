@@ -8,8 +8,6 @@ import (
 
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 var (
@@ -70,19 +68,8 @@ and block seal.`,
 		)
 		log.Info().Msg("")
 
-		log.Info().Msg("constructing root execution result and block seal")
-		constructRootResultAndSeal(flagRootCommit, block)
-		log.Info().Msg("")
-
 		log.Info().Msg("computing collection node clusters")
-		// TODO: clean this up
-		participants := model.ToIdentityList(stakingNodes)
-		collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
-		assignments := protocol.ClusterAssignments(flagCollectionClusters, collectors)
-		clusters, err := flow.NewClusterList(assignments, collectors)
-		if err != nil {
-			panic(err)
-		}
+		assignments, clusters := constructClusterAssignment(partnerNodes, internalNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root blocks for collection node clusters")
@@ -90,7 +77,11 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root QCs for collection node clusters")
-		constructRootQCsForClusters(clusters, internalNodes, block, clusterBlocks)
+		clusterQCs := constructRootQCsForClusters(clusters, internalNodes, block, clusterBlocks)
+		log.Info().Msg("")
+
+		log.Info().Msg("constructing root execution result and block seal")
+		constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")

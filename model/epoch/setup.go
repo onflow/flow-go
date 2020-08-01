@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// TODO docs
 type Setup struct {
 	Counter      uint64
 	FinalView    uint64
@@ -16,7 +17,7 @@ type Setup struct {
 
 // ID returns a unique ID for the epoch, based on the counter. This
 // is used as a work-around for the current caching layer, which only
-// suports flow entities keyed by ID for now.
+// supports flow entities keyed by ID for now.
 func (s *Setup) ID() flow.Identifier {
 	var commitID flow.Identifier
 	binary.LittleEndian.PutUint64(commitID[:], s.Counter)

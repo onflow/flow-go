@@ -6,8 +6,10 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/signature"
 )
@@ -30,10 +32,16 @@ type Snapshot interface {
 	// Commit return the sealed execution state commitment at this block.
 	Commit() (flow.StateCommitment, error)
 
-	// Cluster selects the given cluster from the node selection. You have to
-	// manually filter the identities to the desired set of nodes before
-	// clustering them.
+	// Clusters returns the list of collector clusters for the current epoch.
 	Clusters() (flow.ClusterList, error)
+
+	// ClusterRootBlock returns the root block for the given cluster in the
+	// current epoch.
+	ClusterRootBlock(cluster flow.IdentityList) (*cluster.Block, error)
+
+	// ClusterRootQC returns the quorum certificate for the root block for the
+	// given cluster in the current epoch.
+	ClusterRootQC(cluster flow.IdentityList) (*hotstuff.QuorumCertificate, error)
 
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,
@@ -59,6 +67,9 @@ type Snapshot interface {
 
 	// DKG provides access to DKG information for the selected snapshot.
 	DKG() DKG
+
+	//
+
 }
 
 // SeedFromParentSignature reads the raw random seed from a combined signature.

@@ -107,6 +107,7 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 		selection := leader.NewSelectionForBootstrap()
 
 		// create consensus committee's state
+		committee, err := committee.NewStaticCommittee()
 		committee, err := committee.NewMainConsensusCommitteeState(ps, participant.NodeID, selection)
 		if err != nil {
 			return nil, nil, err

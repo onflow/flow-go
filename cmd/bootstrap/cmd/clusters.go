@@ -4,24 +4,57 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
 
+// Construct cluster assignment with internal and partner nodes uniformly
+// distributed across clusters
+func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (flow.AssignmentList, flow.ClusterList) {
+
+	partners := model.ToIdentityList(partnerNodes).Filter(filter.HasRole(flow.RoleCollection))
+	internals := model.ToIdentityList(internalNodes).Filter(filter.HasRole(flow.RoleCollection))
+
+	nClusters := flagCollectionClusters
+	assignments := make(flow.AssignmentList, nClusters)
+
+	// first, round-robin internal nodes into each cluster
+	for i, node := range internals {
+		assignments[i%len(assignments)] = append(assignments[i%len(assignments)], node.NodeID)
+	}
+
+	// next, round-robin partner nodes into each cluster
+	for i, node := range partners {
+		assignments[i%len(assignments)] = append(assignments[i%len(assignments)], node.NodeID)
+	}
+
+	collectors := append(partners, internals...)
+	clusters, err := flow.NewClusterList(assignments, collectors)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not create cluster list")
+	}
+
+	return assignments, clusters
+}
+
+// TODO this should be defined in protocol state
 func constructRootBlocksForClusters(clusters flow.ClusterList) []*cluster.Block {
 	clusterBlocks := run.GenerateRootClusterBlocks(clusters)
 
 	for _, clusterBlock := range clusterBlocks {
 		// cluster ID is equivalent to chain ID
 		clusterID := clusterBlock.Header.ChainID
+		// TODO remove
 		writeJSON(fmt.Sprintf(model.PathRootClusterBlock, clusterID), clusterBlock)
 	}
 
 	return clusterBlocks
 }
 
-func constructRootQCsForClusters(clusterList flow.ClusterList, nodeInfos []model.NodeInfo, block *flow.Block, clusterBlocks []*cluster.Block) {
+func constructRootQCsForClusters(clusterList flow.ClusterList, nodeInfos []model.NodeInfo, block *flow.Block, clusterBlocks []*cluster.Block) []*hotstuff.QuorumCertificate {
 
 	if len(clusterBlocks) != len(clusterList) {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
@@ -38,14 +71,9 @@ func constructRootQCsForClusters(clusterList flow.ClusterList, nodeInfos []model
 
 		// cluster ID is equivalent to chain ID
 		clusterID := clusterBlocks[i].Header.ChainID
+		// TODO remove
 		writeJSON(fmt.Sprintf(model.PathRootClusterQC, clusterID), qc)
 	}
-}
-
-func savingNClusters(nclusters uint16) {
-	writeJSON(model.PathNClusters, model.NClusters{
-		NClusters: uint(nclusters),
-	})
 }
 
 // Filters a list of nodes to include only nodes that will sign the QC for the

@@ -50,10 +50,10 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 	commit := epoch.Commit{
 		// MISSING: counter, cluster QCs
 		DKGGroupKey:     groupKey,
-		DKGParticipants: make(map[flow.Identifier]epoch.Participant),
+		DKGParticipants: make(map[flow.Identifier]epoch.DKGParticipant),
 	}
 	for i, identity := range identities {
-		participant := epoch.Participant{
+		participant := epoch.DKGParticipant{
 			Index:    uint(i),
 			KeyShare: randomBPKs[i],
 		}

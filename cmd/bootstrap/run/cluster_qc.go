@@ -20,8 +20,7 @@ import (
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 )
 
-func GenerateClusterRootQC(participants []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (
-	*model.QuorumCertificate, error) {
+func GenerateClusterRootQC(participants []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (*model.QuorumCertificate, error) {
 
 	ps, db, err := NewProtocolState(block)
 	if err != nil {

@@ -40,6 +40,7 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
 	}
 
+	// TODO remove
 	writeJSON(model.PathDKGDataPub, dkgData.Public(nodes))
 
 	return dkgData

@@ -34,12 +34,12 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData
 
 	sd := run.ParticipantData{}
 
-	participantLookup := make(map[flow.Identifier]epoch.Participant)
+	participantLookup := make(map[flow.Identifier]epoch.DKGParticipant)
 
 	// the QC will be signed by everyone in internalNodes
 	for i, node := range internalNodes {
 		// assign a node to a DGKdata entry, using the canonical ordering
-		participantLookup[node.NodeID] = epoch.Participant{
+		participantLookup[node.NodeID] = epoch.DKGParticipant{
 			KeyShare: dkgData.PubKeyShares[i],
 			Index:    uint(i),
 		}
@@ -61,7 +61,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData
 	for i := len(internalNodes); i < len(allNodes); i++ {
 		// assign a node to a DGKdata entry, using the canonical ordering
 		node := allNodes[i]
-		participantLookup[node.NodeID] = epoch.Participant{
+		participantLookup[node.NodeID] = epoch.DKGParticipant{
 			KeyShare: dkgData.PubKeyShares[i],
 			Index:    uint(i),
 		}
