@@ -493,8 +493,8 @@ func (fnb *FlowNodeBuilder) initState() {
 	// TODO: revisit this check when implementing Epoch
 	if rootBlockHeader.ID() != fnb.RootBlock.ID() {
 		fnb.Logger.Fatal().Msgf("mismatching root block ID, bootstrap root block ID: %v, protocol state block ID: %v",
-			rootBlockHeader.ID(),
-			fnb.RootBlock.ID())
+			fnb.RootBlock.ID(),
+			rootBlockHeader.ID())
 	}
 
 	self, err := state.Final().Identity(myID)
