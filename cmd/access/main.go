@@ -27,6 +27,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/module/synchronization"
@@ -37,19 +38,27 @@ import (
 func main() {
 
 	var (
-		blockLimit      uint
-		collectionLimit uint
-		receiptLimit    uint
-		ingestEng       *ingestion.Engine
-		requestEng      *requester.Engine
-		followerEng     *followereng.Engine
-		syncCore        *synchronization.Core
-		rpcConf         rpc.Config
-		rpcEng          *rpc.Engine
-		collectionRPC   access.AccessAPIClient
-		executionRPC    execution.ExecutionAPIClient
-		err             error
-		conCache        *buffer.PendingBlocks // pending block cache for follower
+		blockLimit                   uint
+		collectionLimit              uint
+		receiptLimit                 uint
+		ingestEng                    *ingestion.Engine
+		requestEng                   *requester.Engine
+		followerEng                  *followereng.Engine
+		syncCore                     *synchronization.Core
+		rpcConf                      rpc.Config
+		rpcEng                       *rpc.Engine
+		collectionRPC                access.AccessAPIClient
+		executionRPC                 execution.ExecutionAPIClient
+		err                          error
+		conCache                     *buffer.PendingBlocks // pending block cache for follower
+		transactionTimings           *stdmap.TransactionTimings
+		collectionsToMarkFinalized   *stdmap.Times
+		collectionsToMarkExecuted    *stdmap.Times
+		blocksToMarkExecuted         *stdmap.Times
+		transactionMetrics           module.TransactionMetrics
+		logTxTimeToFinalized         bool
+		logTxTimeToExecuted          bool
+		logTxTimeToFinalizedExecuted bool
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -61,6 +70,9 @@ func main() {
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
+			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
+			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
+			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
@@ -96,8 +108,32 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
+		Module("transaction timing mempools", func(node *cmd.FlowNodeBuilder) error {
+			transactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			collectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			collectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			blocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+			return err
+		}).
+		Module("transaction metrics", func(node *cmd.FlowNodeBuilder) error {
+			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger, logTxTimeToFinalized,
+				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng = rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID)
+			rpcEng = rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID, transactionMetrics)
 			return rpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -114,7 +150,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
-			ingestEng, err = ingestion.New(node.Logger, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, rpcEng)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, transactionMetrics,
+				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
 		}).
