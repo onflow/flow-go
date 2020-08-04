@@ -1,0 +1,255 @@
+{
+  "PubGroupKey": "h5F5ed0Y3b7XoPc/Y2MEBfs/wdFB/LM6NHLW0TFPVOwZXs2SzwjJvcJFbm8DlMU9ArCCbNQ0gRXIAleAJwywn6vGEKSt3rKG9XmLIQtbNvp11Q2MXr5/CxdqvAdWIGVy",
+  "Participants": [
+    {
+      "NodeID": "b0c3df68c85360355d4519eec334dcd03f06433f5e2422655d2ad445dbbe24f2",
+      "RandomBeaconPubKey": "s6KCcfYickWAbHM0ipBdPSN50JWzQuYJ4dKWGInW3V27hutNuL4KD+LVzMBH4HWWA817s42ZN4gLhpFwl1Zs66lS8p7Jc/lrsxXnr1j+TBVC66xJQfnVCkHKQFozAVoi",
+      "GroupIndex": 0
+    },
+    {
+      "NodeID": "c9812f873e898d37845dd23e0969aa2a708d9a7d550b6875c7a978cd1a921f0f",
+      "RandomBeaconPubKey": "qQnj+4UNrIU9WHQfJ0zLFSv7xu1i+VTklN9kh46C3+PynQc63jZb7pYyCXrrYmGLAMGGz68MKBloH+UZyjTiMP1C9MS9NPCm61XODAB8EsdP8amluPHB092xzZquXdd+",
+      "GroupIndex": 1
+    },
+    {
+      "NodeID": "b98d25f01e699be61e9bdfad15626e6b0b647ba3f28a6f62a9df6a058b85c662",
+      "RandomBeaconPubKey": "pQxmQgJW+TRS8yOnYGOgWSgy4EyPbrxXVGeBi8ffRFIf+o5wtea1SinCM4ZFB6U4AMSiNDoLkku3rDKbmXVCCaz0H+35V+kxvySUqwGNNPUZ2cf7Sys4RGwtjVAA0B+S",
+      "GroupIndex": 2
+    },
+    {
+      "NodeID": "deff0ed524b211baf5746b6fb1d1d5ab6349ac31250a94de88bbabc0d04dc7de",
+      "RandomBeaconPubKey": "jzut5U2n7+ZjL1wW7ucoV44emWHZA+97vEu/MLVq8PB35ovcOAXQCcijAnfGZ6XrEOvGQYKwKlPToo4o0AycS74yAtMQ5SfjLY7jIllQinvqRAWp1AjJUxfwMSS0dSg8",
+      "GroupIndex": 3
+    },
+    {
+      "NodeID": "fda1038bec942e4222b6e2d1e7727f05f56e0ae6dc53f06f253cae924bc40296",
+      "RandomBeaconPubKey": "mRSvWYfzMf5On4Ia+gv0FfvVoJAuHZ+95FUo9CxF3Dbeg51iZvj9JVSoYCc+zH9gCbyzfwUS0tVTb3F03xQT9W438XccQ/yHAH4blN4CdVCkBH00eMIybpHvsTce0+jg",
+      "GroupIndex": 4
+    },
+    {
+      "NodeID": "30c4438241d76c9781c917567772ca60faed22e0107a8b4382db5723789e559a",
+      "RandomBeaconPubKey": "tHD+6q5opmzHvLBx7L5x7Rkh7RGnQ+n9PjwEWatjO0pbFQT+/863gt4kJhv/J/2BA+yuWMVsnbgxTllTqHyjE0CfSDfJEyBvgDjlNyC80u9h8O0g5f+JB/SwNzHd2k8R",
+      "GroupIndex": 5
+    },
+    {
+      "NodeID": "a4cf72200d163af0a29df1353384cbdf5f399f8955d77b4653458c7f9150b833",
+      "RandomBeaconPubKey": "oY1jLWS4RjmQeNsRYGL/sZRyk3u7iQoIMzo/YCdaq5yYBxzcfDGZMGVanD5mwFyMGHl7fqWaY9VKN/z57NnsdBjcX6qLi6qLrdgwJcTBadxw/O0CXMuBaNk69rRawzjQ",
+      "GroupIndex": 6
+    },
+    {
+      "NodeID": "d7fd01c1fae51e6cb1c8bb0eaa8b930496a2bb941dd70bea1e87048ce2ae2a4e",
+      "RandomBeaconPubKey": "mGZh1wkMxiwrnLXgldebo6FV2438QxQJQjQrUN66AKlFiUzw3jHRdgv86iFwf329Ayamcgs9HNUiUs0Li+PMd3lmPN/E72S/3HXttDsK3EnghEcCpvV4FG1HNtlza0hd",
+      "GroupIndex": 7
+    },
+    {
+      "NodeID": "64b6c999668f30039d7cb0da71218304a64edb6049600d1eead94e97f190e015",
+      "RandomBeaconPubKey": "lAAhr7iZXOh4zZh+DLEae3wiGeLScVk9s4iMyotBzDkcpS9rm1UaKTkxJWgaXhWBDZEQ75N4L78N1nrzVmOO2haNkYzBVyXG1w0ezEjiwjxzNwy8UHIEXj8OiyiKc6qo",
+      "GroupIndex": 8
+    },
+    {
+      "NodeID": "c64154d911d7e618f0a539c623f986acf35b17481282e569d2027fb1c71ea279",
+      "RandomBeaconPubKey": "sxKzJb3jeh5qiWf7hSxjJY8FUejMmzXhtY8V9wV9gc1BSIjdk4xy8R2lwZfWKiGPCcXM2mG8tSZHYCdPX+Lr7m/lBDYBSPQZx4ASZxBYZ9UoIRohdDMxHO6EE9tWvGts",
+      "GroupIndex": 9
+    },
+    {
+      "NodeID": "a06fca51df496625456b0d78a026ee720b5a1f0b7bf0f6339c6cf488a1db08ab",
+      "RandomBeaconPubKey": "qn4ZPXs+BtwbeA0k4uECuYKCwFT1K3xtPpqATWHuxhqKCOhBfglvLxdIArM8eFGRA8byoDLHQUrJKjP34UuW0sbXxzkS2fXsIHsloIN2wVxK3Lyu8VLhpowJBGsRoDoF",
+      "GroupIndex": 10
+    },
+    {
+      "NodeID": "06578e88937a2a9671b36699f4d9ff0c7f001ce6223fabd9548d8f6e96f54dd4",
+      "RandomBeaconPubKey": "h9nnFDhanIOKxyOsujYLxeJJQsGkY8gqdFfWQ73PvVFpEGxVRNqRROB/9nUrw862F14uUdxXTyJkzLBd94QF7JJW3qVTRILvhZYM+u6jWYISgzR0+k5qgmDhFy/Fb2vm",
+      "GroupIndex": 11
+    },
+    {
+      "NodeID": "32b25b0a24ed3a400dd642528eb25c7c2dd59a3af9e2412d8bdd6365cd4a4e45",
+      "RandomBeaconPubKey": "q/8lhrkD4w8DLJ+/M047Rv5LfDKi/snBaCtuGo6rzLioKTRS+GLjZNI/ig3Zh5JAADvCy7m0+Jkt2jRdI+ropNPSDxzqZfwZJacNc0qpy/0TWyjm4GjPDpUwQwQiQs9t",
+      "GroupIndex": 12
+    },
+    {
+      "NodeID": "7727c3dc5a7deb2ac39e8428d573324f4fe512358115074785fdd18db004a93d",
+      "RandomBeaconPubKey": "h6Sw7onQcX9iQuApreBTGDZHWvXQ+o/i3qmqQTN0iBcDXP0xUlA0h6QBV+pWMuJQEl0y2ee9J4SOQkwRViBmEqfz9MBOTJecuwDfaBkGMgDombH6dtf1XuZCAZrXuFtN",
+      "GroupIndex": 13
+    },
+    {
+      "NodeID": "50b3957f1b1870e2418850a5522d1c89dd997f2310a27ce163601d24f9b51837",
+      "RandomBeaconPubKey": "r1kZsSQ1/xM5KoBv3FoIkZ1uDXpcuhkbbwqQBOx8EtJX8ks+g7wowuDRLpts3SHlAus3/YD/fnzjlJQDmQ1hXy33f8p3qm9+18RSFoVMRaN2yd2kUOi0ponKBojuzCJP",
+      "GroupIndex": 14
+    },
+    {
+      "NodeID": "b0bc1ed1417bf8eda21b578e6007a9c636fb6513c03ea85e6f93629aa9acea2d",
+      "RandomBeaconPubKey": "kYEU4OmDEpQGj7STiI4U/6pfIENm3NkDqpg4XZk3Lldu7Xn/PXkFnYdyiSW557/XC7YUg9u++tqZv1XrMPZvUefutNhaxm/XXUIeiEvVFeHBQLcluPLpLDmEwqAXElVZ",
+      "GroupIndex": 15
+    },
+    {
+      "NodeID": "10a0f87393b4f530d6e9890139cddaeb60bf2befbc2c656e8499a6588067c487",
+      "RandomBeaconPubKey": "rZOdDh7i5iXhEALE6Wx10hRxV4TpYYctAF0Sc68uI1XV6UTzjz8wQsIOrjvUIhfLBnLX6Lt29R0xrWr5l1z+hxoILY2n1x6PekZKWEhRdjr1RLx9ywrDOs4IurZ6NayT",
+      "GroupIndex": 16
+    },
+    {
+      "NodeID": "81973b7b0c1f4bf9871ee378360236d4d8fdad573c24fed86210d448c3ebe979",
+      "RandomBeaconPubKey": "rQNTKQYddJZ6BvA5c2apXjUeyGw9lL0hfAEtNy1DUIafBBzz2L2CbXqst6On2MinFD56qIKYN4gdVs+lfUI8g2GDveTJuBKzp2k5gVQNXbcr81TRpkYRN01wOR8ODkGi",
+      "GroupIndex": 17
+    },
+    {
+      "NodeID": "8fd34adaf6f653d062287b98ccfacea618be088c90a1e5e07a488b685b7908db",
+      "RandomBeaconPubKey": "kPpzGrjZ02n8Bk/Z46iOGtAhpH+rL6LVQcjAX7w8yN5ZbCvZmiofHArBFrvS0d3vEzwirOroTIyvmTzmfOVGPys1aoZmUt4FOHPNwgJ0qiwZ5IwCNFZnRjkQMCge7aBb",
+      "GroupIndex": 18
+    },
+    {
+      "NodeID": "397bc1e6512a49f8ba9c4d5202e2045571cf175ff9fee8aff9b642bb37fbf48f",
+      "RandomBeaconPubKey": "pQ1yUupdCBBYCTYdKIydOJBwD430i2bOEY+FludCxqZC7+s0WuFGFgTbSyfbxS3iFCn7Ckn5Zbh8BUR/ugCGULuPr1X9Z3Ly1zrwBPqihHvD9NqAq3et1JtnQi1+SOZ/",
+      "GroupIndex": 19
+    },
+    {
+      "NodeID": "6b8c144fa1b0959a4f53929903c0bdd10989a128da3e9bf67154df051deb8921",
+      "RandomBeaconPubKey": "uOR510MmcYlEJK1kDh7r7f4AulTi/NAcM1I0ITKxhhHUBoDJB8GFEOfCPeIxCRHkBrcLA5wR2WAHz4m9GCIWYFUow30LpgvJHYHy5FTWs9wRlP8DjFx4UEjf4bIpVU8k",
+      "GroupIndex": 20
+    },
+    {
+      "NodeID": "669c5436d213935b7d1ac181d9048fd37b08c4af5ba4de9c0a7cd63fd81f0473",
+      "RandomBeaconPubKey": "lVCOBJUzqF4dVkSy1B1Ez9rgYP9cn7PYYTfPOga5gX75E14be7D8gVclgznfRR/YCSG/v24rpR+UTOmMnWH71vFQVzkP7kgYmZfYPnFvx0/+T+FO2gOobMScdBghgW7r",
+      "GroupIndex": 21
+    },
+    {
+      "NodeID": "e18e5a5ad2be6342c1635c07b55b55c4a44f86afc9ae1975912747b994dcdeb9",
+      "RandomBeaconPubKey": "oZNcRr6+GIRqxATSDGGlXX7n6y8mQ83JhFS3w1SpYinY564LWZE9b2unxzWJ82XWAGFvT4eYT7WhNZNd1I9W1LVOKlwuCvXpxlf5TvyUWCM9VnpKi/Xgj8i7KTCu1YFn",
+      "GroupIndex": 22
+    },
+    {
+      "NodeID": "c94eb542a5c9047524bf404227360e56dd8768db30ba3508e838bd01be6e1bd5",
+      "RandomBeaconPubKey": "iADW0eptgP3OqcW966y74cqiMiOyxDZwDx2kBX8ditoWhV9sBifqGTOoN4qd/zqYD6bMNOn9lVdV6MOVNCoH/Yo6RIWFkJ3wx/owvUNA3EzhoULAke5BimvnrKDxeFcf",
+      "GroupIndex": 23
+    },
+    {
+      "NodeID": "03fed57ad8fe38f4ffa84da12faa3d810fe34ef3f423d71050e1ce05dcdd1946",
+      "RandomBeaconPubKey": "kp1dFbh9tguETTkSneADevGd9PscfAAA8tO271TRvnkZkITOn9Cm1vK0nQpbHn7mEC5pXerDWKOqtFIN2qH1e/jwam0hO45uvIlPLRcfFISgg813dBJkkBgE1j5/ditO",
+      "GroupIndex": 24
+    },
+    {
+      "NodeID": "279895204ebc9bc2c505dbdd6624c194741dd726e19c520b695ce2cd78e6ed33",
+      "RandomBeaconPubKey": "l4fc2o+26dfzfayTGmJARqW3EttpH15b5XiNGfK26Vge0K4M2buT+QA3Jfii1El+BXGGKn2k57LqbPLYf+LLMpub7U3uxK9oGTagc+xCr9JNErLCDQ9Ra5eziVlCkPc0",
+      "GroupIndex": 25
+    },
+    {
+      "NodeID": "1c8ae637c5eeb7a0bc913883d8a6082319b1e9cf00220bfffdb59934891b1a46",
+      "RandomBeaconPubKey": "oKn6s772nAcSsLBUOaLS1qXS1YmScg5NbeE8IbwZP+TcWy4qAc/Evc5krZ79u3YMDPGr4XRqQcYx/lCYoFPnJVcOxLqtNRZTCW2aQ5fBhHNSNjqnW61zTj66skMK2NH1",
+      "GroupIndex": 26
+    },
+    {
+      "NodeID": "35bde9d571d286f0f039f51e6c3ef9c40ea33904f52dfbc4afc308c5327006b0",
+      "RandomBeaconPubKey": "knRiVK3UQ/5/dn/0qa57CBO2uvcK+qfTLPrmhoRmmRYsuFR7lzE+rUAQOCs37jWFFC9fRYjpF6Xbwmdlq1Neu0GeeXbBrWMY3zjx8zRwcP5zr7RfqiWaLcyqp1n/7Wpa",
+      "GroupIndex": 27
+    },
+    {
+      "NodeID": "c5e1cd6bbb59be8e4ca311ffc5605802f7d359e6d20598dfe8c78525960ef4ee",
+      "RandomBeaconPubKey": "kk+qRw4YBu2JTIFOVNFhrotXtxiqt6VExVHZcNbs+n1m0dAwTtcjxdjYYik8y+fTCNQpoGk19gtRlT+0c1N89+42WlbWDjW24selcml2VNshvAFECPF6JOR0nl6sx2KI",
+      "GroupIndex": 28
+    },
+    {
+      "NodeID": "1db620f1bd1645bf3ab7b936bfb431cc47b97cd50a6ca40626099f9f29361919",
+      "RandomBeaconPubKey": "gxQFaXjqXWKr44J5vYhTs9+ywUVTUoGCYyJ/FtZqS3NT085m6A0CSXoCRtPo0lykGA03Sa+KJmx2LgggC8J7mnM2KRiQh2mPGPSp4qunKzH2kiONqcdFpSYDBdra5eXh",
+      "GroupIndex": 29
+    },
+    {
+      "NodeID": "da2c37b0f238a362fb783c8ddba4f6bcb3b77c6e1245632d2a8dbfa9fad9c69c",
+      "RandomBeaconPubKey": "h5ER+7Xjh/d3goGdgCfp1QmQdZLNyaQveezvGK7mp8I19egF3RQPInGvPCkZBt4JA0RBLq2/shGMZQzYz/K0hIHifbJD/j2WPM9tiFVjN9iwfYBuL4C3pg0ISICLvtkK",
+      "GroupIndex": 30
+    },
+    {
+      "NodeID": "2054adb6571222a208556e2c70bb2cf0c97a03f940c9bf9278764026965a027d",
+      "RandomBeaconPubKey": "kccwv/T+4VRa+brOq8QDWV+9TxbYeoSUM6WbH2bEWi1nv0YneOeC1KauYYt8hwS2BoT1lJm1nAnkvLnZiSqnprT4NGUCjjfVBoSljh43vFtBoegSKhDDYwgHxcdWbbK1",
+      "GroupIndex": 31
+    },
+    {
+      "NodeID": "aeb267a05f1f603267e9c48360b10a9a7d16424b0930a9cfdde86a9de979a18c",
+      "RandomBeaconPubKey": "sFKgrETceogcoiuM2R9RVhi6QwKmupL/eeaiIwAtHjLnPZ5dh7W1iqmhRWHGFIZuBIvBUPNS5KgCVQPB0+heZAl3tPI0tlPsbbNPl4+oXkWer19Y2JFemHyEEI38QijL",
+      "GroupIndex": 32
+    },
+    {
+      "NodeID": "feed46d05151c29435bef27a3c9dda6a86615d2b103f6752cb54f158363d4d62",
+      "RandomBeaconPubKey": "h1wK2cbW3qypvOxe1+bh6xMiVubMn2qz3fKdap9MrlaKxeyfQskOd6OC6mvvyqCIAe43IzWPgVnFio044HhnzdA/0Uowwge6i6H2A/AglbfUtHJTcbPRYuhjoIJz4SaP",
+      "GroupIndex": 33
+    },
+    {
+      "NodeID": "dfb80768a2a8cc7b5e1dffd66f9f8df5bcf8132b9976af5aa2720008b45dfaab",
+      "RandomBeaconPubKey": "gKNCvXTUKpcv2GJiBRi3AGwJNTSrDDu2EerCxhiRcEKip9iAVkMGXUK+6ZCoxwemC006eSF6z1/tsgzGsfS7CZxaaE6/XebiTkmtXQpmj8hk5CNGG/K9BuQhoHAS41X7",
+      "GroupIndex": 34
+    },
+    {
+      "NodeID": "fbde78f05d6227636f0b4848b97992a1c6d4cf82d2d5d631551646eb91fedab0",
+      "RandomBeaconPubKey": "mDelNOXxYXvS9imxWDpNw5I1etxorM8sxkOquSrEl/P0s5BLlmBUFPXinqULz8IlC4LQoIfSwHhYMHqXtkyg/5oi2HenvEvUcW5AwWUGH28Nlx09admY26iQooJTynDi",
+      "GroupIndex": 35
+    },
+    {
+      "NodeID": "159d8313579e8950f43d968d9ac29e150c4dc53e3e8da227379a4a52782b5386",
+      "RandomBeaconPubKey": "oRlWCSNOTqWxnKSpHZM96IsujfsmvGL+M4Ul0+tVqB/dyX3pjbfOx22TxVrRbLzsEsyEqnGNyRLIjDaMYYKtqRaX/th5KloDetQglFuUo8K7yJzHny/xeevYcwRdvBAX",
+      "GroupIndex": 36
+    },
+    {
+      "NodeID": "682e4f698638382a83259f649394b7f30ce827e7f83bc14223352c8321ed0b6f",
+      "RandomBeaconPubKey": "q1kI7A0qwy1TxqREqVVP8YQ6toBXUcAN66NrDsvPnzj9ChhTi0XaXbSJ8f2KjDs7GJUR/LfIFoZiVnHPIf54DOEQMWFz//jH25Hlsj+HjTwDqG67Wyn2kPd7FpN0raeP",
+      "GroupIndex": 37
+    },
+    {
+      "NodeID": "cf9c8eb983440e8197296e3db6726bfe5011ae3af8c45093a755d4c66e783453",
+      "RandomBeaconPubKey": "jWdCU4zMpGRtYZ9xGCrwpdhl3K2QNFKt02SrtLHvcS3Q5Pa6emAaxYABjc+zY4TDAwV5A2TsqNJfnGfWY+9NJ7BYYGGakVN3aW/bpowWlNsW7MxNDt0XJK3hx0N8w6eK",
+      "GroupIndex": 38
+    },
+    {
+      "NodeID": "9cef30192247d48e792dc0e3a65af5bc5931f6276bd29c0ea4c1618a5b075ea3",
+      "RandomBeaconPubKey": "uCvjKCSkhdd5ER8Y95AlntaiXy4Bqmp6KcbJtGJs1uq2KwPSWy6AHhu2QglfQhcQEiBYpbuT+hTF86YhZF8if8t8IJlhCHlMrgcYIMw+Zyh3W2DoMYJYgo5YtwgjZ0oO",
+      "GroupIndex": 39
+    },
+    {
+      "NodeID": "fcaa236ff7109b0ce2cf9b97b18ca2356fa87855dc5e88a30d3569a399fab9cc",
+      "RandomBeaconPubKey": "hIqam/+MrpsXKXxQfWGYaU0P1Uh/wb5vs6X7NK9Ezexrb43KQ+kgpO+grsttKfCXB54zEbQTeMfYHJCljo9o6cZTlkxBpXxZPRW9/4G0AhIMSqMuBCN5AmPCmh7/xLbB",
+      "GroupIndex": 40
+    },
+    {
+      "NodeID": "3fd88c253d3f065a8f0b7fcd439e1d32fa46e9a44ef825d67d69a18f29c2dfc3",
+      "RandomBeaconPubKey": "p57cx5e5RSF/+2HKEWb2rBbfifagBeU3isVN/m21v0p4D3InMl4TZRJMJ4V9Yl2yBdNzCUy78DU9i1OeQJUKP6yLj/IPnnpc3hufFLwfEDWVAi6250tzaUQ7x83g29zD",
+      "GroupIndex": 41
+    },
+    {
+      "NodeID": "b5664ed8443896611d779453594da37c0382c04ebc2e444b40e9bce2dca08f7f",
+      "RandomBeaconPubKey": "ttp+l7RTWVN/GgLGpF4jvdIx135ekS/2Rar4eXjQyE8U5k84VBOnoqq5PMHP6trWF6zf9sDtRpJqYU7ZKuM10Ww7elfb/fN765qQOnlT924MNrDpN3nlZY/7UKDwknMD",
+      "GroupIndex": 42
+    },
+    {
+      "NodeID": "b52bf9a997f7ae23c753cd9a474d772e2521bc03fccccf6f5f6d084e344f5fe2",
+      "RandomBeaconPubKey": "sPAjaNTvV/lVoTf/PAm6VViNDaR4XRviGtB8vvj+Ja8sz+CJh5W6agEqn4yHhNZWDg7Su8+2WhoKYgBwAqXEz3BqxoT4Q8CSz75yKbh8ceLzN2TCQLkpMqmBYrh2lw7h",
+      "GroupIndex": 43
+    },
+    {
+      "NodeID": "74141f7b755b1aabc0fa657e95d261843cab2d82ef45760e6da8f3624dcb5579",
+      "RandomBeaconPubKey": "h6HIgFWcUjV3UATkDzRWRNqa5hguNfUw2864uvR8Fjp+/T1J83Pfi0pXFA+we+jBCLKAQutvnFAXHxaUQ63JzG4oQ1wH5y+m7AXIJrgW85g0lQHCzCh28/b3z+yrLaiz",
+      "GroupIndex": 44
+    },
+    {
+      "NodeID": "1836130969fedb462b73e7ea5fcce6c9c0d99236f037621e5e2532b31e5550db",
+      "RandomBeaconPubKey": "rFkKQoP0gUqy96JCnoBNG/NQ8DIZA6WLlRudb3Q2WESYOTEzaE0p6ZFS4L1MbtSkERCbiq8kgHWXSMM24sBA9H2r9Oz7Nzm9QGIX69TDu8NBsHGxiZhgZUy5Rf2XZbn8",
+      "GroupIndex": 45
+    },
+    {
+      "NodeID": "c82b352617b2df36147649cb962402d6f1d9cf2a8e054f1021022d3a10aec916",
+      "RandomBeaconPubKey": "sRsL1kMPTP/Ry0KUyNpptymGhV1GLyIR1YD7umLXsJ67nLX1lPCWQC9oA/XGKbRlFApwTAY9DnRmrWw+i24ukyf9I8lV1Tl8Y0QrLB0gJFpp2ZVPDXNODVCAtOZstqkU",
+      "GroupIndex": 46
+    },
+    {
+      "NodeID": "7b2b89df050641206570305f89418f8495c240d102daf9f5114fec5defa09e03",
+      "RandomBeaconPubKey": "oZf/Uv2noIKixmO4pSr0OewAt9MlfgSkkCWhxPxCFcmwzv20TlOAop510pJTXD7pCazr3FjSslhJJHEJ1DeukBS+U6NvREt3XJC1egRwpq5cz5aJmwUjwVkAXLRR1NRb",
+      "GroupIndex": 47
+    },
+    {
+      "NodeID": "561252d90946411c99572d41d8d11e5a7d9264ccd298871d6c07225c3487fb03",
+      "RandomBeaconPubKey": "mFiX7gXfBaZB9+i3JIxImY/Xy6hrfm+diMpxZZerSjk6B/PMo3Iz0HhQ7xt9w0NtGNprr+GeMIPEsVH0t/RlIHV6gThx1glbaIgIcKanXCCrA8xOXwsewDHo3wVIHc7P",
+      "GroupIndex": 48
+    },
+    {
+      "NodeID": "b61cc0d27fa061a9ff59a40a3779e3fbd1d2b6bc6c32076b7674f146489dd37f",
+      "RandomBeaconPubKey": "rKAmwg9Iuupfr+jGmcWW8WUt+1AeexnTrU54LqvToM+b0qniYxU4buzW4RuCxJHMD/yAqhpw27rF4zMvmhNKksoBWjowbD01DdzmspBQ59jR3/tCwxrpM8doE2DC1WR4",
+      "GroupIndex": 49
+    }
+  ]
+}
