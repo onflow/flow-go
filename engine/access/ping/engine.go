@@ -94,7 +94,7 @@ func (e *Engine) pingAddress(target flow.Identifier) bool {
 	// ping will timeout in libp2p.PingTimeoutSecs seconds
 	_, err := e.middleware.Ping(target)
 	if err != nil {
-		e.log.Err(err).Str("target", target.String()).Msg("failed to ping")
+		e.log.Debug(err).Str("target", target.String()).Msg("failed to ping")
 		return false
 	}
 	return true
