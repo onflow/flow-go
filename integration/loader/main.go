@@ -139,6 +139,12 @@ func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []Loa
 		if i >= len(tpsDurationsStrings) {
 			break
 		}
+
+		// ignore empty entries (implying that case will run indefinitely)
+		if tpsDurationsStrings[i] == "" {
+			continue
+		}
+
 		d, err := time.ParseDuration(tpsDurationsStrings[i])
 		if err != nil {
 			log.Fatal().Err(err).Str("value", tpsDurationsStrings[i]).
