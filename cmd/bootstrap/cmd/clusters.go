@@ -54,13 +54,19 @@ func constructRootBlocksForClusters(clusters flow.ClusterList) []*cluster.Block 
 	return clusterBlocks
 }
 
-func constructRootQCsForClusters(clusterList flow.ClusterList, nodeInfos []model.NodeInfo, block *flow.Block, clusterBlocks []*cluster.Block) []*hotstuff.QuorumCertificate {
+func constructRootQCsForClusters(
+	clusterList flow.ClusterList,
+	nodeInfos []model.NodeInfo,
+	block *flow.Block,
+	clusterBlocks []*cluster.Block,
+) []*hotstuff.QuorumCertificate {
 
 	if len(clusterBlocks) != len(clusterList) {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
 			Msg("number of clusters needs to equal number of cluster blocks")
 	}
 
+	qcs := make([]*hotstuff.QuorumCertificate, len(clusterBlocks))
 	for i, cluster := range clusterList {
 		signers := filterClusterSigners(cluster, nodeInfos)
 
@@ -68,12 +74,15 @@ func constructRootQCsForClusters(clusterList flow.ClusterList, nodeInfos []model
 		if err != nil {
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
 		}
+		qcs[i] = qc
 
 		// cluster ID is equivalent to chain ID
 		clusterID := clusterBlocks[i].Header.ChainID
 		// TODO remove
 		writeJSON(fmt.Sprintf(model.PathRootClusterQC, clusterID), qc)
 	}
+
+	return qcs
 }
 
 // Filters a list of nodes to include only nodes that will sign the QC for the

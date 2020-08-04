@@ -81,7 +81,7 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root execution result and block seal")
-		constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments)
+		constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")

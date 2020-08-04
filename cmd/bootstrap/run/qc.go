@@ -8,7 +8,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
@@ -21,7 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -35,16 +33,21 @@ type Participant struct {
 type ParticipantData struct {
 	Commit       *epoch.Commit
 	Participants []Participant
+	Lookup       map[flow.Identifier]epoch.DKGParticipant
+	GroupKey     crypto.PublicKey
 }
 
-func GenerateRootQC(participantData ParticipantData, block *flow.Block) (*model.QuorumCertificate, error) {
-	state, db, err := NewProtocolState(block)
-	if err != nil {
-		return nil, err
+func (pd *ParticipantData) Identities() flow.IdentityList {
+	nodes := make([]bootstrap.NodeInfo, 0, len(pd.Participants))
+	for _, participant := range pd.Participants {
+		nodes = append(nodes, participant.NodeInfo)
 	}
-	defer db.Close()
+	return bootstrap.ToIdentityList(nodes)
+}
 
-	validators, signers, err := createValidators(state, participantData, block)
+func GenerateRootQC(block *flow.Block, participantData ParticipantData) (*model.QuorumCertificate, error) {
+
+	validators, signers, err := createValidators(participantData)
 	if err != nil {
 		return nil, err
 	}
@@ -79,8 +82,9 @@ func GenerateRootQC(participantData ParticipantData, block *flow.Block) (*model.
 	return qc, err
 }
 
-func createValidators(ps protocol.State, participantData ParticipantData, block *flow.Block) ([]hotstuff.Validator, []hotstuff.Signer, error) {
+func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []hotstuff.Signer, error) {
 	n := len(participantData.Participants)
+	identities := participantData.Identities()
 
 	groupSize := uint(len(participantData.Commit.DKGParticipants))
 	if groupSize < uint(n) {
@@ -104,14 +108,8 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 			return nil, nil, err
 		}
 
-		selection := leader.NewSelectionForBootstrap()
-
 		// create consensus committee's state
-		committee, err := committee.NewStaticCommittee()
-		committee, err := committee.NewMainConsensusCommitteeState(ps, participant.NodeID, selection)
-		if err != nil {
-			return nil, nil, err
-		}
+		committee, err := committee.NewStaticCommittee(identities, local.NodeID(), participantData.Lookup, participantData.GroupKey)
 
 		// create signer
 		// TODO: The DKG data is now included in the epoch commit event, which is in turn included in the root seal. If

@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
+// TODO create canonical definition in protocol/state
 func GenerateRootClusterBlocks(clusters flow.ClusterList) []*cluster.Block {
 	clusterBlocks := make([]*cluster.Block, len(clusters))
 	for i := range clusterBlocks {
@@ -21,6 +22,7 @@ func GenerateRootClusterBlocks(clusters flow.ClusterList) []*cluster.Block {
 	return clusterBlocks
 }
 
+// TODO create canonical definition in protocol/state
 func GenerateRootClusterBlock(identities flow.IdentityList) *cluster.Block {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	header := &flow.Header{
