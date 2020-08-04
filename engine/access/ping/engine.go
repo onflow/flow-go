@@ -3,13 +3,14 @@ package ping
 import (
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/rs/zerolog"
 )
 
 type Engine struct {
