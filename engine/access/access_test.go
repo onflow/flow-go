@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -25,7 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
@@ -38,15 +37,15 @@ import (
 
 type Suite struct {
 	suite.Suite
-	state              *protocol.State
-	snapshot           *protocol.Snapshot
-	log                zerolog.Logger
-	net                *mockmodule.Network
-	collClient         *accessmock.AccessAPIClient
-	execClient         *accessmock.ExecutionAPIClient
-	collectionsConduit *networkmock.Conduit
-	me                 *mockmodule.Local
-	chainID            flow.ChainID
+	state      *protocol.State
+	snapshot   *protocol.Snapshot
+	log        zerolog.Logger
+	net        *mockmodule.Network
+	request    *mockmodule.Requester
+	collClient *accessmock.AccessAPIClient
+	execClient *accessmock.ExecutionAPIClient
+	me         *mockmodule.Local
+	chainID    flow.ChainID
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -57,18 +56,19 @@ func TestAccess(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
+	suite.net = new(mockmodule.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
-	suite.net = new(mockmodule.Network)
-	suite.collectionsConduit = &networkmock.Conduit{}
+	suite.request = new(mockmodule.Requester)
+	suite.request.On("EntityByID", mock.Anything, mock.Anything)
 	suite.me = new(mockmodule.Local)
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
-	suite.chainID = flow.Mainnet
+	suite.chainID = flow.Testnet
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
@@ -82,7 +82,9 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions, suite.chainID)
+		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections,
+			transactions, suite.chainID, metrics)
+
 		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.snapshot, nil)
 		suite.snapshot.On("Head").Return(&referenceBlock, nil).Once()
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
@@ -114,7 +116,8 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities,
+		_ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
 		// test block2 get by height
@@ -128,7 +131,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil, suite.chainID)
+		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil,
+			suite.chainID, metrics.NewNoopCollector())
 
 		assertHeaderResp := func(resp *access.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
@@ -205,12 +209,12 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
-		suite.net.On("Register", uint8(engine.CollectionProvider), mock.Anything).
-			Return(suite.collectionsConduit, nil).
+		conduit := new(networkmock.Conduit)
+		suite.net.On("Register", uint8(engine.ReceiveReceipts), mock.Anything).Return(conduit, nil).
 			Once()
+		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
-		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
 
 		exeEventResp := execution.GetTransactionResultResponse{
 			Events: nil,
@@ -222,15 +226,24 @@ func (suite *Suite) TestGetSealedTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
+		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		blocksToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
 
-		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, suite.chainID)
+		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
+			suite.chainID, metrics)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections, transactions, rpcEng)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
+			transactions, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
-		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, collections, transactions, suite.chainID)
+		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers,
+			collections, transactions, suite.chainID, metrics)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
@@ -243,21 +256,19 @@ func (suite *Suite) TestGetSealedTransaction() {
 			BlockID: block.ID(),
 		}
 		ingestEng.OnFinalizedBlock(mb)
-		time.Sleep(1 * time.Second)
 
-		// 3. Ingest engine requests all collections of the block
-		suite.collectionsConduit.AssertExpectations(suite.T())
+		// 3. Request engine is used to request missing collection
+		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 
-		// 4. Ingest engine receives the requested collection
-		cr := &messages.CollectionResponse{Collection: collection}
-		err = ingestEng.Process(originID, cr)
-		require.NoError(suite.T(), err)
+		// 4. Ingest engine receives the requested collection and finishes processing
+		ingestEng.OnCollection(originID, &collection)
+		<-ingestEng.Done()
 
 		// 5. client requests a transaction
 		tx := collection.Transactions[0]
-		id := tx.ID()
+		txID := tx.ID()
 		getReq := &access.GetTransactionRequest{
-			Id: id[:],
+			Id: txID[:],
 		}
 		gResp, err := handler.GetTransactionResult(context.Background(), getReq)
 		require.NoError(suite.T(), err)
@@ -290,7 +301,8 @@ func (suite *Suite) TestExecuteScript() {
 
 		ctx := context.Background()
 
-		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, nil, nil, suite.chainID)
+		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, nil,
+			nil, suite.chainID, metrics.NewNoopCollector())
 
 		script := []byte("dummy script")
 
@@ -353,12 +365,13 @@ func (suite *Suite) TestExecuteScript() {
 
 func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	collection := unittest.CollectionFixture(10)
-	cg := &flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: collection.ID(),
 		Signature:    crypto.Signature([]byte("signature A")),
 	}
 	block := unittest.BlockFixture()
-	block.Payload.Guarantees = []*flow.CollectionGuarantee{cg}
+	block.Payload.Guarantees = []*flow.CollectionGuarantee{guarantee}
+	block.Header.PayloadHash = block.Payload.Hash()
 
 	return block, collection
 }

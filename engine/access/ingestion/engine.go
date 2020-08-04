@@ -5,7 +5,7 @@ package ingestion
 import (
 	"errors"
 	"fmt"
-	"math/rand"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -13,9 +13,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -24,13 +24,11 @@ import (
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
 type Engine struct {
-	unit  *engine.Unit   // used to manage concurrency & shutdown
-	log   zerolog.Logger // used to log relevant actions with context
-	state protocol.State // used to access the  protocol state
-	me    module.Local   // used to access local node information
-
-	// Conduits
-	collectionConduit network.Conduit
+	unit    *engine.Unit     // used to manage concurrency & shutdown
+	log     zerolog.Logger   // used to log relevant actions with context
+	state   protocol.State   // used to access the  protocol state
+	me      module.Local     // used to access local node information
+	request module.Requester // used to request collections
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
@@ -39,40 +37,56 @@ type Engine struct {
 	collections  storage.Collections
 	transactions storage.Transactions
 
+	// metrics
+	transactionMetrics         module.TransactionMetrics
+	collectionsToMarkFinalized *stdmap.Times
+	collectionsToMarkExecuted  *stdmap.Times
+	blocksToMarkExecuted       *stdmap.Times
+
 	rpcEngine *rpc.Engine
 }
 
 // New creates a new access ingestion engine
-func New(log zerolog.Logger,
+func New(
+	log zerolog.Logger,
 	net module.Network,
 	state protocol.State,
 	me module.Local,
+	request module.Requester,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
+	transactionMetrics module.TransactionMetrics,
+	collectionsToMarkFinalized *stdmap.Times,
+	collectionsToMarkExecuted *stdmap.Times,
+	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
-		unit:         engine.NewUnit(),
-		log:          log.With().Str("engine", "ingestion").Logger(),
-		state:        state,
-		me:           me,
-		blocks:       blocks,
-		headers:      headers,
-		collections:  collections,
-		transactions: transactions,
-		rpcEngine:    rpcEngine,
+		unit:                       engine.NewUnit(),
+		log:                        log.With().Str("engine", "ingestion").Logger(),
+		state:                      state,
+		me:                         me,
+		request:                    request,
+		blocks:                     blocks,
+		headers:                    headers,
+		collections:                collections,
+		transactions:               transactions,
+		transactionMetrics:         transactionMetrics,
+		collectionsToMarkFinalized: collectionsToMarkFinalized,
+		collectionsToMarkExecuted:  collectionsToMarkExecuted,
+		blocksToMarkExecuted:       blocksToMarkExecuted,
+		rpcEngine:                  rpcEngine,
 	}
 
-	collConduit, err := net.Register(engine.CollectionProvider, eng)
+	// register engine with the execution receipt provider
+	_, err := net.Register(engine.ReceiveReceipts, eng)
 	if err != nil {
-		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
+		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
-
-	eng.collectionConduit = collConduit
 
 	return eng, nil
 }
@@ -125,8 +139,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
-	case *messages.CollectionResponse:
-		return e.handleCollectionResponse(originID, entity)
+	case *flow.ExecutionReceipt:
+		return e.handleExecutionReceipt(originID, entity)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -135,19 +149,20 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 	e.unit.Launch(func() {
-		id := hb.BlockID
-		err := e.processFinalizedBlock(id)
+		blockID := hb.BlockID
+		err := e.processFinalizedBlock(blockID)
 		if err != nil {
-			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
+			e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
 			return
 		}
+		e.trackFinalizedMetricForBlock(hb)
 	})
 }
 
 // processBlock handles an incoming finalized block.
-func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
+func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 
-	block, err := e.blocks.ByID(id)
+	block, err := e.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup block: %w", err)
 	}
@@ -166,14 +181,115 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	// request each of the collections from the collection node
-	return e.requestCollections(block.Payload.Guarantees...)
+	// queue requesting each of the collections from the collection node
+	for _, guarantee := range block.Payload.Guarantees {
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+	}
+
+	return nil
 }
 
-// handleCollectionResponse handles the response of the a collection request made earlier when a block was received
-func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
-	collection := response.Collection
+func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
+	// retrieve the block
+	block, err := e.blocks.ByID(hb.BlockID)
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not track tx finalized metric: finalized block not found locally")
+		return
+	}
+
+	// TODO lookup actual finalization time by looking at the block finalizing `b`
+	now := time.Now().UTC()
+
+	// mark all transactions as finalized
+	// TODO: sample to reduce performance overhead
+	for _, g := range block.Payload.Guarantees {
+		l, err := e.collections.LightByID(g.CollectionID)
+		if errors.Is(err, storage.ErrNotFound) {
+			e.collectionsToMarkFinalized.Add(g.CollectionID, now)
+			continue
+		} else if err != nil {
+			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
+				Msg("could not track tx finalized metric: finalized collection not found locally")
+			continue
+		}
+
+		for _, t := range l.Transactions {
+			e.transactionMetrics.TransactionFinalized(t, now)
+		}
+	}
+
+	if ti, found := e.blocksToMarkExecuted.ByID(hb.BlockID); found {
+		e.trackExecutedMetricForBlock(block, ti)
+		e.blocksToMarkExecuted.Rem(hb.BlockID)
+	}
+}
+
+func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.ExecutionReceipt) error {
+	e.trackExecutedMetricForReceipt(r)
+	return nil
+}
+
+func (e *Engine) trackExecutedMetricForReceipt(r *flow.ExecutionReceipt) {
+	// TODO add actual execution time to execution receipt?
+	now := time.Now().UTC()
+
+	// retrieve the block
+	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+	if errors.Is(err, storage.ErrNotFound) {
+		e.blocksToMarkExecuted.Add(r.ExecutionResult.BlockID, now)
+		return
+	} else if err != nil {
+		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
+		return
+	}
+	e.trackExecutedMetricForBlock(b, now)
+}
+
+func (e *Engine) trackExecutedMetricForBlock(block *flow.Block, ti time.Time) {
+
+	// mark all transactions as executed
+	// TODO: sample to reduce performance overhead
+	for _, g := range block.Payload.Guarantees {
+		l, err := e.collections.LightByID(g.CollectionID)
+		if errors.Is(err, storage.ErrNotFound) {
+			e.collectionsToMarkExecuted.Add(g.CollectionID, ti)
+			continue
+		} else if err != nil {
+			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
+				Msg("could not track tx executed metric: executed collection not found locally")
+			continue
+		}
+
+		for _, t := range l.Transactions {
+			e.transactionMetrics.TransactionExecuted(t, ti)
+		}
+	}
+}
+
+// handleCollection handles the response of the a collection request made earlier when a block was received
+func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) error {
+
+	// convert the entity to a strictly typed collection
+	collection, ok := entity.(*flow.Collection)
+	if !ok {
+		return fmt.Errorf("invalid entity type (%T)", entity)
+	}
+
 	light := collection.Light()
+
+	if ti, found := e.collectionsToMarkFinalized.ByID(light.ID()); found {
+		for _, t := range light.Transactions {
+			e.transactionMetrics.TransactionFinalized(t, ti)
+		}
+		e.collectionsToMarkFinalized.Rem(light.ID())
+	}
+
+	if ti, found := e.collectionsToMarkExecuted.ByID(light.ID()); found {
+		for _, t := range light.Transactions {
+			e.transactionMetrics.TransactionExecuted(t, ti)
+		}
+		e.collectionsToMarkExecuted.Rem(light.ID())
+	}
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
@@ -185,7 +301,7 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 		// ignore collection if already seen
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			e.log.Debug().
-				Hex("collection_id", logging.ID(light.ID())).
+				Hex("collection_id", logging.Entity(light)).
 				Msg("collection is already seen")
 			return nil
 		}
@@ -196,27 +312,19 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 	for _, tx := range collection.Transactions {
 		err := e.transactions.Store(tx)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
 		}
 	}
 
 	return nil
 }
 
-func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
-	for _, guarantee := range guarantees {
-		req := &messages.CollectionRequest{
-			ID:    guarantee.ID(),
-			Nonce: rand.Uint64(),
-		}
-		err := e.collectionConduit.Submit(req, guarantee.SignerIDs...)
-		if err != nil {
-			return err
-		}
+func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
+	err := e.handleCollection(originID, entity)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not handle collection")
+		return
 	}
-
-	return nil
-
 }
 
 // OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks

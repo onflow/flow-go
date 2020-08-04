@@ -158,12 +158,6 @@ type VerificationMetrics interface {
 	// OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
 	// It increases the total number of result approvals.
 	OnResultApproval()
-	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
-	// it starts the timer to record the execution time
-	OnChunkVerificationStarted(chunkID flow.Identifier)
-	// OnChunkVerificationFinished is called whenever chunkID verification gets finished
-	// it records the duration of execution.
-	OnChunkVerificationFinished(chunkID flow.Identifier)
 
 	// LogVerifiableChunkSize is called whenever a verifiable chunk is shaped for a specific
 	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
@@ -277,4 +271,17 @@ type ExecutionMetrics interface {
 	ExecutionCollectionRequestSent()
 
 	ExecutionCollectionRequestRetried()
+}
+
+type TransactionMetrics interface {
+	// TransactionReceived starts tracking of transaction execution/finalization/sealing
+	TransactionReceived(txID flow.Identifier, when time.Time)
+
+	// TransactionFinalized reports the time spent between the transaction being received and finalized. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionFinalized(txID flow.Identifier, when time.Time)
+
+	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionExecuted(txID flow.Identifier, when time.Time)
 }

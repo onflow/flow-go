@@ -87,7 +87,7 @@ generate-proto:
 .PHONY: generate-mocks
 generate-mocks:
 	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks,Payloads,Collections,Commits,Events,TransactionResults
-	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
+	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local,Requester
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	GO111MODULE=on mockgen -destination=network/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/network Engine
 	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
@@ -136,7 +136,14 @@ ci: install-tools tidy lint test coverage
 # on Teamcity
 .PHONY: ci-integration
 ci-integration: install-tools
-	$(MAKE) -C integration integration-test
+	$(MAKE) -C integration ci-integration-test
+
+# Runs benchmark tests
+# NOTE: we do not need `docker-build-flow` as this is run as a separate step
+# on Teamcity
+.PHONY: ci-benchmark
+ci-benchmark: install-tools
+	$(MAKE) -C integration ci-benchmark
 
 # Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
@@ -186,6 +193,22 @@ docker-ci-integration-team-city:
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci-integration
+
+# This command is should only be used by Team City (for linux)
+# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
+.PHONY: docker-ci-benchmark-team-city
+docker-ci-benchmark-team-city:
+	docker run \
+		--env DOCKER_API_VERSION='1.39' \
+		--network host \
+		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
+		-v /tmp:/tmp \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
+		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
+		make ci-benchmark
+	cat /tmp/tx_per_second_test_teamcity.txt
 
 .PHONY: docker-build-collection
 docker-build-collection:
@@ -256,6 +279,11 @@ docker-build-bootstrap:
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap/transit --target production-nocgo \
 		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-loader
+docker-build-loader:
+	docker build -f ./integration/benchmark/main/Dockerfile --ssh default --build-arg TARGET=benchmark/main --target production \
+		-t gcr.io/dl-flow/loader:latest -t "gcr.io/dl-flow/loader:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost

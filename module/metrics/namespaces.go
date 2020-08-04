@@ -4,6 +4,7 @@ package metrics
 const (
 	namespaceNetwork      = "network"
 	namespaceStorage      = "storage"
+	namespaceAccess       = "access"
 	namespaceCollection   = "collection"
 	namespaceConsensus    = "consensus"
 	namespaceVerification = "verification"
@@ -22,6 +23,11 @@ const (
 	subsystemBadger  = "badger"
 	subsystemMempool = "mempool"
 	subsystemCache   = "cache"
+)
+
+// Access subsystem
+const (
+	subsystemTransactionTiming = "transaction_timing"
 )
 
 // Collection subsystem

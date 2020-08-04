@@ -13,12 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	mock2 "github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
@@ -82,7 +84,7 @@ func VerificationHappyPath(t *testing.T,
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
 		for _, verIdentity := range verIdentities {
-			if IsAssigned(chunk.Index) {
+			if IsAssigned(chunk.Index, len(completeER.Receipt.ExecutionResult.Chunks)) {
 				assignees = append(assignees, verIdentity.NodeID)
 			}
 		}
@@ -127,7 +129,13 @@ func VerificationHappyPath(t *testing.T,
 	exeNode, exeEngine := SetupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
 
 	// mock consensus node
-	conNode, conEngine, conWG := SetupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
+	conNode, conEngine, conWG := SetupMockConsensusNode(t,
+		hub,
+		conIdentity,
+		verIdentities,
+		identities,
+		completeER,
+		chainID)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}
@@ -141,7 +149,8 @@ func VerificationHappyPath(t *testing.T,
 	}
 
 	// requires all verification nodes process the receipt
-	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second,
+		"verification node process")
 
 	// creates a network instance for each verification node
 	// and sets it in continuous delivery mode
@@ -152,14 +161,15 @@ func VerificationHappyPath(t *testing.T,
 		assert.True(t, ok)
 		verNet.StartConDev(requestInterval, true)
 		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-			return m.ChannelID == engine.CollectionProvider
+			return m.ChannelID == engine.RequestCollections
 		})
 
 		verNets = append(verNets, verNet)
 	}
 
 	// requires all verification nodes send a result approval per assigned chunk
-	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second,
+		"consensus node process")
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
@@ -211,13 +221,14 @@ func SetupMockExeNode(t *testing.T,
 
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
+	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if IsAssigned(chunk.Index) {
+		if IsAssigned(chunk.Index, chunksNum) {
 			chunkDataPackCount++
 		}
 	}
 
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
 	chunkNum := len(completeER.ChunkDataPacks)
@@ -232,16 +243,21 @@ func SetupMockExeNode(t *testing.T,
 						require.True(t, ok, "chunk out of range requested")
 						chunkID := chunk.ID()
 						if chunkID == req.ChunkID {
-							if !IsAssigned(chunk.Index) {
+							if !IsAssigned(chunk.Index, chunksNum) {
 								require.Error(t, fmt.Errorf(" requested an unassigned chunk data pack %x", req))
 							}
 
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataResponse{
 								ChunkDataPack: *completeER.ChunkDataPacks[i],
-								Collection:    *completeER.Collections[i],
 								Nonce:         rand.Uint64(),
 							}
+
+							// only non-system chunks have a collection
+							if !isSystemChunk(uint64(i), chunksNum) {
+								res.Collection = *completeER.Collections[i]
+							}
+
 							err := exeChunkDataConduit.Submit(res, originID)
 							assert.Nil(t, err)
 
@@ -277,8 +293,9 @@ func SetupMockConsensusNode(t *testing.T,
 	chainID flow.ChainID) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
+	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if IsAssigned(chunk.Index) {
+		if IsAssigned(chunk.Index, chunksNum) {
 			approvalsCount++
 		}
 	}
@@ -301,6 +318,9 @@ func SetupMockConsensusNode(t *testing.T,
 		resultApprovalSeen[verIdentity.NodeID] = make(map[flow.Identifier]struct{})
 	}
 
+	// creates a hasher for spock
+	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
+
 	conEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			originID, ok := args[0].(flow.Identifier)
@@ -308,6 +328,10 @@ func SetupMockConsensusNode(t *testing.T,
 
 			resultApproval, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
+
+			log.Debug().
+				Hex("result_approval_id", logging.ID(resultApproval.ID())).
+				Msg("result approval received")
 
 			// asserts that result approval has not been seen from this
 			_, ok = resultApprovalSeen[originID][resultApproval.ID()]
@@ -317,12 +341,36 @@ func SetupMockConsensusNode(t *testing.T,
 			resultApprovalSeen[originID][resultApproval.ID()] = struct{}{}
 
 			// asserts that the result approval is assigned to the verifier
-			assert.True(t, IsAssigned(resultApproval.Body.ChunkIndex))
+			assert.True(t, IsAssigned(resultApproval.Body.ChunkIndex, chunksNum))
+
+			// verifies SPoCK proof of result approval
+			// against the SPoCK secret of the execution result
+			//
+			// retrieves public key of verification node
+			var pk crypto.PublicKey
+			found := false
+			for _, identity := range verIdentities {
+				if originID == identity.NodeID {
+					pk = identity.StakingPubKey
+					found = true
+				}
+			}
+			require.True(t, found)
+
+			// verifies proof
+			valid, err := crypto.SPOCKVerifyAgainstData(
+				pk,
+				resultApproval.Body.Spock,
+				completeER.SpockSecrets[resultApproval.Body.ChunkIndex],
+				hasher,
+			)
+			assert.NoError(t, err)
+			assert.True(t, valid)
 
 			wg.Done()
 		}).Return(nil)
 
-	_, err := conNode.Net.Register(engine.ApprovalProvider, conEngine)
+	_, err := conNode.Net.Register(engine.ReceiveApprovals, conEngine)
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg
@@ -332,7 +380,9 @@ func SetupMockConsensusNode(t *testing.T,
 // - that a set of chunks are delivered to it.
 // - that each chunk is delivered exactly once
 // SetupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
-func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunkData) (*network.Engine, *sync.WaitGroup) {
+func SetupMockVerifierEng(t testing.TB,
+	vChunks []*verification.VerifiableChunkData,
+	completeER *utils.CompleteExecutionResult) (*network.Engine, *sync.WaitGroup) {
 	eng := new(network.Engine)
 
 	// keep track of which verifiable chunks we have received
@@ -346,8 +396,9 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunkD
 
 	// computes expected number of assigned chunks
 	expected := 0
+	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
 	for _, c := range vChunks {
-		if IsAssigned(c.Chunk.Index) {
+		if IsAssigned(c.Chunk.Index, chunksNum) {
 			expected++
 		}
 	}
@@ -419,6 +470,14 @@ func VerifiableDataChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *v
 }
 
 // IsAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
-func IsAssigned(index uint64) bool {
-	return index%2 == 0
+// It also returns true if the index corresponds to the system chunk.
+func IsAssigned(index uint64, chunkNum int) bool {
+	ok := index%2 == 0 || isSystemChunk(index, chunkNum)
+	return ok
+}
+
+// isSystemChunk returns true if the index corresponds to the system chunk, i.e., last chunk in
+// the receipt.
+func isSystemChunk(index uint64, chunkNum int) bool {
+	return int(index) == chunkNum-1
 }

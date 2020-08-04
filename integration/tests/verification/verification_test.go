@@ -2,7 +2,6 @@ package verification
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -10,17 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/mock"
-	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -86,13 +82,18 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	// complete ER counter example
 	completeER := utils.CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain())
-	chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(0))
-	assert.True(t, ok)
 
 	// assigner and assignment
 	assigner := &mock.ChunkAssigner{}
 	assignment := chmodel.NewAssignment()
-	assignment.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+		assignees := make([]flow.Identifier, 0)
+		if verification.IsAssigned(chunk.Index, len(completeER.Receipt.ExecutionResult.Chunks)) {
+			assignees = append(assignees, verIdentity.NodeID)
+		}
+		assignment.Add(chunk, assignees)
+	}
+
 	assigner.On("Assign",
 		testifymock.Anything,
 		completeER.Receipt.ExecutionResult.Chunks,
@@ -129,44 +130,29 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities, chainID)
-	exeEngine := new(network.Engine)
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
-	assert.Nil(t, err)
-	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			if _, ok := args[1].(*messages.ChunkDataRequest); ok {
-				// publishes the chunk data pack response to the network
-				res := &messages.ChunkDataResponse{
-					ChunkDataPack: *completeER.ChunkDataPacks[0],
-					Collection:    *completeER.Collections[0],
-					Nonce:         rand.Uint64(),
-				}
-				err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
-				assert.Nil(t, err)
-			}
-		}).Return(nil).Once()
+	exeNode, exeEngine := verification.SetupMockExeNode(t,
+		hub,
+		exeIdentity,
+		flow.IdentityList{verIdentity},
+		identities,
+		chainID,
+		completeER)
 
 	// consensus node
-	conNode := testutil.GenericNode(t, hub, conIdentity, identities, chainID)
-	conEngine := new(network.Engine)
-	approvalWG := sync.WaitGroup{}
-	approvalWG.Add(1)
-	conEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			_, ok := args[1].(*flow.ResultApproval)
-			assert.True(t, ok)
-			approvalWG.Done()
-		}).Return(nil).Once()
-
-	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
-	assert.Nil(t, err)
+	// mock consensus node
+	conNode, conEngine, conWG := verification.SetupMockConsensusNode(t,
+		hub,
+		conIdentity,
+		flow.IdentityList{verIdentity},
+		identities,
+		completeER,
+		chainID)
 
 	// send the ER from execution to verification node
 	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
-	unittest.RequireReturnsBefore(t, approvalWG.Wait, 5*time.Second)
+	unittest.RequireReturnsBefore(t, conWG.Wait, 5*time.Second, "consensus nodes process")
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
@@ -190,5 +176,4 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNode.Done()
 	conNode.Done()
 	exeNode.Done()
-
 }

@@ -5,12 +5,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/trace"
 )
-
-// Verification spans.
-const chunkExecutionSpanner = "chunk_execution_duration"
 
 type VerificationCollector struct {
 	tracer          *trace.OpenTracer
@@ -204,19 +200,6 @@ func (vc *VerificationCollector) OnResultApproval() {
 	// the approvals disseminated by verifier engine
 	vc.resultApprovalsTotal.Inc()
 
-}
-
-// OnChunkVerificationStarted is called whenever the verification of a chunk is started.
-// It starts the timer to record the execution time.
-func (vc *VerificationCollector) OnChunkVerificationStarted(chunkID flow.Identifier) {
-	// starts spanner tracer for this chunk ID
-	vc.tracer.StartSpan(chunkID, chunkExecutionSpanner)
-}
-
-// OnChunkVerificationFinished is called whenever chunkID verification gets finished.
-// It finishes recording the duration of execution.
-func (vc *VerificationCollector) OnChunkVerificationFinished(chunkID flow.Identifier) {
-	vc.tracer.FinishSpan(chunkID, chunkExecutionSpanner)
 }
 
 // LogVerifiableChunkSize is called whenever a verifiable chunk is shaped for a specific

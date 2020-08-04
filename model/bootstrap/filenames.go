@@ -23,6 +23,7 @@ var (
 	PathRootSeal              = filepath.Join(DirnamePublicBootstrap, "root-block-seal.json")
 	PathRootClusterBlock      = filepath.Join(DirnamePublicBootstrap, "root-cluster-block.%v.json") // %v will be replaced by cluster ID
 	PathRootClusterQC         = filepath.Join(DirnamePublicBootstrap, "root-cluster-qc.%v.json")    // %v will be replaced by cluster ID
+	PathNClusters             = filepath.Join(DirnamePublicBootstrap, "root-nclusters.json")
 
 	// private genesis information
 	DirPrivateRoot           = "private-root-information"

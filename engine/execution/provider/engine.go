@@ -66,12 +66,12 @@ func New(
 
 	var err error
 
-	eng.receiptCon, err = net.Register(engine.ExecutionReceiptProvider, &eng)
+	eng.receiptCon, err = net.Register(engine.PushReceipts, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
-	chunksConduit, err := net.Register(engine.ChunkDataPackProvider, &eng)
+	chunksConduit, err := net.Register(engine.ProvideChunks, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
@@ -202,7 +202,8 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Msg("broadcasting execution receipt")
 
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus, flow.RoleVerification))
+	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,
+		flow.RoleVerification))
 	if err != nil {
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
