@@ -347,30 +347,43 @@ func (lg *ContLoadGenerator) sendTx(workerID int) {
 	lg.workerStatsTracker.AddTxSent()
 
 	if lg.trackTxs {
+		stopped := false
 		wg := sync.WaitGroup{}
-		wg.Add(1)
 		lg.txTracker.AddTx(transferTx.ID(),
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 				lg.log.Trace().Str("tx_id", transferTx.ID().String()).Msgf("finalized tx")
-				wg.Done()
+				if !stopped {
+					stopped = true
+					wg.Done()
+				}
 			}, // on finalized
 			func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
 				lg.log.Trace().Str("tx_id", transferTx.ID().String()).Msgf("sealed tx")
 			}, // on sealed
 			func(_ flowsdk.Identifier) {
 				lg.log.Warn().Str("tx_id", transferTx.ID().String()).Msgf("tx expired")
-				wg.Done()
+				if !stopped {
+					stopped = true
+					wg.Done()
+				}
 			}, // on expired
 			func(_ flowsdk.Identifier) {
 				lg.log.Warn().Str("tx_id", transferTx.ID().String()).Msgf("tx timed out")
-				wg.Done()
+				if !stopped {
+					stopped = true
+					wg.Done()
+				}
 			}, // on timout
 			func(_ flowsdk.Identifier, err error) {
 				lg.log.Error().Err(err).Str("tx_id", transferTx.ID().String()).Msgf("tx error")
-				wg.Done()
+				if !stopped {
+					stopped = true
+					wg.Done()
+				}
 			}, // on error
 			60)
+		wg.Add(1)
 		wg.Wait()
 	}
 }
