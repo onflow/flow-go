@@ -97,8 +97,7 @@ func (lg *ContLoadGenerator) Init() error {
 		return err
 	}
 
-	err = lg.distributeInitialTokens()
-	return err
+	return nil
 }
 
 func (lg *ContLoadGenerator) Start() {
@@ -122,21 +121,37 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.workerStatsTracker.StopPrinting()
 }
 
-const createAccountsTransaction = `
-transaction(publicKey: [UInt8], count: Int) {
+const createAccountsTransactionTemplate = `
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+
+transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
   prepare(signer: AuthAccount) {
+	let vault = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+      ?? panic("Could not borrow reference to the owner's Vault")
+
     var i = 0
     while i < count {
       let account = AuthAccount(payer: signer)
       account.addPublicKey(publicKey)
+
+	  let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
+		?? panic("Could not borrow receiver reference to the recipient's Vault")
+
+      receiver.deposit(from: <-vault.withdraw(amount: initialTokenAmount))
+
       i = i + 1
     }
   }
 }
 `
 
+func createAccountsTransaction(fungibleToken, flowToken flowsdk.Address) []byte {
+	return []byte(fmt.Sprintf(createAccountsTransactionTemplate, fungibleToken, flowToken))
+}
+
 func (lg *ContLoadGenerator) createAccounts() error {
-	lg.log.Info().Msgf("creating %d accounts...", lg.numberOfAccounts)
+	lg.log.Info().Msgf("creating and funding %d accounts...", lg.numberOfAccounts)
 
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
@@ -153,7 +168,7 @@ func (lg *ContLoadGenerator) createAccounts() error {
 
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
-		SetScript([]byte(createAccountsTransaction)).
+		SetScript(createAccountsTransaction(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
 		SetReferenceBlockID(blockRef).
 		SetProposalKey(
 			*lg.serviceAccount.address,
@@ -166,12 +181,25 @@ func (lg *ContLoadGenerator) createAccounts() error {
 	publicKey := bytesToCadenceArray(accountKey.Encode())
 	count := cadence.NewInt(lg.numberOfAccounts)
 
+	initialTokenAmount, err := cadence.NewUFix64FromParts(
+		24*60*60*tokensPerTransfer, //  (24 hours at 1 block per second and 10 tokens sent)
+		0,
+	)
+	if err != nil {
+		return err
+	}
+
 	err = createAccountTx.AddArgument(publicKey)
 	if err != nil {
 		return err
 	}
 
 	err = createAccountTx.AddArgument(count)
+	if err != nil {
+		return err
+	}
+
+	err = createAccountTx.AddArgument(initialTokenAmount)
 	if err != nil {
 		return err
 	}
@@ -260,81 +288,6 @@ func (lg *ContLoadGenerator) createAccounts() error {
 
 	lg.log.Info().Msgf("created %d accounts", len(lg.accounts))
 
-	return nil
-}
-
-func (lg *ContLoadGenerator) fundAccount(blockRef flowsdk.Identifier, acc *flowAccount, done func()) error {
-	// Transfer tokens
-	transferScript, err := lg.scriptCreator.TokenTransferScript(
-		lg.fungibleTokenAddress,
-		lg.flowTokenAddress,
-		acc.address,
-		24*60*60*tokensPerTransfer) //  (24 hours a 1 block per second a 10 tokens sent)
-	if err != nil {
-		return err
-	}
-	transferTx := flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef).
-		SetScript(transferScript).
-		SetProposalKey(*lg.serviceAccount.address, acc.i+1, 1).
-		SetPayer(*lg.serviceAccount.address).
-		AddAuthorizer(*lg.serviceAccount.address)
-
-	// TODO signer be thread safe
-	lg.serviceAccount.signerLock.Lock()
-	err = transferTx.SignEnvelope(*lg.serviceAccount.address, acc.i+1, lg.serviceAccount.signer)
-	if err != nil {
-		return err
-	}
-	lg.serviceAccount.signerLock.Unlock()
-
-	err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
-	if err != nil {
-		return err
-	}
-
-	lg.txTracker.AddTx(transferTx.ID(),
-		nil,
-		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-			// fmt.Println(res)
-			done()
-		},
-		nil,
-		func(_ flowsdk.Identifier) {
-			lg.log.Error().Msg("fund account transaction has expired")
-			done()
-		}, // on expired
-		func(_ flowsdk.Identifier) {
-			lg.log.Error().Msg("fund account transaction has timed out")
-			done()
-		}, // on timout
-		func(_ flowsdk.Identifier, err error) {
-			lg.log.Error().Err(err).Msg("fund account transaction encountered an error")
-			done()
-		}, // on error
-		120)
-
-	return nil
-}
-
-func (lg *ContLoadGenerator) distributeInitialTokens() error {
-	lg.log.Info().Msgf("distributing initial tokens...")
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		return err
-	}
-	allTxWG := sync.WaitGroup{}
-
-	for i := 0; i < len(lg.accounts); i++ {
-		allTxWG.Add(1)
-		err := lg.fundAccount(blockRef, lg.accounts[i], func() { allTxWG.Done() })
-		if err != nil {
-			lg.log.Error().Err(err).Msg("error funding account")
-		}
-	}
-	allTxWG.Wait()
-
-	lg.log.Info().Msgf("distributed initial tokens")
 	return nil
 }
 
