@@ -52,6 +52,9 @@ func (t *TransactionTimings) Adjust(txID flow.Identifier, f func(*flow.Transacti
 		}
 		return f(tt)
 	})
+	if !updated && e == nil {
+		return nil, false
+	}
 	tt, ok := e.(*flow.TransactionTiming)
 	if !ok {
 		panic(fmt.Sprintf("invalid entity in transaction timings pool (%T)", e))
