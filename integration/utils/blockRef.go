@@ -10,7 +10,7 @@ import (
 )
 
 // block reference is valid for 600 blocks, which is around 10 minutes at 1 second block time.
-const maxAge = 1 * time.Minute
+const maxAge = 5 * time.Second
 
 // BlockRef stores information about the block reference to allow cached fetching
 type BlockRef struct {
