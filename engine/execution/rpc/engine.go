@@ -36,8 +36,15 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events,
-	txResults storage.TransactionResults, chainID flow.ChainID) *Engine {
+func New(
+	log zerolog.Logger,
+	config Config,
+	e *ingestion.Engine,
+	blocks storage.Blocks,
+	events storage.Events,
+	exeResults storage.ExecutionResults,
+	txResults storage.TransactionResults,
+	chainID flow.ChainID) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	if config.MaxMsgSize == 0 {
@@ -52,6 +59,7 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.
 			chain:              chainID,
 			blocks:             blocks,
 			events:             events,
+			exeResults:         exeResults,
 			transactionResults: txResults,
 		},
 		server: grpc.NewServer(
@@ -104,6 +112,7 @@ type handler struct {
 	chain              flow.ChainID
 	blocks             storage.Blocks
 	events             storage.Events
+	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults
 }
 
@@ -155,6 +164,14 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 
 	// collect all the events and create a EventsResponse_Result for each block
 	for i, bID := range flowBlockIDs {
+		// Check if block has been executed
+		if _, err := h.exeResults.ByBlockID(bID); err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, status.Errorf(codes.NotFound, "results for block ID %s does not exist", bID)
+			} else {
+				return nil, status.Errorf(codes.Internal, "results for block ID %s could not be retrieved", bID)
+			}
+		}
 
 		// lookup events
 		blockEvents, err := h.events.ByBlockIDEventType(bID, eType)

@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -100,19 +102,35 @@ func (h *handlerEvents) getBlockEventsFromExecutionNode(ctx context.Context, blo
 	}
 
 	// convert execution node api result to access node api result
-	results := accessEvents(resp.GetResults())
+	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockIDs)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+	}
 
 	return &access.EventsResponse{
 		Results: results,
 	}, nil
 }
 
-// accessEvents converts execution node api result to access node api result
-func accessEvents(execEvents []*execution.GetEventsForBlockIDsResponse_Result) []*access.EventsResponse_Result {
+// verifyAndConvertToAccessEvents converts execution node api result to access node api result, and verifies that the results contains
+// results from each block that was requested
+func verifyAndConvertToAccessEvents(execEvents []*execution.GetEventsForBlockIDsResponse_Result, requestedBlockIDs [][]byte) ([]*access.EventsResponse_Result, error) {
+	if len(execEvents) != len(requestedBlockIDs) {
+		return nil, errors.New("number of results does not match number of blocks requested")
+	}
+
+	blockIDSet := map[string]bool{}
+	for _, blockID := range requestedBlockIDs {
+		blockIDSet[string(blockID)] = true
+	}
 
 	results := make([]*access.EventsResponse_Result, len(execEvents))
 
 	for i, r := range execEvents {
+		if !blockIDSet[string(r.GetBlockId())] {
+			return nil, fmt.Errorf("unexpected blockID from exe node %x", r.GetBlockId())
+		}
+
 		results[i] = &access.EventsResponse_Result{
 			BlockId:     r.GetBlockId(),
 			BlockHeight: r.GetBlockHeight(),
@@ -120,5 +138,5 @@ func accessEvents(execEvents []*execution.GetEventsForBlockIDsResponse_Result) [
 		}
 	}
 
-	return results
+	return results, nil
 }
