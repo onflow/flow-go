@@ -40,7 +40,7 @@ func (s Static) Identity(_ flow.Identifier, participantID flow.Identifier) (*flo
 	return identity, nil
 }
 
-func (s Static) LeaderForView(view uint64) (flow.Identifier, error) {
+func (s Static) LeaderForView(_ uint64) (flow.Identifier, error) {
 	return flow.ZeroID, fmt.Errorf("invalid for static committee")
 }
 
@@ -52,7 +52,7 @@ func (s Static) DKGSize(_ flow.Identifier) (uint, error) {
 	return uint(len(s.dkgParticipants)), nil
 }
 
-func (s Static) DKGGroupKey(blockID flow.Identifier) (crypto.PublicKey, error) {
+func (s Static) DKGGroupKey(_ flow.Identifier) (crypto.PublicKey, error) {
 	return s.dkgGroupKey, nil
 }
 

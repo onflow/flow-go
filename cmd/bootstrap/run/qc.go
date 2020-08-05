@@ -31,7 +31,6 @@ type Participant struct {
 }
 
 type ParticipantData struct {
-	Commit       *epoch.Commit
 	Participants []Participant
 	Lookup       map[flow.Identifier]epoch.DKGParticipant
 	GroupKey     crypto.PublicKey
@@ -86,7 +85,7 @@ func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []
 	n := len(participantData.Participants)
 	identities := participantData.Identities()
 
-	groupSize := uint(len(participantData.Commit.DKGParticipants))
+	groupSize := uint(len(participantData.Participants))
 	if groupSize < uint(n) {
 		return nil, nil, fmt.Errorf("need at least as many signers as DKG participants, got %v and %v", groupSize, n)
 	}
