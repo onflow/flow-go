@@ -19,6 +19,16 @@ const (
 	CONHotEventHandlerStartNewView SpanName = "con.hotstuff.eventHandler.startNewView"
 	CONHotFinalizeBlock            SpanName = "con.hotstuff.finalizeBlock"
 
+	// Collection Node
+
+	COLBuildOn                  = "col.builder"
+	COLBuildOnSetup             = "col.builder.setup"
+	COLBuildOnUnfinalizedLookup = "col.builder.unfinalizedLookup"
+	COLBuildOnFinalizedLookup   = "col.builder.finalizedLookup"
+	COLBuildOnCreatePayload     = "col.builder.createPayload"
+	COLBuildOnCreateHeader      = "col.builder.createHeader"
+	COLBuildOnDBInsert          = "col.builder.dbInsert"
+
 	// Execution Node
 
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
