@@ -157,8 +157,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// expect a storage call for the invalid id but return an error
 		suite.exeResults.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
 
-		// suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(nil, errors.New("")).Once()
-
 		// create an API request with the invalid block id
 		req := concoctReq(string(flow.EventAccountCreated), [][]byte{id[:]})
 
