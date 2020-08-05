@@ -75,11 +75,11 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root blocks for collection node clusters")
-		clusterBlocks := constructRootBlocksForClusters(clusters)
+		clusterBlocks := constructRootBlocksForClusters(flagEpochCounter, clusters)
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root QCs for collection node clusters")
-		clusterQCs := constructRootQCsForClusters(clusters, internalNodes, block, clusterBlocks)
+		clusterQCs := constructRootQCsForClusters(clusters, internalNodes, clusterBlocks)
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root execution result and block seal")

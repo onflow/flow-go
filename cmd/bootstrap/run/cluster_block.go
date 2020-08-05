@@ -8,8 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
-// TODO create canonical definition in protocol/state
-func GenerateRootClusterBlocks(clusters flow.ClusterList) []*cluster.Block {
+func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*cluster.Block {
 	clusterBlocks := make([]*cluster.Block, len(clusters))
 	for i := range clusterBlocks {
 		cluster, ok := clusters.ByIndex(uint(i))
@@ -17,29 +16,7 @@ func GenerateRootClusterBlocks(clusters flow.ClusterList) []*cluster.Block {
 			panic(fmt.Sprintf("failed to get cluster by index: %v", i))
 		}
 
-		clusterBlocks[i] = GenerateRootClusterBlock(cluster)
+		clusterBlocks[i] = protocol.CanonicalClusterRootBlock(epoch, cluster)
 	}
 	return clusterBlocks
-}
-
-// TODO create canonical definition in protocol/state
-func GenerateRootClusterBlock(identities flow.IdentityList) *cluster.Block {
-	payload := cluster.EmptyPayload(flow.ZeroID)
-	header := &flow.Header{
-		ChainID:        protocol.ChainIDForCluster(identities),
-		ParentID:       flow.ZeroID,
-		Height:         0,
-		PayloadHash:    payload.Hash(),
-		Timestamp:      flow.GenesisTime,
-		View:           0,
-		ParentVoterIDs: nil,
-		ParentVoterSig: nil,
-		ProposerID:     flow.ZeroID,
-		ProposerSig:    nil,
-	}
-
-	return &cluster.Block{
-		Header:  header,
-		Payload: &payload,
-	}
 }

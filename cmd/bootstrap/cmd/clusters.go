@@ -41,8 +41,8 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (f
 }
 
 // TODO this should be defined in protocol state
-func constructRootBlocksForClusters(clusters flow.ClusterList) []*cluster.Block {
-	clusterBlocks := run.GenerateRootClusterBlocks(clusters)
+func constructRootBlocksForClusters(epoch uint64, clusters flow.ClusterList) []*cluster.Block {
+	clusterBlocks := run.GenerateRootClusterBlocks(epoch, clusters)
 
 	for _, clusterBlock := range clusterBlocks {
 		// cluster ID is equivalent to chain ID
@@ -57,7 +57,6 @@ func constructRootBlocksForClusters(clusters flow.ClusterList) []*cluster.Block 
 func constructRootQCsForClusters(
 	clusterList flow.ClusterList,
 	nodeInfos []model.NodeInfo,
-	block *flow.Block,
 	clusterBlocks []*cluster.Block,
 ) []*hotstuff.QuorumCertificate {
 
