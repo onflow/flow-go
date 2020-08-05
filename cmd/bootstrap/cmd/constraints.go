@@ -55,6 +55,6 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 		log.Fatal().Msgf(
 			"will not bootstrap configuration with insufficient # of collectors for cluster count: "+
 				"(total_collectors=%d, clusters=%d, min_total_collectors=%d)",
-			totalCollectors, flagCollectionClusters, minNodesPerCluster)
+			totalCollectors, flagCollectionClusters, flagCollectionClusters*minNodesPerCluster)
 	}
 }
