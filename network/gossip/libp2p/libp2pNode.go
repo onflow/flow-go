@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/connmgr"
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -19,6 +20,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
+	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
@@ -62,8 +64,14 @@ type P2PNode struct {
 }
 
 // Start starts a libp2p node on the given address.
-func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, key lcrypto.PrivKey,
-	handler network.StreamHandler, rootBlockID string, psOption ...pubsub.Option) error {
+func (p *P2PNode) Start(ctx context.Context,
+	n NodeAddress,
+	logger zerolog.Logger,
+	key lcrypto.PrivKey,
+	handler network.StreamHandler,
+	rootBlockID string,
+	connGator *connmgr.ConnectionGater,
+	psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
 
@@ -89,16 +97,22 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		return tpt
 	})
 
-	// libp2p.New constructs a new libp2p Host.
-	// Other options can be added here.
-	host, err := libp2p.New(
-		ctx,
-		libp2p.ListenAddrs(sourceMultiAddr),
-		libp2p.ConnectionManager(p.conMgr),
-		libp2p.Identity(key),
-		transport,
-		libp2p.Ping(true),
+	// gather all the options for the libp2p node
+	var options []config.Option
+	options = append(options,
+		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
+		libp2p.Identity(key),                // pass in the networking key
+		libp2p.ConnectionManager(p.conMgr),  // set the connection manager
+		transport,                           // set the protocol
+		libp2p.Ping(true),                   // enable ping
 	)
+
+	if connGator != nil {
+		options = append(options, libp2p.ConnectionGater(*connGator)) // use a connection gator is provided
+	}
+
+	// create the libp2p host
+	host, err := libp2p.New(ctx, options...)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}

@@ -11,9 +11,12 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -132,6 +135,21 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 	m.ov = ov
 
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// derive libp2p peer id and multi-addresses for all the flow identities
+	approvedPeerIDs, approvedPeerMultiAddrs, err := approvedPeers(idsMap)
+	if err != nil {
+		return fmt.Errorf("could not derive list of approved peer list: %w", err)
+	}
+
+	// create a connection gator restricting inbound and outbound connections to nodes in the identity list
+	connGator := newConnGater(approvedPeerIDs, approvedPeerMultiAddrs)
+
 	// create a discovery object to help libp2p discover peers
 	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
 
@@ -147,15 +165,20 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		pubsub.WithMaxMessageSize(m.maxPubSubMsgSize),
 	}
 
-	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
+	selfNodeAddress, err := m.nodeAddressFromID(m.me)
+	if err != nil {
+		return fmt.Errorf("could not get node address of self: %w", err)
+	}
 
 	libp2pKey, err := PrivKey(m.key)
 	if err != nil {
 		return fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
 	}
 
+	var c = connmgr.ConnectionGater(connGator)
+
 	// start the libp2p node
-	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, m.rootBlockID, psOptions...)
+	err = m.libP2PNode.Start(m.ctx, selfNodeAddress, m.log, libp2pKey, m.handleIncomingStream, m.rootBlockID, &c, psOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
@@ -296,6 +319,12 @@ func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) 
 		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
 	}
 
+	return nodeAddressFromIdentity(flowIdentity)
+}
+
+// nodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
+func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
+
 	// split the node address into ip and port
 	ip, port, err := net.SplitHostPort(flowIdentity.Address)
 	if err != nil {
@@ -312,6 +341,27 @@ func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) 
 	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
 
 	return nodeAddress, nil
+}
+
+func approvedPeers(identityMap map[flow.Identifier]flow.Identity) ([]peer.ID, []ma.Multiaddr, error) {
+	peerIDs := make([]peer.ID, len(identityMap))
+	peerAddrs := make([]ma.Multiaddr, len(identityMap))
+	i := 0
+	for _, identity := range identityMap {
+		nodeAddress, err := nodeAddressFromID(identity)
+		if err != nil {
+			return nil, nil, err
+		}
+		peerInfo, err := GetPeerInfo(nodeAddress)
+
+		if len(peerInfo.Addrs) < 1 {
+			return nil, nil, fmt.Errorf("invalid multiaddress for identity %s", identity.String())
+		}
+
+		peerIDs[i] = peerInfo.ID
+		peerAddrs[i] = peerInfo.Addrs[0]
+	}
+	return peerIDs, peerAddrs, nil
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
