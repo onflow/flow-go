@@ -82,7 +82,7 @@ func NewContLoadGenerator(
 		initialized:          false,
 		tps:                  tps,
 		numberOfAccounts:     numberOfAccounts,
-		trackTxs:             true,
+		trackTxs:             false,
 		flowClient:           flowClient,
 		supervisorClient:     supervisorClient,
 		serviceAccount:       servAcc,
