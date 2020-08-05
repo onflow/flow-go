@@ -90,15 +90,16 @@ func TestInstancesThree(t *testing.T) {
 }
 
 func TestInstancesSeven(t *testing.T) {
+
 	// test parameters
 	numPass := 5
 	numFail := 2
 
-	finalizedCount := 10
+	finalizedCount := 1
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
-	instances := make([]*Instance, 0, numPass+numFail)
+	instances := make([]*Instance, numPass+numFail)
 	root := DefaultRoot()
 	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecreaseFactor, 0)
 	require.NoError(t, err)
@@ -113,7 +114,7 @@ func TestInstancesSeven(t *testing.T) {
 			// stop when all honest nodes have finalized a certain number of blocks
 			WithStopCondition(FinalizedCountsAllReached(instances[:numPass], finalizedCount)),
 		)
-		instances = append(instances, in)
+		instances[n] = in
 	}
 
 	// set up two instances which can't vote
@@ -127,7 +128,7 @@ func TestInstancesSeven(t *testing.T) {
 			WithStopCondition(FinalizedCountsAllReached(instances[:numPass], finalizedCount)),
 			WithOutgoingVotes(BlockAllVotes),
 		)
-		instances = append(instances, in)
+		instances[n] = in
 	}
 
 	// connect the communicators of the instances together

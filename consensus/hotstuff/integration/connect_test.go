@@ -53,11 +53,6 @@ func Connect(instances []*Instance) {
 				// iterate through potential receivers
 				for _, receiver := range instances {
 
-					// we should skip ourselves always
-					if receiver.localID == sender.localID {
-						continue
-					}
-
 					// check if we should block the incoming proposal
 					if receiver.blockPropIn(proposal) {
 						return nil
