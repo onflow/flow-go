@@ -59,7 +59,7 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root block")
-		block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp, stakingNodes)
+		block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root QC")
