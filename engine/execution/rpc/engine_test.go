@@ -17,16 +17,18 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	ingestion "github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
+	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type Suite struct {
 	suite.Suite
-	log       zerolog.Logger
-	events    *storage.Events
-	txResults *storage.TransactionResults
-	blocks    *storage.Blocks
+	log        zerolog.Logger
+	events     *storage.Events
+	exeResults *storage.ExecutionResults
+	txResults  *storage.TransactionResults
+	blocks     *storage.Blocks
 }
 
 func TestHandler(t *testing.T) {
@@ -36,6 +38,7 @@ func TestHandler(t *testing.T) {
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.Logger{}
 	suite.events = new(storage.Events)
+	suite.exeResults = new(storage.ExecutionResults)
 	suite.txResults = new(storage.TransactionResults)
 	suite.blocks = new(storage.Blocks)
 }
@@ -62,6 +65,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			eventsForBlock[j] = e
 			eventMessages[j] = convert.EventToMessage(e)
 		}
+		// expect one call to lookup result for each block ID
+		suite.exeResults.On("ByBlockID", id).Return(nil, nil).Once()
+
 		// expect one call to lookup events for each block ID
 		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Once()
 
@@ -80,6 +86,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	handler := &handler{
 		blocks:             suite.blocks,
 		events:             suite.events,
+		exeResults:         suite.exeResults,
 		transactionResults: suite.txResults,
 		chain:              flow.Mainnet,
 	}
@@ -148,7 +155,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		id := unittest.IdentifierFixture()
 
 		// expect a storage call for the invalid id but return an error
-		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(nil, errors.New("")).Once()
+		suite.exeResults.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
+
+		// suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(nil, errors.New("")).Once()
 
 		// create an API request with the invalid block id
 		req := concoctReq(string(flow.EventAccountCreated), [][]byte{id[:]})
@@ -157,7 +166,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 		// check that an error was received
 		suite.Require().Error(err)
-		errors.Is(err, status.Error(codes.Internal, ""))
+		errors.Is(err, status.Error(codes.NotFound, ""))
 
 		// check that no storage calls was made
 		suite.events.AssertExpectations(suite.T())

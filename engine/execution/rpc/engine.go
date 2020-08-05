@@ -167,9 +167,9 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		// Check if block has been executed
 		if _, err := h.exeResults.ByBlockID(bID); err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				return nil, status.Errorf(codes.NotFound, "results for block ID %x does not exist", bID)
+				return nil, status.Errorf(codes.NotFound, "results for block ID %s does not exist", bID)
 			} else {
-				return nil, status.Errorf(codes.Internal, "results for block ID %x could not be retrieved", bID)
+				return nil, status.Errorf(codes.Internal, "results for block ID %s could not be retrieved", bID)
 			}
 		}
 
