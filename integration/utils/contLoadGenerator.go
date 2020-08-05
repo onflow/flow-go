@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
+const accountCreationBatchSize = 100
 const tokensPerTransfer = 0.01 // flow testnets only have 10e6 total supply, so we choose a small amount here
 
 // ContLoadGenerator creates a continuous load of transactions to the network
@@ -100,9 +101,15 @@ func NewContLoadGenerator(
 }
 
 func (lg *ContLoadGenerator) Init() error {
-	err := lg.createAccounts()
-	if err != nil {
-		return err
+	for i := 0; i < lg.numberOfAccounts; i += accountCreationBatchSize {
+		num := lg.numberOfAccounts - i
+		if num > accountCreationBatchSize {
+			num = accountCreationBatchSize
+		}
+		err := lg.createAccounts(num)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -158,8 +165,8 @@ func createAccountsTransaction(fungibleToken, flowToken flowsdk.Address) []byte 
 	return []byte(fmt.Sprintf(createAccountsTransactionTemplate, fungibleToken, flowToken))
 }
 
-func (lg *ContLoadGenerator) createAccounts() error {
-	lg.log.Info().Msgf("creating and funding %d accounts...", lg.numberOfAccounts)
+func (lg *ContLoadGenerator) createAccounts(num int) error {
+	lg.log.Info().Msgf("creating and funding %d accounts...", num)
 
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
@@ -187,7 +194,7 @@ func (lg *ContLoadGenerator) createAccounts() error {
 		SetPayer(*lg.serviceAccount.address)
 
 	publicKey := bytesToCadenceArray(accountKey.Encode())
-	count := cadence.NewInt(lg.numberOfAccounts)
+	count := cadence.NewInt(num)
 
 	initialTokenAmount, err := cadence.NewUFix64FromParts(
 		24*60*60*tokensPerTransfer, //  (24 hours at 1 block per second and 10 tokens sent)
@@ -222,6 +229,8 @@ func (lg *ContLoadGenerator) createAccounts() error {
 	if err != nil {
 		return err
 	}
+
+	lg.serviceAccount.accountKey.SequenceNumber++
 
 	lg.serviceAccount.signerLock.Unlock()
 
