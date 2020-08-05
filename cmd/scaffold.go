@@ -492,9 +492,9 @@ func (fnb *FlowNodeBuilder) initState() {
 	// when this happens during a spork, we could try deleting the protocol state database.
 	// TODO: revisit this check when implementing Epoch
 	if rootBlockHeader.ID() != fnb.RootBlock.ID() {
-		fnb.Logger.Fatal().Msgf("mismatching root block ID, bootstrap root block ID: %v, protocol state block ID: %v",
-			fnb.RootBlock.ID(),
-			rootBlockHeader.ID())
+		fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
+			rootBlockHeader.ID(),
+			fnb.RootBlock.ID())
 	}
 
 	self, err := state.Final().Identity(myID)
