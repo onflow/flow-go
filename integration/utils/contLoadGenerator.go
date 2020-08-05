@@ -28,6 +28,7 @@ type ContLoadGenerator struct {
 	numberOfAccounts     int
 	trackTxs             bool
 	flowClient           *client.Client
+	supervisorClient     *client.Client
 	serviceAccount       *flowAccount
 	flowTokenAddress     *flowsdk.Address
 	fungibleTokenAddress *flowsdk.Address
@@ -45,6 +46,9 @@ type ContLoadGenerator struct {
 func NewContLoadGenerator(
 	log zerolog.Logger,
 	loaderMetrics *metrics.LoaderCollector,
+	flowClient *client.Client,
+	supervisorClient *client.Client,
+	supervisorAccessAddr string,
 	servAccPrivKeyHex string,
 	serviceAccountAddress *flowsdk.Address,
 	fungibleTokenAddress *flowsdk.Address,
@@ -54,14 +58,14 @@ func NewContLoadGenerator(
 
 	numberOfAccounts := tps * 10 // 1 second per block, factor 10 for delays to prevent sequence number collisions
 
-	servAcc, err := loadServiceAccount(fclient, serviceAccountAddress, servAccPrivKeyHex)
+	servAcc, err := loadServiceAccount(flowClient, serviceAccountAddress, servAccPrivKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
 	// TODO get these params hooked to the top level
 	txStatsTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(log, 5000, 100, accessNodeAddress, time.Second, txStatsTracker)
+	txTracker, err := NewTxTracker(log, 5000, 100, supervisorAccessAddr, time.Second, txStatsTracker)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +82,8 @@ func NewContLoadGenerator(
 		tps:                  tps,
 		numberOfAccounts:     numberOfAccounts,
 		trackTxs:             true,
-		flowClient:           fclient,
+		flowClient:           flowClient,
+		supervisorClient:     supervisorClient,
 		serviceAccount:       servAcc,
 		fungibleTokenAddress: fungibleTokenAddress,
 		flowTokenAddress:     flowTokenAddress,
@@ -88,7 +93,7 @@ func NewContLoadGenerator(
 		txStatsTracker:       txStatsTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		scriptCreator:        scriptCreator,
-		blockRef:             NewBlockRef(fclient),
+		blockRef:             NewBlockRef(supervisorClient),
 	}
 
 	return lGen, nil

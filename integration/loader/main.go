@@ -88,6 +88,16 @@ func main() {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
 
+	supervisorAccessAddr := accessNodeAddrs[0]
+	if len(accessNodeAddrs) > 1 {
+		supervisorAccessAddr = accessNodeAddrs[1]
+	}
+
+	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure())
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
+	}
+
 	go func() {
 		// run load cases
 		for i, c := range cases {
@@ -100,7 +110,8 @@ func main() {
 					log,
 					loaderMetrics,
 					flowClient,
-					accessNodeAddrs[0],
+					supervisorClient,
+					supervisorAccessAddr,
 					priv,
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
