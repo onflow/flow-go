@@ -64,6 +64,9 @@ type Instance struct {
 
 	// main logic
 	handler *eventhandler.EventHandler
+
+	// finalized blocks
+	finalized map[flow.Identifier]struct{}
 }
 
 func NewInstance(t require.TestingT, options ...Option) *Instance {
@@ -124,6 +127,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		verifier:     &mocks.Verifier{},
 		communicator: &mocks.Communicator{},
 		finalizer:    &module.Finalizer{},
+
+		finalized: make(map[flow.Identifier]struct{}),
 	}
 
 	// insert root block into headers register
@@ -266,6 +271,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				in.communicator.Calls = nil
 				in.finalizer.Calls = nil
 			}
+
+			// make a block is finalized
+			in.finalized[blockID] = struct{}{}
 
 			// check on stop condition
 			// TODO: we can remove that once the single instance stop

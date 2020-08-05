@@ -39,15 +39,12 @@ func TestSingleInstance(t *testing.T) {
 	assert.Equal(t, finalView, in.forks.FinalizedView(), "finalized view should be three lower than current view")
 }
 
-func TestThreeInstances(t *testing.T) {
+// Run 3 instances to build blocks until there are a certain number of blocks are finalized
+func TestInstancesThree(t *testing.T) {
 
 	// test parameters
-	// NOTE: block finalization seems to be rather slow on CI at the moment,
-	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
-	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
-	// number low here
 	num := 3
-	finalView := uint64(100)
+	finalizedCount := 10
 
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
@@ -56,16 +53,21 @@ func TestThreeInstances(t *testing.T) {
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
-	instances := make([]*Instance, 0, num)
+	instances := make([]*Instance, num)
 	for n := 0; n < num; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(ViewFinalized(finalView)),
+			// when should we stop the instance?
+			// should we stop it as soon as the finalized count reaches a certain number? no.
+			// because if one node has finalized x blocks, other nodes might be behind, stopping this node
+			// would cause other nodes unable to reach the targeted finalized count.
+			// therefore, we should wait until all nodes have passed a certain finalized count.
+			WithStopCondition(FinalizedCountsAllReached(instances, finalizedCount)),
 		)
-		instances = append(instances, in)
+		instances[n] = in
 	}
 
 	// connect the communicators of the instances together
@@ -85,22 +87,14 @@ func TestThreeInstances(t *testing.T) {
 
 	allViews := allFinalizedViews(t, instances)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, finalView)
 }
 
-func TestSevenInstances(t *testing.T) {
+func TestInstancesSeven(t *testing.T) {
 	// test parameters
-	// NOTE: block finalization seems to be rather slow on CI at the moment,
-	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
-	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
-	// number low here
 	numPass := 5
 	numFail := 2
 
-	// When using 100 as finalView, I often saw this tests fail on CI, because it only made to around 64-86
-	// so using 30 will still check that it's making progress and give enough buffer.
-	finalView := uint64(100)
-	runFor := 3 * time.Second
+	finalizedCount := 10
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
@@ -116,7 +110,8 @@ func TestSevenInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(AfterPriod(runFor)),
+			// stop when all honest nodes have finalized a certain number of blocks
+			WithStopCondition(FinalizedCountsAllReached(instances[:numPass], finalizedCount)),
 		)
 		instances = append(instances, in)
 	}
@@ -128,7 +123,8 @@ func TestSevenInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(AfterPriod(runFor)),
+			// stop when all honest nodes have finalized a certain number of blocks
+			WithStopCondition(FinalizedCountsAllReached(instances[:numPass], finalizedCount)),
 			WithOutgoingVotes(BlockAllVotes),
 		)
 		instances = append(instances, in)
@@ -151,5 +147,4 @@ func TestSevenInstances(t *testing.T) {
 
 	allViews := allFinalizedViews(t, instances)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, finalView)
 }
