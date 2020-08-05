@@ -13,6 +13,21 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 
 	partners := model.ToIdentityList(partnerNodes)
 	internals := model.ToIdentityList(internalNodes)
+	all := append(partners, internals...)
+
+	// ensure all nodes of the same role have equal stake/weight
+	for _, role := range flow.Roles() {
+		withRole := all.Filter(filter.HasRole(role))
+		expectedStake := withRole[0].Stake
+		for _, node := range withRole {
+			if node.Stake != expectedStake {
+				log.Fatal().Msgf(
+					"will not bootstrap configuration with non-equal stakes\n"+
+						"found nodes with role %s and stake1=%d, stake2=%d",
+					role, expectedStake, node.Stake)
+			}
+		}
+	}
 
 	// check consensus committee Byzantine threshold
 	partnerCount := partners.Filter(filter.HasRole(flow.RoleConsensus)).Count()
