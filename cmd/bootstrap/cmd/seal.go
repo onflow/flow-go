@@ -29,7 +29,7 @@ func constructRootResultAndSeal(
 	participants := model.ToIdentityList(participantNodes)
 	blockID := block.ID()
 
-	epochSetup := epoch.Setup{
+	epochSetup := &epoch.Setup{
 		Counter:      1, // TODO flag
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
@@ -47,7 +47,7 @@ func constructRootResultAndSeal(
 		}
 	}
 
-	epochCommit := epoch.Commit{
+	epochCommit := &epoch.Commit{
 		Counter:         1, // TODO flag
 		ClusterQCs:      clusterQCs,
 		DKGGroupKey:     dkgData.PubGroupKey,
@@ -55,7 +55,7 @@ func constructRootResultAndSeal(
 	}
 
 	result := run.GenerateRootResult(block, stateCommit)
-	seal := run.GenerateRootSeal(result) // TODO include service events
+	seal := run.GenerateRootSeal(result, epochSetup, epochCommit)
 
 	writeJSON(model.PathRootResult, result)
 	writeJSON(model.PathRootSeal, seal)

@@ -46,21 +46,13 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if len(seal.ServiceEvents) != 2 {
 			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.ServiceEvents))
 		}
-		var services []interface{}
-		for _, event := range seal.ServiceEvents {
-			service, err := epoch.ServiceEvent(event)
-			if err != nil {
-				return fmt.Errorf("could not decode service event: %w", err)
-			}
-			services = append(services, service)
-		}
-		setup, valid := services[0].(*epoch.Setup)
+		setup, valid := seal.ServiceEvents[0].(*epoch.Setup)
 		if !valid {
-			return fmt.Errorf("first service event should be epoch setup (%T)", services[0])
+			return fmt.Errorf("first service event should be epoch setup (%T)", seal.ServiceEvents[0])
 		}
-		commit, valid := services[1].(*epoch.Commit)
+		commit, valid := seal.ServiceEvents[1].(*epoch.Commit)
 		if !valid {
-			return fmt.Errorf("second event should be epoch commit (%T)", services[1])
+			return fmt.Errorf("second event should be epoch commit (%T)", seal.ServiceEvents[1])
 		}
 
 		// They should both have the same epoch counter to be valid.
@@ -429,18 +421,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
 
-			// Convert the event into a strongly typed service event.
-			// TODO: We might want to do this upon creation of the seals
-			// instead; the only question is how to encode it over the
-			// network nicely, as a slice of interfaces needs additional
-			// meta information, and having two nil fields for most seals
-			// is ugly.
-			service, err := epoch.ServiceEvent(event)
-			if err != nil {
-				return fmt.Errorf("could not decode service event: %w", err)
-			}
-
-			switch ev := service.(type) {
+			switch ev := event.(type) {
 
 			case *epoch.Setup:
 
@@ -588,17 +569,13 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	var ops []func(*badger.Txn) error
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
-			service, err := epoch.ServiceEvent(event)
-			if err != nil {
-				return fmt.Errorf("could not decode service event: %w", err)
-			}
-			switch ev := service.(type) {
+			switch ev := event.(type) {
 			case *epoch.Setup:
 				ops = append(ops, m.state.setups.StoreTx(ev))
 			case *epoch.Commit:
 				ops = append(ops, m.state.commits.StoreTx(ev))
 			default:
-				return fmt.Errorf("invalid service event type in payload (%s)", event.Type)
+				return fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
 		}
 	}
@@ -751,11 +728,11 @@ func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool,
 				if setupPending && commitPending {
 					break
 				}
-				if event.Type == flow.EventEpochSetup {
+				if _, ok := event.(*epoch.Setup); ok {
 					setupPending = true
 					continue
 				}
-				if event.Type == flow.EventEpochCommit {
+				if _, ok := event.(*epoch.Commit); ok {
 					commitPending = true
 					continue
 				}
