@@ -111,8 +111,6 @@ func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []
 		committee, err := committee.NewStaticCommittee(identities, local.NodeID(), participantData.Lookup, participantData.GroupKey)
 
 		// create signer
-		// TODO: The DKG data is now included in the epoch commit event, which is in turn included in the root seal. If
-		// we want to properly sign the block QC, we will have to untangle all of this logic here.
 		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
 		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner()

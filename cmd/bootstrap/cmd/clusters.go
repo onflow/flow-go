@@ -75,11 +75,6 @@ func constructRootQCsForClusters(
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
 		}
 		qcs[i] = qc
-
-		// cluster ID is equivalent to chain ID
-		clusterID := clusterBlocks[i].Header.ChainID
-		// TODO remove
-		writeJSON(fmt.Sprintf(model.PathRootClusterQC, clusterID), qc)
 	}
 
 	return qcs
