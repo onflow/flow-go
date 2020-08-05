@@ -16,6 +16,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/integration/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -34,6 +35,8 @@ func main() {
 	access := flag.String("access", "localhost:3569", "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
+	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
+	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 	flag.Parse()
 
 	// parse log level and apply to logger
@@ -43,6 +46,10 @@ func main() {
 		log.Fatal().Err(err).Msg("invalid log level")
 	}
 	log = log.Level(lvl)
+
+	server := metrics.NewServer(log, *metricport, *profilerEnabled)
+	<-server.Ready()
+	loaderMetrics := metrics.NewLoaderCollector()
 
 	accessNodeAddrs := strings.Split(*access, ",")
 
@@ -86,9 +93,12 @@ func main() {
 		for i, c := range cases {
 			log.Info().Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
+			loaderMetrics.SetTPSConfigured(c.tps)
+
 			if c.tps > 0 {
 				lg, err := utils.NewContLoadGenerator(
 					log,
+					loaderMetrics,
 					flowClient,
 					accessNodeAddrs[0],
 					priv,

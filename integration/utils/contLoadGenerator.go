@@ -10,6 +10,8 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
+
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
@@ -20,6 +22,7 @@ const tokensPerTransfer = 0.01 // flow testnets only have 10e6 total supply, so 
 // by creating many accounts and transfer flow tokens between them
 type ContLoadGenerator struct {
 	log                  zerolog.Logger
+	loaderMetrics        *metrics.LoaderCollector
 	initialized          bool
 	tps                  int
 	numberOfAccounts     int
@@ -41,8 +44,7 @@ type ContLoadGenerator struct {
 // NewContLoadGenerator returns a new ContLoadGenerator
 func NewContLoadGenerator(
 	log zerolog.Logger,
-	fclient *client.Client,
-	accessNodeAddress string,
+	loaderMetrics *metrics.LoaderCollector,
 	servAccPrivKeyHex string,
 	serviceAccountAddress *flowsdk.Address,
 	fungibleTokenAddress *flowsdk.Address,
@@ -71,6 +73,7 @@ func NewContLoadGenerator(
 
 	lGen := &ContLoadGenerator{
 		log:                  log,
+		loaderMetrics:        loaderMetrics,
 		initialized:          false,
 		tps:                  tps,
 		numberOfAccounts:     numberOfAccounts,
@@ -345,6 +348,7 @@ func (lg *ContLoadGenerator) sendTx(workerID int) {
 
 	lg.log.Trace().Msgf("tracking sent transaction")
 	lg.workerStatsTracker.AddTxSent()
+	lg.loaderMetrics.TransactionSent()
 
 	if lg.trackTxs {
 		stopped := false
