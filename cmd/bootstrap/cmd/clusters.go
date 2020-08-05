@@ -70,7 +70,7 @@ func constructRootQCsForClusters(
 	for i, cluster := range clusterList {
 		signers := filterClusterSigners(cluster, nodeInfos)
 
-		qc, err := run.GenerateClusterRootQC(signers, block, clusterBlocks[i])
+		qc, err := run.GenerateClusterRootQC(signers, clusterBlocks[i])
 		if err != nil {
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
 		}
