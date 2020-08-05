@@ -6,8 +6,10 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/signature"
 )
@@ -35,13 +37,11 @@ type Snapshot interface {
 
 	// ClusterRootBlock returns the root block for the given cluster in the
 	// current epoch.
-	// TODO
-	//ClusterRootBlock(cluster flow.IdentityList) (*cluster.Block, error)
+	ClusterRootBlock(cluster flow.IdentityList) (*cluster.Block, error)
 
 	// ClusterRootQC returns the quorum certificate for the root block for the
 	// given cluster in the current epoch.
-	// TODO
-	//ClusterRootQC(cluster flow.IdentityList) (*hotstuff.QuorumCertificate, error)
+	ClusterRootQC(cluster flow.IdentityList) (*hotstuff.QuorumCertificate, error)
 
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,
@@ -67,9 +67,6 @@ type Snapshot interface {
 
 	// DKG provides access to DKG information for the selected snapshot.
 	DKG() DKG
-
-	//
-
 }
 
 // SeedFromParentSignature reads the raw random seed from a combined signature.
