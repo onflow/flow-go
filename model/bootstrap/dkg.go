@@ -6,6 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// TODO remove encodable DKG types
+
 // DKGData represents all the output data from the DKG process, including private information.
 // It is used while running the DKG during bootstrapping.
 type DKGData struct {
