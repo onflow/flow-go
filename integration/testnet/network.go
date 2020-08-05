@@ -26,6 +26,7 @@ import (
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/encodable"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -590,7 +591,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// write private key files for each DKG participant
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
-		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{PrivateKey: sk}
+		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
 		privParticpant := bootstrap.DKGParticipantPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encodableSk,

@@ -25,7 +25,7 @@ func TestGenerateRootQC(t *testing.T) {
 	block.Header.View = 3
 	block.Header.PayloadHash = block.Payload.Hash()
 
-	_, err := GenerateRootQC(participantData, &block)
+	_, err := GenerateRootQC(&block, participantData)
 	require.NoError(t, err)
 }
 
@@ -45,28 +45,20 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 		signature.RandomBeaconThreshold(n), seed)
 	require.NoError(t, err)
 
-	// TODO: This is now stored as part of the epoch commit event, which is
-	// in turn stored as part of the block seal. Generate it accordingly.
-	commit := epoch.Commit{
-		// MISSING: counter, cluster QCs
-		DKGGroupKey:     groupKey,
-		DKGParticipants: make(map[flow.Identifier]epoch.Participant),
-	}
+	participantLookup := make(map[flow.Identifier]epoch.DKGParticipant)
+	participants := make([]Participant, n)
+
 	for i, identity := range identities {
-		participant := epoch.Participant{
+
+		// add to lookup
+		lookupParticipant := epoch.DKGParticipant{
 			Index:    uint(i),
 			KeyShare: randomBPKs[i],
 		}
-		commit.DKGParticipants[identity.NodeID] = participant
-	}
+		participantLookup[identity.NodeID] = lookupParticipant
 
-	participantData := ParticipantData{
-		Commit:       &commit,
-		Participants: make([]Participant, n),
-	}
-
-	for i, identity := range identities {
-		participantData.Participants[i].NodeInfo = bootstrap.NewPrivateNodeInfo(
+		// add to participant list
+		nodeInfo := bootstrap.NewPrivateNodeInfo(
 			identity.NodeID,
 			identity.Role,
 			identity.Address,
@@ -74,9 +66,16 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 			networkingKeys[i],
 			stakingKeys[i],
 		)
+		participants[i] = Participant{
+			NodeInfo:            nodeInfo,
+			RandomBeaconPrivKey: randomBSKs[i],
+		}
+	}
 
-		// add random beacon private key
-		participantData.Participants[i].RandomBeaconPrivKey = randomBSKs[i]
+	participantData := ParticipantData{
+		Participants: participants,
+		Lookup:       participantLookup,
+		GroupKey:     groupKey,
 	}
 
 	return participantData

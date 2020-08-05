@@ -8,6 +8,8 @@ import (
 
 func GenerateRootBlock(chainID flow.ChainID, parentID flow.Identifier, height uint64, timestamp time.Time, participants flow.IdentityList) *flow.Block {
 	// TODO: generate root seal with root system events for epoch setup & commit (including identities)
+	// remove participants param here
+
 	payload := flow.Payload{
 		Guarantees: nil,
 		Seals:      nil,

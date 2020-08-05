@@ -32,7 +32,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	_, err := GenerateClusterRootQC(participants, &block, &clusterBlock)
+	_, err := GenerateClusterRootQC(participants, &clusterBlock)
 	require.NoError(t, err)
 }
 
