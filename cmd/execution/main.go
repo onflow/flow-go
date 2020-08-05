@@ -40,6 +40,7 @@ func main() {
 		ledgerStorage      *ledger.MTrieStorage
 		events             storage.Events
 		txResults          storage.TransactionResults
+		results            storage.ExecutionResults
 		providerEngine     *provider.Engine
 		syncCore           *chainsync.Core
 		computationManager *computation.Manager
@@ -144,7 +145,7 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
-			executionResults := badger.NewExecutionResults(node.DB)
+			results = badger.NewExecutionResults(node.DB)
 			stateCommitments := badger.NewCommits(node.Metrics.Cache, node.DB)
 
 			executionState = state.NewExecutionState(
@@ -153,7 +154,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				chunkDataPacks,
-				executionResults,
+				results,
 				node.DB,
 				node.Tracer,
 			)
