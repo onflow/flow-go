@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encodable"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -75,7 +76,7 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root blocks for collection node clusters")
-		clusterBlocks := constructRootBlocksForClusters(flagEpochCounter, clusters)
+		clusterBlocks := run.GenerateRootClusterBlocks(flagEpochCounter, clusters)
 		log.Info().Msg("")
 
 		log.Info().Msg("constructing root QCs for collection node clusters")

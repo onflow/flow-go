@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
@@ -38,20 +36,6 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (f
 	}
 
 	return assignments, clusters
-}
-
-// TODO this should be defined in protocol state
-func constructRootBlocksForClusters(epoch uint64, clusters flow.ClusterList) []*cluster.Block {
-	clusterBlocks := run.GenerateRootClusterBlocks(epoch, clusters)
-
-	for _, clusterBlock := range clusterBlocks {
-		// cluster ID is equivalent to chain ID
-		clusterID := clusterBlock.Header.ChainID
-		// TODO remove
-		writeJSON(fmt.Sprintf(model.PathRootClusterBlock, clusterID), clusterBlock)
-	}
-
-	return clusterBlocks
 }
 
 func constructRootQCsForClusters(
