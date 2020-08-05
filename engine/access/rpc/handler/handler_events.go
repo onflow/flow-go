@@ -128,7 +128,7 @@ func verifyAndConvertToAccessEvents(execEvents []*execution.GetEventsForBlockIDs
 
 	for i, r := range execEvents {
 		if !blockIDSet[string(r.GetBlockId())] {
-			return nil, fmt.Errorf("Unexepected blockID from exe node %x", r.GetBlockId())
+			return nil, fmt.Errorf("unexpected blockID from exe node %x", r.GetBlockId())
 		}
 
 		results[i] = &access.EventsResponse_Result{
