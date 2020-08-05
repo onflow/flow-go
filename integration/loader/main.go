@@ -83,7 +83,8 @@ func main() {
 		time.Sleep(*sleep)
 	}
 
-	flowClient, err := client.New(accessNodeAddrs[0], grpc.WithInsecure())
+	loadedAccessAddr := accessNodeAddrs[0]
+	flowClient, err := client.New(loadedAccessAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
@@ -92,7 +93,6 @@ func main() {
 	if len(accessNodeAddrs) > 1 {
 		supervisorAccessAddr = accessNodeAddrs[1]
 	}
-
 	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
@@ -111,7 +111,7 @@ func main() {
 					loaderMetrics,
 					flowClient,
 					supervisorClient,
-					supervisorAccessAddr,
+					loadedAccessAddr,
 					priv,
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
@@ -156,7 +156,7 @@ func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []Loa
 	}
 
 	tpsDurationsStrings := strings.Split(*tpsDurationsFlag, ",")
-	for i, _ := range cases {
+	for i := range cases {
 		if i >= len(tpsDurationsStrings) {
 			break
 		}

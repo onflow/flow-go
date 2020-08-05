@@ -49,7 +49,7 @@ func NewContLoadGenerator(
 	loaderMetrics *metrics.LoaderCollector,
 	flowClient *client.Client,
 	supervisorClient *client.Client,
-	supervisorAccessAddr string,
+	loadedAccessAddr string,
 	servAccPrivKeyHex string,
 	serviceAccountAddress *flowsdk.Address,
 	fungibleTokenAddress *flowsdk.Address,
@@ -66,7 +66,7 @@ func NewContLoadGenerator(
 
 	// TODO get these params hooked to the top level
 	txStatsTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(log, 5000, 100, supervisorAccessAddr, time.Second, txStatsTracker)
+	txTracker, err := NewTxTracker(log, 5000, 100, loadedAccessAddr, time.Second, txStatsTracker)
 	if err != nil {
 		return nil, err
 	}
