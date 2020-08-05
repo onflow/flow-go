@@ -110,23 +110,30 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	host.SetStreamHandler(p.flowLibP2PProtocolID, handler)
 
+	// Used for Peer Scoring inspection
+	inspector := new(pubsub.PeerScoreInspectFn)
+
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost,
 		// Enables GossipSub  Peer Scoring within the PubSub instance
 		// No idea if this works lol
 		pubsub.WithPeerScore(
 			&pubsub.PeerScoreParams{		// These Parameters are taken from an example and should be tuned
-				AppSpecificScore:		func(peer.ID) float64 { return 0 },
-				BehaviourPenaltyWeight:	-1,
-				BehaviourPenaltyDecay:	pubsub.ScoreParameterDecay(time.Minute),
-				DecayInterval:			pubsub.DefaultDecayInterval,
-				DecayToZero:			pubsub.DefaultDecayToZero,
+				AppSpecificScore:		func(peer.ID) float64 { return 0 },	// Score derived from the app itself (float 64)
+				BehaviourPenaltyWeight:		-1,					// Must be negative
+				BehaviourPenaltyDecay:		pubsub.ScoreParameterDecay(time.Minute),// Incremented by router during specific events
+				DecayInterval:			pubsub.DefaultDecayInterval,		// Counters decay over time to prevent a perminant reputation
+				DecayToZero:			pubsub.DefaultDecayToZero,		// A 'threshold' of sorts. If a counter < DecayToZero, it is considered zero
 			},
-			&pubsub.PeerScoreThresholds{	// Same as the above comment
-				GossipThreshold:		-100,
-				PublishThreshold:		-500,
-				GraylistThreshold:		-1000,
-			}))
+			&pubsub.PeerScoreThresholds{		// These are also defaults and should be changed (All float 64)
+				GossipThreshold:		-100,					// Threshold for sending/recieving gossip from peers
+				PublishThreshold:		-500,					// Threshold for recieving flood published messages
+				GraylistThreshold:		-1000,					// If less than threshold all RPC messages from node are ignored
+			}),
+		// Enables Peer Score debugging (to view local scores)
+		pubsub.WithPeerScoreInspect(
+			*inspector,
+			time.Second))
 	if err != nil {
 		return fmt.Errorf("could not create libp2p pubsub: %w", err)
 	}
@@ -278,6 +285,12 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 	}
 	return s, nil
 }
+
+// Returns local peer scores for node
+//func GetPeerScores(ps *pubsub.PeerScoreInspectFn) map[peer.ID]float64 {
+//	scoreMap := ps
+//	return scoreMap
+//}
 
 // GetPeerInfo generates the libp2p peer.AddrInfo for a Node/Peer given its node address
 func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
