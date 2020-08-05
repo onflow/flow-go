@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
@@ -58,6 +60,14 @@ func (bs *BlockSnapshot) Commit() (flow.StateCommitment, error) {
 // clusters for the epoch active at the current block snapshot.
 func (bs *BlockSnapshot) Clusters() (flow.ClusterList, error) {
 	return bs.EpochSnapshot().Clusters()
+}
+
+func (bs *BlockSnapshot) ClusterRootBlock(cluster flow.IdentityList) (*cluster.Block, error) {
+	return bs.EpochSnapshot().ClusterRootBlock(cluster)
+}
+
+func (bs *BlockSnapshot) ClusterRootQC(cluster flow.IdentityList) (*hotstuff.QuorumCertificate, error) {
+	return bs.EpochSnapshot().ClusterRootQC(cluster)
 }
 
 // Head returns the header associated with the current block snapshot.
