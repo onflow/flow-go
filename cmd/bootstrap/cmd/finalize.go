@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/encodable"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -166,14 +167,14 @@ func validateNodeID(nodeID flow.Identifier) flow.Identifier {
 	return nodeID
 }
 
-func validateNetworkPubKey(key model.EncodableNetworkPubKey) model.EncodableNetworkPubKey {
+func validateNetworkPubKey(key encodable.NetworkPubKey) encodable.NetworkPubKey {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("NetworkPubKey must not be nil")
 	}
 	return key
 }
 
-func validateStakingPubKey(key model.EncodableStakingPubKey) model.EncodableStakingPubKey {
+func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}

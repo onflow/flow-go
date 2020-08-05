@@ -27,16 +27,16 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	// check collection committee Byzantine threshold
 	partnerCount = partners.Filter(filter.HasRole(flow.RoleCollection)).Count()
 	internalCount = internals.Filter(filter.HasRole(flow.RoleCollection)).Count()
-	if partnerCount*2+flagCollectionClusters > internalCount {
+	if internalCount < partnerCount*2+flagCollectionClusters {
 		log.Fatal().Msgf(
 			"will not bootstrap configuration without Byzantine majority of collection nodes: "+
 				"(partner_nodes=%d, internal_nodes=%d, min_internal_nodes=%d)",
-			partnerCount, internalCount, partnerCount*2+1)
+			partnerCount, internalCount, partnerCount*2+flagCollectionClusters)
 	}
 
 	// ensure we have enough total collectors
 	totalCollectors := partnerCount + internalCount
-	if totalCollectors <= flagCollectionClusters*minNodesPerCluster {
+	if totalCollectors < flagCollectionClusters*minNodesPerCluster {
 		log.Fatal().Msgf(
 			"will not bootstrap configuration with insufficient # of collectors for cluster count: "+
 				"(total_collectors=%d, clusters=%d, min_total_collectors=%d)",

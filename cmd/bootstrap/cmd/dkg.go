@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/encodable"
 )
 
 func runDKG(nodes []model.NodeInfo) model.DKGData {
@@ -30,7 +31,7 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 
 		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
 
-		encKey := model.EncodableRandomBeaconPrivKey{PrivateKey: privKey}
+		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
 		privParticpant := model.DKGParticipantPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encKey,
