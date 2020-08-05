@@ -30,7 +30,7 @@ func constructRootResultAndSeal(
 	blockID := block.ID()
 
 	epochSetup := &epoch.Setup{
-		Counter:      1, // TODO flag
+		Counter:      flagEpochCounter,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
 		Assignments:  assignments,
@@ -48,7 +48,7 @@ func constructRootResultAndSeal(
 	}
 
 	epochCommit := &epoch.Commit{
-		Counter:         1, // TODO flag
+		Counter:         flagEpochCounter,
 		ClusterQCs:      clusterQCs,
 		DKGGroupKey:     dkgData.PubGroupKey,
 		DKGParticipants: dkgParticipants,
