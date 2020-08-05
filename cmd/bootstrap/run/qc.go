@@ -2,9 +2,6 @@ package run
 
 import (
 	"fmt"
-	"io/ioutil"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
@@ -18,11 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
-	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type Participant struct {
@@ -123,51 +116,4 @@ func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []
 	}
 
 	return validators, signers, nil
-}
-
-func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error) {
-
-	dir, err := tempDBDir()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	opts := badger.
-		DefaultOptions(dir).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	metrics := metrics.NewNoopCollector()
-
-	headers := storeBadger.NewHeaders(metrics, db)
-	guarantees := storeBadger.NewGuarantees(metrics, db)
-	seals := storeBadger.NewSeals(metrics, db)
-	index := storeBadger.NewIndex(metrics, db)
-	payloads := storeBadger.NewPayloads(db, index, guarantees, seals)
-	blocks := storeBadger.NewBlocks(db, headers, payloads)
-	setups := storeBadger.NewEpochSetups(metrics, db)
-	commits := storeBadger.NewEpochCommits(metrics, db)
-
-	state, err := protoBadger.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	result := bootstrap.Result(block, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
-	err = state.Mutate().Bootstrap(block, result, seal)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return state, db, err
-}
-
-func tempDBDir() (string, error) {
-	return ioutil.TempDir("", "flow-bootstrap-db")
 }
