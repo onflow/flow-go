@@ -17,6 +17,7 @@ import (
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
+	pingeng "github.com/dapperlabs/flow-go/engine/access/ping"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/requester"
@@ -41,6 +42,7 @@ func main() {
 		blockLimit                   uint
 		collectionLimit              uint
 		receiptLimit                 uint
+		pingEnabled                  bool
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
 		followerEng                  *followereng.Engine
@@ -73,6 +75,7 @@ func main() {
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
+			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
@@ -239,6 +242,19 @@ func main() {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 			return sync, nil
+		}).
+		Component("ping engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			ping, err := pingeng.New(
+				node.Logger,
+				node.State,
+				node.Me,
+				pingEnabled,
+				node.Middleware,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create ping engine: %w", err)
+			}
+			return ping, nil
 		}).
 		Run()
 }
