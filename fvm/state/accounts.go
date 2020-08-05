@@ -247,7 +247,7 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 	}
 
 	if !ok {
-		return fmt.Errorf("account with address %s does not exist", address)
+		return fmt.Errorf("SetCode account with address %s does not exist", address)
 	}
 
 	var prevCode []byte

@@ -1,0 +1,2 @@
+let x = 7 / 3;
+assert x == 2

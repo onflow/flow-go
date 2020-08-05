@@ -267,7 +267,7 @@ func (h *handler) GetAccountAtBlockID(
 	}
 
 	if value == nil {
-		return nil, status.Errorf(codes.NotFound, "account with address %s does not exist", flowAddress)
+		return nil, status.Errorf(codes.NotFound, "GAABID account with address %s does not exist", flowAddress)
 	}
 
 	account, err := convert.AccountToMessage(value)

@@ -543,7 +543,7 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encPublicKey []b
 
 	if !ok {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("account with address %s does not exist", address)
+		return fmt.Errorf("AAC account with address %s does not exist", address)
 	}
 
 	var publicKey flow.AccountPublicKey
@@ -585,7 +585,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (p
 
 	if !ok {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("account with address %s does not exist", address)
+		return nil, fmt.Errorf("RAC account with address %s does not exist", address)
 	}
 
 	var publicKeys []flow.AccountPublicKey

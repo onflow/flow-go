@@ -480,6 +480,17 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 				} else {
 					fmt.Println("Tx results differ")
 					spew.Dump(changelog)
+
+					fmt.Printf("Block time %s\n", computedBlock.ExecutableBlock.Block.Header.Timestamp.String())
+
+					for _, c := range computedBlock.CompleteCollections {
+						for _, tx := range c.Transactions {
+							fmt.Println("tx in block")
+							//fmt.Println(string(tx.Script))
+							spew.Dump(tx)
+						}
+					}
+
 				}
 
 				//	log.Info().Msg("Reads")
@@ -530,19 +541,19 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 						}
 					}
 
-					if len(changelog) > 1 {
-						for _, c := range computedBlock.CompleteCollections {
-							for _, tx := range c.Transactions {
-								fmt.Println("tx in block")
-								fmt.Println(string(tx.Script))
-							}
-						}
-					}
+					//if len(changelog) > 1 {
+					//	for _, c := range computedBlock.CompleteCollections {
+					//		for _, tx := range c.Transactions {
+					//			fmt.Println("tx in block")
+					//			fmt.Println(string(tx.Script))
+					//		}
+					//	}
+					//}
 
 					//spew.Dump(changelog)
 					//spew.Dump(writeMappings)
 					//spew.Dump(readMappings)
-
+					return
 				} else {
 					log.Info().Msg("snapshot do   match")
 				}

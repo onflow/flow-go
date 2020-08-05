@@ -1,0 +1,32 @@
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Coverage artifacts
+/coverage.zip
+/cover.json
+/cover-summary
+/index.html
+
+# Since we have tooling that uses node
+node_modules
+
+.DS_Store
+
+# IDE related files
+.idea
+.vscode
+git
+
+language/tools/vscode-extension/cadence-*.vsix
+language/tools/vscode-extension/out/*
+
+# Go mod ignores
+.history
+
+# go-fuzz
+crashers
+corpus
+suppressions

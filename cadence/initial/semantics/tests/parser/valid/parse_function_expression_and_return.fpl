@@ -1,0 +1,1 @@
+    let test = fun (): Int { return 1 }

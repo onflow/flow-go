@@ -1,0 +1,1 @@
+let a = "test \0\n\r\t\"\'\\ xyz"

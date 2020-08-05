@@ -1,0 +1,141 @@
+{
+  "name": "cadence",
+  "displayName": "Cadence",
+  "publisher": "dapperlabs",
+  "description": "",
+  "version": "0.4.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onflow/cadence.git"
+  },
+  "engines": {
+    "vscode": "^1.36.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:cadence",
+    "onCommand:cadence.runEmulator"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cadence.restartServer",
+        "category": "Cadence",
+        "title": "Restart language server"
+      },
+      {
+        "command": "cadence.runEmulator",
+        "category": "Cadence",
+        "title": "Run emulator"
+      },
+      {
+        "command": "cadence.stopEmulator",
+        "category": "Cadence",
+        "title": "Stop emulator"
+      },
+      {
+        "command": "cadence.createAccount",
+        "category": "Cadence",
+        "title": "Create account"
+      },
+      {
+        "command": "cadence.switchActiveAccount",
+        "category": "Cadence",
+        "title": "Switch account"
+      }
+    ],
+    "configuration": {
+      "title": "Cadence",
+      "properties": {
+        "cadence.flowCommand": {
+          "type": "string",
+          "default": "flow",
+          "description": "The command to invoke the Flow CLI",
+          "scope": "resource"
+        },
+        "cadence.servicePrivateKey": {
+          "type": "string",
+          "default": "bf9db4706c2fdb9011ee7e170ccac492f05427b96ab41d8bf2d8c58443704b76",
+          "description": "The private key of the service account to use when submitting transactions",
+          "scope": "resource"
+        },
+        "cadence.serviceKeySignatureAlgorithm": {
+          "type": "string",
+          "default": "ECDSA_P256",
+          "description": "The signature algorithm of the service account to use when submitting transactions",
+          "scope": "resource"
+        },
+        "cadence.serviceKeyHashAlgorithm": {
+          "type": "string",
+          "default": "SHA3_256",
+          "description": "The hash algorithm of the service account to use when submitting transactions",
+          "scope": "resource"
+        },
+        "cadence.emulatorAddress": {
+          "type": "string",
+          "default": "localhost:3569",
+          "description": "The address of an emulator instance",
+          "scope": "resource"
+        },
+        "cadence.numAccounts": {
+          "type": "number",
+          "default": 3,
+          "description": "The number of default accounts to create",
+          "scope": "resource"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "cadence",
+        "extensions": [
+          ".cdc"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cadence",
+        "scopeName": "source.cadence",
+        "path": "./syntaxes/cadence.tmGrammar.json"
+      },
+      {
+        "scopeName": "markdown.cadence.codeblock",
+        "path": "./syntaxes/codeblock.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.cadence": "cadence"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install",
+    "test": "npm run compile && node ./node_modules/vscode/bin/test",
+    "package": "./node_modules/.bin/vsce package",
+    "snyk-protect": "snyk protect",
+    "prepare": "npm run snyk-protect"
+  },
+  "devDependencies": {
+    "typescript": "^3.3.1",
+    "vscode": "^1.1.28",
+    "tslint": "^5.12.1",
+    "@types/node": "^10.12.21",
+    "@types/mocha": "^2.2.42"
+  },
+  "dependencies": {
+    "vsce": "^1.69.0",
+    "vscode-languageclient": "~4.4.0",
+    "snyk": "^1.316.1"
+  },
+  "snyk": true
+}

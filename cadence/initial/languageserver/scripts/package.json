@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "devDependencies": {
+    "@types/node": "^12.6.9"
+  },
+  "dependencies": {
+    "typescript": "^3.5.3"
+  }
+}
