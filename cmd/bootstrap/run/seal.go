@@ -10,7 +10,7 @@ func GenerateRootSeal(result *flow.ExecutionResult, setup *flow.EpochSetup, comm
 		ResultID:      result.ID(),
 		InitialState:  nil,
 		FinalState:    result.FinalStateCommit,
-		ServiceEvents: []interface{}{setup, commit},
+		ServiceEvents: []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()},
 	}
 	return seal
 }

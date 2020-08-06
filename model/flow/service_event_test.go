@@ -41,7 +41,7 @@ func TestEncodeDecode(t *testing.T) {
 	})
 
 	t.Run("generic type", func(t *testing.T) {
-		b, err := json.Marshal(setup.ToServiceEvent())
+		b, err := json.Marshal(setup.ServiceEvent())
 		require.Nil(t, err)
 
 		outer := new(flow.ServiceEvent)
@@ -51,7 +51,7 @@ func TestEncodeDecode(t *testing.T) {
 		require.True(t, ok)
 		assert.DeepEqual(t, setup, gotSetup)
 
-		b, err = json.Marshal(commit.ToServiceEvent())
+		b, err = json.Marshal(commit.ServiceEvent())
 		require.Nil(t, err)
 
 		outer = new(flow.ServiceEvent)

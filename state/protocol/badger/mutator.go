@@ -45,11 +45,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if len(seal.ServiceEvents) != 2 {
 			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.ServiceEvents))
 		}
-		setup, valid := seal.ServiceEvents[0].(*flow.EpochSetup)
+		setup, valid := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
 		if !valid {
 			return fmt.Errorf("first service event should be epoch setup (%T)", seal.ServiceEvents[0])
 		}
-		commit, valid := seal.ServiceEvents[1].(*flow.EpochCommit)
+		commit, valid := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
 		if !valid {
 			return fmt.Errorf("second event should be epoch commit (%T)", seal.ServiceEvents[1])
 		}
@@ -420,8 +420,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
 
-			switch ev := event.(type) {
-
+			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 
 				// We should only have a single epoch setup event per epoch.
@@ -480,10 +479,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				didCommit = true
 
 			default:
-				// NOTE: This is already handled as error in the decoding; if
-				// we decode an event successfully, it should be processed, so
-				// all we need to do here is do a warning log that there are
-				// unprocessed service events.
+				return fmt.Errorf("invalid service event type: %s", event.Type)
 			}
 		}
 	}
@@ -568,7 +564,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	var ops []func(*badger.Txn) error
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
-			switch ev := event.(type) {
+			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 				ops = append(ops, m.state.setups.StoreTx(ev))
 			case *flow.EpochCommit:
@@ -727,11 +723,11 @@ func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool,
 				if setupPending && commitPending {
 					break
 				}
-				if _, ok := event.(*flow.EpochSetup); ok {
+				if _, ok := event.Event.(*flow.EpochSetup); ok {
 					setupPending = true
 					continue
 				}
-				if _, ok := event.(*flow.EpochCommit); ok {
+				if _, ok := event.Event.(*flow.EpochCommit); ok {
 					commitPending = true
 					continue
 				}

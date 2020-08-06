@@ -18,8 +18,8 @@ type EpochSetup struct {
 	Seed         []byte
 }
 
-func (setup *EpochSetup) ToServiceEvent() *ServiceEvent {
-	return &ServiceEvent{
+func (setup *EpochSetup) ServiceEvent() ServiceEvent {
+	return ServiceEvent{
 		Type:  ServiceEventSetup,
 		Event: setup,
 	}
@@ -42,8 +42,8 @@ type EpochCommit struct {
 	DKGParticipants map[Identifier]DKGParticipant
 }
 
-func (commit *EpochCommit) ToServiceEvent() *ServiceEvent {
-	return &ServiceEvent{
+func (commit *EpochCommit) ServiceEvent() ServiceEvent {
+	return ServiceEvent{
 		Type:  ServiceEventCommit,
 		Event: commit,
 	}
