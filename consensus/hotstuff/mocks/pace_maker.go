@@ -79,6 +79,22 @@ func (_m *PaceMaker) TimeoutChannel() <-chan time.Time {
 	return r0
 }
 
+// TimerInfo provides a mock function with given fields:
+func (_m *PaceMaker) TimerInfo() *model.TimerInfo {
+	ret := _m.Called()
+
+	var r0 *model.TimerInfo
+	if rf, ok := ret.Get(0).(func() *model.TimerInfo); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.TimerInfo)
+		}
+	}
+
+	return r0
+}
+
 // UpdateCurViewWithBlock provides a mock function with given fields: block, isLeaderForNextView
 func (_m *PaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
 	ret := _m.Called(block, isLeaderForNextView)
