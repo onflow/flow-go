@@ -12,10 +12,12 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	legacyaccess "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/backend"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
+	legacyhandler "github.com/dapperlabs/flow-go/engine/access/rpc/handler/legacy"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -95,6 +97,12 @@ func New(log zerolog.Logger,
 	access.RegisterAccessAPIServer(
 		eng.grpcServer,
 		handler.New(backend, chainID.Chain()),
+	)
+
+	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
+	legacyaccess.RegisterAccessAPIServer(
+		eng.grpcServer,
+		legacyhandler.New(backend, chainID.Chain()),
 	)
 
 	return eng
