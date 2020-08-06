@@ -342,18 +342,6 @@ func (h *Handler) GetEventsForBlockIDs(
 	}, nil
 }
 
-// blockToHeaderResponse constructs a block header response from a block.
-func blockToHeaderResponse(block *flow.Block) (*access.BlockHeaderResponse, error) {
-	msg, err := convert.BlockHeaderToMessage(block.Header)
-	if err != nil {
-		return nil, err
-	}
-
-	return &access.BlockHeaderResponse{
-		Block: msg,
-	}, nil
-}
-
 func blockResponse(block *flow.Block) (*access.BlockResponse, error) {
 	msg, err := convert.BlockToMessage(block)
 	if err != nil {
