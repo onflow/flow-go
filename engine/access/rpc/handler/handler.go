@@ -26,15 +26,24 @@ func New(api AccessAPI, chain flow.Chain) *Handler {
 }
 
 // Ping the Access API server for a response.
-func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
+func (h *Handler) Ping(ctx context.Context, _ *access.PingRequest) (*access.PingResponse, error) {
+	err := h.api.Ping(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &access.PingResponse{}, nil
 }
 
 func (h *Handler) GetNetworkParameters(
-	context.Context,
-	*access.GetNetworkParametersRequest,
+	ctx context.Context,
+	_ *access.GetNetworkParametersRequest,
 ) (*access.GetNetworkParametersResponse, error) {
-	panic("implement me")
+	params := h.api.GetNetworkParameters(ctx)
+
+	return &access.GetNetworkParametersResponse{
+		ChainId: string(params.ChainID),
+	}, nil
 }
 
 // SendTransaction submits a transaction to the network.
