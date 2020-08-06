@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/epoch"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -58,6 +58,14 @@ func (bs *BlockSnapshot) Commit() (flow.StateCommitment, error) {
 // clusters for the epoch active at the current block snapshot.
 func (bs *BlockSnapshot) Clusters() (flow.ClusterList, error) {
 	return bs.EpochSnapshot().Clusters()
+}
+
+func (bs *BlockSnapshot) ClusterRootBlock(cluster flow.IdentityList) (*cluster.Block, error) {
+	return bs.EpochSnapshot().ClusterRootBlock(cluster)
+}
+
+func (bs *BlockSnapshot) ClusterRootQC(cluster flow.IdentityList) (*flow.QuorumCertificate, error) {
+	return bs.EpochSnapshot().ClusterRootQC(cluster)
 }
 
 // Head returns the header associated with the current block snapshot.
@@ -195,7 +203,7 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 	// with a header for the next epoch (it could be pending). We should never
 	// have pending headers from two epochs in the future, so it's safe to
 	// return here.
-	var setup epoch.Setup
+	var setup flow.EpochSetup
 	err = bs.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
 	if err != nil {
 		return &EpochSnapshot{err: fmt.Errorf("could not retrieve epoch setup: %w", err)}
@@ -213,7 +221,10 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 
 		// we have reached the first epoch, which this header has to be part of thus
 		if counter == 0 {
-			return &EpochSnapshot{counter: 0}
+			return &EpochSnapshot{
+				counter: 0,
+				state:   bs.state,
+			}
 		}
 
 		// get the start view of the epoch
@@ -226,7 +237,10 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 		// of the epoch; as the check still passed for the previous one, the header is thus
 		// definitely part of the previously checked (next) period
 		if start > header.View {
-			return &EpochSnapshot{counter: counter + 1}
+			return &EpochSnapshot{
+				counter: counter + 1,
+				state:   bs.state,
+			}
 		}
 
 		// the header still falls into the currently checked epoch; step back to the previous

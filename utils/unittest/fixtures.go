@@ -774,3 +774,50 @@ func BatchListFixture(n int) []flow.Batch {
 	}
 	return batches
 }
+
+func EpochSetupFixture(n int) *flow.EpochSetup {
+	participants := IdentityListFixture(n, WithAllRoles())
+	assignments := ClusterAssignment(1, participants)
+	return &flow.EpochSetup{
+		Counter:      uint64(rand.Uint32()),
+		FinalView:    uint64(rand.Uint32()),
+		Participants: participants,
+		Assignments:  assignments,
+		Seed:         SeedFixture(32),
+	}
+}
+
+func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
+	key, err := crypto.GeneratePrivateKey(algo, SeedFixture(128))
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
+func QuorumCertificateFixture() *flow.QuorumCertificate {
+	return &flow.QuorumCertificate{
+		View:      uint64(rand.Uint32()),
+		BlockID:   IdentifierFixture(),
+		SignerIDs: IdentifierListFixture(3),
+		SigData:   SeedFixture(32 * 3),
+	}
+}
+
+func EpochCommitFixture(n uint) *flow.EpochCommit {
+
+	participants := make(map[flow.Identifier]flow.DKGParticipant)
+	for i := uint(0); i < n; i++ {
+		participants[IdentifierFixture()] = flow.DKGParticipant{
+			Index:    i,
+			KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
+		}
+	}
+
+	return &flow.EpochCommit{
+		Counter:         uint64(rand.Uint32()),
+		ClusterQCs:      []*flow.QuorumCertificate{QuorumCertificateFixture()},
+		DKGGroupKey:     KeyFixture(crypto.BLSBLS12381).PublicKey(),
+		DKGParticipants: participants,
+	}
+}

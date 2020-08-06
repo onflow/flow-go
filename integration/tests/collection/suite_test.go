@@ -122,10 +122,13 @@ func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
 }
 
 func (suite *CollectorSuite) Clusters() flow.ClusterList {
+	seal := suite.net.Seal()
+	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	suite.Require().True(ok)
+
 	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
-	assignments := protocol.ClusterAssignments(suite.nClusters, collectors)
-	clusters, err := flow.NewClusterList(assignments, collectors)
-	suite.Require().NoError(err)
+	clusters, err := flow.NewClusterList(setup.Assignments, collectors)
+	suite.Require().Nil(err)
 	return clusters
 }
 
@@ -308,7 +311,9 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
-	chainID := protocol.ChainIDForCluster(myCluster)
+	setup, ok := suite.net.Seal().ServiceEvents[1].Event.(*flow.EpochSetup)
+	suite.Require().True(ok)
+	rootBlock := protocol.CanonicalClusterRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
 
 	db, err := node.DB()
@@ -319,7 +324,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	headers := storage.NewHeaders(metrics, db)
 	payloads := storage.NewClusterPayloads(metrics, db)
 
-	state, err := clusterstate.NewState(db, chainID, headers, payloads)
+	state, err := clusterstate.NewState(db, rootBlock.Header.ChainID, headers, payloads)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state

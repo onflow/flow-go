@@ -3,7 +3,7 @@
 package mock
 
 import (
-	epoch "github.com/dapperlabs/flow-go/model/epoch"
+	flow "github.com/dapperlabs/flow-go/model/flow"
 	badger "github.com/dgraph-io/badger/v2"
 
 	mock "github.com/stretchr/testify/mock"
@@ -15,15 +15,15 @@ type EpochSetups struct {
 }
 
 // ByCounter provides a mock function with given fields: counter
-func (_m *EpochSetups) ByCounter(counter uint64) (*epoch.Setup, error) {
+func (_m *EpochSetups) ByCounter(counter uint64) (*flow.EpochSetup, error) {
 	ret := _m.Called(counter)
 
-	var r0 *epoch.Setup
-	if rf, ok := ret.Get(0).(func(uint64) *epoch.Setup); ok {
+	var r0 *flow.EpochSetup
+	if rf, ok := ret.Get(0).(func(uint64) *flow.EpochSetup); ok {
 		r0 = rf(counter)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*epoch.Setup)
+			r0 = ret.Get(0).(*flow.EpochSetup)
 		}
 	}
 
@@ -38,11 +38,11 @@ func (_m *EpochSetups) ByCounter(counter uint64) (*epoch.Setup, error) {
 }
 
 // StoreTx provides a mock function with given fields: setup
-func (_m *EpochSetups) StoreTx(setup *epoch.Setup) func(*badger.Txn) error {
+func (_m *EpochSetups) StoreTx(setup *flow.EpochSetup) func(*badger.Txn) error {
 	ret := _m.Called(setup)
 
 	var r0 func(*badger.Txn) error
-	if rf, ok := ret.Get(0).(func(*epoch.Setup) func(*badger.Txn) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.EpochSetup) func(*badger.Txn) error); ok {
 		r0 = rf(setup)
 	} else {
 		if ret.Get(0) != nil {

@@ -17,7 +17,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -105,7 +104,6 @@ type namedDoneObject struct {
 type FlowNodeBuilder struct {
 	BaseConfig        BaseConfig
 	NodeID            flow.Identifier
-	NClusters         uint
 	flags             *pflag.FlagSet
 	Logger            zerolog.Logger
 	Me                *local.Local
@@ -117,6 +115,7 @@ type FlowNodeBuilder struct {
 	State             *protocol.State
 	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
+	MsgValidators     []validators.MessageValidator
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
@@ -124,11 +123,10 @@ type FlowNodeBuilder struct {
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
-	MsgValidators     []validators.MessageValidator
 
 	// root state information
 	RootBlock   *flow.Block
-	RootQC      *model.QuorumCertificate
+	RootQC      *flow.QuorumCertificate
 	RootResult  *flow.ExecutionResult
 	RootSeal    *flow.Seal
 	RootChainID flow.ChainID
@@ -710,12 +708,12 @@ func loadRootBlock(dir string) (*flow.Block, error) {
 
 }
 
-func loadRootQC(dir string) (*model.QuorumCertificate, error) {
+func loadRootQC(dir string) (*flow.QuorumCertificate, error) {
 	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootQC))
 	if err != nil {
 		return nil, err
 	}
-	var qc model.QuorumCertificate
+	var qc flow.QuorumCertificate
 	err = json.Unmarshal(data, &qc)
 	return &qc, err
 }

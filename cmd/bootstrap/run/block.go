@@ -6,9 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func GenerateRootBlock(chainID flow.ChainID, parentID flow.Identifier, height uint64, timestamp time.Time, participants flow.IdentityList) *flow.Block {
-	// TODO: generate root seal with root system events for epoch setup & commit (including identities)
-	// remove participants param here
+func GenerateRootBlock(chainID flow.ChainID, parentID flow.Identifier, height uint64, timestamp time.Time) *flow.Block {
 
 	payload := flow.Payload{
 		Guarantees: nil,

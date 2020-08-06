@@ -5,11 +5,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
 
 func constructRootResultAndSeal(
@@ -17,7 +14,7 @@ func constructRootResultAndSeal(
 	block *flow.Block,
 	participantNodes []model.NodeInfo,
 	assignments flow.AssignmentList,
-	clusterQCs []*hotstuff.QuorumCertificate,
+	clusterQCs []*flow.QuorumCertificate,
 	dkgData model.DKGData,
 ) {
 
@@ -29,7 +26,7 @@ func constructRootResultAndSeal(
 	participants := model.ToIdentityList(participantNodes)
 	blockID := block.ID()
 
-	epochSetup := &epoch.Setup{
+	epochSetup := &flow.EpochSetup{
 		Counter:      flagEpochCounter,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
@@ -37,21 +34,13 @@ func constructRootResultAndSeal(
 		Seed:         blockID[:],
 	}
 
-	dkgParticipants := make(map[flow.Identifier]epoch.DKGParticipant)
-	dkgParticipantIdentities := participants.Filter(filter.HasRole(flow.RoleConsensus))
-	for i, keyShare := range dkgData.PubKeyShares {
-		identity := dkgParticipantIdentities[i]
-		dkgParticipants[identity.NodeID] = epoch.DKGParticipant{
-			Index:    uint(i),
-			KeyShare: keyShare,
-		}
-	}
+	dkgLookup := model.ToDKGLookup(dkgData, participants)
 
-	epochCommit := &epoch.Commit{
+	epochCommit := &flow.EpochCommit{
 		Counter:         flagEpochCounter,
 		ClusterQCs:      clusterQCs,
 		DKGGroupKey:     dkgData.PubGroupKey,
-		DKGParticipants: dkgParticipants,
+		DKGParticipants: dkgLookup,
 	}
 
 	result := run.GenerateRootResult(block, stateCommit)

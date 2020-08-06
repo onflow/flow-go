@@ -3,28 +3,26 @@
 package flow
 
 type Seal struct {
-	BlockID      Identifier
-	ResultID     Identifier
-	InitialState StateCommitment
-	FinalState   StateCommitment
-	//TODO figure out how to represent these, could use flow.Event once format
-	// is decided. []interface{} needs extra meta info to send over the wire.
-	ServiceEvents []interface{}
+	BlockID       Identifier
+	ResultID      Identifier
+	InitialState  StateCommitment
+	FinalState    StateCommitment
+	ServiceEvents []ServiceEvent
 }
 
+// TODO need to include service events in hash, omitted for now as they are not
+// encodable with RLP
 func (s Seal) Body() interface{} {
 	return struct {
-		BlockID       Identifier
-		ResultID      Identifier
-		InitialState  StateCommitment
-		FinalState    StateCommitment
-		ServiceEvents []interface{}
+		BlockID      Identifier
+		ResultID     Identifier
+		InitialState StateCommitment
+		FinalState   StateCommitment
 	}{
-		BlockID:       s.BlockID,
-		ResultID:      s.ResultID,
-		InitialState:  s.InitialState,
-		FinalState:    s.FinalState,
-		ServiceEvents: s.ServiceEvents,
+		BlockID:      s.BlockID,
+		ResultID:     s.ResultID,
+		InitialState: s.InitialState,
+		FinalState:   s.FinalState,
 	}
 }
 

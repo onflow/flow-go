@@ -14,16 +14,12 @@ var (
 	// public genesis information
 	DirnamePublicBootstrap    = "public-root-information"
 	PathNodeInfosPub          = filepath.Join(DirnamePublicBootstrap, "node-infos.pub.json")
-	PathDKGDataPub            = filepath.Join(DirnamePublicBootstrap, "dkg-data.pub.json")
 	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
 	PathNodeInfoPub           = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID
 	PathRootBlock             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathRootQC                = filepath.Join(DirnamePublicBootstrap, "root-qc.json")
 	PathRootResult            = filepath.Join(DirnamePublicBootstrap, "root-execution-result.json")
 	PathRootSeal              = filepath.Join(DirnamePublicBootstrap, "root-block-seal.json")
-	PathRootClusterBlock      = filepath.Join(DirnamePublicBootstrap, "root-cluster-block.%v.json") // %v will be replaced by cluster ID
-	PathRootClusterQC         = filepath.Join(DirnamePublicBootstrap, "root-cluster-qc.%v.json")    // %v will be replaced by cluster ID
-	PathNClusters             = filepath.Join(DirnamePublicBootstrap, "root-nclusters.json")
 
 	// private genesis information
 	DirPrivateRoot           = "private-root-information"

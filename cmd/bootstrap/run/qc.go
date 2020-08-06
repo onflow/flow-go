@@ -2,9 +2,6 @@ package run
 
 import (
 	"fmt"
-	"io/ioutil"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
@@ -15,14 +12,9 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
-	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type Participant struct {
@@ -32,7 +24,7 @@ type Participant struct {
 
 type ParticipantData struct {
 	Participants []Participant
-	Lookup       map[flow.Identifier]epoch.DKGParticipant
+	Lookup       map[flow.Identifier]flow.DKGParticipant
 	GroupKey     crypto.PublicKey
 }
 
@@ -44,7 +36,7 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
-func GenerateRootQC(block *flow.Block, participantData ParticipantData) (*model.QuorumCertificate, error) {
+func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
 
 	validators, signers, err := createValidators(participantData)
 	if err != nil {
@@ -81,7 +73,7 @@ func GenerateRootQC(block *flow.Block, participantData ParticipantData) (*model.
 	return qc, err
 }
 
-func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []hotstuff.Signer, error) {
+func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.Signer, error) {
 	n := len(participantData.Participants)
 	identities := participantData.Identities()
 
@@ -111,8 +103,6 @@ func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []
 		committee, err := committee.NewStaticCommittee(identities, local.NodeID(), participantData.Lookup, participantData.GroupKey)
 
 		// create signer
-		// TODO: The DKG data is now included in the epoch commit event, which is in turn included in the root seal. If
-		// we want to properly sign the block QC, we will have to untangle all of this logic here.
 		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
 		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner()
@@ -127,49 +117,55 @@ func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []
 	return validators, signers, nil
 }
 
-func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error) {
+func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData bootstrap.DKGData) (*ParticipantData, error) {
 
-	dir, err := tempDBDir()
-	if err != nil {
-		return nil, nil, err
+	// stakingNodes can include external validators, so it can be longer than internalNodes
+	if len(allNodes) < len(internalNodes) {
+		return nil, fmt.Errorf("need at least as many staking public keys as private keys (pub=%d, priv=%d)", len(allNodes), len(internalNodes))
 	}
 
-	opts := badger.
-		DefaultOptions(dir).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, nil, err
+	// length of DKG participants needs to match stakingNodes, since we run DKG for external and internal validators
+	if len(allNodes) != len(dkgData.PrivKeyShares) {
+		return nil, fmt.Errorf("need exactly the same number of staking public keys as DKG private participants")
 	}
 
-	metrics := metrics.NewNoopCollector()
+	qcData := &ParticipantData{}
 
-	headers := storeBadger.NewHeaders(metrics, db)
-	guarantees := storeBadger.NewGuarantees(metrics, db)
-	seals := storeBadger.NewSeals(metrics, db)
-	index := storeBadger.NewIndex(metrics, db)
-	payloads := storeBadger.NewPayloads(db, index, guarantees, seals)
-	blocks := storeBadger.NewBlocks(db, headers, payloads)
-	setups := storeBadger.NewEpochSetups(metrics, db)
-	commits := storeBadger.NewEpochCommits(metrics, db)
+	participantLookup := make(map[flow.Identifier]flow.DKGParticipant)
 
-	state, err := protoBadger.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits)
-	if err != nil {
-		return nil, nil, err
+	// the QC will be signed by everyone in internalNodes
+	for i, node := range internalNodes {
+		// assign a node to a DGKdata entry, using the canonical ordering
+		participantLookup[node.NodeID] = flow.DKGParticipant{
+			KeyShare: dkgData.PubKeyShares[i],
+			Index:    uint(i),
+		}
+
+		if node.NodeID == flow.ZeroID {
+			return nil, fmt.Errorf("node id cannot be zero")
+		}
+
+		if node.Stake == 0 {
+			return nil, fmt.Errorf("node (id=%s) cannot have 0 stake", node.NodeID)
+		}
+
+		qcData.Participants = append(qcData.Participants, Participant{
+			NodeInfo:            node,
+			RandomBeaconPrivKey: dkgData.PrivKeyShares[i],
+		})
 	}
 
-	result := bootstrap.Result(block, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
-	err = state.Mutate().Bootstrap(block, result, seal)
-	if err != nil {
-		return nil, nil, err
+	for i := len(internalNodes); i < len(allNodes); i++ {
+		// assign a node to a DGKdata entry, using the canonical ordering
+		node := allNodes[i]
+		participantLookup[node.NodeID] = flow.DKGParticipant{
+			KeyShare: dkgData.PubKeyShares[i],
+			Index:    uint(i),
+		}
 	}
 
-	return state, db, err
-}
+	qcData.Lookup = participantLookup
+	qcData.GroupKey = dkgData.PubGroupKey
 
-func tempDBDir() (string, error) {
-	return ioutil.TempDir("", "flow-bootstrap-db")
+	return qcData, nil
 }

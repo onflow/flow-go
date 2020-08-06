@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dapperlabs/flow-go/model/epoch"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
@@ -30,9 +30,12 @@ type EpochSnapshot struct {
 // the node IDs, which means that order is deterministic between calls as long as the same selector
 // is used.
 func (es *EpochSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+	if es.err != nil {
+		return nil, es.err
+	}
 
 	// retrieve the identities for the epoch
-	var setup epoch.Setup
+	var setup flow.EpochSetup
 	err := es.state.db.View(operation.RetrieveEpochSetup(es.counter, &setup))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
@@ -56,6 +59,9 @@ func (es *EpochSnapshot) Identities(selector flow.IdentityFilter) (flow.Identity
 // Identity retrieves the identity with the given node ID from the identities for the epoch
 // associated with the current epoch snapshot.
 func (es *EpochSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+	if es.err != nil {
+		return nil, es.err
+	}
 
 	// filter identities at snapshot for node ID
 	identities, err := es.Identities(filter.HasNodeID(nodeID))
@@ -84,8 +90,11 @@ func (es *EpochSnapshot) Commit() (flow.StateCommitment, error) {
 // snapshot and retrieves a list of clusters with the respective collection nodes assigned
 // to the respective clusters.
 func (es *EpochSnapshot) Clusters() (flow.ClusterList, error) {
+	if es.err != nil {
+		return nil, es.err
+	}
 
-	var setup epoch.Setup
+	var setup flow.EpochSetup
 	err := es.state.db.View(operation.RetrieveEpochSetup(es.counter, &setup))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch setup: %w", err)
@@ -98,6 +107,51 @@ func (es *EpochSnapshot) Clusters() (flow.ClusterList, error) {
 	)
 
 	return clusters, nil
+}
+
+// ClusterRootBlock returns the canonical root block for the given cluster, for the
+// epoch associated with the current snapshot.
+func (es *EpochSnapshot) ClusterRootBlock(cluster flow.IdentityList) (*cluster.Block, error) {
+
+	counter, err := es.Epoch()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch: %w", err)
+	}
+	clusters, err := es.Clusters()
+	if err != nil {
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	// verify the cluster exists
+	_, exists := clusters.IndexOf(cluster)
+	if !exists {
+		return nil, fmt.Errorf("cluster does not exist in current epoch")
+	}
+
+	return protocol.CanonicalClusterRootBlock(counter, cluster), nil
+}
+
+// ClusterRootQC returns the quorum certificate for the root block of the given
+// cluster, for the epoch associated with the current snapshot.
+func (es *EpochSnapshot) ClusterRootQC(cluster flow.IdentityList) (*flow.QuorumCertificate, error) {
+
+	clusters, err := es.Clusters()
+	if err != nil {
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	index, exists := clusters.IndexOf(cluster)
+	if !exists {
+		return nil, fmt.Errorf("cluster does not exist in current epoch")
+	}
+
+	var commit flow.EpochCommit
+	err = es.state.db.View(operation.RetrieveEpochCommit(es.counter, &commit))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve epoch commit: %w", err)
+	}
+
+	return commit.ClusterQCs[index], nil
 }
 
 // Head converts the epoch snapshot into a block snapshot in order to retrieve the header

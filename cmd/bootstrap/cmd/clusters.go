@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -40,33 +37,18 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (f
 	return assignments, clusters
 }
 
-// TODO this should be defined in protocol state
-func constructRootBlocksForClusters(clusters flow.ClusterList) []*cluster.Block {
-	clusterBlocks := run.GenerateRootClusterBlocks(clusters)
-
-	for _, clusterBlock := range clusterBlocks {
-		// cluster ID is equivalent to chain ID
-		clusterID := clusterBlock.Header.ChainID
-		// TODO remove
-		writeJSON(fmt.Sprintf(model.PathRootClusterBlock, clusterID), clusterBlock)
-	}
-
-	return clusterBlocks
-}
-
 func constructRootQCsForClusters(
 	clusterList flow.ClusterList,
 	nodeInfos []model.NodeInfo,
-	block *flow.Block,
 	clusterBlocks []*cluster.Block,
-) []*hotstuff.QuorumCertificate {
+) []*flow.QuorumCertificate {
 
 	if len(clusterBlocks) != len(clusterList) {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
 			Msg("number of clusters needs to equal number of cluster blocks")
 	}
 
-	qcs := make([]*hotstuff.QuorumCertificate, len(clusterBlocks))
+	qcs := make([]*flow.QuorumCertificate, len(clusterBlocks))
 	for i, cluster := range clusterList {
 		signers := filterClusterSigners(cluster, nodeInfos)
 
@@ -75,11 +57,6 @@ func constructRootQCsForClusters(
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
 		}
 		qcs[i] = qc
-
-		// cluster ID is equivalent to chain ID
-		clusterID := clusterBlocks[i].Header.ChainID
-		// TODO remove
-		writeJSON(fmt.Sprintf(model.PathRootClusterQC, clusterID), qc)
 	}
 
 	return qcs

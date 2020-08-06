@@ -9,8 +9,8 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -46,11 +46,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if len(seal.ServiceEvents) != 2 {
 			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.ServiceEvents))
 		}
-		setup, valid := seal.ServiceEvents[0].(*epoch.Setup)
+		setup, valid := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
 		if !valid {
 			return fmt.Errorf("first service event should be epoch setup (%T)", seal.ServiceEvents[0])
 		}
-		commit, valid := seal.ServiceEvents[1].(*epoch.Commit)
+		commit, valid := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
 		if !valid {
 			return fmt.Errorf("second event should be epoch commit (%T)", seal.ServiceEvents[1])
 		}
@@ -65,7 +65,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("invalid epoch setup event: %w", err)
 		}
-		err = validCommit(commit, setup.Participants)
+		err = validCommit(commit, setup.Participants.Filter(filter.HasRole(flow.RoleConsensus)))
 		if err != nil {
 			return fmt.Errorf("invalid epoch commit event: %w", err)
 		}
@@ -421,9 +421,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
 
-			switch ev := event.(type) {
-
-			case *epoch.Setup:
+			switch ev := event.Event.(type) {
+			case *flow.EpochSetup:
 
 				// We should only have a single epoch setup event per epoch.
 				if didSetup {
@@ -450,7 +449,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				// Make sure to disallow multiple commit events per payload.
 				didSetup = true
 
-			case *epoch.Commit:
+			case *flow.EpochCommit:
 
 				// We should only have a single epoch commit event per epoch.
 				if didCommit {
@@ -481,10 +480,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				didCommit = true
 
 			default:
-				// NOTE: This is already handled as error in the decoding; if
-				// we decode an event successfully, it should be processed, so
-				// all we need to do here is do a warning log that there are
-				// unprocessed service events.
+				return fmt.Errorf("invalid service event type: %s", event.Type)
 			}
 		}
 	}
@@ -569,10 +565,10 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	var ops []func(*badger.Txn) error
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
-			switch ev := event.(type) {
-			case *epoch.Setup:
+			switch ev := event.Event.(type) {
+			case *flow.EpochSetup:
 				ops = append(ops, m.state.setups.StoreTx(ev))
-			case *epoch.Commit:
+			case *flow.EpochCommit:
 				ops = append(ops, m.state.commits.StoreTx(ev))
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
@@ -728,11 +724,11 @@ func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool,
 				if setupPending && commitPending {
 					break
 				}
-				if _, ok := event.(*epoch.Setup); ok {
+				if _, ok := event.Event.(*flow.EpochSetup); ok {
 					setupPending = true
 					continue
 				}
-				if _, ok := event.(*epoch.Commit); ok {
+				if _, ok := event.Event.(*flow.EpochCommit); ok {
 					commitPending = true
 					continue
 				}

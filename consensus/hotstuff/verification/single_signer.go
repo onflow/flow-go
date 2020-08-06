@@ -78,7 +78,7 @@ func (s *SingleSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 
 // CreateQC generates a quorum certificate with a single aggregated signature for the
 // given votes.
-func (s *SingleSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, error) {
+func (s *SingleSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 
 	// check the consistency of the votes
 	err := checkVotesValidity(votes)
@@ -101,7 +101,7 @@ func (s *SingleSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, 
 	}
 
 	// create the QC
-	qc := &model.QuorumCertificate{
+	qc := &flow.QuorumCertificate{
 		View:      votes[0].View,
 		BlockID:   votes[0].BlockID,
 		SignerIDs: voterIDs,

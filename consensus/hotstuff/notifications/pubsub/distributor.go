@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Distributor distributes notifications to a list of subscribers (event consumers).
@@ -58,7 +59,7 @@ func (p *Distributor) OnReachedTimeout(timeout *model.TimerInfo) {
 	}
 }
 
-func (p *Distributor) OnQcIncorporated(qc *model.QuorumCertificate) {
+func (p *Distributor) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
@@ -66,7 +67,7 @@ func (p *Distributor) OnQcIncorporated(qc *model.QuorumCertificate) {
 	}
 }
 
-func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *model.QuorumCertificate) {
+func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {

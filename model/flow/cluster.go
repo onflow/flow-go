@@ -83,3 +83,14 @@ func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, uint, bool) {
 	}
 	return nil, 0, false
 }
+
+// IndexOf returns the index of the given cluster.
+func (cl ClusterList) IndexOf(cluster IdentityList) (uint, bool) {
+	clusterFingerprint := cluster.Fingerprint()
+	for index, other := range cl {
+		if other.Fingerprint() == clusterFingerprint {
+			return uint(index), true
+		}
+	}
+	return 0, false
+}
