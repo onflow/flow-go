@@ -3,35 +3,11 @@ package flow
 import (
 	"fmt"
 	"math/big"
-	"sort"
-
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/flow/order"
 )
 
 // AssignmentList is a list of identifier lists. Each list of identifiers lists the
 // identities that are part of the given cluster.
 type AssignmentList [][]Identifier
-
-// NewAssignment creates an assignment list with n clusters and with nodes
-// evenly distributed among clusters.
-func NewAssignmentList(n uint, nodes IdentityList) AssignmentList {
-
-	collectors := nodes.Filter(filter.HasRole(RoleCollection))
-
-	// order, so the same list results in the same
-	sort.Slice(collectors, func(i, j int) bool {
-		return order.ByNodeIDAsc(collectors[i], collectors[j])
-	})
-
-	assignments := make(AssignmentList, n)
-	for i, collector := range collectors {
-		index := uint(i) % n
-		assignments[index] = append(assignments[index], collector.NodeID)
-	}
-
-	return assignments
-}
 
 // ClusterList is a list of identity lists. Each `IdentityList` represents the
 // nodes assigned to a specific cluster.

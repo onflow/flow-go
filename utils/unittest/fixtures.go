@@ -8,10 +8,12 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -773,4 +775,51 @@ func BatchListFixture(n int) []flow.Batch {
 		batches[i] = BatchFixture()
 	}
 	return batches
+}
+
+func EpochSetupFixture(n int) *epoch.Setup {
+	participants := IdentityListFixture(n, WithAllRoles())
+	assignments := ClusterAssignment(1, participants)
+	return &epoch.Setup{
+		Counter:      uint64(rand.Uint32()),
+		FinalView:    uint64(rand.Uint32()),
+		Participants: participants,
+		Assignments:  assignments,
+		Seed:         SeedFixture(32),
+	}
+}
+
+func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
+	key, err := crypto.GeneratePrivateKey(algo, SeedFixture(128))
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
+func QuorumCertificateFixture() *hotstuff.QuorumCertificate {
+	return &hotstuff.QuorumCertificate{
+		View:      uint64(rand.Uint32()),
+		BlockID:   IdentifierFixture(),
+		SignerIDs: IdentifierListFixture(3),
+		SigData:   SeedFixture(32 * 3),
+	}
+}
+
+func EpochCommitFixture(n uint) *epoch.Commit {
+
+	participants := make(map[flow.Identifier]epoch.DKGParticipant)
+	for i := uint(0); i < n; i++ {
+		participants[IdentifierFixture()] = epoch.DKGParticipant{
+			Index:    i,
+			KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
+		}
+	}
+
+	return &epoch.Commit{
+		Counter:         uint64(rand.Uint32()),
+		ClusterQCs:      []*hotstuff.QuorumCertificate{QuorumCertificateFixture()},
+		DKGGroupKey:     KeyFixture(crypto.BLSBLS12381).PublicKey(),
+		DKGParticipants: participants,
+	}
 }

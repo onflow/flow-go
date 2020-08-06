@@ -18,6 +18,13 @@ type Commit struct {
 	DKGParticipants map[flow.Identifier]DKGParticipant
 }
 
+func (commit *Commit) ToServiceEvent() *ServiceEvent {
+	return &ServiceEvent{
+		Type:  ServiceEventCommit,
+		Event: commit,
+	}
+}
+
 type encodableCommit struct {
 	Counter         uint64
 	ClusterQCs      []*hotstuff.QuorumCertificate

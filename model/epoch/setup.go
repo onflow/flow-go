@@ -15,11 +15,18 @@ type Setup struct {
 	Seed         []byte
 }
 
+func (setup *Setup) ToServiceEvent() *ServiceEvent {
+	return &ServiceEvent{
+		Type:  ServiceEventSetup,
+		Event: setup,
+	}
+}
+
 // ID returns a unique ID for the epoch, based on the counter. This
 // is used as a work-around for the current caching layer, which only
 // supports flow entities keyed by ID for now.
-func (s *Setup) ID() flow.Identifier {
+func (setup *Setup) ID() flow.Identifier {
 	var commitID flow.Identifier
-	binary.LittleEndian.PutUint64(commitID[:], s.Counter)
+	binary.LittleEndian.PutUint64(commitID[:], setup.Counter)
 	return commitID
 }

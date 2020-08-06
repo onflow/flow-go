@@ -2,8 +2,11 @@ package unittest
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 )
 
 // TransactionForCluster generates a transaction that will be assigned to the
@@ -36,4 +39,24 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterLi
 	}
 
 	panic(fmt.Sprintf("unable to find transaction for target (%x) with %d clusters", target, len(clusters)))
+}
+
+// ClusterAssignment creates an assignment list with n clusters and with nodes
+// evenly distributed among clusters.
+func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
+
+	collectors := nodes.Filter(filter.HasRole(flow.RoleCollection))
+
+	// order, so the same list results in the same
+	sort.Slice(collectors, func(i, j int) bool {
+		return order.ByNodeIDAsc(collectors[i], collectors[j])
+	})
+
+	assignments := make(flow.AssignmentList, n)
+	for i, collector := range collectors {
+		index := uint(i) % n
+		assignments[index] = append(assignments[index], collector.NodeID)
+	}
+
+	return assignments
 }

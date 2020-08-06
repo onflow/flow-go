@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func ServiceEvent(event *flow.Event) (interface{}, error) {
+func ServiceEventFromRaw(event *flow.Event) (interface{}, error) {
 	value, err := json.Decode(event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not event: %w", err)

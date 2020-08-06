@@ -740,7 +740,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig) (flow.
 
 	participants := toParticipants(confs)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
-	assignments := flow.NewAssignmentList(nClusters, collectors)
+	assignments := unittest.ClusterAssignment(nClusters, collectors)
 	clusters, err := flow.NewClusterList(assignments, collectors)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create cluster list: %w", err)
