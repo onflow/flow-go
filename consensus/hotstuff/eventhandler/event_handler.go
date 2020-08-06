@@ -143,6 +143,8 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		}
 	}
 
+	log.Debug().Msg("adding block to forks")
+
 	// store the block. the block will also be validated there
 	err := e.forks.AddBlock(block)
 	if err != nil {
