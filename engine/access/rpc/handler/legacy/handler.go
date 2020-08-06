@@ -6,19 +6,20 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/legacy/access"
+	"github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
+	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
+	"github.com/dapperlabs/flow-go/engine/access/rpc/handler/legacy/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Handler struct {
-	api   AccessAPI
+	api   handler.AccessAPI
 	chain flow.Chain
 }
 
-func New(api AccessAPI, chain flow.Chain) *Handler {
+func New(api handler.AccessAPI, chain flow.Chain) *Handler {
 	return &Handler{
 		api:   api,
 		chain: chain,
@@ -194,7 +195,7 @@ func (h *Handler) GetTransactionResult(
 		return nil, err
 	}
 
-	return TransactionResultToMessage(result), nil
+	return convert.TransactionResultToMessage(*result), nil
 }
 
 // GetAccount returns an account by address at the latest sealed block.
