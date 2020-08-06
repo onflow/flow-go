@@ -5,7 +5,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -15,7 +14,7 @@ func constructRootResultAndSeal(
 	block *flow.Block,
 	participantNodes []model.NodeInfo,
 	assignments flow.AssignmentList,
-	clusterQCs []*hotstuff.QuorumCertificate,
+	clusterQCs []*flow.QuorumCertificate,
 	dkgData model.DKGData,
 ) {
 

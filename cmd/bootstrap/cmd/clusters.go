@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -42,14 +41,14 @@ func constructRootQCsForClusters(
 	clusterList flow.ClusterList,
 	nodeInfos []model.NodeInfo,
 	clusterBlocks []*cluster.Block,
-) []*hotstuff.QuorumCertificate {
+) []*flow.QuorumCertificate {
 
 	if len(clusterBlocks) != len(clusterList) {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
 			Msg("number of clusters needs to equal number of cluster blocks")
 	}
 
-	qcs := make([]*hotstuff.QuorumCertificate, len(clusterBlocks))
+	qcs := make([]*flow.QuorumCertificate, len(clusterBlocks))
 	for i, cluster := range clusterList {
 		signers := filterClusterSigners(cluster, nodeInfos)
 

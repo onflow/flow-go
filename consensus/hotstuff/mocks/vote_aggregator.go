@@ -4,6 +4,8 @@ package mocks
 
 import (
 	model "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,15 +15,15 @@ type VoteAggregator struct {
 }
 
 // BuildQCOnReceivedBlock provides a mock function with given fields: block
-func (_m *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*model.QuorumCertificate, bool, error) {
+func (_m *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error) {
 	ret := _m.Called(block)
 
-	var r0 *model.QuorumCertificate
-	if rf, ok := ret.Get(0).(func(*model.Block) *model.QuorumCertificate); ok {
+	var r0 *flow.QuorumCertificate
+	if rf, ok := ret.Get(0).(func(*model.Block) *flow.QuorumCertificate); ok {
 		r0 = rf(block)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.QuorumCertificate)
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
 		}
 	}
 
@@ -83,15 +85,15 @@ func (_m *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
 }
 
 // StoreVoteAndBuildQC provides a mock function with given fields: vote, block
-func (_m *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*model.QuorumCertificate, bool, error) {
+func (_m *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*flow.QuorumCertificate, bool, error) {
 	ret := _m.Called(vote, block)
 
-	var r0 *model.QuorumCertificate
-	if rf, ok := ret.Get(0).(func(*model.Vote, *model.Block) *model.QuorumCertificate); ok {
+	var r0 *flow.QuorumCertificate
+	if rf, ok := ret.Get(0).(func(*model.Vote, *model.Block) *flow.QuorumCertificate); ok {
 		r0 = rf(vote, block)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.QuorumCertificate)
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
 		}
 	}
 

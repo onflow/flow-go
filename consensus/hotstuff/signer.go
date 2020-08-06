@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Signer is responsible for creating votes, proposals and QC's for a given
@@ -16,5 +17,5 @@ type Signer interface {
 	CreateVote(block *model.Block) (*model.Vote, error)
 
 	// CreateQC creates a QC for the given block.
-	CreateQC(votes []*model.Vote) (*model.QuorumCertificate, error)
+	CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error)
 }

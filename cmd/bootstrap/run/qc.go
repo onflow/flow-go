@@ -36,7 +36,7 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
-func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*model.QuorumCertificate, error) {
+func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
 
 	validators, signers, err := createValidators(participantData)
 	if err != nil {

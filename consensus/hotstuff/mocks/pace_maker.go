@@ -6,6 +6,8 @@ import (
 	time "time"
 
 	model "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -103,11 +105,11 @@ func (_m *PaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextV
 }
 
 // UpdateCurViewWithQC provides a mock function with given fields: qc
-func (_m *PaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool) {
+func (_m *PaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	ret := _m.Called(qc)
 
 	var r0 *model.NewViewEvent
-	if rf, ok := ret.Get(0).(func(*model.QuorumCertificate) *model.NewViewEvent); ok {
+	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) *model.NewViewEvent); ok {
 		r0 = rf(qc)
 	} else {
 		if ret.Get(0) != nil {
@@ -116,7 +118,7 @@ func (_m *PaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.Ne
 	}
 
 	var r1 bool
-	if rf, ok := ret.Get(1).(func(*model.QuorumCertificate) bool); ok {
+	if rf, ok := ret.Get(1).(func(*flow.QuorumCertificate) bool); ok {
 		r1 = rf(qc)
 	} else {
 		r1 = ret.Get(1).(bool)

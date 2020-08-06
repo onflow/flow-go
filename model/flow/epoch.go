@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encodable"
 )
@@ -37,7 +36,7 @@ func (setup *EpochSetup) ID() Identifier {
 // TODO docs
 type EpochCommit struct {
 	Counter         uint64
-	ClusterQCs      []*hotstuff.QuorumCertificate
+	ClusterQCs      []*QuorumCertificate
 	DKGGroupKey     crypto.PublicKey
 	DKGParticipants map[Identifier]DKGParticipant
 }
@@ -51,7 +50,7 @@ func (commit *EpochCommit) ServiceEvent() ServiceEvent {
 
 type encodableCommit struct {
 	Counter         uint64
-	ClusterQCs      []*hotstuff.QuorumCertificate
+	ClusterQCs      []*QuorumCertificate
 	DKGGroupKey     encodable.RandomBeaconPubKey
 	DKGParticipants map[Identifier]DKGParticipant
 }

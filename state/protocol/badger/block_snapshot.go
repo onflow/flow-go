@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
@@ -65,7 +64,7 @@ func (bs *BlockSnapshot) ClusterRootBlock(cluster flow.IdentityList) (*cluster.B
 	return bs.EpochSnapshot().ClusterRootBlock(cluster)
 }
 
-func (bs *BlockSnapshot) ClusterRootQC(cluster flow.IdentityList) (*hotstuff.QuorumCertificate, error) {
+func (bs *BlockSnapshot) ClusterRootQC(cluster flow.IdentityList) (*flow.QuorumCertificate, error) {
 	return bs.EpochSnapshot().ClusterRootQC(cluster)
 }
 

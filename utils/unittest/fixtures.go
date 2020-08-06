@@ -8,7 +8,6 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -796,8 +795,8 @@ func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
 	return key
 }
 
-func QuorumCertificateFixture() *hotstuff.QuorumCertificate {
-	return &hotstuff.QuorumCertificate{
+func QuorumCertificateFixture() *flow.QuorumCertificate {
+	return &flow.QuorumCertificate{
 		View:      uint64(rand.Uint32()),
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
@@ -817,7 +816,7 @@ func EpochCommitFixture(n uint) *flow.EpochCommit {
 
 	return &flow.EpochCommit{
 		Counter:         uint64(rand.Uint32()),
-		ClusterQCs:      []*hotstuff.QuorumCertificate{QuorumCertificateFixture()},
+		ClusterQCs:      []*flow.QuorumCertificate{QuorumCertificateFixture()},
 		DKGGroupKey:     KeyFixture(crypto.BLSBLS12381).PublicKey(),
 		DKGParticipants: participants,
 	}

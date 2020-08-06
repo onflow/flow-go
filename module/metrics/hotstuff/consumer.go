@@ -3,6 +3,7 @@ package consensus
 import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -25,7 +26,7 @@ func (c *MetricsConsumer) OnEnteringView(view uint64) {
 	c.metrics.SetCurView(view)
 }
 
-func (c *MetricsConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
+func (c *MetricsConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	c.metrics.SetQCView(qc.View)
 }
 

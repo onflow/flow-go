@@ -17,7 +17,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -128,7 +127,7 @@ type FlowNodeBuilder struct {
 
 	// root state information
 	RootBlock   *flow.Block
-	RootQC      *model.QuorumCertificate
+	RootQC      *flow.QuorumCertificate
 	RootResult  *flow.ExecutionResult
 	RootSeal    *flow.Seal
 	RootChainID flow.ChainID
@@ -710,12 +709,12 @@ func loadRootBlock(dir string) (*flow.Block, error) {
 
 }
 
-func loadRootQC(dir string) (*model.QuorumCertificate, error) {
+func loadRootQC(dir string) (*flow.QuorumCertificate, error) {
 	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootQC))
 	if err != nil {
 		return nil, err
 	}
-	var qc model.QuorumCertificate
+	var qc flow.QuorumCertificate
 	err = json.Unmarshal(data, &qc)
 	return &qc, err
 }

@@ -8,8 +8,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	model "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-
 	protocol "github.com/dapperlabs/flow-go/state/protocol"
 )
 
@@ -42,15 +40,15 @@ func (_m *Snapshot) ClusterRootBlock(_a0 flow.IdentityList) (*cluster.Block, err
 }
 
 // ClusterRootQC provides a mock function with given fields: _a0
-func (_m *Snapshot) ClusterRootQC(_a0 flow.IdentityList) (*model.QuorumCertificate, error) {
+func (_m *Snapshot) ClusterRootQC(_a0 flow.IdentityList) (*flow.QuorumCertificate, error) {
 	ret := _m.Called(_a0)
 
-	var r0 *model.QuorumCertificate
-	if rf, ok := ret.Get(0).(func(flow.IdentityList) *model.QuorumCertificate); ok {
+	var r0 *flow.QuorumCertificate
+	if rf, ok := ret.Get(0).(func(flow.IdentityList) *flow.QuorumCertificate); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.QuorumCertificate)
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
 		}
 	}
 

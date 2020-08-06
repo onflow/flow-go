@@ -22,7 +22,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encodable"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -735,7 +734,7 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
 //   * a cluster-specific root block
 //   * a cluster-specific root QC
-func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig) (flow.AssignmentList, []*hotstuff.QuorumCertificate, error) {
+func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig) (flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
 	participants := toParticipants(confs)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
@@ -745,7 +744,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig) (flow.
 		return nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}
 
-	qcs := make([]*hotstuff.QuorumCertificate, 0, nClusters)
+	qcs := make([]*flow.QuorumCertificate, 0, nClusters)
 
 	for _, cluster := range clusters {
 		// generate root cluster block

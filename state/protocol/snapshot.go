@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/cluster"
@@ -41,7 +40,7 @@ type Snapshot interface {
 
 	// ClusterRootQC returns the quorum certificate for the root block for the
 	// given cluster in the current epoch.
-	ClusterRootQC(cluster flow.IdentityList) (*hotstuff.QuorumCertificate, error)
+	ClusterRootQC(cluster flow.IdentityList) (*flow.QuorumCertificate, error)
 
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,

@@ -30,7 +30,7 @@ func New(committee hotstuff.Committee, forks hotstuff.ForksReader, verifier hots
 // ValidateQC validates the QC
 // qc - the qc to be validated
 // block - the block that the qc is pointing to
-func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) error {
+func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
 	if qc.BlockID != block.BlockID {
 		// Sanity check! Failing indicates a bug in the higher-level logic
 		return fmt.Errorf("qc.BlockID %s doesn't match block's ID %s", qc.BlockID, block.BlockID)

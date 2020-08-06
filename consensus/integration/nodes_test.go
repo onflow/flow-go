@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
@@ -101,7 +100,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 		signerIDs = append(signerIDs, participant.ID())
 	}
 
-	rootQC := &model.QuorumCertificate{
+	rootQC := &flow.QuorumCertificate{
 		View:      rootBlock.Header.View,
 		BlockID:   rootBlock.ID(),
 		SignerIDs: signerIDs,
@@ -119,7 +118,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 	return nodes, stopper, hub
 }
 
-func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, rootBlock *flow.Block, rootQC *model.QuorumCertificate, hub *Hub, stopper *Stopper) *Node {
+func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, rootBlock *flow.Block, rootQC *flow.QuorumCertificate, hub *Hub, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
 
 	metrics := metrics.NewNoopCollector()

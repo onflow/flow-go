@@ -27,7 +27,7 @@ import (
 // NewParticipant initialize the EventLoop instance and recover the forks' state with all pending block
 func NewParticipant(log zerolog.Logger, tracer module.Tracer, notifier hotstuff.Consumer, metrics module.HotstuffMetrics, headers storage.Headers,
 	committee hotstuff.Committee, builder module.Builder, updater module.Finalizer, persist hotstuff.Persister,
-	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *model.QuorumCertificate,
+	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *flow.QuorumCertificate,
 	finalized *flow.Header, pending []*flow.Header, options ...Option) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
@@ -124,7 +124,7 @@ func NewParticipant(log zerolog.Logger, tracer module.Tracer, notifier hotstuff.
 	return loop, nil
 }
 
-func initForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.Forks, error) {
+func initForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
 	finalizer, err := initFinalizer(final, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
@@ -141,7 +141,7 @@ func initForks(final *flow.Header, headers storage.Headers, updater module.Final
 	return forks, nil
 }
 
-func initFinalizer(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*finalizer.Finalizer, error) {
+func initFinalizer(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*finalizer.Finalizer, error) {
 	// recover the trusted root
 	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {
@@ -157,7 +157,7 @@ func initFinalizer(final *flow.Header, headers storage.Headers, updater module.F
 	return finalizer, nil
 }
 
-func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.BlockQC, error) {
+func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.BlockQC, error) {
 	if final.View < rootHeader.View {
 		return nil, fmt.Errorf("finalized Block has older view than trusted root")
 	}
@@ -197,7 +197,7 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 	return trustedRoot, nil
 }
 
-func makeRootBlockQC(header *flow.Header, qc *model.QuorumCertificate) *forks.BlockQC {
+func makeRootBlockQC(header *flow.Header, qc *flow.QuorumCertificate) *forks.BlockQC {
 	// By convention of Forks, the trusted root block does not need to have a qc
 	// (as is the case for the genesis block). For simplify of the implementation, we always omit
 	// the QC of the root block. Thereby, we have one algorithm which handles all cases,

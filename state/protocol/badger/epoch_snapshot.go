@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -134,7 +133,7 @@ func (es *EpochSnapshot) ClusterRootBlock(cluster flow.IdentityList) (*cluster.B
 
 // ClusterRootQC returns the quorum certificate for the root block of the given
 // cluster, for the epoch associated with the current snapshot.
-func (es *EpochSnapshot) ClusterRootQC(cluster flow.IdentityList) (*hotstuff.QuorumCertificate, error) {
+func (es *EpochSnapshot) ClusterRootQC(cluster flow.IdentityList) (*flow.QuorumCertificate, error) {
 
 	clusters, err := es.Clusters()
 	if err != nil {

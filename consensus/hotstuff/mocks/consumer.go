@@ -4,6 +4,8 @@ package mocks
 
 import (
 	model "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -38,7 +40,7 @@ func (_m *Consumer) OnFinalizedBlock(_a0 *model.Block) {
 }
 
 // OnForkChoiceGenerated provides a mock function with given fields: _a0, _a1
-func (_m *Consumer) OnForkChoiceGenerated(_a0 uint64, _a1 *model.QuorumCertificate) {
+func (_m *Consumer) OnForkChoiceGenerated(_a0 uint64, _a1 *flow.QuorumCertificate) {
 	_m.Called(_a0, _a1)
 }
 
@@ -48,7 +50,7 @@ func (_m *Consumer) OnInvalidVoteDetected(_a0 *model.Vote) {
 }
 
 // OnQcIncorporated provides a mock function with given fields: _a0
-func (_m *Consumer) OnQcIncorporated(_a0 *model.QuorumCertificate) {
+func (_m *Consumer) OnQcIncorporated(_a0 *flow.QuorumCertificate) {
 	_m.Called(_a0)
 }
 

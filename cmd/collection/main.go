@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	hotstuffmodel "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
@@ -82,8 +81,8 @@ func main() {
 		clusterState *clusterkv.State  // chain state for the cluster
 
 		// from bootstrap files
-		clusterBlock *clustermodel.Block              // root block for the cluster
-		clusterQC    *hotstuffmodel.QuorumCertificate // root QC for the cluster
+		clusterBlock *clustermodel.Block     // root block for the cluster
+		clusterQC    *flow.QuorumCertificate // root QC for the cluster
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -499,14 +498,14 @@ func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block,
 	return &block, nil
 }
 
-func loadClusterQC(path string, clusterID flow.ChainID) (*hotstuffmodel.QuorumCertificate, error) {
+func loadClusterQC(path string, clusterID flow.ChainID) (*flow.QuorumCertificate, error) {
 	filename := fmt.Sprintf(bootstrap.PathRootClusterQC, clusterID)
 	data, err := io.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
 	}
 
-	var qc hotstuffmodel.QuorumCertificate
+	var qc flow.QuorumCertificate
 	err = json.Unmarshal(data, &qc)
 	if err != nil {
 		return nil, err
