@@ -100,7 +100,7 @@ func TestInstancesThree(t *testing.T) {
 		}(in)
 	}
 
-	timeoutTriggered := waitTimeout(&wg, 10*time.Second)
+	timeoutTriggered := waitTimeout(&wg, 30*time.Second)
 	require.False(t, timeoutTriggered)
 
 	allViews := allFinalizedViews(t, instances)
@@ -162,7 +162,7 @@ func TestInstancesSeven(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	timeoutTriggered := waitTimeout(&wg, 10*time.Second)
+	timeoutTriggered := waitTimeout(&wg, 30*time.Second)
 	require.False(t, timeoutTriggered)
 
 	allViews := allFinalizedViews(t, instances)
