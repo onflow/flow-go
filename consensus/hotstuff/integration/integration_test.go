@@ -2,6 +2,7 @@ package integration
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -158,7 +159,7 @@ func TestInstancesSeven(t *testing.T) {
 		wg.Add(1)
 		go func(in *Instance) {
 			err := in.Run()
-			require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
+			require.True(t, errors.Is(err, errStopCondition), fmt.Sprintf("should run until stop condition, but got error: %v", err))
 			wg.Done()
 		}(in)
 	}
