@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/access/rpc/backend"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -35,7 +36,7 @@ type Config struct {
 type Engine struct {
 	unit       *engine.Unit
 	log        zerolog.Logger
-	handler    *handler.Handler // the gRPC service implementation
+	backend    *backend.Backend // the gRPC service implementation
 	grpcServer *grpc.Server     // the gRPC server
 	httpServer *http.Server
 	config     Config
@@ -70,16 +71,31 @@ func New(log zerolog.Logger,
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
 
+	backend := backend.New(
+		state,
+		executionRPC,
+		collectionRPC,
+		blocks,
+		headers,
+		collections,
+		transactions,
+		chainID,
+		transactionMetrics,
+	)
+
 	eng := &Engine{
 		log:        log,
 		unit:       engine.NewUnit(),
-		handler:    handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID, transactionMetrics),
+		backend:    backend,
 		grpcServer: grpcServer,
 		httpServer: httpServer,
 		config:     config,
 	}
 
-	access.RegisterAccessAPIServer(eng.grpcServer, eng.handler)
+	access.RegisterAccessAPIServer(
+		eng.grpcServer,
+		handler.New(backend, chainID.Chain()),
+	)
 
 	return eng
 }
@@ -122,7 +138,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) process(event interface{}) error {
 	switch entity := event.(type) {
 	case *flow.Block:
-		e.handler.NotifyFinalizedBlockHeight(entity.Header.Height)
+		e.backend.NotifyFinalizedBlockHeight(entity.Header.Height)
 		return nil
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
