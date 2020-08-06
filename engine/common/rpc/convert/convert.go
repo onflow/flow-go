@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/ptypes"
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/dapperlabs/flow-go/crypto"

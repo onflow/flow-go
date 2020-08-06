@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -88,7 +89,7 @@ func (b *backendTransactions) GetTransaction(_ context.Context, txID flow.Identi
 func (b *backendTransactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-) (*flow.TransactionResult, error) {
+) (*handler.TransactionResult, error) {
 	// look up transaction from storage
 	tx, err := b.transactions.ByID(txID)
 	if err != nil {
@@ -109,12 +110,11 @@ func (b *backendTransactions) GetTransactionResult(
 
 	// TODO: Set correct values for StatusCode and ErrorMessage
 
-	return &flow.TransactionResult{
-		TransactionID: txID,
-		Status:        status,
-		StatusCode:    uint(statusCode),
-		Events:        events,
-		ErrorMessage:  txError,
+	return &handler.TransactionResult{
+		Status:       status,
+		StatusCode:   uint(statusCode),
+		Events:       events,
+		ErrorMessage: txError,
 	}, nil
 }
 
