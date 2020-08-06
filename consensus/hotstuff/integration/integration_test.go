@@ -60,7 +60,7 @@ func TestInstancesThree(t *testing.T) {
 
 	// test parameters
 	num := 3
-	finalizedCount := 100
+	finalizedCount := 10
 
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
@@ -113,7 +113,7 @@ func TestInstancesSeven(t *testing.T) {
 	numPass := 5
 	numFail := 2
 
-	finalizedCount := 100
+	finalizedCount := 1
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
