@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -129,8 +130,8 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	return col, nil
 }
 
-func (b *Backend) GetNetworkParameters(_ context.Context) NetworkParameters {
-	return NetworkParameters{
+func (b *Backend) GetNetworkParameters(_ context.Context) handler.NetworkParameters {
+	return handler.NetworkParameters{
 		ChainID: b.chainID,
 	}
 }

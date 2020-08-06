@@ -63,8 +63,13 @@ func (suite *Suite) SetupTest() {
 }
 
 func (suite *Suite) TestPing() {
-	suite.colClient.On("Ping", mock.Anything, &access.PingRequest{}).Return(&access.PingResponse{}, nil)
-	suite.execClient.On("Ping", mock.Anything, &execution.PingRequest{}).Return(&execution.PingResponse{}, nil)
+	suite.colClient.
+		On("Ping", mock.Anything, &access.PingRequest{}).
+		Return(&access.PingResponse{}, nil)
+
+	suite.execClient.
+		On("Ping", mock.Anything, &execution.PingRequest{}).
+		Return(&execution.PingResponse{}, nil)
 
 	backend := New(
 		suite.state,
@@ -83,6 +88,7 @@ func (suite *Suite) TestPing() {
 func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
+
 	suite.snapshot.On("Head").Return(&block, nil).Once()
 
 	backend := New(
@@ -134,7 +140,10 @@ func (suite *Suite) TestGetTransaction() {
 	transaction := unittest.TransactionFixture()
 	expected := transaction.TransactionBody
 
-	suite.transactions.On("ByID", transaction.ID()).Return(&expected, nil).Once()
+	suite.transactions.
+		On("ByID", transaction.ID()).
+		Return(&expected, nil).
+		Once()
 
 	backend := New(
 		suite.state,
@@ -153,14 +162,12 @@ func (suite *Suite) TestGetTransaction() {
 }
 
 func (suite *Suite) TestGetCollection() {
-	expected := unittest.CollectionFixture(1)
+	expected := unittest.CollectionFixture(1).Light()
 
-	light := expected.Light()
-	suite.collections.On("LightByID", expected.ID()).Return(&light, nil).Once()
-
-	for _, t := range expected.Transactions {
-		suite.transactions.On("ByID", t.ID()).Return(t, nil).Once()
-	}
+	suite.collections.
+		On("LightByID", expected.ID()).
+		Return(&expected, nil).
+		Once()
 
 	backend := New(
 		suite.state,
@@ -190,15 +197,27 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	block.Header.Height = 2
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
-	suite.snapshot.On("Head").Return(headBlock.Header, nil)
+
+	suite.snapshot.
+		On("Head").
+		Return(headBlock.Header, nil)
 
 	light := collection.Light()
+
 	// transaction storage returns the corresponding transaction
-	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
+	suite.transactions.
+		On("ByID", transactionBody.ID()).
+		Return(transactionBody, nil)
+
 	// collection storage returns the corresponding collection
-	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil)
+	suite.collections.
+		On("LightByTransactionID", transactionBody.ID()).
+		Return(&light, nil)
+
 	// block storage returns the corresponding block
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
+	suite.blocks.
+		On("ByCollectionID", collection.ID()).
+		Return(&block, nil)
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
@@ -283,17 +302,30 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	block := unittest.BlockFixture()
 	block.Header.Height = 2
 	transactionBody.SetReferenceBlockID(block.ID())
+
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
-	suite.snapshot.On("Head").Return(headBlock.Header, nil)
+
+	suite.snapshot.
+		On("Head").
+		Return(headBlock.Header, nil)
+
 	snapshotAtBlock := new(protocol.Snapshot)
 	snapshotAtBlock.On("Head").Return(block.Header, nil)
-	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
+
+	suite.state.
+		On("AtBlockID", block.ID()).
+		Return(snapshotAtBlock, nil)
 
 	// transaction storage returns the corresponding transaction
-	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
+	suite.transactions.
+		On("ByID", transactionBody.ID()).
+		Return(transactionBody, nil)
+
 	// collection storage returns a not found error
-	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(nil, realstorage.ErrNotFound)
+	suite.collections.
+		On("LightByTransactionID", transactionBody.ID()).
+		Return(nil, realstorage.ErrNotFound)
 
 	txID := transactionBody.ID()
 
@@ -331,8 +363,16 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	// setup the mocks
 	expected := unittest.BlockFixture()
 	header := expected.Header
-	suite.snapshot.On("Head").Return(header, nil).Once()
-	suite.blocks.On("ByID", header.ID()).Return(&expected, nil).Once()
+
+	suite.snapshot.
+		On("Head").
+		Return(header, nil).
+		Once()
+
+	suite.blocks.
+		On("ByID", header.ID()).
+		Return(&expected, nil).
+		Once()
 
 	backend := New(
 		suite.state,
@@ -369,10 +409,10 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		}
 	}
 
-	expected := make([]BlockEvents, len(blockIDs))
+	expected := make([]flow.BlockEvents, len(blockIDs))
 
 	for i := 0; i < len(blockIDs); i++ {
-		expected[i] = BlockEvents{
+		expected[i] = flow.BlockEvents{
 			BlockID:     blockIDs[i],
 			BlockHeight: uint64(i),
 			Events:      events,
@@ -392,7 +432,10 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 
 	// expect one call to the executor api client
-	suite.execClient.On("GetEventsForBlockIDs", ctx, exeReq).Return(&exeResp, nil).Once()
+	suite.execClient.
+		On("GetEventsForBlockIDs", ctx, exeReq).
+		Return(&exeResp, nil).
+		Once()
 
 	// create the handler
 	backend := New(
@@ -440,20 +483,20 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		return ids
 	}
 
-	setupExecClient := func() []BlockEvents {
+	setupExecClient := func() []flow.BlockEvents {
 		execReq := &execution.GetEventsForBlockIDsRequest{
 			BlockIds: convert.IdentifiersToMessages(expBlockIDs),
 			Type:     string(flow.EventAccountCreated),
 		}
 
-		results := make([]BlockEvents, len(expBlockIDs))
+		results := make([]flow.BlockEvents, len(expBlockIDs))
 		exeResults := make([]*execution.GetEventsForBlockIDsResponse_Result, len(expBlockIDs))
 
 		for i, id := range expBlockIDs {
 			events := getEvents(1)
 			height := uint64(5) // an arbitrary height
 
-			results[i] = BlockEvents{
+			results[i] = flow.BlockEvents{
 				BlockID:     id,
 				BlockHeight: height,
 				Events:      events,
@@ -470,7 +513,10 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			Results: exeResults,
 		}
 
-		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(exeResp, nil).Once()
+		suite.execClient.
+			On("GetEventsForBlockIDs", ctx, execReq).
+			Return(exeResp, nil).
+			Once()
 
 		return results
 	}
@@ -560,7 +606,11 @@ func (suite *Suite) TestGetAccount() {
 	header := unittest.BlockHeaderFixture() // create a mock header
 	seal := unittest.BlockSealFixture()     // create a mock seal
 	seal.BlockID = header.ID()              // make the seal point to the header
-	suite.snapshot.On("Head").Return(&header, nil).Once()
+
+	suite.snapshot.
+		On("Head").
+		Return(&header, nil).
+		Once()
 
 	// create the expected execution API request
 	blockID := header.ID()
@@ -575,7 +625,10 @@ func (suite *Suite) TestGetAccount() {
 	}
 
 	// setup the execution client mock
-	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
+	suite.execClient.
+		On("GetAccountAtBlockID", ctx, exeReq).
+		Return(exeResp, nil).
+		Once()
 
 	// create the handler with the mock
 	backend := New(
@@ -608,8 +661,12 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	// create a mock block header
 	h := unittest.BlockHeaderFixture()
+
 	// setup headers storage to return the header when queried by height
-	suite.headers.On("ByHeight", height).Return(&h, nil).Once()
+	suite.headers.
+		On("ByHeight", height).
+		Return(&h, nil).
+		Once()
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -624,7 +681,10 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	}
 
 	// setup the execution client mock
-	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
+	suite.execClient.
+		On("GetAccountAtBlockID", ctx, exeReq).
+		Return(exeResp, nil).
+		Once()
 
 	// create the handler with the mock
 	backend := New(
@@ -685,7 +745,7 @@ func getIDs(n int) []flow.Identifier {
 }
 
 func getEvents(n int) []flow.Event {
-	events := make([]flow.Event, 10)
+	events := make([]flow.Event, n)
 	for i := range events {
 		events[i] = flow.Event{Type: flow.EventAccountCreated}
 	}
