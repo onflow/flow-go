@@ -27,8 +27,16 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 	}
 }
 
+// NetworkParameters contains the network-wide parameters for the Flow blockchain.
+type NetworkParameters struct {
+	ChainID flow.ChainID
+}
+
 // An AccessAPI provides all public-facing functionality of the Flow Access API.
 type AccessAPI interface {
+	Ping(ctx context.Context) error
+	GetNetworkParameters(ctx context.Context) NetworkParameters
+
 	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, error)
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, error)
 	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, error)

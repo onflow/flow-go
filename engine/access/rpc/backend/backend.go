@@ -43,10 +43,6 @@ type Backend struct {
 	collections  storage.Collections
 }
 
-type NetworkParameters struct {
-	ChainID flow.ChainID
-}
-
 func New(
 	state protocol.State,
 	executionRPC execution.ExecutionAPIClient,
