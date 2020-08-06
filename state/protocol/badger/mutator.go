@@ -10,6 +10,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -64,7 +65,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("invalid epoch setup event: %w", err)
 		}
-		err = validCommit(commit, setup.Participants)
+		err = validCommit(commit, setup.Participants.Filter(filter.HasRole(flow.RoleConsensus)))
 		if err != nil {
 			return fmt.Errorf("invalid epoch commit event: %w", err)
 		}

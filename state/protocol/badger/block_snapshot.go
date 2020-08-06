@@ -221,7 +221,10 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 
 		// we have reached the first epoch, which this header has to be part of thus
 		if counter == 0 {
-			return &EpochSnapshot{counter: 0}
+			return &EpochSnapshot{
+				counter: 0,
+				state:   bs.state,
+			}
 		}
 
 		// get the start view of the epoch
@@ -234,7 +237,10 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 		// of the epoch; as the check still passed for the previous one, the header is thus
 		// definitely part of the previously checked (next) period
 		if start > header.View {
-			return &EpochSnapshot{counter: counter + 1}
+			return &EpochSnapshot{
+				counter: counter + 1,
+				state:   bs.state,
+			}
 		}
 
 		// the header still falls into the currently checked epoch; step back to the previous

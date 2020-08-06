@@ -35,8 +35,9 @@ func (setup *EpochSetup) ID() Identifier {
 
 // TODO docs
 type EpochCommit struct {
-	Counter         uint64
-	ClusterQCs      []*QuorumCertificate
+	Counter    uint64
+	ClusterQCs []*QuorumCertificate
+	// TODO need custom msgpack encode/decode for these otherwise retrieval from storage fails
 	DKGGroupKey     crypto.PublicKey
 	DKGParticipants map[Identifier]DKGParticipant
 }

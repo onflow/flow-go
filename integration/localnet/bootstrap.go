@@ -257,7 +257,6 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
-			fmt.Sprintf("--nclusters=%d", nClusters),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
