@@ -1,4 +1,4 @@
-package epoch_test
+package flow_test
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/epoch"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -22,7 +22,7 @@ func TestEncodeDecode(t *testing.T) {
 		b, err := json.Marshal(setup)
 		require.Nil(t, err)
 
-		gotSetup := new(epoch.Setup)
+		gotSetup := new(flow.EpochSetup)
 		err = json.Unmarshal(b, gotSetup)
 		require.Nil(t, err)
 		assert.DeepEqual(t, setup, gotSetup)
@@ -30,7 +30,7 @@ func TestEncodeDecode(t *testing.T) {
 		b, err = json.Marshal(commit)
 		require.Nil(t, err)
 
-		gotCommit := new(epoch.Commit)
+		gotCommit := new(flow.EpochCommit)
 		err = json.Unmarshal(b, gotCommit)
 		require.Nil(t, err)
 		assert.DeepEqual(t, commit, gotCommit, cmp.FilterValues(func(a, b crypto.PublicKey) bool {
@@ -44,20 +44,20 @@ func TestEncodeDecode(t *testing.T) {
 		b, err := json.Marshal(setup.ToServiceEvent())
 		require.Nil(t, err)
 
-		outer := new(epoch.ServiceEvent)
+		outer := new(flow.ServiceEvent)
 		err = json.Unmarshal(b, outer)
 		require.Nil(t, err)
-		gotSetup, ok := outer.Event.(*epoch.Setup)
+		gotSetup, ok := outer.Event.(*flow.EpochSetup)
 		require.True(t, ok)
 		assert.DeepEqual(t, setup, gotSetup)
 
 		b, err = json.Marshal(commit.ToServiceEvent())
 		require.Nil(t, err)
 
-		outer = new(epoch.ServiceEvent)
+		outer = new(flow.ServiceEvent)
 		err = json.Unmarshal(b, outer)
 		require.Nil(t, err)
-		gotCommit, ok := outer.Event.(*epoch.Commit)
+		gotCommit, ok := outer.Event.(*flow.EpochCommit)
 		require.True(t, ok)
 		assert.DeepEqual(t, commit, gotCommit, cmp.FilterValues(func(a, b crypto.PublicKey) bool {
 			return true

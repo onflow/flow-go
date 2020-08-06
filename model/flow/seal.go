@@ -3,13 +3,11 @@
 package flow
 
 type Seal struct {
-	BlockID      Identifier
-	ResultID     Identifier
-	InitialState StateCommitment
-	FinalState   StateCommitment
-	//TODO figure out how to represent these, could use flow.Event once format
-	// is decided. []interface{} needs extra meta info to send over the wire.
-	ServiceEvents []interface{}
+	BlockID       Identifier
+	ResultID      Identifier
+	InitialState  StateCommitment
+	FinalState    StateCommitment
+	ServiceEvents []ServiceEvent
 }
 
 func (s Seal) Body() interface{} {
@@ -18,7 +16,7 @@ func (s Seal) Body() interface{} {
 		ResultID      Identifier
 		InitialState  StateCommitment
 		FinalState    StateCommitment
-		ServiceEvents []interface{}
+		ServiceEvents []ServiceEvent
 	}{
 		BlockID:       s.BlockID,
 		ResultID:      s.ResultID,

@@ -7,7 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -28,7 +27,7 @@ func constructRootResultAndSeal(
 	participants := model.ToIdentityList(participantNodes)
 	blockID := block.ID()
 
-	epochSetup := &epoch.Setup{
+	epochSetup := &flow.EpochSetup{
 		Counter:      flagEpochCounter,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
@@ -38,7 +37,7 @@ func constructRootResultAndSeal(
 
 	dkgLookup := model.ToDKGLookup(dkgData, participants)
 
-	epochCommit := &epoch.Commit{
+	epochCommit := &flow.EpochCommit{
 		Counter:         flagEpochCounter,
 		ClusterQCs:      clusterQCs,
 		DKGGroupKey:     dkgData.PubGroupKey,

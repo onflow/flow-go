@@ -8,7 +8,6 @@ import (
 
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -205,7 +204,7 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 	// with a header for the next epoch (it could be pending). We should never
 	// have pending headers from two epochs in the future, so it's safe to
 	// return here.
-	var setup epoch.Setup
+	var setup flow.EpochSetup
 	err = bs.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
 	if err != nil {
 		return &EpochSnapshot{err: fmt.Errorf("could not retrieve epoch setup: %w", err)}

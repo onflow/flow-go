@@ -25,7 +25,6 @@ import (
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encodable"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -602,7 +601,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// generate epoch service events
-	epochSetup := &epoch.Setup{
+	epochSetup := &flow.EpochSetup{
 		Counter:      epochCounter,
 		FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
@@ -611,7 +610,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)
-	epochCommit := &epoch.Commit{
+	epochCommit := &flow.EpochCommit{
 		Counter:         epochCounter,
 		ClusterQCs:      clusterQCs,
 		DKGGroupKey:     dkg.PubGroupKey,

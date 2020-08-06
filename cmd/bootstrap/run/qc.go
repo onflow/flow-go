@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/signature"
@@ -25,7 +24,7 @@ type Participant struct {
 
 type ParticipantData struct {
 	Participants []Participant
-	Lookup       map[flow.Identifier]epoch.DKGParticipant
+	Lookup       map[flow.Identifier]flow.DKGParticipant
 	GroupKey     crypto.PublicKey
 }
 
@@ -132,12 +131,12 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 
 	qcData := &ParticipantData{}
 
-	participantLookup := make(map[flow.Identifier]epoch.DKGParticipant)
+	participantLookup := make(map[flow.Identifier]flow.DKGParticipant)
 
 	// the QC will be signed by everyone in internalNodes
 	for i, node := range internalNodes {
 		// assign a node to a DGKdata entry, using the canonical ordering
-		participantLookup[node.NodeID] = epoch.DKGParticipant{
+		participantLookup[node.NodeID] = flow.DKGParticipant{
 			KeyShare: dkgData.PubKeyShares[i],
 			Index:    uint(i),
 		}
@@ -159,7 +158,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 	for i := len(internalNodes); i < len(allNodes); i++ {
 		// assign a node to a DGKdata entry, using the canonical ordering
 		node := allNodes[i]
-		participantLookup[node.NodeID] = epoch.DKGParticipant{
+		participantLookup[node.NodeID] = flow.DKGParticipant{
 			KeyShare: dkgData.PubKeyShares[i],
 			Index:    uint(i),
 		}

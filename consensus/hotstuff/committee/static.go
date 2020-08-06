@@ -4,12 +4,11 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // NewStaticCommittee returns a new committee with a static participant set.
-func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dkgParticipants map[flow.Identifier]epoch.DKGParticipant, dkgGroupKey crypto.PublicKey) (*Static, error) {
+func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dkgParticipants map[flow.Identifier]flow.DKGParticipant, dkgGroupKey crypto.PublicKey) (*Static, error) {
 	static := &Static{
 		participants:    participants,
 		myID:            myID,
@@ -24,7 +23,7 @@ func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dk
 type Static struct {
 	participants    flow.IdentityList
 	myID            flow.Identifier
-	dkgParticipants map[flow.Identifier]epoch.DKGParticipant
+	dkgParticipants map[flow.Identifier]flow.DKGParticipant
 	dkgGroupKey     crypto.PublicKey
 }
 

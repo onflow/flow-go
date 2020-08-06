@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -777,10 +776,10 @@ func BatchListFixture(n int) []flow.Batch {
 	return batches
 }
 
-func EpochSetupFixture(n int) *epoch.Setup {
+func EpochSetupFixture(n int) *flow.EpochSetup {
 	participants := IdentityListFixture(n, WithAllRoles())
 	assignments := ClusterAssignment(1, participants)
-	return &epoch.Setup{
+	return &flow.EpochSetup{
 		Counter:      uint64(rand.Uint32()),
 		FinalView:    uint64(rand.Uint32()),
 		Participants: participants,
@@ -806,17 +805,17 @@ func QuorumCertificateFixture() *hotstuff.QuorumCertificate {
 	}
 }
 
-func EpochCommitFixture(n uint) *epoch.Commit {
+func EpochCommitFixture(n uint) *flow.EpochCommit {
 
-	participants := make(map[flow.Identifier]epoch.DKGParticipant)
+	participants := make(map[flow.Identifier]flow.DKGParticipant)
 	for i := uint(0); i < n; i++ {
-		participants[IdentifierFixture()] = epoch.DKGParticipant{
+		participants[IdentifierFixture()] = flow.DKGParticipant{
 			Index:    i,
 			KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
 		}
 	}
 
-	return &epoch.Commit{
+	return &flow.EpochCommit{
 		Counter:         uint64(rand.Uint32()),
 		ClusterQCs:      []*hotstuff.QuorumCertificate{QuorumCertificateFixture()},
 		DKGGroupKey:     KeyFixture(crypto.BLSBLS12381).PublicKey(),

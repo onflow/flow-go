@@ -8,7 +8,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -45,13 +44,13 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 		signature.RandomBeaconThreshold(n), seed)
 	require.NoError(t, err)
 
-	participantLookup := make(map[flow.Identifier]epoch.DKGParticipant)
+	participantLookup := make(map[flow.Identifier]flow.DKGParticipant)
 	participants := make([]Participant, n)
 
 	for i, identity := range identities {
 
 		// add to lookup
-		lookupParticipant := epoch.DKGParticipant{
+		lookupParticipant := flow.DKGParticipant{
 			Index:    uint(i),
 			KeyShare: randomBPKs[i],
 		}

@@ -1,4 +1,4 @@
-package epoch
+package flow
 
 import (
 	"encoding/binary"
@@ -7,18 +7,42 @@ import (
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encodable"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // TODO docs
-type Commit struct {
+type EpochSetup struct {
+	Counter      uint64
+	FinalView    uint64
+	Participants IdentityList
+	Assignments  AssignmentList
+	Seed         []byte
+}
+
+func (setup *EpochSetup) ToServiceEvent() *ServiceEvent {
+	return &ServiceEvent{
+		Type:  ServiceEventSetup,
+		Event: setup,
+	}
+}
+
+// ID returns a unique ID for the epoch, based on the counter. This
+// is used as a work-around for the current caching layer, which only
+// supports flow entities keyed by ID for now.
+func (setup *EpochSetup) ID() Identifier {
+	var commitID Identifier
+	binary.LittleEndian.PutUint64(commitID[:], setup.Counter)
+	return commitID
+}
+
+// TODO docs
+type EpochCommit struct {
 	Counter         uint64
 	ClusterQCs      []*hotstuff.QuorumCertificate
 	DKGGroupKey     crypto.PublicKey
-	DKGParticipants map[flow.Identifier]DKGParticipant
+	DKGParticipants map[Identifier]DKGParticipant
 }
 
-func (commit *Commit) ToServiceEvent() *ServiceEvent {
+func (commit *EpochCommit) ToServiceEvent() *ServiceEvent {
 	return &ServiceEvent{
 		Type:  ServiceEventCommit,
 		Event: commit,
@@ -29,10 +53,10 @@ type encodableCommit struct {
 	Counter         uint64
 	ClusterQCs      []*hotstuff.QuorumCertificate
 	DKGGroupKey     encodable.RandomBeaconPubKey
-	DKGParticipants map[flow.Identifier]DKGParticipant
+	DKGParticipants map[Identifier]DKGParticipant
 }
 
-func (commit *Commit) MarshalJSON() ([]byte, error) {
+func (commit *EpochCommit) MarshalJSON() ([]byte, error) {
 	enc := encodableCommit{
 		Counter:         commit.Counter,
 		ClusterQCs:      commit.ClusterQCs,
@@ -42,14 +66,14 @@ func (commit *Commit) MarshalJSON() ([]byte, error) {
 	return json.Marshal(enc)
 }
 
-func (commit *Commit) UnmarshalJSON(b []byte) error {
+func (commit *EpochCommit) UnmarshalJSON(b []byte) error {
 	var enc encodableCommit
 	err := json.Unmarshal(b, &enc)
 	if err != nil {
 		return err
 	}
 
-	*commit = Commit{
+	*commit = EpochCommit{
 		Counter:         enc.Counter,
 		ClusterQCs:      enc.ClusterQCs,
 		DKGGroupKey:     enc.DKGGroupKey.PublicKey,
@@ -61,8 +85,8 @@ func (commit *Commit) UnmarshalJSON(b []byte) error {
 // ID returns a unique ID for the epoch, based on the counter. This
 // is used as a work-around for the current caching layer, which only
 // suports flow entities keyed by ID for now.
-func (commit *Commit) ID() flow.Identifier {
-	var commitID flow.Identifier
+func (commit *EpochCommit) ID() Identifier {
+	var commitID Identifier
 	binary.LittleEndian.PutUint64(commitID[:], commit.Counter)
 	return commitID
 }

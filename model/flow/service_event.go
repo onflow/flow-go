@@ -1,4 +1,4 @@
-package epoch
+package flow
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ const (
 // ServiceEvent represents a service event, which is a special event that when
 // emitted from a service account smart contract, is propagated to the protocol
 // and included in blocks. Service events typically cause changes to the
-// protocol state. See Setup and Commit events in this package for examples.
+// protocol state. See EpochSetup and EpochCommit events in this package for examples.
 //
 // This type represents a generic service event and primarily exists to simplify
 // encoding and decoding.
@@ -48,14 +48,14 @@ func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
 	var event interface{}
 	switch tp {
 	case ServiceEventSetup:
-		setup := new(Setup)
+		setup := new(EpochSetup)
 		err = json.Unmarshal(evb, setup)
 		if err != nil {
 			return err
 		}
 		event = setup
 	case ServiceEventCommit:
-		commit := new(Commit)
+		commit := new(EpochCommit)
 		err = json.Unmarshal(evb, commit)
 		if err != nil {
 			return err

@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
@@ -70,7 +69,7 @@ func TestIdentities(t *testing.T) {
 		counter := uint64(1337)
 		blockID := unittest.IdentifierFixture()
 		identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleCollection))
-		event := &epoch.Setup{Participants: identities}
+		event := &flow.EpochSetup{Participants: identities}
 
 		err := db.Update(operation.InsertRootHeight(0))
 		require.NoError(t, err)
@@ -105,7 +104,7 @@ func TestClusters(t *testing.T) {
 		counter := uint64(1337)
 		blockID := unittest.IdentifierFixture()
 		identities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleCollection))
-		event := &epoch.Setup{Participants: identities}
+		event := &flow.EpochSetup{Participants: identities}
 
 		err := db.Update(operation.InsertRootHeight(0))
 		require.NoError(t, err)

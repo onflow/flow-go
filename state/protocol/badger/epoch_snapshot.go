@@ -8,7 +8,6 @@ import (
 
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
@@ -37,7 +36,7 @@ func (es *EpochSnapshot) Identities(selector flow.IdentityFilter) (flow.Identity
 	}
 
 	// retrieve the identities for the epoch
-	var setup epoch.Setup
+	var setup flow.EpochSetup
 	err := es.state.db.View(operation.RetrieveEpochSetup(es.counter, &setup))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
@@ -96,7 +95,7 @@ func (es *EpochSnapshot) Clusters() (flow.ClusterList, error) {
 		return nil, es.err
 	}
 
-	var setup epoch.Setup
+	var setup flow.EpochSetup
 	err := es.state.db.View(operation.RetrieveEpochSetup(es.counter, &setup))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch setup: %w", err)
@@ -147,7 +146,7 @@ func (es *EpochSnapshot) ClusterRootQC(cluster flow.IdentityList) (*hotstuff.Quo
 		return nil, fmt.Errorf("cluster does not exist in current epoch")
 	}
 
-	var commit epoch.Commit
+	var commit flow.EpochCommit
 	err = es.state.db.View(operation.RetrieveEpochCommit(es.counter, &commit))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch commit: %w", err)

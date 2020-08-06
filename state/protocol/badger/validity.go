@@ -5,12 +5,11 @@ import (
 
 	"github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
 
-func validSetup(setup *epoch.Setup) error {
+func validSetup(setup *flow.EpochSetup) error {
 
 	// there should be no duplicate node IDs
 	identLookup := make(map[flow.Identifier]struct{})
@@ -76,7 +75,7 @@ func validSetup(setup *epoch.Setup) error {
 	return nil
 }
 
-func validCommit(commit *epoch.Commit, participants flow.IdentityList) error {
+func validCommit(commit *flow.EpochCommit, participants flow.IdentityList) error {
 
 	// make sure we have a valid DKG public key
 	if commit.DKGGroupKey == nil {

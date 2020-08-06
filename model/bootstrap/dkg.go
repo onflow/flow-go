@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encodable"
-	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
@@ -23,13 +22,13 @@ type DKGParticipantPriv struct {
 	GroupIndex          int
 }
 
-func ToDKGLookup(dkg DKGData, identities flow.IdentityList) map[flow.Identifier]epoch.DKGParticipant {
+func ToDKGLookup(dkg DKGData, identities flow.IdentityList) map[flow.Identifier]flow.DKGParticipant {
 
-	lookup := make(map[flow.Identifier]epoch.DKGParticipant)
+	lookup := make(map[flow.Identifier]flow.DKGParticipant)
 	participants := identities.Filter(filter.HasRole(flow.RoleConsensus))
 	for i, keyShare := range dkg.PubKeyShares {
 		identity := participants[i]
-		lookup[identity.NodeID] = epoch.DKGParticipant{
+		lookup[identity.NodeID] = flow.DKGParticipant{
 			Index:    uint(i),
 			KeyShare: keyShare,
 		}
