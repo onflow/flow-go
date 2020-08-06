@@ -19,6 +19,22 @@ const safeTimeout = 2 * time.Second
 const safeDecrease = 200 * time.Millisecond
 const safeDecreaseFactor = 0.85
 
+// waitTimeout waits for the waitgroup for the specified max timeout.
+// Returns true if waiting timed out.
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
 func TestSingleInstance(t *testing.T) {
 
 	// set up a single instance to run
@@ -26,7 +42,7 @@ func TestSingleInstance(t *testing.T) {
 	// with a single instance, leading to a boundlessly growing call stack,
 	// which slows down the mocks significantly due to splitting the callstack
 	// to find the calling function name; we thus keep it low for now
-	finalView := uint64(10)
+	finalView := uint64(100)
 	in := NewInstance(t,
 		WithStopCondition(ViewFinalized(finalView)),
 	)
@@ -44,7 +60,7 @@ func TestInstancesThree(t *testing.T) {
 
 	// test parameters
 	num := 3
-	finalizedCount := 10
+	finalizedCount := 100
 
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
@@ -83,7 +99,9 @@ func TestInstancesThree(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	wg.Wait()
+
+	timeoutTriggered := waitTimeout(&wg, 10*time.Second)
+	require.False(t, timeoutTriggered)
 
 	allViews := allFinalizedViews(t, instances)
 	assertSafety(t, allViews)
@@ -95,7 +113,7 @@ func TestInstancesSeven(t *testing.T) {
 	numPass := 5
 	numFail := 2
 
-	finalizedCount := 1
+	finalizedCount := 100
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
@@ -144,7 +162,8 @@ func TestInstancesSeven(t *testing.T) {
 			wg.Done()
 		}(in)
 	}
-	wg.Wait()
+	timeoutTriggered := waitTimeout(&wg, 10*time.Second)
+	require.False(t, timeoutTriggered)
 
 	allViews := allFinalizedViews(t, instances)
 	assertSafety(t, allViews)

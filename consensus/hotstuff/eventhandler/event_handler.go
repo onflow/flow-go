@@ -112,7 +112,9 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		Hex("proposer_id", block.ProposerID[:]).
 		Logger()
 
-	log.Info().Msg("proposal forwarded from compliance engine")
+	log.Info().
+		Bool("is_own_proposal", proposal.Block.BlockID == e.ownProposal).
+		Msg("proposal forwarded from compliance engine")
 
 	// ignore stale proposals
 	if block.View < e.forks.FinalizedView() {
@@ -150,6 +152,8 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	// store the proposer's vote in voteAggregator
 	stored := e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
 
+	log.Debug().Msg("proposer vote stored")
+
 	// if the block is for the current view, then process the current block
 	if block.View == curView {
 		err = e.processBlockForCurrentView(block)
@@ -163,6 +167,8 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 		return nil
 	}
+
+	log.Debug().Msg("try building qc for block")
 
 	err = e.tryBuildQCForBlock(block)
 	if err != nil {
