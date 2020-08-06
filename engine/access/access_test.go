@@ -21,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	accessmock "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
+	"github.com/dapperlabs/flow-go/engine/access/rpc/backend"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -82,8 +83,20 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections,
-			transactions, suite.chainID, metrics)
+
+		backend := backend.New(
+			suite.state,
+			nil,
+			suite.collClient,
+			nil,
+			nil,
+			collections,
+			transactions,
+			suite.chainID,
+			metrics,
+		)
+
+		handler := handler.New(backend, suite.chainID.Chain())
 
 		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.snapshot, nil)
 		suite.snapshot.On("Head").Return(&referenceBlock, nil).Once()
@@ -131,15 +144,26 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil,
-			suite.chainID, metrics.NewNoopCollector())
+		backend := backend.New(
+			suite.state,
+			nil,
+			suite.collClient,
+			blocks,
+			headers,
+			nil,
+			nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+		)
+
+		handler := handler.New(backend, suite.chainID.Chain())
 
 		assertHeaderResp := func(resp *access.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := *resp.Block
 			expected, _ := convert.BlockHeaderToMessage(header)
-			require.Equal(suite.T(), expected, actual)
+			require.Equal(suite.T(), *expected, actual)
 		}
 
 		assertBlockResp := func(resp *access.BlockResponse, err error, block *flow.Block) {
@@ -242,8 +266,19 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
-		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers,
-			collections, transactions, suite.chainID, metrics)
+		backend := backend.New(
+			suite.state,
+			suite.execClient,
+			suite.collClient,
+			blocks,
+			headers,
+			collections,
+			transactions,
+			suite.chainID,
+			metrics,
+		)
+
+		handler := handler.New(backend, suite.chainID.Chain())
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
@@ -301,8 +336,18 @@ func (suite *Suite) TestExecuteScript() {
 
 		ctx := context.Background()
 
-		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, nil,
-			nil, suite.chainID, metrics.NewNoopCollector())
+		backend := backend.New(
+			suite.state,
+			suite.execClient,
+			suite.collClient,
+			blocks,
+			headers,
+			nil, nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+		)
+
+		handler := handler.New(backend, suite.chainID.Chain())
 
 		script := []byte("dummy script")
 
