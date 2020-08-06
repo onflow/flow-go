@@ -46,30 +46,6 @@ func (h *Handler) GetNetworkParameters(
 	}, nil
 }
 
-// SendTransaction submits a transaction to the network.
-func (h *Handler) SendTransaction(
-	ctx context.Context,
-	req *access.SendTransactionRequest,
-) (*access.SendTransactionResponse, error) {
-	txMsg := req.GetTransaction()
-
-	tx, err := convert.MessageToTransaction(txMsg, h.chain)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	err = h.api.SendTransaction(ctx, &tx)
-	if err != nil {
-		return nil, err
-	}
-
-	txID := tx.ID()
-
-	return &access.SendTransactionResponse{
-		Id: txID[:],
-	}, nil
-}
-
 // GetLatestBlockHeader gets the latest sealed block header.
 func (h *Handler) GetLatestBlockHeader(
 	ctx context.Context,
@@ -101,9 +77,12 @@ func (h *Handler) GetBlockHeaderByID(
 	ctx context.Context,
 	req *access.GetBlockHeaderByIDRequest,
 ) (*access.BlockHeaderResponse, error) {
-	blockID := convert.MessageToIdentifier(req.GetId())
+	id, err := convert.BlockID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
 
-	header, err := h.api.GetBlockHeaderByID(ctx, blockID)
+	header, err := h.api.GetBlockHeaderByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -142,9 +121,12 @@ func (h *Handler) GetBlockByID(
 	ctx context.Context,
 	req *access.GetBlockByIDRequest,
 ) (*access.BlockResponse, error) {
-	blockID := convert.MessageToIdentifier(req.GetId())
+	id, err := convert.BlockID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
 
-	block, err := h.api.GetBlockByID(ctx, blockID)
+	block, err := h.api.GetBlockByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +139,10 @@ func (h *Handler) GetCollectionByID(
 	ctx context.Context,
 	req *access.GetCollectionByIDRequest,
 ) (*access.CollectionResponse, error) {
-	id := convert.MessageToIdentifier(req.GetId())
+	id, err := convert.CollectionID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
 
 	col, err := h.api.GetCollectionByID(ctx, id)
 	if err != nil {
@@ -174,12 +159,39 @@ func (h *Handler) GetCollectionByID(
 	}, nil
 }
 
+// SendTransaction submits a transaction to the network.
+func (h *Handler) SendTransaction(
+	ctx context.Context,
+	req *access.SendTransactionRequest,
+) (*access.SendTransactionResponse, error) {
+	txMsg := req.GetTransaction()
+
+	tx, err := convert.MessageToTransaction(txMsg, h.chain)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err = h.api.SendTransaction(ctx, &tx)
+	if err != nil {
+		return nil, err
+	}
+
+	txID := tx.ID()
+
+	return &access.SendTransactionResponse{
+		Id: txID[:],
+	}, nil
+}
+
 // GetTransaction gets a transaction by ID.
 func (h *Handler) GetTransaction(
 	ctx context.Context,
 	req *access.GetTransactionRequest,
 ) (*access.TransactionResponse, error) {
-	id := convert.MessageToIdentifier(req.GetId())
+	id, err := convert.TransactionID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
 
 	tx, err := h.api.GetTransaction(ctx, id)
 	if err != nil {
@@ -196,7 +208,10 @@ func (h *Handler) GetTransactionResult(
 	ctx context.Context,
 	req *access.GetTransactionRequest,
 ) (*access.TransactionResultResponse, error) {
-	id := convert.MessageToIdentifier(req.GetId())
+	id, err := convert.TransactionID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := h.api.GetTransactionResult(ctx, id)
 	if err != nil {
@@ -233,7 +248,10 @@ func (h *Handler) GetAccountAtLatestBlock(
 	ctx context.Context,
 	req *access.GetAccountAtLatestBlockRequest,
 ) (*access.AccountResponse, error) {
-	address := flow.BytesToAddress(req.GetAddress())
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, err
+	}
 
 	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
 	if err != nil {
@@ -252,12 +270,29 @@ func (h *Handler) GetAccountAtLatestBlock(
 
 func (h *Handler) GetAccountAtBlockHeight(
 	ctx context.Context,
-	request *access.GetAccountAtBlockHeightRequest,
+	req *access.GetAccountAtBlockHeightRequest,
 ) (*access.AccountResponse, error) {
-	panic("implement me")
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight())
+	if err != nil {
+		return nil, err
+	}
+
+	accountMsg, err := convert.AccountToMessage(account)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &access.AccountResponse{
+		Account: accountMsg,
+	}, nil
 }
 
-// ExecuteScriptAtLatestBlock executes a script at a the latest block
+// ExecuteScriptAtLatestBlock executes a script at a the latest block.
 func (h *Handler) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	req *access.ExecuteScriptAtLatestBlockRequest,
@@ -275,7 +310,7 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	}, nil
 }
 
-// ExecuteScriptAtBlockHeight executes a script at a specific block height
+// ExecuteScriptAtBlockHeight executes a script at a specific block height.
 func (h *Handler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	req *access.ExecuteScriptAtBlockHeightRequest,
@@ -294,7 +329,7 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	}, nil
 }
 
-// ExecuteScriptAtBlockID executes a script at a specific block ID
+// ExecuteScriptAtBlockID executes a script at a specific block ID.
 func (h *Handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *access.ExecuteScriptAtBlockIDRequest,
@@ -318,7 +353,11 @@ func (h *Handler) GetEventsForHeightRange(
 	ctx context.Context,
 	req *access.GetEventsForHeightRangeRequest,
 ) (*access.EventsResponse, error) {
-	eventType := req.GetType()
+	eventType, err := convert.EventType(req.GetType())
+	if err != nil {
+		return nil, err
+	}
+
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
@@ -337,8 +376,15 @@ func (h *Handler) GetEventsForBlockIDs(
 	ctx context.Context,
 	req *access.GetEventsForBlockIDsRequest,
 ) (*access.EventsResponse, error) {
-	eventType := req.GetType()
-	blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
+	eventType, err := convert.EventType(req.GetType())
+	if err != nil {
+		return nil, err
+	}
+
+	blockIDs, err := convert.BlockIDs(req.GetBlockIds())
+	if err != nil {
+		return nil, err
+	}
 
 	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs)
 	if err != nil {
