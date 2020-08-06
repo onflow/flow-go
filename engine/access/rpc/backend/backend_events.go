@@ -27,6 +27,11 @@ func (b *backendEvents) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 ) ([]flow.BlockEvents, error) {
+
+	if endHeight < startHeight {
+		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
+	}
+
 	// get the latest sealed block header
 	head, err := b.state.Sealed().Head()
 	if err != nil {
