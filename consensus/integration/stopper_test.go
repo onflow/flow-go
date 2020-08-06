@@ -12,11 +12,6 @@ import (
 
 type StopperConsumer struct {
 	notifications.NoopConsumer
-	onEnteringView func(view uint64)
-}
-
-func (c *StopperConsumer) OnEnteringView(view uint64) {
-	c.onEnteringView(view)
 }
 
 func (c *StopperConsumer) OnStartingTimeout(info *model.TimerInfo) {
@@ -28,12 +23,11 @@ func (c *StopperConsumer) OnStartingTimeout(info *model.TimerInfo) {
 
 type Stopper struct {
 	sync.Mutex
-	running     map[flow.Identifier]struct{}
-	nodes       []*Node
-	stopping    bool
-	stopAtView  uint64
-	stopAtCount uint
-	stopped     chan struct{}
+	running  map[flow.Identifier]struct{}
+	nodes    []*Node
+	stopping bool
+	stopped  chan struct{}
+	onStop   func(nodes []*Node) bool
 }
 
 // How to stop nodes?
@@ -49,14 +43,13 @@ type Stopper struct {
 // terminated.
 // for example: NewStopper(100, 10000) means all nodes will be terminated if all nodes have passed
 // view 100 or any node has finalized 10000 blocks.
-func NewStopper(stopAtView uint64, stopAtCount uint) *Stopper {
+func NewStopper(onStop func([]*Node) bool) *Stopper {
 	return &Stopper{
-		running:     make(map[flow.Identifier]struct{}),
-		nodes:       make([]*Node, 0),
-		stopping:    false,
-		stopAtView:  stopAtView,
-		stopAtCount: stopAtCount,
-		stopped:     make(chan struct{}),
+		running:  make(map[flow.Identifier]struct{}),
+		nodes:    make([]*Node, 0),
+		stopping: false,
+		stopped:  make(chan struct{}),
+		onStop:   onStop,
 	}
 }
 
@@ -65,40 +58,15 @@ func (s *Stopper) AddNode(n *Node) *StopperConsumer {
 	defer s.Unlock()
 	s.running[n.id.ID()] = struct{}{}
 	s.nodes = append(s.nodes, n)
-	stopConsumer := &StopperConsumer{
-		onEnteringView: func(view uint64) {
-			s.onEnteringView(n.id.ID(), view)
-		},
-	}
+	stopConsumer := &StopperConsumer{}
 	return stopConsumer
-}
-
-func (s *Stopper) onEnteringView(id flow.Identifier, view uint64) {
-	s.Lock()
-	defer s.Unlock()
-
-	if view < s.stopAtView {
-		return
-	}
-
-	// keep track of remaining running nodes
-	delete(s.running, id)
-
-	// if there is no running nodes, stop all
-	if len(s.running) == 0 {
-		// terminating all nodes in a different goroutine,
-		// otherwise onEnteringView will be blocking,
-		// which will block hotstuff eventloop from exiting, and
-		// cause deadlock
-		go s.stopAll()
-	}
 }
 
 func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
 	s.Lock()
 	defer s.Unlock()
 
-	if total < s.stopAtCount {
+	if s.onStop(s.nodes) {
 		return
 	}
 
@@ -108,7 +76,6 @@ func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
 	// if there is no running nodes, stop all
 	if len(s.running) == 0 {
 		// terminating all nodes in a different goroutine,
-		// otherwise onEnteringView will be blocking,
 		// which will block hotstuff eventloop from exiting, and
 		// cause deadlock
 		go s.stopAll()

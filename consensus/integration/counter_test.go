@@ -14,8 +14,8 @@ type CounterConsumer struct {
 	log       zerolog.Logger
 	interval  time.Duration
 	next      time.Time
-	count     uint
-	total     uint
+	count     uint // for caculating finalize rate
+	total     uint // for caculating finalize total
 	ma        []uint
 	finalized func(uint)
 }

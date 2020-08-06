@@ -55,6 +55,7 @@ type Node struct {
 	state         *protocol.State
 	headers       *storage.Headers
 	net           *Network
+	counter       *CounterConsumer
 	blockproposal int
 	blockvote     int
 	syncreq       int
@@ -64,7 +65,7 @@ type Node struct {
 	batchresp     int
 }
 
-func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*Node, *Stopper, *Hub) {
+func createNodes(t *testing.T, n int, onStop func([]*Node) bool) ([]*Node, *Stopper, *Hub) {
 
 	// create n consensus node participants
 	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
@@ -109,7 +110,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 	}
 
 	hub := NewHub()
-	stopper := NewStopper(stopAtView, stopCountAt)
+	stopper := NewStopper(onStop)
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
 		node := createNode(t, i, identity, consensus, rootBlock, rootQC, hub, stopper)
@@ -244,6 +245,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	node.headers = headersDB
 	node.net = net
 	node.log = log
+	node.counter = counterConsumer
 
 	return node
 }

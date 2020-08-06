@@ -16,10 +16,21 @@ func runNodes(nodes []*Node) {
 	}
 }
 
+func allFinalized(total int) func([]*Node) bool {
+	return func(nodes []*Node) bool {
+		for _, node := range nodes {
+			if node.counter.total < uint(total) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
 
-	nodes, stopper, hub := createNodes(t, 3, 100, 1000)
+	nodes, stopper, hub := createNodes(t, 3, allFinalized(10))
 
 	hub.WithFilter(blockNothing)
 	runNodes(nodes)
@@ -31,7 +42,6 @@ func Test3Nodes(t *testing.T) {
 	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 90)
 
 	cleanupNodes(nodes)
 }
@@ -65,15 +75,6 @@ func assertSafety(t *testing.T, allViews [][]uint64) {
 			require.Equal(t, longest[j], view, "each view in a chain must match with the view in longest chain at the same height, but didn't")
 		}
 	}
-}
-
-// assert all finalized views must have reached a given view to ensure enough process has been made
-func assertLiveness(t *testing.T, allViews [][]uint64, view uint64) {
-	// the shortest chain must made enough progress
-	shortest := allViews[0]
-	require.Greater(t, len(shortest), 0, "no block was finalized")
-	highestView := shortest[len(shortest)-1]
-	require.Greater(t, highestView, view, "did not finalize enough block")
 }
 
 func printState(t *testing.T, nodes []*Node, i int) {
