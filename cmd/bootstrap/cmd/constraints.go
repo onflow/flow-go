@@ -32,21 +32,32 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	// check consensus committee Byzantine threshold
 	partnerCount := partners.Filter(filter.HasRole(flow.RoleConsensus)).Count()
 	internalCount := internals.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	if partnerCount*2 >= internalCount {
+	if internalCount <= partnerCount*2 {
 		log.Fatal().Msgf(
 			"will not bootstrap configuration without Byzantine majority of consensus nodes: "+
 				"(partners=%d, internals=%d, min_internals=%d)",
 			partnerCount, internalCount, partnerCount*2+1)
 	}
 
-	// check collection committee Byzantine threshold
-	partnerCount = partners.Filter(filter.HasRole(flow.RoleCollection)).Count()
-	internalCount = internals.Filter(filter.HasRole(flow.RoleCollection)).Count()
-	if internalCount < partnerCount*2+flagCollectionClusters {
-		log.Fatal().Msgf(
-			"will not bootstrap configuration without Byzantine majority of collection nodes: "+
-				"(partner_nodes=%d, internal_nodes=%d, min_internal_nodes=%d)",
-			partnerCount, internalCount, partnerCount*2+flagCollectionClusters)
+	// check collection committee Byzantine threshold for each cluster
+	_, clusters := constructClusterAssignment(partnerNodes, internalNodes)
+	for _, cluster := range clusters {
+		partnerCount = 0
+		internalCount = 0
+		for _, node := range cluster {
+			if _, exists := partners.ByNodeID(node.NodeID); exists {
+				partnerCount++
+			}
+			if _, exists := internals.ByNodeID(node.NodeID); exists {
+				internalCount++
+			}
+			if internalCount <= partnerCount*2 {
+				log.Fatal().Msgf(
+					"will not bootstrap configuration without Byzantine majority of cluster: "+
+						"(partners=%d, internals=%d, min_internals=%d)",
+					partnerCount, internalCount, partnerCount*2+1)
+			}
+		}
 	}
 
 	// ensure we have enough total collectors
