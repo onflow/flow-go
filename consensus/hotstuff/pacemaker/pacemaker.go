@@ -65,6 +65,10 @@ func (p *NitroPaceMaker) CurView() uint64 {
 	return p.currentView
 }
 
+func (p *NitroPaceMaker) TimerInfo() *model.TimerInfo {
+	return p.timeoutControl.TimerInfo()
+}
+
 // TimeoutChannel returns the timeout channel for current active timeout.
 // Note the returned timeout channel returns only one timeout, which is the current
 // timeout.

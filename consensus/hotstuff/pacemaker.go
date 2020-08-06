@@ -39,6 +39,8 @@ type PaceMaker interface {
 	// CurView returns the current view.
 	CurView() uint64
 
+	TimerInfo() *model.TimerInfo
+
 	// UpdateCurViewWithQC will check if the given QC will allow PaceMaker to fast
 	// forward to QC.view+1. If PaceMaker incremented the current View, a NewViewEvent will be returned.
 	UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool)

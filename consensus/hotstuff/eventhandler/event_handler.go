@@ -193,21 +193,33 @@ func (e *EventHandler) TimeoutChannel() <-chan time.Time {
 func (e *EventHandler) OnLocalTimeout() error {
 
 	curView := e.paceMaker.CurView()
+	timerInfo := e.paceMaker.TimerInfo()
+
 	newView := e.paceMaker.OnTimeout()
 
 	log := e.log.With().
 		Uint64("cur_view", curView).
 		Uint64("new_view", newView.View).
+		Str("timeout_mode", timerInfo.Mode.String()).
 		Logger()
 
-	log.Info().Msg("timeout received from event loop")
+	currentLeader, err := e.committee.LeaderForView(curView)
+	if err != nil {
+		return fmt.Errorf("failed to determine leader when timeout: %d: %w", curView, err)
+	}
+
+	if e.committee.Self() == currentLeader {
+		log.Info().Msg("leader behavior: timeout received")
+	} else {
+		log.Info().Msg("timeout received from event loop")
+	}
 
 	if curView == newView.View {
 		return fmt.Errorf("OnLocalTimeout should guarantee that the pacemaker should go to next view, but didn't: (curView: %v, newView: %v)", curView, newView.View)
 	}
 
 	// current view has changed, go to new view
-	err := e.startNewView()
+	err = e.startNewView()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
@@ -286,7 +298,7 @@ func (e *EventHandler) startNewView() error {
 			Uint64("parent_view", qc.View).
 			Hex("parent_id", qc.BlockID[:]).
 			Hex("signer", block.ProposerID[:]).
-			Msg("forwarding proposal to compliance engine")
+			Msg("leader behavior: forwarding proposal to compliance engine")
 
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
@@ -378,6 +390,8 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 		Hex("signer", block.ProposerID[:]).
 		Logger()
 
+	log.Debug().Msg("leader behavior: block received as next leader")
+
 	// voter performs all the checks to decide whether to vote for this block or not.
 	// note this call has to make before calling pacemaker, because calling to pace maker first might
 	// cause the `curView` here to be stale
@@ -411,10 +425,12 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 		if err != nil {
 			return fmt.Errorf("failed to process QC for block when not voting: %w", err)
 		}
+
+		log.Debug().Bool("vote", false).Msg("leader behavior: block processed when not voting for it")
 		return nil
 	}
 
-	log.Debug().Msg("processing own vote as next leader")
+	log.Debug().Bool("vote", true).Msg("leader behavior: processing own vote as next leader")
 
 	// since I'm the next leader, instead of sending the vote through the network and receiving it
 	// back, it can be processed locally right away.
