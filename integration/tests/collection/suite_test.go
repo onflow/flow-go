@@ -121,12 +121,14 @@ func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
 	return client
 }
 
-// TODO update to use setup event from protocol state
 func (suite *CollectorSuite) Clusters() flow.ClusterList {
+	seal := suite.net.Seal()
+	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	suite.Require().True(ok)
+
 	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
-	assignments := protocol.ClusterAssignments(suite.nClusters, collectors)
-	clusters, err := flow.NewClusterList(assignments, collectors)
-	suite.Require().NoError(err)
+	clusters, err := flow.NewClusterList(setup.Assignments, collectors)
+	suite.Require().Nil(err)
 	return clusters
 }
 
