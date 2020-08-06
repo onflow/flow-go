@@ -145,6 +145,7 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("could not get cluster root block: %w", err)
 			}
+			clusterID = clusterBlock.Header.ChainID
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {

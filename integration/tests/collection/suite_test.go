@@ -311,7 +311,9 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
-	chainID := protocol.ChainIDForCluster(myCluster)
+	setup, ok := suite.net.Seal().ServiceEvents[1].Event.(*flow.EpochSetup)
+	suite.Require().True(ok)
+	rootBlock := protocol.CanonicalClusterRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
 
 	db, err := node.DB()
@@ -322,7 +324,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	headers := storage.NewHeaders(metrics, db)
 	payloads := storage.NewClusterPayloads(metrics, db)
 
-	state, err := clusterstate.NewState(db, chainID, headers, payloads)
+	state, err := clusterstate.NewState(db, rootBlock.Header.ChainID, headers, payloads)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state

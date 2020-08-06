@@ -7,12 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// ChainIDForCluster returns the canonical chain ID for a collection node cluster.
-// TODO remove
-func ChainIDForCluster(cluster flow.IdentityList) flow.ChainID {
-	return flow.ChainID(cluster.Fingerprint().String())
-}
-
 // CanonicalClusterRootBlock returns the canonical root block for the given
 // cluster in the given epoch.
 func CanonicalClusterRootBlock(epoch uint64, participants flow.IdentityList) *cluster.Block {
