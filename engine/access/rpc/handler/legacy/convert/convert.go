@@ -10,6 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -118,7 +119,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 }
 
-func TransactionResultToMessage(result flow.TransactionResult) *access.TransactionResultResponse {
+func TransactionResultToMessage(result handler.TransactionResult) *access.TransactionResultResponse {
 	return &access.TransactionResultResponse{
 		Status:       entities.TransactionStatus(result.Status),
 		StatusCode:   uint32(result.StatusCode),
