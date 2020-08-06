@@ -152,6 +152,8 @@ func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.Accoun
 			return nil, fmt.Errorf("failed to decode public key: %w", err)
 		}
 
+		decodedPublicKey.Index = int(i)
+
 		publicKeys[i] = decodedPublicKey
 	}
 
