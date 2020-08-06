@@ -6,6 +6,7 @@ const (
 	EngineLabel   = "engine"
 	LabelResource = "resource"
 	LabelMessage  = "message"
+	LabelNodeID   = "nodeid"
 )
 
 const (

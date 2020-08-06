@@ -285,3 +285,7 @@ type TransactionMetrics interface {
 	// works if the transaction was earlier added as received.
 	TransactionExecuted(txID flow.Identifier, when time.Time)
 }
+
+type PingMetrics interface {
+	NodeReachable(nodeID flow.Identifier, reachable bool)
+}
