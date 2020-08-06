@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -28,7 +26,6 @@ import (
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/provider"
 	consync "github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -45,10 +42,8 @@ import (
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/module/synchronization"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
-	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
 	storagekv "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/io"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -76,13 +71,11 @@ func main() {
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
 
-		myCluster    flow.IdentityList // cluster identity list
-		clusterID    flow.ChainID      // chain ID for the cluster
-		clusterState *clusterkv.State  // chain state for the cluster
-
-		// from bootstrap files
+		myCluster    flow.IdentityList       // cluster identity list
+		clusterID    flow.ChainID            // chain ID for the cluster
 		clusterBlock *clustermodel.Block     // root block for the cluster
 		clusterQC    *flow.QuorumCertificate // root QC for the cluster
+		clusterState *clusterkv.State        // chain state for the cluster
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -135,7 +128,7 @@ func main() {
 			pool, err = stdmap.NewTransactions(txLimit)
 			return err
 		}).
-		Module("collection cluster ID", func(node *cmd.FlowNodeBuilder) error {
+		Module("collection cluster", func(node *cmd.FlowNodeBuilder) error {
 			clusters, err := node.State.Final().Clusters()
 			if err != nil {
 				return fmt.Errorf("could not get clusters: %w", err)
@@ -144,7 +137,14 @@ func main() {
 			if !found {
 				return fmt.Errorf("could not find cluster for self")
 			}
-			clusterID = protocol.ChainIDForCluster(cluster)
+			clusterQC, err = node.State.Final().ClusterRootQC(cluster)
+			if err != nil {
+				return fmt.Errorf("could not get cluster root QC: %w", err)
+			}
+			clusterBlock, err = node.State.Final().ClusterRootBlock(cluster)
+			if err != nil {
+				return fmt.Errorf("could not get cluster root block: %w", err)
+			}
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
@@ -161,23 +161,6 @@ func main() {
 		Module("metrics", func(node *cmd.FlowNodeBuilder) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			clusterMetrics = metrics.NewHotstuffCollector(clusterID)
-			return nil
-		}).
-		// regardless of whether we are starting from scratch or from an
-		// existing state, we load the root files
-		Module("cluster consensus bootstrapping", func(node *cmd.FlowNodeBuilder) error {
-
-			// read cluster bootstrapping files from standard bootstrap directory
-			clusterBlock, err = loadClusterBlock(node.BaseConfig.BootstrapDir, clusterID)
-			if err != nil {
-				return fmt.Errorf("could not load cluster block: %w", err)
-			}
-
-			clusterQC, err = loadClusterQC(node.BaseConfig.BootstrapDir, clusterID)
-			if err != nil {
-				return fmt.Errorf("could not load cluster qc: %w", err)
-			}
-
 			return nil
 		}).
 		// if a root cluster block already exists in the database, discard
@@ -481,34 +464,4 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 	}
 
 	return committee.New(node.State, translator, node.Me.NodeID(), selector, cluster.NodeIDs(), selection), nil
-}
-
-func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block, error) {
-	filename := fmt.Sprintf(bootstrap.PathRootClusterBlock, clusterID)
-	data, err := io.ReadFile(filepath.Join(path, filename))
-	if err != nil {
-		return nil, err
-	}
-
-	var block clustermodel.Block
-	err = json.Unmarshal(data, &block)
-	if err != nil {
-		return nil, err
-	}
-	return &block, nil
-}
-
-func loadClusterQC(path string, clusterID flow.ChainID) (*flow.QuorumCertificate, error) {
-	filename := fmt.Sprintf(bootstrap.PathRootClusterQC, clusterID)
-	data, err := io.ReadFile(filepath.Join(path, filename))
-	if err != nil {
-		return nil, err
-	}
-
-	var qc flow.QuorumCertificate
-	err = json.Unmarshal(data, &qc)
-	if err != nil {
-		return nil, err
-	}
-	return &qc, nil
 }

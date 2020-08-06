@@ -104,7 +104,6 @@ type namedDoneObject struct {
 type FlowNodeBuilder struct {
 	BaseConfig        BaseConfig
 	NodeID            flow.Identifier
-	NClusters         uint
 	flags             *pflag.FlagSet
 	Logger            zerolog.Logger
 	Me                *local.Local
@@ -116,6 +115,7 @@ type FlowNodeBuilder struct {
 	State             *protocol.State
 	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
+	MsgValidators     []validators.MessageValidator
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
@@ -123,7 +123,6 @@ type FlowNodeBuilder struct {
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
-	MsgValidators     []validators.MessageValidator
 
 	// root state information
 	RootBlock   *flow.Block
