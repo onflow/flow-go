@@ -121,6 +121,7 @@ func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
 	return client
 }
 
+// TODO update to use setup event from protocol state
 func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
 	assignments := protocol.ClusterAssignments(suite.nClusters, collectors)

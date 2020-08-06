@@ -9,7 +9,6 @@ import (
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
 
 func constructRootResultAndSeal(
@@ -37,21 +36,13 @@ func constructRootResultAndSeal(
 		Seed:         blockID[:],
 	}
 
-	dkgParticipants := make(map[flow.Identifier]epoch.DKGParticipant)
-	dkgParticipantIdentities := participants.Filter(filter.HasRole(flow.RoleConsensus))
-	for i, keyShare := range dkgData.PubKeyShares {
-		identity := dkgParticipantIdentities[i]
-		dkgParticipants[identity.NodeID] = epoch.DKGParticipant{
-			Index:    uint(i),
-			KeyShare: keyShare,
-		}
-	}
+	dkgLookup := model.ToDKGLookup(dkgData, participants)
 
 	epochCommit := &epoch.Commit{
 		Counter:         flagEpochCounter,
 		ClusterQCs:      clusterQCs,
 		DKGGroupKey:     dkgData.PubGroupKey,
-		DKGParticipants: dkgParticipants,
+		DKGParticipants: dkgLookup,
 	}
 
 	result := run.GenerateRootResult(block, stateCommit)

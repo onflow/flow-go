@@ -20,13 +20,12 @@ import (
 
 	"github.com/dapperlabs/testingdock"
 
-	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encodable"
+	"github.com/dapperlabs/flow-go/model/epoch"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -534,61 +533,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
-	// generate the initial execution state
-	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(trieDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// define root block parameters
-	parentID := flow.ZeroID
-	height := uint64(0)
-	timestamp := time.Now().UTC()
-
-	// generate root block
-	root := bootstraprun.GenerateRootBlock(chainID, parentID, height, timestamp, toParticipants(confs))
-
-	// generate QC
-	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
-	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
-	qc, err := bootstraprun.GenerateRootQC(signerData, root)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// generate execution result and block seal
-	result := bootstraprun.GenerateRootResult(root, commit)
-	seal := bootstraprun.GenerateRootSeal(result)
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootBlock), root)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootQC), qc)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootResult), result)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootSeal), seal)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// write public DKG data
-	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public(consensusNodes))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	// write private key files for each DKG participant
+	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
@@ -621,37 +567,79 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// generate root blocks for each collector cluster
-	clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, root)
+	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathNClusters), bootstrap.NClusters{
-		NClusters: uint(networkConf.NClusters),
-	})
+	// generate the initial execution state
+	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
+	commit, err := run.GenerateExecutionState(trieDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	// write collector-specific root bootstrap files for each cluster
-	for i := 0; i < len(clusterBlocks); i++ {
-		clusterRoot := clusterBlocks[i]
-		clusterQC := clusterQCs[i]
+	// define root block parameters
+	parentID := flow.ZeroID
+	height := uint64(0)
+	timestamp := time.Now().UTC()
+	epochCounter := uint64(0)
+	participants := bootstrap.ToIdentityList(toNodeInfos(confs))
 
-		// cluster ID is equivalent to chain ID
-		clusterID := clusterRoot.Header.ChainID
+	// generate root block
+	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
+	rootID := root.Header.ID()
 
-		clusterRootPath := fmt.Sprintf(bootstrap.PathRootClusterBlock, clusterID)
-		err = writeJSON(filepath.Join(bootstrapDir, clusterRootPath), clusterRoot)
-		if err != nil {
-			return nil, nil, nil, err
-		}
+	// generate QC
+	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
+	signerData, err := run.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	qc, err := run.GenerateRootQC(root, signerData)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
-		clusterQCPath := fmt.Sprintf(bootstrap.PathRootClusterQC, clusterID)
-		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
-		if err != nil {
-			return nil, nil, nil, err
-		}
+	// generate epoch service events
+	epochSetup := &epoch.Setup{
+		Counter:      epochCounter,
+		FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
+		Participants: participants,
+		Assignments:  clusterAssignments,
+		Seed:         rootID[:],
+	}
+
+	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)
+	epochCommit := &epoch.Commit{
+		Counter:         epochCounter,
+		ClusterQCs:      clusterQCs,
+		DKGGroupKey:     dkg.PubGroupKey,
+		DKGParticipants: dkgLookup,
+	}
+
+	// generate execution result and block seal
+	result := run.GenerateRootResult(root, commit)
+	seal := run.GenerateRootSeal(result, epochSetup, epochCommit)
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootBlock), root)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootQC), qc)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootResult), result)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootSeal), seal)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	return root, seal, confs, nil
@@ -728,7 +716,7 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 		return bootstrap.DKGData{}, err
 	}
 
-	dkg, err := bootstraprun.RunFastKG(nConsensusNodes, dkgSeed)
+	dkg, err := run.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
@@ -748,31 +736,31 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
 //   * a cluster-specific root block
 //   * a cluster-specific root QC
-func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, root *flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate, error) {
+func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig) (flow.AssignmentList, []*hotstuff.QuorumCertificate, error) {
 
 	participants := toParticipants(confs)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
-	assignments := protocol.ClusterAssignments(nClusters, collectors)
+	assignments := flow.NewAssignmentList(nClusters, collectors)
 	clusters, err := flow.NewClusterList(assignments, collectors)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}
 
-	blocks := make([]*cluster.Block, 0, nClusters)
 	qcs := make([]*hotstuff.QuorumCertificate, 0, nClusters)
 
 	for _, cluster := range clusters {
 		// generate root cluster block
-		block := bootstraprun.GenerateRootClusterBlock(cluster)
+		block := protocol.CanonicalClusterRootBlock(0, cluster)
+
+		lookup := make(map[flow.Identifier]struct{})
+		for _, node := range cluster {
+			lookup[node.NodeID] = struct{}{}
+		}
 
 		// gather cluster participants
-		// ToDo: optimize. This has quadratic scaling with the number of collectors:
-		//       Let N be the number of collectors. The number of clusters Xi = N / c where c is nearly a constant.
-		//       Furthermore, cluster.ByNodeID iterate over all c cluster members to check whether their ID matches.
-		//       Hence, we get a runtime cost: Xi * N * c = N^2. This could probably be reduced to linear cost of O(N).
 		participants := make([]bootstrap.NodeInfo, 0, len(cluster))
 		for _, conf := range confs {
-			_, exists := cluster.ByNodeID(conf.NodeID)
+			_, exists := lookup[conf.NodeID]
 			if exists {
 				participants = append(participants, conf.NodeInfo)
 			}
@@ -782,15 +770,14 @@ func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, root *
 		}
 
 		// generate qc for root cluster block
-		qc, err := bootstraprun.GenerateClusterRootQC(participants, root, block)
+		qc, err := run.GenerateClusterRootQC(participants, block)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// add block and qc to list
-		blocks = append(blocks, block)
 		qcs = append(qcs, qc)
 	}
 
-	return blocks, qcs, nil
+	return assignments, qcs, nil
 }

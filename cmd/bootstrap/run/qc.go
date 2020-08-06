@@ -37,7 +37,7 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
-func GenerateRootQC(block *flow.Block, participantData ParticipantData) (*model.QuorumCertificate, error) {
+func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*model.QuorumCertificate, error) {
 
 	validators, signers, err := createValidators(participantData)
 	if err != nil {
@@ -74,7 +74,7 @@ func GenerateRootQC(block *flow.Block, participantData ParticipantData) (*model.
 	return qc, err
 }
 
-func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []hotstuff.Signer, error) {
+func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.Signer, error) {
 	n := len(participantData.Participants)
 	identities := participantData.Identities()
 
@@ -116,4 +116,57 @@ func createValidators(participantData ParticipantData) ([]hotstuff.Validator, []
 	}
 
 	return validators, signers, nil
+}
+
+func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData bootstrap.DKGData) (*ParticipantData, error) {
+
+	// stakingNodes can include external validators, so it can be longer than internalNodes
+	if len(allNodes) < len(internalNodes) {
+		return nil, fmt.Errorf("need at least as many staking public keys as private keys (pub=%d, priv=%d)", len(allNodes), len(internalNodes))
+	}
+
+	// length of DKG participants needs to match stakingNodes, since we run DKG for external and internal validators
+	if len(allNodes) != len(dkgData.PrivKeyShares) {
+		return nil, fmt.Errorf("need exactly the same number of staking public keys as DKG private participants")
+	}
+
+	qcData := &ParticipantData{}
+
+	participantLookup := make(map[flow.Identifier]epoch.DKGParticipant)
+
+	// the QC will be signed by everyone in internalNodes
+	for i, node := range internalNodes {
+		// assign a node to a DGKdata entry, using the canonical ordering
+		participantLookup[node.NodeID] = epoch.DKGParticipant{
+			KeyShare: dkgData.PubKeyShares[i],
+			Index:    uint(i),
+		}
+
+		if node.NodeID == flow.ZeroID {
+			return nil, fmt.Errorf("node id cannot be zero")
+		}
+
+		if node.Stake == 0 {
+			return nil, fmt.Errorf("node (id=%s) cannot have 0 stake", node.NodeID)
+		}
+
+		qcData.Participants = append(qcData.Participants, Participant{
+			NodeInfo:            node,
+			RandomBeaconPrivKey: dkgData.PrivKeyShares[i],
+		})
+	}
+
+	for i := len(internalNodes); i < len(allNodes); i++ {
+		// assign a node to a DGKdata entry, using the canonical ordering
+		node := allNodes[i]
+		participantLookup[node.NodeID] = epoch.DKGParticipant{
+			KeyShare: dkgData.PubKeyShares[i],
+			Index:    uint(i),
+		}
+	}
+
+	qcData.Lookup = participantLookup
+	qcData.GroupKey = dkgData.PubGroupKey
+
+	return qcData, nil
 }
