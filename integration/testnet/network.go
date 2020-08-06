@@ -564,12 +564,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		}
 	}
 
-	// generate root blocks for each collector cluster
-	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	// generate the initial execution state
 	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
 	commit, err := run.GenerateExecutionState(trieDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
@@ -595,6 +589,12 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, err
 	}
 	qc, err := run.GenerateRootQC(root, signerData)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// generate root blocks for each collector cluster
+	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, confs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -734,7 +734,7 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
 //   * a cluster-specific root block
 //   * a cluster-specific root QC
-func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig) (flow.AssignmentList, []*flow.QuorumCertificate, error) {
+func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) (flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
 	participants := toParticipants(confs)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
@@ -748,7 +748,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig) (flow.
 
 	for _, cluster := range clusters {
 		// generate root cluster block
-		block := protocol.CanonicalClusterRootBlock(0, cluster)
+		block := protocol.CanonicalClusterRootBlock(epochCounter, cluster)
 
 		lookup := make(map[flow.Identifier]struct{})
 		for _, node := range cluster {
