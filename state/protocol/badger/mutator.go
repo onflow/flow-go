@@ -391,13 +391,15 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
-	err = m.state.blocks.Store(candidate)
-	if err != nil {
-		return fmt.Errorf("could not store candidate block: %w", err)
-	}
 	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
-		err := operation.IndexBlockSeal(blockID, last.ID())(tx)
+
+		err := m.state.blocks.StoreTx(candidate)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store candidate block: %w", err)
+		}
+
+		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}

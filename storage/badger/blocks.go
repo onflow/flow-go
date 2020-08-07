@@ -63,6 +63,10 @@ func (b *Blocks) Store(block *flow.Block) error {
 	return operation.RetryOnConflict(b.db.Update, b.storeTx(block))
 }
 
+func (b *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
+	return b.storeTx(block)
+}
+
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
