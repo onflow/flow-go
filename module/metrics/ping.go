@@ -18,7 +18,7 @@ func NewPingCollector() *PingCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
-		}, []string{LabelNodeID, LabelRole}),
+		}, []string{LabelNodeID, LabelNodeRole}),
 	}
 	return pc
 }
@@ -28,5 +28,5 @@ func (pc *PingCollector) NodeReachable(node *flow.Identity, reachable bool) {
 	if reachable {
 		val = 1
 	}
-	pc.reachable.With(prometheus.Labels{LabelNodeID: node.String(), LabelRole: node.Role.String()}).Set(val)
+	pc.reachable.With(prometheus.Labels{LabelNodeID: node.String(), LabelNodeRole: node.Role.String()}).Set(val)
 }
