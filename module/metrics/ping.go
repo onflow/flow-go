@@ -1,8 +1,6 @@
 package metrics
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -13,7 +11,7 @@ type PingCollector struct {
 	reachable *prometheus.GaugeVec
 }
 
-func NewPingCollector(interval time.Duration) *PingCollector {
+func NewPingCollector() *PingCollector {
 	pc := &PingCollector{
 		reachable: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "node_reachable",
