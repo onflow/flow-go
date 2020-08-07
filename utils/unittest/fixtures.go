@@ -776,6 +776,19 @@ func BatchListFixture(n int) []flow.Batch {
 	return batches
 }
 
+func ResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
+	result := &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID:          block.ID(),
+			PreviousResultID: flow.ZeroID,
+			FinalStateCommit: commit,
+			Chunks:           nil,
+		},
+		Signatures: nil,
+	}
+	return result
+}
+
 func SealFixture(result *flow.ExecutionResult, setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.Seal {
 	seal := &flow.Seal{
 		BlockID:       result.BlockID,
@@ -811,6 +824,12 @@ func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	}
 }
 
+func SetupWithCounter(counter uint64) func(*flow.EpochSetup) {
+	return func(setup *flow.EpochSetup) {
+		setup.Counter = counter
+	}
+}
+
 func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	participants := IdentityListFixture(5, WithAllRoles())
 	assignments := ClusterAssignment(1, participants)
@@ -833,10 +852,16 @@ func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCom
 		for i, node := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
 			lookup[node.NodeID] = flow.DKGParticipant{
 				Index:    uint(i),
-				KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
+				KeyShare: nil,
 			}
 		}
 		commit.DKGParticipants = lookup
+	}
+}
+
+func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
+	return func(commit *flow.EpochCommit) {
+		commit.Counter = counter
 	}
 }
 
@@ -851,4 +876,18 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 		apply(commit)
 	}
 	return commit
+}
+
+// BootstrapFixture generates all the artifacts necessary to bootstrap the
+// protocol state.
+func BootstrapFixture(participants flow.IdentityList) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+
+	root := GenesisFixture(participants)
+	result := ResultFixture(root, GenesisStateCommitment)
+
+	counter := uint64(1)
+	setup := EpochSetupFixture(WithParticipants(participants), SetupWithCounter(counter))
+	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
+	seal := SealFixture(result, setup, commit)
+	return root, result, seal
 }

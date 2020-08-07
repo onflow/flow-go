@@ -22,7 +22,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/buffer"
@@ -161,7 +160,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		DKGParticipants: nil,
 	}
 
-	result := bootstrap.Result(rootBlock, unittest.GenesisStateCommitment)
+	result := unittest.ResultFixture(rootBlock, unittest.GenesisStateCommitment)
 	seal := unittest.SealFixture(result, setup, commit)
 	err = state.Mutate().Bootstrap(rootBlock, result, seal)
 	require.NoError(t, err)

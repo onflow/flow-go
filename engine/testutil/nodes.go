@@ -30,7 +30,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -78,7 +77,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(chainID)
-	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
+	result := unittest.ResultFixture(genesis, unittest.GenesisStateCommitment)
 	seal := unittest.SealFixture(result)
 	err = state.Mutate().Bootstrap(genesis, result, seal)
 	require.NoError(t, err)
