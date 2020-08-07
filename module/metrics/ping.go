@@ -23,10 +23,10 @@ func NewPingCollector() *PingCollector {
 	return pc
 }
 
-func (pc *PingCollector) NodeReachable(nodeID flow.Identifier, reachable bool) {
+func (pc *PingCollector) NodeReachable(node *flow.Identity, reachable bool) {
 	var val float64
 	if reachable {
 		val = 1
 	}
-	pc.reachable.With(prometheus.Labels{LabelNodeID: nodeID.String()}).Set(val)
+	pc.reachable.With(prometheus.Labels{LabelNodeID: node.String()}).Set(val)
 }

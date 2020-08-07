@@ -88,7 +88,7 @@ func (e *Engine) startPing() {
 // send ping to a given node and report the reachable result to metrics
 func (e *Engine) pingNode(peer *flow.Identity) {
 	reachable := e.pingAddress(peer.ID())
-	e.metrics.NodeReachable(peer.ID(), reachable)
+	e.metrics.NodeReachable(peer, reachable)
 }
 
 // pingAddress sends a ping request to the given address, and block until either receive
