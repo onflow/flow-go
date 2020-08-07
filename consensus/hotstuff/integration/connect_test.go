@@ -36,6 +36,8 @@ func Connect(instances []*Instance) {
 		*sender.communicator = mocks.Communicator{}
 		sender.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
 			func(header *flow.Header, delay time.Duration) error {
+				time.Sleep(delay)
+
 				// sender should always have the parent
 				parentBlob, exists := sender.headers.Load(header.ParentID)
 				if !exists {

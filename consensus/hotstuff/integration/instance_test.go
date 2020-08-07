@@ -75,12 +75,16 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// generate random default identity
 	identity := unittest.IdentityFixture()
 
+	// add block delay to ensure other nodes have received proposal before proposing the next
+	timeoutCfg := timeout.DefaultConfig
+	timeoutCfg.BlockRateDelayMS = float64((5 * time.Millisecond).Milliseconds())
+
 	// initialize the default configuration
 	cfg := Config{
 		Root:              DefaultRoot(),
 		Participants:      flow.IdentityList{identity},
 		LocalID:           identity.NodeID,
-		Timeouts:          timeout.DefaultConfig,
+		Timeouts:          timeoutCfg,
 		IncomingVotes:     BlockNoVotes,
 		OutgoingVotes:     BlockNoVotes,
 		IncomingProposals: BlockNoProposals,
