@@ -187,7 +187,8 @@ func main() {
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
-				requester.WithBatchInterval(24*time.Hour), // we are manually triggering batches in execution
+				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
+				requester.WithBatchInterval(60*time.Second),
 			)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
