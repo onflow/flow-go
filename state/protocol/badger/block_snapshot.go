@@ -208,9 +208,6 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 	if err != nil {
 		return &EpochSnapshot{err: fmt.Errorf("could not retrieve epoch setup: %w", err)}
 	}
-	fmt.Println("header.View", header.View)
-	fmt.Println("setup.FinalView", setup.FinalView)
-	fmt.Println("counter: ", counter)
 	if header.View > setup.FinalView {
 		return &EpochSnapshot{counter: counter + 1}
 	}

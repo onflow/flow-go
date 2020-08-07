@@ -80,48 +80,33 @@ func TestIdentities(t *testing.T) {
 func TestClusters(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		counter := uint64(1337)
-		blockID := unittest.IdentifierFixture()
-		identities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleCollection))
-		event := &flow.EpochSetup{Participants: identities}
+		nClusters := 3
+		nCollectors := 7
 
-		err := db.Update(operation.InsertRootHeight(0))
+		collectors := unittest.IdentityListFixture(nCollectors, unittest.WithRole(flow.RoleCollection))
+		identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
+
+		root, result, seal := unittest.BootstrapFixture(identities)
+		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
+		err := state.Mutate().Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertFinalizedHeight(0))
+		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
+		require.NoError(t, err)
+		actualClusters, err := state.Final().Clusters()
 		require.NoError(t, err)
 
-		err = db.Update(operation.IndexBlockHeight(0, blockID))
-		require.NoError(t, err)
+		require.Equal(t, nClusters, len(expectedClusters))
+		require.Equal(t, len(expectedClusters), len(actualClusters))
 
-		err = db.Update(operation.InsertEpochCounter(counter))
-		require.NoError(t, err)
+		for i := 0; i < nClusters; i++ {
+			expected := expectedClusters[i]
+			actual := actualClusters[i]
 
-		err = db.Update(operation.InsertEpochSetup(counter, event))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
-		require.NoError(t, err)
-
-		actual, err := state.Final().Clusters()
-		require.NoError(t, err)
-
-		require.Equal(t, 3, len(actual))
-		cluster, ok := actual.ByIndex(0)
-		require.True(t, ok)
-		assert.Len(t, cluster, 3)
-
-		cluster, ok = actual.ByIndex(1)
-		require.True(t, ok)
-		assert.Len(t, cluster, 2)
-
-		cluster, ok = actual.ByIndex(2)
-		require.True(t, ok)
-		assert.Len(t, cluster, 2)
-
+			assert.Equal(t, len(expected), len(actual))
+			assert.Equal(t, expected.Fingerprint(), actual.Fingerprint())
+		}
 	})
 }
 
