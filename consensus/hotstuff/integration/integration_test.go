@@ -20,8 +20,8 @@ const safeTimeout = 2 * time.Second
 const safeDecrease = 200 * time.Millisecond
 const safeDecreaseFactor = 0.85
 
-// add 5 milliseconds block delay to ensure other nodes have received proposal before proposing the next
-const safeBlockRateDelay = 5 * time.Millisecond
+// add block delay to ensure other nodes have received proposal before proposing the next
+const safeBlockRateDelay = 50 * time.Millisecond
 
 // waitTimeout waits for the waitgroup for the specified max timeout.
 // Returns true if waiting timed out.
