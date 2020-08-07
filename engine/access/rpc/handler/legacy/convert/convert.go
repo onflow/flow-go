@@ -145,7 +145,6 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 }
 
 func BlockToMessage(h *flow.Block) (*entities.Block, error) {
-
 	id := h.ID()
 
 	parentID := h.Header.ParentID
@@ -196,27 +195,6 @@ func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 	}
 }
 
-func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
-	if c == nil || c.Transactions == nil {
-		return nil, fmt.Errorf("invalid collection")
-	}
-
-	transactionsIDs := make([][]byte, len(c.Transactions))
-	for i, t := range c.Transactions {
-		id := t.ID()
-		transactionsIDs[i] = id[:]
-	}
-
-	collectionID := c.ID()
-
-	ce := &entities.Collection{
-		Id:             collectionID[:],
-		TransactionIds: transactionsIDs,
-	}
-
-	return ce, nil
-}
-
 func LightCollectionToMessage(c *flow.LightCollection) (*entities.Collection, error) {
 	if c == nil || c.Transactions == nil {
 		return nil, fmt.Errorf("invalid collection")
@@ -238,29 +216,6 @@ func EventToMessage(e flow.Event) *entities.Event {
 		EventIndex:       e.EventIndex,
 		Payload:          e.Payload,
 	}
-}
-
-func MessageToAccount(m *entities.Account) (*flow.Account, error) {
-	if m == nil {
-		return nil, ErrEmptyMessage
-	}
-
-	accountKeys := make([]flow.AccountPublicKey, len(m.GetKeys()))
-	for i, key := range m.GetKeys() {
-		accountKey, err := MessageToAccountKey(key)
-		if err != nil {
-			return nil, err
-		}
-
-		accountKeys[i] = *accountKey
-	}
-
-	return &flow.Account{
-		Address: flow.BytesToAddress(m.GetAddress()),
-		Balance: m.GetBalance(),
-		Code:    m.GetCode(),
-		Keys:    accountKeys,
-	}, nil
 }
 
 func AccountToMessage(a *flow.Account) (*entities.Account, error) {
@@ -304,34 +259,14 @@ func MessageToAccountKey(m *entities.AccountKey) (*flow.AccountPublicKey, error)
 }
 
 func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) {
-	publicKey := a.PublicKey.Encode()
 	return &entities.AccountKey{
-		PublicKey:      publicKey,
+		Index:          uint32(a.Index),
+		PublicKey:      a.PublicKey.Encode(),
 		SignAlgo:       uint32(a.SignAlgo),
 		HashAlgo:       uint32(a.HashAlgo),
 		Weight:         uint32(a.Weight),
 		SequenceNumber: uint32(a.SeqNumber),
 	}, nil
-}
-
-func MessagesToEvents(l []*entities.Event) []flow.Event {
-	events := make([]flow.Event, len(l))
-
-	for i, m := range l {
-		events[i] = MessageToEvent(m)
-	}
-
-	return events
-}
-
-func MessageToEvent(m *entities.Event) flow.Event {
-	return flow.Event{
-		Type:             flow.EventType(m.GetType()),
-		TransactionID:    flow.HashToID(m.GetTransactionId()),
-		TransactionIndex: m.GetTransactionIndex(),
-		EventIndex:       m.GetEventIndex(),
-		Payload:          m.GetPayload(),
-	}
 }
 
 func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
