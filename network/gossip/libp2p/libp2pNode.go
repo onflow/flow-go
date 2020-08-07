@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/connmgr"
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -27,6 +27,7 @@ import (
 	"github.com/rs/zerolog"
 
 	netwk "github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 )
 
 const (
@@ -60,6 +61,7 @@ type P2PNode struct {
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
 	conMgr               ConnManager                     // the connection manager passed in to libp2p
+	connGater            *connGater         // the connection gator passed in to libp2p
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 }
 
@@ -70,7 +72,8 @@ func (p *P2PNode) Start(ctx context.Context,
 	key lcrypto.PrivKey,
 	handler network.StreamHandler,
 	rootBlockID string,
-	connGator *connmgr.ConnectionGater,
+	whiteList bool,
+	whitelistAddrs []NodeAddress,
 	psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
@@ -107,8 +110,16 @@ func (p *P2PNode) Start(ctx context.Context,
 		libp2p.Ping(true),                   // enable ping
 	)
 
-	if connGator != nil {
-		options = append(options, libp2p.ConnectionGater(*connGator)) // use a connection gator is provided
+	if whiteList {
+		whilelistPInfos, err := GetPeerInfos(whitelistAddrs...)
+		if err != nil {
+			return fmt.Errorf("failed to create approved list of peers: %w", err)
+		}
+		p.connGater, err = newConnGater(whilelistPInfos, p.logger)
+		if err != nil {
+			return fmt.Errorf("failed to create connection gator: %w", err)
+		}
+		options = append(options, libp2p.ConnectionGater(p.connGater))
 	}
 
 	// create the libp2p host
@@ -257,6 +268,10 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		// Add node address as a peer
 		err = p.AddPeers(ctx, n)
 		if err != nil {
+			// if the connection was rejected due to whitelisting, skip the re-attempt
+			if errors.IsDialFailureError(err) && strings.Contains(err.Error(), "gater disallows connection to peer") {
+				return s, err
+			}
 			errs = multierror.Append(errs, err)
 			continue
 		}
@@ -288,6 +303,18 @@ func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
 	}
 	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
 	return pInfo, err
+}
+
+func GetPeerInfos(addrs ...NodeAddress) ([]peer.AddrInfo, error) {
+	peerInfos := make([]peer.AddrInfo, len(addrs))
+	var err error
+	for i, addr := range addrs {
+		peerInfos[i], err = GetPeerInfo(addr)
+		if err != nil {
+			break
+		}
+	}
+	return peerInfos, err
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
@@ -428,6 +455,18 @@ func MultiaddressStr(address NodeAddress) string {
 	// could not parse it as an IP address and returns the dns version of the
 	// multi-address
 	return fmt.Sprintf("/dns4/%s/tcp/%s", address.IP, address.Port)
+}
+
+func (p *P2PNode) UpdateWhitelist(whitelistAddrs ...NodeAddress) error {
+	whilelistPInfos, err := GetPeerInfos(whitelistAddrs...)
+	if err != nil {
+		return fmt.Errorf("failed to create approved list of peers: %w", err)
+	}
+	err =  p.connGater.update(whilelistPInfos)
+	if err != nil {
+		return fmt.Errorf("failed to update approved list of peers: %w", err)
+	}
+	return nil
 }
 
 func generateProtocolID(rootBlockID string) protocol.ID {

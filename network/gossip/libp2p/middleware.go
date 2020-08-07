@@ -11,10 +11,8 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
-	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
@@ -140,16 +138,10 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// derive libp2p peer.AddrInfos for all the flow identities
-	peerInfos, err := approvedPeers(idsMap)
+	// derive all node addresses from flow identities
+	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
 	if err != nil {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
-	}
-
-	// create a connection gator restricting inbound and outbound connections to nodes in the identity list
-	connGator, err := newConnGater(peerInfos, m.log)
-	if err != nil {
-		return fmt.Errorf("could not create the connection gator: %w", err)
 	}
 
 	// create a discovery object to help libp2p discover peers
@@ -177,10 +169,15 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
 	}
 
-	var c = connmgr.ConnectionGater(connGator)
-
 	// start the libp2p node
-	err = m.libP2PNode.Start(m.ctx, selfNodeAddress, m.log, libp2pKey, m.handleIncomingStream, m.rootBlockID, &c, psOptions...)
+	err = m.libP2PNode.Start(m.ctx,
+		selfNodeAddress,
+		m.log, libp2pKey,
+		m.handleIncomingStream,
+		m.rootBlockID,
+		true,
+		nodeAddrsWhiteList,
+		psOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
@@ -345,23 +342,17 @@ func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
 	return nodeAddress, nil
 }
 
-func approvedPeers(identityMap map[flow.Identifier]flow.Identity) ([]peer.AddrInfo, error) {
-	var peerInfos []peer.AddrInfo
-
+func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {
+	var nodeAddrs []NodeAddress
 	for _, identity := range identityMap {
 		nodeAddress, err := nodeAddressFromID(identity)
 		if err != nil {
 			return nil, err
 		}
 
-		peerInfo, err := GetPeerInfo(nodeAddress)
-		if err != nil {
-			return nil, err
-		}
-
-		peerInfos = append(peerInfos, peerInfo)
+		nodeAddrs = append(nodeAddrs, nodeAddress)
 	}
-	return peerInfos, nil
+	return nodeAddrs, nil
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -519,4 +510,25 @@ func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
 	}
 
 	return m.libP2PNode.Ping(m.ctx, nodeAddress)
+}
+
+func (m *Middleware) UpdateWhitelist() error {
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// derive all node addresses from flow identities
+	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
+	if err != nil {
+		return fmt.Errorf("could not derive list of approved peer list: %w", err)
+	}
+
+	err = m.libP2PNode.UpdateWhitelist(nodeAddrsWhiteList...)
+	if err != nil {
+		return fmt.Errorf("failed to update approved peer list: %w", err)
+	}
+
+	return nil
 }

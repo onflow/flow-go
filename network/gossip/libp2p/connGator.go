@@ -14,9 +14,9 @@ import (
 var _ connmgr.ConnectionGater = (*connGater)(nil)
 
 type connGater struct {
-	peerIDs map[peer.ID]struct{}
-	ipAddrs map[string]struct{}
-	log zerolog.Logger
+	peerIDWhitelist  map[peer.ID]struct{}
+	ipAddrsWhitelist map[string]struct{}
+	log              zerolog.Logger
 }
 
 func newConnGater(peerInfos []peer.AddrInfo, log zerolog.Logger) (*connGater, error) {
@@ -43,8 +43,8 @@ func (c *connGater) update(peerInfos []peer.AddrInfo) error {
 		}
 	}
 
-	c.peerIDs = peerIDs
-	c.ipAddrs = ipAddrs
+	c.peerIDWhitelist = peerIDs
+	c.ipAddrsWhitelist = ipAddrs
 	return nil
 }
 
@@ -70,7 +70,7 @@ func (c *connGater) InterceptUpgraded(network.Conn) (allow bool, reason control.
 }
 
 func (c *connGater) validPeerID(p peer.ID) bool {
-	_, ok := c.peerIDs[p]
+	_, ok := c.peerIDWhitelist[p]
 	return ok
 }
 
@@ -81,6 +81,6 @@ func (c *connGater) validMultiAddr(addr multiaddr.Multiaddr) bool {
 		return false
 	}
 
-	_, found := c.ipAddrs[ip]
+	_, found := c.ipAddrsWhitelist[ip]
 	return found
 }

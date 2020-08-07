@@ -138,6 +138,9 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		}
 		idMap := idMaps[i]
 		idMap[flowID.NodeID] = flowID
+
+		// update whitelist so that nodes can talk to each other
+		m.mws[i].UpdateWhitelist()
 	}
 }
 
