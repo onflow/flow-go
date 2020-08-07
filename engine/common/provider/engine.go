@@ -79,7 +79,30 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	return e.unit.Ready(func() {
+		e.log.Info().Msg("Faking request for collection 560ac48b6d99be812dc6306694a76e71c2a9a2170f50c5f56870b2824e2fc415")
+		exe1, err := flow.HexStringToIdentifier("f95a83fc0fa01ecbfbb0d88aed3285771fce51dcaf829d2a6cff844960d14b85")
+		if err != nil {
+			e.log.Err(err).Msg("Could not parse execution 1 node id")
+			return
+		}
+		colID, err := flow.HexStringToIdentifier("560ac48b6d99be812dc6306694a76e71c2a9a2170f50c5f56870b2824e2fc415")
+		if err != nil {
+			e.log.Err(err).Msg("Could not parse collection id")
+			return
+		}
+		req := &messages.EntityRequest{
+			Nonce:     1,
+			EntityIDs: []flow.Identifier{colID},
+		}
+		err = e.Process(exe1, req)
+		if err != nil {
+			e.log.Err(err).Msg("Could process fake request")
+			return
+		}
+		e.log.Info().Msg("Faking request for collection successful")
+
+	})
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
