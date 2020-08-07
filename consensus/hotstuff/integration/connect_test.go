@@ -50,9 +50,9 @@ func Connect(instances []*Instance) {
 				// convert into proposal immediately
 				proposal := model.ProposalFromFlow(header, parent.View)
 
-				// store locally and loop back to engine for processing
+				// store locally and loop back to engine for processing and ensure itself receives it first
 				sender.headers.Store(header.ID(), header)
-				go sendProposalTo(sender, proposal)
+				sendProposalTo(sender, proposal)
 
 				// check if we should block the outgoing proposal
 				if sender.blockPropOut(proposal) {
@@ -75,8 +75,9 @@ func Connect(instances []*Instance) {
 					// put the proposal header into the receivers map
 					receiver.headers.Store(header.ID(), header)
 
-					// submit the proposal to the receiving event loop (non-blocking)
-					go sendProposalTo(receiver, proposal)
+					// submit the proposal to the receiving event loop (blocking)
+					// ensure event handler must have seen the parent block
+					sendProposalTo(receiver, proposal)
 				}
 
 				return nil

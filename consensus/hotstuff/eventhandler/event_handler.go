@@ -122,8 +122,11 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return nil
 	}
 
+	log.Debug().Msg("not staled proposal")
+
 	// we skip validation for our last own proposal
 	if proposal.Block.BlockID != e.ownProposal {
+		log.Debug().Msg("validating non own proposal")
 
 		// validate the block. exit if the proposal is invalid
 		err := e.validator.ValidateProposal(proposal)
@@ -139,10 +142,12 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 			// a new block with a QC to this block will fail to be added
 			// to forks and crash the event loop.
 		} else if err != nil {
+			log.Debug().Msg("unknown validation error")
 			return fmt.Errorf("cannot validate proposal (%x): %w", block.BlockID, err)
 		}
 	}
 
+	log.Debug().Msg("adding proposal to forks")
 	// store the block. the block will also be validated there
 	err := e.forks.AddBlock(block)
 	if err != nil {
