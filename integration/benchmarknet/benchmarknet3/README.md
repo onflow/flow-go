@@ -28,21 +28,21 @@ make docker-build-loader
 5. Tag the containers:
 
 ```sh
-docker tag gcr.io/dl-flow/collection:latest gcr.io/dl-flow/benchmark/collection:benchmarknet3
-docker tag gcr.io/dl-flow/consensus:latest gcr.io/dl-flow/benchmark/consensus:benchmarknet3
-docker tag gcr.io/dl-flow/execution:latest gcr.io/dl-flow/benchmark/execution:benchmarknet3
-docker tag gcr.io/dl-flow/verification:latest gcr.io/dl-flow/benchmark/verification:benchmarknet3
-docker tag gcr.io/dl-flow/access:latest gcr.io/dl-flow/benchmark/access:benchmarknet3
+docker tag gcr.io/dl-flow/collection:latest gcr.io/dl-flow/benchmark/collection:benchmarknet3; \
+docker tag gcr.io/dl-flow/consensus:latest gcr.io/dl-flow/benchmark/consensus:benchmarknet3; \
+docker tag gcr.io/dl-flow/execution:latest gcr.io/dl-flow/benchmark/execution:benchmarknet3; \
+docker tag gcr.io/dl-flow/verification:latest gcr.io/dl-flow/benchmark/verification:benchmarknet3; \
+docker tag gcr.io/dl-flow/access:latest gcr.io/dl-flow/benchmark/access:benchmarknet3; \
 docker tag gcr.io/dl-flow/loader:latest gcr.io/dl-flow/benchmark/loader:benchmarknet3
 ```
 
 6. Push all containers:
 
 ```sh
-docker push gcr.io/dl-flow/benchmark/collection:benchmarknet3
-docker push gcr.io/dl-flow/benchmark/consensus:benchmarknet3
-docker push gcr.io/dl-flow/benchmark/execution:benchmarknet3
-docker push gcr.io/dl-flow/benchmark/verification:benchmarknet3
-docker push gcr.io/dl-flow/benchmark/access:benchmarknet3
+docker push gcr.io/dl-flow/benchmark/collection:benchmarknet3; \
+docker push gcr.io/dl-flow/benchmark/consensus:benchmarknet3; \
+docker push gcr.io/dl-flow/benchmark/execution:benchmarknet3; \
+docker push gcr.io/dl-flow/benchmark/verification:benchmarknet3; \
+docker push gcr.io/dl-flow/benchmark/access:benchmarknet3; \
 docker push gcr.io/dl-flow/benchmark/loader:benchmarknet3
 ```

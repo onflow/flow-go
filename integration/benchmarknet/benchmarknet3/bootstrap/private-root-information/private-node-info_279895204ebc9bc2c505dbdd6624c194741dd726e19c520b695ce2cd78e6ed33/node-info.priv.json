@@ -1,7 +1,0 @@
-{
-  "Role": "consensus",
-  "Address": "consensus-026.benchmarknet3.nodes.onflow.org:3569",
-  "NodeID": "279895204ebc9bc2c505dbdd6624c194741dd726e19c520b695ce2cd78e6ed33",
-  "NetworkPrivKey": "7JukgyPQOVLCaBAJ7iYtPxuOFHazsRpUDKbNKJlSn8o=",
-  "StakingPrivKey": "PUUZ+/ZI8j8WpYJ2A9xEXXD4fk7ignxa28ScobvY83A="
-}

@@ -1,0 +1,932 @@
+[
+  {
+    "Role": "access",
+    "Address": "access-001.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "access",
+    "Address": "access-002.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "access",
+    "Address": "access-003.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "access",
+    "Address": "access-004.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "access",
+    "Address": "access-005.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-001.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-002.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-003.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-004.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-005.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-006.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-007.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-008.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-009.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-010.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-011.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-012.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-013.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-014.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-015.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-016.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-017.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-018.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-019.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-020.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-021.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-022.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-023.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-024.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-025.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-026.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-027.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-028.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-029.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-030.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-031.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-032.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-033.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-034.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-035.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-036.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-037.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-038.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-039.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-040.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-041.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-042.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-043.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-044.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-045.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-046.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-047.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-048.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-049.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-050.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-001.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-002.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-003.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-004.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-005.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-006.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-007.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-008.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-009.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-010.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-011.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-012.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-013.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-014.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-015.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-016.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-017.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-018.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-019.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-020.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-021.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-022.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-023.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-024.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-025.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-026.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-027.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-028.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-029.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-030.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-031.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-032.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-033.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-034.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-035.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-036.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-037.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-038.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-039.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-040.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-041.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-042.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-043.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-044.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-045.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-046.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-047.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-048.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-049.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-050.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-051.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-052.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-053.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-054.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-055.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-056.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-057.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-058.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-059.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-060.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-061.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-062.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-063.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-064.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-065.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-066.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-067.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-068.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-069.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-070.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-071.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-072.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-073.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-074.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-075.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-076.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-077.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-078.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-079.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-080.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-081.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-082.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-083.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-084.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-085.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-086.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-087.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-088.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-089.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-090.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-091.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-092.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-093.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-094.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-095.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-096.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-097.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-098.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-099.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-100.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-101.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-102.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-103.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-104.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-105.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-106.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-107.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-108.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-109.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-110.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-111.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-112.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-113.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-114.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-115.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-116.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-117.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-118.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-119.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-120.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "execution",
+    "Address": "execution-001.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "execution",
+    "Address": "execution-002.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-001.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-002.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-003.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-004.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-005.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-006.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-007.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-008.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-009.benchmarknet6.nodes.onflow.org:3569",
+    "Stake": 100
+  }
+]
