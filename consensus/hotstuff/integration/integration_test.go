@@ -96,13 +96,14 @@ func TestInstancesThree(t *testing.T) {
 		wg.Add(1)
 		go func(in *Instance) {
 			err := in.Run()
-			require.True(t, errors.Is(err, errStopCondition), fmt.Sprintf("instance (%v) should run until stop condition, but got error: %v", in.localID, err))
+			require.True(t, errors.Is(err, errStopCondition),
+				fmt.Sprintf("instance (%v) should run until stop condition, but got error: %v", in.localID, err))
 			wg.Done()
 		}(in)
 	}
 
 	timeoutTriggered := waitTimeout(&wg, 30*time.Second)
-	require.False(t, timeoutTriggered)
+	require.False(t, timeoutTriggered, "didn't finalize enough blocks before timeout")
 
 	allViews := allFinalizedViews(t, instances)
 	assertSafety(t, allViews)
@@ -164,7 +165,7 @@ func TestInstancesSeven(t *testing.T) {
 		}(in)
 	}
 	timeoutTriggered := waitTimeout(&wg, 30*time.Second)
-	require.False(t, timeoutTriggered)
+	require.False(t, timeoutTriggered, "didn't finalize enough blocks before timeout")
 
 	allViews := allFinalizedViews(t, instances)
 	assertSafety(t, allViews)
