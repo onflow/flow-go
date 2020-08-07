@@ -105,8 +105,10 @@ func main() {
 
 			loaderMetrics.SetTPSConfigured(c.tps)
 
+			var lg *utils.ContLoadGenerator
 			if c.tps > 0 {
-				lg, err := utils.NewContLoadGenerator(
+				var err error
+				lg, err = utils.NewContLoadGenerator(
 					log,
 					loaderMetrics,
 					flowClient,
@@ -135,6 +137,10 @@ func main() {
 			}
 
 			time.Sleep(c.duration)
+
+			if lg != nil {
+				lg.Stop()
+			}
 		}
 	}()
 

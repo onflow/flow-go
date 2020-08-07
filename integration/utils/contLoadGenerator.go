@@ -41,6 +41,7 @@ type ContLoadGenerator struct {
 	workerStatsTracker   *WorkerStatsTracker
 	workers              []*Worker
 	blockRef             BlockRef
+	stopped              bool
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
@@ -102,6 +103,10 @@ func NewContLoadGenerator(
 
 func (lg *ContLoadGenerator) Init() error {
 	for i := 0; i < lg.numberOfAccounts; i += accountCreationBatchSize {
+		if lg.stopped == true {
+			return nil
+		}
+
 		num := lg.numberOfAccounts - i
 		if num > accountCreationBatchSize {
 			num = accountCreationBatchSize
@@ -129,6 +134,7 @@ func (lg *ContLoadGenerator) Start() {
 }
 
 func (lg *ContLoadGenerator) Stop() {
+	lg.stopped = true
 	for _, w := range lg.workers {
 		w.Stop()
 	}
