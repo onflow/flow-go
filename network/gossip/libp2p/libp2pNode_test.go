@@ -12,15 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/node"
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/control"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +32,7 @@ type LibP2PNodeTestSuite struct {
 	suite.Suite
 	ctx    context.Context
 	cancel context.CancelFunc // used to cancel the context
+	logger zerolog.Logger
 }
 
 // TestLibP2PNodesTestSuite runs all the test methods in this test suit
@@ -44,8 +42,9 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 
 // SetupTests initiates the test setups prior to each test
 func (l *LibP2PNodeTestSuite) SetupTest() {
+	l.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	l.ctx, l.cancel = context.WithCancel(context.Background())
-	golog.SetAllLoggers(golog.LevelInfo)
+	golog.SetAllLoggers(golog.LevelDebug)
 }
 
 // TestMultiAddress evaluates correct translations from
@@ -369,41 +368,54 @@ func (l *LibP2PNodeTestSuite) TestPing() {
 func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 	defer l.cancel()
 
-	createNodeAndGater := func () (*P2PNode, NodeAddress, peer.AddrInfo, []peer.ID, []ma.Multiaddr){
-		var allowedPeerIDs []peer.ID
-		var allowedaddrs []ma.Multiaddr
-		gater1 := newConnGater(allowedPeerIDs, allowedaddrs)
-		g := connmgr.ConnectionGater(gater1)
-		nodes, nodeAddrs := l.CreateNodes(1, nil, &g)
-		nodeAddr := nodeAddrs[0]
-		peerInfo, err := GetPeerInfo(nodeAddr)
-		require.NoError(l.T(), err)
-		return nodes[0], nodeAddr, peerInfo, allowedPeerIDs, allowedaddrs
-	}
+	// initial gater with no allowed peers
+	gater1, err := newConnGater(nil, l.logger)
+	require.NoError(l.T(), err)
+	g1 := connmgr.ConnectionGater(gater1)
 
-	node1, node1Addr, node1PeerAddr, node1AllowedIDs, node1AllowedMultiAddrs := createNodeAndGater()
+	gater2, err := newConnGater(nil, l.logger)
+	require.NoError(l.T(), err)
+	g2 := connmgr.ConnectionGater(gater2)
+
+	nodes, nodeAddrs := l.CreateNodes(2, nil, &g1, &g2)
+
+	node1 := nodes[0]
+	node1Addr := nodeAddrs[0]
+	peerInfo1, err := GetPeerInfo(node1Addr)
+	require.NoError(l.T(), err)
 	defer l.StopNode(node1)
 
-	node2, node2Addr, node2PeerAddr, node2AllowedIDs, node2AllowedMultiAddrs := createNodeAndGater()
+	node2 := nodes[1]
+	node2Addr := nodeAddrs[1]
+	peerInfo2, err := GetPeerInfo(node2Addr)
+	require.NoError(l.T(), err)
 	defer l.StopNode(node2)
 
-	//node3, node3Addr, node3PeerAddr, node3AllowedIDs, node3AllowedMultiAddrs := createNodeAndGater()
-	//defer l.StopNode(node3)
-
-	l.Run("no node can talk to each other", func() {
-		_, err := node1.CreateStream(l.ctx, node2Addr)
-		require.Errorf(l.T(), err, " node1 was able to connect to node2 when it should have been blocked")
+	l.Run("outbound connection to a blacklisted node is not allowed", func() {
+		// node1 and node2 both have no whitelisted peers
+		_, err = node1.CreateStream(l.ctx, node2Addr)
+		require.Error(l.T(), err)
 		_, err = node2.CreateStream(l.ctx, node1Addr)
-		require.Errorf(l.T(), err, " node2 was able to connect to node1 when it should have been blocked")
+		require.Error(l.T(), err)
 	})
-	l.Run("node can talk to each other", func() {
-		node1AllowedIDs := append(node1AllowedIDs, )
-		_, err := node1.CreateStream(l.ctx, node2Addr)
-		require.Errorf(l.T(), err, " node1 was able to connect to node2 when it should have been blocked")
-		_, err = node2.CreateStream(l.ctx, node1Addr)
-		require.Errorf(l.T(), err, " node2 was able to connect to node1 when it should have been blocked")
-	})
+	l.Run("outbound connection to an approved node is not allowed if target node has blacklisted the sender", func() {
 
+		gater1.update([]peer.AddrInfo{peerInfo2}) // node1 whitelists node2
+		gater2.update([]peer.AddrInfo{})          // node2 does not whitelists node1
+
+		_, err = node1.CreateStream(l.ctx, node2Addr)
+		require.Error(l.T(), err)
+	})
+	l.Run("outbound connection to an approved node is allowed", func() {
+
+		gater1.update([]peer.AddrInfo{peerInfo2}) // node1 whitelists node2
+		gater2.update([]peer.AddrInfo{peerInfo1}) // node2 whitelists node1
+
+		_, err = node1.CreateStream(l.ctx, node2Addr)
+		require.NoError(l.T(), err)
+		_, err = node2.CreateStream(l.ctx, node1Addr)
+		require.NoError(l.T(), err)
+	})
 }
 
 // CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
@@ -411,7 +423,7 @@ func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 // a single error in creating one node terminates the entire test
 func (l *LibP2PNodeTestSuite) CreateNodes(count int,
 	handler network.StreamHandler,
-	gater *connmgr.ConnectionGater) ([]*P2PNode, []NodeAddress) {
+	gater ...*connmgr.ConnectionGater) ([]*P2PNode, []NodeAddress) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*P2PNode
@@ -425,14 +437,14 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int,
 
 	// creating nodes
 	var nodeAddrs []NodeAddress
-	for i := 1; i <= count; i++ {
+	for i := 0; i < count; i++ {
 
-		name := fmt.Sprintf("node%d", i)
+		name := fmt.Sprintf("node%d", i+1)
 		pkey, err := generateNetworkingKey(name)
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler, gater)
+		n, nodeID := l.CreateNode(name, pkey, "127.0.0.1", "0", rootID, handler, gater[i])
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
@@ -448,7 +460,6 @@ func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip str
 		Port:   port,
 		PubKey: key.GetPublic(),
 	}
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	var handlerFunc network.StreamHandler
 	if handler != nil {
@@ -459,7 +470,7 @@ func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip str
 		handlerFunc = func(network.Stream) {}
 	}
 
-	err := n.Start(l.ctx, nodeID, logger, key, handlerFunc, rootID, gater)
+	err := n.Start(l.ctx, nodeID, l.logger, key, handlerFunc, rootID, gater)
 	require.NoError(l.T(), err)
 	require.Eventuallyf(l.T(), func() bool {
 		ip, p := n.GetIPPort()

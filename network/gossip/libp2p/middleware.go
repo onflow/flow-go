@@ -16,7 +16,6 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -141,14 +140,17 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// derive libp2p peer id and multi-addresses for all the flow identities
-	approvedPeerIDs, approvedPeerMultiAddrs, err := approvedPeers(idsMap)
+	// derive libp2p peer.AddrInfos for all the flow identities
+	peerInfos, err := approvedPeers(idsMap)
 	if err != nil {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
 	}
 
 	// create a connection gator restricting inbound and outbound connections to nodes in the identity list
-	connGator := newConnGater(approvedPeerIDs, approvedPeerMultiAddrs)
+	connGator, err := newConnGater(peerInfos, m.log)
+	if err != nil {
+		return fmt.Errorf("could not create the connection gator: %w", err)
+	}
 
 	// create a discovery object to help libp2p discover peers
 	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
@@ -343,25 +345,23 @@ func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
 	return nodeAddress, nil
 }
 
-func approvedPeers(identityMap map[flow.Identifier]flow.Identity) ([]peer.ID, []ma.Multiaddr, error) {
-	peerIDs := make([]peer.ID, len(identityMap))
-	peerAddrs := make([]ma.Multiaddr, len(identityMap))
-	i := 0
+func approvedPeers(identityMap map[flow.Identifier]flow.Identity) ([]peer.AddrInfo, error) {
+	var peerInfos []peer.AddrInfo
+
 	for _, identity := range identityMap {
 		nodeAddress, err := nodeAddressFromID(identity)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
+
 		peerInfo, err := GetPeerInfo(nodeAddress)
-
-		if len(peerInfo.Addrs) < 1 {
-			return nil, nil, fmt.Errorf("invalid multiaddress for identity %s", identity.String())
+		if err != nil {
+			return nil, err
 		}
 
-		peerIDs[i] = peerInfo.ID
-		peerAddrs[i] = peerInfo.Addrs[0]
+		peerInfos = append(peerInfos, peerInfo)
 	}
-	return peerIDs, peerAddrs, nil
+	return peerInfos, nil
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
