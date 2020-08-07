@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
@@ -82,7 +83,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 	timestamp := time.Now().UTC()
 	// add all identities to rootBlock block and
 	// create and bootstrap consensus node with the rootBlock
-	rootBlock := run.GenerateRootBlock(chainID, parentID, height, timestamp, participants)
+	rootBlock := run.GenerateRootBlock(chainID, parentID, height, timestamp)
 
 	// make root QC
 	sig1 := make([]byte, 32)
@@ -111,7 +112,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 	stopper := NewStopper(stopAtView, stopCountAt)
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
-		node := createNode(t, i, identity, consensus, rootBlock, rootQC, hub, stopper)
+		node := createNode(t, i, identity, participants, rootBlock, rootQC, hub, stopper)
 		nodes = append(nodes, node)
 	}
 
@@ -136,8 +137,32 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB)
 	require.NoError(t, err)
 
+	// TODO check does using nil keys work here?
+	seed := unittest.SeedFixture(32)
+	setup := &flow.EpochSetup{
+		Counter:      0,
+		FinalView:    rootBlock.Header.View + leader.EstimatedSixMonthOfViews,
+		Participants: participants,
+		Assignments:  unittest.ClusterAssignment(1, participants),
+		Seed:         seed,
+	}
+
+	lookup := make(map[flow.Identifier]flow.DKGParticipant)
+	for i, node := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
+		lookup[node.NodeID] = flow.DKGParticipant{
+			Index:    uint(i),
+			KeyShare: nil,
+		}
+	}
+	commit := &flow.EpochCommit{
+		Counter:         0,
+		ClusterQCs:      nil,
+		DKGGroupKey:     nil,
+		DKGParticipants: nil,
+	}
+
 	result := bootstrap.Result(rootBlock, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
+	seal := unittest.SealFixture(result, setup, commit)
 	err = state.Mutate().Bootstrap(rootBlock, result, seal)
 	require.NoError(t, err)
 

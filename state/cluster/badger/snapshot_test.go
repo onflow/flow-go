@@ -65,7 +65,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
+	seal := unittest.SealFixture(result)
 	err = suite.protoState.Mutate().Bootstrap(genesis, result, seal)
 	suite.Require().Nil(err)
 

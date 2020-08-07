@@ -104,7 +104,7 @@ func (suite *BuilderSuite) Bootstrap() {
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
+	seal := unittest.SealFixture(result)
 	err := suite.protoState.Mutate().Bootstrap(genesis, result, seal)
 	suite.Require().Nil(err)
 
