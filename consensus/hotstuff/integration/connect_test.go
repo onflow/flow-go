@@ -11,6 +11,16 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+func sendProposalTo(receiver *Instance, proposal *model.Proposal) {
+	time.Sleep(time.Millisecond) // simulate network latency
+	receiver.proposalqueue <- proposal
+}
+
+func sendVoteTo(receiver *Instance, vote *model.Vote) {
+	time.Sleep(time.Millisecond) // simulate network latency
+	receiver.votequeue <- vote
+}
+
 func Connect(instances []*Instance) {
 
 	// first, create a map of all instances and a queue for each
@@ -45,9 +55,7 @@ func Connect(instances []*Instance) {
 
 				// store locally and loop back to engine for processing
 				sender.headers.Store(header.ID(), header)
-				go func(sender *Instance, proposal *model.Proposal) {
-					sender.proposalqueue <- proposal
-				}(sender, proposal)
+				go sendProposalTo(sender, proposal)
 
 				// check if we should block the outgoing proposal
 				if sender.blockPropOut(proposal) {
@@ -71,7 +79,7 @@ func Connect(instances []*Instance) {
 					receiver.headers.Store(header.ID(), header)
 
 					// submit the proposal to the receiving event loop (non-blocking)
-					receiver.proposalqueue <- proposal
+					go sendProposalTo(receiver, proposal)
 				}
 
 				return nil
@@ -105,7 +113,7 @@ func Connect(instances []*Instance) {
 				}
 
 				// submit the vote to the receiving event loop (non-blocking)
-				receiver.votequeue <- vote
+				go sendVoteTo(receiver, vote)
 
 				return nil
 			},
