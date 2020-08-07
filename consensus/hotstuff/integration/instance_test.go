@@ -53,6 +53,7 @@ type Instance struct {
 	signer       *mocks.Signer
 	verifier     *mocks.Verifier
 	communicator *mocks.Communicator
+	mu           sync.Mutex
 
 	// real dependencies
 	pacemaker  hotstuff.PaceMaker
