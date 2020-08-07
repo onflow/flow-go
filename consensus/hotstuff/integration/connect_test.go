@@ -12,12 +12,10 @@ import (
 )
 
 func sendProposalTo(receiver *Instance, proposal *model.Proposal) {
-	time.Sleep(time.Millisecond) // simulate network latency
 	receiver.proposalqueue <- proposal
 }
 
 func sendVoteTo(receiver *Instance, vote *model.Vote) {
-	time.Sleep(time.Millisecond) // simulate network latency
 	receiver.votequeue <- vote
 }
 
@@ -36,6 +34,7 @@ func Connect(instances []*Instance) {
 		*sender.communicator = mocks.Communicator{}
 		sender.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
 			func(header *flow.Header, delay time.Duration) error {
+				fmt.Printf("sender %v is sleeping for %v ms to broadcast proposals\n", sender.localID, delay.Milliseconds())
 				time.Sleep(delay)
 
 				// sender should always have the parent
@@ -54,7 +53,7 @@ func Connect(instances []*Instance) {
 
 				// store locally and loop back to engine for processing and ensure itself receives it first
 				sender.headers.Store(header.ID(), header)
-				sendProposalTo(sender, proposal)
+				go sendProposalTo(sender, proposal)
 
 				// check if we should block the outgoing proposal
 				if sender.blockPropOut(proposal) {
@@ -79,7 +78,7 @@ func Connect(instances []*Instance) {
 
 					// submit the proposal to the receiving event loop (blocking)
 					// ensure event handler must have seen the parent block
-					sendProposalTo(receiver, proposal)
+					go sendProposalTo(receiver, proposal)
 				}
 
 				return nil

@@ -20,6 +20,9 @@ const safeTimeout = 2 * time.Second
 const safeDecrease = 200 * time.Millisecond
 const safeDecreaseFactor = 0.85
 
+// add 5 milliseconds block delay to ensure other nodes have received proposal before proposing the next
+const safeBlockRateDelay = 5 * time.Millisecond
+
 // waitTimeout waits for the waitgroup for the specified max timeout.
 // Returns true if waiting timed out.
 func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
@@ -58,7 +61,6 @@ func TestSingleInstance(t *testing.T) {
 
 // Run 3 instances to build blocks until there are a certain number of blocks are finalized
 func TestInstancesThree(t *testing.T) {
-
 	// test parameters
 	num := 3
 	finalizedCount := 10
@@ -66,7 +68,7 @@ func TestInstancesThree(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecreaseFactor, 0)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecreaseFactor, safeBlockRateDelay)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -121,7 +123,7 @@ func TestInstancesSeven(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecreaseFactor, 0)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecreaseFactor, safeBlockRateDelay)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
