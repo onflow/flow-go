@@ -42,8 +42,9 @@ type Instance struct {
 	stop         Condition
 
 	// instance data
-	queue   chan interface{}
-	headers sync.Map //	headers map[flow.Identifier]*flow.Header
+	votequeue     chan *model.Vote
+	proposalqueue chan *model.Proposal
+	headers       sync.Map //	headers map[flow.Identifier]*flow.Header
 
 	// mocked dependencies
 	committee    *mocks.Committee
@@ -118,7 +119,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		stop:         cfg.StopCondition,
 
 		// instance data
-		queue: make(chan interface{}, 1024),
+		votequeue:     make(chan *model.Vote, 1024), // votes from different senders can be processed in parallel
+		proposalqueue: make(chan *model.Proposal),   // no buffer for porposal, so that proposal has to be processed by the order of calling
 
 		// instance mocks
 		committee:    &mocks.Committee{},
@@ -247,7 +249,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 			// store locally and loop back to engine for processing
 			in.headers.Store(header.ID(), header)
-			in.queue <- proposal
+			in.proposalqueue <- proposal
 
 			return nil
 		},
@@ -376,18 +378,15 @@ func (in *Instance) Run() error {
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
 			}
-		case msg := <-in.queue:
-			switch m := msg.(type) {
-			case *model.Proposal:
-				err := in.handler.OnReceiveProposal(m)
-				if err != nil {
-					return fmt.Errorf("could not process proposal: %w", err)
-				}
-			case *model.Vote:
-				err := in.handler.OnReceiveVote(m)
-				if err != nil {
-					return fmt.Errorf("could not process vote: %w", err)
-				}
+		case m := <-in.proposalqueue:
+			err := in.handler.OnReceiveProposal(m)
+			if err != nil {
+				return fmt.Errorf("could not process proposal: %w", err)
+			}
+		case m := <-in.votequeue:
+			err := in.handler.OnReceiveVote(m)
+			if err != nil {
+				return fmt.Errorf("could not process vote: %w", err)
 			}
 		}
 

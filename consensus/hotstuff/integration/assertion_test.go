@@ -4,8 +4,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func FinalizedBlocks(in *Instance) []*flow.Header {

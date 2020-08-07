@@ -46,7 +46,7 @@ func Connect(instances []*Instance) {
 				// store locally and loop back to engine for processing
 				sender.headers.Store(header.ID(), header)
 				go func(sender *Instance, proposal *model.Proposal) {
-					sender.queue <- proposal
+					sender.proposalqueue <- proposal
 				}(sender, proposal)
 
 				// check if we should block the outgoing proposal
@@ -71,7 +71,7 @@ func Connect(instances []*Instance) {
 					receiver.headers.Store(header.ID(), header)
 
 					// submit the proposal to the receiving event loop (non-blocking)
-					receiver.queue <- proposal
+					receiver.proposalqueue <- proposal
 				}
 
 				return nil
@@ -105,7 +105,7 @@ func Connect(instances []*Instance) {
 				}
 
 				// submit the vote to the receiving event loop (non-blocking)
-				receiver.queue <- vote
+				receiver.votequeue <- vote
 
 				return nil
 			},
