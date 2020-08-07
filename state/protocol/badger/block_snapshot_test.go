@@ -66,30 +66,9 @@ func TestHead(t *testing.T) {
 func TestIdentities(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		counter := uint64(1337)
-		blockID := unittest.IdentifierFixture()
-		identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleCollection))
-		event := &flow.EpochSetup{Participants: identities}
-
-		err := db.Update(operation.InsertRootHeight(0))
-		require.NoError(t, err)
-
-		err = db.Update(operation.InsertFinalizedHeight(0))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexBlockHeight(0, blockID))
-		require.NoError(t, err)
-
-		err = db.Update(operation.InsertEpochCounter(counter))
-		require.NoError(t, err)
-
-		err = db.Update(operation.InsertEpochSetup(counter, event))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
+		identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+		root, result, seal := unittest.BootstrapFixture(identities)
+		err := state.Mutate().Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
 		actual, err := state.Final().Identities(filter.Any)

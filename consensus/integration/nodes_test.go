@@ -160,7 +160,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		DKGParticipants: nil,
 	}
 
-	result := unittest.ResultFixture(rootBlock, unittest.GenesisStateCommitment)
+	result := unittest.BootstrapExecutionResultFixture(rootBlock, unittest.GenesisStateCommitment)
 	seal := unittest.SealFixture(result, setup, commit)
 	err = state.Mutate().Bootstrap(rootBlock, result, seal)
 	require.NoError(t, err)

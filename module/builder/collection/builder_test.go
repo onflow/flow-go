@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/bootstrap"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
@@ -103,7 +102,7 @@ func (suite *BuilderSuite) Bootstrap() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
+	result := unittest.BootstrapExecutionResultFixture(genesis, unittest.GenesisStateCommitment)
 	seal := unittest.SealFixture(result)
 	err := suite.protoState.Mutate().Bootstrap(genesis, result, seal)
 	suite.Require().Nil(err)

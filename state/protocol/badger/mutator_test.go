@@ -4,7 +4,6 @@ package badger_test
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -30,21 +29,13 @@ var participants = flow.IdentityList{
 	{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
 	{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
 	{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+	{NodeID: flow.Identifier{0x05}, Address: "a5", Role: flow.RoleAccess, Stake: 5},
 }
 
 func TestBootstrapValid(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
@@ -90,15 +81,7 @@ func TestBootstrapDuplicateID(t *testing.T) {
 			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
 		}
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants)
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -115,15 +98,7 @@ func TestBootstrapZeroStake(t *testing.T) {
 			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
 		}
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants)
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -139,15 +114,7 @@ func TestBootstrapNoCollection(t *testing.T) {
 			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
 		}
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants)
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -163,15 +130,7 @@ func TestBootstrapNoConsensus(t *testing.T) {
 			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
 		}
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants)
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -187,15 +146,7 @@ func TestBootstrapNoExecution(t *testing.T) {
 			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
 		}
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants)
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -211,15 +162,7 @@ func TestBootstrapNoVerification(t *testing.T) {
 			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
 		}
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants)
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -236,15 +179,7 @@ func TestBootstrapExistingAddress(t *testing.T) {
 			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
 		}
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants)
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -254,17 +189,10 @@ func TestBootstrapExistingAddress(t *testing.T) {
 func TestBootstrapNonZeroParent(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-		block.Header.Height = 13
-		block.Header.ParentID = unittest.IdentifierFixture()
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants, func(block *flow.Block) {
+			block.Header.Height = 13
+			block.Header.ParentID = unittest.IdentifierFixture()
+		})
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -274,17 +202,9 @@ func TestBootstrapNonZeroParent(t *testing.T) {
 func TestBootstrapNonEmptyCollections(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-		block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(1)
-		block.Header.PayloadHash = block.Payload.Hash()
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		block, result, seal := unittest.BootstrapFixture(participants, func(block *flow.Block) {
+			block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(1)
+		})
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -314,16 +234,7 @@ func TestBootstrapWithSeal(t *testing.T) {
 func TestExtendValid(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
@@ -347,18 +258,8 @@ func TestExtendValid(t *testing.T) {
 func TestExtendSealedBoundary(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.InitialState = nil
-		seal.FinalState = result.FinalStateCommit
-
-		fmt.Printf("root: %x\n", block.ID())
+		block, result, seal := unittest.BootstrapFixture(participants)
+		t.Logf("root: %x\n", block.ID())
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -417,16 +318,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 func TestExtendMissingParent(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
@@ -453,16 +345,7 @@ func TestExtendMissingParent(t *testing.T) {
 func TestExtendHeightTooSmall(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
@@ -511,16 +394,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 func TestExtendBlockNotConnected(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
@@ -557,16 +431,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 func TestExtendSealNotConnected(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
@@ -610,16 +475,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 func TestExtendWrongIdentity(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 

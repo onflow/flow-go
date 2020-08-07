@@ -332,21 +332,6 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	}
 }
 
-func ExecutionResultFixture() *flow.ExecutionResult {
-	return &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: IdentifierFixture(),
-			BlockID:          IdentifierFixture(),
-			FinalStateCommit: StateCommitmentFixture(),
-			Chunks: flow.ChunkList{
-				ChunkFixture(),
-				ChunkFixture(),
-			},
-		},
-		Signatures: SignaturesFixture(6),
-	}
-}
-
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
 		ra.Body.ExecutionResultID = id
@@ -418,14 +403,6 @@ func WithStake(stake uint64) func(*flow.Identity) {
 	}
 }
 
-func generateRandomSeed() []byte {
-	seed := make([]byte, 48)
-	if n, err := crand.Read(seed); err != nil || n != 48 {
-		panic(err)
-	}
-	return seed
-}
-
 func RandomBytes(n int) []byte {
 	b := make([]byte, n)
 	read, err := crand.Read(b)
@@ -463,16 +440,8 @@ func WithNodeID(b byte) func(*flow.Identity) {
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		stak, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, generateRandomSeed())
-		if err != nil {
-			panic(err)
-		}
-		identity.StakingPubKey = stak.PublicKey()
-		netw, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, generateRandomSeed())
-		if err != nil {
-			panic(err)
-		}
-		identity.NetworkPubKey = netw.PublicKey()
+		identity.StakingPubKey = KeyFixture(crypto.BLSBLS12381).PublicKey()
+		identity.NetworkPubKey = KeyFixture(crypto.ECDSAP256).PublicKey()
 	}
 }
 
@@ -776,7 +745,22 @@ func BatchListFixture(n int) []flow.Batch {
 	return batches
 }
 
-func ResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
+func ExecutionResultFixture() *flow.ExecutionResult {
+	return &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: IdentifierFixture(),
+			BlockID:          IdentifierFixture(),
+			FinalStateCommit: StateCommitmentFixture(),
+			Chunks: flow.ChunkList{
+				ChunkFixture(),
+				ChunkFixture(),
+			},
+		},
+		Signatures: SignaturesFixture(6),
+	}
+}
+
+func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
 	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID:          block.ID(),
@@ -880,10 +864,13 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 
 // BootstrapFixture generates all the artifacts necessary to bootstrap the
 // protocol state.
-func BootstrapFixture(participants flow.IdentityList) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block)) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 
 	root := GenesisFixture(participants)
-	result := ResultFixture(root, GenesisStateCommitment)
+	for _, apply := range opts {
+		apply(root)
+	}
+	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
 
 	counter := uint64(1)
 	setup := EpochSetupFixture(WithParticipants(participants), SetupWithCounter(counter))
