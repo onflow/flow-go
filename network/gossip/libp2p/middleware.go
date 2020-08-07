@@ -159,10 +159,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		pubsub.WithMaxMessageSize(m.maxPubSubMsgSize),
 	}
 
-	selfNodeAddress, err := m.nodeAddressFromID(m.me)
-	if err != nil {
-		return fmt.Errorf("could not get node address of self: %w", err)
-	}
+	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 
 	libp2pKey, err := PrivKey(m.key)
 	if err != nil {
@@ -171,7 +168,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 	// start the libp2p node
 	err = m.libP2PNode.Start(m.ctx,
-		selfNodeAddress,
+		nodeAddress,
 		m.log, libp2pKey,
 		m.handleIncomingStream,
 		m.rootBlockID,

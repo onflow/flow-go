@@ -46,7 +46,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	metrics := metrics.NewNoopCollector()
 	// create an empty identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
 	// identities are set to appropriate IP Port after the network and middleware are started
-	identities := make(flow.IdentityList, len(ids))
+	identities := make(flow.IdentityList, 0)
 
 	// if no topology is passed in, use the default topology for all networks
 	if tops == nil {
@@ -77,6 +77,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		}
 	}
 
+	identities = make(flow.IdentityList, len(ids))
 	// set the identities to appropriate ip and port
 	for i := range ids {
 		// retrieves IP and port of the middleware
@@ -100,9 +101,16 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	}
 
 	// now that the network has started, address within the identity will have the actual port number
-	// update the network with the new id
+	// update the network with the new ids
 	for _, net := range nets {
 		net.SetIDs(identities)
+	}
+
+	// update whitelist of each of the middleware after the network ids have been updated
+	if !dryrun {
+		for _, m := range mws {
+			m.UpdateWhitelist()
+		}
 	}
 
 	return nets, nil
@@ -121,7 +129,7 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 		}
 
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics,
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "127.0.0.1:0", identities[i].NodeID, key, metrics,
 			libp2p.DefaultMaxPubSubMsgSize, rootBlockID)
 		if err != nil {
 			return nil, err

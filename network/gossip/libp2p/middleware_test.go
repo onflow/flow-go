@@ -272,7 +272,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		key := m.generateNetworkingKey(target[:])
 
 		// creates new middleware (with an arbitrary genesis block id)
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize,
+		mw, err := NewMiddleware(logger, codec, "127.0.0.1:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize,
 			rootID)
 		require.NoError(m.Suite.T(), err)
 
