@@ -20,7 +20,7 @@ require (
 	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
-	github.com/libp2p/go-libp2p v0.10.2
+	github.com/libp2p/go-libp2p v0.10.3
 	github.com/libp2p/go-libp2p-core v0.6.1
 	github.com/libp2p/go-libp2p-pubsub v0.3.3
 	github.com/libp2p/go-libp2p-swarm v0.2.8
