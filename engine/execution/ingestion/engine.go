@@ -703,7 +703,18 @@ func (e *Engine) saveExecutionResults(
 			return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 		}
 
-		chunk := generateChunk(i, startState, endState)
+		var collectionID flow.Identifier
+
+		// account for system chunk being last
+		if i < len(stateInteractions)-1 {
+			collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
+			completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
+			collectionID = completeCollection.Collection().ID()
+		} else {
+			collectionID = flow.ZeroID
+		}
+
+		chunk := generateChunk(i, startState, endState, collectionID)
 
 		// chunkDataPack
 		allRegisters := view.AllRegisters()
@@ -715,10 +726,7 @@ func (e *Engine) saveExecutionResults(
 			)
 		}
 
-		collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
-		completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
-
-		chdp := generateChunkDataPack(chunk, completeCollection.Collection().ID(), allRegisters, values, proofs)
+		chdp := generateChunkDataPack(chunk, collectionID, allRegisters, values, proofs)
 
 		err = e.execState.PersistChunkDataPack(childCtx, chdp)
 		if err != nil {
@@ -814,13 +822,15 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 }
 
 // generateChunk creates a chunk from the provided computation data.
-func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flow.Chunk {
+func generateChunk(colIndex int, startState, endState flow.StateCommitment, colID flow.Identifier) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),
 			StartState:      startState,
-			// TODO: include event collection hash
-			EventCollection: flow.ZeroID,
+			// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
+			// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
+			// startState stays the same if blocks are empty
+			EventCollection: colID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
 			// TODO: record number of txs

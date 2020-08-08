@@ -162,7 +162,14 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
-	spockSecret, chFault, err := e.chVerif.Verify(vc)
+
+	var spockSecret []byte
+	var chFault chmodels.ChunkFault
+	if vc.IsSystemChunk {
+		spockSecret, chFault, err = e.chVerif.SystemChunkVerify(vc)
+	} else {
+		spockSecret, chFault, err = e.chVerif.Verify(vc)
+	}
 	span.Finish()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err
@@ -274,6 +281,14 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	// starts verification of chunk
 	err := e.verify(ctx, originID, ch)
 
+	if err != nil {
+		e.log.Debug().
+			Err(err).
+			Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+			Msg("could not verify chunk")
+
+	}
+
 	// closes verification performance metrics trackers
-	return err
+	return nil
 }

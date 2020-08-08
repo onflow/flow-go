@@ -298,7 +298,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithBlocks(node.Blocks),
 	)
 
-	computationEngine := computation.New(
+	computationEngine, err := computation.New(
 		node.Log,
 		node.Metrics,
 		node.Tracer,

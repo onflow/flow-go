@@ -53,7 +53,8 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	gs.T().Logf("got erExe1BlockB with SC %x", erExe1BlockB.ExecutionResult.FinalStateCommit)
 
 	// extract chunk ID from execution receipt
-	require.Len(gs.T(), erExe1BlockB.ExecutionResult.Chunks, 1)
+	// expecting the chunk itself plus the system chunk
+	require.Len(gs.T(), erExe1BlockB.ExecutionResult.Chunks, 2)
 	chunkID := erExe1BlockB.ExecutionResult.Chunks[0].ID()
 
 	// TODO the following is extremely flaky, investigate why and re-activate.
