@@ -22,7 +22,7 @@ import (
 	"github.com/raviqqe/hamt"
 	"github.com/segmentio/fasthash/fnv1"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/ast"
 )
 
 type ResourceInvalidation struct {

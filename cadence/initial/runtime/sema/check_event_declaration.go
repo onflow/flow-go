@@ -19,7 +19,7 @@
 package sema
 
 import (
-	"github.com/onflow/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/ast"
 )
 
 // checkEventParameters checks that the event initializer's parameters are valid,

@@ -19,7 +19,7 @@
 package common
 
 import (
-	"github.com/onflow/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/errors"
 )
 
 //go:generate stringer -type=OperandSide

@@ -21,7 +21,7 @@ package ast
 import (
 	"fmt"
 
-	"github.com/onflow/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/errors"
 )
 
 type BoolExtractor interface {

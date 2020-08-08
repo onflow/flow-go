@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/common"
-	"github.com/onflow/cadence-initial/runtime/sema"
-	"github.com/onflow/cadence-initial/runtime/tests/utils"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/sema"
+	"example.com/cadence-initial/runtime/tests/utils"
 )
 
 type encodeDecodeTest struct {

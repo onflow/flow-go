@@ -12,13 +12,13 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 
+	initialCadence "example.com/cadence-initial"
+	initialJsoncdc "example.com/cadence-initial/encoding/json"
+	initialRuntime "example.com/cadence-initial/runtime"
+	initialAst "example.com/cadence-initial/runtime/ast"
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
-	initialCadence "github.com/onflow/cadence-initial"
-	initialJsoncdc "github.com/onflow/cadence-initial/encoding/json"
-	initialRuntime "github.com/onflow/cadence-initial/runtime"
-	initialAst "github.com/onflow/cadence-initial/runtime/ast"
 )
 
 var _ runtime.Interface = &hostEnvForCurrentCadence{}

@@ -30,5 +30,13 @@ func (v *TrieVerifier) VerifyRegistersProof(
 	if err != nil {
 		return false, err
 	}
-	return bp.Verify(registerIDs, values, stateCommitment, v.keyByteSize), nil
+	rid := make([][]byte, len(registerIDs))
+	for i, d := range registerIDs {
+		rid[i] = d
+	}
+	vid := make([][]byte, len(registerIDs))
+	for i, d := range values {
+		vid[i] = d
+	}
+	return bp.Verify(rid, vid, stateCommitment, v.keyByteSize), nil
 }

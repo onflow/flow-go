@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 
+	"go.mongodb.org/mongo-driver/bson"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/fingerprint"
@@ -45,6 +47,32 @@ type TransactionBody struct {
 
 	// payer signature over the envelope (payload + payload signatures)
 	EnvelopeSignatures []TransactionSignature
+}
+
+func (b *TransactionBody) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(struct {
+		ID                 string
+		ReferenceBlockID   Identifier
+		Script             string
+		Arguments          [][]byte
+		GasLimit           uint64
+		ProposalKey        ProposalKey
+		Payer              Address
+		Authorizers        []Address
+		PayloadSignatures  []TransactionSignature
+		EnvelopeSignatures []TransactionSignature
+	}{
+		ID:                 b.ID().String(),
+		ReferenceBlockID:   b.ReferenceBlockID,
+		Script:             string(b.Script),
+		Arguments:          b.Arguments,
+		GasLimit:           b.GasLimit,
+		ProposalKey:        b.ProposalKey,
+		Payer:              b.Payer,
+		Authorizers:        b.Authorizers,
+		PayloadSignatures:  b.PayloadSignatures,
+		EnvelopeSignatures: b.EnvelopeSignatures,
+	})
 }
 
 // NewTransactionBody initializes and returns an empty transaction body

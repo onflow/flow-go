@@ -22,11 +22,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/onflow/cadence-initial"
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/common"
-	"github.com/onflow/cadence-initial/runtime/interpreter"
-	"github.com/onflow/cadence-initial/runtime/sema"
+	"example.com/cadence-initial"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/interpreter"
+	"example.com/cadence-initial/runtime/sema"
 )
 
 // exportValue converts a runtime value to its native Go representation.

@@ -4,9 +4,10 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	initialRuntime "github.com/onflow/cadence-initial/runtime"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+
+	initialRuntime "example.com/cadence-initial/runtime"
 
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"

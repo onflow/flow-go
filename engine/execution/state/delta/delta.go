@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/vmihailenco/msgpack/v4"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -24,6 +25,28 @@ type Delta struct {
 	Data          map[string]flow.RegisterValue
 	ReadMappings  map[string]Mapping
 	WriteMappings map[string]Mapping
+}
+
+func (b *Delta) MarshalBSON() ([]byte, error) {
+	data := make(map[string]flow.RegisterValue, len(b.Data))
+	read := make(map[string]Mapping, len(b.ReadMappings))
+	write := make(map[string]Mapping, len(b.WriteMappings))
+
+	for k, v := range b.Data {
+		data[hex.EncodeToString([]byte(k))] = v
+	}
+	for k, v := range b.ReadMappings {
+		read[hex.EncodeToString([]byte(k))] = v
+	}
+	for k, v := range b.WriteMappings {
+		write[hex.EncodeToString([]byte(k))] = v
+	}
+
+	return bson.Marshal(Delta{
+		Data:          data,
+		ReadMappings:  read,
+		WriteMappings: write,
+	})
 }
 
 // NewDelta returns an empty ledger delta.

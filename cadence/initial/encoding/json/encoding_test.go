@@ -27,10 +27,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence-initial"
-	"github.com/onflow/cadence-initial/encoding/json"
-	"github.com/onflow/cadence-initial/runtime"
-	"github.com/onflow/cadence-initial/runtime/sema"
+	"example.com/cadence-initial"
+
+	"example.com/cadence-initial/encoding/json"
+	"example.com/cadence-initial/runtime"
+	"example.com/cadence-initial/runtime/sema"
 )
 
 type encodeTest struct {

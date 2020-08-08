@@ -18,7 +18,7 @@
 
 package interpreter
 
-import "github.com/onflow/cadence-initial/runtime/ast"
+import "example.com/cadence-initial/runtime/ast"
 
 // LocationPosition defines a position in the source of the import tree.
 // The Location defines the script within the import tree, the Position

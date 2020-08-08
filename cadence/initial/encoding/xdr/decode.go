@@ -26,7 +26,7 @@ import (
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
-	cadence "github.com/onflow/cadence-initial"
+	cadence "example.com/cadence-initial"
 )
 
 // A Decoder decodes XDR-encoded representations of Cadence values.

@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence-initial/runtime/sema"
-	"github.com/onflow/cadence-initial/runtime/tests/utils"
+	"example.com/cadence-initial/runtime/sema"
+	"example.com/cadence-initial/runtime/tests/utils"
 )
 
 func TestInterpreterOptionalBoxing(t *testing.T) {

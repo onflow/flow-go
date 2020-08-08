@@ -2,18 +2,20 @@ package main
 
 import (
 	"context"
-	"encoding/gob"
 	"fmt"
-	"os"
 	"reflect"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/r3labs/diff"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/r3labs/diff"
+
+	initialRuntime "example.com/cadence-initial/runtime"
 	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
@@ -29,7 +31,6 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
-	initialRuntime "github.com/onflow/cadence-initial/runtime"
 )
 
 type Update struct {
@@ -38,7 +39,7 @@ type Update struct {
 }
 
 type ComputedBlock struct {
-	entity.ExecutableBlock
+	ExecutableBlock entity.ExecutableBlock
 	Updates  []Update //collectionID -> update
 	EndState flow.StateCommitment
 	Results  []flow.TransactionResult
@@ -59,6 +60,8 @@ type Loader struct {
 	chunkDataPacks   *badger.ChunkDataPacks
 	executionState   state.ExecutionState
 	metrics          *metrics.NoopCollector
+	vm               *fvm.VirtualMachine
+	ctx              context.Context
 }
 
 func main() {
@@ -83,6 +86,10 @@ func main() {
 	chunkDataPacks := badger.NewChunkDataPacks(db)
 	executionResults := badger.NewExecutionResults(db)
 	executionState := state.NewExecutionState(nil, commits, blocks, collections, chunkDataPacks, executionResults, db, tracer)
+
+	initialRT := initialRuntime.NewInterpreterRuntime()
+	vm := fvm.NewWithInitial(initialRT)
+
 	loader := Loader{
 		headers:          headers,
 		index:            index,
@@ -98,6 +105,8 @@ func main() {
 		chunkDataPacks:   chunkDataPacks,
 		executionState:   executionState,
 		metrics:          cacheMetrics,
+		vm:               vm,
+		ctx:              context.Background(),
 	}
 
 	genesis, err := blocks.ByHeight(0)
@@ -115,8 +124,8 @@ func main() {
 
 	//step := 200_000
 	step := 50_000
-	//last := 1_065_711
-	last := 49_999
+	last := 1_065_711
+	//last := 49_999
 
 	for i := 0; i <= last; i += step {
 		end := i + step - 1
@@ -136,6 +145,21 @@ func dumpEntity(entity interface{}) {
 
 	spew.Dump(entity)
 
+}
+
+func (l *Loader) connectToMongo() *mongo.Client {
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://maks:QvLfBqkibC9kogFdVN!VKA64@portal-ssl489-5.flow-temp-mongodb.3981023.composedb.com:19806,portal-ssl1127-2.flow-temp-mongodb.3981023.composedb.com:19806/compose?authSource=admin&ssl=true&retryWrites=false"))
+	if err != nil {
+		log.Fatal().Err(err)
+	}
+
+	ctx, _ := context.WithTimeout(l.ctx, 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
+
+	return client
 }
 
 // retrieve block with collection and deltas and chunks to rebuild its interactions
@@ -302,7 +326,7 @@ func (l *Loader) findUpdates(blocks map[uint64][]*ComputedBlock) map[string]*tri
 	for _, computedBlocks := range blocks {
 		for _, computerBlock := range computedBlocks {
 			hashes[string(computerBlock.EndState)] = nil
-			hashes[string(computerBlock.StartState)] = nil
+			hashes[string(computerBlock.ExecutableBlock.StartState)] = nil
 		}
 	}
 
@@ -346,80 +370,86 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 
 	var blockData map[uint64][]*ComputedBlock
 
-	gob.Register(crypto.PubKeyBLSBLS12381{})
+	log.Info().Msgf("Processing blocks from  %d to %d", start, end)
 
-	blocksFilename := fmt.Sprintf("data/blocks_%d_%d.gob", start, end)
-	if _, err := os.Stat(blocksFilename); !os.IsNotExist(err) && false {
+	blockData = make(map[uint64][]*ComputedBlock, end-start)
 
-		log.Info().Msg("Loading block data from file")
+	rangeStart := start
+	rangeStop := end
 
-		//load file
-		dataFile, err := os.Open(blocksFilename)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not open file for blocks")
-		}
-		defer dataFile.Close()
+	totalTx := 0
 
-		// serialize the data
-		dataEncoder := gob.NewDecoder(dataFile)
-
-		err = dataEncoder.Decode(&blockData)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not decode blocks")
+	// abuse findHeader to get all the blocks
+	_, err := l.headers.FindHeaders(func(header *flow.Header) bool {
+		if header.Height >= rangeStart && header.Height <= rangeStop {
+			totalTx += l.addToList(header, blockData)
 		}
 
-		log.Info().Msg("Blocks data loaded")
-
-	} else {
-
-		log.Info().Msgf("Processing blocks from  %d to %d", start, end)
-
-		blockData = make(map[uint64][]*ComputedBlock, end-start)
-
-		rangeStart := start
-		rangeStop := end
-
-		totalTx := 0
-
-		// abuse findHeader to get all the blocks
-		_, err := l.headers.FindHeaders(func(header *flow.Header) bool {
-			if header.Height >= rangeStart && header.Height <= rangeStop {
-				totalTx += l.addToList(header, blockData)
-			}
-
-			return false
-		})
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not collect blocks")
-		}
-
-		log.Info().Msgf("Finished processing total of %d blocks containing %d transactions\n", len(blockData), totalTx)
-
-		////save to file
-		//dataFile, err := os.Create(blocksFilename)
-		//if err != nil {
-		//	log.Fatal().Err(err).Msg("could not create file for blocks")
-		//}
-		//defer dataFile.Close()
-		//
-		//// serialize the data
-		//dataEncoder := gob.NewEncoder(dataFile)
-		//
-		//err = dataEncoder.Encode(blockData)
-		//if err != nil {
-		//	log.Fatal().Err(err).Msg("could not encode blocks")
-		//}
+		return false
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not collect blocks")
 	}
+
+	log.Info().Msgf("Finished processing total of %d blocks containing %d transactions\n", len(blockData), totalTx)
+
+	////save to file
+	//dataFile, err := os.Create(blocksFilename)
+	//if err != nil {
+	//	log.Fatal().Err(err).Msg("could not create file for blocks")
+	//}
+	//defer dataFile.Close()
+	//
+	//// serialize the data
+	//dataEncoder := gob.NewEncoder(dataFile)
+	//
+	//err = dataEncoder.Encode(blockData)
+	//if err != nil {
+	//	log.Fatal().Err(err).Msg("could not encode blocks")
+	//}
 
 	updates := l.findUpdates(blockData)
 
 	//rt := runtime.NewInterpreterRuntime()
 
-	initialRT := initialRuntime.NewInterpreterRuntime()
 
-	vm := fvm.NewWithInitial(initialRT)
+
+	type Output struct {
+		BlockID              string `json:"block_id"`
+		BlockHeight          uint64 `json:"block_height"`
+		PrevBlockId          string `json:"prev_block_id"`
+		CollectionIndex      int    `json:"collection_index"`
+		CollectionID         string `json:"collection_id"`
+		TxHash               string `json:"tx_hash"`
+		StartStateCommitment string `json:"start_state_commitment"`
+		Transaction          string `json:"transaction"`
+	}
+
+	//outputs := make([]Output, 0)
+
+	//mongoClient := l.connectToMongo()
+	//defer mongoClient.Disconnect(l.ctx)
+
+	//collection := mongoClient.Database("ftx").Collection("complete_blocks")
+
+	//bufferSize := 200
+	//blocksBuffer := make([]interfa	//for _, block := range blockData[5449] {
+	//	//	fmt.Printf("Block %d ID %x\n", block.Block.Header.Height, block.Block.Header.ID())
+	//	//	spew.Dump(block)
+	//	//}
+	//	//
+	//	//os.Exit(1)ce{}, 0, bufferSize+1)
 
 	for i := start; i <= end; i++ {
+
+		////if i >= 163 && i <= 173 || (i == 0) {
+		//if i == 5449 {
+		//	// BLock with height
+		//	for _, block := range blockData[i] {
+		//		fmt.Printf("Block %d ID %x\n", block.Block.Header.Height, block.Block.Header.ID())
+		//		spew.Dump(block)
+		//	}
+		//}
 
 		blocks, has := blockData[i]
 
@@ -429,137 +459,228 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 
 		for _, computedBlock := range blocks {
 
-			startState := computedBlock.StartState
+			//blocksBuffer = append(blocksBuffer, computedBlock)
+			//if len(blocksBuffer) >= bufferSize {
+			//	_, err := collection.InsertMany(l.ctx, blocksBuffer)
+			//	if err != nil {
+			//		spew.Dump(blocksBuffer)
+			//		log.Fatal().Err(err).Msg("failed to insert many to mongo")
+			//	}
+			//
+			//	blocksBuffer = make([]interface{}, 0, bufferSize+1)
+			//}
 
-			mTrie := updates[string(startState)]
 
-			blockView := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-				read, err := mTrie.UnsafeRead([][]byte{state2.RegisterID(owner, controller, key)})
-				if err != nil {
-					return nil, err
-				}
-				return read[0], nil
-			})
 
-			type mapping struct {
-				owner []byte
-				key   []byte
-			}
+			//for colIndex, guarantee := range computedBlock.Block.Payload.Guarantees {
+			//	collection := computedBlock.CompleteCollections[guarantee.CollectionID]
+			//	for _, tx := range collection.Transactions {
+			//
+			//		txBytes, err := json.Marshal(tx)
+			//		if err != nil {
+			//			log.Fatal().Msgf("cannot marshall tx")
+			//		}
+			//
+			//		o := Output{
+			//			BlockID:              computedBlock.Block.ID().String(),
+			//			BlockHeight:          computedBlock.Block.Header.Height,
+			//			PrevBlockId:          computedBlock.Block.Header.ParentID.String(),
+			//			CollectionIndex:      colIndex,
+			//			CollectionID:         collection.Guarantee.CollectionID.String(),
+			//			TxHash:               tx.ID().String(),
+			//			StartStateCommitment: fmt.Sprintf("%x", computedBlock.StartState),
+			//			Transaction:          string(txBytes),
+			//		}
+			//
+			//		var _ = o
+			//
+			//		//outputs = append(outputs, o)
+			//	}
+			//}
+			//continue
 
-			vmCtx := fvm.NewContext(
-				fvm.WithChain(flow.Mainnet.Chain()),
-				fvm.WithBlocks(l.blocks),
-			)
-
-			computationManager := computation.New(
-				zerolog.Nop(), l.metrics, nil,
-				nil, //module.Local should not be used
-				nil, //protocol.State should not be used
-				vm, vmCtx,
-			)
-
-			computationResult, err := computationManager.ComputeBlock(
-				context.Background(),
-				&computedBlock.ExecutableBlock,
-				blockView,
-			)
-
-			if err != nil {
-				log.Fatal().Err(err).Str("block_id", computedBlock.ID().String()).Msg("cannot compute block")
-			}
-
-			if len(computedBlock.Block.Payload.Guarantees) > 0 {
-				log.Info().Msgf("Block %000000d", computedBlock.Block.Header.Height)
-
-				changelog, err := diff.Diff(computedBlock.Results, computationResult.TransactionResult)
-				if err != nil {
-					log.Fatal().Err(err).Str("block_id", computedBlock.ID().String()).Msg("cannot compare results")
-				}
-				if changelog == nil {
-					fmt.Println("Tx results equal!")
-				} else {
-					fmt.Println("Tx results differ")
-					spew.Dump(changelog)
-
-					fmt.Printf("Block time %s\n", computedBlock.ExecutableBlock.Block.Header.Timestamp.String())
-
-					for _, c := range computedBlock.CompleteCollections {
-						for _, tx := range c.Transactions {
-							fmt.Println("tx in block")
-							//fmt.Println(string(tx.Script))
-							spew.Dump(tx)
-						}
-					}
-
-				}
-
-				//	log.Info().Msg("Reads")
-				//	spew.Dump(readMappings)
-				//
-				//	log.Info().Msg("Writes")
-				//	spew.Dump(writeMappings)
-			}
-
-			for i, _ := range computedBlock.Block.Payload.Guarantees {
-				//collectionID := collectionGuarantee.CollectionID
-
-				calculatedSnapshot := computationResult.StateSnapshots[i]
-				originalSnapshot := computedBlock.Updates[i].Snapshot
-
-				if originalSnapshot == nil {
-					log.Fatal().Msgf("Original snapshot %d does not exist", i)
-					spew.Dump(computedBlock)
-				}
-				if calculatedSnapshot == nil {
-					log.Fatal().Msgf("Calculated snapshot %d does not exist", i)
-				}
-
-				calculatedDelta := calculatedSnapshot.Delta
-				originalDelta := originalSnapshot.Delta
-
-				if !reflect.DeepEqual(calculatedDelta.Data, originalDelta.Data) {
-					log.Info().Msg("snapshot dont match")
-
-					//spew.Dump(originalDelta)
-					//spew.Dump(calculatedDelta)
-
-					changelog, err := diff.Diff(originalDelta.Data, calculatedDelta.Data)
-
-					if err != nil {
-						log.Fatal().Err(err).Str("block_id", computedBlock.ID().String()).Msg("cannot compare")
-					}
-
-					for _, change := range changelog {
-						key := change.Path[0]
-
-						fullKey, has := calculatedDelta.WriteMappings[key]
-
-						if !has {
-							fmt.Printf("Key not found in mapping - %s: %x => %s \n", change.Type, key, change.From)
-						} else {
-							fmt.Printf("Changed key - %s '%x' '%x' '%s' => %s \n", change.Type, fullKey.Owner, fullKey.Controller, fullKey.Key, change.From)
-						}
-					}
-
-					//if len(changelog) > 1 {
-					//	for _, c := range computedBlock.CompleteCollections {
-					//		for _, tx := range c.Transactions {
-					//			fmt.Println("tx in block")
-					//			fmt.Println(string(tx.Script))
-					//		}
-					//	}
-					//}
-
-					//spew.Dump(changelog)
-					//spew.Dump(writeMappings)
-					//spew.Dump(readMappings)
-					return
-				} else {
-					log.Info().Msg("snapshot do   match")
-				}
-			}
+			l.executeBlock(computedBlock, updates)
 
 		}
+
+
+
+
+	}
+	//if len(blocksBuffer) > 0 {
+	//	_, err := collection.InsertMany(l.ctx, blocksBuffer)
+	//	if err != nil {
+	//		spew.Dump(blocksBuffer)
+	//		log.Fatal().Err(err).Msg("failed to insert many to mongo")
+	//	}
+	//
+	//}
+
+	//json, err := json.MarshalIndent(outputs, "", "  ")
+	//if err != nil {
+	//	log.Fatal().Msgf("cannot marhshll tx dump")
+	//}
+	//
+	//fmt.Println(string(json))
+}
+
+func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*trie.MTrie) {
+	startState := computedBlock.ExecutableBlock.StartState
+
+	mTrie := updates[string(startState)]
+
+	blockView := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		read, err := mTrie.UnsafeRead([][]byte{state2.RegisterID(owner, controller, key)})
+		if err != nil {
+			return nil, err
+		}
+		return read[0], nil
+	})
+
+	type mapping struct {
+		owner []byte
+		key   []byte
 	}
 
+	vmCtx := fvm.NewContext(
+		fvm.WithChain(flow.Mainnet.Chain()),
+		fvm.WithBlocks(l.blocks),
+	)
+
+	computationManager := computation.New(
+		zerolog.Nop(), l.metrics, nil,
+		nil, //module.Local should not be used
+		nil, //protocol.State should not be used
+		l.vm, vmCtx,
+	)
+
+	computationResult, err := computationManager.ComputeBlock(
+		context.Background(),
+		&computedBlock.ExecutableBlock,
+		blockView,
+	)
+
+	if err != nil {
+		log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compute block")
+	}
+
+	if len(computedBlock.ExecutableBlock.Block.Payload.Guarantees) > 0 {
+		log.Info().Msgf("Block %000000d", computedBlock.ExecutableBlock.Block.Header.Height)
+
+		results := collapseByTxID(computedBlock.Results)
+
+		changelog, err := diff.Diff(results, computationResult.TransactionResult)
+		if err != nil {
+			log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compare results")
+		}
+		if changelog == nil {
+			log.Info().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("Tx results equal!")
+		} else {
+			log.Info().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("Tx results differ!")
+
+			fmt.Println("DB results")
+			spew.Dump(computedBlock.Results)
+			fmt.Println("Computer results")
+			spew.Dump(computationResult.TransactionResult)
+			fmt.Println("---")
+			spew.Dump(changelog)
+			fmt.Println("---")
+			spew.Dump(computedBlock.ExecutableBlock.Block)
+
+			fmt.Printf("Block time %s\n", computedBlock.ExecutableBlock.Block.Header.Timestamp.String())
+
+			//for _, c := range computedBlock.CompleteCollections {
+			//	for _, tx := range c.Transactions {
+			//		fmt.Println("tx in block")
+			//		//fmt.Println(string(tx.Script))
+			//		spew.Dump(tx)
+			//	}
+			//}
+
+		}
+
+		//	log.Info().Msg("Reads")
+		//	spew.Dump(readMappings)
+		//
+		//	log.Info().Msg("Writes")
+		//	spew.Dump(writeMappings)
+	}
+
+	for i, _ := range computedBlock.ExecutableBlock.Block.Payload.Guarantees {
+		//collectionID := collectionGuarantee.CollectionID
+
+		calculatedSnapshot := computationResult.StateSnapshots[i]
+		originalSnapshot := computedBlock.Updates[i].Snapshot
+
+		if originalSnapshot == nil {
+			log.Fatal().Msgf("Original snapshot %d does not exist", i)
+			spew.Dump(computedBlock)
+		}
+		if calculatedSnapshot == nil {
+			log.Fatal().Msgf("Calculated snapshot %d does not exist", i)
+		}
+
+		calculatedDelta := calculatedSnapshot.Delta
+		originalDelta := originalSnapshot.Delta
+
+		if !reflect.DeepEqual(calculatedDelta.Data, originalDelta.Data) {
+			log.Info().Msg("snapshot dont match")
+
+			//spew.Dump(originalDelta)
+			//spew.Dump(calculatedDelta)
+
+			changelog, err := diff.Diff(originalDelta.Data, calculatedDelta.Data)
+
+			if err != nil {
+				log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compare")
+			}
+
+			for _, change := range changelog {
+				key := change.Path[0]
+
+				fullKey, has := calculatedDelta.WriteMappings[key]
+
+				if !has {
+					fmt.Printf("Key not found in mapping - %s: %x => %s \n", change.Type, key, change.From)
+				} else {
+					fmt.Printf("Changed key - %s '%x' '%x' '%s' # %s => %s  \n", change.Type, fullKey.Owner, fullKey.Controller, fullKey.Key, change.From, change.To)
+				}
+			}
+
+			//if len(changelog) > 1 {
+			//	for _, c := range computedBlock.CompleteCollections {
+			//		for _, tx := range c.Transactions {
+			//			fmt.Println("tx in block")
+			//			fmt.Println(string(tx.Script))
+			//		}
+			//	}
+			//}
+
+			//spew.Dump(changelog)
+			//spew.Dump(writeMappings)
+			//spew.Dump(readMappings)
+			//return
+		} else {
+			log.Info().Msg("snapshot do   match")
+		}
+	}
+}
+
+func collapseByTxID(results []flow.TransactionResult) []flow.TransactionResult {
+	if len(results) == 0 {
+		return results
+	}
+
+	ret := make([]flow.TransactionResult, 0)
+
+	prev := results[0]
+	for i := 1; i < len(results); i++ {
+		if prev != results[i] {
+			ret = append(ret, prev)
+			prev = results[i]
+		}
+	}
+	ret = append(ret, prev)
+
+	return ret
 }

@@ -19,8 +19,8 @@
 package sema
 
 import (
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/errors"
 )
 
 func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {

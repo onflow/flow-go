@@ -19,7 +19,7 @@
 package lexer
 
 import (
-	"github.com/onflow/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/errors"
 )
 
 type TokenType uint8

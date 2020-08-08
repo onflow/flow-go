@@ -111,7 +111,7 @@ func NewExecutionState(
 }
 
 func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
-	return func(owner, controller, key string) ([]byte, error) {
+	return func(owner, controller, key string) (flow.RegisterValue, error) {
 
 		values, err := ledger.GetRegisters(
 			[]flow.RegisterID{state2.RegisterID(owner, controller, key)},

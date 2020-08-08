@@ -7,10 +7,18 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 // Address represents the 8 byte address of an account.
 type Address [AddressLength]byte
+
+
+func (s Address) MarshalBSONValue() (bsontype.Type, []byte, error) {
+	return bsonx.String(s.String()).MarshalBSONValue()
+}
 
 type AddressGenerator interface {
 	NextAddress() (Address, error)

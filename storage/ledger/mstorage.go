@@ -101,7 +101,16 @@ func (f *MTrieStorage) GetRegisters(
 	err error,
 ) {
 	start := time.Now()
-	values, err = f.mForest.Read(stateCommitment, registerIDs)
+	rid := make([][]byte, len(registerIDs))
+	for i, d := range registerIDs {
+		rid[i] = d
+	}
+	rrr, err := f.mForest.Read(stateCommitment, rid)
+
+	vid := make([]flow.RegisterValue, len(registerIDs))
+	for i, d := range rrr {
+		rid[i] = d
+	}
 
 	f.metrics.ReadValuesNumber(uint64(len(registerIDs)))
 	readDuration := time.Since(start)
@@ -112,7 +121,7 @@ func (f *MTrieStorage) GetRegisters(
 		f.metrics.ReadDurationPerItem(durationPerValue)
 	}
 
-	return values, err
+	return vid, err
 }
 
 // UpdateRegisters updates the values by register ID given the state commitment
@@ -143,12 +152,22 @@ func (f *MTrieStorage) UpdateRegisters(
 	f.metrics.UpdateCount()
 	f.metrics.UpdateValuesNumber(uint64(len(ids)))
 
-	err = f.wal.RecordUpdate(stateCommitment, ids, values)
+	rid := make([][]byte, len(ids))
+	for i, d := range ids {
+		rid[i] = d
+	}
+	vid := make([][]byte, len(values))
+	for i, d := range values {
+		vid[i] = d
+	}
+
+
+	err = f.wal.RecordUpdate(stateCommitment, rid, vid)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
 	}
 
-	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
+	newTrie, err := f.mForest.Update(stateCommitment, rid, vid)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
@@ -186,7 +205,11 @@ func (f *MTrieStorage) GetRegistersWithProof(
 		return nil, nil, fmt.Errorf("could not get register values: %w", err)
 	}
 
-	batchProof, err := f.mForest.Proofs(stateCommitment, registerIDs)
+	rid := make([][]byte, len(registerIDs))
+	for i, d := range registerIDs {
+		rid[i] = d
+	}
+	batchProof, err := f.mForest.Proofs(stateCommitment, rid)
 	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not get proofs: %w", err)

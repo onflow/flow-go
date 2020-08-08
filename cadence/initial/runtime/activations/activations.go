@@ -21,7 +21,7 @@ package activations
 import (
 	"github.com/raviqqe/hamt"
 
-	"github.com/onflow/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/common"
 )
 
 // Activations is a stack of activation records.

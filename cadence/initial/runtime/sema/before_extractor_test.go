@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/parser"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/parser"
 )
 
 func TestBeforeExtractor(t *testing.T) {

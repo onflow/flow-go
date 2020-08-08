@@ -19,7 +19,7 @@
 package ast
 
 import (
-	"github.com/onflow/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/common"
 )
 
 type TransactionDeclaration struct {

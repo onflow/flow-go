@@ -3,6 +3,8 @@ package entity
 import (
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -75,4 +77,23 @@ func (b *ExecutableBlock) HasAllTransactions() bool {
 
 func (b *ExecutableBlock) IsComplete() bool {
 	return b.HasAllTransactions() && len(b.StartState) > 0
+}
+
+
+func (b *ExecutableBlock) MarshalBSON() ([]byte, error) {
+	cols := make(map[string]*CompleteCollection, len(b.CompleteCollections))
+
+	for k, v := range b.CompleteCollections {
+		cols[k.String()] = v
+	}
+
+	return bson.Marshal(struct {
+		Block               *flow.Block
+		CompleteCollections map[string]*CompleteCollection
+		StartState          flow.StateCommitment
+	}{
+		Block:               b.Block,
+		CompleteCollections: cols,
+		StartState:          b.StartState,
+	})
 }

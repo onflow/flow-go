@@ -26,7 +26,7 @@ import (
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
-	cadence "github.com/onflow/cadence-initial"
+	cadence "example.com/cadence-initial"
 )
 
 // An Encoder converts Cadence values into XDR-encoded bytes.

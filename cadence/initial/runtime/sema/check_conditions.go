@@ -18,7 +18,7 @@
 
 package sema
 
-import "github.com/onflow/cadence-initial/runtime/ast"
+import "example.com/cadence-initial/runtime/ast"
 
 func (checker *Checker) visitConditions(conditions []*ast.Condition) {
 

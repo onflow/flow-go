@@ -25,8 +25,8 @@ import (
 
 	"go.uber.org/goleak"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/tests/utils"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/tests/utils"
 )
 
 func TestMain(m *testing.M) {

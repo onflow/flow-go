@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/fingerprint"
@@ -39,6 +42,11 @@ func HexStringToIdentifier(hexString string) (Identifier, error) {
 func (id Identifier) String() string {
 	return hex.EncodeToString(id[:])
 }
+
+func (s Identifier) MarshalBSONValue() (bsontype.Type, []byte, error) {
+	return bsonx.String(s.String()).MarshalBSONValue()
+}
+
 
 // Format handles formatting of id for different verbs. This is called when
 // formatting an identifier with fmt.

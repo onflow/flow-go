@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/ast"
 )
 
 type Token struct {

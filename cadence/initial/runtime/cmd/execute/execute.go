@@ -19,7 +19,7 @@
 package execute
 
 import (
-	"github.com/onflow/cadence-initial/runtime/cmd"
+	"example.com/cadence-initial/runtime/cmd"
 )
 
 // Execute parses the given filename and prints any syntax errors.

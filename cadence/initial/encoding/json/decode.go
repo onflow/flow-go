@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"strings"
 
-	cadence "github.com/onflow/cadence-initial"
+	cadence "example.com/cadence-initial"
 )
 
 // A Decoder decodes JSON-encoded representations of Cadence values.

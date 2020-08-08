@@ -19,7 +19,7 @@
 package sema
 
 import (
-	"github.com/onflow/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/ast"
 )
 
 // VisitReferenceExpression checks a reference expression `&t as T`,

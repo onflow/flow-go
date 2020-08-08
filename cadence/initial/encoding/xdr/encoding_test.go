@@ -26,9 +26,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cadence "github.com/onflow/cadence-initial"
-	"github.com/onflow/cadence-initial/encoding/xdr"
-	"github.com/onflow/cadence-initial/runtime/common"
+	cadence "example.com/cadence-initial"
+	"example.com/cadence-initial/encoding/xdr"
+	"example.com/cadence-initial/runtime/common"
 )
 
 type encodeTest struct {

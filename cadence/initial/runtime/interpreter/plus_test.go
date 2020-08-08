@@ -25,7 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/cadence-initial/runtime/sema"
+	"example.com/cadence-initial/runtime/sema"
 )
 
 func TestPlusUInt8(t *testing.T) {

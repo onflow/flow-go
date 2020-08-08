@@ -22,7 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/ast"
 )
 
 type (

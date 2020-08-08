@@ -23,8 +23,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/cadence-initial/runtime/common"
-	"github.com/onflow/cadence-initial/runtime/tests/utils"
+	"example.com/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/tests/utils"
 )
 
 func newTestCompositeValue(owner common.Address) *CompositeValue {

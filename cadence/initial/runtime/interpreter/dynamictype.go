@@ -19,7 +19,7 @@
 package interpreter
 
 import (
-	"github.com/onflow/cadence-initial/runtime/sema"
+	"example.com/cadence-initial/runtime/sema"
 )
 
 type DynamicType interface {

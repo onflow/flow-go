@@ -1,4 +1,4 @@
-module github.com/onflow/cadence-initial
+module example.com/cadence-initial
 
 go 1.13
 

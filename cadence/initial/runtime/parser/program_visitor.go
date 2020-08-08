@@ -25,9 +25,9 @@ import (
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/common"
-	"github.com/onflow/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/errors"
 )
 
 type ProgramVisitor struct {

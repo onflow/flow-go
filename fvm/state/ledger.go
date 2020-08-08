@@ -61,5 +61,5 @@ func fullKey(owner, controller, key string) string {
 
 func fullKeyHash(owner, controller, key string) flow.RegisterID {
 	hasher := hash.NewSHA2_256()
-	return hasher.ComputeHash([]byte(fullKey(owner, controller, key)))
+	return flow.RegisterID(hasher.ComputeHash([]byte(fullKey(owner, controller, key))))
 }

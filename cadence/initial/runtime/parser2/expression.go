@@ -24,9 +24,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/errors"
-	"github.com/onflow/cadence-initial/runtime/parser2/lexer"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/parser2/lexer"
 )
 
 const (

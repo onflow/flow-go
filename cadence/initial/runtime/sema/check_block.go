@@ -18,7 +18,7 @@
 
 package sema
 
-import "github.com/onflow/cadence-initial/runtime/ast"
+import "example.com/cadence-initial/runtime/ast"
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 	checker.enterValueScope()

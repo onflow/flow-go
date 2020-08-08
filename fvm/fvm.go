@@ -3,9 +3,9 @@ package fvm
 import (
 	"github.com/onflow/cadence/runtime"
 
+	initialRuntime "example.com/cadence-initial/runtime"
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
-	initialRuntime "github.com/onflow/cadence-initial/runtime"
 )
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.

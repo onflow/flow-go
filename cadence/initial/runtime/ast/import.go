@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onflow/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/common"
 )
 
 // Identifier

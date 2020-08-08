@@ -24,8 +24,8 @@ import (
 
 	"github.com/raviqqe/hamt"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
-	interfaceentry "github.com/onflow/cadence-initial/runtime/common/interface_entry"
+	"example.com/cadence-initial/runtime/ast"
+	interfaceentry "example.com/cadence-initial/runtime/common/interface_entry"
 )
 
 // ResourceInfo is the info for a resource.

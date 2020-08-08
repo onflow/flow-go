@@ -18,7 +18,7 @@
 
 package ast
 
-import "github.com/onflow/cadence-initial/runtime/common"
+import "example.com/cadence-initial/runtime/common"
 
 type FunctionDeclaration struct {
 	Access               Access

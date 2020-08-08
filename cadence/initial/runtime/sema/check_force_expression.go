@@ -19,7 +19,7 @@
 package sema
 
 import (
-	"github.com/onflow/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/ast"
 )
 
 func (checker *Checker) VisitForceExpression(expression *ast.ForceExpression) ast.Repr {

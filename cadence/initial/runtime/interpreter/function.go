@@ -23,12 +23,12 @@ import (
 
 	"github.com/raviqqe/hamt"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/common"
-	"github.com/onflow/cadence-initial/runtime/errors"
-	"github.com/onflow/cadence-initial/runtime/sema"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/sema"
 
-	. "github.com/onflow/cadence-initial/runtime/trampoline"
+	. "example.com/cadence-initial/runtime/trampoline"
 )
 
 // Invocation

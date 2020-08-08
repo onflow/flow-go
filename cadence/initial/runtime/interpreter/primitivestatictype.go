@@ -19,8 +19,8 @@
 package interpreter
 
 import (
-	"github.com/onflow/cadence-initial/runtime/errors"
-	"github.com/onflow/cadence-initial/runtime/sema"
+	"example.com/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/sema"
 )
 
 //go:generate stringer -type=PrimitiveStaticType -trimprefix=PrimitiveStaticType

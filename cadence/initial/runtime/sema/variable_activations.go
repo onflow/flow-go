@@ -21,9 +21,9 @@ package sema
 import (
 	"github.com/raviqqe/hamt"
 
-	"github.com/onflow/cadence-initial/runtime/activations"
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/activations"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/common"
 )
 
 type VariableActivations struct {

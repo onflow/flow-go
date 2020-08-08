@@ -11,8 +11,8 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/common"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/common"
 )
 
 // !!! *WARNING* !!!

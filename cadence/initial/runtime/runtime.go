@@ -26,15 +26,15 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	cadence "github.com/onflow/cadence-initial"
-	"github.com/onflow/cadence-initial/runtime/ast"
-	"github.com/onflow/cadence-initial/runtime/common"
-	runtimeErrors "github.com/onflow/cadence-initial/runtime/errors"
-	"github.com/onflow/cadence-initial/runtime/interpreter"
-	"github.com/onflow/cadence-initial/runtime/parser"
-	"github.com/onflow/cadence-initial/runtime/sema"
-	"github.com/onflow/cadence-initial/runtime/stdlib"
-	"github.com/onflow/cadence-initial/runtime/trampoline"
+	cadence "example.com/cadence-initial"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/common"
+	runtimeErrors "example.com/cadence-initial/runtime/errors"
+	"example.com/cadence-initial/runtime/interpreter"
+	"example.com/cadence-initial/runtime/parser"
+	"example.com/cadence-initial/runtime/sema"
+	"example.com/cadence-initial/runtime/stdlib"
+	"example.com/cadence-initial/runtime/trampoline"
 )
 
 // Runtime is a runtime capable of executing Cadence.

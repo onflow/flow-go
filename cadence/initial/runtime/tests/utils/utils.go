@@ -26,8 +26,8 @@ import (
 	"github.com/go-test/deep"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/common"
+	"example.com/cadence-initial/runtime/ast"
+	"example.com/cadence-initial/runtime/common"
 )
 
 // TestLocation is used as the default location for programs in tests.
