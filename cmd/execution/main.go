@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
@@ -44,6 +46,7 @@ func main() {
 		receipts              *storage.ExecutionReceipts
 		providerEngine        *exeprovider.Engine
 		syncCore              *chainsync.Core
+		syncEngine            *synchronization.Engine
 		computationManager    *computation.Manager
 		collectionRequester   *requester.Engine
 		ingestionEng          *ingestion.Engine
@@ -55,6 +58,7 @@ func main() {
 		mTrieCacheSize        uint32
 		checkpointDistance    uint
 		preferredExeNodeIDStr string
+		syncByBlocks          bool
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -67,6 +71,7 @@ func main() {
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
+			flags.BoolVar(&syncByBlocks, "sync-by-blocks", false, "flag for if we want to sync by blocks instead of execution state deltas")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -221,6 +226,7 @@ func main() {
 				executionState,
 				6, // TODO - config param maybe?
 				preferredExeFilter,
+				syncByBlocks,
 				collector,
 				node.Tracer,
 				true,
@@ -255,24 +261,26 @@ func main() {
 			return eng, err
 		}).
 		// TODO: currently issues with this engine on the EXE node, as there is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
-		// Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		// 	// initialize the synchronization engine
-		// 	syncEngine, err = synchronization.New(
-		// 		node.Logger,
-		// 		node.Metrics.Engine,
-		// 		node.Network,
-		// 		node.Me,
-		// 		node.State,
-		// 		node.Storage.Blocks,
-		// 		ingestionEng,
-		// 		syncCore,
-		// 	)
-		// 	if err != nil {
-		// 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
-		// 	}
+		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// initialize the synchronization engine
+			syncEngine, err = synchronization.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				ingestionEng,
+				syncCore,
+				// Right now, only used to sync, so never poll
+				synchronization.WithPollInterval(time.Duration(0)),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
 
-		// 	return syncEngine, nil
-		// }).
+			return syncEngine, nil
+		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
 			return rpcEng, nil

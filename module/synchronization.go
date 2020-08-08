@@ -12,6 +12,12 @@ type BlockRequester interface {
 
 	// RequestBlock indicates that the given block should be queued for retrieval.
 	RequestBlock(blockID flow.Identifier)
+
+	// RequestHeight indicates that the given block height should be queued for retrieval.
+	RequestHeight(height uint64)
+
+	// Manually Prune requests
+	Prune(final *flow.Header)
 }
 
 // SyncCore represents state management for chain state synchronization.
