@@ -37,23 +37,24 @@ import (
 func main() {
 
 	var (
-		ledgerStorage       *ledger.MTrieStorage
-		events              *storage.Events
-		txResults           *storage.TransactionResults
-		results             *storage.ExecutionResults
-		receipts            *storage.ExecutionReceipts
-		providerEngine      *exeprovider.Engine
-		syncCore            *chainsync.Core
-		computationManager  *computation.Manager
-		collectionRequester *requester.Engine
-		ingestionEng        *ingestion.Engine
-		rpcConf             rpc.Config
-		err                 error
-		executionState      state.ExecutionState
-		triedir             string
-		collector           module.ExecutionMetrics
-		mTrieCacheSize      uint32
-		checkpointDistance  uint
+		ledgerStorage         *ledger.MTrieStorage
+		events                *storage.Events
+		txResults             *storage.TransactionResults
+		results               *storage.ExecutionResults
+		receipts              *storage.ExecutionReceipts
+		providerEngine        *exeprovider.Engine
+		syncCore              *chainsync.Core
+		computationManager    *computation.Manager
+		collectionRequester   *requester.Engine
+		ingestionEng          *ingestion.Engine
+		rpcConf               rpc.Config
+		err                   error
+		executionState        state.ExecutionState
+		triedir               string
+		collector             module.ExecutionMetrics
+		mTrieCacheSize        uint32
+		checkpointDistance    uint
+		preferredExeNodeIDStr string
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -65,6 +66,7 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
+			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -190,6 +192,13 @@ func main() {
 				requester.WithBatchInterval(24*time.Hour), // we are manually triggering batches in execution
 			)
 
+			preferredExeFilter := filter.Any
+			preferredExeNodeID, err := flow.HexStringToIdentifier(preferredExeNodeIDStr)
+			if err == nil {
+				node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
+				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
+			}
+
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
@@ -209,6 +218,7 @@ func main() {
 				syncCore,
 				executionState,
 				6, // TODO - config param maybe?
+				preferredExeFilter,
 				collector,
 				node.Tracer,
 				true,
