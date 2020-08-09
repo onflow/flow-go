@@ -37,33 +37,25 @@ func NewTransactionValidator(
 	}
 }
 
-func (v *TransactionValidator) Validate(tx *flow.TransactionBody) error {
-	// ensure all required fields are set
-	missingFields := tx.MissingFields()
-	if len(missingFields) > 0 {
-		return IncompleteTransactionError{MissingFields: missingFields}
-	}
-
-	// ensure the gas limit is not over the maximum
-	if tx.GasLimit > v.options.MaxGasLimit {
-		return InvalidGasLimitError{
-			Actual:  tx.GasLimit,
-			Maximum: v.options.MaxGasLimit,
-		}
-	}
-
-	// ensure the reference block is valid
-	err := v.checkTransactionExpiry(tx)
+func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
+	err = v.checkMissingFields(tx)
 	if err != nil {
 		return err
 	}
 
-	if v.options.CheckScriptsParse {
-		// ensure the script is at least parse-able
-		_, _, err = parser.ParseProgram(string(tx.Script))
-		if err != nil {
-			return InvalidScriptError{ParserErr: err}
-		}
+	err = v.checkGasLimit(tx)
+	if err != nil {
+		return err
+	}
+
+	err = v.checkExpiry(tx)
+	if err != nil {
+		return err
+	}
+
+	err = v.checkCanBeParsed(tx)
+	if err != nil {
+		return err
 	}
 
 	// TODO check account/payer signatures
@@ -71,10 +63,30 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) error {
 	return nil
 }
 
-// checkTransactionExpiry checks whether a transaction's reference block ID is
+func (v *TransactionValidator) checkMissingFields(tx *flow.TransactionBody) error {
+	missingFields := tx.MissingFields()
+	if len(missingFields) > 0 {
+		return IncompleteTransactionError{MissingFields: missingFields}
+	}
+
+	return nil
+}
+
+func (v *TransactionValidator) checkGasLimit(tx *flow.TransactionBody) error {
+	if tx.GasLimit > v.options.MaxGasLimit {
+		return InvalidGasLimitError{
+			Actual:  tx.GasLimit,
+			Maximum: v.options.MaxGasLimit,
+		}
+	}
+
+	return nil
+}
+
+// checkExpiry checks whether a transaction's reference block ID is
 // valid. Returns nil if the reference is valid, returns an error if the
 // reference is invalid or we failed to check it.
-func (v *TransactionValidator) checkTransactionExpiry(tx *flow.TransactionBody) error {
+func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 
 	// look up the reference block
 	ref, err := v.blockHeaderByID(tx.ReferenceBlockID)
@@ -110,6 +122,17 @@ func (v *TransactionValidator) checkTransactionExpiry(tx *flow.TransactionBody) 
 		return ExpiredTransactionError{
 			RefHeight:   ref.Height,
 			FinalHeight: final.Height,
+		}
+	}
+
+	return nil
+}
+
+func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error {
+	if v.options.CheckScriptsParse {
+		_, _, err := parser.ParseProgram(string(tx.Script))
+		if err != nil {
+			return InvalidScriptError{ParserErr: err}
 		}
 	}
 
