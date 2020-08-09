@@ -6,23 +6,22 @@ import (
 	"testing"
 	"time"
 
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-
-	mockaccess "github.com/dapperlabs/flow-go/engine/access/mock"
+	access "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realstorage "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
+	"github.com/dapperlabs/flow-go/storage"
+	storagemock "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -33,12 +32,12 @@ type Suite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks       *storage.Blocks
-	headers      *storage.Headers
-	collections  *storage.Collections
-	transactions *storage.Transactions
-	colClient    *mockaccess.AccessAPIClient
-	execClient   *mockaccess.ExecutionAPIClient
+	blocks       *storagemock.Blocks
+	headers      *storagemock.Headers
+	collections  *storagemock.Collections
+	transactions *storagemock.Transactions
+	colClient    *access.AccessAPIClient
+	execClient   *access.ExecutionAPIClient
 	chainID      flow.ChainID
 }
 
@@ -53,23 +52,23 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.blocks = new(storage.Blocks)
-	suite.headers = new(storage.Headers)
-	suite.transactions = new(storage.Transactions)
-	suite.collections = new(storage.Collections)
-	suite.colClient = new(mockaccess.AccessAPIClient)
-	suite.execClient = new(mockaccess.ExecutionAPIClient)
+	suite.blocks = new(storagemock.Blocks)
+	suite.headers = new(storagemock.Headers)
+	suite.transactions = new(storagemock.Transactions)
+	suite.collections = new(storagemock.Collections)
+	suite.colClient = new(access.AccessAPIClient)
+	suite.execClient = new(access.ExecutionAPIClient)
 	suite.chainID = flow.Testnet
 }
 
 func (suite *Suite) TestPing() {
 	suite.colClient.
-		On("Ping", mock.Anything, &access.PingRequest{}).
-		Return(&access.PingResponse{}, nil)
+		On("Ping", mock.Anything, &accessproto.PingRequest{}).
+		Return(&accessproto.PingResponse{}, nil)
 
 	suite.execClient.
-		On("Ping", mock.Anything, &execution.PingRequest{}).
-		Return(&execution.PingResponse{}, nil)
+		On("Ping", mock.Anything, &execproto.PingRequest{}).
+		Return(&execproto.PingResponse{}, nil)
 
 	backend := New(
 		suite.state,
@@ -222,12 +221,12 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	txID := transactionBody.ID()
 	blockID := block.ID()
 
-	exeEventReq := execution.GetTransactionResultRequest{
+	exeEventReq := execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
 	}
 
-	exeEventResp := execution.GetTransactionResultResponse{
+	exeEventResp := execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
 
@@ -325,7 +324,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	// collection storage returns a not found error
 	suite.collections.
 		On("LightByTransactionID", transactionBody.ID()).
-		Return(nil, realstorage.ErrNotFound)
+		Return(nil, storage.ErrNotFound)
 
 	txID := transactionBody.ID()
 
@@ -399,10 +398,10 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	events := getEvents(10)
 
 	// create the expected results from execution node and access node
-	exeResults := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
+	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockIDs))
 
 	for i := 0; i < len(blockIDs); i++ {
-		exeResults[i] = &execution.GetEventsForBlockIDsResponse_Result{
+		exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
 			BlockId:     convert.IdentifierToMessage(blockIDs[i]),
 			BlockHeight: uint64(i),
 			Events:      convert.EventsToMessages(events),
@@ -420,13 +419,13 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 
 	// create the execution node response
-	exeResp := execution.GetEventsForBlockIDsResponse{
+	exeResp := execproto.GetEventsForBlockIDsResponse{
 		Results: exeResults,
 	}
 
 	ctx := context.Background()
 
-	exeReq := &execution.GetEventsForBlockIDsRequest{
+	exeReq := &execproto.GetEventsForBlockIDsRequest{
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 		Type:     string(flow.EventAccountCreated),
 	}
@@ -484,13 +483,13 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	}
 
 	setupExecClient := func() []flow.BlockEvents {
-		execReq := &execution.GetEventsForBlockIDsRequest{
+		execReq := &execproto.GetEventsForBlockIDsRequest{
 			BlockIds: convert.IdentifiersToMessages(expBlockIDs),
 			Type:     string(flow.EventAccountCreated),
 		}
 
 		results := make([]flow.BlockEvents, len(expBlockIDs))
-		exeResults := make([]*execution.GetEventsForBlockIDsResponse_Result, len(expBlockIDs))
+		exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(expBlockIDs))
 
 		for i, id := range expBlockIDs {
 			events := getEvents(1)
@@ -502,14 +501,14 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 				Events:      events,
 			}
 
-			exeResults[i] = &execution.GetEventsForBlockIDsResponse_Result{
+			exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
 				BlockId:     convert.IdentifierToMessage(id),
 				BlockHeight: height,
 				Events:      convert.EventsToMessages(events),
 			}
 		}
 
-		exeResp := &execution.GetEventsForBlockIDsResponse{
+		exeResp := &execproto.GetEventsForBlockIDsResponse{
 			Results: exeResults,
 		}
 
@@ -596,7 +595,7 @@ func (suite *Suite) TestGetAccount() {
 	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
 	suite.Require().NoError(err)
 
-	account := &entities.Account{
+	account := &entitiesproto.Account{
 		Address: address.Bytes(),
 	}
 	ctx := context.Background()
@@ -613,13 +612,13 @@ func (suite *Suite) TestGetAccount() {
 
 	// create the expected execution API request
 	blockID := header.ID()
-	exeReq := &execution.GetAccountAtBlockIDRequest{
+	exeReq := &execproto.GetAccountAtBlockIDRequest{
 		BlockId: blockID[:],
 		Address: address.Bytes(),
 	}
 
 	// create the expected execution API response
-	exeResp := &execution.GetAccountAtBlockIDResponse{
+	exeResp := &execproto.GetAccountAtBlockIDResponse{
 		Account: account,
 	}
 
@@ -653,7 +652,7 @@ func (suite *Suite) TestGetAccount() {
 func (suite *Suite) TestGetAccountAtBlockHeight() {
 	height := uint64(5)
 	address := unittest.AddressFixture()
-	account := &entities.Account{
+	account := &entitiesproto.Account{
 		Address: address.Bytes(),
 	}
 	ctx := context.Background()
@@ -669,13 +668,13 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	// create the expected execution API request
 	blockID := h.ID()
-	exeReq := &execution.GetAccountAtBlockIDRequest{
+	exeReq := &execproto.GetAccountAtBlockIDRequest{
 		BlockId: blockID[:],
 		Address: address.Bytes(),
 	}
 
 	// create the expected execution API response
-	exeResp := &execution.GetAccountAtBlockIDResponse{
+	exeResp := &execproto.GetAccountAtBlockIDResponse{
 		Account: account,
 	}
 

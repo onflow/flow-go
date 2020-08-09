@@ -1,4 +1,4 @@
-package handler
+package access
 
 import (
 	"context"
@@ -10,30 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// TODO: Combine this with flow.TransactionResult?
-type TransactionResult struct {
-	Status       flow.TransactionStatus
-	StatusCode   uint
-	Events       []flow.Event
-	ErrorMessage string
-}
-
-func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
-	return &access.TransactionResultResponse{
-		Status:       entities.TransactionStatus(result.Status),
-		StatusCode:   uint32(result.StatusCode),
-		ErrorMessage: result.ErrorMessage,
-		Events:       convert.EventsToMessages(result.Events),
-	}
-}
-
-// NetworkParameters contains the network-wide parameters for the Flow blockchain.
-type NetworkParameters struct {
-	ChainID flow.ChainID
-}
-
-// An AccessAPI provides all public-facing functionality of the Flow Access API.
-type AccessAPI interface {
+// API provides all public-facing functionality of the Flow Access API.
+type API interface {
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) NetworkParameters
 
@@ -61,4 +39,26 @@ type AccessAPI interface {
 
 	GetEventsForHeightRange(ctx context.Context, eventType string, startHeight, endHeight uint64) ([]flow.BlockEvents, error)
 	GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier) ([]flow.BlockEvents, error)
+}
+
+// TODO: Combine this with flow.TransactionResult?
+type TransactionResult struct {
+	Status       flow.TransactionStatus
+	StatusCode   uint
+	Events       []flow.Event
+	ErrorMessage string
+}
+
+func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
+	return &access.TransactionResultResponse{
+		Status:       entities.TransactionStatus(result.Status),
+		StatusCode:   uint32(result.StatusCode),
+		ErrorMessage: result.ErrorMessage,
+		Events:       convert.EventsToMessages(result.Events),
+	}
+}
+
+// NetworkParameters contains the network-wide parameters for the Flow blockchain.
+type NetworkParameters struct {
+	ChainID flow.ChainID
 }

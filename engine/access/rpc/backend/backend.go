@@ -5,13 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-
-	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
+	"github.com/dapperlabs/flow-go/access"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -38,7 +37,7 @@ type Backend struct {
 	backendBlockDetails
 	backendAccounts
 
-	executionRPC execution.ExecutionAPIClient
+	executionRPC execproto.ExecutionAPIClient
 	state        protocol.State
 	chainID      flow.ChainID
 	collections  storage.Collections
@@ -46,8 +45,8 @@ type Backend struct {
 
 func New(
 	state protocol.State,
-	executionRPC execution.ExecutionAPIClient,
-	collectionRPC access.AccessAPIClient,
+	executionRPC execproto.ExecutionAPIClient,
+	collectionRPC accessproto.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -106,12 +105,12 @@ func New(
 
 // Ping responds to requests when the server is up.
 func (b *Backend) Ping(ctx context.Context) error {
-	_, err := b.executionRPC.Ping(ctx, &execution.PingRequest{})
+	_, err := b.executionRPC.Ping(ctx, &execproto.PingRequest{})
 	if err != nil {
 		return fmt.Errorf("could not ping execution node: %w", err)
 	}
 
-	_, err = b.collectionRPC.Ping(ctx, &access.PingRequest{})
+	_, err = b.collectionRPC.Ping(ctx, &accessproto.PingRequest{})
 	if err != nil {
 		return fmt.Errorf("could not ping collection node: %w", err)
 	}
@@ -130,8 +129,8 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	return col, nil
 }
 
-func (b *Backend) GetNetworkParameters(_ context.Context) handler.NetworkParameters {
-	return handler.NetworkParameters{
+func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParameters {
+	return access.NetworkParameters{
 		ChainID: b.chainID,
 	}
 }

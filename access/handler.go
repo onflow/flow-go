@@ -1,24 +1,23 @@
-package handler
+package access
 
 import (
 	"context"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Handler struct {
-	api   AccessAPI
+	api   API
 	chain flow.Chain
 }
 
-func New(api AccessAPI, chain flow.Chain) *Handler {
+func NewHandler(api API, chain flow.Chain) *Handler {
 	return &Handler{
 		api:   api,
 		chain: chain,

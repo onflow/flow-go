@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/execution"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
-	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
+	"github.com/dapperlabs/flow-go/access"
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -22,8 +21,8 @@ import (
 )
 
 type backendTransactions struct {
-	collectionRPC      access.AccessAPIClient
-	executionRPC       execution.ExecutionAPIClient
+	collectionRPC      accessproto.AccessAPIClient
+	executionRPC       execproto.ExecutionAPIClient
 	transactions       storage.Transactions
 	collections        storage.Collections
 	blocks             storage.Blocks
@@ -40,7 +39,7 @@ func (b *backendTransactions) SendTransaction(
 ) error {
 	now := time.Now().UTC()
 
-	colReq := &access.SendTransactionRequest{
+	colReq := &accessproto.SendTransactionRequest{
 		Transaction: convert.TransactionToMessage(*tx),
 	}
 
@@ -66,9 +65,9 @@ func (b *backendTransactions) SendTransaction(
 // SendRawTransaction sends a raw transaction to the collection node
 func (b *backendTransactions) SendRawTransaction(
 	ctx context.Context,
-	tx *entities.Transaction,
-) (*access.SendTransactionResponse, error) {
-	req := &access.SendTransactionRequest{
+	tx *entitiesproto.Transaction,
+) (*accessproto.SendTransactionResponse, error) {
+	req := &accessproto.SendTransactionRequest{
 		Transaction: tx,
 	}
 
@@ -89,7 +88,7 @@ func (b *backendTransactions) GetTransaction(_ context.Context, txID flow.Identi
 func (b *backendTransactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-) (*handler.TransactionResult, error) {
+) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	tx, err := b.transactions.ByID(txID)
 	if err != nil {
@@ -110,7 +109,7 @@ func (b *backendTransactions) GetTransactionResult(
 
 	// TODO: Set correct values for StatusCode and ErrorMessage
 
-	return &handler.TransactionResult{
+	return &access.TransactionResult{
 		Status:       status,
 		StatusCode:   uint(statusCode),
 		Events:       events,
@@ -234,7 +233,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 ) ([]flow.Event, uint32, string, error) {
 
 	// create an execution API request for events at blockID and transactionID
-	req := execution.GetTransactionResultRequest{
+	req := execproto.GetTransactionResultRequest{
 		BlockId:       blockID,
 		TransactionId: transactionID,
 	}
