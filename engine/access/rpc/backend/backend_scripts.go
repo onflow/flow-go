@@ -3,10 +3,9 @@ package backend
 import (
 	"context"
 
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -16,7 +15,7 @@ import (
 type backendScripts struct {
 	headers      storage.Headers
 	state        protocol.State
-	executionRPC execution.ExecutionAPIClient
+	executionRPC execproto.ExecutionAPIClient
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -76,7 +75,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	arguments [][]byte,
 ) ([]byte, error) {
 
-	execReq := execution.ExecuteScriptAtBlockIDRequest{
+	execReq := execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId: blockID[:],
 		Script:  script,
 	}

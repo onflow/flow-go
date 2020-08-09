@@ -3,7 +3,7 @@ package backend
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/execution"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -15,7 +15,7 @@ import (
 
 type backendAccounts struct {
 	state        protocol.State
-	executionRPC execution.ExecutionAPIClient
+	executionRPC execproto.ExecutionAPIClient
 	headers      storage.Headers
 }
 
@@ -71,7 +71,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 	blockID flow.Identifier,
 ) (*flow.Account, error) {
 
-	exeReq := execution.GetAccountAtBlockIDRequest{
+	exeReq := execproto.GetAccountAtBlockIDRequest{
 		Address: address.Bytes(),
 		BlockId: blockID[:],
 	}

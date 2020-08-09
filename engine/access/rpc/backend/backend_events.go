@@ -3,10 +3,9 @@ package backend
 import (
 	"context"
 
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -15,7 +14,7 @@ import (
 )
 
 type backendEvents struct {
-	executionRPC execution.ExecutionAPIClient
+	executionRPC execproto.ExecutionAPIClient
 	blocks       storage.Blocks
 	state        protocol.State
 }
@@ -75,7 +74,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 ) ([]flow.BlockEvents, error) {
 
 	// create an execution API request for events at block ID
-	req := execution.GetEventsForBlockIDsRequest{
+	req := execproto.GetEventsForBlockIDsRequest{
 		Type:     eventType,
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
@@ -94,7 +93,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 }
 
 // accessEvents converts execution node api result to access node api result
-func accessEvents(execResults []*execution.GetEventsForBlockIDsResponse_Result) []flow.BlockEvents {
+func accessEvents(execResults []*execproto.GetEventsForBlockIDsResponse_Result) []flow.BlockEvents {
 	results := make([]flow.BlockEvents, len(execResults))
 
 	for i, result := range execResults {
