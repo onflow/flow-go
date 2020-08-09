@@ -28,7 +28,13 @@ type ResendEngine struct {
 }
 
 func New(logger zerolog.Logger, network *libp2p.Network, me module.Local, storage cmd.Storage,
-	flagHeightStart uint64, flagHeightEnd uint64, flagDelayMs uint16) *ResendEngine {
+	flagHeightStart uint64, flagHeightEnd uint64, flagDelayMs uint16, flagTarget string) *ResendEngine {
+
+	identifier, err := flow.HexStringToIdentifier(flagTarget)
+	if err != nil {
+		logger.Fatal().Msg("cannot decode target identifier")
+	}
+
 	e := &ResendEngine{
 		unit:    engine.NewUnit(),
 		network: network,
@@ -38,6 +44,7 @@ func New(logger zerolog.Logger, network *libp2p.Network, me module.Local, storag
 		flagHeightEnd: flagHeightEnd,
 		flagHeightStart: flagHeightStart,
 		flagDelayMs: flagDelayMs,
+		target: identifier,
 	}
 
 	conduit, err := network.Register(engine.PushBlocks, e)

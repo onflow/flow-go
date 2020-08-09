@@ -14,6 +14,7 @@ func main() {
 		flagHeightStart uint64
 		flagHeightEnd   uint64
 		flagDelayMs     uint16
+		flagTaget		string
 	)
 
 	cmd.FlowNode("block-sender").
@@ -28,6 +29,9 @@ func main() {
 			flags.Uint16Var(&flagDelayMs, "delay", 10,
 				"delay between block")
 
+			flags.StringVar(&flagTaget, "target", "",
+				"target node identifier (hexencoded)")
+
 			//homedir, _ := os.UserHomeDir()
 			//datadir := filepath.Join(homedir, ".flow", "execution")
 
@@ -38,6 +42,8 @@ func main() {
 		}).
 		Component("resend engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
+
+
 			resendEngine := resend_engine.New(
 				node.Logger,
 				node.Network,
@@ -45,7 +51,8 @@ func main() {
 				node.Storage,
 				flagHeightStart,
 				flagHeightEnd,
-				flagDelayMs)
+				flagDelayMs,
+				flagTaget)
 
 			return resendEngine, nil
 		}).Run()
