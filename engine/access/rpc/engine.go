@@ -10,14 +10,14 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-	legacyaccess "github.com/onflow/flow/protobuf/go/flow/legacy/access"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
+	"github.com/dapperlabs/flow-go/access"
+	legacyaccess "github.com/dapperlabs/flow-go/access/legacy"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/backend"
-	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
-	legacyhandler "github.com/dapperlabs/flow-go/engine/access/rpc/handler/legacy"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -48,8 +48,8 @@ type Engine struct {
 func New(log zerolog.Logger,
 	state protocol.State,
 	config Config,
-	executionRPC execution.ExecutionAPIClient,
-	collectionRPC access.AccessAPIClient,
+	executionRPC execproto.ExecutionAPIClient,
+	collectionRPC accessproto.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -94,15 +94,15 @@ func New(log zerolog.Logger,
 		config:     config,
 	}
 
-	access.RegisterAccessAPIServer(
+	accessproto.RegisterAccessAPIServer(
 		eng.grpcServer,
-		handler.New(backend, chainID.Chain()),
+		access.NewHandler(backend, chainID.Chain()),
 	)
 
 	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
-	legacyaccess.RegisterAccessAPIServer(
+	legacyaccessproto.RegisterAccessAPIServer(
 		eng.grpcServer,
-		legacyhandler.New(backend, chainID.Chain()),
+		legacyaccess.NewHandler(backend, chainID.Chain()),
 	)
 
 	return eng
