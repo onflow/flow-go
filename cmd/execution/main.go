@@ -197,6 +197,8 @@ func main() {
 			if err == nil {
 				node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
 				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
+			} else if err != nil && preferredExeNodeIDStr != "" {
+				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 			}
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
