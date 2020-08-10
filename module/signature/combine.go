@@ -14,8 +14,7 @@ const lengthSize = 4
 // on a level above the cryptographic implementation. It simply concatenates
 // signatures together with their length information and uses this information
 // to split the concatenated bytes into its signature parts again.
-type Combiner struct {
-}
+type Combiner struct{}
 
 // NewCombiner creates a new combiner to join and split signatures.
 func NewCombiner() *Combiner {
