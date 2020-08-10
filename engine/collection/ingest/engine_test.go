@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/collection/ingest"
+	"github.com/dapperlabs/flow-go/access"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -42,7 +42,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		if assert.Error(t, err) {
-			assert.True(t, errors.As(err, &ingest.IncompleteTransactionError{}))
+			assert.True(t, errors.As(err, &access.IncompleteTransactionError{}))
 		}
 	})
 
@@ -52,7 +52,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		if assert.Error(t, err) {
-			assert.True(t, errors.As(err, &ingest.GasLimitExceededError{}))
+			assert.True(t, errors.As(err, &access.InvalidGasLimitError{}))
 		}
 	})
 
@@ -62,7 +62,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		t.Log(err)
-		assert.True(t, errors.As(err, &ingest.ErrUnknownReferenceBlock))
+		assert.True(t, errors.As(err, &access.ErrUnknownReferenceBlock))
 	})
 
 	t.Run("un-parseable script", func(t *testing.T) {
@@ -72,7 +72,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		t.Log(err)
-		assert.True(t, errors.As(err, &ingest.InvalidScriptError{}))
+		assert.True(t, errors.As(err, &access.InvalidScriptError{}))
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
@@ -100,7 +100,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 			err := node.IngestionEngine.ProcessLocal(&tx)
 			t.Log(err)
-			assert.True(t, errors.As(err, &ingest.ExpiredTransactionError{}))
+			assert.True(t, errors.As(err, &access.ExpiredTransactionError{}))
 		})
 	})
 }

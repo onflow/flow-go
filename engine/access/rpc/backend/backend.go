@@ -106,21 +106,7 @@ func New(
 
 func configureTransactionValidator(state protocol.State) *access.TransactionValidator {
 	return access.NewTransactionValidator(
-		func(id flow.Identifier) (*flow.Header, error) {
-			header, err := state.AtBlockID(id).Head()
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					return nil, nil
-				}
-
-				return nil, err
-			}
-
-			return header, nil
-		},
-		func() (*flow.Header, error) {
-			return state.Final().Head()
-		},
+		access.NewProtocolStateBlockGetter(state),
 		access.TransactionValidationOptions{
 			Expiry:                     10,
 			ExpiryBuffer:               0,

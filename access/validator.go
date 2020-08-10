@@ -1,15 +1,45 @@
 package access
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence/runtime/parser"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-type GetBlockHeaderByID func(id flow.Identifier) (*flow.Header, error)
-type GetFinalizedBlockHeader func() (*flow.Header, error)
+type BlockGetter interface {
+	BlockHeaderByID(id flow.Identifier) (*flow.Header, error)
+	FinalizedBlockHeader() (*flow.Header, error)
+}
+
+type ProtocolStateBlockGetter struct {
+	state protocol.State
+}
+
+func NewProtocolStateBlockGetter(state protocol.State) *ProtocolStateBlockGetter {
+	return &ProtocolStateBlockGetter{state: state}
+}
+
+func (b *ProtocolStateBlockGetter) BlockHeaderByID(id flow.Identifier) (*flow.Header, error) {
+	header, err := b.state.AtBlockID(id).Head()
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return header, nil
+}
+
+func (b *ProtocolStateBlockGetter) FinalizedBlockHeader() (*flow.Header, error) {
+	return b.state.Final().Head()
+}
 
 type TransactionValidationOptions struct {
 	Expiry                     uint
@@ -20,20 +50,17 @@ type TransactionValidationOptions struct {
 }
 
 type TransactionValidator struct {
-	getBlockHeaderByID      GetBlockHeaderByID
-	getFinalizedBlockHeader GetFinalizedBlockHeader
-	options                 TransactionValidationOptions
+	blockGetter BlockGetter
+	options     TransactionValidationOptions
 }
 
 func NewTransactionValidator(
-	getBlockHeaderByID GetBlockHeaderByID,
-	getFinalizedBlockHeader GetFinalizedBlockHeader,
+	blockGetter BlockGetter,
 	options TransactionValidationOptions,
 ) *TransactionValidator {
 	return &TransactionValidator{
-		getBlockHeaderByID:      getBlockHeaderByID,
-		getFinalizedBlockHeader: getFinalizedBlockHeader,
-		options:                 options,
+		blockGetter: blockGetter,
+		options:     options,
 	}
 }
 
@@ -89,7 +116,7 @@ func (v *TransactionValidator) checkGasLimit(tx *flow.TransactionBody) error {
 func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 
 	// look up the reference block
-	ref, err := v.getBlockHeaderByID(tx.ReferenceBlockID)
+	ref, err := v.blockGetter.BlockHeaderByID(tx.ReferenceBlockID)
 	if err != nil {
 		return fmt.Errorf("could not get reference block: %w", err)
 	}
@@ -105,7 +132,7 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 	}
 
 	// get the latest finalized block we know about
-	final, err := v.getFinalizedBlockHeader()
+	final, err := v.blockGetter.FinalizedBlockHeader()
 	if err != nil {
 		return fmt.Errorf("could not get finalized header: %w", err)
 	}
