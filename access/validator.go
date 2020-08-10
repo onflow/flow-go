@@ -8,14 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type BlockHeaderByID func(id flow.Identifier) (*flow.Header, error)
-type FinalizedBlockHeader func() (*flow.Header, error)
-
-type TransactionValidator struct {
-	blockHeaderByID      BlockHeaderByID
-	finalizedBlockHeader FinalizedBlockHeader
-	options              TransactionValidationOptions
-}
+type GetBlockHeaderByID func(id flow.Identifier) (*flow.Header, error)
+type GetFinalizedBlockHeader func() (*flow.Header, error)
 
 type TransactionValidationOptions struct {
 	Expiry                     uint
@@ -25,15 +19,21 @@ type TransactionValidationOptions struct {
 	CheckScriptsParse          bool
 }
 
+type TransactionValidator struct {
+	getBlockHeaderByID      GetBlockHeaderByID
+	getFinalizedBlockHeader GetFinalizedBlockHeader
+	options                 TransactionValidationOptions
+}
+
 func NewTransactionValidator(
-	blockHeaderByID BlockHeaderByID,
-	finalizedBlockHeader FinalizedBlockHeader,
+	getBlockHeaderByID GetBlockHeaderByID,
+	getFinalizedBlockHeader GetFinalizedBlockHeader,
 	options TransactionValidationOptions,
 ) *TransactionValidator {
 	return &TransactionValidator{
-		blockHeaderByID:      blockHeaderByID,
-		finalizedBlockHeader: finalizedBlockHeader,
-		options:              options,
+		getBlockHeaderByID:      getBlockHeaderByID,
+		getFinalizedBlockHeader: getFinalizedBlockHeader,
+		options:                 options,
 	}
 }
 
@@ -89,7 +89,7 @@ func (v *TransactionValidator) checkGasLimit(tx *flow.TransactionBody) error {
 func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 
 	// look up the reference block
-	ref, err := v.blockHeaderByID(tx.ReferenceBlockID)
+	ref, err := v.getBlockHeaderByID(tx.ReferenceBlockID)
 	if err != nil {
 		return fmt.Errorf("could not get reference block: %w", err)
 	}
@@ -105,7 +105,7 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 	}
 
 	// get the latest finalized block we know about
-	final, err := v.finalizedBlockHeader()
+	final, err := v.getFinalizedBlockHeader()
 	if err != nil {
 		return fmt.Errorf("could not get finalized header: %w", err)
 	}
