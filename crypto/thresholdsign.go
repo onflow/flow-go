@@ -164,8 +164,7 @@ func (s *thresholdSigner) VerifyThresholdSignature(thresholdSignature Signature)
 // ClearShares clears the shares and signers lists
 func (s *thresholdSigner) ClearShares() {
 	s.thresholdSignature = nil
-	s.tempShare = nil
-	s.tempOrig = -1
+	s.emptyTempShare()
 	s.signers = s.signers[:0]
 	s.shares = s.shares[:0]
 }
@@ -191,7 +190,7 @@ func (s *thresholdSigner) AddSignatureShare(orig int, share Signature) (bool, er
 	// stage the share
 	verif, err := s.VerifyStageShare(orig, share)
 	if err != nil {
-		return verif, fmt.Errorf("add signature failed: %w", err)
+		return false, fmt.Errorf("add signature failed: %w", err)
 	}
 	if verif {
 		// commit the share
@@ -277,7 +276,7 @@ func (s *thresholdSigner) ThresholdSignature() (Signature, error) {
 		s.thresholdSignature = thresholdSignature
 		return thresholdSignature, nil
 	}
-	return nil, errors.New("The number of signatures shares does not reach the threshold")
+	return nil, errors.New("there are not enough signatures shares")
 }
 
 // ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
@@ -312,6 +311,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 
 // ReconstructThresholdSignature is a stateless api that takes a list of
 // signatures and their signers's indices and returns the threshold signature.
+//
 // size is the size of the threshold signature group
 // The function does not check the validity of the shares, and does not check
 // the validity of the resulting signature. It also does not check the signatures signers
