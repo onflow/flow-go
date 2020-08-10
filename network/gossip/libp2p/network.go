@@ -11,8 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
-	libp2perrors "github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 )
@@ -29,28 +28,28 @@ type Network struct {
 	top     middleware.Topology
 	metrics module.NetworkMetrics
 	engines map[uint8]network.Engine
-	rcache  *cache.RcvCache // used to deduplicate incoming messages
+	rqueue  *queue.RcvQueue // used to deduplicate incoming messages and prioritize them
 	fanout  int             // used to determine number of nodes' neighbors on overlay
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
-// using the given state & cache interfaces to track volatile information.
-// csize determines the size of the cache dedicated to keep track of received messages
+// using the given state & queue interfaces to track volatile information.
+// csize determines the size of the queue dedicated to keep track of received messages
 func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
 	ids flow.IdentityList,
 	me module.Local,
 	mw middleware.Middleware,
-	csize int,
+	qsize int,
 	top middleware.Topology,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
 
-	rcache, err := cache.NewRcvCache(csize)
+	rqueue, err := queue.NewRcvQueue(log, qsize)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize cache: %w", err)
+		return nil, fmt.Errorf("could not initialize queue: %w", err)
 	}
 
 	// fanout is set to half of the system size for connectivity assurance w.h.p
@@ -62,12 +61,13 @@ func NewNetwork(
 		me:      me,
 		mw:      mw,
 		engines: make(map[uint8]network.Engine),
-		rcache:  rcache,
+		rqueue:  rqueue,
 		fanout:  fanout,
 		top:     top,
 		metrics: metrics,
 	}
 
+	o.rqueue.SetEngines(&o.engines)
 	o.SetIDs(ids)
 
 	return o, nil
@@ -141,12 +141,7 @@ func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
-
-	err := n.processNetworkMessage(nodeID, msg)
-	if err != nil {
-		return fmt.Errorf("could not process message: %w", err)
-	}
-
+	n.processNetworkMessage(nodeID, msg)
 	return nil
 }
 
@@ -156,9 +151,9 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 	n.ids = idsMinusMe
 }
 
-func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
-	// checks the cache for deduplication and adds the message if not already present
-	if n.rcache.Add(message.EventID, message.ChannelID) {
+func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) {
+	// Adds the message to the queue. If the message is a duplicate or the overflow buffer is full, it drops it.
+	if !n.rqueue.Add(senderID, message) {
 		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
@@ -166,31 +161,12 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 
 		channelName := engine.ChannelName(uint8(message.ChannelID))
 
-		// drops duplicate message
+		// Drops duplicate message.
 		log.Debug().
 			Str("channel", channelName).
-			Msg("dropping message due to duplication")
+			Msg("dropping message due to duplication or overflow")
 		n.metrics.NetworkDuplicateMessagesDropped(channelName)
-		return nil
 	}
-
-	// Extract channel id and find the registered engine
-	channelID := uint8(message.ChannelID)
-	en, found := n.engines[channelID]
-	if !found {
-		return libp2perrors.NewInvalidEngineError(channelID, senderID.String())
-	}
-
-	// Convert message payload to a known message type
-	decodedMessage, err := n.codec.Decode(message.Payload)
-	if err != nil {
-		return fmt.Errorf("could not decode event: %w", err)
-	}
-
-	// call the engine asynchronously with the message payload
-	en.Submit(senderID, decodedMessage)
-
-	return nil
 }
 
 // genNetworkMessage uses the codec to encode an event into a NetworkMessage

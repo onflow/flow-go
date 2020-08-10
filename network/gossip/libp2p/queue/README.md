@@ -1,0 +1,7 @@
+# Queue
+
+The purpose of this package is to build on the success of the `cache` package and add features such as prioritization based on message type and size, while adding functionality to control the message flow by virtue of creating a buffer.
+
+The `queue` package replaces the previous `cache` package to provide de-duplication of messages, while adding an overflow stack and priority stacks for message buffering. First, messages flow into the overflow stack. The overflow stack makes sure that we are processing a limited number of messages at any given time. The `queue` purposefully limits the size of this stack and discards any messages that overflow to prevent overwhelming the system during times of bursty traffic. After this, messages flow to the ten priority stacks. Priority scores are rounded into an integer between 0-9, distributing them among the ten priority stacks. The package intelligently detects the number of logical cores in the machine and carefully controls execution of a limited number of messages to prevent overwhelming the system.
+
+The package is designed to provide minimal overhead while providing for the stated goals. That said, and this is *important*, the queue is very much like a faucet. The patterns necessary to fine-tune it will not be evident until much later and it is designed to be tuned. For example, it might be necessary to reduce the size of the overflow stack or perhaps it is possible to increase it.
