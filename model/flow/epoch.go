@@ -60,7 +60,7 @@ func (commit *EpochCommit) MarshalJSON() ([]byte, error) {
 	enc := encodableCommit{
 		Counter:         commit.Counter,
 		ClusterQCs:      commit.ClusterQCs,
-		DKGGroupKey:     encodable.RandomBeaconPubKey{commit.DKGGroupKey},
+		DKGGroupKey:     encodable.RandomBeaconPubKey{PublicKey: commit.DKGGroupKey},
 		DKGParticipants: commit.DKGParticipants,
 	}
 	return json.Marshal(enc)
@@ -104,7 +104,7 @@ type encodableDKGParticipant struct {
 func (part DKGParticipant) MarshalJSON() ([]byte, error) {
 	enc := encodableDKGParticipant{
 		Index:    part.Index,
-		KeyShare: encodable.RandomBeaconPubKey{part.KeyShare},
+		KeyShare: encodable.RandomBeaconPubKey{PublicKey: part.KeyShare},
 	}
 	return json.Marshal(enc)
 }

@@ -23,18 +23,6 @@ func constructRootBlock(rootChain string, rootParent string, rootHeight uint64, 
 	return block
 }
 
-func generateIdentityList(nodes []model.NodeInfo) flow.IdentityList {
-
-	list := make([]*flow.Identity, 0, len(nodes))
-
-	for _, node := range nodes {
-		ident := node.Identity()
-		list = append(list, ident)
-	}
-
-	return list
-}
-
 func parseChainID(chainID string) flow.ChainID {
 	switch chainID {
 	case "main":

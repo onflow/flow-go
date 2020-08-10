@@ -101,6 +101,9 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 
 		// create consensus committee's state
 		committee, err := committee.NewStaticCommittee(identities, local.NodeID(), participantData.Lookup, participantData.GroupKey)
+		if err != nil {
+			return nil, nil, err
+		}
 
 		// create signer
 		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
