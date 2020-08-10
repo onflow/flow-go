@@ -17,6 +17,10 @@ type Blocks interface {
 	// Store a block within a badger transaction
 	StoreTx(block *flow.Block) func(*badger.Txn) error
 
+	// SyncCache syncs the block cache with the database
+	// this is only needed when `StoreTx` is failed
+	SyncCache(blockID flow.Identifier) error
+
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.
 	ByID(blockID flow.Identifier) (*flow.Block, error)

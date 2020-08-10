@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/state/protocol/util"
+	"github.com/dapperlabs/flow-go/storage"
 	stoerr "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -651,4 +652,64 @@ func TestExtendInvalidChainID(t *testing.T) {
 		err := state.Mutate().Extend(&block)
 		require.Error(t, err)
 	})
+}
+
+// verify that the Extend will store the block and its index within one transaction
+func TestExtendTransaction(t *testing.T) {
+
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		root := unittest.GenesisFixture(participants)
+
+		result := unittest.ExecutionResultFixture()
+		result.BlockID = root.ID()
+
+		seal := unittest.BlockSealFixture()
+		seal.BlockID = root.ID()
+		seal.ResultID = result.ID()
+		seal.FinalState = result.FinalStateCommit
+
+		err := state.Mutate().Bootstrap(root, result, seal)
+		require.NoError(t, err)
+
+		extend := unittest.BlockFixture()
+		extend.Payload.Guarantees = nil
+		extend.Payload.Seals = nil
+		extend.Header.Height = 1
+		extend.Header.View = 1
+		extend.Header.ParentID = root.ID()
+		extend.Header.PayloadHash = extend.Payload.Hash()
+
+		// inserting the block children first so that it will cause
+		// the later transaction fail in the middle.
+		err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
+			err = operation.InsertBlockChildren(extend.ID(), nil)(tx)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+
+		require.NoError(t, err)
+
+		// verify that the Extend should fail
+		err = state.Mutate().Extend(&extend)
+		require.Error(t, err)
+
+		// the block should not be saved in the middle of a transaction,
+		// because the entire transaction was failed.
+		// so database should not have the block stored
+		var header flow.Header
+		err = db.View(operation.RetrieveHeader(extend.ID(), &header))
+		require.NotNil(t, err)
+		require.True(t, errors.Is(storage.ErrNotFound, err), fmt.Sprintf("block should not be stored in db: %v", err))
+
+		// protocol state uses cache, it should also not have this block stored.
+		_, err = state.AtBlockID(extend.ID()).Head()
+		require.NotNil(t, err)
+		require.Error(t, err)
+		// fmt.Printf("error is %v\n", err)
+		// require.True(t, errors.Is(storage.ErrNotFound, fmt.Errorf("could not retrieve resource: %w", storage.ErrNotFound)))
+		// require.True(t, errors.Is(storage.ErrNotFound, err), fmt.Sprintf("block should not be stored in protocol state: %v", err))
+	})
+
 }

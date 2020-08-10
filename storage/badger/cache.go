@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -9,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 func withLimit(limit uint) func(*Cache) {
@@ -123,4 +125,39 @@ func (c *Cache) Put(entityID flow.Identifier, resource interface{}) func(*badger
 
 		return nil
 	}
+}
+
+// Sync will check if the data cached under the given entityID got inconsistent with
+// the database. If got out of sync, then resync the cache
+func (c *Cache) Sync(entityID flow.Identifier) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		_, cached := c.cache.Get(entityID)
+
+		resource, err := c.retrieve(entityID)(tx)
+		if errors.Is(storage.ErrNotFound, err) {
+			if !cached {
+				return nil
+			}
+
+			// cache inconsistent: cache has the block, but database doesn't
+			c.cache.Remove(entityID)
+			return nil
+		}
+
+		if err == nil {
+			if cached {
+				return nil
+			}
+
+			// cache inconsistent: database has the block, but cache doesn't
+			evicted := c.cache.Add(entityID, resource)
+			if !evicted {
+				c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+			}
+			return nil
+		}
+
+		return fmt.Errorf("could not read from entity database: %w", err)
+	}
+
 }

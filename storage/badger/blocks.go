@@ -67,6 +67,12 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
 	return b.storeTx(block)
 }
 
+// SyncCache syncs the block headers' cache with the database
+func (b *Blocks) SyncCache(blockID flow.Identifier) error {
+	// since only block header uses cache, we only need to sync headers' cache
+	return b.headers.syncCache(blockID)
+}
+
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()

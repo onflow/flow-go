@@ -61,6 +61,13 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.H
 	}
 }
 
+func (h *Headers) syncCache(blockID flow.Identifier) error {
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	return h.cache.Sync(blockID)(tx)
+}
+
 func (h *Headers) Store(header *flow.Header) error {
 	return operation.RetryOnConflict(h.db.Update, h.storeTx(header))
 }

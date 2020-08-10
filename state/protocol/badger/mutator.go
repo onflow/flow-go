@@ -415,7 +415,18 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		}
 		return nil
 	})
+
 	if err != nil {
+		// since protocol state caches the blocks after saved to badgerDB,
+		// it might introduce a cache inconsistency when the transaction failed after
+		// the cache is updated,
+		// a solution here is to force a cache sync when the transaction fails.
+		syncerr := m.state.blocks.SyncCache(blockID)
+		if syncerr != nil {
+			return fmt.Errorf("failed to sync cache: %v, could not execute state extension: %w",
+				syncerr, err)
+		}
+
 		return fmt.Errorf("could not execute state extension: %w", err)
 	}
 
