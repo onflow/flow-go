@@ -126,3 +126,17 @@ func (_m *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
 
 	return r0
 }
+
+// SyncCache provides a mock function with given fields: blockID
+func (_m *Blocks) SyncCache(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

@@ -121,6 +121,20 @@ func (mr *MockBlocksMockRecorder) StoreTx(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreTx", reflect.TypeOf((*MockBlocks)(nil).StoreTx), arg0)
 }
 
+// SyncCache mocks base method
+func (m *MockBlocks) SyncCache(arg0 flow.Identifier) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SyncCache", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SyncCache indicates an expected call of SyncCache
+func (mr *MockBlocksMockRecorder) SyncCache(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncCache", reflect.TypeOf((*MockBlocks)(nil).SyncCache), arg0)
+}
+
 // MockPayloads is a mock of Payloads interface
 type MockPayloads struct {
 	ctrl     *gomock.Controller
