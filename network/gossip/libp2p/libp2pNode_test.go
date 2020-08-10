@@ -446,7 +446,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandl
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "127.0.0.1", "0", rootID, handler, whiteList)
+		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler, whiteList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
