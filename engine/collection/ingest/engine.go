@@ -286,6 +286,7 @@ func (e *Engine) checkTransactionExpiry(tx *flow.TransactionBody) error {
 	if ref.Height > final.Height {
 		diff = 0
 	}
+
 	// discard transactions that are expired, or that will expire sooner than
 	// our configured buffer allows
 	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {
