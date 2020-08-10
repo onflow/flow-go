@@ -42,11 +42,12 @@ func (b *ProtocolStateBlocks) FinalizedBlockHeader() (*flow.Header, error) {
 }
 
 type TransactionValidationOptions struct {
-	Expiry                     uint
-	ExpiryBuffer               uint
-	AllowUnknownReferenceBlock bool
-	MaxGasLimit                uint64
-	CheckScriptsParse          bool
+	Expiry                       uint
+	ExpiryBuffer                 uint
+	AllowEmptyReferenceBlockID   bool
+	AllowUnknownReferenceBlockID bool
+	MaxGasLimit                  uint64
+	CheckScriptsParse            bool
 }
 
 type TransactionValidator struct {
@@ -92,6 +93,11 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 
 func (v *TransactionValidator) checkMissingFields(tx *flow.TransactionBody) error {
 	missingFields := tx.MissingFields()
+
+	if v.options.AllowEmptyReferenceBlockID {
+		missingFields = remove(missingFields, flow.TransactionFieldRefBlockID.String())
+	}
+
 	if len(missingFields) > 0 {
 		return IncompleteTransactionError{MissingFields: missingFields}
 	}
@@ -114,6 +120,9 @@ func (v *TransactionValidator) checkGasLimit(tx *flow.TransactionBody) error {
 // valid. Returns nil if the reference is valid, returns an error if the
 // reference is invalid or we failed to check it.
 func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
+	if tx.ReferenceBlockID == flow.ZeroID && v.options.AllowEmptyReferenceBlockID {
+		return nil
+	}
 
 	// look up the reference block
 	ref, err := v.blocks.HeaderByID(tx.ReferenceBlockID)
@@ -124,7 +133,7 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 	if ref == nil {
 		// the transaction references an unknown block - at this point we decide
 		// whether to consider it expired based on configuration
-		if v.options.AllowUnknownReferenceBlock {
+		if v.options.AllowUnknownReferenceBlockID {
 			return nil
 		}
 
@@ -164,4 +173,13 @@ func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error 
 	}
 
 	return nil
+}
+
+func remove(s []string, r string) []string {
+	for i, v := range s {
+		if v == r {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
 }
