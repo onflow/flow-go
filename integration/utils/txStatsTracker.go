@@ -27,35 +27,35 @@ type TxStats struct {
 	isExpired bool
 }
 
-// StatsTracker keep track of TxStats
-type StatsTracker struct {
+// TxStatsTracker keep track of TxStats
+type TxStatsTracker struct {
 	config  *StatsConfig
 	txStats []*TxStats
 	mux     sync.Mutex
 }
 
-// NewStatsTracker returns a new instance of StatsTracker
-func NewStatsTracker(config *StatsConfig) *StatsTracker {
-	return &StatsTracker{
+// NewTxStatsTracker returns a new instance of StatsTracker
+func NewTxStatsTracker(config *StatsConfig) *TxStatsTracker {
+	return &TxStatsTracker{
 		config:  config,
 		txStats: make([]*TxStats, 0),
 	}
 }
 
 // AddTxStats adds a new TxStats to the tracker
-func (st *StatsTracker) AddTxStats(tt *TxStats) {
+func (st *TxStatsTracker) AddTxStats(tt *TxStats) {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	st.txStats = append(st.txStats, tt)
 }
 
 // TotalTxSubmited returns the total transaction submited
-func (st *StatsTracker) TotalTxSubmited() int {
+func (st *TxStatsTracker) TotalTxSubmited() int {
 	return len(st.txStats)
 }
 
 // TxFailureRate returns the number of expired transactions divided by total number of transactions
-func (st *StatsTracker) TxFailureRate() float64 {
+func (st *TxStatsTracker) TxFailureRate() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	counter := 0
@@ -68,7 +68,7 @@ func (st *StatsTracker) TxFailureRate() float64 {
 }
 
 // AvgTTF returns the average transaction time to finality (in seconds)
-func (st *StatsTracker) AvgTTF() float64 {
+func (st *TxStatsTracker) AvgTTF() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	sum := float64(0)
@@ -83,7 +83,7 @@ func (st *StatsTracker) AvgTTF() float64 {
 }
 
 // MedTTF returns the median transaction time to finality (in seconds)
-func (st *StatsTracker) MedTTF() float64 {
+func (st *TxStatsTracker) MedTTF() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
@@ -97,7 +97,7 @@ func (st *StatsTracker) MedTTF() float64 {
 }
 
 // MaxTTF returns the maximum transaction time to finality (in seconds)
-func (st *StatsTracker) MaxTTF() float64 {
+func (st *TxStatsTracker) MaxTTF() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	max := float64(0)
@@ -112,7 +112,7 @@ func (st *StatsTracker) MaxTTF() float64 {
 }
 
 // AvgTTE returns the average transaction time to execution (in seconds)
-func (st *StatsTracker) AvgTTE() float64 {
+func (st *TxStatsTracker) AvgTTE() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	sum := float64(0)
@@ -127,7 +127,7 @@ func (st *StatsTracker) AvgTTE() float64 {
 }
 
 // MedTTE returns the median transaction time to execution (in seconds)
-func (st *StatsTracker) MedTTE() float64 {
+func (st *TxStatsTracker) MedTTE() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
@@ -141,7 +141,7 @@ func (st *StatsTracker) MedTTE() float64 {
 }
 
 // MaxTTE returns the maximum transaction time to execution (in seconds)
-func (st *StatsTracker) MaxTTE() float64 {
+func (st *TxStatsTracker) MaxTTE() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	max := float64(0)
@@ -156,7 +156,7 @@ func (st *StatsTracker) MaxTTE() float64 {
 }
 
 // AvgTTS return the average transaction time to seal (in seconds)
-func (st *StatsTracker) AvgTTS() float64 {
+func (st *TxStatsTracker) AvgTTS() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	sum := float64(0)
@@ -171,7 +171,7 @@ func (st *StatsTracker) AvgTTS() float64 {
 }
 
 // MaxTTS returns the maximum transaction time to seal (in seconds)
-func (st *StatsTracker) MaxTTS() float64 {
+func (st *TxStatsTracker) MaxTTS() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	max := float64(0)
@@ -186,7 +186,7 @@ func (st *StatsTracker) MaxTTS() float64 {
 }
 
 // MedTTS returns the median transaction time to seal (in seconds)
-func (st *StatsTracker) MedTTS() float64 {
+func (st *TxStatsTracker) MedTTS() float64 {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
@@ -199,7 +199,7 @@ func (st *StatsTracker) MedTTS() float64 {
 	return computeMedian(observations)
 }
 
-func (st *StatsTracker) String() string {
+func (st *TxStatsTracker) String() string {
 	t := table.NewWriter()
 	t.AppendHeader(table.Row{"index",
 		"TTF (s)",
@@ -216,7 +216,7 @@ func (st *StatsTracker) String() string {
 	return t.Render()
 }
 
-func (st *StatsTracker) Digest() string {
+func (st *TxStatsTracker) Digest() string {
 	t := table.NewWriter()
 	t.AppendHeader(table.Row{"total TX",
 		"failure rate",

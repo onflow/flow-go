@@ -7,6 +7,7 @@ const (
 	LabelResource = "resource"
 	LabelMessage  = "message"
 	LabelNodeID   = "nodeid"
+	LabelNodeRole = "noderole"
 )
 
 const (
