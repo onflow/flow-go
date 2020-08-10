@@ -39,7 +39,7 @@ const (
 )
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
-const maxConnectAttempt = 1
+const maxConnectAttempt = 3
 
 // NodeAddress is used to define a libp2p node
 type NodeAddress struct {
