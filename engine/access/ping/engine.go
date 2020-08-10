@@ -29,6 +29,7 @@ func New(
 	log zerolog.Logger,
 	state protocol.State,
 	me module.Local,
+	metrics module.PingMetrics,
 	pingEnabled bool,
 	mw *libp2p.Middleware,
 ) (*Engine, error) {
@@ -37,6 +38,7 @@ func New(
 		log:          log.With().Str("engine", "ping").Logger(),
 		state:        state,
 		me:           me,
+		metrics:      metrics,
 		pingEnabled:  pingEnabled,
 		pingInterval: time.Minute,
 		middleware:   mw,
@@ -53,6 +55,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.pingEnabled {
 		e.unit.Launch(e.startPing)
 	}
+	e.log.Info().Bool("ping enabled", e.pingEnabled).Msg("ping enabled")
 	return e.unit.Ready()
 }
 
@@ -74,6 +77,7 @@ func (e *Engine) startPing() {
 	// for each peer, send a ping every ping interval
 	for i, peer := range peers {
 		func(peer *flow.Identity, delay time.Duration) {
+			e.log.Info().Str("peer", peer.String()).Dur("interval", pingInterval).Msg("periodically ping node")
 			e.unit.LaunchPeriodically(func() {
 				e.pingNode(peer)
 			}, pingInterval, delay)
@@ -84,7 +88,7 @@ func (e *Engine) startPing() {
 // send ping to a given node and report the reachable result to metrics
 func (e *Engine) pingNode(peer *flow.Identity) {
 	reachable := e.pingAddress(peer.ID())
-	e.metrics.NodeReachable(peer.ID(), reachable)
+	e.metrics.NodeReachable(peer, reachable)
 }
 
 // pingAddress sends a ping request to the given address, and block until either receive
