@@ -10,7 +10,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -28,6 +30,7 @@ type Builder struct {
 	clusterHeaders    storage.Headers
 	payloads          storage.ClusterPayloads
 	transactions      mempool.Transactions
+	tracer            module.Tracer
 	maxCollectionSize uint
 	expiryBuffer      uint
 }
@@ -46,7 +49,14 @@ func WithExpiryBuffer(buf uint) Opt {
 	}
 }
 
-func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, opts ...Opt) *Builder {
+func NewBuilder(
+	db *badger.DB,
+	headers storage.Headers,
+	payloads storage.ClusterPayloads,
+	transactions mempool.Transactions,
+	tracer module.Tracer,
+	opts ...Opt,
+) *Builder {
 
 	b := Builder{
 		db:                db,
@@ -54,6 +64,7 @@ func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.Cluster
 		clusterHeaders:    headers,
 		payloads:          payloads,
 		transactions:      transactions,
+		tracer:            tracer,
 		maxCollectionSize: 100,
 		expiryBuffer:      15,
 	}
@@ -69,11 +80,15 @@ func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.Cluster
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 	var proposal cluster.Block
 
+	b.tracer.StartSpan(parentID, trace.COLBuildOn)
+	defer b.tracer.FinishSpan(parentID, trace.COLBuildOn)
+
 	// first we construct a proposal in-memory, ensuring it is a valid extension
 	// of chain state -- this can be done in a read-only transaction
 	err := b.db.View(func(tx *badger.Txn) error {
 
 		// STEP ONE: Load some things we need to do our work.
+		b.tracer.StartSpan(parentID, trace.COLBuildOnSetup)
 
 		var parent flow.Header
 		err := operation.RetrieveHeader(parentID, &parent)(tx)
@@ -105,6 +120,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// part of the chain we care about. We do this separately for
 		// un-finalized and finalized sections of the chain to decide whether to
 		// remove conflicting transactions from the mempool.
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
+		b.tracer.StartSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 
 		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
@@ -130,6 +147,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			}
 			ancestorID = ancestor.ParentID
 		}
+
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+		b.tracer.StartSpan(parentID, trace.COLBuildOnFinalizedLookup)
 
 		//TODO for now we check a fixed # of finalized ancestors - we should
 		// instead look back based on reference block ID and expiry
@@ -164,6 +184,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 		// STEP THREE: build a payload of valid transactions, while at the same
 		// time figuring out the correct reference block ID for the collection.
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
+		b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
 
 		minRefHeight := uint64(math.MaxUint64)
 		// start with the finalized reference ID (longest expiry time)
@@ -225,6 +247,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// STEP FOUR: we have a set of transactions that are valid to include
 		// on this fork. Now we need to create the collection that will be
 		// used in the payload and construct the final proposal model
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
+		b.tracer.StartSpan(parentID, trace.COLBuildOnCreateHeader)
 
 		// build the payload from the transactions
 		payload := cluster.PayloadFromTransactions(minRefID, transactions...)
@@ -251,11 +275,16 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			Payload: &payload,
 		}
 
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
+
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not build block: %w", err)
 	}
+
+	b.tracer.StartSpan(parentID, trace.COLBuildOnDBInsert)
+	defer b.tracer.FinishSpan(parentID, trace.COLBuildOnDBInsert)
 
 	// finally we insert the block in a write transaction
 	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))
