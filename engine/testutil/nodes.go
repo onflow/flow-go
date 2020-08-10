@@ -76,10 +76,8 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits)
 	require.NoError(t, err)
 
-	genesis := flow.Genesis(chainID)
-	result := unittest.BootstrapExecutionResultFixture(genesis, unittest.GenesisStateCommitment)
-	seal := unittest.SealFixture(result)
-	err = state.Mutate().Bootstrap(genesis, result, seal)
+	root, result, seal := unittest.BootstrapFixture(participants)
+	err = state.Mutate().Bootstrap(root, result, seal)
 	require.NoError(t, err)
 
 	for _, option := range options {
