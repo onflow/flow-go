@@ -3,11 +3,8 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 )
-
-type GetIdentityList func() flow.IdentityList
 
 // Network represents the network layer of the node. It allows processes that
 // work across the peer-to-peer network to register themselves as an engine with
