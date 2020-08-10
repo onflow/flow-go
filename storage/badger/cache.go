@@ -134,7 +134,7 @@ func (c *Cache) Sync(entityID flow.Identifier) func(*badger.Txn) error {
 		_, cached := c.cache.Get(entityID)
 
 		resource, err := c.retrieve(entityID)(tx)
-		if errors.Is(storage.ErrNotFound, err) {
+		if errors.Is(err, storage.ErrNotFound) {
 			if !cached {
 				return nil
 			}

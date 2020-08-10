@@ -701,15 +701,11 @@ func TestExtendTransaction(t *testing.T) {
 		var header flow.Header
 		err = db.View(operation.RetrieveHeader(extend.ID(), &header))
 		require.NotNil(t, err)
-		require.True(t, errors.Is(storage.ErrNotFound, err), fmt.Sprintf("block should not be stored in db: %v", err))
+		require.True(t, errors.Is(err, storage.ErrNotFound), fmt.Sprintf("block should not be stored in db: %v", err))
 
 		// protocol state uses cache, it should also not have this block stored.
 		_, err = state.AtBlockID(extend.ID()).Head()
 		require.NotNil(t, err)
-		require.Error(t, err)
-		// fmt.Printf("error is %v\n", err)
-		// require.True(t, errors.Is(storage.ErrNotFound, fmt.Errorf("could not retrieve resource: %w", storage.ErrNotFound)))
-		// require.True(t, errors.Is(storage.ErrNotFound, err), fmt.Sprintf("block should not be stored in protocol state: %v", err))
+		require.True(t, errors.Is(err, storage.ErrNotFound), fmt.Sprintf("block should not be stored in protocol state: %v", err))
 	})
-
 }
