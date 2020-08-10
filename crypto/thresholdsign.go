@@ -60,6 +60,10 @@ type thresholdSigner struct {
 	// the threshold signature. It is equal to nil if less than (t+1) shares are
 	// received
 	thresholdSignature Signature
+	// tempShare stores a temporary share that is staged but not committed yet
+	// to the list of shares. tempOrig is the index related to tempShare
+	tempShare Signature
+	tempOrig  int
 }
 
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
@@ -91,6 +95,8 @@ func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash
 		shares:             shares,
 		signers:            signers,
 		thresholdSignature: nil,
+		tempShare:          nil,
+		tempOrig:           -1,
 	}, nil
 }
 
@@ -158,6 +164,8 @@ func (s *thresholdSigner) VerifyThresholdSignature(thresholdSignature Signature)
 // ClearShares clears the shares and signers lists
 func (s *thresholdSigner) ClearShares() {
 	s.thresholdSignature = nil
+	s.tempShare = nil
+	s.tempOrig = -1
 	s.signers = s.signers[:0]
 	s.shares = s.shares[:0]
 }
@@ -168,36 +176,90 @@ func (s *thresholdSigner) EnoughShares() bool {
 	return len(s.signers) == (s.threshold + 1)
 }
 
-// AddSignatureShare processes a signature share
+func (s *thresholdSigner) emptyTempShare() {
+	s.tempShare = nil
+	s.tempOrig = -1
+}
+
+// AddSignatureShare adds a signature share to the local list of shares.
+//
 // If the share is valid, not perviously added and the threshold is not reached yet,
-// it is appended to a local list of valid shares
-// The function returns true if the share is valid, false otherwise
+// it is appended to the local list of valid shares. This is equivelent to staging
+// and commiting a share at the same step.
+// The function returns true if the share is valid and new, false otherwise.
 func (s *thresholdSigner) AddSignatureShare(orig int, share Signature) (bool, error) {
+	// stage the share
+	verif, err := s.VerifyStageShare(orig, share)
+	if err != nil {
+		return verif, fmt.Errorf("add signature failed: %w", err)
+	}
+	if verif {
+		// commit the share
+		err = s.CommitShare()
+		if err != nil {
+			return true, fmt.Errorf("add signature failed: %w", err)
+		}
+	}
+	return verif, nil
+}
+
+// VerifyStageShare verifies a signature share without adding it to the local list of shares.
+//
+// If the share is valid and new, it is stored temporarily till is it committed to the shares
+// list using CommitShare.
+// Any call to VerifyStageShare, AddSignatureShare or CommitShare empties the temporary share.
+// If the threshold is already reached, the VerifyStageShare still verifies the share.
+// The function returns true if the share is valid and new, false otherwise.
+func (s *thresholdSigner) VerifyStageShare(orig int, share Signature) (bool, error) {
+	// empty the temporary share
+	s.emptyTempShare()
+
 	if orig >= s.size || orig < 0 {
 		return false, errors.New("orig input is invalid")
 	}
 
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
-		return false, fmt.Errorf("add signature share failed: %w", err)
+		return false, fmt.Errorf("signature share is invalid: %w", err)
 	}
-	// check if share is valid and threshold is not reached
-	if verif && !s.EnoughShares() {
-		// check if the share is new
-		isSeen := false
-		for _, e := range s.signers {
-			if e == index(orig) {
-				isSeen = true
-				break
-			}
-		}
-		if !isSeen {
-			// append the share
-			s.shares = append(s.shares, share...)
-			s.signers = append(s.signers, index(orig))
+
+	// check if the share is new
+	isSeen := false
+	for _, e := range s.signers {
+		if e == index(orig) {
+			isSeen = true
+			break
 		}
 	}
-	return verif, nil
+
+	// assign the temp share
+	if verif && !isSeen {
+		// store the share temporarily
+		s.tempShare = share
+		s.tempOrig = orig
+		return true, nil
+	}
+	return false, nil
+}
+
+// CommitShare commits the temporary signature to the local list of shares if the threshold
+// is not reached.
+//
+// The temprory share is stored by the latest call to VerifyStageShare. Calling CommitShare
+// empties the temporary share.
+func (s *thresholdSigner) CommitShare() error {
+	if s.tempShare == nil || s.tempOrig == -1 {
+		return fmt.Errorf("there is no signature to commit")
+	}
+	// append the temporary share
+	if !s.EnoughShares() {
+		s.shares = append(s.shares, s.tempShare...)
+		s.signers = append(s.signers, index(s.tempOrig))
+	}
+
+	// empty the temporary share
+	s.emptyTempShare()
+	return nil
 }
 
 // ThresholdSignature returns the threshold signature if the threshold was reached, nil otherwise
