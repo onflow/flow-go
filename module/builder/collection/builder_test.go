@@ -101,10 +101,9 @@ func (suite *BuilderSuite) TearDownTest() {
 func (suite *BuilderSuite) Bootstrap() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
-	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	result := unittest.BootstrapExecutionResultFixture(genesis, unittest.GenesisStateCommitment)
-	seal := unittest.SealFixture(result)
-	err := suite.protoState.Mutate().Bootstrap(genesis, result, seal)
+	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	root, result, seal := unittest.BootstrapFixture(identities)
+	err := suite.protoState.Mutate().Bootstrap(root, result, seal)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain
@@ -114,7 +113,7 @@ func (suite *BuilderSuite) Bootstrap() {
 	// add some transactions to transaction pool
 	for i := 0; i < 3; i++ {
 		transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
-			tx.ReferenceBlockID = genesis.ID()
+			tx.ReferenceBlockID = root.ID()
 			tx.ProposalKey.SequenceNumber = uint64(i)
 		})
 		added := suite.pool.Add(&transaction)
