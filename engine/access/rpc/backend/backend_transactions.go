@@ -21,15 +21,16 @@ import (
 )
 
 type backendTransactions struct {
-	collectionRPC      accessproto.AccessAPIClient
-	executionRPC       execproto.ExecutionAPIClient
-	transactions       storage.Transactions
-	collections        storage.Collections
-	blocks             storage.Blocks
-	state              protocol.State
-	chainID            flow.ChainID
-	transactionMetrics module.TransactionMetrics
-	retry              *Retry
+	collectionRPC        accessproto.AccessAPIClient
+	executionRPC         execproto.ExecutionAPIClient
+	transactions         storage.Transactions
+	collections          storage.Collections
+	blocks               storage.Blocks
+	state                protocol.State
+	chainID              flow.ChainID
+	transactionValidator *access.TransactionValidator
+	transactionMetrics   module.TransactionMetrics
+	retry                *Retry
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -39,12 +40,17 @@ func (b *backendTransactions) SendTransaction(
 ) error {
 	now := time.Now().UTC()
 
-	colReq := &accessproto.SendTransactionRequest{
+	err := b.transactionValidator.Validate(tx)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid transaction: %s", err.Error())
+	}
+
+	req := &accessproto.SendTransactionRequest{
 		Transaction: convert.TransactionToMessage(*tx),
 	}
 
 	// send the transaction to the collection node if valid
-	_, err := b.collectionRPC.SendTransaction(ctx, colReq)
+	_, err = b.collectionRPC.SendTransaction(ctx, req)
 	if err != nil {
 		return status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
 	}
