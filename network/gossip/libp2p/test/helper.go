@@ -82,10 +82,14 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	for i := range ids {
 		// retrieves IP and port of the middleware
 		var ip, port string
+		var err error
 		var key crypto.PublicKey
 		if !dryrun {
 			m := mws[i]
-			ip, port = m.GetIPPort()
+			ip, port, err = m.GetIPPort()
+			if err != nil {
+				return nil, err
+			}
 			key = m.PublicKey()
 		}
 
@@ -109,7 +113,10 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	// update whitelist of each of the middleware after the network ids have been updated
 	if !dryrun {
 		for _, m := range mws {
-			m.UpdateWhitelist()
+			err := m.UpdateWhitelist()
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

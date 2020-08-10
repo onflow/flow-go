@@ -3,10 +3,10 @@ package libp2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -27,7 +27,6 @@ import (
 	"github.com/rs/zerolog"
 
 	netwk "github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 )
 
 const (
@@ -40,7 +39,7 @@ const (
 )
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
-const maxConnectAttempt = 3
+const maxConnectAttempt = 1
 
 // NodeAddress is used to define a libp2p node
 type NodeAddress struct {
@@ -61,7 +60,7 @@ type P2PNode struct {
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
 	conMgr               ConnManager                     // the connection manager passed in to libp2p
-	connGater            *connGater         // the connection gator passed in to libp2p
+	connGater            *connGater                      // the connection gator passed in to libp2p
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 }
 
@@ -110,15 +109,19 @@ func (p *P2PNode) Start(ctx context.Context,
 		libp2p.Ping(true),                   // enable ping
 	)
 
+	// if whitelisting is enabled, create a connection gator with whitelistAddrs
 	if whiteList {
+
+		// convert each of the whitelist address to libp2p peer infos
 		whilelistPInfos, err := GetPeerInfos(whitelistAddrs...)
 		if err != nil {
 			return fmt.Errorf("failed to create approved list of peers: %w", err)
 		}
-		p.connGater, err = newConnGater(whilelistPInfos, p.logger)
-		if err != nil {
-			return fmt.Errorf("failed to create connection gator: %w", err)
-		}
+
+		// create a connection gater
+		p.connGater = newConnGater(whilelistPInfos, p.logger)
+
+		// provide the connection gater as an option to libp2p
 		options = append(options, libp2p.ConnectionGater(p.connGater))
 	}
 
@@ -141,7 +144,11 @@ func (p *P2PNode) Start(ctx context.Context,
 	p.topics = make(map[string]*pubsub.Topic)
 	p.subs = make(map[string]*pubsub.Subscription)
 
-	ip, port := p.GetIPPort()
+	ip, port, err := p.GetIPPort()
+	if err != nil {
+		return fmt.Errorf("failed to find IP and port on which the node was started: %w", err)
+	}
+
 	p.logger.Debug().
 		Str("name", p.name).
 		Str("address", fmt.Sprintf("%s:%s", ip, port)).
@@ -249,27 +256,27 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		default:
 		}
 
+		// remove the peer from the peer store if present
+		p.libP2PHost.Peerstore().ClearAddrs(targetID)
+
+		// cancel the dial back off (if any), since we want to connect immediately
+		network := p.libP2PHost.Network()
+		if s, ok := network.(*swarm.Swarm); ok {
+			s.Backoff().Clear(targetID)
+		}
+
 		// if this is a retry attempt, wait for some time before retrying
-		if err != nil {
+		if retries > 0 {
 			// choose a random interval between 0 and 5 ms to retry
 			r := rand.Intn(5)
 			time.Sleep(time.Duration(r) * time.Millisecond)
-
-			// remove the peer from the peer store if present
-			p.libP2PHost.Peerstore().ClearAddrs(targetID)
-
-			// cancel the dial back off, since we want to retry immediately
-			n := p.libP2PHost.Network()
-			if s, ok := n.(*swarm.Swarm); ok {
-				s.Backoff().Clear(targetID)
-			}
 		}
 
-		// Add node address as a peer
+		// add node address as a peer
 		err = p.AddPeers(ctx, n)
 		if err != nil {
 			// if the connection was rejected due to whitelisting, skip the re-attempt
-			if errors.IsDialFailureError(err) && strings.Contains(err.Error(), "gater disallows connection to peer") {
+			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
 				return s, err
 			}
 			errs = multierror.Append(errs, err)
@@ -318,15 +325,8 @@ func GetPeerInfos(addrs ...NodeAddress) ([]peer.AddrInfo, error) {
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
-func (p *P2PNode) GetIPPort() (ip string, port string) {
-	for _, a := range p.libP2PHost.Network().ListenAddresses() {
-		if ip, e := a.ValueForProtocol(multiaddr.P_IP4); e == nil {
-			if p, e := a.ValueForProtocol(multiaddr.P_TCP); e == nil {
-				return ip, p
-			}
-		}
-	}
-	return "", ""
+func (p *P2PNode) GetIPPort() (string, string, error) {
+	return IPPortFromMultiAddress(p.libP2PHost.Network().ListenAddresses()...)
 }
 
 // Subscribe subscribes the node to the given topic and returns the subscription
@@ -457,15 +457,45 @@ func MultiaddressStr(address NodeAddress) string {
 	return fmt.Sprintf("/dns4/%s/tcp/%s", address.IP, address.Port)
 }
 
+// IPPortFromMultiAddress returns the IP/hostname and the port for the given multi-addresses
+// associated with a libp2p host
+func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error) {
+
+	var ipOrHostname, port string
+	var err error
+
+	for _, a := range addrs {
+		// try and get the dns4 hostname
+		ipOrHostname, err = a.ValueForProtocol(multiaddr.P_DNS4)
+		if err != nil {
+			// if dns4 hostname is not found, try and get the IP address
+			ipOrHostname, err = a.ValueForProtocol(multiaddr.P_IP4)
+		}
+
+		if err != nil {
+			continue // this may not be a TCP IP multiaddress
+		}
+
+		// if either IP address or hostname is found, look for the port number
+		port, err = a.ValueForProtocol(multiaddr.P_TCP)
+		if err != nil {
+			// an IPv4 or DNS4 based multiaddress should have a port number
+			return "", "", err
+		}
+
+		//there should only be one valid IPv4 address
+		return ipOrHostname, port, nil
+	}
+	return "", "", fmt.Errorf("ip address or hostname not found")
+}
+
+// UpdateWhitelist allows the peer whitelist to be updated
 func (p *P2PNode) UpdateWhitelist(whitelistAddrs ...NodeAddress) error {
 	whilelistPInfos, err := GetPeerInfos(whitelistAddrs...)
 	if err != nil {
 		return fmt.Errorf("failed to create approved list of peers: %w", err)
 	}
-	err =  p.connGater.update(whilelistPInfos)
-	if err != nil {
-		return fmt.Errorf("failed to update approved list of peers: %w", err)
-	}
+	p.connGater.update(whilelistPInfos)
 	return nil
 }
 

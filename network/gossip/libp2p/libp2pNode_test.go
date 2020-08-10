@@ -16,13 +16,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
+	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
-	lerrors "github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
@@ -365,9 +364,11 @@ func (l *LibP2PNodeTestSuite) TestPing() {
 	require.NoError(l.T(), err)
 }
 
+// TestConnectionGating tests node whitelisting by peer.ID
 func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 	defer l.cancel()
 
+	// create 2 nodes
 	nodes, nodeAddrs := l.CreateNodes(2, nil, true)
 
 	node1 := nodes[0]
@@ -380,18 +381,18 @@ func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 
 	requireError := func(err error) {
 		require.Error(l.T(), err)
-		require.True(l.T(), lerrors.IsDialFailureError(err))
-		require.Contains(l.T(), err.Error(), "gater disallows connection to peer")
+		require.True(l.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection))
 	}
 
-	l.Run("outbound connection to a non-whitelisted node is not allowed", func() {
+	l.Run("outbound connection to a non-whitelisted node is rejected", func() {
 		// node1 and node2 both have no whitelisted peers
 		_, err := node1.CreateStream(l.ctx, node2Addr)
 		requireError(err)
 		_, err = node2.CreateStream(l.ctx, node1Addr)
 		requireError(err)
 	})
-	l.Run("inbound connection from a non-whitelisted node is not allowed", func() {
+
+	l.Run("inbound connection from a non-whitelisted node is rejected", func() {
 
 		// node1 whitelists node2 but node2 does not whitelist node1
 		err := node1.UpdateWhitelist([]NodeAddress{node2Addr}...)
@@ -402,12 +403,13 @@ func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 		_, err = node1.CreateStream(l.ctx, node2Addr)
 		require.Error(l.T(), err)
 	})
+
 	l.Run("outbound connection to an approved node is allowed", func() {
 
-		// node1 whitelist node2
+		// node1 whitelists node2
 		err := node1.UpdateWhitelist([]NodeAddress{node2Addr}...)
 		require.NoError(l.T(), err)
-		// node2 whitelist node1
+		// node2 whitelists node1
 		err = node2.UpdateWhitelist([]NodeAddress{node1Addr}...)
 		require.NoError(l.T(), err)
 
@@ -444,7 +446,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandl
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "127.0.0.1", "0", rootID, handler, whiteList)
+		n, nodeID := l.CreateNode(name, pkey, "Vishals-MacBook-Pro.local", "0", rootID, handler, whiteList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
@@ -473,12 +475,14 @@ func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip str
 	err := n.Start(l.ctx, nodeID, l.logger, key, handlerFunc, rootID, whiteList, nil)
 	require.NoError(l.T(), err)
 	require.Eventuallyf(l.T(), func() bool {
-		ip, p := n.GetIPPort()
-		return ip != "" && p != ""
+		ip, p, err := n.GetIPPort()
+		return err == nil && ip != "" && p != ""
 	}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %s", name))
 
 	// get the actual IP and port that have been assigned by the subsystem
-	nodeID.IP, nodeID.Port = n.GetIPPort()
+	nodeID.IP, nodeID.Port, err = n.GetIPPort()
+	require.NoError(l.T(), err)
+
 	return n, nodeID
 }
 

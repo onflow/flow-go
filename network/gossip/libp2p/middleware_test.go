@@ -126,7 +126,8 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 			target = 0
 		}
 
-		ip, port := m.mws[target].GetIPPort()
+		ip, port, err := m.mws[target].GetIPPort()
+		require.NoError(m.Suite.T(), err)
 		key := m.mws[target].PublicKey()
 
 		// mocks an identity
@@ -140,7 +141,8 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		idMap[flowID.NodeID] = flowID
 
 		// update whitelist so that nodes can talk to each other
-		m.mws[i].UpdateWhitelist()
+		err = m.mws[i].UpdateWhitelist()
+		require.NoError(m.Suite.T(), err)
 	}
 }
 

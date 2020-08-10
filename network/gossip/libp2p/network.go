@@ -152,10 +152,9 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 }
 
 // fanout returns the node fanout derived from the identity list
-func (n *Network) fanout() int{
+func (n *Network) fanout() int {
 	// fanout is currently set to half of the system size for connectivity assurance
-	fanout := (len(n.ids) + 1) / 2
-	return fanout
+	return (len(n.ids) + 1) / 2
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {

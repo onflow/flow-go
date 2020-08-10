@@ -119,7 +119,7 @@ func (m *Middleware) Me() flow.Identifier {
 }
 
 // GetIPPort returns the ip address and port number associated with the middleware
-func (m *Middleware) GetIPPort() (string, string) {
+func (m *Middleware) GetIPPort() (string, string, error) {
 	return m.libP2PNode.GetIPPort()
 }
 
@@ -138,7 +138,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// derive all node addresses from flow identities
+	// derive all node addresses from flow identities. Those node address will serve as the network whitelist
 	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
 	if err != nil {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
@@ -180,7 +180,10 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
-	m.host, m.port = m.libP2PNode.GetIPPort()
+	m.host, m.port, err = m.libP2PNode.GetIPPort()
+	if err != nil {
+		return fmt.Errorf("failed to find IP and port of the libp2p node: %w", err)
+	}
 
 	return nil
 }
@@ -342,7 +345,7 @@ func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
 func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {
 	var nodeAddrs []NodeAddress
 	for _, identity := range identityMap {
-		nodeAddress, err := nodeAddressFromID(identity)
+		nodeAddress, err := nodeAddressFromIdentity(identity)
 		if err != nil {
 			return nil, err
 		}

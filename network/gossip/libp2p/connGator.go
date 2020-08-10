@@ -1,8 +1,6 @@
 package libp2p
 
 import (
-	"fmt"
-
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/control"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -13,58 +11,75 @@ import (
 
 var _ connmgr.ConnectionGater = (*connGater)(nil)
 
+// connGater is the implementatiion of the libp2p connmgr.ConnectionGater interface
+// It provides node whitelisting by libp2p peer.ID which is derived from the node public networking key
 type connGater struct {
-	peerIDWhitelist  map[peer.ID]struct{}
-	ipAddrsWhitelist map[string]struct{}
-	log              zerolog.Logger
+	peerIDWhitelist map[peer.ID]struct{} // the in-memory map of approved peer IDs
+	log             zerolog.Logger
 }
 
-func newConnGater(peerInfos []peer.AddrInfo, log zerolog.Logger) (*connGater, error) {
+func newConnGater(peerInfos []peer.AddrInfo, log zerolog.Logger) *connGater {
 	cg := &connGater{
 		log: log,
 	}
-	err := cg.update(peerInfos)
-	return cg, err
+	cg.update(peerInfos)
+	return cg
 }
 
-func (c *connGater) update(peerInfos []peer.AddrInfo) error {
+// update updates the peer ID map
+func (c *connGater) update(peerInfos []peer.AddrInfo) {
 
+	// create a new peer.ID map
 	peerIDs := make(map[peer.ID]struct{}, len(peerInfos))
-	ipAddrs := make(map[string]struct{}, len(peerInfos))
 
+	// for each peer.AddrInfo, create an entry in the map for the peer.ID
 	for _, p := range peerInfos {
 		peerIDs[p.ID] = struct{}{}
-		for _, ma := range p.Addrs {
-			ip, err := ma.ValueForProtocol(multiaddr.P_IP4)
-			if err != nil {
-				return fmt.Errorf("failed to get IPv4 address from %s", ma.String())
-			}
-			ipAddrs[ip] = struct{}{}
-		}
 	}
 
+	// cache the new map
 	c.peerIDWhitelist = peerIDs
-	c.ipAddrsWhitelist = ipAddrs
-	return nil
+
+	c.log.Info().Msg("approved list of peers updated")
 }
 
+// InterceptPeerDial - a callback which allows or disallows outbound connection
 func (c *connGater) InterceptPeerDial(p peer.ID) bool {
 	return c.validPeerID(p)
 }
 
-func (c *connGater) InterceptAddrDial(p peer.ID, _ multiaddr.Multiaddr) bool {
-	return c.validPeerID(p)
+// Currently, whitelisting is only implemented by Peer IDs and not multi-addresses
+func (c *connGater) InterceptAddrDial(_ peer.ID, ma multiaddr.Multiaddr) bool {
+	return true
 }
 
+// Currently, whitelisting is only implemented by Peer IDs and not multi-addresses
 func (c *connGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
-	remoteAddr := cm.RemoteMultiaddr()
-	return c.validMultiAddr(remoteAddr)
+	return true
 }
 
-func (c *connGater) InterceptSecured(_ network.Direction, p peer.ID, _ network.ConnMultiaddrs) bool {
-	return c.validPeerID(p) // ip address should have been already verified earlier in InterceptAccept
+// InterceptSecured - a callback executed after the libp2p security handshake. It tests whether to accept or reject
+// an inbound connection based on its peer id.
+func (c *connGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
+	switch dir {
+	case network.DirInbound:
+		allowed := c.validPeerID(p)
+		if !allowed {
+			// log the illegal connection attempt from the remote node
+			c.log.Info().
+				Str("node_id", p.Pretty()).
+				Str("local_address", addr.LocalMultiaddr().String()).
+				Str("remote_address", addr.RemoteMultiaddr().String()).
+				Msg("rejected inbound connection")
+		}
+		return allowed
+	default:
+		// outbound connection should have been already blocked before this call
+		return true
+	}
 }
 
+// Decision to continue or drop the connection should have been made before this call
 func (c *connGater) InterceptUpgraded(network.Conn) (allow bool, reason control.DisconnectReason) {
 	return true, 0
 }
@@ -72,15 +87,4 @@ func (c *connGater) InterceptUpgraded(network.Conn) (allow bool, reason control.
 func (c *connGater) validPeerID(p peer.ID) bool {
 	_, ok := c.peerIDWhitelist[p]
 	return ok
-}
-
-func (c *connGater) validMultiAddr(addr multiaddr.Multiaddr) bool {
-	ip, err := addr.ValueForProtocol(multiaddr.P_IP4)
-	if err != nil {
-		c.log.Err(err).Str("multiaddress", addr.String()).Msg("failed to determine IP address of client")
-		return false
-	}
-
-	_, found := c.ipAddrsWhitelist[ip]
-	return found
 }
