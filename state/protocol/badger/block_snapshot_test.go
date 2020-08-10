@@ -117,18 +117,8 @@ func TestSeed(t *testing.T) {
 		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-
-			block := unittest.GenesisFixture(identities)
-
-			result := unittest.ExecutionResultFixture()
-			result.BlockID = block.ID()
-
-			seal := unittest.BlockSealFixture()
-			seal.BlockID = block.ID()
-			seal.ResultID = result.ID()
-			seal.FinalState = result.FinalStateCommit
-
-			err := state.Mutate().Bootstrap(block, result, seal)
+			root, result, seal := unittest.BootstrapFixture(identities)
+			err := state.Mutate().Bootstrap(root, result, seal)
 			require.NoError(t, err)
 
 			_, err = state.Final().(*protocol.BlockSnapshot).Seed(1, 2, 3, 4)
@@ -143,22 +133,13 @@ func TestSeed(t *testing.T) {
 		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+			root, result, seal := unittest.BootstrapFixture(identities)
 
-			block := unittest.GenesisFixture(identities)
-
-			result := unittest.ExecutionResultFixture()
-			result.BlockID = block.ID()
-
-			seal := unittest.BlockSealFixture()
-			seal.BlockID = block.ID()
-			seal.ResultID = result.ID()
-			seal.FinalState = result.FinalStateCommit
-
-			err := state.Mutate().Bootstrap(block, result, seal)
+			err := state.Mutate().Bootstrap(root, result, seal)
 			require.NoError(t, err)
 
 			// add child
-			unvalidatedChild := unittest.BlockWithParentFixture(block.Header)
+			unvalidatedChild := unittest.BlockWithParentFixture(root.Header)
 			unvalidatedChild.Payload.Guarantees = nil
 			unvalidatedChild.Header.PayloadHash = unvalidatedChild.Payload.Hash()
 			err = state.Mutate().Extend(&unvalidatedChild)
