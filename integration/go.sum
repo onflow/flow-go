@@ -410,10 +410,10 @@ github.com/libp2p/go-eventbus v0.2.1/go.mod h1:jc2S4SoEVPP48H9Wpzm5aiGwUCBMfGhVh
 github.com/libp2p/go-flow-metrics v0.0.1/go.mod h1:Iv1GH0sG8DtYN3SVJ2eG221wMiNpZxBdp967ls1g+k8=
 github.com/libp2p/go-flow-metrics v0.0.3 h1:8tAs/hSdNvUiLgtlSy3mxwxWP4I9y/jlkPFT7epKdeM=
 github.com/libp2p/go-flow-metrics v0.0.3/go.mod h1:HeoSNUrOJVK1jEpDqVEiUOIXqhbnS27omG0uWU5slZs=
-github.com/libp2p/go-libp2p v0.10.2 h1:VQOo/Pbj9Ijco9jiMYN5ImAg236IjTXfnUPJ2OvbpLM=
-github.com/libp2p/go-libp2p v0.10.2/go.mod h1:BYckt6lmS/oA1SlRETSPWSUulCQKiZuTVsymVMc//HQ=
-github.com/libp2p/go-libp2p-autonat v0.3.1 h1:60sc3NuQz+RxEb4ZVCRp/7uPtD7gnlLcOIKYNulzSIo=
-github.com/libp2p/go-libp2p-autonat v0.3.1/go.mod h1:0OzOi1/cVc7UcxfOddemYD5vzEqi4fwRbnZcJGLi68U=
+github.com/libp2p/go-libp2p v0.10.3 h1:Bc8/VjmC+pICtK6xG8YgVutZvCdK0MsroWCHP+6AdFQ=
+github.com/libp2p/go-libp2p v0.10.3/go.mod h1:0ER6iPSaPeQjryNgOnm9bLNpMJCYmuw54xJXsVR17eE=
+github.com/libp2p/go-libp2p-autonat v0.3.2 h1:OhDSwVVaq7liTaRIsFFYvsaPp0pn2yi0WazejZ4DUmo=
+github.com/libp2p/go-libp2p-autonat v0.3.2/go.mod h1:0OzOi1/cVc7UcxfOddemYD5vzEqi4fwRbnZcJGLi68U=
 github.com/libp2p/go-libp2p-blankhost v0.2.0 h1:3EsGAi0CBGcZ33GwRuXEYJLLPoVWyXJ1bcJzAJjINkk=
 github.com/libp2p/go-libp2p-blankhost v0.2.0/go.mod h1:eduNKXGTioTuQAUcZ5epXi9vMl+t4d8ugUBRQ4SqaNQ=
 github.com/libp2p/go-libp2p-circuit v0.3.1 h1:69ENDoGnNN45BNDnBd+8SXSetDuw0eJFcGmOvvtOgBw=

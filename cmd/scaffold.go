@@ -116,6 +116,7 @@ type FlowNodeBuilder struct {
 	Storage           Storage
 	State             *protocol.State
 	DKGState          *wrapper.State
+	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
@@ -171,6 +172,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
+		fnb.Middleware = mw
 
 		participants, err := fnb.State.Final().Identities(filter.Any)
 		if err != nil {
@@ -184,7 +186,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		nodeRole := nodeID.Role
 		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e2, topology, fnb.Metrics.Network)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, fnb.Middleware, 10e2, topology, fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -492,7 +494,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	// when this happens during a spork, we could try deleting the protocol state database.
 	// TODO: revisit this check when implementing Epoch
 	if rootBlockHeader.ID() != fnb.RootBlock.ID() {
-		fnb.Logger.Fatal().Msgf("mismatching root block ID, bootstrap root block ID: %v, protocol state block ID: %v",
+		fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
 			rootBlockHeader.ID(),
 			fnb.RootBlock.ID())
 	}
