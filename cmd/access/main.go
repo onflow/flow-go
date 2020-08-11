@@ -58,6 +58,7 @@ func main() {
 		collectionsToMarkExecuted    *stdmap.Times
 		blocksToMarkExecuted         *stdmap.Times
 		transactionMetrics           module.TransactionMetrics
+		pingMetrics                  module.PingMetrics
 		logTxTimeToFinalized         bool
 		logTxTimeToExecuted          bool
 		logTxTimeToFinalizedExecuted bool
@@ -133,6 +134,10 @@ func main() {
 		Module("transaction metrics", func(node *cmd.FlowNodeBuilder) error {
 			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger, logTxTimeToFinalized,
 				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
+			return nil
+		}).
+		Module("ping metrics", func(node *cmd.FlowNodeBuilder) error {
+			pingMetrics = metrics.NewPingCollector()
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -248,6 +253,7 @@ func main() {
 				node.Logger,
 				node.State,
 				node.Me,
+				pingMetrics,
 				pingEnabled,
 				node.Middleware,
 			)

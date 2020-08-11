@@ -173,7 +173,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		}
 
 		// lookup events
-		blockEvents, err := h.events.ByBlockIDEventType(bID, eType)
+		blockEvents, err := h.events.ByBlockIDEventType(bID, flow.EventType(eType))
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 		}

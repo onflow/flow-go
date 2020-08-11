@@ -143,7 +143,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 		}
 	}
 
-	// TODO RAMTIN rename the metric
+	// TODO(RAMTIN) rename the metrics
 	f.metrics.ReadValuesSize(uint64(totalPayloadSize))
 
 	return orderedPayloads, nil
