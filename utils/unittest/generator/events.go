@@ -25,7 +25,7 @@ func (g *Events) New() flow.Event {
 	identifier := fmt.Sprintf("FooEvent%d", g.count)
 	typeID := "test." + identifier
 
-	testEventType := cadence.EventType{
+	testEventType := &cadence.EventType{
 		TypeID:     typeID,
 		Identifier: identifier,
 		Fields: []cadence.Field{

@@ -341,20 +341,22 @@ func (tx *Transaction) String() string {
 		tx.ID(), tx.Payer.Hex(), tx.ReferenceBlockID)
 }
 
-// TransactionStatus represents the status of a Transaction.
+// TransactionStatus represents the status of a transaction.
 type TransactionStatus int
 
 const (
 	// TransactionStatusUnknown indicates that the transaction status is not known.
 	TransactionStatusUnknown TransactionStatus = iota
-	// TransactionPending is the status of a pending transaction.
-	TransactionPending
-	// TransactionFinalized is the status of a finalized transaction.
-	TransactionFinalized
-	// TransactionReverted is the status of a reverted transaction.
-	TransactionReverted
-	// TransactionSealed is the status of a sealed transaction.
-	TransactionSealed
+	// TransactionStatusPending is the status of a pending transaction.
+	TransactionStatusPending
+	// TransactionStatusFinalized is the status of a finalized transaction.
+	TransactionStatusFinalized
+	// TransactionStatusExecuted is the status of an executed transaction.
+	TransactionStatusExecuted
+	// TransactionStatusSealed is the status of a sealed transaction.
+	TransactionStatusSealed
+	// TransactionStatusExpired is the status of an expired transaction.
+	TransactionStatusExpired
 )
 
 // String returns the string representation of a transaction status.

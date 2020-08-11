@@ -109,7 +109,7 @@ func (mt *MTrie) String() string {
 	return trieStr + mt.root.FmtStr("", "")
 }
 
-// TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
+// TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(keys [][]byte) ([][]byte, error) {
 	return mt.read(mt.root, keys)
 }
