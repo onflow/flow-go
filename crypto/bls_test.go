@@ -108,30 +108,30 @@ func TestAggregateSignatures(t *testing.T) {
 	require.NoError(t, err)
 	// First check: check the signatures are equal
 	assert.Equal(t, aggSig, expectedSig,
-		fmt.Sprintf("incorrect signature %s, should be %s, private keys are %s, input is %s",
+		fmt.Sprintf("incorrect signature %s, should be %s, private keys are %s, input is %x",
 			aggSig, expectedSig, sks, input))
 	// Second check: Verify the aggregated signature
 	valid, err := VerifySignatureOneMessage(pks, aggSig, input, kmac)
 	require.NoError(t, err)
 	assert.True(t, valid,
-		fmt.Sprintf("Verification of %s failed, signature should be %s private keys are %s, input is %s",
+		fmt.Sprintf("Verification of %s failed, signature should be %s private keys are %s, input is %x",
 			aggSig, expectedSig, sks, input))
 
 	// check if one the signatures is not correct
 	input[0] ^= 1
 	randomIndex := mrand.Intn(sigsNum)
 	sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+	input[0] ^= 1
 	aggSig, err = AggregateSignatures(sigs)
 	require.NoError(t, err)
 	assert.NotEqual(t, aggSig, expectedSig,
-		fmt.Sprintf("signature %s shouldn't be %s private keys are %s, input is %s",
+		fmt.Sprintf("signature %s shouldn't be %s private keys are %s, input is %x",
 			aggSig, expectedSig, sks, input))
 	valid, err = VerifySignatureOneMessage(pks, aggSig, input, kmac)
 	require.NoError(t, err)
 	assert.False(t, valid,
-		fmt.Sprintf("verification of signature %s should fail, it shouldn't be %s private keys are %s, input is %s",
+		fmt.Sprintf("verification of signature %s should fail, it shouldn't be %s private keys are %s, input is %x",
 			aggSig, expectedSig, sks, input))
-	input[0] ^= 1
 	sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
 	// check if one the public keys is not correct
 	randomIndex = mrand.Intn(sigsNum)
@@ -147,12 +147,12 @@ func TestAggregateSignatures(t *testing.T) {
 	expectedSig, err = aggSk.Sign(input, kmac)
 	require.NoError(t, err)
 	assert.NotEqual(t, aggSig, expectedSig,
-		fmt.Sprintf("signature %s shouldn't be %s, private keys are %s, input is %s, wrong key is of index %d",
+		fmt.Sprintf("signature %s shouldn't be %s, private keys are %s, input is %x, wrong key is of index %d",
 			aggSig, expectedSig, sks, input, randomIndex))
 	valid, err = VerifySignatureOneMessage(pks, aggSig, input, kmac)
 	require.NoError(t, err)
 	assert.False(t, valid,
-		fmt.Sprintf("signature %s should fail, shouldn't be %s, private keys are %s, input is %s, wrong key is of index %d",
+		fmt.Sprintf("signature %s should fail, shouldn't be %s, private keys are %s, input is %x, wrong key is of index %d",
 			aggSig, expectedSig, sks, input, randomIndex))
 
 	// test the empty list case
