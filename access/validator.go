@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/parser"
+	"github.com/onflow/cadence/runtime/parser2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -24,7 +24,7 @@ func NewProtocolStateBlocks(state protocol.State) *ProtocolStateBlocks {
 	return &ProtocolStateBlocks{state: state}
 }
 
-func (b *ProtocolStateBlocks) BlockHeaderByID(id flow.Identifier) (*flow.Header, error) {
+func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.Header, error) {
 	header, err := b.state.AtBlockID(id).Head()
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
@@ -37,7 +37,7 @@ func (b *ProtocolStateBlocks) BlockHeaderByID(id flow.Identifier) (*flow.Header,
 	return header, nil
 }
 
-func (b *ProtocolStateBlocks) FinalizedBlockHeader() (*flow.Header, error) {
+func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
 	return b.state.Final().Head()
 }
 
@@ -154,7 +154,7 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 
 	// discard transactions that are expired, or that will expire sooner than
 	// our configured buffer allows
-	if uint(diff) > v.options.Expiry-v.options.Expiry {
+	if uint(diff) > v.options.Expiry-v.options.ExpiryBuffer {
 		return ExpiredTransactionError{
 			RefHeight:   ref.Height,
 			FinalHeight: final.Height,
@@ -166,7 +166,7 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 
 func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error {
 	if v.options.CheckScriptsParse {
-		_, _, err := parser.ParseProgram(string(tx.Script))
+		_, err := parser2.ParseProgram(string(tx.Script))
 		if err != nil {
 			return InvalidScriptError{ParserErr: err}
 		}
