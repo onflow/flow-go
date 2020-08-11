@@ -9,6 +9,10 @@ import (
 // in blocks. Equivalent to 10 minutes for a 1-second block time.
 const DefaultTransactionExpiry = 10 * 60
 
+// DefaultTransactionExpiryBuffer is the default buffer time between a transaction being ingested by a
+// collection node and being included in a collection and block.
+const DefaultTransactionExpiryBuffer = 30
+
 // DefaultMaxGasLimit is the default maximum value for the transaction gas limit.
 const DefaultMaxGasLimit = 9999
 
