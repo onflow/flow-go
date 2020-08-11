@@ -54,6 +54,7 @@ func main() {
 		collector           module.ExecutionMetrics
 		mTrieCacheSize      uint32
 		checkpointDistance  uint
+		requestInterval     time.Duration
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -65,6 +66,7 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
+			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -188,7 +190,7 @@ func main() {
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
-				requester.WithBatchInterval(60*time.Second),
+				requester.WithBatchInterval(requestInterval),
 			)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
