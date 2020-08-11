@@ -51,7 +51,8 @@ func WithExpiryBuffer(buf uint) Opt {
 
 func NewBuilder(
 	db *badger.DB,
-	headers storage.Headers,
+	mainHeaders storage.Headers,
+	clusterHeaders storage.Headers,
 	payloads storage.ClusterPayloads,
 	transactions mempool.Transactions,
 	tracer module.Tracer,
@@ -60,8 +61,8 @@ func NewBuilder(
 
 	b := Builder{
 		db:                db,
-		mainHeaders:       headers,
-		clusterHeaders:    headers,
+		mainHeaders:       mainHeaders,
+		clusterHeaders:    clusterHeaders,
 		payloads:          payloads,
 		transactions:      transactions,
 		tracer:            tracer,

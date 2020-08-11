@@ -358,7 +358,7 @@ func main() {
 			return push, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			builder := builder.NewBuilder(node.DB, colHeaders, colPayloads, pool, node.Tracer,
+			builder := builder.NewBuilder(node.DB, node.Storage.Headers, colHeaders, colPayloads, pool, node.Tracer,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
