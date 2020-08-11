@@ -35,12 +35,11 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}
 
-		// start the new block with an empty child index
-		err = operation.InsertBlockChildren(blockID, nil)(tx)
+		// index the child block for recovery
+		err = IndexNewBlock(blockID, block.Header.ParentID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not create empty child index: %w", err)
+			return fmt.Errorf("could not index new block: %w", err)
 		}
-
 		return nil
 	}
 }

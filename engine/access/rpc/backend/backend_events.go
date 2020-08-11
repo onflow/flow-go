@@ -2,6 +2,9 @@ package backend
 
 import (
 	"context"
+	"encoding/hex"
+	"errors"
+	"fmt"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
@@ -87,16 +90,33 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	}
 
 	// convert execution node api result to access node api result
-	results := accessEvents(resp.GetResults())
+	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockIDs)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+	}
 
 	return results, nil
 }
 
-// accessEvents converts execution node api result to access node api result
-func accessEvents(execResults []*execproto.GetEventsForBlockIDsResponse_Result) []flow.BlockEvents {
-	results := make([]flow.BlockEvents, len(execResults))
+// verifyAndConvertToAccessEvents converts execution node api result to access node api result, and verifies that the results contains
+// results from each block that was requested
+func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDsResponse_Result, requestedBlockIDs []flow.Identifier) ([]flow.BlockEvents, error) {
+	if len(execEvents) != len(requestedBlockIDs) {
+		return nil, errors.New("number of results does not match number of blocks requested")
+	}
 
-	for i, result := range execResults {
+	blockIDSet := map[string]bool{}
+	for _, blockID := range requestedBlockIDs {
+		blockIDSet[blockID.String()] = true
+	}
+
+	results := make([]flow.BlockEvents, len(execEvents))
+
+	for i, result := range execEvents {
+		if !blockIDSet[hex.EncodeToString(result.GetBlockId())] {
+			return nil, fmt.Errorf("unexpected blockID from exe node %x", result.GetBlockId())
+		}
+
 		results[i] = flow.BlockEvents{
 			BlockID:     convert.MessageToIdentifier(result.GetBlockId()),
 			BlockHeight: result.GetBlockHeight(),
@@ -104,5 +124,5 @@ func accessEvents(execResults []*execproto.GetEventsForBlockIDsResponse_Result) 
 		}
 	}
 
-	return results
+	return results, nil
 }
