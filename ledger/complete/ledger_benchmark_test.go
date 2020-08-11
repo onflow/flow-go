@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common/encoding"
 	"github.com/dapperlabs/flow-go/ledger/common/utils"
@@ -38,7 +40,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		b.Fatal(err)
 	}
 
-	led, err := complete.NewLedger(dir, steps+1, &metrics.NoopCollector{}, nil)
+	led, err := complete.NewLedger(dir, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
 	defer led.Done()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")

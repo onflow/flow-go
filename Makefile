@@ -282,7 +282,7 @@ docker-build-bootstrap-transit:
 
 .PHONY: docker-build-loader
 docker-build-loader:
-	docker build -f ./integration/benchmark/main/Dockerfile --ssh default --build-arg TARGET=benchmark/main --target production \
+	docker build -f ./integration/loader/Dockerfile --ssh default --build-arg TARGET=loader --target production \
 		-t gcr.io/dl-flow/loader:latest -t "gcr.io/dl-flow/loader:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow

@@ -328,6 +328,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		syncCore,
 		execState,
 		syncThreshold,
+		filter.Any,
 		node.Metrics,
 		node.Tracer,
 		false,

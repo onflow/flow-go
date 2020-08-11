@@ -287,5 +287,5 @@ type TransactionMetrics interface {
 }
 
 type PingMetrics interface {
-	NodeReachable(nodeID flow.Identifier, reachable bool)
+	NodeReachable(node *flow.Identity, reachable bool)
 }
