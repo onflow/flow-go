@@ -258,22 +258,18 @@ func TestExtendValid(t *testing.T) {
 func TestExtendSealedBoundary(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block, result, seal := unittest.BootstrapFixture(participants)
-		t.Logf("root: %x\n", block.ID())
+		root, result, seal := unittest.BootstrapFixture(participants)
+		t.Logf("root: %x\n", root.ID())
 
-		err := state.Mutate().Bootstrap(block, result, seal)
+		err := state.Mutate().Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
 		require.NoError(t, err)
 		assert.Equal(t, seal.FinalState, finalCommit, "original commit should be root commit")
 
-		first := unittest.BlockFixture()
-		first.Payload.Guarantees = nil
-		first.Payload.Seals = nil
-		first.Header.Height = 1
-		first.Header.ParentID = block.ID()
-		first.Header.PayloadHash = first.Payload.Hash()
+		first := unittest.BlockWithParentFixture(root.Header)
+		first.SetPayload(flow.Payload{})
 
 		extend := &flow.Seal{
 			BlockID:      first.ID(),
@@ -282,12 +278,10 @@ func TestExtendSealedBoundary(t *testing.T) {
 			FinalState:   unittest.StateCommitmentFixture(),
 		}
 
-		second := unittest.BlockFixture()
-		second.Payload.Guarantees = nil
-		second.Payload.Seals = []*flow.Seal{extend}
-		second.Header.Height = 2
-		second.Header.ParentID = first.ID()
-		second.Header.PayloadHash = second.Payload.Hash()
+		second := unittest.BlockWithParentFixture(first.Header)
+		second.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{extend},
+		})
 
 		err = state.Mutate().Extend(&first)
 		require.NoError(t, err)

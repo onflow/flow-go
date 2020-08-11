@@ -819,7 +819,7 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	assignments := ClusterAssignment(1, participants)
 	setup := &flow.EpochSetup{
 		Counter:      uint64(rand.Uint32()),
-		FinalView:    uint64(rand.Uint32()),
+		FinalView:    uint64(rand.Uint32() + 1000),
 		Participants: participants,
 		Assignments:  assignments,
 		Seed:         SeedFixture(32),
@@ -836,7 +836,7 @@ func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCom
 		for i, node := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
 			lookup[node.NodeID] = flow.DKGParticipant{
 				Index:    uint(i),
-				KeyShare: nil,
+				KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
 			}
 		}
 		commit.DKGParticipants = lookup

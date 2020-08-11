@@ -2,6 +2,7 @@ package encodable
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/vmihailenco/msgpack"
 
@@ -143,6 +144,9 @@ func (pub *RandomBeaconPubKey) UnmarshalJSON(b []byte) error {
 }
 
 func (pub RandomBeaconPubKey) MarshalMsgpack() ([]byte, error) {
+	if pub.PublicKey == nil {
+		return nil, fmt.Errorf("empty public key")
+	}
 	return msgpack.Marshal(pub.PublicKey.Encode())
 }
 
