@@ -1,10 +1,8 @@
-package handler
+package backend
 
 import (
 	"context"
 	"sync"
-
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -13,12 +11,12 @@ import (
 // retryFrequency has to be less than TransactionExpiry or else this module does nothing
 const retryFrequency uint64 = 120 // blocks
 
-// Retry implements a simple retrier,
+// Retry implements a simple retry mechanism for transaction submission.
 type Retry struct {
 	mu sync.RWMutex
 	// pending transactions
 	transactionByReferencBlockHeight map[uint64]map[flow.Identifier]*flow.TransactionBody
-	txHandler                        *Handler
+	backend                          *Backend
 }
 
 func newRetry() *Retry {
@@ -27,8 +25,8 @@ func newRetry() *Retry {
 	}
 }
 
-func (r *Retry) SetHandler(rpc *Handler) *Retry {
-	r.txHandler = rpc
+func (r *Retry) SetBackend(b *Backend) *Retry {
+	r.backend = b
 	return r
 }
 
@@ -91,14 +89,14 @@ func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
 	defer r.mu.Unlock()
 	txsAtHeight := r.transactionByReferencBlockHeight[heightToRetry]
 	for txID, tx := range txsAtHeight {
-		status, err := r.txHandler.DeriveTransactionStatus(tx, false)
+		status, err := r.backend.DeriveTransactionStatus(tx, false)
 		if err != nil {
 			continue
 		}
-		if status == entities.TransactionStatus_PENDING {
+		if status == flow.TransactionStatusPending {
 			txMsg := convert.TransactionToMessage(*tx)
-			_, _ = r.txHandler.SendRawTransaction(context.Background(), txMsg)
-		} else if status != entities.TransactionStatus_UNKNOWN {
+			_, _ = r.backend.SendRawTransaction(context.Background(), txMsg)
+		} else if status != flow.TransactionStatusUnknown {
 			// not pending or unknown, don't need to retry anymore
 			delete(txsAtHeight, txID)
 		}

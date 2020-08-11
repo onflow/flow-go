@@ -9,11 +9,12 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
 )
 
-// TODO(Ramtin) add metrics
-// TODO(Ramtin) add tests
-
+// PathFinderVersion captures the version of path finder that the partial ledger uses
 const PathFinderVersion = 0
 
+// Ledger implements the ledger functionality for a limited subset of keys (partial ledger).
+// Partial ledgers are designed to be constructed and verified by a collection of proofs from a complete ledger.
+// The partial ledger uses a partial binary Merkle trie which holds intermediate hash value for the pruned branched and prevents updates to keys that were not part of proofs.
 type Ledger struct {
 	ptrie *ptrie.PSMT
 	state ledger.State

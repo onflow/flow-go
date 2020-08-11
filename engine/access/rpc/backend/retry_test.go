@@ -1,4 +1,4 @@
-package handler
+package backend
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -41,10 +40,10 @@ func (suite *Suite) TestTransactionRetry() {
 	// txID := transactionBody.ID()
 	// blockID := block.ID()
 	// Setup Handler + Retry
-	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
+	backend := New(suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
 		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector())
-	retry := newRetry().SetHandler(handler)
-	handler.retry = retry
+	retry := newRetry().SetBackend(backend)
+	backend.retry = retry
 
 	retry.RegisterTransaction(block.Header.Height, transactionBody)
 
@@ -98,15 +97,11 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		Events: nil,
 	}
 
-	req := &access.GetTransactionRequest{
-		Id: txID[:],
-	}
-
 	// Setup Handler + Retry
-	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
+	backend := New(suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
 		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector())
-	retry := newRetry().SetHandler(handler)
-	handler.retry = retry
+	retry := newRetry().SetBackend(backend)
+	backend.retry = retry
 
 	retry.RegisterTransaction(block.Header.Height, transactionBody)
 
@@ -115,11 +110,11 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	// return not found to return finalized status
 	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).Once()
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	resp, err := handler.GetTransactionResult(ctx, req)
-	suite.checkResponse(resp, err)
+	result, err := backend.GetTransactionResult(ctx, txID)
+	suite.checkResponse(result, err)
 
 	// status should be finalized since the sealed blocks is smaller in height
-	suite.Assert().Equal(entities.TransactionStatus_FINALIZED, resp.GetStatus())
+	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 
 	// Don't retry now now that block is finalized
 	retry.Retry(block.Header.Height + 1)

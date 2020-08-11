@@ -9,8 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
-// TODO RAMTIN update this documentation
-// Node defines a memory forest node
+// Node defines an Mtrie node
 //
 // DEFINITIONS:
 //     * HEIGHT of a node v in a tree is the number of edges on the longest
@@ -28,7 +27,6 @@ import (
 // Nodes are supposed to be used in READ-ONLY fashion. However,
 // for performance reasons, we not not copy read.
 // TODO: optimized data structures might be able to reduce memory consumption
-
 type Node struct {
 	lChild    *Node           // Left Child
 	rChild    *Node           // Right Child
