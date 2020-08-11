@@ -216,19 +216,10 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		return fmt.Errorf("could not validate extending block: %w", err)
 	}
 
-	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
-		// insert the block
-		err := procedure.InsertClusterBlock(block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert block: %w", err)
-		}
-
-		// add this block to its parent's child index
-		err = procedure.IndexBlockChild(block.Header.ParentID, block.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not add to parent index: %w", err)
-		}
-
-		return nil
-	})
+	// insert the new block
+	err = m.state.db.Update(procedure.InsertClusterBlock(block))
+	if err != nil {
+		return fmt.Errorf("could not insert cluster block: %w", err)
+	}
+	return nil
 }
