@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common/encoding"
@@ -16,26 +17,29 @@ import (
 )
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
-// Ledger holds an array of registers (key value pairs) and keep tracks of changes over a limited time.
+// Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
 // Each register is referenced by an ID (key) and holds a value (byte slice).
-// Ledger provides atomic batched update and read (with or without proofs) operation given a list of keys.
+// Ledger provides atomic batched updates and read (with or without proofs) operation given a list of keys.
 // Every update to the Ledger creates a new state which captures the state of the storage.
-// Under the hood, it uses binary merkle tries to generate inclusion and noninclusion proofs.
-// Ledger is fork-aware that means any update can applied at any previous state which forms a tree of tries (forest).
-// The forrest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
-// In order to limit the memory usage and maintain the performance storage only keeps limited number of
-// tries and purge the old ones (LRU-based); in other words Ledger is not designed to be used
-// for archival use but make it possible for other software components to reconstruct very old tries using write-ahead logs.
+// Under the hood, it uses binary Merkle tries to generate inclusion and non-inclusion proofs.
+// Ledger is fork-aware which means any update can be applied at any previous state which forms a tree of tries (forest).
+// The forest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
+// In order to limit the memory usage and maintain the performance storage only keeps a limited number of
+// tries and purge the old ones (LRU-based); in other words, Ledger is not designed to be used
+// for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type Ledger struct {
 	forest  *mtrie.Forest
 	wal     *wal.LedgerWAL
 	metrics module.LedgerMetrics
+	logger  zerolog.Logger
 }
 
-const CacheSize = 1000
-
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
-func NewLedger(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*Ledger, error) {
+func NewLedger(dbDir string,
+	capacity int,
+	metrics module.LedgerMetrics,
+	log zerolog.Logger,
+	reg prometheus.Registerer) (*Ledger, error) {
 
 	w, err := wal.NewWAL(nil, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
@@ -48,10 +52,14 @@ func NewLedger(dbDir string, capacity int, metrics module.LedgerMetrics, reg pro
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
+
+	logger := log.With().Str("ledger", "complete").Logger()
+
 	storage := &Ledger{
 		forest:  forest,
 		wal:     w,
 		metrics: metrics,
+		logger:  logger,
 	}
 
 	err = w.ReplayOnForest(forest)
@@ -157,7 +165,10 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
-	// TODO log info state
+	l.logger.Info().Hex("from", update.State()).
+		Hex("to", newRootHash[:]).
+		Int("update_size", update.Size()).
+		Msg("ledger updated")
 	return ledger.State(newRootHash), nil
 }
 
@@ -189,6 +200,7 @@ func (l *Ledger) CloseStorage() {
 	_ = l.wal.Close()
 }
 
+// MemSize return the amount of memory used by ledger
 // TODO implement an approximate MemSize method
 func (l *Ledger) MemSize() (int64, error) {
 	return 0, nil
@@ -204,6 +216,7 @@ func (l *Ledger) ForestSize() int {
 	return l.forest.Size()
 }
 
+// Checkpointer returns a checkpointer instance
 func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 	checkpointer, err := l.wal.NewCheckpointer()
 	if err != nil {

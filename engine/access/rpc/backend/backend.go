@@ -106,13 +106,14 @@ func New(
 
 func configureTransactionValidator(state protocol.State) *access.TransactionValidator {
 	return access.NewTransactionValidator(
-		access.NewProtocolStateBlockGetter(state),
+		access.NewProtocolStateBlocks(state),
 		access.TransactionValidationOptions{
-			Expiry:                     10,
-			ExpiryBuffer:               0,
-			AllowUnknownReferenceBlock: false,
-			MaxGasLimit:                1000000,
-			CheckScriptsParse:          false,
+			Expiry:                       flow.DefaultTransactionExpiry,
+			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
+			AllowEmptyReferenceBlockID:   false,
+			AllowUnknownReferenceBlockID: false,
+			MaxGasLimit:                  flow.DefaultMaxGasLimit,
+			CheckScriptsParse:            true,
 		},
 	)
 }

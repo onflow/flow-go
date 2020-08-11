@@ -51,13 +51,13 @@ func New(
 	logger := log.With().Str("engine", "ingest").Logger()
 
 	transactionValidator := access.NewTransactionValidator(
-		access.NewProtocolStateBlockGetter(state),
+		access.NewProtocolStateBlocks(state),
 		access.TransactionValidationOptions{
-			Expiry:                     flow.DefaultTransactionExpiry,
-			ExpiryBuffer:               config.ExpiryBuffer,
-			AllowUnknownReferenceBlock: config.AllowUnknownReference,
-			MaxGasLimit:                flow.DefaultMaxGasLimit,
-			CheckScriptsParse:          config.CheckScriptsParse,
+			Expiry:                       flow.DefaultTransactionExpiry,
+			ExpiryBuffer:                 config.ExpiryBuffer,
+			AllowUnknownReferenceBlockID: config.AllowUnknownReference,
+			MaxGasLimit:                  flow.DefaultMaxGasLimit,
+			CheckScriptsParse:            config.CheckScriptsParse,
 		},
 	)
 

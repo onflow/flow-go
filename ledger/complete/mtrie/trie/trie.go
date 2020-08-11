@@ -15,8 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
 )
 
-// MTrie is a fully in memory trie with option to persist to disk.
-// Formally, an MTrie represents a perfect, full binary Merkle tree with uniform height.
+// MTrie represents a perfect in-memory full binary Merkle tree with uniform height.
 // For a detailed description of the storage model, please consult `mtrie/README.md`
 //
 // A MTrie is a thin wrapper around a the trie's root Node. An MTrie implements the
@@ -41,6 +40,7 @@ type MTrie struct {
 	pathByteSize int
 }
 
+// NewEmptyMTrie returns an empty Mtrie (root is an empty node)
 func NewEmptyMTrie(pathByteSize int) (*MTrie, error) {
 	if pathByteSize < 1 {
 		return nil, errors.New("trie's path size [in bytes] must be positive")
@@ -53,6 +53,7 @@ func NewEmptyMTrie(pathByteSize int) (*MTrie, error) {
 	}, nil
 }
 
+// NewMTrie returns a Mtrie given the root
 func NewMTrie(root *node.Node) (*MTrie, error) {
 	if root.Height()%8 != 0 {
 		return nil, errors.New("height of root node must be integer-multiple of 8")
@@ -98,6 +99,8 @@ func (mt *MTrie) String() string {
 	return trieStr + mt.root.FmtStr("", "")
 }
 
+// UnsafeRead read payloads for the given paths. It is called unsafe as it requires the
+// paths to be sorted
 // TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(paths []ledger.Path) ([]*ledger.Payload, error) {
 	return mt.read(mt.root, paths)
@@ -294,6 +297,8 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, paylo
 	return node.NewInterimNode(nodeHeight, lChild, rChild), nil
 }
 
+// UnsafeProofs provides proofs for the given paths, this is called unsafe as
+// it requires the input paths to be sorted in advance.
 func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) error {
 	return mt.proofs(mt.root, paths, proofs)
 }

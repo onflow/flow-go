@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
+// default value and default hash value for a default node
 var emptySlice []byte
 var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)
 

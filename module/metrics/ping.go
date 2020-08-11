@@ -1,8 +1,6 @@
 package metrics
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -13,22 +11,22 @@ type PingCollector struct {
 	reachable *prometheus.GaugeVec
 }
 
-func NewPingCollector(interval time.Duration) *PingCollector {
+func NewPingCollector() *PingCollector {
 	pc := &PingCollector{
 		reachable: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "node_reachable",
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
-		}, []string{LabelNodeID}),
+		}, []string{LabelNodeID, LabelNodeRole}),
 	}
 	return pc
 }
 
-func (pc *PingCollector) NodeReachable(nodeID flow.Identifier, reachable bool) {
+func (pc *PingCollector) NodeReachable(node *flow.Identity, reachable bool) {
 	var val float64
 	if reachable {
 		val = 1
 	}
-	pc.reachable.With(prometheus.Labels{LabelNodeID: nodeID.String()}).Set(val)
+	pc.reachable.With(prometheus.Labels{LabelNodeID: node.String(), LabelNodeRole: node.Role.String()}).Set(val)
 }
