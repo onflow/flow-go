@@ -8,6 +8,7 @@ import (
 )
 
 // TODO move this to proof itself
+
 // VerifyTrieProof verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
 func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {

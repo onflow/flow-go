@@ -1,3 +1,4 @@
+// Package pathfinder computes the trie storage path for any given key/value pair
 package pathfinder
 
 import (
