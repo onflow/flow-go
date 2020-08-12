@@ -127,7 +127,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
 		unfinalizedLookup := make(map[flow.Identifier]struct{})
-		for ancestorID != clusterFinal.ID() {
+		clusterFinalID := clusterFinal.ID()
+		for ancestorID != clusterFinalID {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
 				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
