@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/state/protocol/util"
 	stoerr "github.com/dapperlabs/flow-go/storage"
@@ -24,13 +26,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-var participants = flow.IdentityList{
-	{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-	{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-	{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-	{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	{NodeID: flow.Identifier{0x05}, Address: "a5", Role: flow.RoleAccess, Stake: 5},
-}
+var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 
 func TestBootstrapValid(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
@@ -254,17 +250,34 @@ func TestBootstrapInvalidEpochSetup(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		t.Run("invalid final view", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+			// set an invalid final view for the first epoch
+			setup.FinalView = root.Header.View
 
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
 		})
 
 		t.Run("invalid cluster assignments", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+			// create an invalid cluster assignment (node appears in multiple clusters)
+			collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
+			setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
 
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
 		})
 
 		t.Run("empty seed", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+			setup.Seed = nil
 
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
 		})
-
 	})
 }
 
@@ -272,15 +285,47 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		t.Run("inconsistent counter", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+			commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+			// use a different counter for the commit
+			commit.Counter = setup.Counter + 1
 
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
 		})
 
 		t.Run("inconsistent cluster QCs", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+			// add an extra QC to commit
+			commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
 
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
+		})
+
+		t.Run("missing dkg group key", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+			commit.DKGGroupKey = nil
+
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
 		})
 
 		t.Run("inconsistent DKG participants", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+			// add an invalid DKG participant
+			collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
+			commit.DKGParticipants[collector.NodeID] = flow.DKGParticipant{
+				KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
+				Index:    1,
+			}
 
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
 		})
 	})
 }

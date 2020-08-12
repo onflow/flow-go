@@ -10,7 +10,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -60,12 +59,17 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("epoch setup counter differs from epoch commit counter (%d != %d)", setup.Counter, commit.Counter)
 		}
 
+		// The final view of the epoch must be greater than the view of the first block
+		if root.Header.View >= setup.FinalView {
+			return fmt.Errorf("final view of epoch less than first block view")
+		}
+
 		// They should also both be valid within themselves.
 		err := validSetup(setup)
 		if err != nil {
 			return fmt.Errorf("invalid epoch setup event: %w", err)
 		}
-		err = validCommit(commit, setup.Participants.Filter(filter.HasRole(flow.RoleConsensus)))
+		err = validCommit(commit, setup)
 		if err != nil {
 			return fmt.Errorf("invalid epoch commit event: %w", err)
 		}
@@ -476,7 +480,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				if err != nil {
 					return fmt.Errorf("could not retrieve next epoch setup: %w", err)
 				}
-				err = validCommit(ev, setup.Participants)
+				err = validCommit(ev, setup)
 				if err != nil {
 					return fmt.Errorf("invalid epoch commit: %w", err)
 				}

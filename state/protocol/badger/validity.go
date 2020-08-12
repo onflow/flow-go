@@ -75,12 +75,18 @@ func validSetup(setup *flow.EpochSetup) error {
 	return nil
 }
 
-func validCommit(commit *flow.EpochCommit, participants flow.IdentityList) error {
+func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+
+	if len(setup.Assignments) != len(commit.ClusterQCs) {
+		return fmt.Errorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
+	}
 
 	// make sure we have a valid DKG public key
 	if commit.DKGGroupKey == nil {
 		return fmt.Errorf("missing DKG public group key")
 	}
+
+	participants := setup.Participants.Filter(filter.HasRole(flow.RoleConsensus))
 
 	// make sure each participant of the epoch has a DKG entry
 	for _, participant := range participants {
