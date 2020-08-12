@@ -209,7 +209,10 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 		return &EpochSnapshot{err: fmt.Errorf("could not retrieve epoch setup: %w", err)}
 	}
 	if header.View > setup.FinalView {
-		return &EpochSnapshot{counter: counter + 1}
+		return &EpochSnapshot{
+			state:   bs.state,
+			counter: counter + 1,
+		}
 	}
 
 	// we can now iterate backwards through the epochs until we find the one the
@@ -223,10 +226,10 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 			return &EpochSnapshot{err: fmt.Errorf("could not look up epoch start (counter: %d): %w", counter, err)}
 		}
 
-		if start <= header.View {
+		if header.View >= start {
 			return &EpochSnapshot{
-				counter: counter,
 				state:   bs.state,
+				counter: counter,
 			}
 		}
 
