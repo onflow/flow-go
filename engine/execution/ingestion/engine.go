@@ -1182,6 +1182,8 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 					e.wg.Add(1)
 					go e.executeBlock(context.Background(), executableBlock)
 				}
+				e.syncInProgress.Store(false)
+				e.metrics.ExecutionSync(e.syncInProgress.Load())
 				log.Debug().Msg("final target sync block processed")
 
 				return nil
