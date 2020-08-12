@@ -38,7 +38,7 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 	cp := &ClusterPayloads{
 		db: db,
 		cache: newCache(cacheMetrics,
-			withLimit(flow.DefaultTransactionExpiry+100),
+			withLimit(flow.DefaultTransactionExpiry*4),
 			withStore(store),
 			withRetrieve(retrieve),
 			withResource(metrics.ResourceClusterPayload)),

@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -94,8 +93,7 @@ func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
 			continue
 		}
 		if status == flow.TransactionStatusPending {
-			txMsg := convert.TransactionToMessage(*tx)
-			_, _ = r.backend.SendRawTransaction(context.Background(), txMsg)
+			_ = r.backend.SendRawTransaction(context.Background(), tx)
 		} else if status != flow.TransactionStatusUnknown {
 			// not pending or unknown, don't need to retry anymore
 			delete(txsAtHeight, txID)

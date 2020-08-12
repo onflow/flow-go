@@ -53,6 +53,8 @@ func New(
 	transactions storage.Transactions,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
+	collectionGRPCPort uint,
+	connFactory ConnectionFactory,
 ) *Backend {
 	retry := newRetry()
 
@@ -66,15 +68,17 @@ func New(
 			state:        state,
 		},
 		backendTransactions: backendTransactions{
-			collectionRPC:      collectionRPC,
-			executionRPC:       executionRPC,
-			state:              state,
-			chainID:            chainID,
-			collections:        collections,
-			blocks:             blocks,
-			transactions:       transactions,
-			transactionMetrics: transactionMetrics,
-			retry:              retry,
+			staticCollectionRPC: collectionRPC,
+			executionRPC:        executionRPC,
+			state:               state,
+			chainID:             chainID,
+			collections:         collections,
+			blocks:              blocks,
+			transactions:        transactions,
+			transactionMetrics:  transactionMetrics,
+			retry:               retry,
+			collectionGRPCPort:  collectionGRPCPort,
+			connFactory:         connFactory,
 		},
 		backendEvents: backendEvents{
 			executionRPC: executionRPC,
@@ -110,9 +114,12 @@ func (b *Backend) Ping(ctx context.Context) error {
 		return fmt.Errorf("could not ping execution node: %w", err)
 	}
 
-	_, err = b.collectionRPC.Ping(ctx, &accessproto.PingRequest{})
-	if err != nil {
-		return fmt.Errorf("could not ping collection node: %w", err)
+	// staticCollectionRPC is only set if a collection node address was provided at startup
+	if b.staticCollectionRPC != nil {
+		_, err = b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
+		if err != nil {
+			return fmt.Errorf("could not ping collection node: %w", err)
+		}
 	}
 
 	return nil
