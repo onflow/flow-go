@@ -60,6 +60,7 @@ type Engine struct {
 	syncModeThreshold  uint64 // how many consecutive orphaned blocks trigger sync
 	syncInProgress     *atomic.Bool
 	syncTargetBlockID  atomic.Value
+	syncFilter         flow.IdentityFilter
 	stateSync          executionSync.StateSynchronizer
 	metrics            module.ExecutionMetrics
 	tracer             module.Tracer
@@ -83,6 +84,7 @@ func New(
 	blockSync module.BlockRequester,
 	execState state.ExecutionState,
 	syncThreshold uint64,
+	syncFilter flow.IdentityFilter,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
@@ -111,6 +113,7 @@ func New(
 		execState:          execState,
 		syncModeThreshold:  syncThreshold,
 		syncInProgress:     atomic.NewBool(false),
+		syncFilter:         syncFilter,
 		stateSync:          executionSync.NewStateSynchronizer(execState),
 		metrics:            metrics,
 		tracer:             tracer,
@@ -938,7 +941,7 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 	e.log.Debug().
 		Msgf("syncing from height %d to height %d", lastExecutedHeight, targetHeight)
 
-	otherNodes, err := e.state.Final().Identities(filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter()))
+	otherNodes, err := e.state.Final().Identities(filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter(), e.syncFilter))
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("error while finding other execution nodes identities")
 		return

@@ -135,8 +135,6 @@ func (suite *SnapshotSuite) InsertSubtree(parent model.Block, depth, fanout int)
 	for i := 0; i < fanout; i++ {
 		block := suite.BlockWithParent(&parent)
 		suite.InsertBlock(block)
-		err := suite.db.Update(procedure.IndexBlockChild(parent.ID(), block.ID()))
-		suite.Require().Nil(err)
 		suite.InsertSubtree(block, depth-1, fanout)
 	}
 }
@@ -236,39 +234,23 @@ func (suite *SnapshotSuite) TestPending_NoPendingBlocks() {
 		suite.Assert().Len(pending, 0)
 	})
 
-	// check with some finalized blocks
-	suite.Run("with some chain history", func() {
-		parent := suite.genesis
-		for i := 0; i < 10; i++ {
-			next := suite.BlockWithParent(parent)
-			suite.InsertBlock(next)
-			parent = &next
-		}
-
-		pending, err := suite.state.Final().Pending()
-		suite.Require().Nil(err)
-		suite.Assert().Len(pending, 0)
-	})
 }
 
 // test that the appropriate pending blocks are included
 func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
 
-	// build a block that wasn't validated by hotstuff, thus wasn't indexed as a child
-	unvalidated := suite.BlockWithParent(suite.genesis)
-	suite.InsertBlock(unvalidated)
+	// check with some finalized blocks
+	parent := suite.genesis
+	pendings := make([]flow.Identifier, 0, 10)
+	for i := 0; i < 10; i++ {
+		next := suite.BlockWithParent(parent)
+		suite.InsertBlock(next)
+		pendings = append(pendings, next.ID())
+	}
 
-	// build a block that was validated by hotstuff, is indexed as a child
-	validated := suite.BlockWithParent(suite.genesis)
-	suite.InsertBlock(validated)
-	err := suite.db.Update(procedure.IndexBlockChild(suite.genesis.ID(), validated.ID()))
-	suite.Assert().Nil(err)
-
-	// only the validated block should be included
 	pending, err := suite.state.Final().Pending()
 	suite.Require().Nil(err)
-	suite.Require().Len(pending, 1)
-	suite.Assert().Equal(validated.ID(), pending[0])
+	suite.Require().Equal(pendings, pending)
 }
 
 // ensure that pending blocks are included, even they aren't direct children
