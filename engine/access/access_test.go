@@ -159,11 +159,11 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		// create collection node cluster
 		count := 2
 		collNodes := unittest.IdentityListFixture(count, unittest.WithRole(flow.RoleCollection))
-		clusters := flow.NewClusterList(uint(count))
+		assignments := unittest.ClusterAssignment(uint(count), collNodes)
+		clusters, err := flow.NewClusterList(assignments, collNodes)
+		suite.Require().Nil(err)
 		collNode1 := collNodes[0]
 		collNode2 := collNodes[1]
-		clusters.Add(0, collNode1)
-		clusters.Add(1, collNode2)
 		suite.snapshot.On("Clusters").Return(clusters, nil).Twice()
 
 		// create two transactions bound for each of the cluster
