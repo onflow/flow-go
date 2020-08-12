@@ -968,7 +968,7 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 			e.blockSync.RequestHeight(reqHeight)
 		}
 
-		go func() {
+		e.unit.Launch(func() {
 			// Track progress and prune
 			tick := time.NewTicker(time.Minute)
 			for {
@@ -1004,7 +1004,7 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 				}
 			}
 
-		}()
+		})
 		return
 	}
 
