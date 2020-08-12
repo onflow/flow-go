@@ -26,15 +26,9 @@ var participants = flow.IdentityList{
 // if it's not finalized yet, this block should be returned by latest
 func TestSaveBlockAsReplica(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-		b0 := unittest.GenesisFixture(participants)
 
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = b0.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = b0.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+		b0, result, seal := unittest.BootstrapFixture(participants)
 
 		err := state.Mutate().Bootstrap(b0, result, seal)
 		require.NoError(t, err)
