@@ -2,29 +2,38 @@ package queue
 
 import (
 	"fmt"
-	"runtime"
 	"math"
+	"runtime"
 
-	"github.com/rs/zerolog"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
+)
+
+// The priority levels currently defined.
+const (
+	Cap            float64 = 50000
+	HighPriority   int     = 10
+	MediumPriority int     = 5
+	LowPriority    int     = 3
+	NoPriority     int     = 1
 )
 
 // RcvQueue implements an LRU cache of the received eventIDs that delivered to their engines
 type RcvQueue struct {
 	logger  zerolog.Logger
-	size		int
+	size    int
 	workers int
 	max     int
-	codec		network.Codec
-	cache   *lru.Cache // The LRU cache we use for de-duplication.
-	queue		*lru.Cache // The LRU cache we use for overflow.
-	stacks  [10]*lru.Cache // Ten LRU caches we use for priority organization.
+	codec   network.Codec
+	cache   *lru.Cache                // The LRU cache we use for de-duplication.
+	queue   *lru.Cache                // The LRU cache we use for overflow.
+	stacks  [10]*lru.Cache            // Ten LRU caches we use for priority organization.
 	engines *map[uint8]network.Engine // The engines we need to execute the message.
 }
 
@@ -36,27 +45,20 @@ type RcvQueueKey struct {
 
 // RcvQueueValue represents a value for the queue
 type RcvQueueValue struct {
-	senderID	flow.Identifier
-	message		*message.Message
+	senderID flow.Identifier
+	message  *message.Message
 }
 
 // RcvStackValue represents a value for the queue
 type RcvStackValue struct {
-	senderID				flow.Identifier
-	decodedMessage	interface{}
+	senderID       flow.Identifier
+	decodedMessage interface{}
 }
 
 // NewRcvQueue creates and returns a new RcvQueue
 func NewRcvQueue(log zerolog.Logger, size int) (*RcvQueue, error) {
 	// Determine the maximum number of cores we can use for processing
-	var max int
-	maxProcs := runtime.GOMAXPROCS(0)
-	numCPU := runtime.NumCPU()
-	if maxProcs < numCPU {
-		max = maxProcs
-	} else {
-		max = numCPU
-	}
+	max := int(math.Min(float64(runtime.GOMAXPROCS(0)), float64(runtime.NumCPU())))
 
 	// We will need the codec to decode messages to determine the message type
 	codec := jsoncodec.NewCodec()
@@ -82,15 +84,15 @@ func NewRcvQueue(log zerolog.Logger, size int) (*RcvQueue, error) {
 		}
 	}
 
-	rcv := &RcvQueue {
-		logger: log,
-		size: size,
+	rcv := &RcvQueue{
+		logger:  log,
+		size:    size,
 		workers: 0,
-		max: max,
-		codec: codec,
-		cache: cache,
-		queue: queue,
-		stacks: stacks,
+		max:     max,
+		codec:   codec,
+		cache:   cache,
+		queue:   queue,
+		stacks:  stacks,
 	}
 
 	return rcv, nil
@@ -102,100 +104,88 @@ func (r *RcvQueue) SetEngines(engines *map[uint8]network.Engine) {
 }
 
 // Determine the numerical priority of our incoming message
-func (r *RcvQueue) Priority(v interface {}) int {
+func (r *RcvQueue) Priority(v interface{}) int {
 	switch v.(type) {
-		// consensus
-		case *messages.BlockProposal:
-			return 10
-		case *messages.BlockVote:
-			return 10
+	// consensus
+	case *messages.BlockProposal:
+		return HighPriority
+	case *messages.BlockVote:
+		return HighPriority
 
-		// protocol state sync
-		case *messages.SyncRequest:
-			return 3
-		case *messages.SyncResponse:
-			return 3
-		case *messages.RangeRequest:
-			return 3
-		case *messages.BatchRequest:
-			return 3
-		case *messages.BlockResponse:
-			return 3
+	// protocol state sync
+	case *messages.SyncRequest:
+		return LowPriority
+	case *messages.SyncResponse:
+		return LowPriority
+	case *messages.RangeRequest:
+		return LowPriority
+	case *messages.BatchRequest:
+		return LowPriority
+	case *messages.BlockResponse:
+		return LowPriority
 
-		// cluster consensus
-		case *messages.ClusterBlockProposal:
-			return 10
-		case *messages.ClusterBlockVote:
-			return 10
-		case *messages.ClusterBlockResponse:
-			return 3
+	// cluster consensus
+	case *messages.ClusterBlockProposal:
+		return HighPriority
+	case *messages.ClusterBlockVote:
+		return HighPriority
+	case *messages.ClusterBlockResponse:
+		return LowPriority
 
-		// collections, guarantees & transactions
-		case *flow.CollectionGuarantee:
-			return 10
-		case *flow.TransactionBody:
-			return 10
-		case *flow.Transaction:
-			return 10
+	// collections, guarantees & transactions
+	case *flow.CollectionGuarantee:
+		return HighPriority
+	case *flow.TransactionBody:
+		return HighPriority
+	case *flow.Transaction:
+		return HighPriority
 
-		// core messages for execution & verification
-		case *flow.ExecutionReceipt:
-			return 10
-		case *flow.ResultApproval:
-			return 10
+	// core messages for execution & verification
+	case *flow.ExecutionReceipt:
+		return HighPriority
+	case *flow.ResultApproval:
+		return HighPriority
 
-		// execution state synchronization
-		case *messages.ExecutionStateSyncRequest:
-			return 5
-		case *messages.ExecutionStateDelta:
-			return 5
+	// execution state synchronization
+	case *messages.ExecutionStateSyncRequest:
+		return MediumPriority
+	case *messages.ExecutionStateDelta:
+		return MediumPriority
 
-		// data exchange for execution of blocks
-		case *messages.ChunkDataRequest:
-			return 10
-		case *messages.ChunkDataResponse:
-			return 10
+	// data exchange for execution of blocks
+	case *messages.ChunkDataRequest:
+		return HighPriority
+	case *messages.ChunkDataResponse:
+		return HighPriority
 
-		// generic entity exchange engines
-		case *messages.EntityRequest:
-			return 3
-		case *messages.EntityResponse:
-			return 3
+	// generic entity exchange engines
+	case *messages.EntityRequest:
+		return LowPriority
+	case *messages.EntityResponse:
+		return LowPriority
 
-		default:
-			return 1
+	default:
+		return NoPriority
 	}
 }
 
 // Provides a size score when given a byte size.
-func (r *RcvQueue) Size(size int) int {
-  switch {
-    case size > 50000:
-			return 1
-		case size > 30000:
-			return 2
-		case size > 10000:
-			return 3
-		case size > 6000:
-			return 4
-		case size > 5000:
-			return 5
-		case size > 4000:
-			return 6
-		case size > 3000:
-			return 7
-		case size > 2000:
-			return 8
-		case size > 1000:
-			return 9
-    default:
-      return 10
-  }
+func (r *RcvQueue) Size(size float64) int {
+	switch {
+	case size > Cap*float64(0.75):
+		return NoPriority
+	case size > Cap*float64(0.50):
+		return LowPriority
+	case size > Cap*float64(0.25):
+		return MediumPriority
+	default:
+		return HighPriority
+	}
 }
 
 // Provides a combined priority and size score when given a message.
 func (r *RcvQueue) Score(s int, p interface{}) int {
-	size := r.Size(s)
+	size := r.Size(float64(s))
 	priority := r.Priority(p)
 	return int(math.Ceil(float64((size + priority) / 2)))
 }
@@ -203,36 +193,43 @@ func (r *RcvQueue) Score(s int, p interface{}) int {
 // Remove the oldest entry in the queue and process it, shift something from the priority lanes and submit it, or die.
 func (r *RcvQueue) Work() {
 	if r.queue.Len() > 0 {
-		key, value, ok := r.queue.GetOldest()
+		key, value, ok := r.queue.RemoveOldest()
+		if !ok {
+			r.Work()
+			return
+		}
 
-		if ok {
-			r.queue.Remove(key)
+		k, kOk := key.(RcvQueueKey)
+		v, vOk := value.(RcvQueueValue)
+		if !kOk || !vOk {
+			r.Work()
+			return
+		}
 
-			// Convert message payload to a known message type
-			decodedMessage, decodedErr := r.codec.Decode(value.(RcvQueueValue).message.Payload)
-			if decodedErr != nil {
-				r.logger.
-					Debug().
-					Str("sender_id", value.(RcvQueueValue).senderID.String()).
-					Str("event_id", key.(RcvQueueKey).eventID).
-					Msg(fmt.Sprintf("could not decode event: %w", decodedErr))
-				r.workers--
-				return
-			}
+		// Convert message payload to a known message type
+		decodedMessage, decodedErr := r.codec.Decode(v.message.Payload)
+		if decodedErr != nil {
+			r.logger.
+				Debug().
+				Str("sender_id", v.senderID.String()).
+				Str("event_id", k.eventID).
+				Msg(fmt.Sprintf("could not decode event: %w", decodedErr))
+			r.Work()
+			return
+		}
 
-			score := r.Score(value.(RcvQueueValue).message.Size(), decodedMessage)
+		score := r.Score(v.message.Size(), decodedMessage)
 
-			stack := RcvStackValue {
-				senderID: value.(RcvQueueValue).senderID,
-				decodedMessage: decodedMessage,
-			}
+		stack := RcvStackValue{
+			senderID:       v.senderID,
+			decodedMessage: decodedMessage,
+		}
 
-			evicted := r.stacks[score - 1].Add(key, stack)
-			if evicted {
-				r.logger.
-					Debug().
-					Msg("an eviction occured on a priority stack. increase priority stack size.")
-			}
+		evicted := r.stacks[score-1].Add(key, stack)
+		if evicted {
+			r.logger.
+				Debug().
+				Msg("an eviction occured on a priority stack. increase priority stack size.")
 		}
 
 		r.Work()
@@ -242,42 +239,57 @@ func (r *RcvQueue) Work() {
 		for i := 9; i > -1; i-- {
 			if r.stacks[i].Len() > 0 {
 				work = i
+				break
 			}
 		}
-
 		if work == -1 {
 			r.workers--
-		} else {
-			key, value, ok := r.stacks[work].GetOldest()
-
-			if ok {
-				r.stacks[work].Remove(key)
-
-				// Extract channel id and find the registered engine.
-				engine, found := (*r.engines)[key.(RcvQueueKey).channelID]
-				if !found {
-					r.logger.
-						Debug().
-						Str("sender_id", value.(RcvStackValue).senderID.String()).
-						Str("event_id", key.(RcvQueueKey).eventID).
-						Msg(fmt.Sprintf("invalid engine error on channel: %d", key.(RcvQueueKey).channelID))
-					r.workers--
-					return
-				}
-
-				// Call the engine asynchronously with the message payload.
-				engine.Submit(value.(RcvStackValue).senderID, value.(RcvStackValue).decodedMessage)
-			}
-
-			r.Work()
+			return
 		}
+
+		key, value, ok := r.stacks[work].RemoveOldest()
+		if !ok {
+			r.Work()
+			return
+		}
+
+		k, kOk := key.(RcvQueueKey)
+		v, vOk := value.(RcvStackValue)
+		if !kOk || !vOk {
+			r.Work()
+			return
+		}
+
+		// Extract channel id and find the registered engine.
+		engine, found := (*r.engines)[k.channelID]
+		if !found {
+			r.logger.
+				Debug().
+				Str("sender_id", v.senderID.String()).
+				Str("event_id", k.eventID).
+				Msg(fmt.Sprintf("invalid engine error on channel: %d", k.channelID))
+			r.Work()
+			return
+		}
+
+		// Call the engine synchronously with the message payload.
+		err := engine.Process(v.senderID, v.decodedMessage)
+		if err != nil {
+			r.logger.
+				Debug().
+				Str("sender_id", v.senderID.String()).
+				Str("event_id", k.eventID).
+				Msg(fmt.Sprintf("could not process message: %w", err))
+		}
+
+		r.Work()
 	}
 }
 
-// Add adds a new message to the queue if not already present. Returns true if the message was already in the queue or there are
-// too many messages in the queue, false otherwise
+// Add adds a new message to the queue if not already present. Returns false if the message was already in the queue or there are
+// too many messages in the queue, true otherwise
 func (r *RcvQueue) Add(senderID flow.Identifier, message *message.Message) bool {
-	key := RcvQueueKey {
+	key := RcvQueueKey{
 		eventID:   string(message.EventID),
 		channelID: uint8(message.ChannelID),
 	}
@@ -288,7 +300,7 @@ func (r *RcvQueue) Add(senderID flow.Identifier, message *message.Message) bool 
 		return false
 	}
 
-	value := RcvQueueValue {
+	value := RcvQueueValue{
 		senderID: senderID,
 		message:  message,
 	}

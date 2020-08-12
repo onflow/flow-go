@@ -35,7 +35,9 @@ type Network struct {
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & queue interfaces to track volatile information.
-// csize determines the size of the queue dedicated to keep track of received messages
+// qsize provided below is used to set the size of the cache, overflow buffer,
+// and priority queues of the queue component. Cache is then set to qsize * 10e3.
+// The overflow buffer is set to qsize. The priority queues are set to qsize * 100.
 func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
