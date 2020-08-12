@@ -324,6 +324,12 @@ docker-push-ghost:
 	docker push "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/ghost:$(IMAGE_TAG)"
 
+.PHONY: docker-push-loader
+docker-push-loader:
+	docker push gcr.io/dl-flow/benchmark/loader:latest
+	docker push "gcr.io/dl-flow/benchmark/loader:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/benchmark/loader:$(IMAGE_TAG)"
+
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
 
