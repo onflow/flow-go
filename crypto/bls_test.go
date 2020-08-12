@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // BLS tests
@@ -30,6 +32,27 @@ func BenchmarkBLSBLS12381Sign(b *testing.B) {
 func BenchmarkBLSBLS12381Verify(b *testing.B) {
 	halg := NewBLSKMAC("bench tag")
 	benchVerify(b, BLSBLS12381, halg)
+}
+
+// BLS tests
+func TestBLSBLS12381Hasher(t *testing.T) {
+	// generate a key pair
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	require.NoError(t, err)
+	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
+	require.NoError(t, err)
+	// empty hasher
+	_, err = sk.Sign(seed, nil)
+	assert.Error(t, err)
+	_, err = sk.PublicKey().Verify(Signature{}, seed, nil)
+	assert.Error(t, err)
+	// short size hasher
+	_, err = sk.Sign(seed, hash.NewSHA2_256())
+	assert.Error(t, err)
+	_, err = sk.PublicKey().Verify(Signature{}, seed, hash.NewSHA2_256())
+	assert.Error(t, err)
 }
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys
