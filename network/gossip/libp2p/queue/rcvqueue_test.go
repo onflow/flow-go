@@ -113,8 +113,8 @@ func (r *RcvQueueTestSuite) TestSingleMessageAdd() {
 	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
 }
 
-// TestDuplicateMessageAdd adds a single message twice to the queue and verifies its rejection
-func (r *RcvQueueTestSuite) TestDuplicateMessageAdd() {
+// TestDuplicateSyncMessageAdd adds a single message twice to the queue and verifies its rejection in a synchronous manner
+func (r *RcvQueueTestSuite) TestDuplicateSyncMessageAdd() {
 	msg := createMessage(0)
 
 	var sender [32]byte
@@ -135,6 +135,33 @@ func (r *RcvQueueTestSuite) TestDuplicateMessageAdd() {
 
 	assert.False(r.Suite.T(), added)
 	time.Sleep(time.Second)
+}
+
+// TestDuplicateAsyncMessageAdd adds a single message twice to the queue and verifies its rejection in a asynchronous manner
+func (r *RcvQueueTestSuite) TestDuplicateAsyncMessageAdd() {
+	msg := createMessage(0)
+
+	var sender [32]byte
+	sender[0] = byte(2 + 1)
+	senderID := flow.Identifier(sender)
+
+	ctrl := gomock.NewController(r.Suite.T())
+	defer ctrl.Finish()
+	engines := make(map[uint8]network.Engine)
+	engine := mocks.NewMockEngine(ctrl)
+	payload, _ := r.q.codec.Decode(msg.Payload)
+	engine.EXPECT().Process(senderID, payload).Return(nil).Times(1)
+	engines[1] = engine
+	r.q.SetEngines(&engines)
+
+	go r.q.Add(senderID, msg)
+	go r.q.Add(senderID, msg)
+
+	time.Sleep(time.Second)
+	assert.Equal(r.Suite.T(), r.q.cache.Len(), 1)
+	assert.Equal(r.Suite.T(), r.q.workers, 0)
+	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
+	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
 }
 
 // TestOneHundredMessagesAdd tries to add 100 messages to the queue and confirms results.
