@@ -60,6 +60,87 @@ func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Op
 	return ch, nil
 }
 
+// TestPeerScore simulates a network where nodes use the built-in libp2p peer scoring mechanism
+func (p *PubSubTestSuite) TestPeerScore() {
+	defer p.cancel()
+        topic := "testtopic/" + unittest.IdentifierFixture().String()
+        count := 4
+        golog.SetAllLoggers(golog.LevelError)
+
+	// Create nodes with peer scoring enabled, subscribed to same topic
+	d := &mockDiscovery{}
+	nodes := p.CreateScoringNodes(count, topic, d)
+
+	// Peer Discovery
+	var pInfos []peer.AddrInfo
+        for _, n := range nodes {
+                id := n.libP2PHost.ID()
+                addrs := n.libP2PHost.Addrs()
+                pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
+        }
+	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
+        d.SetPeers(pInfos)
+
+        // let the nodes discover each other
+        time.Sleep(2 * time.Second)
+
+	// Send messages
+	require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello")))
+	recv := make(map[string]bool, count)
+        for i := 0; i < count; i++ {
+                select {
+                case res := <-ch:
+                        recv[res] = true
+                case <-time.After(3 * time.Second):
+                        missing := make([]string, 0)
+                        for _, n := range nodes {
+                                if _, found := recv[n.name]; !found {
+                                        missing = append(missing, n.name)
+                                }
+                        }
+                        assert.Fail(p.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
+                        break
+                }
+        }
+
+	// Display each nodes local scores at end
+	for i := 0 ; i < count ; i++ {
+		scores = inspector.score(nodes[i].id)
+		fmt.println("Node %v has this to say about its peers: %v", i, scores)
+	}
+
+	// Step 6: unsubscribes all nodes from the topic
+        for _, n := range nodes {
+                assert.NoError(p.Suite.T(), n.UnSubscribe(topic))
+        }
+}
+
+type mockPeerScoreInspector struct {
+	mx     sync.Mutex
+	scores map[peer.ID]float64
+}
+
+func (ps *mockPeerScoreInspector) inspect(scores map[peer.ID]float64) {
+	ps.mx.Lock()
+	defer ps.mx.Unlock()
+	ps.scores = scores
+}
+
+func (ps *mockPeerScoreInspector) score(p peer.ID) float64 {
+	ps.mx.Lock()
+	defer ps.mx.Unlock()
+	return ps.scores[p]
+}
+
+// TestPeerScoreBad simulates a network where nodes use libp2p's peer score system, but there is a bad node within the network
+func (p *PubSubTestSuite) TestPeerScoreBad() {
+	// Create good nodes
+	// Create atleast one bad node
+	// Subscribe to topic
+	// Send messages
+	// Display scores at end; bad node should recieve negative scores from its peers
+}
+
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message
 func (p *PubSubTestSuite) TestPubSub() {
 	defer p.cancel()
@@ -138,6 +219,87 @@ func (p *PubSubTestSuite) TestPubSub() {
 	}
 }
 
+// CreateScoringNodes creates a number of libp2p nodes with peer scoring enabled
+func (psts *PubSubTestSuite) CreateScoringNodes(count int, mytopic string, d *mockDiscovery) (nodes []*P2PNode) {
+// keeps track of errors on creating a node
+        var err error
+        logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+        defer func() {
+                if err != nil && nodes != nil {
+                        // stops all nodes upon an error in starting even one single node
+                        psts.StopNodes(nodes)
+                }
+        }()
+
+        handlerFunc := func(network.Stream) {}
+
+        // creating nodes
+        for i := 1; i <= count; i++ {
+
+                name := fmt.Sprintf("node%d", i)
+                pkey, err := generateNetworkingKey(name)
+                require.NoError(psts.Suite.T(), err)
+
+                n := &P2PNode{}
+                nodeID := NodeAddress{
+                        Name:   name,
+                        IP:     "0.0.0.0",        // localhost
+                        Port:   "0",              // random Port number
+                        PubKey: pkey.GetPublic(), // the networking public key
+                }
+
+		// Create parameters with reasonable default values
+		params := &PeerScoreParams{
+			AppSpecificScore:            func(peer.ID) float64 { return 0 },
+			IPColocationFactorWeight:    0,
+			IPColocationFactorThreshold: 1,
+			DecayInterval:               5 * time.Second,
+			DecayToZero:                 0.01,
+			RetainScore:                 10 * time.Second,
+			Topics:                      make(map[string]*TopicScoreParams),
+		}
+		params.Topics[mytopic] = &TopicScoreParams{
+			TopicWeight:                     0.25,
+			TimeInMeshWeight:                0.0027,
+			TimeInMeshQuantum:               time.Second,
+			TimeInMeshCap:                   3600,
+			FirstMessageDeliveriesWeight:    0.664,
+			FirstMessageDeliveriesDecay:     0.9916,
+			FirstMessageDeliveriesCap:       1500,
+			MeshMessageDeliveriesWeight:     -0.25,
+			MeshMessageDeliveriesDecay:      0.97,
+			MeshMessageDeliveriesCap:        400,
+			MeshMessageDeliveriesThreshold:  100,
+			MeshMessageDeliveriesActivation: 30 * time.Second,
+			MeshMessageDeliveriesWindow:     5 * time.Minute,
+			MeshFailurePenaltyWeight:        -0.25,
+			MeshFailurePenaltyDecay:         0.997,
+			InvalidMessageDeliveriesWeight:  -99,
+			InvalidMessageDeliveriesDecay:   0.9994,
+		}
+		thresholds := &PeerScoreThresholds{
+			GossipThreshold:   -100,
+			PublishThreshold:  -200,
+			GraylistThreshold: -300,
+			AcceptPXThreshold: 0,
+		}
+
+		ps, err := pubsub.NewGossipSub(psts.ctx, NodeID, pubsub.WithDiscovery(d), pubsub.WithPeerScore(params, thresholds),pubsub.WithPeerScoreInspect(inspector.inspect, time.Second))
+
+
+		//psOption := pubsub.WithDiscovery(d)
+                //err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootID, psOption)
+
+                require.NoError(psts.Suite.T(), err)
+                require.Eventuallyf(psts.Suite.T(), func() bool {
+                        ip, p := n.GetIPPort()
+                        return ip != "" && p != ""
+                }, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
+                nodes = append(nodes, n)
+        }
+        return nodes
+}
+
 // CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
@@ -171,6 +333,7 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 
 		psOption := pubsub.WithDiscovery(d)
 		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootID, psOption)
+
 		require.NoError(psts.Suite.T(), err)
 		require.Eventuallyf(psts.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
