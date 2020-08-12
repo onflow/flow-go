@@ -13,8 +13,7 @@ import (
 )
 
 func TestGenesisEncodingJSON(t *testing.T) {
-	identities := unittest.IdentityListFixture(8)
-	genesis := flow.Genesis(identities, flow.Mainnet)
+	genesis := flow.Genesis(flow.Mainnet)
 	genesisID := genesis.ID()
 	data, err := json.Marshal(genesis)
 	require.NoError(t, err)
@@ -27,8 +26,7 @@ func TestGenesisEncodingJSON(t *testing.T) {
 }
 
 func TestGenesisDecodingMsgpack(t *testing.T) {
-	identities := unittest.IdentityListFixture(8)
-	genesis := flow.Genesis(identities, flow.Mainnet)
+	genesis := flow.Genesis(flow.Mainnet)
 	genesisID := genesis.ID()
 	data, err := msgpack.Marshal(genesis)
 	require.NoError(t, err)

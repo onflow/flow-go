@@ -89,17 +89,15 @@ func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beac
 		beaconSKs, beaconPKs, beaconGroupPK, err = crypto.ThresholdSignKeyGen(len(identities),
 			signature.RandomBeaconThreshold(len(identities)), seed)
 		require.NoError(t, err)
-		// TODO: Update this to be on the committee directly.
-		_ = beaconSKs
-		_ = beaconPKs
-		_ = beaconGroupPK
-		// dkg.On("GroupSize").Return(uint(len(beaconSKs)), nil)
-		// dkg.On("GroupKey").Return(beaconGroupPK, nil)
-		// for i, identity := range identities {
-		// 	dkg.On("HasParticipant", identity.NodeID).Return(true, nil)
-		// 	dkg.On("ParticipantIndex", identity.NodeID).Return(uint(i), nil)
-		// 	dkg.On("ParticipantKey", identity.NodeID).Return(beaconPKs[i], nil)
-		// }
+
+		committee.On("DKGSize", mock.Anything).Return(uint(len(identities)), nil)
+		committee.On("DKGGroupKey", mock.Anything).Return(beaconGroupPK, nil)
+		for i, node := range identities {
+			share := beaconPKs[i]
+			committee.On("DKGKeyShare", mock.Anything, node.NodeID).Return(share, nil)
+			committee.On("DKGIndex", mock.Anything, node.NodeID).Return(uint(i), nil)
+		}
 	}
+
 	return committee, stakingKeys, beaconSKs
 }

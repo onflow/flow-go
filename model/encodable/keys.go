@@ -2,6 +2,9 @@ package encodable
 
 import (
 	"encoding/json"
+	"fmt"
+
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
@@ -134,6 +137,23 @@ func (pub *RandomBeaconPubKey) UnmarshalJSON(b []byte) error {
 	}
 	if len(bz) == 0 {
 		return nil
+	}
+	var err error
+	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, bz)
+	return err
+}
+
+func (pub RandomBeaconPubKey) MarshalMsgpack() ([]byte, error) {
+	if pub.PublicKey == nil {
+		return nil, fmt.Errorf("empty public key")
+	}
+	return msgpack.Marshal(pub.PublicKey.Encode())
+}
+
+func (pub *RandomBeaconPubKey) UnmarshalMsgpack(b []byte) error {
+	var bz []byte
+	if err := msgpack.Unmarshal(b, &bz); err != nil {
+		return err
 	}
 	var err error
 	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, bz)

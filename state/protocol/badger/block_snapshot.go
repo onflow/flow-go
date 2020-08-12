@@ -209,23 +209,16 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 		return &EpochSnapshot{err: fmt.Errorf("could not retrieve epoch setup: %w", err)}
 	}
 	if header.View > setup.FinalView {
-		return &EpochSnapshot{counter: counter + 1}
+		return &EpochSnapshot{
+			state:   bs.state,
+			counter: counter + 1,
+		}
 	}
 
-	// We can now iterate backwards through the epoch's as long as the header's
-	// view is higher than the start of a given period. As soon as we find an
-	// epoch that has a start lower than the current header's view, it means
-	// the header falls in the epoch following that one.
-	var start uint64
+	// we can now iterate backwards through the epochs until we find the one the
+	// header's view falls within
+	var start uint64 // first view of the epoch, inclusive
 	for {
-
-		// we have reached the first epoch, which this header has to be part of thus
-		if counter == 0 {
-			return &EpochSnapshot{
-				counter: 0,
-				state:   bs.state,
-			}
-		}
 
 		// get the start view of the epoch
 		err = bs.state.db.View(operation.LookupEpochStart(counter, &start))
@@ -233,18 +226,13 @@ func (bs *BlockSnapshot) EpochSnapshot() *EpochSnapshot {
 			return &EpochSnapshot{err: fmt.Errorf("could not look up epoch start (counter: %d): %w", counter, err)}
 		}
 
-		// if start is bigger than the header view, it means the header is definitely not part
-		// of the epoch; as the check still passed for the previous one, the header is thus
-		// definitely part of the previously checked (next) period
-		if start > header.View {
+		if header.View >= start {
 			return &EpochSnapshot{
-				counter: counter + 1,
 				state:   bs.state,
+				counter: counter,
 			}
 		}
 
-		// the header still falls into the currently checked epoch; step back to the previous
-		// one until we found one that the header doesn't belong to
 		counter--
 	}
 }

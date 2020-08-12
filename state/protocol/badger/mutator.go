@@ -154,6 +154,10 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not index epoch start: %w", err)
 		}
+		err = operation.InsertEpochHeight(setup.Counter, root.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch height: %w", err)
+		}
 		err = operation.InsertEpochSetup(setup.Counter, setup)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert epoch seed: %w", err)
@@ -175,9 +179,8 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 
 func (m *Mutator) Extend(candidate *flow.Block) error {
 
-	// FIRST: We do some initial cheap sanity checks. Currently, only the
-	// root block can contain identities. We also want to make sure that the
-	// payload hash has been set correctly.
+	// FIRST: We do some initial cheap sanity checks, like checking the payload
+	// hash is consistent
 
 	header := candidate.Header
 	payload := candidate.Payload

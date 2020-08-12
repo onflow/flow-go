@@ -373,7 +373,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
-				fmt.Sprintf("--nclusters=%d", net.config.NClusters),
 			}, nodeConf.AdditionalFlags...),
 		},
 		HostConfig: &container.HostConfig{},

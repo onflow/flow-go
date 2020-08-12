@@ -15,17 +15,16 @@ import (
 )
 
 type State struct {
-	metrics    module.ComplianceMetrics
-	db         *badger.DB
-	headers    storage.Headers
-	identities storage.Identities
-	seals      storage.Seals
-	index      storage.Index
-	payloads   storage.Payloads
-	blocks     storage.Blocks
-	setups     storage.EpochSetups
-	commits    storage.EpochCommits
-	cfg        Config
+	metrics  module.ComplianceMetrics
+	db       *badger.DB
+	headers  storage.Headers
+	seals    storage.Seals
+	index    storage.Index
+	payloads storage.Payloads
+	blocks   storage.Blocks
+	setups   storage.EpochSetups
+	commits  storage.EpochCommits
+	cfg      Config
 }
 
 // NewState initializes a new state backed by a badger database, applying the

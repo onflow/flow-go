@@ -15,8 +15,8 @@ import (
 
 func TestEncodeDecode(t *testing.T) {
 
-	setup := unittest.EpochSetupFixture(3)
-	commit := unittest.EpochCommitFixture(3)
+	setup := unittest.EpochSetupFixture()
+	commit := unittest.EpochCommitFixture()
 
 	t.Run("specific event types", func(t *testing.T) {
 		b, err := json.Marshal(setup)

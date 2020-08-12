@@ -28,7 +28,7 @@ func TestGenerateRootQC(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func createSignerData(t *testing.T, n int) ParticipantData {
+func createSignerData(t *testing.T, n int) *ParticipantData {
 	identities := unittest.IdentityListFixture(n)
 
 	networkingKeys, err := unittest.NetworkingKeys(n)
@@ -71,7 +71,7 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 		}
 	}
 
-	participantData := ParticipantData{
+	participantData := &ParticipantData{
 		Participants: participants,
 		Lookup:       participantLookup,
 		GroupKey:     groupKey,

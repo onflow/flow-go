@@ -105,8 +105,7 @@ func (es *EpochSnapshot) Clusters() (flow.ClusterList, error) {
 		setup.Assignments,
 		setup.Participants.Filter(filter.HasRole(flow.RoleCollection)),
 	)
-
-	return clusters, nil
+	return clusters, err
 }
 
 // ClusterRootBlock returns the canonical root block for the given cluster, for the
