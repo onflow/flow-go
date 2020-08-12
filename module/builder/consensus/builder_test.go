@@ -254,7 +254,9 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.guarPool,
 		bs.sealPool,
 	)
+
 	bs.build.cfg.expiry = 11
+
 }
 
 func (bs *BuilderSuite) TearDownTest() {

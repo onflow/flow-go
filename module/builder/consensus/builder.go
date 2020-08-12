@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
@@ -341,9 +342,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return fmt.Errorf("could not index proposal seal: %w", err)
 		}
-		err = operation.InsertBlockChildren(blockID, nil)(tx)
+
+		// index the child block for recovery
+		err = procedure.IndexNewBlock(blockID, proposal.Header.ParentID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert empty block children: %w", err)
+			return fmt.Errorf("could not index new block: %w", err)
 		}
 		return nil
 	})

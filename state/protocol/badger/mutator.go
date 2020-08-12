@@ -96,6 +96,8 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not index root block: %w", err)
 		}
+		// root block has no parent, so only needs to add one index
+		// to indicate the root block has no child yet
 		err = operation.InsertBlockChildren(root.ID(), nil)(tx)
 		if err != nil {
 			return fmt.Errorf("could not initialize root child index: %w", err)
@@ -504,15 +506,11 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
-		// add an empty child index for the added block
-		err = operation.InsertBlockChildren(blockID, nil)(tx)
+
+		// index the child block for recovery
+		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not initialize children index: %w", err)
-		}
-		// index the added block as a child of its parent
-		err = procedure.IndexBlockChild(candidate.Header.ParentID, blockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not add to parent index: %w", err)
+			return fmt.Errorf("could not index new block: %w", err)
 		}
 		return nil
 	})
