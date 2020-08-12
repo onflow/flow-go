@@ -231,6 +231,60 @@ func TestBootstrapWithSeal(t *testing.T) {
 	})
 }
 
+func TestBootstrapMissingServiceEvents(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		t.Run("missing setup", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			seal.ServiceEvents = seal.ServiceEvents[1:]
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
+		})
+
+		t.Run("missing commit", func(t *testing.T) {
+			root, result, seal := unittest.BootstrapFixture(participants)
+			seal.ServiceEvents = seal.ServiceEvents[:1]
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Error(t, err)
+		})
+	})
+}
+
+func TestBootstrapInvalidEpochSetup(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		t.Run("invalid final view", func(t *testing.T) {
+
+		})
+
+		t.Run("invalid cluster assignments", func(t *testing.T) {
+
+		})
+
+		t.Run("empty seed", func(t *testing.T) {
+
+		})
+
+	})
+}
+
+func TestBootstrapInvalidEpochCommit(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		t.Run("inconsistent counter", func(t *testing.T) {
+
+		})
+
+		t.Run("inconsistent cluster QCs", func(t *testing.T) {
+
+		})
+
+		t.Run("inconsistent DKG participants", func(t *testing.T) {
+
+		})
+	})
+}
+
 func TestExtendValid(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
