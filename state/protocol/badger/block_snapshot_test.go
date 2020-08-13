@@ -88,7 +88,12 @@ func TestClusters(t *testing.T) {
 
 		root, result, seal := unittest.BootstrapFixture(identities)
 		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
 		setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
+		commit.ClusterQCs = make([]*flow.QuorumCertificate, nClusters)
+		for i := 0; i < nClusters; i++ {
+			commit.ClusterQCs[i] = unittest.QuorumCertificateFixture()
+		}
 		err := state.Mutate().Bootstrap(root, result, seal)
 		require.NoError(t, err)
 

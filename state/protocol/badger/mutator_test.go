@@ -605,8 +605,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		// first bootstrap with the initial epoch
-		root, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Mutate().Bootstrap(root, result, seal)
+		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(root, rootResult, rootSeal)
 		require.Nil(t, err)
 
 		// add a block for the first seal to reference
@@ -617,7 +617,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Mutate().Finalize(block1.ID())
 		require.Nil(t, err)
 
-		epoch1Setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		epoch1Setup := rootSeal.ServiceEvents[0].Event.(*flow.EpochSetup)
 		epoch1FinalView := epoch1Setup.FinalView
 
 		// add a participant for the next epoch
@@ -634,7 +634,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// create the seal referencing block1 and including the setup event
 		seal1 := unittest.SealFixture(
 			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithInitalState(seal.FinalState),
+			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
@@ -743,5 +743,275 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		epochCounter, err = state.Final().Epoch()
 		require.Nil(t, err)
 		assert.Equal(t, epoch2Setup.Counter, epochCounter)
+	})
+}
+
+// extending protocol state with an invalid epoch setup service event should cause an error
+func TestExtendEpochSetupInvalid(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		// first bootstrap with the initial epoch
+		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(root, rootResult, rootSeal)
+		require.Nil(t, err)
+
+		// add a block for the first seal to reference
+		block1 := unittest.BlockWithParentFixture(root.Header)
+		block1.SetPayload(flow.Payload{})
+		err = state.Mutate().Extend(&block1)
+		require.Nil(t, err)
+		err = state.Mutate().Finalize(block1.ID())
+		require.Nil(t, err)
+
+		epoch1Setup := rootSeal.ServiceEvents[0].Event.(*flow.EpochSetup)
+
+		// add a participant for the next epoch
+		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+		epoch2Participants := append(participants, epoch2NewParticipant).Order(order.ByNodeIDAsc)
+
+		// this function will return a VALID setup event and seal, we will modify
+		// in different ways in each test case
+		createSetup := func() (*flow.EpochSetup, *flow.Seal) {
+			setup := unittest.EpochSetupFixture(
+				unittest.WithParticipants(epoch2Participants),
+				unittest.SetupWithCounter(epoch1Setup.Counter+1),
+				unittest.WithFinalView(epoch1Setup.FinalView+1000),
+			)
+			seal := unittest.SealFixture(
+				unittest.SealWithBlockID(block1.ID()),
+				unittest.WithInitalState(rootSeal.FinalState),
+				unittest.WithServiceEvents(setup.ServiceEvent()),
+			)
+			return setup, seal
+		}
+
+		t.Run("wrong counter", func(t *testing.T) {
+			setup, seal := createSetup()
+			setup.Counter = epoch1Setup.Counter
+
+			block := unittest.BlockWithParentFixture(block1.Header)
+			block.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal},
+			})
+
+			err = state.Mutate().Extend(&block)
+			require.Error(t, err)
+		})
+
+		t.Run("invalid final view", func(t *testing.T) {
+			setup, seal := createSetup()
+
+			block := unittest.BlockWithParentFixture(block1.Header)
+			setup.FinalView = block.Header.View
+			block.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal},
+			})
+			err = state.Mutate().Extend(&block)
+			require.Error(t, err)
+		})
+
+		t.Run("empty seed", func(t *testing.T) {
+			setup, seal := createSetup()
+			setup.Seed = nil
+
+			block := unittest.BlockWithParentFixture(block1.Header)
+			block.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal},
+			})
+
+			err = state.Mutate().Extend(&block)
+			require.Error(t, err)
+		})
+	})
+}
+
+// extending protocol state with an invalid epoch commit service event should cause an error
+func TestExtendEpochCommitInvalid(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		// first bootstrap with the initial epoch
+		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(root, rootResult, rootSeal)
+		require.Nil(t, err)
+
+		// add a block for the first seal to reference
+		block1 := unittest.BlockWithParentFixture(root.Header)
+		block1.SetPayload(flow.Payload{})
+		err = state.Mutate().Extend(&block1)
+		require.Nil(t, err)
+		err = state.Mutate().Finalize(block1.ID())
+		require.Nil(t, err)
+
+		epoch1Setup := rootSeal.ServiceEvents[0].Event.(*flow.EpochSetup)
+
+		// swap consensus node for a new one for epoch 2
+		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+		epoch2Participants := append(
+			participants.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))),
+			epoch2NewParticipant,
+		).Order(order.ByNodeIDAsc)
+
+		createSetup := func() (*flow.EpochSetup, *flow.Seal) {
+			setup := unittest.EpochSetupFixture(
+				unittest.WithParticipants(epoch2Participants),
+				unittest.SetupWithCounter(epoch1Setup.Counter+1),
+				unittest.WithFinalView(epoch1Setup.FinalView+1000),
+			)
+			seal := unittest.SealFixture(
+				unittest.SealWithBlockID(block1.ID()),
+				unittest.WithInitalState(rootSeal.FinalState),
+				unittest.WithServiceEvents(setup.ServiceEvent()),
+			)
+			return setup, seal
+		}
+
+		createCommit := func(refBlockID flow.Identifier, initState flow.StateCommitment) (*flow.EpochCommit, *flow.Seal) {
+			commit := unittest.EpochCommitFixture(
+				unittest.CommitWithCounter(epoch1Setup.Counter+1),
+				unittest.WithDKGFromParticipants(epoch2Participants),
+			)
+
+			seal := unittest.SealFixture(
+				unittest.SealWithBlockID(refBlockID),
+				unittest.WithInitalState(initState),
+				unittest.WithServiceEvents(commit.ServiceEvent()),
+			)
+			return commit, seal
+		}
+
+		t.Run("without setup", func(t *testing.T) {
+			_, seal := createCommit(block1.ID(), rootSeal.FinalState)
+
+			block := unittest.BlockWithParentFixture(block1.Header)
+			block.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal},
+			})
+			err = state.Mutate().Extend(&block)
+			require.Error(t, err)
+		})
+
+		// insert the epoch setup
+		epoch2Setup, setupSeal := createSetup()
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{setupSeal},
+		})
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+		err = state.Mutate().Finalize(block2.ID())
+		require.Nil(t, err)
+		_ = epoch2Setup
+
+		t.Run("inconsistent counter", func(t *testing.T) {
+			commit, seal := createCommit(block2.ID(), setupSeal.FinalState)
+			commit.Counter = epoch2Setup.Counter + 1
+
+			block := unittest.BlockWithParentFixture(block2.Header)
+			block.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal},
+			})
+			err := state.Mutate().Extend(&block)
+			require.Error(t, err)
+		})
+
+		t.Run("inconsistent cluster QCs", func(t *testing.T) {
+			commit, seal := createCommit(block2.ID(), setupSeal.FinalState)
+			commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
+
+			block := unittest.BlockWithParentFixture(block2.Header)
+			block.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal},
+			})
+			err := state.Mutate().Extend(&block)
+			require.Error(t, err)
+		})
+
+		t.Run("missing dkg group key", func(t *testing.T) {
+			commit, seal := createCommit(block2.ID(), setupSeal.FinalState)
+			commit.DKGGroupKey = nil
+
+			block := unittest.BlockWithParentFixture(block2.Header)
+			block.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal},
+			})
+			err := state.Mutate().Extend(&block)
+			require.Error(t, err)
+		})
+
+		t.Run("inconsistent DKG participants", func(t *testing.T) {
+			commit, seal := createCommit(block2.ID(), setupSeal.FinalState)
+
+			// add the consensus node from epoch *1*, which was removed for epoch 2
+			epoch1CONNode := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
+			commit.DKGParticipants[epoch1CONNode.NodeID] = flow.DKGParticipant{
+				KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
+				Index:    1,
+			}
+
+			block := unittest.BlockWithParentFixture(block2.Header)
+			block.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal},
+			})
+			err := state.Mutate().Extend(&block)
+			require.Error(t, err)
+		})
+	})
+}
+
+// if we reach the first block of the next epoch before both setup and commit
+// service events are finalized, the chain should halt
+func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		// first bootstrap with the initial epoch
+		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(root, rootResult, rootSeal)
+		require.Nil(t, err)
+
+		// add a block for the first seal to reference
+		block1 := unittest.BlockWithParentFixture(root.Header)
+		block1.SetPayload(flow.Payload{})
+		err = state.Mutate().Extend(&block1)
+		require.Nil(t, err)
+		err = state.Mutate().Finalize(block1.ID())
+		require.Nil(t, err)
+
+		epoch1Setup := rootSeal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		epoch1FinalView := epoch1Setup.FinalView
+
+		// add a participant for the next epoch
+		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+		epoch2Participants := append(participants, epoch2NewParticipant).Order(order.ByNodeIDAsc)
+
+		// create the epoch setup event for the second epoch
+		epoch2Setup := unittest.EpochSetupFixture(
+			unittest.WithParticipants(epoch2Participants),
+			unittest.SetupWithCounter(epoch1Setup.Counter+1),
+			unittest.WithFinalView(epoch1FinalView+1000),
+		)
+
+		// create the seal referencing block1 and including the setup event
+		seal1 := unittest.SealFixture(
+			unittest.SealWithBlockID(block1.ID()),
+			unittest.WithInitalState(rootSeal.FinalState),
+			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
+		)
+
+		// block 2 contains the epoch setup service event
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal1},
+		})
+
+		// insert the block containing the seal containing the setup event
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		// block 3 will be the first block for epoch 2
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Header.View = epoch2Setup.FinalView + 1
+
+		err = state.Mutate().Extend(&block3)
+		require.Error(t, err)
 	})
 }
