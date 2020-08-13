@@ -79,10 +79,12 @@ func (suite *MutatorSuite) Bootstrap() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	genesis, result, seal := unittest.BootstrapFixture(participants)
-	err := suite.protoState.Mutate().Bootstrap(genesis, result, seal)
+	root, result, seal := unittest.BootstrapFixture(participants)
+	// ensure we don't enter a new epoch for tests that build many blocks
+	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+	err := suite.protoState.Mutate().Bootstrap(root, result, seal)
 	suite.Require().Nil(err)
-	suite.protoGenesis = genesis.Header
+	suite.protoGenesis = root.Header
 
 	// bootstrap cluster chain
 	err = suite.mutator.Bootstrap(suite.genesis)

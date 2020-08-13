@@ -253,19 +253,49 @@ func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarante
 	return guarantees
 }
 
-func BlockSealFixture() *flow.Seal {
-	return &flow.Seal{
+func SealFromResult(result *flow.ExecutionResult) func(*flow.Seal) {
+	return func(seal *flow.Seal) {
+		seal.ResultID = result.ID()
+		seal.BlockID = result.BlockID
+		seal.FinalState = result.FinalStateCommit
+	}
+}
+
+func SealWithBlockID(blockID flow.Identifier) func(*flow.Seal) {
+	return func(seal *flow.Seal) {
+		seal.BlockID = blockID
+	}
+}
+
+func WithServiceEvents(events ...flow.ServiceEvent) func(*flow.Seal) {
+	return func(seal *flow.Seal) {
+		seal.ServiceEvents = events
+	}
+}
+
+func WithInitalState(initial flow.StateCommitment) func(*flow.Seal) {
+	return func(seal *flow.Seal) {
+		seal.InitialState = initial
+	}
+}
+
+func SealFixture(opts ...func(*flow.Seal)) *flow.Seal {
+	seal := &flow.Seal{
 		BlockID:      IdentifierFixture(),
 		ResultID:     IdentifierFixture(),
 		InitialState: StateCommitmentFixture(),
 		FinalState:   StateCommitmentFixture(),
 	}
+	for _, apply := range opts {
+		apply(seal)
+	}
+	return seal
 }
 
 func BlockSealsFixture(n int) []*flow.Seal {
 	seals := make([]*flow.Seal, 0, n)
 	for i := 0; i < n; i++ {
-		seal := BlockSealFixture()
+		seal := SealFixture()
 		if i > 0 {
 			seal.InitialState = seals[i-1].FinalState
 		}
@@ -776,17 +806,6 @@ func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitm
 	return result
 }
 
-func SealFixture(result *flow.ExecutionResult, setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.Seal {
-	seal := &flow.Seal{
-		BlockID:       result.BlockID,
-		ResultID:      result.ID(),
-		InitialState:  nil,
-		FinalState:    result.FinalStateCommit,
-		ServiceEvents: []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()},
-	}
-	return seal
-}
-
 func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
 	key, err := crypto.GeneratePrivateKey(algo, SeedFixture(128))
 	if err != nil {
@@ -814,6 +833,12 @@ func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 func SetupWithCounter(counter uint64) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
 		setup.Counter = counter
+	}
+}
+
+func WithFinalView(view uint64) func(*flow.EpochSetup) {
+	return func(setup *flow.EpochSetup) {
+		setup.FinalView = view
 	}
 }
 
@@ -876,8 +901,12 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
 
 	counter := uint64(1)
-	setup := EpochSetupFixture(WithParticipants(participants), SetupWithCounter(counter))
+	setup := EpochSetupFixture(
+		WithParticipants(participants),
+		SetupWithCounter(counter),
+		WithFinalView(root.Header.View+1000),
+	)
 	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
-	seal := SealFixture(result, setup, commit)
+	seal := SealFixture(SealFromResult(result), WithServiceEvents(setup.ServiceEvent(), commit.ServiceEvent()))
 	return root, result, seal
 }

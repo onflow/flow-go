@@ -10,7 +10,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -60,12 +59,17 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("epoch setup counter differs from epoch commit counter (%d != %d)", setup.Counter, commit.Counter)
 		}
 
+		// The final view of the epoch must be greater than the view of the first block
+		if root.Header.View >= setup.FinalView {
+			return fmt.Errorf("final view of epoch less than first block view")
+		}
+
 		// They should also both be valid within themselves.
 		err := validSetup(setup)
 		if err != nil {
 			return fmt.Errorf("invalid epoch setup event: %w", err)
 		}
-		err = validCommit(commit, setup.Participants.Filter(filter.HasRole(flow.RoleConsensus)))
+		err = validCommit(commit, setup)
 		if err != nil {
 			return fmt.Errorf("invalid epoch commit event: %w", err)
 		}
@@ -476,7 +480,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				if err != nil {
 					return fmt.Errorf("could not retrieve next epoch setup: %w", err)
 				}
-				err = validCommit(ev, setup.Participants)
+				err = validCommit(ev, setup)
 				if err != nil {
 					return fmt.Errorf("invalid epoch commit: %w", err)
 				}
@@ -568,8 +572,10 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		for _, event := range seal.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				fmt.Println("inserting setup", ev.Counter)
 				ops = append(ops, m.state.setups.StoreTx(ev))
 			case *flow.EpochCommit:
+				fmt.Println("inserting commit", ev.Counter)
 				ops = append(ops, m.state.commits.StoreTx(ev))
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
@@ -603,6 +609,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		}
 		counter = counter + 1
 		ops = append(ops, operation.UpdateEpochCounter(counter))
+		ops = append(ops, operation.IndexEpochStart(counter, header.View))
 		ops = append(ops, operation.InsertEpochHeight(counter, header.Height))
 	} else {
 		ops = append(ops, operation.UpdateEpochHeight(counter, header.Height))
@@ -664,7 +671,11 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	return nil
 }
 
-func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool, bool, error) {
+// epochStatus returns booleans indicating the status of the epoch with the given
+// counter, with respect to the given ancestor block. Each boolean return value
+// indicates whether the given service event type has been included, either in a
+// finalized block or in a pending ancestor block.
+func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (isSetup bool, isCommitted bool, err error) {
 
 	// First, we check if both epoch events have already been finalized; if they have, we don't
 	// need to check anything else.
@@ -738,7 +749,7 @@ func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool,
 		ancestorID = ancestor.ParentID
 	}
 
-	return setupPending, commitPending, nil
+	return setupPending || setupFinalized, commitPending || commitFinalized, nil
 }
 
 func (m *Mutator) setupFinalized(counter uint64) (bool, error) {

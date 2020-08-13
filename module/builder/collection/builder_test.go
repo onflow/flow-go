@@ -103,6 +103,8 @@ func (suite *BuilderSuite) Bootstrap() {
 	// just bootstrap with a genesis block, we'll use this as reference
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	root, result, seal := unittest.BootstrapFixture(identities)
+	// ensure we don't enter a new epoch for tests that build many blocks
+	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	err := suite.protoState.Mutate().Bootstrap(root, result, seal)
 	suite.Require().Nil(err)
 
