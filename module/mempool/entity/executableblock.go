@@ -10,6 +10,7 @@ type CompleteCollection struct {
 }
 
 type ExecutableBlock struct {
+	id                  flow.Identifier
 	Block               *flow.Block
 	CompleteCollections map[flow.Identifier]*CompleteCollection
 	StartState          flow.StateCommitment
@@ -33,7 +34,10 @@ func (b *BlocksByCollection) Checksum() flow.Identifier {
 }
 
 func (b *ExecutableBlock) ID() flow.Identifier {
-	return b.Block.ID()
+	if b.id == flow.ZeroID {
+		b.id = b.Block.ID()
+	}
+	return b.id
 }
 
 func (b *ExecutableBlock) Checksum() flow.Identifier {
