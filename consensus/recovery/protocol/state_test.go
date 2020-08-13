@@ -15,13 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-var participants = flow.IdentityList{
-	{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-	{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-	{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-	{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-}
-
 // as a consensus follower, when a block is received and saved,
 // if it's not finalized yet, this block should be returned by latest
 func TestSaveBlockAsReplica(t *testing.T) {
