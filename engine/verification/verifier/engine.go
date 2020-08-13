@@ -143,15 +143,6 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
-	// extracts list of verifier nodes id
-	//
-	// TODO state extraction should be done based on block references
-	consensusNodes, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		// TODO this error needs more advance handling after MVP
-		return fmt.Errorf("could not load consensus node IDs: %w", err)
-	}
 
 	// extracts chunk ID
 	ch, ok := vc.Result.Chunks.ByIndex(vc.Chunk.Index)
@@ -165,6 +156,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	var spockSecret []byte
 	var chFault chmodels.ChunkFault
+	var err error
 	if vc.IsSystemChunk {
 		spockSecret, chFault, err = e.chVerif.SystemChunkVerify(vc)
 	} else {
@@ -204,7 +196,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 
 	// broadcast result approval to the consensus nodes
-	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
+	err = e.conduit.Publish(approval, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
