@@ -382,16 +382,17 @@ func (p *P2PNode) Ping(ctx context.Context, target NodeAddress) (time.Duration, 
 		return pingError(err)
 	}
 
-	// create a ping client
-	pingClient := ping.NewPingService(p.libP2PHost)
+	// create a cancellable ping context
+	pctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// ping the target
-	resultChan := pingClient.Ping(ctx, targetInfo.ID)
+	resultChan := ping.Ping(pctx, p.libP2PHost, targetInfo.ID)
 
 	// read the result channel
 	select {
 	case res := <-resultChan:
-		if err != nil {
+		if res.Error != nil {
 			return pingError(err)
 		}
 		return res.RTT, nil
