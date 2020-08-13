@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -61,6 +62,7 @@ type Engine struct {
 	syncInProgress     *atomic.Bool
 	syncTargetBlockID  atomic.Value
 	syncFilter         flow.IdentityFilter
+	syncByBlocks       bool
 	stateSync          executionSync.StateSynchronizer
 	metrics            module.ExecutionMetrics
 	tracer             module.Tracer
@@ -85,6 +87,7 @@ func New(
 	execState state.ExecutionState,
 	syncThreshold uint64,
 	syncFilter flow.IdentityFilter,
+	syncByBlocks bool,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
@@ -114,6 +117,7 @@ func New(
 		syncModeThreshold:  syncThreshold,
 		syncInProgress:     atomic.NewBool(false),
 		syncFilter:         syncFilter,
+		syncByBlocks:       syncByBlocks,
 		stateSync:          executionSync.NewStateSynchronizer(execState),
 		metrics:            metrics,
 		tracer:             tracer,
@@ -240,7 +244,9 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			// synchronize DB writing to avoid tx conflicts with multiple blocks arriving fast
 			err := e.blocks.Store(block)
 			if err != nil {
-				return fmt.Errorf("could not store block: %w", err)
+				if !e.syncInProgress.Load() || !errors.Is(err, storage.ErrAlreadyExists) {
+					return fmt.Errorf("could not store block: %w", err)
+				}
 			}
 
 			// if block fits into execution queue, that's it
@@ -413,9 +419,10 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
+		Uint64("block_height", executableBlock.Block.Header.Height).
 		Hex("final_state", finalState).
 		Msg("block executed")
-	e.metrics.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
+	e.metrics.ExecutionLastExecutedBlockHeight(executableBlock.Block.Header.Height)
 }
 
 func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
@@ -920,6 +927,7 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 	targetHeight := firstKnown.Block.Header.Height - 1
 
 	e.syncTargetBlockID.Store(targetBlockID)
+	e.metrics.ExecutionSync(e.syncInProgress.Load())
 
 	e.log.Info().
 		Hex("target_id", targetBlockID[:]).
@@ -935,6 +943,7 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 		e.log.Error().Err(err).Msg("error while starting sync - first known not on same branch as last executed block")
 		// Mark sync as no longer in progress, and allow any additional incoming blocks to kick off sync again with a different block
 		e.syncInProgress.Store(false)
+		e.metrics.ExecutionSync(e.syncInProgress.Load())
 		return
 	}
 
@@ -947,10 +956,50 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 		return
 	}
 
-	if len(otherNodes) < 1 {
+	if e.syncByBlocks || len(otherNodes) == 0 {
 		e.log.Debug().
 			Msgf("no other execution nodes found, request last block instead at height %d", targetHeight)
-		e.blockSync.RequestBlock(targetBlockID)
+		for reqHeight := lastExecutedHeight + 1; reqHeight <= targetHeight; reqHeight++ {
+			e.blockSync.RequestHeight(reqHeight)
+		}
+
+		e.unit.Launch(func() {
+			// Track progress and prune
+			tick := time.NewTicker(time.Minute)
+			for {
+				select {
+				case <-e.unit.Quit():
+					break
+				case <-tick.C:
+					lastExecutedHeight, lastExecutedBlockID, err := e.execState.GetHighestExecutedBlockID(ctx)
+					if err != nil {
+						e.log.Fatal().Err(err).Msg("error while starting sync - cannot find highest executed block")
+					}
+
+					if lastExecutedHeight > targetHeight {
+						// We made it!
+						e.syncInProgress.Store(false)
+						e.metrics.ExecutionSync(e.syncInProgress.Load())
+						return
+					}
+
+					// Still need to sync, log something
+					e.log.Info().
+						Uint64("last_executed_height", lastExecutedHeight).
+						Uint64("target_height", targetHeight).
+						Msgf("syncing ...")
+
+					last, err := e.blocks.ByID(lastExecutedBlockID)
+					if err != nil {
+						e.log.Error().Err(err).Msg("could not get ;ast executed block")
+						continue
+					}
+
+					e.blockSync.Prune(last.Header)
+				}
+			}
+
+		})
 		return
 	}
 
@@ -1128,6 +1177,8 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 					e.wg.Add(1)
 					go e.executeBlock(context.Background(), executableBlock)
 				}
+				e.syncInProgress.Store(false)
+				e.metrics.ExecutionSync(e.syncInProgress.Load())
 				log.Debug().Msg("final target sync block processed")
 
 				return nil

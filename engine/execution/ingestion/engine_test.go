@@ -153,6 +153,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		executionState,
 		21,
 		filter.Any,
+		false,
 		metrics,
 		tracer,
 		false,
