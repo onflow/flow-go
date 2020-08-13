@@ -22,7 +22,7 @@ type ExecutionCollector struct {
 	gasUsedPerBlock                  prometheus.Histogram
 	stateReadsPerBlock               prometheus.Histogram
 	totalExecutedTransactionsCounter prometheus.Counter
-	lastExecutedBlockViewGauge       prometheus.Gauge
+	lastExecutedBlockHeightGauge     prometheus.Gauge
 	stateStorageDiskTotal            prometheus.Gauge
 	storageStateCommitment           prometheus.Gauge
 	forestApproxMemorySize           prometheus.Gauge
@@ -47,6 +47,7 @@ type ExecutionCollector struct {
 	transactionCheckTime             prometheus.Histogram
 	transactionInterpretTime         prometheus.Histogram
 	totalChunkDataPackRequests       prometheus.Counter
+	stateSyncActive                  prometheus.Gauge
 }
 
 func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -281,11 +282,11 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 			Help:      "the total number of transactions that have been executed",
 		}),
 
-		lastExecutedBlockViewGauge: promauto.NewGauge(prometheus.GaugeOpts{
+		lastExecutedBlockHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Name:      "last_executed_block_view",
-			Help:      "the last view that was executed",
+			Name:      "last_executed_block_height",
+			Help:      "the last height that was executed",
 		}),
 
 		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
@@ -300,6 +301,13 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 			Subsystem: subsystemStateStorage,
 			Name:      "commitment_size_bytes",
 			Help:      "the storage size of a state commitment in bytes",
+		}),
+
+		stateSyncActive: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemIngestion,
+			Name:      "state_sync_active",
+			Help:      "indicates if the state sync is active",
 		}),
 	}
 
@@ -338,9 +346,9 @@ func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 	ec.storageStateCommitment.Set(float64(bytes))
 }
 
-// ExecutionLastExecutedBlockView reports last executed block view
-func (ec *ExecutionCollector) ExecutionLastExecutedBlockView(view uint64) {
-	ec.lastExecutedBlockViewGauge.Set(float64(view))
+// ExecutionLastExecutedBlockHeight reports last executed block height
+func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
+	ec.lastExecutedBlockHeightGauge.Set(float64(height))
 }
 
 // ExecutionTotalExecutedTransactions reports total executed transactions
@@ -455,4 +463,12 @@ func (ec *ExecutionCollector) TransactionInterpreted(dur time.Duration) {
 // It increases the request counter by one.
 func (ec *ExecutionCollector) ChunkDataPackRequested() {
 	ec.totalChunkDataPackRequests.Inc()
+}
+
+func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
+	if syncing {
+		ec.stateSyncActive.Set(float64(1))
+		return
+	}
+	ec.stateSyncActive.Set(float64(0))
 }
