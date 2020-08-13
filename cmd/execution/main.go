@@ -71,7 +71,7 @@ func main() {
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
-			flags.BoolVar(&syncByBlocks, "sync-by-blocks", false, "flag for if we want to sync by blocks instead of execution state deltas")
+			flags.BoolVar(&syncByBlocks, "sync-by-blocks", false, "sync by blocks instead of execution state deltas")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
