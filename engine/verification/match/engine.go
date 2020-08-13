@@ -194,7 +194,8 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	// different execution results can be chunked in parallel
 	chunks, err := e.myChunkAssignments(ctx, pendingResult.ExecutionResult)
 	if err != nil {
-		return fmt.Errorf("could not find my chunk assignments: %w", err)
+		log.Debug().Msgf("could not find my chunk assignments: %w", err)
+		return nil
 	}
 
 	log.Info().
@@ -392,7 +393,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	// TODO check the origin is a node that we requested before
 	sender, err := e.state.Final().Identity(originID)
 	if errors.Is(err, storage.ErrNotFound) {
-		return engine.NewInvalidInputErrorf("origin is unstaked: %v", originID)
+		log.Debug().Msgf("origin is unstaked: %v", originID)
+		return nil
 	}
 
 	if err != nil {
@@ -400,12 +402,14 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	}
 
 	if sender.Role != flow.RoleExecution {
-		return engine.NewInvalidInputError("receives chunk data pack from a non-execution node")
+		log.Debug().Msgf("receives chunk data pack from a non-execution node")
+		return nil
 	}
 
 	status, exists := e.pendingChunks.ByID(chunkID)
 	if !exists {
-		return engine.NewInvalidInputErrorf("chunk does not exist, chunkID: %v", chunkID)
+		log.Debug().Msgf("Chunk ID: %v doesn't exist, or has already been processed", chunkID)
+		return nil
 	}
 
 	// TODO: verify the collection ID matches with the collection guarantee in the block payload
@@ -413,7 +417,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	// remove first to ensure concurrency issue
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
 	if !removed {
-		return engine.NewInvalidInputErrorf("chunk has not been removed, chunkID: %v", chunkID)
+		log.Debug().Msgf("chunk has not been removed, chunkID: %v", chunkID)
+		return nil
 	}
 
 	resultID := status.ExecutionResultID
@@ -426,7 +431,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	result, exists := e.results.ByID(resultID)
 	if !exists {
 		// result no longer exists
-		return engine.NewInvalidInputErrorf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID)
+		log.Debug().Msgf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID)
+		return nil
 	}
 
 	// computes the end state of the chunk
