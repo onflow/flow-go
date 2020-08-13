@@ -12,7 +12,17 @@ type BlockRequester struct {
 	mock.Mock
 }
 
+// Prune provides a mock function with given fields: final
+func (_m *BlockRequester) Prune(final *flow.Header) {
+	_m.Called(final)
+}
+
 // RequestBlock provides a mock function with given fields: blockID
 func (_m *BlockRequester) RequestBlock(blockID flow.Identifier) {
 	_m.Called(blockID)
+}
+
+// RequestHeight provides a mock function with given fields: height
+func (_m *BlockRequester) RequestHeight(height uint64) {
+	_m.Called(height)
 }

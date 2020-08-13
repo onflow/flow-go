@@ -356,10 +356,13 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 
 	block.Header.PayloadHash = block.Payload.Hash()
 
-	return &entity.ExecutableBlock{
+	executableBlock := &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
 	}
+	// Preload the id
+	executableBlock.ID()
+	return executableBlock
 }
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
@@ -527,7 +530,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 
 	for i := 0; i < n; i++ {
 		identity := IdentityFixture()
-		identity.Address = fmt.Sprintf("%x@flow.com", identity.NodeID)
+		identity.Address = fmt.Sprintf("%x@flow.com:1234", identity.NodeID)
 		for _, opt := range opts {
 			opt(identity)
 		}

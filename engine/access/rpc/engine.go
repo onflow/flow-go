@@ -56,6 +56,7 @@ func New(log zerolog.Logger,
 	transactions storage.Transactions,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
+	collectionGRPCPort uint,
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -83,6 +84,8 @@ func New(log zerolog.Logger,
 		transactions,
 		chainID,
 		transactionMetrics,
+		collectionGRPCPort,
+		&backend.ConnectionFactoryImpl{},
 	)
 
 	eng := &Engine{
