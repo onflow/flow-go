@@ -671,7 +671,11 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	return nil
 }
 
-func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool, bool, error) {
+// epochStatus returns booleans indicating the status of the epoch with the given
+// counter, with respect to the given ancestor block. Each boolean return value
+// indicates whether the given service event type has been included, either in a
+// finalized block or in a pending ancestor block.
+func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (isSetup bool, isCommitted bool, err error) {
 
 	// First, we check if both epoch events have already been finalized; if they have, we don't
 	// need to check anything else.
