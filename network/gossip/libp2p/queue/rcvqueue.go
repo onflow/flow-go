@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // The priority levels currently defined.
@@ -26,15 +27,14 @@ const (
 
 // RcvQueue implements an LRU cache of the received eventIDs that delivered to their engines
 type RcvQueue struct {
-	logger  zerolog.Logger
-	size    int
-	workers int
-	max     int
-	codec   network.Codec
-	cache   *lru.Cache                // The LRU cache we use for de-duplication.
-	queue   *lru.Cache                // The LRU cache we use for overflow.
-	stacks  [10]*lru.Cache            // Ten LRU caches we use for priority organization.
-	engines *map[uint8]network.Engine // The engines we need to execute the message.
+	logger    zerolog.Logger
+	size      int
+	codec     network.Codec
+	cache     *lru.Cache                // The LRU cache we use for de-duplication.
+	queue     *lru.Cache                // The LRU cache we use for overflow.
+	stacks    [10]*lru.Cache            // Ten LRU caches we use for priority organization.
+	engines   *map[uint8]network.Engine // The engines we need to execute the message.
+	collector Collector                 // The pool collector for running our async work.
 }
 
 // RcvQueueKey represents a key for the cache and queue
@@ -84,15 +84,16 @@ func NewRcvQueue(log zerolog.Logger, size int) (*RcvQueue, error) {
 		}
 	}
 
+	collector := StartDispatcher(max)
+
 	rcv := &RcvQueue{
-		logger:  log,
-		size:    size,
-		workers: 0,
-		max:     max,
-		codec:   codec,
-		cache:   cache,
-		queue:   queue,
-		stacks:  stacks,
+		logger:    log,
+		size:      size,
+		codec:     codec,
+		cache:     cache,
+		queue:     queue,
+		stacks:    stacks,
+		collector: collector,
 	}
 
 	return rcv, nil
@@ -104,6 +105,7 @@ func (r *RcvQueue) SetEngines(engines *map[uint8]network.Engine) {
 }
 
 // Determine the numerical priority of our incoming message
+// ToDo: Consider moving this Priority method to a PriorityManager type of interface and make it fully decouple from the underlying libp2p.
 func (r *RcvQueue) Priority(v interface{}) int {
 	switch v.(type) {
 	// consensus
@@ -190,19 +192,17 @@ func (r *RcvQueue) Score(s int, p interface{}) int {
 	return int(math.Ceil(float64((size + priority) / 2)))
 }
 
-// Remove the oldest entry in the queue and process it, shift something from the priority lanes and submit it, or die.
-func (r *RcvQueue) Work() {
+// Remove the oldest entry in the queue and prioritize it.
+func (r *RcvQueue) Prioritize() {
 	if r.queue.Len() > 0 {
 		key, value, ok := r.queue.RemoveOldest()
 		if !ok {
-			r.Work()
 			return
 		}
 
 		k, kOk := key.(RcvQueueKey)
 		v, vOk := value.(RcvQueueValue)
 		if !kOk || !vOk {
-			r.Work()
 			return
 		}
 
@@ -211,10 +211,9 @@ func (r *RcvQueue) Work() {
 		if decodedErr != nil {
 			r.logger.
 				Debug().
-				Str("sender_id", v.senderID.String()).
+				Hex("sender_id", logging.ID(v.senderID)).
 				Str("event_id", k.eventID).
-				Msg(fmt.Sprintf("could not decode event: %w", decodedErr))
-			r.Work()
+				Err(decodedErr)
 			return
 		}
 
@@ -232,57 +231,55 @@ func (r *RcvQueue) Work() {
 				Msg("an eviction occured on a priority stack. increase priority stack size.")
 		}
 
-		r.Work()
-	} else {
-		// check priority queues for messages
-		work := -1
-		for i := 9; i > -1; i-- {
-			if r.stacks[i].Len() > 0 {
-				work = i
-				break
-			}
-		}
-		if work == -1 {
-			r.workers--
-			return
-		}
+		// start a job to process a message
+		r.collector.Work <- Work{r: r, m: "Process"}
+	}
+}
 
-		key, value, ok := r.stacks[work].RemoveOldest()
-		if !ok {
-			r.Work()
-			return
+// Shift a decoded message from the priority lanes and process it.
+func (r *RcvQueue) Process() {
+	// check priority queues for messages
+	work := -1
+	for i := 9; i > -1; i-- {
+		if r.stacks[i].Len() > 0 {
+			work = i
+			break
 		}
+	}
+	if work == -1 {
+		return
+	}
 
-		k, kOk := key.(RcvQueueKey)
-		v, vOk := value.(RcvStackValue)
-		if !kOk || !vOk {
-			r.Work()
-			return
-		}
+	key, value, ok := r.stacks[work].RemoveOldest()
+	if !ok {
+		return
+	}
 
-		// Extract channel id and find the registered engine.
-		engine, found := (*r.engines)[k.channelID]
-		if !found {
-			r.logger.
-				Debug().
-				Str("sender_id", v.senderID.String()).
-				Str("event_id", k.eventID).
-				Msg(fmt.Sprintf("invalid engine error on channel: %d", k.channelID))
-			r.Work()
-			return
-		}
+	k, kOk := key.(RcvQueueKey)
+	v, vOk := value.(RcvStackValue)
+	if !kOk || !vOk {
+		return
+	}
 
-		// Call the engine synchronously with the message payload.
-		err := engine.Process(v.senderID, v.decodedMessage)
-		if err != nil {
-			r.logger.
-				Debug().
-				Str("sender_id", v.senderID.String()).
-				Str("event_id", k.eventID).
-				Msg(fmt.Sprintf("could not process message: %w", err))
-		}
+	// Extract channel id and find the registered engine.
+	engine, found := (*r.engines)[k.channelID]
+	if !found {
+		r.logger.
+			Debug().
+			Hex("sender_id", logging.ID(v.senderID)).
+			Str("event_id", k.eventID).
+			Msgf("invalid engine error on channel: %d", k.channelID)
+		return
+	}
 
-		r.Work()
+	// Call the engine synchronously with the message payload.
+	err := engine.Process(v.senderID, v.decodedMessage)
+	if err != nil {
+		r.logger.
+			Debug().
+			Hex("sender_id", logging.ID(v.senderID)).
+			Str("event_id", k.eventID).
+			Err(err)
 	}
 }
 
@@ -306,11 +303,8 @@ func (r *RcvQueue) Add(senderID flow.Identifier, message *message.Message) bool 
 	}
 	r.queue.Add(key, value)
 
-	// Start a worker if needed
-	if r.workers < r.max {
-		r.workers++
-		go r.Work()
-	}
+	// start a job to prioritize a message
+	r.collector.Work <- Work{r: r, m: "Prioritize"}
 
 	return true
 }

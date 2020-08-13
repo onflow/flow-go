@@ -104,11 +104,8 @@ func (r *RcvQueueTestSuite) TestSingleMessageAdd() {
 	added := r.q.Add(senderID, msg)
 
 	assert.True(r.Suite.T(), added)
-	assert.Equal(r.Suite.T(), r.q.workers, 1)
 	assert.Equal(r.Suite.T(), r.q.cache.Len(), 1)
-	assert.Equal(r.Suite.T(), r.q.queue.Len(), 1)
 	time.Sleep(time.Second)
-	assert.Equal(r.Suite.T(), r.q.workers, 0)
 	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
 	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
 }
@@ -159,7 +156,6 @@ func (r *RcvQueueTestSuite) TestDuplicateAsyncMessageAdd() {
 
 	time.Sleep(time.Second)
 	assert.Equal(r.Suite.T(), r.q.cache.Len(), 1)
-	assert.Equal(r.Suite.T(), r.q.workers, 0)
 	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
 	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
 }
@@ -190,7 +186,42 @@ func (r *RcvQueueTestSuite) TestOneHundredMessagesAdd() {
 
 	time.Sleep(time.Second * 2)
 	assert.Equal(r.Suite.T(), r.q.cache.Len(), 100)
-	assert.Equal(r.Suite.T(), r.q.workers, 0)
+	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
+	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
+}
+
+// TestOneHundredMessagesWithPauseAdd tries to add 100 messages split into two groups, with a pause, to the queue and confirms results.
+func (r *RcvQueueTestSuite) TestOneHundredMessagesWithPauseAdd() {
+	msgs := make(map[int]*message.Message)
+	for i := 99; i > -1; i-- {
+		msgs[i] = createMessage(i * 2)
+	}
+
+	var sender [32]byte
+	sender[0] = byte(2 + 1)
+	senderID := flow.Identifier(sender)
+
+	ctrl := gomock.NewController(r.Suite.T())
+	defer ctrl.Finish()
+	engines := make(map[uint8]network.Engine)
+	engine := mocks.NewMockEngine(ctrl)
+	payload, _ := r.q.codec.Decode(msgs[0].Payload)
+	engine.EXPECT().Process(senderID, payload).Return(nil).Times(100)
+	engines[1] = engine
+	r.q.SetEngines(&engines)
+
+	for i := 49; i > -1; i-- {
+		r.q.Add(senderID, msgs[i])
+	}
+
+	time.Sleep(time.Second * 2)
+
+	for i := 99; i > 49; i-- {
+		r.q.Add(senderID, msgs[i])
+	}
+
+	time.Sleep(time.Second * 2)
+	assert.Equal(r.Suite.T(), r.q.cache.Len(), 100)
 	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
 	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
 }
