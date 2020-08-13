@@ -72,7 +72,11 @@ func NewPSMT(
 
 	// Decode proof encodings
 	if len(proofs) < 1 {
-		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
+		return nil,
+			fmt.Errorf("illigal proof size (%d) for building partial trie, keys size: (%d) value size (%d)",
+				len(proofs),
+				len(keys),
+				len(values))
 	}
 	batchProof, err := proof.DecodeBatchProof(proofs)
 	if err != nil {

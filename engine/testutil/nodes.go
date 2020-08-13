@@ -326,6 +326,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		execState,
 		syncThreshold,
 		filter.Any,
+		false,
 		node.Metrics,
 		node.Tracer,
 		false,
@@ -343,6 +344,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Blocks,
 		ingestionEngine,
 		syncCore,
+		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
 
