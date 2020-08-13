@@ -31,7 +31,7 @@ func TestSaveBlockAsReplica(t *testing.T) {
 		result := unittest.ExecutionResultFixture()
 		result.BlockID = b0.ID()
 
-		seal := unittest.BlockSealFixture()
+		seal := unittest.SealFixture()
 		seal.BlockID = b0.ID()
 		seal.ResultID = result.ID()
 		seal.FinalState = result.FinalStateCommit
