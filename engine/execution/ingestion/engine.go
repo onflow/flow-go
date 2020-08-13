@@ -251,14 +251,14 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 
 			// if block fits into execution queue, that's it
 			if queue, added := tryEnqueue(executableBlock, executionQueues); added {
-				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to existing execution queue")
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock)).Msg("added block to existing execution queue")
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 				return nil
 			}
 
 			// if block fits into orphan queues
 			if queue, added := tryEnqueue(executableBlock, orphanQueues); added {
-				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to existing orphan queue")
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock)).Msg("added block to existing orphan queue")
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 				// this is only queue which grew and could trigger threshold
 				if queue.Height() < e.syncModeThreshold {
@@ -281,7 +281,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 					panic("could not enqueue orphaned block")
 				}
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
-				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Hex("parent_id", logging.ID(executableBlock.Block.Header.ParentID)).Msg("added block to new orphan queue")
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock)).Hex("parent_id", logging.ID(executableBlock.Block.Header.ParentID)).Msg("added block to new orphan queue")
 				// special case when sync threshold is reached
 				if queue.Height() < e.syncModeThreshold {
 					return nil
@@ -309,7 +309,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			if !added {
 				panic(fmt.Sprintf("could enqueue block for execution: %s", err))
 			}
-			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to execution queue")
+			e.log.Debug().Hex("block_id", logging.Entity(executableBlock)).Msg("added block to execution queue")
 
 			e.tryRequeueOrphans(executableBlock, newQueue, orphanQueues)
 
@@ -345,25 +345,25 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	view := e.execState.NewView(executableBlock.StartState)
 	e.log.Info().
-		Hex("block_id", logging.Entity(executableBlock.Block)).
+		Hex("block_id", logging.Entity(executableBlock)).
 		Msg("executing block")
 
 	computationResult, err := e.computationManager.ComputeBlock(ctx, executableBlock, view)
 	if err != nil {
 		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock.Block)).
+			Hex("block_id", logging.Entity(executableBlock)).
 			Msg("error while computing block")
 		return
 	}
 
-	e.metrics.FinishBlockReceivedToExecuted(executableBlock.Block.ID())
+	e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
 	e.metrics.ExecutionGasUsedPerBlock(computationResult.GasUsed)
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
 	if err != nil {
 		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock.Block)).
+			Hex("block_id", logging.Entity(executableBlock)).
 			Msg("error while handing computation results")
 		return
 	}
@@ -382,7 +382,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 			executionQueues *stdmap.QueuesBackdata,
 			_ *stdmap.QueuesBackdata,
 		) error {
-			executionQueue, exists := executionQueues.ByID(executableBlock.Block.ID())
+			executionQueue, exists := executionQueues.ByID(executableBlock.ID())
 			if !exists {
 				return fmt.Errorf("fatal error - executed block not present in execution queue")
 			}
@@ -406,19 +406,19 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 				e.executeBlockIfComplete(newExecutableBlock)
 			}
 
-			executionQueues.Rem(executableBlock.Block.ID())
+			executionQueues.Rem(executableBlock.ID())
 
 			return nil
 		})
 
 	if err != nil {
 		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock.Block)).
+			Hex("block_id", logging.Entity(executableBlock)).
 			Msg("error while requeueing blocks after execution")
 	}
 
 	e.log.Info().
-		Hex("block_id", logging.Entity(executableBlock.Block)).
+		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("block_height", executableBlock.Block.Header.Height).
 		Hex("final_state", finalState).
 		Msg("block executed")
@@ -428,7 +428,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	if eb.IsComplete() {
 		e.log.Debug().
-			Hex("block_id", logging.Entity(eb.Block)).
+			Hex("block_id", logging.Entity(eb)).
 			Msg("block complete, starting execution")
 
 		if e.extensiveLogging {
@@ -595,7 +595,7 @@ func (e *Engine) matchOrRequestCollections(
 				}
 
 				e.log.Debug().
-					Hex("block_id", logging.Entity(executableBlock.Block)).
+					Hex("block_id", logging.Entity(executableBlock)).
 					Hex("collection_id", logging.ID(guarantee.ID())).
 					Msg("requesting collection")
 
@@ -656,7 +656,7 @@ func (e *Engine) handleComputationResult(
 ) (flow.StateCommitment, error) {
 
 	e.log.Debug().
-		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
+		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
 	// There is one result per transaction
 	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
@@ -695,7 +695,7 @@ func (e *Engine) saveExecutionResults(
 
 	originalState := startState
 
-	err := e.execState.PersistStateInteractions(childCtx, executableBlock.Block.ID(), stateInteractions)
+	err := e.execState.PersistStateInteractions(childCtx, executableBlock.ID(), stateInteractions)
 	if err != nil {
 		return nil, err
 	}
@@ -806,7 +806,7 @@ func (e *Engine) saveExecutionResults(
 func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	// log block
 	e.log.Info().
-		Hex("block_id", logging.Entity(eb.Block)).
+		Hex("block_id", logging.Entity(eb)).
 		Hex("prev_block_id", logging.ID(eb.Block.Header.ParentID)).
 		Uint64("block_height", eb.Block.Header.Height).
 		Int("number_of_collections", len(eb.Collections())).
@@ -817,7 +817,7 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	for i, col := range eb.Collections() {
 		for j, tx := range col.Transactions {
 			e.log.Info().
-				Hex("block_id", logging.Entity(eb.Block)).
+				Hex("block_id", logging.Entity(eb)).
 				Int("block_height", int(eb.Block.Header.Height)).
 				Hex("prev_block_id", logging.ID(eb.Block.Header.ParentID)).
 				Int("collection_index", i).

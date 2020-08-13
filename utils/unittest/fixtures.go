@@ -330,10 +330,13 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 
 	block.Header.PayloadHash = block.Payload.Hash()
 
-	return &entity.ExecutableBlock{
+	executableBlock := &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
 	}
+	// Preload the id
+	executableBlock.ID()
+	return executableBlock
 }
 
 func ExecutionResultFixture() *flow.ExecutionResult {
