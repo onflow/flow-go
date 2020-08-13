@@ -572,8 +572,10 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		for _, event := range seal.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				fmt.Println("inserting setup", ev.Counter)
 				ops = append(ops, m.state.setups.StoreTx(ev))
 			case *flow.EpochCommit:
+				fmt.Println("inserting commit", ev.Counter)
 				ops = append(ops, m.state.commits.StoreTx(ev))
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
@@ -607,6 +609,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		}
 		counter = counter + 1
 		ops = append(ops, operation.UpdateEpochCounter(counter))
+		ops = append(ops, operation.IndexEpochStart(counter, header.View))
 		ops = append(ops, operation.InsertEpochHeight(counter, header.Height))
 	} else {
 		ops = append(ops, operation.UpdateEpochHeight(counter, header.Height))
@@ -742,7 +745,7 @@ func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (bool,
 		ancestorID = ancestor.ParentID
 	}
 
-	return setupPending, commitPending, nil
+	return setupPending || setupFinalized, commitPending || commitFinalized, nil
 }
 
 func (m *Mutator) setupFinalized(counter uint64) (bool, error) {

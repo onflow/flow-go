@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/state/protocol/util"
 	stoerr "github.com/dapperlabs/flow-go/storage"
@@ -211,13 +212,13 @@ func TestBootstrapWithSeal(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		block := unittest.GenesisFixture(participants)
-		block.Payload.Seals = []*flow.Seal{unittest.BlockSealFixture()}
+		block.Payload.Seals = []*flow.Seal{unittest.SealFixture()}
 		block.Header.PayloadHash = block.Payload.Hash()
 
 		result := unittest.ExecutionResultFixture()
 		result.BlockID = block.ID()
 
-		seal := unittest.BlockSealFixture()
+		seal := unittest.SealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
 		seal.FinalState = result.FinalStateCommit
@@ -595,5 +596,152 @@ func TestExtendInvalidChainID(t *testing.T) {
 
 		err := state.Mutate().Extend(&block)
 		require.Error(t, err)
+	})
+}
+
+// tests the full flow of transitioning between epochs by finalizing a setup
+// event, then a commit event, then finalizing the first block of the next epoch
+func TestExtendEpochTransitionValid(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		// first bootstrap with the initial epoch
+		root, result, seal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(root, result, seal)
+		require.Nil(t, err)
+
+		// add a block for the first seal to reference
+		block1 := unittest.BlockWithParentFixture(root.Header)
+		block1.SetPayload(flow.Payload{})
+		err = state.Mutate().Extend(&block1)
+		require.Nil(t, err)
+		err = state.Mutate().Finalize(block1.ID())
+		require.Nil(t, err)
+
+		epoch1Setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		epoch1FinalView := epoch1Setup.FinalView
+
+		// add a participant for the next epoch
+		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+		epoch2Participants := append(participants, epoch2NewParticipant).Order(order.ByNodeIDAsc)
+
+		// create the epoch setup event for the second epoch
+		epoch2Setup := unittest.EpochSetupFixture(
+			unittest.WithParticipants(epoch2Participants),
+			unittest.SetupWithCounter(epoch1Setup.Counter+1),
+			unittest.WithFinalView(epoch1FinalView+1000),
+		)
+
+		// create the seal referencing block1 and including the setup event
+		seal1 := unittest.SealFixture(
+			unittest.SealWithBlockID(block1.ID()),
+			unittest.WithInitalState(seal.FinalState),
+			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
+		)
+
+		// block 2 contains the epoch setup service event
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal1},
+		})
+
+		// insert the block containing the seal containing the setup event
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		// we should not be able to query epoch 2, since block 2 is un-finalized
+		gotIdentities, err := state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
+		require.Error(t, err)
+
+		err = state.Mutate().Finalize(block2.ID())
+		require.Nil(t, err)
+
+		// block 2 is finalized, we should be able to get setup info for epoch 2
+		gotIdentities, err = state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
+		require.Nil(t, err)
+		assert.Equal(t, epoch2Participants, gotIdentities)
+		clusters, err := state.AtEpoch(epoch2Setup.Counter).Clusters()
+		require.Nil(t, err)
+
+		// only setup event is finalized, not commit, so shouldn't be able to get certain info
+		_, err = state.AtEpoch(epoch2Setup.Counter).ClusterRootQC(clusters[0])
+		assert.Error(t, err)
+
+		epoch2Commit := unittest.EpochCommitFixture(
+			unittest.CommitWithCounter(epoch2Setup.Counter),
+			unittest.WithDKGFromParticipants(epoch2Participants),
+		)
+
+		seal2 := unittest.SealFixture(
+			unittest.SealWithBlockID(block2.ID()),
+			unittest.WithInitalState(seal1.FinalState),
+			unittest.WithServiceEvents(epoch2Commit.ServiceEvent()),
+		)
+
+		// block 3 contains the epoch commit service event
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal2},
+		})
+
+		err = state.Mutate().Extend(&block3)
+		require.Nil(t, err)
+
+		// we should not be able to query commit-only info for epoch 2, since block3 is unfinalized
+		_, err = state.AtEpoch(epoch2Setup.Counter).ClusterRootQC(clusters[0])
+		assert.Error(t, err)
+
+		err = state.Mutate().Finalize(block3.ID())
+		require.Nil(t, err)
+
+		// now epoch 2 is fully ready, we can query anything we want about it
+		_, err = state.AtEpoch(epoch2Setup.Counter).ClusterRootQC(clusters[0])
+		assert.Nil(t, err)
+		_, err = state.AtEpoch(epoch2Setup.Counter).DKG().GroupKey()
+		assert.Nil(t, err)
+
+		// we should still be in epoch 1
+		epochCounter, err := state.Final().Epoch()
+		require.Nil(t, err)
+		assert.Equal(t, epoch1Setup.Counter, epochCounter)
+
+		// block 4 has the final view of the epoch
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.SetPayload(flow.Payload{})
+		block4.Header.View = epoch1FinalView
+
+		err = state.Mutate().Extend(&block4)
+		require.Nil(t, err)
+		err = state.Mutate().Finalize(block4.ID())
+		require.Nil(t, err)
+
+		// we should still be in epoch 1, since epochs are inclusive of final view
+		epochCounter, err = state.Final().Epoch()
+		require.Nil(t, err)
+		assert.Equal(t, epoch1Setup.Counter, epochCounter)
+
+		// block 5 has a view > final view of epoch 1, it will be considered the
+		// first block of epoch 2
+		block5 := unittest.BlockWithParentFixture(block4.Header)
+		block5.SetPayload(flow.Payload{})
+		// we should handle view that aren't exactly the first valid view of the epoch
+		block5.Header.View = epoch1FinalView + uint64(rand.Intn(10))
+
+		err = state.Mutate().Extend(&block5)
+		require.Nil(t, err)
+
+		// we should STILL be in epoch 1, since the first block of epoch 2 has not
+		// yet been finalized
+		epochCounter, err = state.Final().Epoch()
+		require.Nil(t, err)
+		assert.Equal(t, epoch1Setup.Counter, epochCounter)
+
+		// finalize the first block of epoch 2
+		err = state.Mutate().Finalize(block5.ID())
+		require.Nil(t, err)
+
+		// now, at long last, we are in epoch 2
+		epochCounter, err = state.Final().Epoch()
+		require.Nil(t, err)
+		assert.Equal(t, epoch2Setup.Counter, epochCounter)
 	})
 }
