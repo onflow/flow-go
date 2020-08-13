@@ -161,7 +161,8 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).Logger()
-	log.Info().Msg("execution receipt arrived")
+	log.Info().
+		Msg("execution receipt arrived")
 
 	// monitoring: increases number of received execution receipts
 	e.metrics.OnExecutionReceiptReceived()
@@ -174,7 +175,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	}
 
 	ok = e.cachedReceipts.Add(rdp)
-	log.Info().
+	log.Debug().
 		Bool("cached", ok).
 		Msg("execution receipt successfully handled")
 
@@ -232,7 +233,7 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 		return fmt.Errorf("submission error to match engine: %w", err)
 	}
 
-	e.log.Debug().
+	e.log.Info().
 		Hex("result_id", logging.ID(resultID)).
 		Msg("result submitted to match engine")
 
@@ -488,4 +489,5 @@ func (e *Engine) onTimer() {
 	}()
 
 	wg.Wait()
+
 }
