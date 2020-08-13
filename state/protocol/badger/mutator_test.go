@@ -649,14 +649,14 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Nil(t, err)
 
 		// we should not be able to query epoch 2, since block 2 is un-finalized
-		gotIdentities, err := state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
+		_, err = state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
 		require.Error(t, err)
 
 		err = state.Mutate().Finalize(block2.ID())
 		require.Nil(t, err)
 
 		// block 2 is finalized, we should be able to get setup info for epoch 2
-		gotIdentities, err = state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
+		gotIdentities, err := state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
 		require.Nil(t, err)
 		assert.Equal(t, epoch2Participants, gotIdentities)
 		clusters, err := state.AtEpoch(epoch2Setup.Counter).Clusters()
