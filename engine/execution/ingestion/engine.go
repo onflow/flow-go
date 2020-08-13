@@ -673,11 +673,6 @@ func (e *Engine) handleComputationResult(
 		return nil, err
 	}
 
-	if e.syncInProgress.Load() {
-		// syncing, no need to broadcast
-		return receipt.ExecutionResult.FinalStateCommit, nil
-	}
-
 	err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 	if err != nil {
 		return nil, fmt.Errorf("could not send broadcast order: %w", err)

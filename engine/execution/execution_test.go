@@ -460,6 +460,34 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 
 				err := syncConduit.Submit(res, originID)
 				assert.NoError(t, err)
+			case *messages.RangeRequest:
+
+				consensusNode.Log.Debug().
+					Hex("origin", originID[:]).
+					Uint64("from_height", msg.FromHeight).
+					Uint64("to_height", msg.ToHeight).
+					Uint64("nonce", msg.Nonce).
+					Msg("protocol range request received")
+
+				blocks := make([]*flow.Block, 0)
+				for height := msg.FromHeight; height <= msg.ToHeight; height++ {
+					if height == block1.Header.Height {
+						blocks = append(blocks, &block1)
+					} else if height == block2.Header.Height {
+						blocks = append(blocks, &block2)
+					} else {
+						require.FailNow(t, "unknown block requested: %v", height)
+					}
+				}
+
+				// send the response
+				res := &messages.BlockResponse{
+					Nonce:  msg.Nonce,
+					Blocks: blocks,
+				}
+
+				err := syncConduit.Submit(res, originID)
+				assert.NoError(t, err)
 			default:
 				t.Errorf("unexpected msg to sync engine: %T, %v", args[1], args[1])
 			}
