@@ -162,18 +162,18 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		assignments := unittest.ClusterAssignment(uint(count), collNodes)
 		clusters, err := flow.NewClusterList(assignments, collNodes)
 		suite.Require().Nil(err)
-		collNode1 := collNodes[0]
-		collNode2 := collNodes[1]
+		collNode1 := clusters[0][0]
+		collNode2 := clusters[1][0]
 		suite.snapshot.On("Clusters").Return(clusters, nil).Twice()
 
 		// create two transactions bound for each of the cluster
-		cluster1, _ := clusters.ByIndex(0)
+		cluster1 := clusters[0]
 		cluster1tx := unittest.AlterTransactionForCluster(transaction.TransactionBody, clusters, cluster1, func(transaction *flow.TransactionBody) {})
 		tx1 := convert.TransactionToMessage(cluster1tx)
 		sendReq1 := &accessproto.SendTransactionRequest{
 			Transaction: tx1,
 		}
-		cluster2, _ := clusters.ByIndex(1)
+		cluster2 := clusters[1]
 		cluster2tx := unittest.AlterTransactionForCluster(transaction.TransactionBody, clusters, cluster2, func(transaction *flow.TransactionBody) {})
 		tx2 := convert.TransactionToMessage(cluster2tx)
 		sendReq2 := &accessproto.SendTransactionRequest{
