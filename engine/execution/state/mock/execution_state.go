@@ -42,20 +42,20 @@ func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 context.Context, _a1 flow.I
 }
 
 // CommitDelta provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) CommitDelta(_a0 context.Context, _a1 delta.Delta, _a2 []byte) ([]byte, error) {
+func (_m *ExecutionState) CommitDelta(_a0 context.Context, _a1 delta.Delta, _a2 flow.StateCommitment) (flow.StateCommitment, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, delta.Delta, []byte) []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func(context.Context, delta.Delta, flow.StateCommitment) flow.StateCommitment); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, delta.Delta, []byte) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, delta.Delta, flow.StateCommitment) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
@@ -162,20 +162,20 @@ func (_m *ExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64
 }
 
 // GetRegisters provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, error) {
+func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 flow.StateCommitment, _a2 []flow.RegisterID) ([]flow.RegisterValue, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	var r0 []flow.RegisterValue
+	if rf, ok := ret.Get(0).(func(context.Context, flow.StateCommitment, []flow.RegisterID) []flow.RegisterValue); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]byte)
+			r0 = ret.Get(0).([]flow.RegisterValue)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.StateCommitment, []flow.RegisterID) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
@@ -185,20 +185,20 @@ func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 [][]
 }
 
 // GetRegistersWithProofs provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, [][]byte, error) {
+func (_m *ExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 flow.StateCommitment, _a2 []flow.RegisterID) ([]flow.RegisterValue, [][]byte, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	var r0 []flow.RegisterValue
+	if rf, ok := ret.Get(0).(func(context.Context, flow.StateCommitment, []flow.RegisterID) []flow.RegisterValue); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]byte)
+			r0 = ret.Get(0).([]flow.RegisterValue)
 		}
 	}
 
 	var r1 [][]byte
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.StateCommitment, []flow.RegisterID) [][]byte); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(1) != nil {
@@ -207,7 +207,7 @@ func (_m *ExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 []byte
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, flow.StateCommitment, []flow.RegisterID) error); ok {
 		r2 = rf(_a0, _a1, _a2)
 	} else {
 		r2 = ret.Error(2)
@@ -217,11 +217,11 @@ func (_m *ExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 []byte
 }
 
 // NewView provides a mock function with given fields: _a0
-func (_m *ExecutionState) NewView(_a0 []byte) *delta.View {
+func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *delta.View {
 	ret := _m.Called(_a0)
 
 	var r0 *delta.View
-	if rf, ok := ret.Get(0).(func([]byte) *delta.View); ok {
+	if rf, ok := ret.Get(0).(func(flow.StateCommitment) *delta.View); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -261,11 +261,11 @@ func (_m *ExecutionState) PersistExecutionResult(_a0 context.Context, _a1 flow.I
 }
 
 // PersistStateCommitment provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) PersistStateCommitment(_a0 context.Context, _a1 flow.Identifier, _a2 []byte) error {
+func (_m *ExecutionState) PersistStateCommitment(_a0 context.Context, _a1 flow.Identifier, _a2 flow.StateCommitment) error {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.StateCommitment) error); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Error(0)
@@ -312,15 +312,15 @@ func (_m *ExecutionState) RetrieveStateDelta(_a0 context.Context, _a1 flow.Ident
 }
 
 // StateCommitmentByBlockID provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) StateCommitmentByBlockID(_a0 context.Context, _a1 flow.Identifier) ([]byte, error) {
+func (_m *ExecutionState) StateCommitmentByBlockID(_a0 context.Context, _a1 flow.Identifier) (flow.StateCommitment, error) {
 	ret := _m.Called(_a0, _a1)
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) flow.StateCommitment); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 

@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/r3labs/diff"
 
 	initialRuntime "example.com/cadence-initial/runtime"
@@ -40,9 +42,9 @@ type Update struct {
 
 type ComputedBlock struct {
 	ExecutableBlock entity.ExecutableBlock
-	Updates  []Update //collectionID -> update
-	EndState flow.StateCommitment
-	Results  []flow.TransactionResult
+	Updates         []Update //collectionID -> update
+	EndState        flow.StateCommitment
+	Results         []flow.TransactionResult
 }
 
 type Loader struct {
@@ -412,8 +414,6 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 
 	//rt := runtime.NewInterpreterRuntime()
 
-
-
 	type Output struct {
 		BlockID              string `json:"block_id"`
 		BlockHeight          uint64 `json:"block_height"`
@@ -439,6 +439,33 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 	//	//}
 	//	//
 	//	//os.Exit(1)ce{}, 0, bufferSize+1)
+
+	megaMapping := make(map[string]delta.Mapping, 100)
+
+	bootstrapper := bootstrap.NewBootstrapper(log.Logger)
+
+	bootstrapView := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+
+	privateKey, err := testutil.GenerateAccountPrivateKey()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot generate pk")
+	}
+
+	fix64, err := cadence.NewUFix64("1234.0")
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot create ufix64")
+	}
+
+	err = bootstrapper.BoostrapView(bootstrapView, privateKey.PublicKey(1000), fix64, flow.Mainnet.Chain())
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot bootstrap")
+	}
+
+	for k, v := range bootstrapView.Delta().WriteMappings {
+		megaMapping[k] = v
+	}
 
 	for i := start; i <= end; i++ {
 
@@ -470,8 +497,6 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 			//	blocksBuffer = make([]interface{}, 0, bufferSize+1)
 			//}
 
-
-
 			//for colIndex, guarantee := range computedBlock.Block.Payload.Guarantees {
 			//	collection := computedBlock.CompleteCollections[guarantee.CollectionID]
 			//	for _, tx := range collection.Transactions {
@@ -499,14 +524,45 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 			//}
 			//continue
 
-			l.executeBlock(computedBlock, updates)
+			blockMapping := l.executeBlock(computedBlock, updates)
 
+			for k, v := range blockMapping {
+				megaMapping[k] = v
+			}
 		}
 
-
-
-
 	}
+
+
+	for _, computedBlock := range blockData[end] {
+		allMappingsFound := true
+
+		lastTrie := updates[string(computedBlock.EndState)]
+
+		iterator := flattener.NewNodeIterator(lastTrie)
+
+		for iterator.Next() {
+			node := iterator.Value()
+
+			key := node.Key()
+			if key != nil {
+				if _, has := megaMapping[string(key)]; !has {
+					allMappingsFound = false
+					log.Warn().Hex("key", key).Msg("Megamapping missing")
+					spew.Dump(node.Value())
+				}
+			}
+		}
+
+		if allMappingsFound {
+			log.Info().Uint64("block", end).Msg("All mapping for trie at this height found")
+		} else {
+			log.Info().Uint64("block", end).Msg("Mapping missing at this height")
+		}
+	}
+
+
+
 	//if len(blocksBuffer) > 0 {
 	//	_, err := collection.InsertMany(l.ctx, blocksBuffer)
 	//	if err != nil {
@@ -524,7 +580,10 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 	//fmt.Println(string(json))
 }
 
-func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*trie.MTrie) {
+func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*trie.MTrie) map[string]delta.Mapping {
+
+	writtenMappings := make(map[string]delta.Mapping, 0)
+
 	startState := computedBlock.ExecutableBlock.StartState
 
 	mTrie := updates[string(startState)]
@@ -564,8 +623,10 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 		log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compute block")
 	}
 
+	txResultEqual := false
+
 	if len(computedBlock.ExecutableBlock.Block.Payload.Guarantees) > 0 {
-		log.Info().Msgf("Block %000000d", computedBlock.ExecutableBlock.Block.Header.Height)
+		//log.Info().Msgf("Block %000000d", computedBlock.ExecutableBlock.Block.Header.Height)
 
 		results := collapseByTxID(computedBlock.Results)
 
@@ -574,20 +635,21 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 			log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compare results")
 		}
 		if changelog == nil {
-			log.Info().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("Tx results equal!")
+			//log.Info().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("Tx results equal!")
+			txResultEqual = true
 		} else {
-			log.Info().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("Tx results differ!")
+			//log.Info().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("Tx results differ!")
 
-			fmt.Println("DB results")
-			spew.Dump(computedBlock.Results)
-			fmt.Println("Computer results")
-			spew.Dump(computationResult.TransactionResult)
-			fmt.Println("---")
-			spew.Dump(changelog)
-			fmt.Println("---")
-			spew.Dump(computedBlock.ExecutableBlock.Block)
-
-			fmt.Printf("Block time %s\n", computedBlock.ExecutableBlock.Block.Header.Timestamp.String())
+			//fmt.Println("DB results")
+			//spew.Dump(computedBlock.Results)
+			//fmt.Println("Computer results")
+			//spew.Dump(computationResult.TransactionResult)
+			//fmt.Println("---")
+			//spew.Dump(changelog)
+			//fmt.Println("---")
+			//spew.Dump(computedBlock.ExecutableBlock.Block)
+			//
+			//fmt.Printf("Block time %s\n", computedBlock.ExecutableBlock.Block.Header.Timestamp.String())
 
 			//for _, c := range computedBlock.CompleteCollections {
 			//	for _, tx := range c.Transactions {
@@ -605,6 +667,7 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 		//	log.Info().Msg("Writes")
 		//	spew.Dump(writeMappings)
 	}
+	failed := false
 
 	for i, _ := range computedBlock.ExecutableBlock.Block.Payload.Guarantees {
 		//collectionID := collectionGuarantee.CollectionID
@@ -623,47 +686,73 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 		calculatedDelta := calculatedSnapshot.Delta
 		originalDelta := originalSnapshot.Delta
 
-		if !reflect.DeepEqual(calculatedDelta.Data, originalDelta.Data) {
-			log.Info().Msg("snapshot dont match")
-
-			//spew.Dump(originalDelta)
-			//spew.Dump(calculatedDelta)
-
-			changelog, err := diff.Diff(originalDelta.Data, calculatedDelta.Data)
-
-			if err != nil {
-				log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compare")
+		for key, _ := range originalDelta.Data {
+			if mapping, has := calculatedDelta.WriteMappings[key]; !has {
+				failed = true
+				log.Warn().Hex("key", []byte(key)).Msg("Key not found in mapping")
+			} else {
+				writtenMappings[key] = mapping
 			}
+		}
 
-			for _, change := range changelog {
-				key := change.Path[0]
+		//if !reflect.DeepEqual(calculatedDelta.Data, originalDelta.Data) {
+		//	log.Info().Msg("snapshot dont match")
+		//
+		//	//spew.Dump(originalDelta)
+		//	//spew.Dump(calculatedDelta)
+		//
+		//	changelog, err := diff.Diff(originalDelta.Data, calculatedDelta.Data)
+		//
+		//	if err != nil {
+		//		log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compare")
+		//	}
+		//
+		//	for _, change := range changelog {
+		//		key := change.Path[0]
+		//
+		//		fullKey, has := calculatedDelta.WriteMappings[key]
+		//
+		//		if !has {
+		//			fmt.Printf("Key not found in mapping - %s: %x => %s \n", change.Type, key, change.From)
+		//		} else {
+		//			fmt.Printf("Changed key - %s '%x' '%x' '%s' # %s => %s  \n", change.Type, fullKey.Owner, fullKey.Controller, fullKey.Key, change.From, change.To)
+		//		}
+		//	}
+		//
+		//	//if len(changelog) > 1 {
+		//	//	for _, c := range computedBlock.CompleteCollections {
+		//	//		for _, tx := range c.Transactions {
+		//	//			fmt.Println("tx in block")
+		//	//			fmt.Println(string(tx.Script))
+		//	//		}
+		//	//	}
+		//	//}
+		//
+		//	//spew.Dump(changelog)
+		//	//spew.Dump(writeMappings)
+		//	//spew.Dump(readMappings)
+		//	//return
+		//} else {
+		//	log.Info().Msg("snapshot do   match")
+		//}
 
-				fullKey, has := calculatedDelta.WriteMappings[key]
-
-				if !has {
-					fmt.Printf("Key not found in mapping - %s: %x => %s \n", change.Type, key, change.From)
-				} else {
-					fmt.Printf("Changed key - %s '%x' '%x' '%s' # %s => %s  \n", change.Type, fullKey.Owner, fullKey.Controller, fullKey.Key, change.From, change.To)
-				}
-			}
-
-			//if len(changelog) > 1 {
-			//	for _, c := range computedBlock.CompleteCollections {
-			//		for _, tx := range c.Transactions {
-			//			fmt.Println("tx in block")
-			//			fmt.Println(string(tx.Script))
-			//		}
-			//	}
-			//}
-
-			//spew.Dump(changelog)
-			//spew.Dump(writeMappings)
-			//spew.Dump(readMappings)
-			//return
+		msg := ""
+		if txResultEqual {
+			msg = "equal"
 		} else {
-			log.Info().Msg("snapshot do   match")
+			msg = "not equal"
+		}
+
+		blockLogger := log.Info().Uint64("block", computedBlock.ExecutableBlock.Block.Header.Height)
+
+		if !failed {
+			blockLogger.Msgf("All mapping path found, txResult %s", msg)
+		} else {
+			blockLogger.Msgf("Some paths missing, txResult %s", msg)
 		}
 	}
+
+	return writtenMappings
 }
 
 func collapseByTxID(results []flow.TransactionResult) []flow.TransactionResult {

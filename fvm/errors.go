@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	initialRuntime "example.com/cadence-initial/runtime"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -184,6 +185,8 @@ func handleError(err error) (vmErr Error, fatalErr error) {
 	case runtime.Error:
 		// If the error originated from the runtime, handle separately
 		return handleRuntimeError(typedErr)
+	case initialRuntime.Error:
+		return handleInitialRuntimeError(typedErr)
 	case Error:
 		// If the error is an fvm.Error, return as is
 		return typedErr, nil
@@ -213,4 +216,26 @@ func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
 
 	// All other errors are non-fatal Cadence errors.
 	return &ExecutionError{Err: err}, nil
+}
+
+func handleInitialRuntimeError(err initialRuntime.Error) (vmErr Error, fatalErr error) {
+	innerErr := err.Err
+
+	// External errors are reported by the runtime but originate from the VM.
+	//
+	// External errors may be fatal or non-fatal, so additional handling
+	// is required.
+	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
+		if recoveredErr, ok := externalErr.Recovered.(error); ok {
+			// If the recovered value is an error, pass it to the original
+			// error handler to distinguish between fatal and non-fatal errors.
+			return handleError(recoveredErr)
+		}
+
+		// If the recovered value is not an error, bubble up the panic.
+		panic(externalErr.Recovered)
+	}
+
+	// All other errors are non-fatal Cadence errors.
+	return &ExecutionError{Err: runtime.Error{Err: err.Err}}, nil
 }

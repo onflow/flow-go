@@ -35,11 +35,7 @@ func (b *Bootstrapper) BootstrapLedger(
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	vm := fvm.New(runtime.NewInterpreterRuntime())
-
-	ctx := fvm.NewContext(fvm.WithChain(chain))
-
-	err := vm.Run(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
+	err := b.BoostrapView(view, servicePublicKey, initialTokenSupply, chain)
 	if err != nil {
 		return nil, err
 	}
@@ -50,6 +46,14 @@ func (b *Bootstrapper) BootstrapLedger(
 	}
 
 	return newStateCommitment, nil
+}
+
+func (b *Bootstrapper) BoostrapView(view *delta.View, servicePublicKey flow.AccountPublicKey, initialTokenSupply cadence.UFix64,chain  flow.Chain) error {
+	vm := fvm.New(runtime.NewInterpreterRuntime())
+
+	ctx := fvm.NewContext(fvm.WithChain(chain))
+
+	return vm.Run(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
 }
 
 func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {

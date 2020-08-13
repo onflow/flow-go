@@ -139,20 +139,20 @@ func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID(_a0 context.Context)
 }
 
 // GetRegisters provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ReadOnlyExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, error) {
+func (_m *ReadOnlyExecutionState) GetRegisters(_a0 context.Context, _a1 flow.StateCommitment, _a2 []flow.RegisterID) ([]flow.RegisterValue, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	var r0 []flow.RegisterValue
+	if rf, ok := ret.Get(0).(func(context.Context, flow.StateCommitment, []flow.RegisterID) []flow.RegisterValue); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]byte)
+			r0 = ret.Get(0).([]flow.RegisterValue)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.StateCommitment, []flow.RegisterID) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
@@ -162,20 +162,20 @@ func (_m *ReadOnlyExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, 
 }
 
 // GetRegistersWithProofs provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, [][]byte, error) {
+func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 flow.StateCommitment, _a2 []flow.RegisterID) ([]flow.RegisterValue, [][]byte, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	var r0 []flow.RegisterValue
+	if rf, ok := ret.Get(0).(func(context.Context, flow.StateCommitment, []flow.RegisterID) []flow.RegisterValue); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]byte)
+			r0 = ret.Get(0).([]flow.RegisterValue)
 		}
 	}
 
 	var r1 [][]byte
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.StateCommitment, []flow.RegisterID) [][]byte); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(1) != nil {
@@ -184,7 +184,7 @@ func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 context.Context, _a
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, flow.StateCommitment, []flow.RegisterID) error); ok {
 		r2 = rf(_a0, _a1, _a2)
 	} else {
 		r2 = ret.Error(2)
@@ -194,11 +194,11 @@ func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 context.Context, _a
 }
 
 // NewView provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) NewView(_a0 []byte) *delta.View {
+func (_m *ReadOnlyExecutionState) NewView(_a0 flow.StateCommitment) *delta.View {
 	ret := _m.Called(_a0)
 
 	var r0 *delta.View
-	if rf, ok := ret.Get(0).(func([]byte) *delta.View); ok {
+	if rf, ok := ret.Get(0).(func(flow.StateCommitment) *delta.View); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -233,15 +233,15 @@ func (_m *ReadOnlyExecutionState) RetrieveStateDelta(_a0 context.Context, _a1 fl
 }
 
 // StateCommitmentByBlockID provides a mock function with given fields: _a0, _a1
-func (_m *ReadOnlyExecutionState) StateCommitmentByBlockID(_a0 context.Context, _a1 flow.Identifier) ([]byte, error) {
+func (_m *ReadOnlyExecutionState) StateCommitmentByBlockID(_a0 context.Context, _a1 flow.Identifier) (flow.StateCommitment, error) {
 	ret := _m.Called(_a0, _a1)
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) flow.StateCommitment); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 
