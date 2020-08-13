@@ -6,6 +6,8 @@ const (
 	EngineLabel   = "engine"
 	LabelResource = "resource"
 	LabelMessage  = "message"
+	LabelNodeID   = "nodeid"
+	LabelNodeRole = "noderole"
 )
 
 const (
@@ -76,4 +78,6 @@ const (
 	MessageSubmitGuarantee      = "submit_guarantee"
 	MessageCollectionRequest    = "collection_request"
 	MessageCollectionResponse   = "collection_response"
+	MessageEntityRequest        = "entity_request"
+	MessageEntityResponse       = "entity_response"
 )

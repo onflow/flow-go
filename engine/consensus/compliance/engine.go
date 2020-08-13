@@ -86,7 +86,7 @@ func New(
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolConsensus, e)
+	con, err := net.Register(engine.ConsensusCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -271,10 +271,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
-	// process one event at a time for now
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
 	// skip any message as long as we don't have the dependencies
 	if e.hotstuff == nil || e.sync == nil {
 		return fmt.Errorf("still initializing")
@@ -282,12 +278,22 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *events.SyncedBlock:
+		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+		e.unit.Lock()
+		defer e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+		defer e.unit.Unlock()
 		return e.onSyncedBlock(originID, ev)
 	case *messages.BlockProposal:
 		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		e.unit.Lock()
+		defer e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		defer e.unit.Unlock()
 		return e.onBlockProposal(originID, ev)
 	case *messages.BlockVote:
+		// we don't lock the engine on vote messages, because votes are passed
+		// directly to HotStuff with no extra validation by compliance layer.
 		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+		defer e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockVote)
 		return e.onBlockVote(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)

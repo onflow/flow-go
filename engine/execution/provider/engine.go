@@ -66,12 +66,12 @@ func New(
 
 	var err error
 
-	eng.receiptCon, err = net.Register(engine.ExecutionReceiptProvider, &eng)
+	eng.receiptCon, err = net.Register(engine.PushReceipts, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
-	chunksConduit, err := net.Register(engine.ChunkDataPackProvider, &eng)
+	chunksConduit, err := net.Register(engine.ProvideChunks, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
@@ -119,7 +119,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	ctx := context.Background()
 	switch v := event.(type) {
 	case *messages.ChunkDataRequest:
-		return e.onChunkDataRequest(ctx, originID, v)
+		err := e.onChunkDataRequest(ctx, originID, v)
+		if err != nil {
+			return fmt.Errorf("could not answer chunk data request: %w", err)
+		}
+		return err
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -169,24 +173,31 @@ func (e *Engine) onChunkDataRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
 	}
 
-	collection, err := e.execState.GetCollection(cdp.CollectionID)
-	if err != nil {
-		return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
+	var collection flow.Collection
+	if cdp.CollectionID != flow.ZeroID {
+		// retrieves collection of non-zero chunks
+		coll, err := e.execState.GetCollection(cdp.CollectionID)
+		if err != nil {
+			return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
+		}
+		collection = *coll
 	}
 
 	response := &messages.ChunkDataResponse{
 		ChunkDataPack: *cdp,
 		Nonce:         rand.Uint64(),
-		Collection:    *collection,
+		Collection:    collection,
 	}
-
-	log.Debug().Msg("sending chunk data pack response")
 
 	// sends requested chunk data pack to the requester
 	err = e.chunksConduit.Transmit(response, originID)
 	if err != nil {
 		return fmt.Errorf("could not send requested chunk data pack to (%s): %w", origin, err)
 	}
+
+	log.Debug().
+		Hex("collection_id", logging.ID(response.Collection.ID())).
+		Msg("chunk data pack request successfully replied")
 
 	return nil
 }

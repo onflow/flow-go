@@ -66,7 +66,7 @@ func New(
 	sync module.BlockRequester,
 ) (*Engine, error) {
 
-	participants, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
+	participants, _, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not get cluster participants: %w", err)
 	}
@@ -92,7 +92,7 @@ func New(
 
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 
-	con, err := net.Register(engine.ProtocolClusterConsensus, e)
+	con, err := net.Register(engine.ConsensusCluster, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -264,46 +264,33 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 // process processes events for the proposal engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
-	//TODO currently it is possible for network messages to be received
-	// and passed to the engine before the engine has been setup
-	// (ie had Ready called). This is a quickfix to get around the issue
-	// but ultimately we should start receiving over the network only
-	// once all the engines are ready.
-	if e.sync == nil {
-		return fmt.Errorf("missing sync dependency")
+	// skip any message as long as we don't have the dependencies
+	if e.hotstuff == nil || e.sync == nil {
+		return fmt.Errorf("still initializing")
 	}
-	if e.hotstuff == nil {
-		return fmt.Errorf("missing hotstuff dependency")
-	}
-
-	// just process one event at a time for now
 
 	switch ev := event.(type) {
 	case *events.SyncedClusterBlock:
-		e.before(metrics.MessageSyncedClusterBlock)
-		defer e.after(metrics.MessageSyncedClusterBlock)
+		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageSyncedClusterBlock)
+		e.unit.Lock()
+		defer e.engMetrics.MessageHandled(metrics.EngineProposal, metrics.MessageSyncedClusterBlock)
+		defer e.unit.Unlock()
 		return e.onSyncedBlock(originID, ev)
 	case *messages.ClusterBlockProposal:
-		e.before(metrics.MessageClusterBlockProposal)
-		defer e.after(metrics.MessageClusterBlockProposal)
+		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
+		e.unit.Lock()
+		defer e.engMetrics.MessageHandled(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
+		defer e.unit.Unlock()
 		return e.onBlockProposal(originID, ev)
 	case *messages.ClusterBlockVote:
-		e.before(metrics.MessageClusterBlockVote)
-		defer e.after(metrics.MessageClusterBlockVote)
+		// we don't lock the engine on vote messages, because votes are passed
+		// directly to HotStuff with no extra validation by compliance layer.
+		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+		defer e.engMetrics.MessageHandled(metrics.EngineProposal, metrics.MessageClusterBlockVote)
 		return e.onBlockVote(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-}
-
-func (e *Engine) before(msg string) {
-	e.engMetrics.MessageReceived(metrics.EngineProposal, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.engMetrics.MessageHandled(metrics.EngineProposal, msg)
 }
 
 // onSyncedBlock processes a block synced by the synchronization engine.

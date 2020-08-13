@@ -76,9 +76,9 @@ func (p *Proof) String() string {
 	}
 	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr)
 	if p.Inclusion {
-		proofStr += fmt.Sprint("\t inclusion proof:\n")
+		proofStr += "\t inclusion proof:\n"
 	} else {
-		proofStr += fmt.Sprint("\t noninclusion proof:\n")
+		proofStr += "\t noninclusion proof:\n"
 	}
 	valueIndex := 0
 	for j := 0; j < int(p.Steps); j++ {

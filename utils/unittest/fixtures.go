@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -17,7 +19,7 @@ import (
 )
 
 func AddressFixture() flow.Address {
-	return flow.Mainnet.Chain().ServiceAddress()
+	return flow.Testnet.Chain().ServiceAddress()
 }
 
 func TransactionSignatureFixture() flow.TransactionSignature {
@@ -328,10 +330,13 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 
 	block.Header.PayloadHash = block.Payload.Hash()
 
-	return &entity.ExecutableBlock{
+	executableBlock := &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
 	}
+	// Preload the id
+	executableBlock.ID()
+	return executableBlock
 }
 
 func ExecutionResultFixture() *flow.ExecutionResult {
@@ -530,7 +535,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 
 	for i := 0; i < n; i++ {
 		identity := IdentityFixture()
-		identity.Address = fmt.Sprintf("%x@flow.com", identity.NodeID)
+		identity.Address = fmt.Sprintf("%x@flow.com:1234", identity.NodeID)
 		for _, opt := range opts {
 			opt(identity)
 		}
@@ -609,7 +614,7 @@ func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
 
 func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: chain.ServiceAddress()},
+		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				pub fun main() {}

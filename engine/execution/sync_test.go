@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -71,10 +72,15 @@ func TestSyncFlow(t *testing.T) {
 	err = execTestutil.SignTransactionAsServiceAccount(tx5, seq, chain)
 	require.NoError(t, err)
 
-	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
-	col2 := flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
-	col4 := flow.Collection{Transactions: []*flow.TransactionBody{tx4}}
-	col5 := flow.Collection{Transactions: []*flow.TransactionBody{tx5}}
+	col1 := &flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
+	col2 := &flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
+	col4 := &flow.Collection{Transactions: []*flow.TransactionBody{tx4}}
+	col5 := &flow.Collection{Transactions: []*flow.TransactionBody{tx5}}
+
+	blob1, _ := msgpack.Marshal(col1)
+	blob2, _ := msgpack.Marshal(col2)
+	blob4, _ := msgpack.Marshal(col4)
+	blob5, _ := msgpack.Marshal(col5)
 
 	// Create three blocks, with one tx each
 	block1 := unittest.BlockWithParentFixture(genesis)
@@ -138,42 +144,71 @@ func TestSyncFlow(t *testing.T) {
 	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.Header.ParentID)
 	fmt.Printf("block5 ID %x parent %x\n", block5.ID(), block5.Header.ParentID)
 
-	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
+	providerEngine := new(network.Engine)
+	colConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
 
-	collectionEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col1.ID() })).Run(func(args mock.Arguments) {
-		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col1}, exe2ID.NodeID)
+	providerEngine.On("Submit", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			originID := args.Get(0).(flow.Identifier)
+			req := args.Get(1).(*messages.EntityRequest)
+			if originID == exe2ID.NodeID && req.EntityIDs[0] == col1.ID() {
+				res := &messages.EntityResponse{Nonce: req.Nonce, Blobs: [][]byte{blob1}, EntityIDs: req.EntityIDs[:1]}
+				_ = colConduit.Submit(res, originID)
+				return
+			}
+			if originID == exe2ID.NodeID && req.EntityIDs[0] == col2.ID() {
+				res := &messages.EntityResponse{Nonce: req.Nonce, Blobs: [][]byte{blob2}, EntityIDs: req.EntityIDs[:1]}
+				_ = colConduit.Submit(res, originID)
+				return
+			}
+			if originID == exe1ID.NodeID && req.EntityIDs[0] == col4.ID() {
+				res := &messages.EntityResponse{Nonce: req.Nonce, Blobs: [][]byte{blob4}, EntityIDs: req.EntityIDs[:1]}
+				_ = colConduit.Submit(res, originID)
+				return
+			}
+			if originID == exe1ID.NodeID && req.EntityIDs[0] == col5.ID() {
+				res := &messages.EntityResponse{Nonce: req.Nonce, Blobs: [][]byte{blob5}, EntityIDs: req.EntityIDs[:1]}
+				_ = colConduit.Submit(res, originID)
+				return
+			}
+			assert.FailNowf(t, "invalid collection request", "(origin: %x, entities: %s)", originID, req.EntityIDs)
+		},
+	).
+		Times(4).
+		Return(nil)
+	providerEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.EntityRequest) bool { return r.EntityIDs[0] == col1.ID() })).Run(func(args mock.Arguments) {
+		_ = colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob1}}, exe2ID.NodeID)
 	}).Return(nil)
-	collectionEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col2.ID() })).Run(func(args mock.Arguments) {
-		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col2}, exe2ID.NodeID)
+	providerEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.EntityRequest) bool { return r.EntityIDs[0] == col2.ID() })).Run(func(args mock.Arguments) {
+		_ = colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob2}}, exe2ID.NodeID)
 	}).Return(nil)
-	collectionEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col4.ID() })).Run(func(args mock.Arguments) {
-		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col4}, exe1ID.NodeID)
+	providerEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.EntityRequest) bool { return r.EntityIDs[0] == col4.ID() })).Run(func(args mock.Arguments) {
+		_ = colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob4}}, exe2ID.NodeID)
 	}).Return(nil)
-	collectionEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col5.ID() })).Run(func(args mock.Arguments) {
-		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col5}, exe1ID.NodeID)
+	providerEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.EntityRequest) bool { return r.EntityIDs[0] == col5.ID() })).Run(func(args mock.Arguments) {
+		_ = colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob5}}, exe2ID.NodeID)
 	}).Return(nil)
 
 	var receipt *flow.ExecutionReceipt
 
-	executedBlocks := map[flow.Identifier]*flow.Identifier{}
+	executedBlocks := make(map[flow.Identifier]flow.Identifier)
 	ebMutex := sync.RWMutex{}
 
 	verificationEngine := new(network.Engine)
-	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
+	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			ebMutex.Lock()
 			defer ebMutex.Unlock()
-			identifier, _ := args[0].(flow.Identifier)
+			originID, _ := args[0].(flow.Identifier)
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
-			executedBlocks[receipt.ExecutionResult.BlockID] = &identifier
+			executedBlocks[receipt.ExecutionResult.BlockID] = originID
 			fmt.Printf("verified %x\n", receipt.ExecutionResult.BlockID)
 		}).
 		Return(nil).Times(0)
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(0)
 
 	// submit block from consensus node
@@ -185,8 +220,8 @@ func TestSyncFlow(t *testing.T) {
 		ebMutex.RLock()
 		defer ebMutex.RUnlock()
 
-		if nodeId, ok := executedBlocks[block2.ID()]; ok {
-			return *nodeId == exe2ID.NodeID
+		if nodeID, ok := executedBlocks[block2.ID()]; ok {
+			return nodeID == exe2ID.NodeID
 		}
 		return false
 	})
@@ -206,11 +241,11 @@ func TestSyncFlow(t *testing.T) {
 
 		block3ok := false
 		block4ok := false
-		if nodeId, ok := executedBlocks[block3.ID()]; ok {
-			block3ok = *nodeId == exe1ID.NodeID
+		if nodeID, ok := executedBlocks[block3.ID()]; ok {
+			block3ok = nodeID == exe1ID.NodeID
 		}
-		if nodeId, ok := executedBlocks[block4.ID()]; ok {
-			block4ok = *nodeId == exe1ID.NodeID
+		if nodeID, ok := executedBlocks[block4.ID()]; ok {
+			block4ok = nodeID == exe1ID.NodeID
 		}
 		return block3ok && block4ok
 	})
@@ -218,23 +253,23 @@ func TestSyncFlow(t *testing.T) {
 	// make sure collections are saved and synced as well
 	rCol1, err := exeNode1.Collections.ByID(col1.ID())
 	require.NoError(t, err)
-	assert.Equal(t, col1, *rCol1)
+	assert.Equal(t, col1, rCol1)
 
 	rCol2, err := exeNode1.Collections.ByID(col2.ID())
 	require.NoError(t, err)
-	assert.Equal(t, col2, *rCol2)
+	assert.Equal(t, col2, rCol2)
 
 	rCol4, err := exeNode1.Collections.ByID(col4.ID())
 	require.NoError(t, err)
-	assert.Equal(t, col4, *rCol4)
+	assert.Equal(t, col4, rCol4)
 
 	rCol1, err = exeNode2.Collections.ByID(col1.ID())
 	require.NoError(t, err)
-	assert.Equal(t, col1, *rCol1)
+	assert.Equal(t, col1, rCol1)
 
 	rCol2, err = exeNode2.Collections.ByID(col2.ID())
 	require.NoError(t, err)
-	assert.Equal(t, col2, *rCol2)
+	assert.Equal(t, col2, rCol2)
 
 	// node two didn't get block4
 	_, err = exeNode2.Collections.ByID(col4.ID())
@@ -248,14 +283,14 @@ func TestSyncFlow(t *testing.T) {
 		ebMutex.RLock()
 		defer ebMutex.RUnlock()
 
-		if nodeId, ok := executedBlocks[block5.ID()]; ok {
-			return *nodeId == exe1ID.NodeID
+		if nodeID, ok := executedBlocks[block5.ID()]; ok {
+			return nodeID == exe1ID.NodeID
 		}
 		return false
 	})
 
 	exeNode1.AssertHighestExecutedBlock(t, block5.Header)
 
-	collectionEngine.AssertExpectations(t)
+	providerEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
 }

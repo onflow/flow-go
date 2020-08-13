@@ -5,7 +5,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"time"
 
@@ -16,19 +15,22 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
 	committeeImpl "github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -40,6 +42,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/module/synchronization"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/io"
 )
 
 func main() {
@@ -66,8 +69,8 @@ func main() {
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
 		seals          mempool.Seals
-		prop           *propagation.Engine
 		prov           *provider.Engine
+		requesterEng   *requester.Engine
 		syncCore       *synchronization.Core
 		comp           *compliance.Engine
 		conMetrics     module.ConsensusMetrics
@@ -142,6 +145,19 @@ func main() {
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)
 			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
+			requesterEng, err = requester.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.RequestReceiptsByBlockID,
+				filter.HasRole(flow.RoleExecution),
+				func() flow.Entity { return &flow.ExecutionReceipt{} },
+			)
+			if err != nil {
+				return nil, err
+			}
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -150,6 +166,7 @@ func main() {
 				node.Network,
 				node.State,
 				node.Me,
+				requesterEng,
 				resultsDB,
 				sealsDB,
 				node.Storage.Headers,
@@ -159,6 +176,7 @@ func main() {
 				approvals,
 				seals,
 			)
+			requesterEng.WithHandle(match.HandleReceipt)
 			return match, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -172,31 +190,18 @@ func main() {
 			)
 			return prov, err
 		}).
-		Component("propagation engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prop, err = propagation.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
-				node.Tracer,
-				conMetrics,
-				node.Network,
-				node.State,
-				node.Me,
-				guarantees,
-			)
-			return prop, err
-		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
 				node.Logger,
-				node.Metrics.Engine,
 				node.Tracer,
+				node.Metrics.Engine,
 				conMetrics,
+				node.Metrics.Mempool,
 				node.Network,
-				prop,
 				node.State,
 				node.Storage.Headers,
 				node.Me,
+				guarantees,
 			)
 			return ing, err
 		}).
@@ -205,7 +210,6 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// initialize the pending blocks cache
@@ -252,7 +256,6 @@ func main() {
 			finalize := finalizer.NewFinalizer(
 				node.DB,
 				node.Storage.Headers,
-				node.Storage.Payloads,
 				node.State,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
@@ -272,9 +275,15 @@ func main() {
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner()
 
+			// initialize and pre-generate leader selections from the seed
+			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
+			}
+
 			// initialize Main consensus committee's state
 			var committee hotstuff.Committee
-			committee, err = committeeImpl.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			committee, err = committeeImpl.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -351,12 +360,16 @@ func main() {
 
 			return sync, nil
 		}).
+		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// created with matching engine
+			return requesterEng, nil
+		}).
 		Run()
 }
 
 func loadDKGPrivateData(dir string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
 	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, myID)
-	data, err := ioutil.ReadFile(filepath.Join(dir, path))
+	data, err := io.ReadFile(filepath.Join(dir, path))
 	if err != nil {
 		return nil, err
 	}

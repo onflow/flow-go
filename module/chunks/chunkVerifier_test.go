@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -46,9 +47,10 @@ func TestChunkVerifier(t *testing.T) {
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
 	assert.NotNil(s.T(), vch)
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
+	assert.NotNil(s.T(), spockSecret)
 }
 
 // TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
@@ -57,9 +59,10 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
 	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
@@ -70,9 +73,10 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
 	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
@@ -83,9 +87,10 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("wrongEndState"))
 	assert.NotNil(s.T(), vch)
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
 	_, ok := chFaults.(*chunksmodels.CFNonMatchingFinalState)
 	assert.True(s.T(), ok)
 }
@@ -96,9 +101,31 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("failedTx"))
 	assert.NotNil(s.T(), vch)
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
+	assert.NotNil(s.T(), spockSecret)
+}
+
+// TestVerifyWrongChunkType evaluates that following invocations return an error:
+// - verifying a system chunk with Verify method.
+// - verifying a non-system chunk with SystemChunkVerify method.
+func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
+	// defines verifiable chunk for a system chunk
+	svc := &verification.VerifiableChunkData{
+		IsSystemChunk: true,
+	}
+	// invoking Verify method with system chunk should return an error
+	_, _, err := s.verifier.Verify(svc)
+	require.Error(s.T(), err)
+
+	// defines verifiable chunk for a non-system chunk
+	vc := &verification.VerifiableChunkData{
+		IsSystemChunk: false,
+	}
+	// invoking SystemChunkVerify method with a non-system chunk should return an error
+	_, _, err = s.verifier.SystemChunkVerify(vc)
+	require.Error(s.T(), err)
 }
 
 // TestEmptyCollection tests verification behaviour if a
@@ -109,9 +136,10 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	col := unittest.CollectionFixture(0)
 	vch.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
+	assert.NotNil(s.T(), spockSecret)
 }
 
 // GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
@@ -188,6 +216,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		}
 
 		verifiableChunkData = verification.VerifiableChunkData{
+			IsSystemChunk: false,
 			Chunk:         &chunk,
 			Header:        &header,
 			Result:        &result,

@@ -14,7 +14,7 @@ func TestConvertTransaction(t *testing.T) {
 	tx := unittest.TransactionBodyFixture()
 
 	msg := convert.TransactionToMessage(tx)
-	converted, err := convert.MessageToTransaction(msg, flow.Mainnet.Chain())
+	converted, err := convert.MessageToTransaction(msg, flow.Testnet.Chain())
 	assert.Nil(t, err)
 
 	assert.Equal(t, tx, converted)

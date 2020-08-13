@@ -14,11 +14,14 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/state"
 	protomock "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -41,7 +44,6 @@ type AggregatorSuite struct {
 }
 
 func (as *AggregatorSuite) SetupTest() {
-
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
 
@@ -57,6 +59,7 @@ func (as *AggregatorSuite) SetupTest() {
 		},
 		nil,
 	)
+
 	for _, participant := range as.participants {
 		as.snapshot.On("Identity", participant.NodeID).Return(participant, nil)
 	}
@@ -68,9 +71,30 @@ func (as *AggregatorSuite) SetupTest() {
 	// create a mocked forks
 	as.forks = &mocks.Forks{}
 
+	rootHeader := &flow.Header{}
+
+	sig1 := make([]byte, 32)
+	rand.Read(sig1[:])
+	sig2 := make([]byte, 32)
+	rand.Read(sig2[:])
+	c := &signature.Combiner{}
+	combined, err := c.Join(sig1, sig2)
+	require.NoError(as.T(), err)
+
+	rootQC := &model.QuorumCertificate{
+		View:      rootHeader.View,
+		BlockID:   rootHeader.ID(),
+		SignerIDs: nil,
+		SigData:   combined,
+	}
+
+	as.MockProtocolByBlockID(rootHeader.ID())
+
+	// initialize and pre-generate leader selections from the seed
+	selection, err := leader.NewSelectionForConsensus(10000, rootHeader, rootQC, as.protocol)
+	require.NoError(as.T(), err)
 	// create hotstuff.Committee
-	var err error
-	as.committee, err = committee.NewMainConsensusCommitteeState(as.protocol, as.participants[0].NodeID)
+	as.committee, err = committee.NewMainConsensusCommitteeState(as.protocol, as.participants[0].NodeID, selection)
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
@@ -96,6 +120,12 @@ func (as *AggregatorSuite) SetupTest() {
 
 	// create the aggregator
 	as.aggregator = New(&mocks.Consumer{}, 0, as.committee, as.validator, as.signer)
+}
+
+func (as *AggregatorSuite) MockProtocolByBlockID(id flow.Identifier) {
+	// force reading the seed from root qc instead of protocol state
+	as.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nil, state.NewNoValidChildBlockError(""))
+	as.protocol.On("AtBlockID", id).Return(as.snapshot)
 }
 
 func (as *AggregatorSuite) RegisterProposal(proposal *model.Proposal) {
@@ -215,7 +245,8 @@ func (as *AggregatorSuite) TestReceiveInsufficientVotesBeforeBlock() {
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	for i := 0; i < 3; i++ {
 		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
-		ok := as.aggregator.StorePendingVote(vote)
+		ok, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 		require.True(as.T(), ok)
 	}
 	ok := as.aggregator.StoreProposerVote(bp.ProposerVote())
@@ -240,7 +271,8 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeBlock() {
 	_, _, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	for i := 0; i < 6; i++ {
 		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
-		ok := as.aggregator.StorePendingVote(vote)
+		ok, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 		require.True(as.T(), ok)
 	}
 	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
@@ -256,6 +288,63 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeBlock() {
 	require.True(as.T(), built)
 }
 
+// PENDING PATH votes are valid and block arrives after votes)
+// receive 3 votes first, a QC should be built when receiving the proposal with my own vote
+// 5 total votes for the QC are from: 3 pending votes, 1 proposer vote, and my own vote
+func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeProposal() {
+	testView := uint64(5)
+
+	// the proposal is from the last node
+	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
+
+	// create 3 pending votes from the first 3 nodes, which are different from the last node
+	for i := 0; i < 3; i++ {
+		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		ok, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
+		require.True(as.T(), ok)
+	}
+
+	// when receiving the block, the proposer vote from the proposal will be received and stored
+	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
+
+	// now we have 4 votes in total, the last vote is our own vote
+	ownVote := newMockVote(as, testView, bp.Block.BlockID, as.participants[4].NodeID)
+	qc, built, err := as.aggregator.StoreVoteAndBuildQC(ownVote, bp.Block)
+	require.NoError(as.T(), err)
+	require.NotNil(as.T(), qc)
+	require.True(as.T(), built)
+}
+
+// PENDING PATH. This tests that when the the proposer is myself and there isn't enough
+// vote, then a QC can not be built
+func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeProposalTheProposerIsMyself() {
+	testView := uint64(5)
+
+	// the proposal is from the last node
+	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
+
+	// create 3 pending votes from the first 3 nodes, which are different from the last node
+	for i := 0; i < 3; i++ {
+		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		ok, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
+		require.True(as.T(), ok)
+	}
+
+	// when receiving the block, the proposer vote from the proposal will be received and stored
+	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
+
+	// now we have 4 votes in total, the last vote is our own vote, which is
+	// also the proposer's vote, this happens when we have weighted random leader selection, and
+	// the same leader happens to be selected in a row.
+	ownVote := newMockVote(as, testView, bp.Block.BlockID, as.participants[len(as.participants)-1].NodeID)
+	qc, built, err := as.aggregator.StoreVoteAndBuildQC(ownVote, bp.Block)
+	require.NoError(as.T(), err)
+	require.Nil(as.T(), qc)
+	require.False(as.T(), built)
+}
+
 // UNHAPPY PATH
 // highestPrunedView is 10, receive a vote with view 5 without the block
 // the vote should not be stored
@@ -263,7 +352,8 @@ func (as *AggregatorSuite) TestStaleVoteWithoutBlock() {
 	as.aggregator.PruneByView(10)
 	testView := uint64(5)
 	vote := newMockVote(as, testView, unittest.IdentifierFixture(), as.participants[0].NodeID)
-	ok := as.aggregator.StorePendingVote(vote)
+	ok, err := as.aggregator.StorePendingVote(vote)
+	require.NoError(as.T(), err)
 	require.False(as.T(), ok)
 }
 
@@ -337,7 +427,8 @@ func (as *AggregatorSuite) TestInvalidVotesOnly() {
 		// vote view is invalid
 		vote := newMockVote(as, testView-1, bp.Block.BlockID, as.participants[i].NodeID)
 		notifier.On("OnInvalidVoteDetected", vote)
-		as.aggregator.StorePendingVote(vote)
+		_, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 	}
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
@@ -364,7 +455,8 @@ func (as *AggregatorSuite) TestVoteMixtureBeforeBlock() {
 		} else {
 			vote = newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
 		}
-		as.aggregator.StorePendingVote(vote)
+		_, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 	}
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
@@ -425,10 +517,10 @@ func (as *AggregatorSuite) TestDuplicateVotesBeforeBlock() {
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
-	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[1].NodeID)
 	for i := 0; i < 4; i++ {
-		_ = as.aggregator.StorePendingVote(vote)
+		_, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 	}
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
@@ -446,7 +538,8 @@ func (as *AggregatorSuite) TestVoteOrderAfterBlock() {
 	voteList = append(voteList, bp.ProposerVote())
 	for i := 0; i < 5; i++ {
 		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
-		as.aggregator.StorePendingVote(vote)
+		_, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 		voteList = append(voteList, vote)
 	}
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
@@ -554,7 +647,8 @@ func (as *AggregatorSuite) TestFullPruneBeforeBlock() {
 	for i := 2; i <= 5; i++ {
 		view := uint64(i)
 		vote := newMockVote(as, view, unittest.IdentifierFixture(), as.participants[i].NodeID)
-		as.aggregator.StorePendingVote(vote)
+		_, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 	}
 	as.aggregator.PruneByView(pruneView)
 	prunedView, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ := getStateLength(as.aggregator)
@@ -598,7 +692,8 @@ func (as *AggregatorSuite) TestNonePruneBeforeBlock() {
 	for i := 3; i <= 5; i++ {
 		view := uint64(i)
 		vote := newMockVote(as, view, unittest.IdentifierFixture(), as.participants[i].NodeID)
-		as.aggregator.StorePendingVote(vote)
+		_, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 	}
 	_, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ := getStateLength(as.aggregator)
 	require.Equal(as.T(), 3, viewToBlockLen)

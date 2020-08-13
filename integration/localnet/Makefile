@@ -36,3 +36,7 @@ logs:
 .PHONY: stop
 stop:
 	docker-compose -f docker-compose.base.yml -f docker-compose.nodes.yml down -v
+
+.PHONY: load
+load:
+	go run --tags relic ../loader -log-level debug -tps 1,0,1,0,1 -tps-durations 30s,30s,10s,10s,30s

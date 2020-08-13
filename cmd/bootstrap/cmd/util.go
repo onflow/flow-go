@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/utils/io"
 )
 
 func generateRandomSeeds(n int) [][]byte {
@@ -28,7 +29,7 @@ func generateRandomSeed() []byte {
 }
 
 func readJSON(path string, target interface{}) {
-	dat, err := ioutil.ReadFile(path)
+	dat, err := io.ReadFile(path)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot read json")
 	}

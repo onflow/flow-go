@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/libp2p/go-libp2p-core/helpers"
@@ -236,31 +237,37 @@ func (m *Middleware) Send(msg *message.Message, recipientID flow.Identifier) err
 	return nil
 }
 
-// connect creates a new stream
-func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey) (libp2pnetwork.Stream, error) {
+// nodeAddressFromID returns the libp2p.NodeAddress for the given flow.id.
+func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) {
 
-	ip, port, err := net.SplitHostPort(address)
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
 	if err != nil {
-		return nil, fmt.Errorf("could not parse address %s: %w", address, err)
+		return NodeAddress{}, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// retrieve the flow.Identity for the give flow.ID
+	flowIdentity, found := idsMap[id]
+	if !found {
+		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
+	}
+
+	// split the node address into ip and port
+	ip, port, err := net.SplitHostPort(flowIdentity.Address)
+	if err != nil {
+		return NodeAddress{}, fmt.Errorf("could not parse address %s: %w", flowIdentity.Address, err)
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := PublicKey(key)
+	lkey, err := PublicKey(flowIdentity.NetworkPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
+		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
 
-	// Create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port, PubKey: lkey}
+	// create a new NodeAddress
+	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
 
-	// Create a stream for it
-	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stream for %s :%w", nodeAddress.Name, err)
-	}
-
-	m.log.Info().Str("target_id", flowID).Str("address", address).Msg("stream created")
-	return stream, nil
+	return nodeAddress, nil
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -408,4 +415,14 @@ func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
 
 func (m *Middleware) reportInboundMsgSize(size int, channel string) {
 	m.metrics.NetworkMessageReceived(size, channel)
+}
+
+// Ping pings the target node and returns the ping RTT or an error
+func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
+	nodeAddress, err := m.nodeAddressFromID(targetID)
+	if err != nil {
+		return -1, err
+	}
+
+	return m.libP2PNode.Ping(m.ctx, nodeAddress)
 }

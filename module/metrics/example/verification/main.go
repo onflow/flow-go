@@ -9,8 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	vertestutil "github.com/dapperlabs/flow-go/engine/testutil/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
+	"github.com/dapperlabs/flow-go/engine/verification/test"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	vermodel "github.com/dapperlabs/flow-go/model/verification"
@@ -52,7 +52,7 @@ func happyPathExample() {
 		// starts happy path
 		t := &testing.T{}
 		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
-		vertestutil.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
+		test.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
 		<-mempoolCollector.Done()
 	})
 }
@@ -149,7 +149,6 @@ func demo() {
 		// This is done to stretch metrics and scatter their pattern
 		// for a clear visualization.
 		for i := 0; i < 100; i++ {
-			chunkID := unittest.ChunkFixture().ID()
 			// finder
 			if rand.Int()%2 == 0 {
 				verificationCollector.OnExecutionReceiptReceived()
@@ -174,8 +173,6 @@ func demo() {
 			if rand.Int()%2 == 0 {
 				verificationCollector.OnVerifiableChunkReceived()
 			}
-
-			verificationCollector.OnChunkVerificationStarted(chunkID)
 
 			// mempools
 			// creates and add a receipt
@@ -236,7 +233,7 @@ func demo() {
 
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
-			verificationCollector.OnChunkVerificationFinished(chunkID)
+
 			if rand.Int()%2 == 0 {
 				verificationCollector.OnResultApproval()
 			}

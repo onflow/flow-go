@@ -3,6 +3,8 @@
 package middleware
 
 import (
+	"time"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 )
@@ -16,6 +18,7 @@ type Middleware interface {
 	Send(msg *message.Message, recipientIDs ...flow.Identifier) error
 	Publish(msg *message.Message) error
 	Subscribe(channelID uint8) error
+	Ping(targetID flow.Identifier) (time.Duration, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the

@@ -20,7 +20,7 @@ package crypto
 //  - membership checks in G1 and G2 are using a naive scalar multiplication with the group order
 
 // future features:
-//  - signature aggregations
+//  - multi-signature and batch verification
 //  - membership checks in G1 and G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
@@ -78,7 +78,7 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	return newBLSBLS12381().blsSign(&sk.scalar, h), nil
 }
 
-// BLS_KMACFunction is the customizer used for KMAC in BLS
+// blsKMACFunction is the customizer used for KMAC in BLS
 const blsKMACFunction = "H2C"
 
 // NewBLSKMAC returns a new KMAC128 instance with the right parameters
@@ -125,6 +125,24 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	// error is not checked as it is guaranteed to be nil; len(seed)<maxScalarSize
 	mapToZr(&(sk.scalar), seed)
 	return sk, nil
+}
+
+// GeneratePOP returns a proof of possession (PoP) for the receiver private key
+// using the given hasher.
+//
+// The hasher must be independant from the hashers used for signatures
+// or SPoCK proofs. In the case of KMAC, this means a specific domain tag must
+// be used for PoP and not used for other domains.
+func (sk *PrKeyBLSBLS12381) GeneratePOP(kmac hash.Hasher) (Signature, error) {
+	// sign the public key
+	return sk.Sign(sk.PublicKey().Encode(), kmac)
+}
+
+// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
+// using the given hasher.
+func (pk *PubKeyBLSBLS12381) VerifyPOP(s Signature, kmac hash.Hasher) (bool, error) {
+	// verify the signature against the public key
+	return pk.Verify(s, pk.Encode(), kmac)
 }
 
 // decodePrivateKey decodes a slice of bytes into a private key.

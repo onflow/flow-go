@@ -117,6 +117,9 @@ func (net *FlowNetwork) Remove() {
 // StopContainers stops all containers in the network, without removing them. This allows containers to be
 // restarted. To remove them, call `RemoveContainers`.
 func (net *FlowNetwork) StopContainers() {
+	if net == nil || net.suite == nil {
+		return
+	}
 
 	err := net.suite.Close()
 	if err != nil {
@@ -126,6 +129,9 @@ func (net *FlowNetwork) StopContainers() {
 
 // RemoveContainers removes all the containers in the network. Containers need to be stopped first using `Stop`.
 func (net *FlowNetwork) RemoveContainers() {
+	if net == nil || net.suite == nil {
+		return
+	}
 
 	err := net.suite.Remove()
 	if err != nil {
@@ -135,7 +141,9 @@ func (net *FlowNetwork) RemoveContainers() {
 
 // Cleanup cleans up all temporary files used by the network.
 func (net *FlowNetwork) Cleanup() {
-
+	if net == nil || net.suite == nil {
+		return
+	}
 	// remove data directories
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
@@ -465,8 +473,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
-			// Should always have at least 1 collection and execution node
-			nodeContainer.addFlag("ingress-addr", "collection_1:9000")
+			// uncomment line below to point the access node exclusively to a single collection node
+			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("collection-ingress-port", "9000")
+			// should always have at least 1 execution node
 			nodeContainer.addFlag("script-addr", "execution_1:9000")
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
@@ -490,9 +500,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
 	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
-		// collection1, _ := net.ContainerByName("collection_1")
 		execution1 := net.ContainerByName("execution_1")
-		// collection1.After(suiteContainer)
 		execution1.After(suiteContainer)
 	} else {
 		net.network.After(suiteContainer)
@@ -614,6 +622,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate root blocks for each collector cluster
 	clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, root)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathNClusters), bootstrap.NClusters{
+		NClusters: uint(networkConf.NClusters),
+	})
 	if err != nil {
 		return nil, nil, nil, err
 	}

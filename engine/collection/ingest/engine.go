@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/parser"
+	"github.com/onflow/cadence/runtime/parser2"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -62,7 +62,7 @@ func New(
 		config:     config,
 	}
 
-	con, err := net.Register(engine.CollectionIngest, e)
+	con, err := net.Register(engine.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -172,9 +172,13 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// get the locally assigned cluster and the cluster responsible for the transaction
-	txCluster := clusters.ByTxID(tx.ID())
+	txCluster, ok := clusters.ByTxID(tx.ID())
+	if !ok {
+		return fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
+	}
+
 	localID := e.me.NodeID()
-	localCluster, ok := clusters.ByNodeID(localID)
+	localCluster, _, ok := clusters.ByNodeID(localID)
 	if !ok {
 		return fmt.Errorf("could not get local cluster")
 	}
@@ -236,7 +240,7 @@ func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
 
 	if e.config.CheckScriptsParse {
 		// ensure the script is at least parse-able
-		_, _, err = parser.ParseProgram(string(tx.Script))
+		_, err = parser2.ParseProgram(string(tx.Script))
 		if err != nil {
 			return InvalidScriptError{ParserErr: err}
 		}
