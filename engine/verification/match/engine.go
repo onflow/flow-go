@@ -329,22 +329,17 @@ func (e *Engine) onTimer() {
 // needed to make a VerifiableChunk
 func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 	chunkID := c.ID()
-
-	execNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return fmt.Errorf("could not load execution nodes identities: %w", err)
-	}
-
-	// request from the exeuctor plus another random execution node as a backup
-	nodes := execNodes.Filter(filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID()))).Sample(1).NodeIDs()
-	nodes = append(nodes, c.ExecutorID)
-
 	req := &messages.ChunkDataRequest{
 		ChunkID: chunkID,
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
-	err = e.con.Submit(req, nodes...)
+	// requests from the executor node plust another random execution node
+	originFilter := filter.HasNodeID(c.ExecutorID)
+	anotherFilter := filter.And(filter.HasRole(flow.RoleExecution),
+		filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID())))
+
+	err := e.con.Send(req, 1, filter.And(originFilter, anotherFilter))
 	if err != nil {
 		return fmt.Errorf("could not submit chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}
