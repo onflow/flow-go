@@ -9,6 +9,12 @@ type CompleteCollection struct {
 	Transactions []*flow.TransactionBody
 }
 
+// ExecutableBlock represents a block that can be executed by the VM
+//
+// It assumes that the Block attached is immutable, so take care in not modifying or changing the inner
+// *flow.Block, otherwise the struct will be in an inconsistent state. It requires the Block is immutable
+// because the it lazy lodas the Block.ID() into the private id field, on the first call to ExecutableBlock.ID()
+// All future calls to ID will not call Block.ID(), therefore it Block changes, the id will not match the Block.
 type ExecutableBlock struct {
 	id                  flow.Identifier
 	Block               *flow.Block
@@ -33,6 +39,8 @@ func (b *BlocksByCollection) Checksum() flow.Identifier {
 	return b.CollectionID
 }
 
+// ID lazy loads the Block.ID() into the private id field on the first call, and returns
+// the id field in all future calls
 func (b *ExecutableBlock) ID() flow.Identifier {
 	if b.id == flow.ZeroID {
 		b.id = b.Block.ID()
