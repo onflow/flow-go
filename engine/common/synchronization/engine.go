@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -24,16 +25,14 @@ import (
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	metrics  module.EngineMetrics
-	me       module.Local
-	state    protocol.State
-	selector flow.IdentityFilter
-	con      network.Conduit
-	blocks   storage.Blocks
-	comp     network.Engine // compliance layer engine
-
+	unit         *engine.Unit
+	log          zerolog.Logger
+	metrics      module.EngineMetrics
+	me           module.Local
+	state        protocol.State
+	con          network.Conduit
+	blocks       storage.Blocks
+	comp         network.Engine // compliance layer engine
 	pollInterval time.Duration
 	scanInterval time.Duration
 	core         module.SyncCore
@@ -46,7 +45,6 @@ func New(
 	net module.Network,
 	me module.Local,
 	state protocol.State,
-	selector flow.IdentityFilter,
 	blocks storage.Blocks,
 	comp network.Engine,
 	core module.SyncCore,
@@ -65,7 +63,6 @@ func New(
 		metrics:      metrics,
 		me:           me,
 		state:        state,
-		selector:     selector,
 		blocks:       blocks,
 		comp:         comp,
 		core:         core,
@@ -409,11 +406,15 @@ func (e *Engine) pollHeight() error {
 		Nonce:  rand.Uint64(),
 		Height: final.Height,
 	}
-	err = e.con.Send(req, 1, e.selector)
+
+	selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.Not(filter.HasNodeID(e.me.NodeID())))
+
+	err = e.con.Send(req, 3, selector)
 	if err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 	}
 
+	// Todo reflect sending three request messages to metrics
 	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 
 	return nil
@@ -421,6 +422,8 @@ func (e *Engine) pollHeight() error {
 
 // sendRequests sends a request for each range and batch.
 func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
+	selector := filter.And(filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())))
 
 	for _, ran := range ranges {
 
@@ -430,7 +433,8 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Send(req, 1, e.selector)
+
+		err := e.con.Send(req, 3, selector)
 		if err != nil {
 			return fmt.Errorf("could not send range request: %w", err)
 		}
@@ -440,6 +444,8 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			Uint64("range_nonce", req.Nonce).
 			Msg("range requested")
 		e.core.RangeRequested(ran)
+
+		// Todo reflect sending three request messages on metrics
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 	}
 
@@ -450,11 +456,12 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Send(req, 1, e.selector)
+		err := e.con.Send(req, 3, selector)
 		if err != nil {
 			return fmt.Errorf("could not send batch request: %w", err)
 		}
 		e.core.BatchRequested(batch)
+		// Todo reflect sending three request messages on metrics
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 	}
 
