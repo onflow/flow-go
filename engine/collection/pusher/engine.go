@@ -124,19 +124,12 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 // SubmitCollectionGuarantee submits the collection guarantee to all
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
-
-	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return fmt.Errorf("could not get consensus nodes: %w", err)
-	}
-
 	// TODO: We actually only need to send to a small subset of consensus engines, as
 	// they propagate the guarantee within the consensus committee. We can reduce
 	// network usage significantly by implementing a simple retry mechanism here and
 	// only sending to a single consensus node.
 	// => https://github.com/dapperlabs/flow-go/issues/4358
-	err = e.push.Submit(guarantee, consensusNodes.NodeIDs()...)
-	if err != nil {
+	if err := e.push.Publish(guarantee, filter.HasRole(flow.RoleConsensus)); err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
 
