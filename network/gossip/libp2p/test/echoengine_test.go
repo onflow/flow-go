@@ -127,7 +127,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 
 	// sends the same message 10 times
 	for i := 0; i < 10; i++ {
-		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
+		require.NoError(s.Suite.T(), sender.con.Transmit(event, s.ids[rcvID].NodeID))
 	}
 
 	time.Sleep(1 * time.Second)
@@ -162,7 +162,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
+			require.NoError(s.Suite.T(), sender.con.Transmit(event, s.ids[rcvID].NodeID))
 		}()
 	}
 	wg.Wait()
@@ -214,10 +214,10 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 		go func() {
 			defer wg.Done()
 			// sender1 to receiver1 on channel1
-			require.NoError(s.Suite.T(), sender1.con.Submit(event, s.ids[rcvNode].NodeID))
+			require.NoError(s.Suite.T(), sender1.con.Transmit(event, s.ids[rcvNode].NodeID))
 
 			// sender2 to receiver2 on channel2
-			require.NoError(s.Suite.T(), sender2.con.Submit(event, s.ids[rcvNode].NodeID))
+			require.NoError(s.Suite.T(), sender2.con.Transmit(event, s.ids[rcvNode].NodeID))
 		}()
 	}
 	wg.Wait()
@@ -250,7 +250,7 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 	event := &message.Echo{
 		Text: "hello",
 	}
-	require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
+	require.NoError(s.Suite.T(), sender.con.Transmit(event, s.ids[rcvID].NodeID))
 
 	// evaluates reception of echo request
 	select {
@@ -321,7 +321,7 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 		event := &message.Echo{
 			Text: fmt.Sprintf("hello%d", i),
 		}
-		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
+		require.NoError(s.Suite.T(), sender.con.Transmit(event, s.ids[rcvID].NodeID))
 
 		select {
 		case <-receiver.received:
@@ -400,7 +400,7 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 		event := &message.Echo{
 			Text: fmt.Sprintf("hello%d", i),
 		}
-		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[1].NodeID))
+		require.NoError(s.Suite.T(), sender.con.Transmit(event, s.ids[1].NodeID))
 	}
 
 	for i := 0; i < count; i++ {
