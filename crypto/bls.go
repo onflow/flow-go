@@ -75,7 +75,8 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	}
 	// check hasher output size
 	if kmac.Size() < opSwUInputLenBLSBLS12381 {
-		return nil, fmt.Errorf("Hasher with at least %d output byte size is required", opSwUInputLenBLSBLS12381)
+		return nil, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+			opSwUInputLenBLSBLS12381, kmac.Size())
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
@@ -108,7 +109,8 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 	// check hasher output size
 	if kmac.Size() < opSwUInputLenBLSBLS12381 {
-		return false, fmt.Errorf("Hasher with at least %d output byte size is required", opSwUInputLenBLSBLS12381)
+		return false, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+			opSwUInputLenBLSBLS12381, kmac.Size())
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
