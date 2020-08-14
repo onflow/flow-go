@@ -399,6 +399,13 @@ func (e *Engine) checkSealing() {
 	}
 
 	// process the results
+
+	final, err := e.state.Final().Head()
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not get finalized header")
+		return
+	}
+
 	var sealedResultIDs []flow.Identifier
 	var sealedBlockIDs []flow.Identifier
 	for _, result := range results {
@@ -409,7 +416,7 @@ func (e *Engine) checkSealing() {
 			Hex("block_id", result.BlockID[:]).
 			Logger()
 
-		err := e.sealResult(result)
+		err := e.sealResult(result, final)
 		if err == errUnknownBlock {
 			log.Debug().Msg("skipping sealable result with unknown sealed block")
 			continue
@@ -562,10 +569,10 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	return results, nil
 }
 
-func (e *Engine) sealResult(result *flow.ExecutionResult) error {
+func (e *Engine) sealResult(result *flow.ExecutionResult, final *flow.Header) error {
 
 	// check if we know the block the result pertains to
-	_, err := e.headersDB.ByBlockID(result.BlockID)
+	header, err := e.headersDB.ByBlockID(result.BlockID)
 	if errors.Is(err, storage.ErrNotFound) {
 		return errUnknownBlock
 	}
@@ -606,11 +613,12 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	}
 
 	// don't add the seal if it's already been included in a proposal
-	sealID := seal.ID()
-	_, err = e.sealsDB.ByID(sealID)
-	if err == nil {
-		return nil
-	}
+	// NOTE: a short term fix to see if it fixes the sealing halt problem
+	// sealID := seal.ID()
+	// _, err = e.sealsDB.ByID(sealID)
+	// if err == nil {
+	// 	return nil
+	// }
 
 	// we don't care whether the seal is already in the mempool
 	_ = e.seals.Add(seal)
