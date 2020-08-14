@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -43,6 +44,10 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	tops ...middleware.Topology) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
+
+	// mocks state snapshot
+	state := &protocol.State{}
+
 	metrics := metrics.NewNoopCollector()
 	// create an empty identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
 	// identities are set to appropriate IP Port after the network and middleware are started
@@ -62,7 +67,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
 		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, mws[i], csize, tops[i], metrics)
+		net, err := libp2p.NewNetwork(log, state, me, json.NewCodec(), mws[i], csize, tops[i], metrics)
 		if err != nil {
 			return nil, fmt.Errorf("could not create error %w", err)
 		}
@@ -101,9 +106,8 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 
 	// now that the network has started, address within the identity will have the actual port number
 	// update the network with the new id
-	for _, net := range nets {
-		net.SetIDs(identities)
-	}
+	stateSnapshot := &SnapshotMock{ids: identities}
+	state.On("Final").Return(stateSnapshot)
 
 	return nets, nil
 }
