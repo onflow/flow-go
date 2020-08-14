@@ -383,7 +383,6 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	err = exe2Node.IngestionEngine.Process(conID.NodeID, proposal3)
 	assert.NoError(t, err)
 
-
 	// ensure block 1, 2 and 3 have been executed
 	hub.Eventually(t, func() bool {
 		return receiptsReceived == 3
