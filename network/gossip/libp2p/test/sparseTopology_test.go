@@ -72,7 +72,7 @@ func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetwork() {
 	event := &message.Echo{
 		Text: "hello from node 0",
 	}
-	require.NoError(stt.Suite.T(), engs[0].con.Submit(event, stt.ids.NodeIDs()...))
+	require.NoError(stt.Suite.T(), engs[0].con.Transmit(event, stt.ids.NodeIDs()...))
 
 	// wait for message to be received by all recipients (excluding node 0)
 	stt.checkMessageReception(engs, 1, count)
@@ -120,7 +120,7 @@ func (stt *SparseTopologyTestSuite) TestDisjointedNetwork() {
 	event := &message.Echo{
 		Text: "hello from node 0",
 	}
-	require.NoError(stt.Suite.T(), engs[0].con.Submit(event, stt.ids.NodeIDs()...))
+	require.NoError(stt.Suite.T(), engs[0].con.Transmit(event, stt.ids.NodeIDs()...))
 
 	// wait for message to be received by nodes only in subset 1 (excluding node 0)
 	stt.checkMessageReception(engs, 1, subsets)
@@ -149,12 +149,13 @@ type IndexBoundTopology struct {
 }
 
 // Returns a subset of ids bounded by [minIndex, maxIndex) for the SparseTopology
-func (ibt IndexBoundTopology) Subset(idList flow.IdentityList, _ int, _ string) (map[flow.Identifier]flow.Identity, error) {
+func (ibt IndexBoundTopology) Subset(idList flow.IdentityList, _ int, _ string) (map[flow.Identifier]*flow.Identity,
+	error) {
 	subsetLen := ibt.maxIndex - ibt.minIndex
-	var result = make(map[flow.Identifier]flow.Identity, subsetLen)
+	var result = make(map[flow.Identifier]*flow.Identity, subsetLen)
 	sub := idList[ibt.minIndex:ibt.maxIndex]
 	for _, id := range sub {
-		result[id.ID()] = *id
+		result[id.ID()] = id
 	}
 	return result, nil
 }
