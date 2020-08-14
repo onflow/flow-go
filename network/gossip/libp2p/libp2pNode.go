@@ -318,7 +318,7 @@ func GetPeerInfos(addrs ...NodeAddress) ([]peer.AddrInfo, error) {
 	for i, addr := range addrs {
 		peerInfos[i], err = GetPeerInfo(addr)
 		if err != nil {
-			break
+			return []peer.AddrInfo{}, err
 		}
 	}
 	return peerInfos, err
