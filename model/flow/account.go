@@ -25,6 +25,7 @@ type Account struct {
 //
 // An account public key contains the public key, signing and hashing algorithms, and a key weight.
 type AccountPublicKey struct {
+	Index     int
 	PublicKey crypto.PublicKey
 	SignAlgo  crypto.SigningAlgorithm
 	HashAlgo  hash.HashingAlgorithm

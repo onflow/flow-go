@@ -278,6 +278,11 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	// for sake of metrics
 	e.metrics.OnVerifiableChunkReceived()
 
+	e.log.Info().
+		Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+		Hex("result_id", logging.ID(ch.Result.ID())).
+		Msg("verifiable chunk received")
+
 	// starts verification of chunk
 	err := e.verify(ctx, originID, ch)
 
@@ -286,7 +291,6 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 			Err(err).
 			Hex("chunk_id", logging.ID(ch.Chunk.ID())).
 			Msg("could not verify chunk")
-
 	}
 
 	// closes verification performance metrics trackers

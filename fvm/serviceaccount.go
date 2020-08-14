@@ -9,10 +9,11 @@ import (
 const systemChunkTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 transaction {
-  execute() {
- 	FlowServiceAccount.pulse()
+  execute {
+    // TODO: replace with call to service account heartbeat
+ 	log("pulse")
   }
-}
+} 
 `
 
 // SystemChunkTransaction creates and returns the transaction corresponding to the system chunk
