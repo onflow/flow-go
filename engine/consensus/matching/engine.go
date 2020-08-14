@@ -9,6 +9,7 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -434,8 +435,9 @@ func (e *Engine) checkSealing() {
 		sealedResultIDs = append(sealedResultIDs, result.ID())
 		sealedBlockIDs = append(sealedBlockIDs, result.BlockID)
 
-		log.Info().Msg("sealed execution result")
 	}
+
+	log.Info().Int("sealed", len(sealedResultIDs)).Msg("sealed execution results")
 
 	// clear the memory pools
 	e.clearPools(sealedResultIDs)
@@ -467,6 +469,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	threshold := verifiers.TotalStake() / 3 * 2
 
 	// check for stored execution results that don't have a corresponding seal
+	// last sealed block
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealed height: %w", err)
@@ -501,13 +504,21 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 			return nil, fmt.Errorf("could not get execution result (block_id=%x): %w", blockID, err)
 		}
 		results = append(results, result)
+
+		// at most add 200 results
+		if len(missingByBlockIDOrdered) > 200 {
+			break
+		}
 	}
 
 	// get all available approvals once
-	approvals := e.approvals.All()
+	// TODO: Temp
+	// approvals := e.approvals.All()
+	approvals := make([]*flow.ResultApproval, 0)
 
 	// go through all pending results and check which ones we have enough approvals for
-	for _, result := range e.results.All() {
+	// for _, result := range e.results.All() {
+	for _, result := range []*flow.ExecutionResult{} {
 
 		// get the node IDs for all approvers of this result
 		// TODO: check for duplicate approver
@@ -544,18 +555,14 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		Uint64("sealed", sealed.Height).
 		Uint("threshold", e.requestReceiptThreshold).
 		Int("missing", len(missingByBlockID)).
+		Int("missingCount", len(missingByBlockIDOrdered)).
 		Msg("check missing receipts")
 
 	// request missing execution results, if sealed height is low enough
 	if uint(final.Height-sealed.Height) >= e.requestReceiptThreshold {
-		numRequests := 0
 		for _, blockID := range missingByBlockIDOrdered {
 			if _, ok := missingByBlockID[blockID]; ok {
 				e.requester.EntityByID(blockID, filter.Any)
-				numRequests++
-			}
-			if numRequests > 200 {
-				break
 			}
 		}
 	}
