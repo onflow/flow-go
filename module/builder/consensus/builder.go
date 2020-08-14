@@ -216,7 +216,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// enter this loop, because last sealed height is higher than finalized
 	unchained := false
 	var seals []*flow.Seal
-	for height := sealed.Height + 1; height <= finalized; height++ {
+	sealCount := 0
+	for height := sealed.Height + 1; height <= finalized && sealCount < 100; height++ {
 		if len(byBlock) == 0 {
 			break
 		}
@@ -234,6 +235,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			return nil, fmt.Errorf("seal execution states do not connect in finalized")
 		}
 		seals = append(seals, next)
+		sealCount++
 		delete(byBlock, blockID)
 		last = next
 	}

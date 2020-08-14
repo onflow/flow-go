@@ -572,7 +572,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 func (e *Engine) sealResult(result *flow.ExecutionResult, final *flow.Header) error {
 
 	// check if we know the block the result pertains to
-	header, err := e.headersDB.ByBlockID(result.BlockID)
+	_, err := e.headersDB.ByBlockID(result.BlockID)
 	if errors.Is(err, storage.ErrNotFound) {
 		return errUnknownBlock
 	}
