@@ -484,6 +484,10 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	missingByBlockIDOrdered := make([]flow.Identifier, 0, int(final.Height-sealed.Height))
 
 	for height := sealed.Height; height < final.Height; height++ {
+		// at most add 200 results
+		if len(missingByBlockIDOrdered) > 200 {
+			break
+		}
 
 		// get the block header at this height
 		header, err := e.headersDB.ByHeight(height)
@@ -505,10 +509,6 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		}
 		results = append(results, result)
 
-		// at most add 200 results
-		if len(missingByBlockIDOrdered) > 200 {
-			break
-		}
 	}
 
 	// get all available approvals once
@@ -519,7 +519,6 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	// go through all pending results and check which ones we have enough approvals for
 	// for _, result := range e.results.All() {
 	for _, result := range []*flow.ExecutionResult{} {
-
 		// get the node IDs for all approvers of this result
 		// TODO: check for duplicate approver
 		var approverIDs []flow.Identifier
@@ -550,6 +549,12 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		results = append(results, result)
 	}
 
+	for _, result := range e.results.All() {
+		// ensure we mark this result as not missing if applicable
+		delete(missingByBlockID, result.BlockID)
+		results = append(results, result)
+	}
+
 	e.log.Info().
 		Uint64("final", final.Height).
 		Uint64("sealed", sealed.Height).
@@ -560,16 +565,22 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 	// request missing execution results, if sealed height is low enough
 	if uint(final.Height-sealed.Height) >= e.requestReceiptThreshold {
+		requestedCount := 0
 		for _, blockID := range missingByBlockIDOrdered {
 			if _, ok := missingByBlockID[blockID]; ok {
 				e.requester.EntityByID(blockID, filter.Any)
+				requestedCount++
 			}
 		}
+		e.log.Info().
+			Int("count", requestedCount).
+			Msg("requested missing results")
 	}
 
 	// don't overflow the seal mempool
 	space := e.seals.Limit() - e.seals.Size()
 	if len(results) > int(space) {
+		e.log.Info().Int("space", int(space)).Int("results", len(results)).Msg("cut and return the first x results")
 		return results[:space], nil
 	}
 
