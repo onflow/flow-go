@@ -243,19 +243,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("could not check result: %w", err)
 	}
 
-	// store the receipt in the memory pool
-	added := e.receipts.Add(receipt)
-	if !added {
-		log.Debug().Msg("skipping receipt already in mempool")
-		return nil
-	}
-
-	log.Info().Msg("execution receipt added to mempool")
-
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
-
 	// store the result belonging to the receipt in the memory pool
-	added = e.results.Add(result)
+	added := e.results.Add(result)
 	if !added {
 		log.Debug().Msg("skipping result already in mempool")
 		return nil
