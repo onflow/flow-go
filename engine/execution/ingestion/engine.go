@@ -1166,11 +1166,12 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 					return fmt.Errorf("cannot send collection requests: %w", err)
 				}
 
+				added := executionQueues.Add(syncedQueue)
+				if !added {
+					log.Fatal().Msgf("cannot add queue to execution queues")
+				}
+
 				if executableBlock.IsComplete() {
-					added := executionQueues.Add(syncedQueue)
-					if !added {
-						log.Fatal().Msgf("cannot add queue to execution queues")
-					}
 
 					log.Debug().Msg("block complete - executing")
 
