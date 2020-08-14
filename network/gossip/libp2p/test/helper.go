@@ -62,6 +62,10 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		}
 	}
 
+	// mocks state snapshot
+	stateSnapshot := &SnapshotMock{ids: identities}
+	state.On("Final").Return(stateSnapshot)
+
 	for i := 0; i < count; i++ {
 		// creates and mocks me
 		me := &mock.Local{}
@@ -106,8 +110,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 
 	// now that the network has started, address within the identity will have the actual port number
 	// update the network with the new id
-	stateSnapshot := &SnapshotMock{ids: identities}
-	state.On("Final").Return(stateSnapshot)
+	stateSnapshot.ids = identities
 
 	return nets, nil
 }
@@ -140,7 +143,7 @@ type SnapshotMock struct {
 	ids flow.IdentityList
 }
 
-func (s *SnapshotMock) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
+func (s *SnapshotMock) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return s.ids, nil
 }
 
@@ -152,12 +155,20 @@ func (s *SnapshotMock) Clusters() (*flow.ClusterList, error) {
 	return nil, fmt.Errorf(" not implemented")
 }
 
+func (s *SnapshotMock) Commit() ([]byte, error) {
+	return nil, fmt.Errorf(" not implemented")
+}
+
 func (s *SnapshotMock) Head() (*flow.Header, error) {
 	return nil, fmt.Errorf(" not implemented")
 }
 
-func (s *SnapshotMock) Seal() (flow.Seal, error) {
-	return flow.Seal{}, fmt.Errorf(" not implemented")
+func (s *SnapshotMock) Seed(indices ...uint32) ([]byte, error) {
+	return []byte{}, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Pending() ([]flow.Identifier, error) {
+	return []flow.Identifier{}, fmt.Errorf(" not implemented")
 }
 
 // GenerateNetworkingKey generates a Flow ECDSA key using the given seed
