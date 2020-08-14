@@ -66,22 +66,28 @@ func (r *RcvQueueTestSuite) TestPriorityScore() {
 	score := r.q.Priority(payload)
 
 	assert.NoError(r.Suite.T(), payloadErr)
-	assert.Equal(r.Suite.T(), score, 3)
+	// All of our mocked messages should have a priority score of 3
+	assert.Equal(r.Suite.T(), 3, score)
 }
 
 // TestSizeScore sends a message size to calculate a size score by message size
 func (r *RcvQueueTestSuite) TestSizeScore() {
-	assert.Equal(r.Suite.T(), r.q.Size(34567), 3)
+	msg := createMessage(0)
+
+	// All of our mocked messages should have a size score of 10
+	assert.Equal(r.Suite.T(), 10, r.q.Size(float64(msg.Size())))
 }
 
 // TestScore submits a message to calculate a total score
 func (r *RcvQueueTestSuite) TestScore() {
 	msg := createMessage(0)
+
 	payload, payloadErr := r.q.codec.Decode(msg.Payload)
 	score := r.q.Score(msg.Size(), payload)
 
 	assert.NoError(r.Suite.T(), payloadErr)
-	assert.Equal(r.Suite.T(), score, 6)
+	// All of our mocked messages should have a score of 6
+	assert.Equal(r.Suite.T(), 6, score)
 }
 
 // TestSingleMessageAdd adds a single message to the queue and verifies its existence
@@ -103,11 +109,16 @@ func (r *RcvQueueTestSuite) TestSingleMessageAdd() {
 
 	added := r.q.Add(senderID, msg)
 
+	// We should receive a true for added, since we have never seen that message before.
 	assert.True(r.Suite.T(), added)
-	assert.Equal(r.Suite.T(), r.q.cache.Len(), 1)
+	// Cache should have one entry in it, since we're adding one message.
+	assert.Equal(r.Suite.T(), 1, r.q.cache.Len())
+	// Sleep to allow the message to be processed.
 	time.Sleep(time.Second)
-	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
-	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
+	// Queue should now be empty.
+	assert.Equal(r.Suite.T(), 0, r.q.queue.Len())
+	// Priority stack should be empty as well on our priority level.
+	assert.Equal(r.Suite.T(), 0, r.q.stacks[5].Len())
 }
 
 // TestDuplicateSyncMessageAdd adds a single message twice to the queue and verifies its rejection in a synchronous manner
@@ -130,6 +141,7 @@ func (r *RcvQueueTestSuite) TestDuplicateSyncMessageAdd() {
 	r.q.Add(senderID, msg)
 	added := r.q.Add(senderID, msg)
 
+	// We should receive a rejection since it is a duplicate message.
 	assert.False(r.Suite.T(), added)
 	time.Sleep(time.Second)
 }
@@ -155,9 +167,12 @@ func (r *RcvQueueTestSuite) TestDuplicateAsyncMessageAdd() {
 	go r.q.Add(senderID, msg)
 
 	time.Sleep(time.Second)
-	assert.Equal(r.Suite.T(), r.q.cache.Len(), 1)
-	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
-	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
+	// Cache should have one entry in it, since we're adding the same message twice.
+	assert.Equal(r.Suite.T(), 1, r.q.cache.Len())
+	// Queue should now be empty.
+	assert.Equal(r.Suite.T(), 0, r.q.queue.Len())
+	// Priority stack should be empty as well on our priority level.
+	assert.Equal(r.Suite.T(), 0, r.q.stacks[5].Len())
 }
 
 // TestOneHundredMessagesAdd tries to add 100 messages to the queue and confirms results.
@@ -185,9 +200,12 @@ func (r *RcvQueueTestSuite) TestOneHundredMessagesAdd() {
 	}
 
 	time.Sleep(time.Second * 2)
-	assert.Equal(r.Suite.T(), r.q.cache.Len(), 100)
-	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
-	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
+	// Cache should have 100 entries in it, since we're adding 100 messages.
+	assert.Equal(r.Suite.T(), 100, r.q.cache.Len())
+	// Queue should now be empty.
+	assert.Equal(r.Suite.T(), 0, r.q.queue.Len())
+	// Priority stack should be empty as well on our priority level.
+	assert.Equal(r.Suite.T(), 0, r.q.stacks[5].Len())
 }
 
 // TestOneHundredMessagesWithPauseAdd tries to add 100 messages split into two groups, with a pause, to the queue and confirms results.
@@ -221,7 +239,10 @@ func (r *RcvQueueTestSuite) TestOneHundredMessagesWithPauseAdd() {
 	}
 
 	time.Sleep(time.Second * 2)
-	assert.Equal(r.Suite.T(), r.q.cache.Len(), 100)
-	assert.Equal(r.Suite.T(), r.q.queue.Len(), 0)
-	assert.Equal(r.Suite.T(), r.q.stacks[5].Len(), 0)
+	// Cache should have 100 entries in it, since we're adding 100 messages.
+	assert.Equal(r.Suite.T(), 100, r.q.cache.Len())
+	// Queue should now be empty.
+	assert.Equal(r.Suite.T(), 0, r.q.queue.Len())
+	// Priority stack should be empty as well on our priority level.
+	assert.Equal(r.Suite.T(), 0, r.q.stacks[5].Len())
 }
