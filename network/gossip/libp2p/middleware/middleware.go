@@ -15,8 +15,8 @@ import (
 type Middleware interface {
 	Start(overlay Overlay) error
 	Stop()
-	Send(msg *message.Message, recipientIDs ...flow.Identifier) error
-	Publish(msg *message.Message) error
+	Send(msg *message.Message, recipientID flow.Identifier) error
+	Publish(channelID uint8, msg *message.Message) error
 	Subscribe(channelID uint8) error
 	Ping(targetID flow.Identifier) (time.Duration, error)
 }

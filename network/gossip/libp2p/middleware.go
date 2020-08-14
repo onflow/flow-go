@@ -27,14 +27,6 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 )
 
-type communicationMode int
-
-const (
-	NoOp communicationMode = iota
-	OneToOne
-	OneToK
-)
-
 const DefaultMaxPubSubMsgSize = 1 << 21 //2mb
 
 // the inbound message queue size for One to One and One to K messages (each)
@@ -188,20 +180,18 @@ func (m *Middleware) Stop() {
 
 // Send will try to send the given message to the given peer utilizing a 1-1 direct connection
 func (m *Middleware) Send(msg *message.Message, recipientID flow.Identifier) error {
-
-	// get an identity to connect to. The identity provides the destination TCP address.
-	identity, err := m.ov.Identity(recipientID)
+	targetAddress, err := m.nodeAddressFromID(recipientID)
 	if err != nil {
-		return fmt.Errorf("could not get identity: %w", err)
+		return err
 	}
 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the the receiver
-	stream, err := m.connect(identity.NodeID.String(), identity.Address, identity.NetworkPubKey)
+	stream, err := m.libP2PNode.CreateStream(m.ctx, targetAddress)
 	if err != nil {
-		return fmt.Errorf("could not create new stream for %s: %w", recipientID.String(), err)
+		return fmt.Errorf("failed to create stream for %s :%w", targetAddress.Name, err)
 	}
 
 	// create a gogo protobuf writer
@@ -241,14 +231,8 @@ func (m *Middleware) Send(msg *message.Message, recipientID flow.Identifier) err
 func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) {
 
 	// get the node identity map from the overlay
-	idsMap, err := m.ov.Identity()
+	flowIdentity, err := m.ov.Identity(id)
 	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not get identities: %w", err)
-	}
-
-	// retrieve the flow.Identity for the give flow.ID
-	flowIdentity, found := idsMap[id]
-	if !found {
 		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
 	}
 
