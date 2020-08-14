@@ -71,8 +71,8 @@ func (p *P2PNode) Start(ctx context.Context,
 	key lcrypto.PrivKey,
 	handler network.StreamHandler,
 	rootBlockID string,
-	whiteList bool,
-	whitelistAddrs []NodeAddress,
+	allowList bool,
+	allowListAddrs []NodeAddress,
 	psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
@@ -109,17 +109,17 @@ func (p *P2PNode) Start(ctx context.Context,
 		libp2p.Ping(true),                   // enable ping
 	)
 
-	// if whitelisting is enabled, create a connection gator with whitelistAddrs
-	if whiteList {
+	// if allowlisting is enabled, create a connection gator with allowListAddrs
+	if allowList {
 
-		// convert each of the whitelist address to libp2p peer infos
-		whilelistPInfos, err := GetPeerInfos(whitelistAddrs...)
+		// convert each of the allowList address to libp2p peer infos
+		allowListPInfos, err := GetPeerInfos(allowListAddrs...)
 		if err != nil {
 			return fmt.Errorf("failed to create approved list of peers: %w", err)
 		}
 
 		// create a connection gater
-		p.connGater = newConnGater(whilelistPInfos, p.logger)
+		p.connGater = newConnGater(allowListPInfos, p.logger)
 
 		// provide the connection gater as an option to libp2p
 		options = append(options, libp2p.ConnectionGater(p.connGater))
@@ -275,7 +275,7 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		// add node address as a peer
 		err = p.AddPeers(ctx, n)
 		if err != nil {
-			// if the connection was rejected due to whitelisting, skip the re-attempt
+			// if the connection was rejected due to allowlisting, skip the re-attempt
 			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
 				return s, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
 			}
@@ -488,9 +488,9 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-// UpdateWhitelist allows the peer whitelist to be updated
-func (p *P2PNode) UpdateWhitelist(whitelistAddrs ...NodeAddress) error {
-	whilelistPInfos, err := GetPeerInfos(whitelistAddrs...)
+// UpdateAllowlist allows the peer allowlist to be updated
+func (p *P2PNode) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
+	whilelistPInfos, err := GetPeerInfos(allowListAddrs...)
 	if err != nil {
 		return fmt.Errorf("failed to create approved list of peers: %w", err)
 	}

@@ -12,9 +12,9 @@ import (
 var _ connmgr.ConnectionGater = (*connGater)(nil)
 
 // connGater is the implementatiion of the libp2p connmgr.ConnectionGater interface
-// It provides node whitelisting by libp2p peer.ID which is derived from the node public networking key
+// It provides node allowlisting by libp2p peer.ID which is derived from the node public networking key
 type connGater struct {
-	peerIDWhitelist map[peer.ID]struct{} // the in-memory map of approved peer IDs
+	peerIDAllowlist map[peer.ID]struct{} // the in-memory map of approved peer IDs
 	log             zerolog.Logger
 }
 
@@ -38,7 +38,7 @@ func (c *connGater) update(peerInfos []peer.AddrInfo) {
 	}
 
 	// cache the new map
-	c.peerIDWhitelist = peerIDs
+	c.peerIDAllowlist = peerIDs
 
 	c.log.Info().Msg("approved list of peers updated")
 }
@@ -48,12 +48,12 @@ func (c *connGater) InterceptPeerDial(p peer.ID) bool {
 	return c.validPeerID(p)
 }
 
-// InterceptAddrDial is not used. Currently, whitelisting is only implemented by Peer IDs and not multi-addresses
+// InterceptAddrDial is not used. Currently, allowlisting is only implemented by Peer IDs and not multi-addresses
 func (c *connGater) InterceptAddrDial(_ peer.ID, ma multiaddr.Multiaddr) bool {
 	return true
 }
 
-// InterceptAccept is not used. Currently, whitelisting is only implemented by Peer IDs and not multi-addresses
+// InterceptAccept is not used. Currently, allowlisting is only implemented by Peer IDs and not multi-addresses
 func (c *connGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 	return true
 }
@@ -85,6 +85,6 @@ func (c *connGater) InterceptUpgraded(network.Conn) (allow bool, reason control.
 }
 
 func (c *connGater) validPeerID(p peer.ID) bool {
-	_, ok := c.peerIDWhitelist[p]
+	_, ok := c.peerIDAllowlist[p]
 	return ok
 }

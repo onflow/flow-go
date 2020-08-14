@@ -92,8 +92,8 @@ func (_m *Middleware) Subscribe(channelID uint8) error {
 	return r0
 }
 
-// UpdateWhitelist provides a mock function with given fields:
-func (_m *Middleware) UpdateWhitelist() error {
+// UpdateAllowlist provides a mock function with given fields:
+func (_m *Middleware) UpdateAllowList() error {
 	ret := _m.Called()
 
 	var r0 error

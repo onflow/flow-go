@@ -141,7 +141,7 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		idMap[flowID.NodeID] = flowID
 
 		// update whitelist so that nodes can talk to each other
-		err = m.mws[i].UpdateWhitelist()
+		err = m.mws[i].UpdateAllowList()
 		require.NoError(m.Suite.T(), err)
 	}
 }

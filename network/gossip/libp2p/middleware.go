@@ -512,7 +512,7 @@ func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
 	return m.libP2PNode.Ping(m.ctx, nodeAddress)
 }
 
-func (m *Middleware) UpdateWhitelist() error {
+func (m *Middleware) UpdateAllowList() error {
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
 	if err != nil {
@@ -520,12 +520,12 @@ func (m *Middleware) UpdateWhitelist() error {
 	}
 
 	// derive all node addresses from flow identities
-	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
+	nodeAddrsAllowList, err := nodeAddresses(idsMap)
 	if err != nil {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
 	}
 
-	err = m.libP2PNode.UpdateWhitelist(nodeAddrsWhiteList...)
+	err = m.libP2PNode.UpdateAllowlist(nodeAddrsAllowList...)
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
 	}

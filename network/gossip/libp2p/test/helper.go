@@ -113,7 +113,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	// update whitelist of each of the middleware after the network ids have been updated
 	if !dryrun {
 		for _, m := range mws {
-			err := m.UpdateWhitelist()
+			err := m.UpdateAllowList()
 			if err != nil {
 				return nil, err
 			}

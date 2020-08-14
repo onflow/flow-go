@@ -364,7 +364,7 @@ func (l *LibP2PNodeTestSuite) TestPing() {
 	require.NoError(l.T(), err)
 }
 
-// TestConnectionGating tests node whitelisting by peer.ID
+// TestConnectionGating tests node allow listing by peer.ID
 func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 	defer l.cancel()
 
@@ -384,18 +384,18 @@ func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 		require.True(l.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection))
 	}
 
-	l.Run("outbound connection to a non-whitelisted node is rejected", func() {
-		// node1 and node2 both have no whitelisted peers
+	l.Run("outbound connection to a not-allowed node is rejected", func() {
+		// node1 and node2 both have no allowListed peers
 		_, err := node1.CreateStream(l.ctx, node2Addr)
 		requireError(err)
 		_, err = node2.CreateStream(l.ctx, node1Addr)
 		requireError(err)
 	})
 
-	l.Run("inbound connection from a non-whitelisted node is rejected", func() {
+	l.Run("inbound connection from an allowed node is rejected", func() {
 
-		// node1 whitelists node2 but node2 does not whitelist node1
-		err := node1.UpdateWhitelist([]NodeAddress{node2Addr}...)
+		// node1 allowlists node2 but node2 does not allowlists node1
+		err := node1.UpdateAllowlist([]NodeAddress{node2Addr}...)
 		require.NoError(l.T(), err)
 
 		// node1 attempts to connect to node2
@@ -406,11 +406,11 @@ func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 
 	l.Run("outbound connection to an approved node is allowed", func() {
 
-		// node1 whitelists node2
-		err := node1.UpdateWhitelist([]NodeAddress{node2Addr}...)
+		// node1 allowlists node2
+		err := node1.UpdateAllowlist([]NodeAddress{node2Addr}...)
 		require.NoError(l.T(), err)
-		// node2 whitelists node1
-		err = node2.UpdateWhitelist([]NodeAddress{node1Addr}...)
+		// node2 allowlists node1
+		err = node2.UpdateAllowlist([]NodeAddress{node1Addr}...)
 		require.NoError(l.T(), err)
 
 		// node1 should be allowed to connect to node2
@@ -425,7 +425,7 @@ func (l *LibP2PNodeTestSuite) TestConnectionGating() {
 // CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandler, whiteList bool) ([]*P2PNode, []NodeAddress) {
+func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandler, allowList bool) ([]*P2PNode, []NodeAddress) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*P2PNode
@@ -446,7 +446,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandl
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler, whiteList)
+		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler, allowList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
@@ -454,7 +454,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandl
 }
 
 func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
-	handler network.StreamHandler, whiteList bool) (*P2PNode, NodeAddress) {
+	handler network.StreamHandler, allowList bool) (*P2PNode, NodeAddress) {
 	n := &P2PNode{}
 	nodeID := NodeAddress{
 		Name:   name,
@@ -472,7 +472,7 @@ func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip str
 		handlerFunc = func(network.Stream) {}
 	}
 
-	err := n.Start(l.ctx, nodeID, l.logger, key, handlerFunc, rootID, whiteList, nil)
+	err := n.Start(l.ctx, nodeID, l.logger, key, handlerFunc, rootID, allowList, nil)
 	require.NoError(l.T(), err)
 	require.Eventuallyf(l.T(), func() bool {
 		ip, p, err := n.GetIPPort()
