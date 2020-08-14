@@ -231,7 +231,8 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	consensusEngine.AssertExpectations(t)
 }
 
-// TODO merge this test with TestSyncFlow in engine/execution/sync_test.go
+// Tests synchronisation and make sure it picks up blocks
+// processing after syncing range (block3)
 func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
@@ -280,6 +281,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	tx2 := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err = execTestutil.SignTransactionAsServiceAccount(tx2, seq, chain)
 	require.NoError(t, err)
+	seq++
 
 	col2 := &flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
 	block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -293,6 +295,23 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	proposal2 := unittest.ProposalFromBlock(&block2)
 	blob2, _ := msgpack.Marshal(col2)
+
+	tx3 := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = execTestutil.SignTransactionAsServiceAccount(tx3, seq, chain)
+	require.NoError(t, err)
+
+	col3 := &flow.Collection{Transactions: []*flow.TransactionBody{tx3}}
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.Header.View = 3
+	block3.Header.ProposerID = conID.ID()
+	block3.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{CollectionID: col3.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
+		},
+	})
+
+	blob3, _ := msgpack.Marshal(col3)
+	proposal3 := unittest.ProposalFromBlock(&block3)
 
 	// setup mocks and assertions
 	collectionEngine := new(network.Engine)
@@ -309,12 +328,16 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 				res := &messages.EntityResponse{Blobs: [][]byte{blob2}, EntityIDs: req.EntityIDs[:1]}
 				err := colConduit.Submit(res, originID)
 				assert.NoError(t, err)
+			} else if req.EntityIDs[0] == col3.ID() {
+				res := &messages.EntityResponse{Blobs: [][]byte{blob3}, EntityIDs: req.EntityIDs[:1]}
+				err := colConduit.Submit(res, originID)
+				assert.NoError(t, err)
 			} else {
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
 			}
 		}).
 		Return(nil).
-		Twice()
+		Times(3)
 
 	receiptsReceived := 0
 
@@ -354,17 +377,20 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	defer exe2Node.Done()
 	exe2Node.AssertHighestExecutedBlock(t, genesis)
 
-	// submit block2 from consensus node to execution node 2 (who does not have block1), but not to execution node 1
-	exe2Node.IngestionEngine.Submit(conID.NodeID, proposal2)
+	// submit block2 and block 3 from consensus node to execution node 2 (who does not have block1), but not to execution node 1
+	err = exe2Node.IngestionEngine.Process(conID.NodeID, proposal2)
+	assert.NoError(t, err)
+	err = exe2Node.IngestionEngine.Process(conID.NodeID, proposal3)
+	assert.NoError(t, err)
 
-	// ensure block 1 and 2 have been executed
+	// ensure block 1, 2 and 3 have been executed
 	hub.Eventually(t, func() bool {
-		return receiptsReceived == 2
+		return receiptsReceived == 3
 	})
 
 	// ensure state has been synced across both nodes
 	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
-	exe2Node.AssertHighestExecutedBlock(t, block2.Header)
+	exe2Node.AssertHighestExecutedBlock(t, block3.Header)
 
 	scExe2Block1, err := exe2Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block1.ID())
 	assert.NoError(t, err)
