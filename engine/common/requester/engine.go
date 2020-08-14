@@ -329,7 +329,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
-	err = e.con.Submit(req, providerID)
+	err = e.con.Transmit(req, providerID)
 	if err != nil {
 		return true, fmt.Errorf("could not send request: %w", err)
 	}
