@@ -215,5 +215,8 @@ func (es *EpochSnapshot) BlockSnapshot() *BlockSnapshot {
 		return &BlockSnapshot{err: fmt.Errorf("could not look up block height: %w", err)}
 	}
 
-	return &BlockSnapshot{blockID: blockID}
+	return &BlockSnapshot{
+		blockID: blockID,
+		state:   es.state,
+	}
 }

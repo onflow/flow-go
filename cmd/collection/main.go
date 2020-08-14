@@ -457,7 +457,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 	}
 	selector := filter.And(filter.In(cluster), filter.HasStake(true))
 
-	translator := clusterkv.NewTranslator(colPayloads)
+	translator := clusterkv.NewTranslator(colPayloads, node.State)
 
 	selection, err := leader.NewSelectionForCollection(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State, clusterGenesisHeader, clusterState, clusterIndex)
 	if err != nil {
