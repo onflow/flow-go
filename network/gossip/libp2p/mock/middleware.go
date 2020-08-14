@@ -17,13 +17,34 @@ type Middleware struct {
 	mock.Mock
 }
 
-// Publish provides a mock function with given fields: msg
-func (_m *Middleware) Publish(msg *message.Message) error {
-	ret := _m.Called(msg)
+// Ping provides a mock function with given fields: targetID
+func (_m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
+	ret := _m.Called(targetID)
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func(flow.Identifier) time.Duration); ok {
+		r0 = rf(targetID)
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(targetID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Publish provides a mock function with given fields: channelID, msg
+func (_m *Middleware) Publish(channelID uint8, msg *message.Message) error {
+	ret := _m.Called(channelID, msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message) error); ok {
-		r0 = rf(msg)
+	if rf, ok := ret.Get(0).(func(uint8, *message.Message) error); ok {
+		r0 = rf(channelID, msg)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -31,20 +52,13 @@ func (_m *Middleware) Publish(msg *message.Message) error {
 	return r0
 }
 
-// Send provides a mock function with given fields: msg, recipientIDs
-func (_m *Middleware) Send(msg *message.Message, recipientIDs ...flow.Identifier) error {
-	_va := make([]interface{}, len(recipientIDs))
-	for _i := range recipientIDs {
-		_va[_i] = recipientIDs[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, msg)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+// Send provides a mock function with given fields: msg, recipientID
+func (_m *Middleware) Send(msg *message.Message, recipientID flow.Identifier) error {
+	ret := _m.Called(msg, recipientID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message, ...flow.Identifier) error); ok {
-		r0 = rf(msg, recipientIDs...)
+	if rf, ok := ret.Get(0).(func(*message.Message, flow.Identifier) error); ok {
+		r0 = rf(msg, recipientID)
 	} else {
 		r0 = ret.Error(0)
 	}

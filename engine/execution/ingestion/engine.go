@@ -5,9 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -703,7 +701,7 @@ func (e *Engine) saveExecutionResults(
 	chunks := make([]*flow.Chunk, len(stateInteractions))
 
 	// TODO: check current state root == startState
-	var endState flow.StateCommitment = startState
+	var endState = startState
 
 	for i, view := range stateInteractions {
 		// TODO: deltas should be applied to a particular state

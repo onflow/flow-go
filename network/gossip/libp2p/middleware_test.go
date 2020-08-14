@@ -27,10 +27,10 @@ var rootID = unittest.BlockFixture().ID().String()
 
 type MiddlewareTestSuit struct {
 	suite.Suite
-	size    int           // used to determine number of middlewares under test
-	mws     []*Middleware // used to keep track of middlewares under test
-	ov      []*mock.Overlay
-	ids     []flow.Identifier
+	size    int                    // used to determine number of middlewares under test
+	mws     []*Middleware          // used to keep track of middlewares under test
+	ov      []*mock.Overlay        // used to keep track of overlay instances of nodes
+	ids     []flow.Identifier      // used to keep track of identifiers of nodes
 	metrics *metrics.NoopCollector // no-op performance monitoring simulation
 }
 
@@ -109,7 +109,6 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 	for i := 0; i < m.size; i++ {
 		idMap := make(map[flow.Identifier]flow.Identity)
 		// mocks Overlay.Identity with an empty map for now (till we start middleware)
-		m.ov[i].On("Identity").Maybe().Return(idMap, nil)
 		m.ov[i].On("Topology").Maybe().Return(idMap, nil)
 
 		// start the middleware
@@ -139,6 +138,13 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		idMap := idMaps[i]
 		idMap[flowID.NodeID] = flowID
 	}
+
+	// mocks Identity function of overlay for each node
+	for i := 0; i < m.size; i++ {
+		for identifier, identity := range idMaps[i] {
+			m.ov[i].On("Identity", identifier).Maybe().Return(&identity, nil)
+		}
+	}
 }
 
 // Ping sends a message from the first middleware of the test suit to the last one
@@ -159,7 +165,7 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 
 	msg := createMessage(m.ids[firstNode], m.ids[lastNode])
 
-	err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
+	err = m.mws[firstNode].Send(msg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	select {
@@ -191,7 +197,7 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 				wg.Done()
 			})
 		go func() {
-			err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
+			err = m.mws[firstNode].Send(msg, m.ids[lastNode])
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
@@ -226,7 +232,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			err = m.mws[lastNode].Send(0, replyMsg, m.mws[firstNode].me)
+			err = m.mws[lastNode].Send(replyMsg, m.mws[firstNode].me)
 			assert.NoError(m.T(), err)
 
 		})
@@ -237,7 +243,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 			wg.Done()
 		})
 
-	err = m.mws[firstNode].Send(0, sendMsg, m.ids[lastNode])
+	err = m.mws[firstNode].Send(sendMsg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	wg.Wait()
@@ -269,7 +275,13 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		key := m.generateNetworkingKey(target[:])
 
 		// creates new middleware (with an arbitrary genesis block id)
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize,
+		mw, err := NewMiddleware(logger,
+			codec,
+			"0.0.0.0:0",
+			targetID,
+			key,
+			m.metrics,
+			DefaultMaxPubSubMsgSize,
 			rootID)
 		require.NoError(m.Suite.T(), err)
 

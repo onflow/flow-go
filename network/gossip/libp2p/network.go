@@ -346,7 +346,7 @@ func (n *Network) publish(channelID uint8, message interface{}, selector flow.Id
 	for _, recipient := range recipients {
 		targetIDs = append(targetIDs, recipient.NodeID[:])
 	}
-	err = n.mw.Publish(msg)
+	err = n.mw.Publish(channelID, msg)
 	if err != nil {
 		return fmt.Errorf("could not publish event")
 	}
