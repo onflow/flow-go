@@ -80,10 +80,10 @@ func main() {
 	cmd.FlowNode(flow.RoleConsensus.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 10000, "maximum number of guarantees in the memory pool")
-			flags.UintVar(&resultLimit, "result-limit", 1000, "maximum number of execution results in the memory pool")
-			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&resultLimit, "result-limit", 100000, "maximum number of execution results in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
-			flags.UintVar(&sealLimit, "seal-limit", 1000, "maximum number of block seals in the memory pool")
+			flags.UintVar(&sealLimit, "seal-limit", 100000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
@@ -154,6 +154,7 @@ func main() {
 				engine.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
+				// requester.WithBatchThreshold(100),
 			)
 			if err != nil {
 				return nil, err

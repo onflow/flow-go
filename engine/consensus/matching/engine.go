@@ -455,6 +455,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 	// keep track of any missing execution results for finalized blocks
 	missingByBlockID := make(map[flow.Identifier]struct{})
+	missingByBlockIDOrdered := make([]flow.Identifier, 0, int(final.Height-sealed.Height))
 
 	for height := sealed.Height; height < final.Height; height++ {
 
@@ -470,6 +471,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		result, err := e.resultsDB.ByBlockID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			missingByBlockID[blockID] = struct{}{}
+			missingByBlockIDOrdered = append(missingByBlockIDOrdered, blockID)
 			continue
 		}
 		if err != nil {
@@ -523,8 +525,15 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 	// request missing execution results, if sealed height is low enough
 	if uint(final.Height-sealed.Height) >= e.requestReceiptThreshold {
-		for blockID := range missingByBlockID {
-			e.requester.EntityByID(blockID, filter.Any)
+		numRequests := 0
+		for _, blockID := range missingByBlockIDOrdered {
+			if _, ok := missingByBlockID[blockID]; ok {
+				e.requester.EntityByID(blockID, filter.Any)
+				numRequests++
+			}
+			if numRequests > 200 {
+				break
+			}
 		}
 	}
 
