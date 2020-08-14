@@ -99,7 +99,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		event := &message.Echo{
 			Text: fmt.Sprintf("hello from node %v", i),
 		}
-		require.NoError(m.Suite.T(), engs[i].con.Submit(event, m.ids.NodeIDs()...))
+		require.NoError(m.Suite.T(), engs[i].con.Transmit(event, m.ids.NodeIDs()...))
 		wg.Add(count - 1)
 	}
 
@@ -178,7 +178,7 @@ func (m *MeshNetTestSuite) TestTargetValidator() {
 	event := &message.Echo{
 		Text: "hello from node 0",
 	}
-	require.NoError(m.Suite.T(), engs[0].con.Submit(event, targets...))
+	require.NoError(m.Suite.T(), engs[0].con.Transmit(event, targets...))
 
 	// fires a goroutine for all engines to listens for the incoming message
 	for i := 1; i < len(allIds)/2; i++ {
@@ -257,7 +257,7 @@ func (m *MeshNetTestSuite) TestMaxMessageSize() {
 	require.InDelta(m.Suite.T(), len(encodedEvent), libp2p.DefaultMaxPubSubMsgSize, float64(overhead))
 
 	// submit the message
-	require.NoError(m.Suite.T(), engs[0].con.Submit(event, targets...))
+	require.NoError(m.Suite.T(), engs[0].con.Transmit(event, targets...))
 
 	// fires a goroutine for all engines to listens for the incoming message
 	for i := 1; i < len(allIds); i++ {
