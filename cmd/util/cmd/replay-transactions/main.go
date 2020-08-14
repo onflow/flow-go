@@ -2,7 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"reflect"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -129,12 +134,14 @@ func main() {
 	last := 1_065_711
 	//last := 49_999
 
+	megaMapping := make(map[string]delta.Mapping, 0)
+
 	for i := 0; i <= last; i += step {
 		end := i + step - 1
 		if end > last {
 			end = last
 		}
-		loader.ProcessBlocks(uint64(i), uint64(end))
+		megaMapping = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
 	}
 
 }
@@ -368,7 +375,7 @@ func (l *Loader) findUpdates(blocks map[uint64][]*ComputedBlock) map[string]*tri
 	return hashes
 }
 
-func (l *Loader) ProcessBlocks(start uint64, end uint64) {
+func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]delta.Mapping) map[string]delta.Mapping {
 
 	var blockData map[uint64][]*ComputedBlock
 
@@ -380,6 +387,29 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 	rangeStop := end
 
 	totalTx := 0
+
+	var megaMapping map[string]delta.Mapping
+
+	filename := fmt.Sprintf("data/megamapping_%d_%d.json", rangeStart, rangeStop)
+
+	if _, err := os.Stat(filename); !os.IsNotExist(err) {
+		bytes, err := ioutil.ReadFile(filename)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot read files")
+		}
+		err = json.Unmarshal(bytes, &megaMapping)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot unmarshall megamapping")
+		}
+		log.Info().Msgf("Loaded megamapping %d %d from file (%d entries)", rangeStart, rangeStop, len(megaMapping))
+		return megaMapping
+	}
+
+	if rangeStart == 0 {
+		megaMapping = l.BootstrapMegamapping()
+	} else {
+		megaMapping = prevMapping
+	}
 
 	// abuse findHeader to get all the blocks
 	_, err := l.headers.FindHeaders(func(header *flow.Header) bool {
@@ -440,32 +470,6 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 	//	//
 	//	//os.Exit(1)ce{}, 0, bufferSize+1)
 
-	megaMapping := make(map[string]delta.Mapping, 100)
-
-	bootstrapper := bootstrap.NewBootstrapper(log.Logger)
-
-	bootstrapView := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		return nil, nil
-	})
-
-	privateKey, err := testutil.GenerateAccountPrivateKey()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot generate pk")
-	}
-
-	fix64, err := cadence.NewUFix64("1234.0")
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot create ufix64")
-	}
-
-	err = bootstrapper.BoostrapView(bootstrapView, privateKey.PublicKey(1000), fix64, flow.Mainnet.Chain())
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot bootstrap")
-	}
-
-	for k, v := range bootstrapView.Delta().WriteMappings {
-		megaMapping[k] = v
-	}
 
 	for i := start; i <= end; i++ {
 
@@ -486,53 +490,13 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 
 		for _, computedBlock := range blocks {
 
-			//blocksBuffer = append(blocksBuffer, computedBlock)
-			//if len(blocksBuffer) >= bufferSize {
-			//	_, err := collection.InsertMany(l.ctx, blocksBuffer)
-			//	if err != nil {
-			//		spew.Dump(blocksBuffer)
-			//		log.Fatal().Err(err).Msg("failed to insert many to mongo")
-			//	}
-			//
-			//	blocksBuffer = make([]interface{}, 0, bufferSize+1)
-			//}
-
-			//for colIndex, guarantee := range computedBlock.Block.Payload.Guarantees {
-			//	collection := computedBlock.CompleteCollections[guarantee.CollectionID]
-			//	for _, tx := range collection.Transactions {
-			//
-			//		txBytes, err := json.Marshal(tx)
-			//		if err != nil {
-			//			log.Fatal().Msgf("cannot marshall tx")
-			//		}
-			//
-			//		o := Output{
-			//			BlockID:              computedBlock.Block.ID().String(),
-			//			BlockHeight:          computedBlock.Block.Header.Height,
-			//			PrevBlockId:          computedBlock.Block.Header.ParentID.String(),
-			//			CollectionIndex:      colIndex,
-			//			CollectionID:         collection.Guarantee.CollectionID.String(),
-			//			TxHash:               tx.ID().String(),
-			//			StartStateCommitment: fmt.Sprintf("%x", computedBlock.StartState),
-			//			Transaction:          string(txBytes),
-			//		}
-			//
-			//		var _ = o
-			//
-			//		//outputs = append(outputs, o)
-			//	}
-			//}
-			//continue
-
 			blockMapping := l.executeBlock(computedBlock, updates)
 
 			for k, v := range blockMapping {
 				megaMapping[k] = v
 			}
 		}
-
 	}
-
 
 	for _, computedBlock := range blockData[end] {
 		allMappingsFound := true
@@ -556,28 +520,48 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 
 		if allMappingsFound {
 			log.Info().Uint64("block", end).Msg("All mapping for trie at this height found")
+
+			hexencodedMappings := make(map[string]delta.Mapping, len(megaMapping))
+			for k, mapping := range megaMapping {
+				hexencodedMappings[hex.EncodeToString([]byte(k))] = mapping
+			}
+
+			megaJson, _ := json.MarshalIndent(hexencodedMappings, "", "  ")
+			err = ioutil.WriteFile(filename, megaJson, 0644)
+
+			var readMappings = map[string]delta.Mapping{}
+			var hexencodedRead map[string]delta.Mapping
+			// sanity check
+			bytes, err := ioutil.ReadFile(filename)
+			if err != nil {
+				log.Fatal().Err(err).Msg("cannot read files")
+			}
+			err = json.Unmarshal(bytes, &hexencodedRead)
+			if err != nil {
+				log.Fatal().Err(err).Msg("cannot unmarshall megamapping while checking")
+			}
+
+			for k, mapping := range hexencodedRead {
+				decodeString, err := hex.DecodeString(k)
+				if err != nil {
+					log.Fatal().Err(err).Msg("cannot decode key")
+				}
+				readMappings[string(decodeString)] = mapping
+			}
+
+			if !reflect.DeepEqual(megaMapping, readMappings) {
+				spew.Dump(megaMapping)
+				spew.Dump(readMappings)
+
+				log.Fatal().Msg("json bad")
+			}
+
 		} else {
 			log.Info().Uint64("block", end).Msg("Mapping missing at this height")
 		}
 	}
 
-
-
-	//if len(blocksBuffer) > 0 {
-	//	_, err := collection.InsertMany(l.ctx, blocksBuffer)
-	//	if err != nil {
-	//		spew.Dump(blocksBuffer)
-	//		log.Fatal().Err(err).Msg("failed to insert many to mongo")
-	//	}
-	//
-	//}
-
-	//json, err := json.MarshalIndent(outputs, "", "  ")
-	//if err != nil {
-	//	log.Fatal().Msgf("cannot marhshll tx dump")
-	//}
-	//
-	//fmt.Println(string(json))
+	return megaMapping
 }
 
 func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*trie.MTrie) map[string]delta.Mapping {
@@ -686,10 +670,11 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 		calculatedDelta := calculatedSnapshot.Delta
 		originalDelta := originalSnapshot.Delta
 
-		for key, _ := range originalDelta.Data {
+		for key, val := range originalDelta.Data {
 			if mapping, has := calculatedDelta.WriteMappings[key]; !has {
 				failed = true
 				log.Warn().Hex("key", []byte(key)).Msg("Key not found in mapping")
+				spew.Dump(val)
 			} else {
 				writtenMappings[key] = mapping
 			}
@@ -749,10 +734,50 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 			blockLogger.Msgf("All mapping path found, txResult %s", msg)
 		} else {
 			blockLogger.Msgf("Some paths missing, txResult %s", msg)
+
+			fmt.Println("Original results")
+			spew.Dump(computedBlock.Results)
+			fmt.Println("Computed results")
+			spew.Dump(computationResult.TransactionResult)
+			fmt.Println("Transactions")
+			spew.Dump(computedBlock.ExecutableBlock.CompleteCollections)
+
+			os.Exit(1)
 		}
 	}
 
 	return writtenMappings
+}
+
+func (l *Loader) BootstrapMegamapping() map[string]delta.Mapping {
+	megaMapping := make(map[string]delta.Mapping, 100)
+
+	bootstrapper := bootstrap.NewBootstrapper(log.Logger)
+
+	bootstrapView := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+
+	privateKey, err := testutil.GenerateAccountPrivateKey()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot generate pk")
+	}
+
+	fix64, err := cadence.NewUFix64("1234.0")
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot create ufix64")
+	}
+
+	err = bootstrapper.BoostrapView(bootstrapView, privateKey.PublicKey(1000), fix64, flow.Mainnet.Chain())
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot bootstrap")
+	}
+
+	for k, v := range bootstrapView.Delta().WriteMappings {
+		megaMapping[k] = v
+	}
+
+	return megaMapping
 }
 
 func collapseByTxID(results []flow.TransactionResult) []flow.TransactionResult {
