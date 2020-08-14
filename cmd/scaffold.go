@@ -22,7 +22,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -174,11 +173,6 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 		fnb.Middleware = mw
 
-		participants, err := fnb.State.Final().Identities(filter.Any)
-		if err != nil {
-			return nil, fmt.Errorf("could not get network identities: %w", err)
-		}
-
 		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get node id: %w", err)
@@ -186,7 +180,14 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		nodeRole := nodeID.Role
 		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, fnb.State, fnb.Me, codec, mw, 10e6, topology, fnb.Metrics.Network)
+		net, err := libp2p.NewNetwork(fnb.Logger,
+			fnb.State,
+			fnb.Me,
+			codec,
+			fnb.Middleware,
+			10e6,
+			topology,
+			fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
