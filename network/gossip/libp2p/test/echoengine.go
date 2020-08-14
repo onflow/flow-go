@@ -106,7 +106,7 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 		Text: fmt.Sprintf("%s: %s", te.echomsg, strEvent),
 	}
 
-	err := te.con.Submit(msg, originID)
+	err := te.con.Transmit(msg, originID)
 	// we allow one dial failure on echo due to connection tear down
 	// specially when the test is for a single message and not echo
 	// the sender side may close the connection as it does not expect any echo
