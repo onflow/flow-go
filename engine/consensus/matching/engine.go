@@ -9,6 +9,7 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -30,23 +31,24 @@ var (
 // Engine is the matching engine, which matches execution receipts with result
 // approvals to create block seals.
 type Engine struct {
-	unit      *engine.Unit         // used to control startup/shutdown
-	log       zerolog.Logger       // used to log relevant actions with context
-	metrics   module.EngineMetrics // used to track sent and received messages
-	tracer    module.Tracer
-	mempool   module.MempoolMetrics    // used to track mempool size
-	state     protocol.State           // used to access the  protocol state
-	me        module.Local             // used to access local node information
-	requester module.Requester         // used to request missing execution receipts by block ID
-	resultsDB storage.ExecutionResults // used to permanently store results
-	sealsDB   storage.Seals            // used to check existing seals
-	headersDB storage.Headers          // used to check sealed headers
-	indexDB   storage.Index
-	results   mempool.Results          // holds execution results in memory
-	receipts  mempool.Receipts         // holds execution receipts in memory
-	approvals mempool.Approvals        // holds result approvals in memory
-	seals     mempool.Seals            // holds block seals in memory
-	missing   map[flow.Identifier]uint // track how often a block was missing
+	unit            *engine.Unit         // used to control startup/shutdown
+	log             zerolog.Logger       // used to log relevant actions with context
+	metrics         module.EngineMetrics // used to track sent and received messages
+	tracer          module.Tracer
+	mempool         module.MempoolMetrics    // used to track mempool size
+	state           protocol.State           // used to access the  protocol state
+	me              module.Local             // used to access local node information
+	requester       module.Requester         // used to request missing execution receipts by block ID
+	resultsDB       storage.ExecutionResults // used to permanently store results
+	sealsDB         storage.Seals            // used to check existing seals
+	headersDB       storage.Headers          // used to check sealed headers
+	indexDB         storage.Index
+	results         mempool.Results          // holds execution results in memory
+	receipts        mempool.Receipts         // holds execution receipts in memory
+	approvals       mempool.Approvals        // holds result approvals in memory
+	seals           mempool.Seals            // holds block seals in memory
+	missing         map[flow.Identifier]uint // track how often a block was missing
+	checkingSealing *atomic.Bool             // used to rate limit the checksealing call
 
 	// how many blocks between sealed/finalized before we request execcution receipts
 	requestReceiptThreshold uint
@@ -91,6 +93,7 @@ func New(
 		approvals:               approvals,
 		seals:                   seals,
 		missing:                 make(map[flow.Identifier]uint),
+		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 	}
 
@@ -337,8 +340,21 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 // checkSealing checks if there is anything worth sealing at the moment.
 func (e *Engine) checkSealing() {
+	// rate limit the check sealing
+	if e.checkingSealing.Load() {
+		return
+	}
+
 	e.unit.Lock()
 	defer e.unit.Unlock()
+
+	// only check sealing when no one else is checking
+	canCheck := e.checkingSealing.CAS(false, true)
+	if !canCheck {
+		return
+	}
+
+	defer e.checkingSealing.Store(false)
 
 	start := time.Now()
 
