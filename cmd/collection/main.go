@@ -129,7 +129,7 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction",
 				timeout.DefaultConfig.VoteAggregationTimeoutFraction,
 				"additional fraction of replica timeout that the primary will wait for votes")
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", 1000*time.Millisecond,
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
