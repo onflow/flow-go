@@ -261,8 +261,8 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 
 		// cancel the dial back off (if any), since we want to connect immediately
 		network := p.libP2PHost.Network()
-		if s, ok := network.(*swarm.Swarm); ok {
-			s.Backoff().Clear(targetID)
+		if swm, ok := network.(*swarm.Swarm); ok {
+			swm.Backoff().Clear(targetID)
 		}
 
 		// if this is a retry attempt, wait for some time before retrying
@@ -277,7 +277,7 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		if err != nil {
 			// if the connection was rejected due to whitelisting, skip the re-attempt
 			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
-				return s, err
+				return s, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
 			}
 			errs = multierror.Append(errs, err)
 			continue
@@ -470,10 +470,9 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 		if err != nil {
 			// if dns4 hostname is not found, try and get the IP address
 			ipOrHostname, err = a.ValueForProtocol(multiaddr.P_IP4)
-		}
-
-		if err != nil {
-			continue // this may not be a TCP IP multiaddress
+			if err != nil {
+				continue // this may not be a TCP IP multiaddress
+			}
 		}
 
 		// if either IP address or hostname is found, look for the port number

@@ -48,12 +48,12 @@ func (c *connGater) InterceptPeerDial(p peer.ID) bool {
 	return c.validPeerID(p)
 }
 
-// Currently, whitelisting is only implemented by Peer IDs and not multi-addresses
+// InterceptAddrDial is not used. Currently, whitelisting is only implemented by Peer IDs and not multi-addresses
 func (c *connGater) InterceptAddrDial(_ peer.ID, ma multiaddr.Multiaddr) bool {
 	return true
 }
 
-// Currently, whitelisting is only implemented by Peer IDs and not multi-addresses
+// InterceptAccept is not used. Currently, whitelisting is only implemented by Peer IDs and not multi-addresses
 func (c *connGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 	return true
 }
