@@ -164,7 +164,7 @@ func (s *thresholdSigner) VerifyThresholdSignature(thresholdSignature Signature)
 // ClearShares clears the shares and signers lists
 func (s *thresholdSigner) ClearShares() {
 	s.thresholdSignature = nil
-	s.emptystagedShare()
+	s.emptyStagedShare()
 	s.signers = s.signers[:0]
 	s.shares = s.shares[:0]
 }
@@ -175,7 +175,7 @@ func (s *thresholdSigner) EnoughShares() bool {
 	return len(s.signers) == (s.threshold + 1)
 }
 
-func (s *thresholdSigner) emptystagedShare() {
+func (s *thresholdSigner) emptyStagedShare() {
 	s.stagedShare = nil
 	s.stagedOrig = -1
 }
@@ -211,7 +211,7 @@ func (s *thresholdSigner) AddShare(orig int, share Signature) (bool, error) {
 // The function returns true if the share is valid and new, false otherwise.
 func (s *thresholdSigner) VerifyAndStageShare(orig int, share Signature) (bool, error) {
 	// empty the staged share
-	s.emptystagedShare()
+	s.emptyStagedShare()
 
 	if orig >= s.size || orig < 0 {
 		return false, errors.New("orig input is invalid")
@@ -257,7 +257,7 @@ func (s *thresholdSigner) CommitShare() error {
 	}
 
 	// empty the staged share
-	s.emptystagedShare()
+	s.emptyStagedShare()
 	return nil
 }
 
