@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -8,23 +9,23 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence"
+	"github.com/pbenner/threadpool"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 
 	initialRuntime "example.com/cadence-initial/runtime"
 	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm"
@@ -70,6 +71,7 @@ type Loader struct {
 	metrics          *metrics.NoopCollector
 	vm               *fvm.VirtualMachine
 	ctx              context.Context
+	mappingMutex     sync.Mutex
 }
 
 func main() {
@@ -471,6 +473,11 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 	//	//
 	//	//os.Exit(1)ce{}, 0, bufferSize+1)
 
+	pool := threadpool.New(16, int(end-start)*2)
+	g := pool.NewJobGroup()
+
+	allBlocks := make([]*ComputedBlock, 0, int(end-start))
+
 	for i := start; i <= end; i++ {
 
 		////if i >= 163 && i <= 173 || (i == 0) {
@@ -489,14 +496,54 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 		}
 
 		for _, computedBlock := range blocks {
-
-			blockMapping := l.executeBlock(computedBlock, updates)
-
-			for k, v := range blockMapping {
-				megaMapping[k] = v
+			if !bytes.Equal(computedBlock.EndState, computedBlock.ExecutableBlock.StartState) {
+				cb := computedBlock
+				allBlocks = append(allBlocks, cb)
 			}
+
+			// cb := computedBlock
+
+			// pool.AddJob(g, func(pool threadpool.ThreadPool, erf func() error) error {
+
+			// 	blockMapping := l.executeBlock(cb, updates)
+
+			// 	l.mappingMutex.Lock()
+			// 	for k, v := range blockMapping {
+			// 		megaMapping[k] = v
+			// 	}
+			// 	l.mappingMutex.Unlock()
+
+			// 	return nil
+			// })
+
 		}
 	}
+
+	// blockResults := make([]map[string]delta.Mapping, len(allBlocks))
+
+	pool.AddRangeJob(0, len(allBlocks), g, func(i int, pool threadpool.ThreadPool, erf func() error) error {
+		blockMapping := l.executeBlock(allBlocks[i], updates)
+
+		//blockResults[i] = blockMapping
+
+		l.mappingMutex.Lock()
+		for k, v := range blockMapping {
+			megaMapping[k] = v
+		}
+		l.mappingMutex.Unlock()
+		return nil
+	})
+
+	pool.Wait(g)
+
+	// for _, r := range blockResults {
+	// 	// l.mappingMutex.Lock()
+	// 	for k, v := range r {
+	// 		megaMapping[k] = v
+	// 	}
+	// 	// l.mappingMutex.Unlock()
+	// 	//return nil
+	// }
 
 	for _, computedBlock := range blockData[end] {
 		allMappingsFound := true
