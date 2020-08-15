@@ -33,6 +33,7 @@ require (
 	github.com/onflow/flow-go-sdk v0.8.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/opentracing/opentracing-go v1.1.0
+	github.com/pbenner/threadpool v0.0.0-20200729220145-19cbae573817
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.3.0
 	github.com/prometheus/tsdb v0.7.1

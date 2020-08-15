@@ -396,16 +396,27 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 	filename := fmt.Sprintf("data/megamapping_%d_%d.json", rangeStart, rangeStop)
 
 	if _, err := os.Stat(filename); !os.IsNotExist(err) {
+		var readMappings = map[string]delta.Mapping{}
+		var hexencodedRead map[string]delta.Mapping
+
 		bytes, err := ioutil.ReadFile(filename)
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot read files")
 		}
-		err = json.Unmarshal(bytes, &megaMapping)
+		err = json.Unmarshal(bytes, &hexencodedRead)
 		if err != nil {
-			log.Fatal().Err(err).Msg("cannot unmarshall megamapping")
+			log.Fatal().Err(err).Msg("cannot unmarshall megamapping while checking")
 		}
-		log.Info().Msgf("Loaded megamapping %d %d from file (%d entries)", rangeStart, rangeStop, len(megaMapping))
-		return megaMapping
+
+		for k, mapping := range hexencodedRead {
+			decodeString, err := hex.DecodeString(k)
+			if err != nil {
+				log.Fatal().Err(err).Msg("cannot decode key")
+			}
+			readMappings[string(decodeString)] = mapping
+		}
+
+		return readMappings
 	}
 
 	if rangeStart == 0 {
