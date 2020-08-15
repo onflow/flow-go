@@ -17,15 +17,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/r3labs/diff"
-
 	initialRuntime "example.com/cadence-initial/runtime"
 	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm"
 	state2 "github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -614,11 +612,7 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 
 		results := collapseByTxID(computedBlock.Results)
 
-		changelog, err := diff.Diff(results, computationResult.TransactionResult)
-		if err != nil {
-			log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compare results")
-		}
-		if changelog == nil {
+		if reflect.DeepEqual(results, computationResult.TransactionResult) {
 			//log.Info().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("Tx results equal!")
 			txResultEqual = true
 		} else {
