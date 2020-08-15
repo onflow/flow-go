@@ -26,7 +26,7 @@ const thresholdSignatureTag = "Threshold Signatures"
 
 // simple single-threaded test of the stateful threshold signature using the simple key generation.
 // The test generates keys for a threshold signatures scheme, uses the keys to sign shares,
-// tests VerifyStageShare and CommitShare apis,
+// tests VerifyAndStageShare and CommitShare apis,
 // and reconstruct the threshold signatures using (t+1) random shares.
 func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 	n := 10
@@ -63,9 +63,11 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 			i := signers[j]
 			share, err := skShares[i].Sign(messageToSign, kmac)
 			require.NoError(t, err)
-			verif, err := ts.VerifyStageShare(i, share)
+			verif, err := ts.VerifyAndStageShare(i, share)
 			assert.NoError(t, err)
 			assert.True(t, verif, "signature should be valid")
+			// check that threshold is not reached before the commit
+			assert.False(t, ts.EnoughShares(), "threshold shouldn't be reached")
 			if verif {
 				err = ts.CommitShare()
 				assert.NoError(t, err)
@@ -76,7 +78,7 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 			i := signers[threshold+1]
 			share, err := skShares[i].Sign(messageToSign, kmac)
 			require.NoError(t, err)
-			verif, err := ts.VerifyStageShare(i, share)
+			verif, err := ts.VerifyAndStageShare(i, share)
 			assert.NoError(t, err)
 			assert.True(t, verif, "signature should be valid")
 			if verif {
@@ -88,13 +90,15 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 		i := signers[0]
 		share, err := skShares[i].Sign(messageToSign, kmac)
 		require.NoError(t, err)
-		verif, err := ts.VerifyStageShare(i, share)
+		verif, err := ts.VerifyAndStageShare(i, share)
 		assert.NoError(t, err)
 		assert.False(t, verif, "signature should be invalid")
 		// commit a non staged share
 		err = ts.CommitShare()
 		assert.Error(t, err)
 
+		// check that threshold is reached
+		assert.True(t, ts.EnoughShares(), "threshold should be reached")
 		// reconstruct the threshold signature
 		_, err = ts.ThresholdSignature()
 		require.NoError(t, err)
@@ -349,7 +353,7 @@ func tsRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving TS from %d:", proc.current, newMsg.orig)
-			verif, err := proc.ts.AddSignatureShare(
+			verif, err := proc.ts.AddShare(
 				newMsg.orig, newMsg.data)
 			require.NoError(t, err)
 			assert.True(t, verif,
