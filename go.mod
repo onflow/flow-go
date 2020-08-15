@@ -65,6 +65,6 @@ replace github.com/dapperlabs/flow-go/protobuf => ./protobuf
 
 replace github.com/dapperlabs/flow-go/integration => ./integration
 
-replace github.com/r3labs/diff => ../../../../../diff
+// replace github.com/r3labs/diff => ../../../../../diff
 
 replace example.com/cadence-initial => ./cadence/initial

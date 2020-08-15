@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/r3labs/diff"
 
 	initialRuntime "example.com/cadence-initial/runtime"
 	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
@@ -68,7 +68,7 @@ type Loader struct {
 
 func main() {
 
-	db := common.InitStorage("/Users/makspawlak/Downloads/candidate1-execution/protocol")
+	db := common.InitStorage("/home/m4ks/candidate1-execution/protocol")
 	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
@@ -319,7 +319,7 @@ func (l *Loader) findUpdates(blocks map[uint64][]*ComputedBlock) map[string]*tri
 
 	hashes := make(map[string]*trie.MTrie)
 
-	ledgerWAL, err := wal.NewWAL(nil, nil, "/Users/makspawlak/Downloads/candidate1-execution/execution", len(blocks), ledger.RegisterKeySize, wal.SegmentSize)
+	ledgerWAL, err := wal.NewWAL(nil, nil, "/home/m4ks/candidate1-execution/execution", len(blocks), ledger.RegisterKeySize, wal.SegmentSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create WAL")
 	}
@@ -533,7 +533,6 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 
 	}
 
-
 	for _, computedBlock := range blockData[end] {
 		allMappingsFound := true
 
@@ -560,8 +559,6 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64) {
 			log.Info().Uint64("block", end).Msg("Mapping missing at this height")
 		}
 	}
-
-
 
 	//if len(blocksBuffer) > 0 {
 	//	_, err := collection.InsertMany(l.ctx, blocksBuffer)
@@ -630,11 +627,7 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 
 		results := collapseByTxID(computedBlock.Results)
 
-		changelog, err := diff.Diff(results, computationResult.TransactionResult)
-		if err != nil {
-			log.Fatal().Err(err).Str("block_id", computedBlock.ExecutableBlock.ID().String()).Msg("cannot compare results")
-		}
-		if changelog == nil {
+		if reflect.DeepEqual(results, computationResult.TransactionResult) {
 			//log.Info().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("Tx results equal!")
 			txResultEqual = true
 		} else {

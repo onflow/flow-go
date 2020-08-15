@@ -706,6 +706,7 @@ github.com/onflow/cadence v0.6.0 h1:V4u390VPCYQanTK3GYGRjauoyOpMFRmX4EF6Pc6E/Fo=
 github.com/onflow/cadence v0.6.0/go.mod h1:VCZ/aqMjf84JQDkCOGqGRQslVwFjx/7PJrH/zpAh/Qo=
 github.com/onflow/cadence v0.7.0 h1:qJcDJJP7GFy7jq3uPM2ZnaDISQWCkRg0XI77ntrMVAo=
 github.com/onflow/cadence v0.7.0/go.mod h1:R43uGnqQsTcnFf1fMPCcMjDPplBIzbR5XkFZRF2OH3Y=
+github.com/onflow/cadence v0.8.0 h1:7qMjZ3QJBdHZO+/HsxAJaLAXBJWVwT60Zw7t2PmJ/pY=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce h1:I8SaLOFlQN7Jr+aU1mZB0mnsq2qlaaJPeji4PmkTWfA=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
 github.com/onflow/flow-go-sdk v0.3.0-beta1 h1:HmAqosPHLoNmYfhUECsSFpvSD4kWIkJ+Xs8LAJijKDc=
@@ -736,6 +737,7 @@ github.com/openzipkin/zipkin-go v0.1.1/go.mod h1:NtoC/o8u3JlF1lSlyPNswIbeQH9bJTm
 github.com/pborman/uuid v0.0.0-20170112150404-1b00554d8222/go.mod h1:VyrYX9gd7irzKovcSS6BIIEwPRkP2Wm2m9ufcdFSJ34=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
+github.com/pelletier/go-toml v1.4.0 h1:u3Z1r+oOXJIkxqw34zVhyPgjBsm6X2wn21NWs/HfSeg=
 github.com/pelletier/go-toml v1.4.0/go.mod h1:PN7xzY2wHTK0K9p34ErDQMlFxa51Fk0OUruD3k1mMwo=
 github.com/peterh/liner v1.1.1-0.20190123174540-a2c9a5303de7/go.mod h1:CRroGNssyjTd/qIG2FyxByd2S8JEAZXBl4qUrZf8GS0=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
