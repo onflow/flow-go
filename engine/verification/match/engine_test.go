@@ -657,3 +657,42 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	<-e.Done()
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
 }
+
+func TestIdentifyChunkID(t *testing.T) {
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	// create a execution result that assigns to me
+	result, assignment := createExecutionResult(
+		head.ID(),
+		WithChunks(
+			WithAssignee(myID),
+		),
+	)
+
+	// metrics
+	// receiving an execution result
+	metrics.On("OnExecutionResultReceived").Return().Once()
+	// sending a verifiable chunk
+	metrics.On("OnVerifiableChunkSent").Return().Once()
+	// receiving a chunk data pack
+	metrics.On("OnChunkDataPackReceived").Return().Once()
+
+	// add assignment to assigner
+	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+
+	// block header has been received
+	headerDB[result.BlockID] = head
+
+	// find the execution node id that created the execution result
+	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+
+	// Does this un-stake the node?
+	en.Stake = 0
+
+	<-e.Ready()
+
+	err := e.Process(en.ID(), result)
+	require.NoError(t, err)
+
+	<-e.Done()
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
+}
