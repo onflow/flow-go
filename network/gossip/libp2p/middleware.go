@@ -363,8 +363,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	defer m.wg.Done()
 
 	log := m.log.With().
-		Str("local_addr", s.Conn().LocalPeer().String()).
-		Str("remote_addr", s.Conn().RemotePeer().String()).
+		Str("local_addr", s.Conn().LocalMultiaddr().String()).
+		Str("remote_addr", s.Conn().RemoteMultiaddr().String()).
 		Logger()
 
 	// initialize the encoder/decoder and create the connection handler
