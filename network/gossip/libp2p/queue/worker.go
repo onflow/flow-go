@@ -1,12 +1,7 @@
 package queue
 
-import (
-	"reflect"
-)
-
 type Work struct {
-	r *RcvQueue // The queue which we can use to call the method.
-	m string    // The method that we will call.
+	f func() // The function that we will call.
 }
 
 type Worker struct {
@@ -67,7 +62,7 @@ func (w *Worker) Start() {
 			w.WorkerChannel <- w.Channel
 			select {
 			case job := <-w.Channel:
-				reflect.ValueOf(job.r).MethodByName(job.m).Call([]reflect.Value{})
+				job.f()
 			case <-w.End:
 				return
 			}

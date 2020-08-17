@@ -232,7 +232,7 @@ func (r *RcvQueue) Prioritize() {
 		}
 
 		// start a job to process a message
-		r.collector.Work <- Work{r: r, m: "Process"}
+		r.collector.Work <- Work{f: r.Process}
 	}
 }
 
@@ -304,7 +304,7 @@ func (r *RcvQueue) Add(senderID flow.Identifier, message *message.Message) bool 
 	r.queue.Add(key, value)
 
 	// start a job to prioritize a message
-	r.collector.Work <- Work{r: r, m: "Prioritize"}
+	r.collector.Work <- Work{f: r.Prioritize}
 
 	return true
 }
