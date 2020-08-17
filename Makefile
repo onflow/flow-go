@@ -284,7 +284,7 @@ docker-build-bootstrap-transit:
 .PHONY: docker-build-loader
 docker-build-loader:
 	docker build -f ./integration/loader/Dockerfile --ssh default --build-arg TARGET=loader --target production \
-		-t gcr.io/dl-flow/loader:latest -t "gcr.io/dl-flow/loader:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/loader:$(IMAGE_TAG)" .
+		-t gcr.io/dl-flow/benchmark/loader:latest -t "gcr.io/dl-flow/benchmark/loader:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/benchmark/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
