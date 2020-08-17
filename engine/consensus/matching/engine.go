@@ -512,13 +512,10 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	}
 
 	// get all available approvals once
-	// TODO: Temp
-	// approvals := e.approvals.All()
-	approvals := make([]*flow.ResultApproval, 0)
+	approvals := e.approvals.All()
 
 	// go through all pending results and check which ones we have enough approvals for
-	// for _, result := range e.results.All() {
-	for _, result := range []*flow.ExecutionResult{} {
+	for _, result := range e.results.All() {
 		// get the node IDs for all approvers of this result
 		// TODO: check for duplicate approver
 		var approverIDs []flow.Identifier
@@ -546,12 +543,6 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		}
 
 		// add the result to the results that should be sealed
-		results = append(results, result)
-	}
-
-	for _, result := range e.results.All() {
-		// ensure we mark this result as not missing if applicable
-		delete(missingByBlockID, result.BlockID)
 		results = append(results, result)
 	}
 
