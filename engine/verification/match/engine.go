@@ -189,7 +189,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	// different execution results can be chunked in parallel
 	chunks, err := e.myChunkAssignments(ctx, pendingResult.ExecutionResult)
 	if err != nil {
-		log.Debug().Msgf("could not find my chunk assignments: %w", err)
+		log.Debug().Msgf("could not find my chunk assignments: %v", err)
 		return
 	}
 
@@ -393,7 +393,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	}
 
 	if err != nil {
-		log.Debug().Msgf("could not find identity for chunkID %v: %w", chunkID, err)
+		log.Debug().Msgf("could not find identity for chunkID %v: %v", chunkID, err)
 		return
 	}
 
