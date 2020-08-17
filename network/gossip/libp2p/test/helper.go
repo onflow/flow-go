@@ -144,7 +144,7 @@ type SnapshotMock struct {
 }
 
 func (s *SnapshotMock) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.ids, nil
+	return s.ids.Filter(selector), nil
 }
 
 func (s *SnapshotMock) Identity(nodeID flow.Identifier) (*flow.Identity, error) {

@@ -70,6 +70,7 @@ func NewNetwork(
 		codec:   codec,
 		me:      me,
 		mw:      mw,
+		state:   state,
 		engines: make(map[uint8]network.Engine),
 		rcache:  rcache,
 		fanout:  fanout,
