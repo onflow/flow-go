@@ -113,10 +113,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
+		_ = e.Process(originID, event)
 	})
 }
 
@@ -128,9 +125,8 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+		e.process(originID, event)
+		return nil
 }
 
 // process receives and submits an event to the engine for processing.
@@ -138,21 +134,21 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // it is successfully processed by the engine.
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) process(originID flow.Identifier, event interface{}) {
 	switch resource := event.(type) {
 	case *flow.ExecutionResult:
-		return e.handleExecutionResult(originID, resource)
+		e.handleExecutionResult(originID, resource)
 	case *messages.ChunkDataResponse:
-		return e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
+		e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
 	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+		fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
 // handleExecutionResult takes a execution result and finds chunks that are assigned to this
 // verification node and adds them to the pending chunk list to be processed.
 // It stores the result in memory, in order to check if a chunk still needs to be processed.
-func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.ExecutionResult) error {
+func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.ExecutionResult) {
 	resultID := result.ID()
 	blockID := result.ExecutionResultBody.BlockID
 
@@ -186,16 +182,13 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	if !added {
 		// drops processing execution result if it has already
 		// been added to results mempool
-		log.Debug().
-			Msg("duplicate execution result dropped")
-		return nil
+		log.Debug().Msg("duplicate execution result dropped")
 	}
 
 	// different execution results can be chunked in parallel
 	chunks, err := e.myChunkAssignments(ctx, pendingResult.ExecutionResult)
 	if err != nil {
 		log.Debug().Msgf("could not find my chunk assignments: %w", err)
-		return nil
 	}
 
 	log.Info().
@@ -211,7 +204,6 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		Int("total_assigned_chunks", len(chunks)).
 		Uint("total_pending_chunks", e.pendingChunks.Size()).
 		Msg("finish processing execution result")
-	return nil
 }
 
 // myChunkAssignments returns the list of chunks in the chunk list that this verification node
@@ -376,7 +368,7 @@ func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, execut
 // VerifiableChunk, and pass it to the verifier engine to verify
 func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection) error {
+	collection *flow.Collection) {
 	start := time.Now()
 
 	chunkID := chunkDataPack.ChunkID
@@ -394,22 +386,19 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	sender, err := e.state.Final().Identity(originID)
 	if errors.Is(err, storage.ErrNotFound) {
 		log.Debug().Msgf("origin is unstaked: %v", originID)
-		return nil
 	}
 
 	if err != nil {
-		return fmt.Errorf("could not find identity for chunkID %v: %w", chunkID, err)
+		log.Debug().Msgf("could not find identity for chunkID %v: %w", chunkID, err)
 	}
 
 	if sender.Role != flow.RoleExecution {
 		log.Debug().Msgf("receives chunk data pack from a non-execution node")
-		return nil
 	}
 
 	status, exists := e.pendingChunks.ByID(chunkID)
 	if !exists {
 		log.Debug().Msgf("Chunk ID: %v doesn't exist, or has already been processed", chunkID)
-		return nil
 	}
 
 	// TODO: verify the collection ID matches with the collection guarantee in the block payload
@@ -418,7 +407,6 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
 	if !removed {
 		log.Debug().Msgf("chunk has not been removed, chunkID: %v", chunkID)
-		return nil
 	}
 
 	resultID := status.ExecutionResultID
@@ -432,7 +420,6 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	if !exists {
 		// result no longer exists
 		log.Debug().Msgf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID)
-		return nil
 	}
 
 	// computes the end state of the chunk
@@ -470,9 +457,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 			Hex("result_id", logging.ID(resultID)).
 			Msg("chunk successfully matched")
 	}
-
-	return nil
-}
+	}
 
 // matchChunk performs the last step in matching pipeline for a chunk.
 // It captures the chunk into a verifiable chunk and submits it to the
