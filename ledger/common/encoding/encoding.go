@@ -1,3 +1,4 @@
+// Package encoding provides byte serialization and deserialization of trie and ledger structs.
 package encoding
 
 import (
@@ -7,15 +8,14 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
-// Version encoder/decoder code only supports
-// decoding data with version smaller or equal to this value
-// bumping this number prevents older versions of the code
-// to deal with the newer version of data
+// Version captures the maximum version of encoding that this code supports
+// in other words this code encodes the data with the latest version and
+// can only decode data with version smaller or equal to this value
+// bumping this number prevents older versions of the code to deal with the newer version of data
 // codes should be updated with backward compatibility if needed
-// and act differently based on the version
 const Version = uint16(0)
 
-// Type capture the type of encoded entity
+// Type capture the type of encoded entity (e.g. State, Key, Value, Path)
 type Type uint8
 
 const (
@@ -49,7 +49,7 @@ const (
 )
 
 func (e Type) String() string {
-	return [...]string{"Unknown", "State", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof"}[e]
+	return [...]string{"Unknown", "State", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof", "Query", "Update", "Trie Update"}[e]
 }
 
 // CheckVersion extracts encoding bytes from a raw encoded message
@@ -545,7 +545,7 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 	return &ledger.TrieUpdate{RootHash: rh, Paths: paths, Payloads: payloads}, nil
 }
 
-// EncodeProof encodes the content of a proof into a byte slice
+// EncodeTrieProof encodes the content of a proof into a byte slice
 func EncodeTrieProof(p *ledger.TrieProof) []byte {
 	if p == nil {
 		return []byte{}

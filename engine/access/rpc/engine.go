@@ -10,11 +10,14 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
+	"github.com/dapperlabs/flow-go/access"
+	legacyaccess "github.com/dapperlabs/flow-go/access/legacy"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
+	"github.com/dapperlabs/flow-go/engine/access/rpc/backend"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -35,7 +38,7 @@ type Config struct {
 type Engine struct {
 	unit       *engine.Unit
 	log        zerolog.Logger
-	handler    *handler.Handler // the gRPC service implementation
+	backend    *backend.Backend // the gRPC service implementation
 	grpcServer *grpc.Server     // the gRPC server
 	httpServer *http.Server
 	config     Config
@@ -45,14 +48,15 @@ type Engine struct {
 func New(log zerolog.Logger,
 	state protocol.State,
 	config Config,
-	executionRPC execution.ExecutionAPIClient,
-	collectionRPC access.AccessAPIClient,
+	executionRPC execproto.ExecutionAPIClient,
+	collectionRPC accessproto.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
+	collectionGRPCPort uint,
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -70,16 +74,39 @@ func New(log zerolog.Logger,
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
 
+	backend := backend.New(
+		state,
+		executionRPC,
+		collectionRPC,
+		blocks,
+		headers,
+		collections,
+		transactions,
+		chainID,
+		transactionMetrics,
+		collectionGRPCPort,
+		&backend.ConnectionFactoryImpl{},
+	)
+
 	eng := &Engine{
 		log:        log,
 		unit:       engine.NewUnit(),
-		handler:    handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID, transactionMetrics),
+		backend:    backend,
 		grpcServer: grpcServer,
 		httpServer: httpServer,
 		config:     config,
 	}
 
-	access.RegisterAccessAPIServer(eng.grpcServer, eng.handler)
+	accessproto.RegisterAccessAPIServer(
+		eng.grpcServer,
+		access.NewHandler(backend, chainID.Chain()),
+	)
+
+	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
+	legacyaccessproto.RegisterAccessAPIServer(
+		eng.grpcServer,
+		legacyaccess.NewHandler(backend, chainID.Chain()),
+	)
 
 	return eng
 }
@@ -122,7 +149,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) process(event interface{}) error {
 	switch entity := event.(type) {
 	case *flow.Block:
-		e.handler.NotifyFinalizedBlockHeight(entity.Header.Height)
+		e.backend.NotifyFinalizedBlockHeight(entity.Header.Height)
 		return nil
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)

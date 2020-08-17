@@ -1,3 +1,5 @@
+// +build relic
+
 package signature
 
 import (

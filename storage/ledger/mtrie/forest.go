@@ -25,7 +25,7 @@ import (
 // tries that are still needed. In fully matured Flow, we will have an
 // explicit eviction policy.
 //
-// TODO: Storage Eviction Policy for MForrest
+// TODO: Storage Eviction Policy for MForest
 //       For the execution node: we only evict on sealing a result.
 type MForest struct {
 	// tries stores all MTries in the forest. It is NOT a CACHE in the conventional sense:
@@ -66,7 +66,7 @@ func NewMForest(keyByteSize int, trieStorageDir string, forestCapacity int, metr
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
 
-	// init Forrest and add an empty trie
+	// init Forest and add an empty trie
 	if keyByteSize < 1 {
 		return nil, errors.New("trie's key size [in bytes] must be positive")
 	}
@@ -134,7 +134,7 @@ func (f *MForest) AddTries(newTries []*trie.MTrie) error {
 	for _, t := range newTries {
 		err := f.AddTrie(t)
 		if err != nil {
-			return fmt.Errorf("adding tries to forrest failed: %w", err)
+			return fmt.Errorf("adding tries to forest failed: %w", err)
 		}
 	}
 	return nil
