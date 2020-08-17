@@ -293,7 +293,11 @@ func (r *RcvQueue) Add(senderID flow.Identifier, message *message.Message) bool 
 
 	found, _ := r.cache.ContainsOrAdd(key, true)
 	// return false if we found a duplicate or our overflow queue is full
-	if found || r.queue.Len() == r.size {
+	if found {
+		return false
+	}
+	if r.queue.Len() == r.size {
+		r.cache.Remove(key)
 		return false
 	}
 
