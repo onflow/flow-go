@@ -183,12 +183,14 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		// drops processing execution result if it has already
 		// been added to results mempool
 		log.Debug().Msg("duplicate execution result dropped")
+		return
 	}
 
 	// different execution results can be chunked in parallel
 	chunks, err := e.myChunkAssignments(ctx, pendingResult.ExecutionResult)
 	if err != nil {
 		log.Debug().Msgf("could not find my chunk assignments: %w", err)
+		return
 	}
 
 	log.Info().
@@ -362,6 +364,7 @@ func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, execut
 		Hex("chunk_id", logging.ID(chunk.ID())).
 		Hex("result_id", logging.ID(status.ExecutionResultID)).
 		Msg("chunk marked assigned to this verification node")
+	return
 }
 
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
@@ -386,19 +389,23 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	sender, err := e.state.Final().Identity(originID)
 	if errors.Is(err, storage.ErrNotFound) {
 		log.Debug().Msgf("origin is unstaked: %v", originID)
+		return
 	}
 
 	if err != nil {
 		log.Debug().Msgf("could not find identity for chunkID %v: %w", chunkID, err)
+		return
 	}
 
 	if sender.Role != flow.RoleExecution {
 		log.Debug().Msgf("receives chunk data pack from a non-execution node")
+		return
 	}
 
 	status, exists := e.pendingChunks.ByID(chunkID)
 	if !exists {
 		log.Debug().Msgf("Chunk ID: %v doesn't exist, or has already been processed", chunkID)
+		return
 	}
 
 	// TODO: verify the collection ID matches with the collection guarantee in the block payload
@@ -407,6 +414,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
 	if !removed {
 		log.Debug().Msgf("chunk has not been removed, chunkID: %v", chunkID)
+		return
 	}
 
 	resultID := status.ExecutionResultID
@@ -420,6 +428,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	if !exists {
 		// result no longer exists
 		log.Debug().Msgf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID)
+		return
 	}
 
 	// computes the end state of the chunk
