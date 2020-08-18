@@ -20,9 +20,9 @@ import (
 const (
 	Cap            float64 = 50000
 	HighPriority   int     = 10
-	MediumPriority int     = 5
-	LowPriority    int     = 3
-	NoPriority     int     = 1
+	MediumPriority int     = 6
+	LowPriority    int     = 4
+	NoPriority     int     = 2
 )
 
 // RcvQueue implements an LRU cache of the received eventIDs that delivered to their engines
@@ -189,7 +189,7 @@ func (r *RcvQueue) Size(size float64) int {
 func (r *RcvQueue) Score(s int, p interface{}) int {
 	size := r.Size(float64(s))
 	priority := r.Priority(p)
-	return int(math.Ceil(float64((size + priority) / 2)))
+	return (size + priority) / 2
 }
 
 // Remove the oldest entry in the queue and prioritize it.
