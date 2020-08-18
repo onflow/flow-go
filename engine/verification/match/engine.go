@@ -125,8 +125,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-		e.process(originID, event)
-		return nil
+		return e.process(originID, event)
 }
 
 // process receives and submits an event to the engine for processing.
@@ -134,15 +133,16 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // it is successfully processed by the engine.
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
-func (e *Engine) process(originID flow.Identifier, event interface{}) {
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *flow.ExecutionResult:
 		e.handleExecutionResult(originID, resource)
 	case *messages.ChunkDataResponse:
 		e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
 	default:
-		fmt.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
+	return nil
 }
 
 // handleExecutionResult takes a execution result and finds chunks that are assigned to this
