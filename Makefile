@@ -25,6 +25,8 @@ ifndef CONTAINER_REGISTRY
 override CONTAINER_REGISTRY=gcr.io/dl-flow
 endif
 
+COMPOSE_DOCKER_CLI_BUILD=1
+
 DOCKER_BUILDKIT := 1
 
 crypto/relic:
