@@ -92,7 +92,7 @@ func (_m *Middleware) Subscribe(channelID uint8) error {
 	return r0
 }
 
-// UpdateAllowlist provides a mock function with given fields:
+// UpdateAllowList provides a mock function with given fields:
 func (_m *Middleware) UpdateAllowList() error {
 	ret := _m.Called()
 
