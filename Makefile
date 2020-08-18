@@ -315,26 +315,26 @@ docker-push-execution:
 .PHONY: docker-push-verification
 docker-push-verification:
 	docker push "$(CONTAINER_REGISTRY)/verification:latest"
-	docker push "$(CONTAINER_REGISTRY)verification:$(SHORT_COMMIT)"
-	docker push "$(CONTAINER_REGISTRY)verification:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)"
 
 .PHONY: docker-push-access
 docker-push-access:
-	docker push "$(CONTAINER_REGISTRY)access:latest"
-	docker push "$(CONTAINER_REGISTRY)access:$(SHORT_COMMIT)"
-	docker push "$(CONTAINER_REGISTRY)access:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/access:latest"
+	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
 
 .PHONY: docker-push-ghost
 docker-push-ghost:
-	docker push "$(CONTAINER_REGISTRY)ghost:latest"
-	docker push "$(CONTAINER_REGISTRY)ghost:$(SHORT_COMMIT)"
-	docker push "$(CONTAINER_REGISTRY)ghost:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
+	docker push "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)"
 
 .PHONY: docker-push-loader
 docker-push-loader:
-	docker push gcr.io/dl-flow/benchmark/loader:latest
-	docker push "gcr.io/dl-flow/benchmark/loader:$(SHORT_COMMIT)"
-	docker push "gcr.io/dl-flow/benchmark/loader:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/loader:latest"
+	docker push "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)"
 
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
