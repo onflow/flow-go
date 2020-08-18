@@ -1,6 +1,6 @@
 package ledger
 
-// ErrLedgerConstruction returned when there is a failure with ledger creation
+// ErrLedgerConstruction is returned upon a failure in ledger creation steps
 type ErrLedgerConstruction struct {
 	Err error
 }
@@ -9,7 +9,7 @@ func (e ErrLedgerConstruction) Error() string {
 	return e.Err.Error()
 }
 
-// Is return true if the type of errors are the same
+// Is returns true if the type of errors are the same
 func (e ErrLedgerConstruction) Is(other error) bool {
 	_, ok := other.(ErrLedgerConstruction)
 	return ok
@@ -20,7 +20,8 @@ func NewErrLedgerConstruction(err error) *ErrLedgerConstruction {
 	return &ErrLedgerConstruction{err}
 }
 
-// ErrMissingKeys returned when there are some missing keys in the ledger
+// ErrMissingKeys is returned when some keys are not found in the ledger
+// this is mostly used when dealing with partial ledger
 type ErrMissingKeys struct {
 	Keys []Key
 }
@@ -33,7 +34,7 @@ func (e ErrMissingKeys) Error() string {
 	return str
 }
 
-// Is return true if the type of errors are the same
+// Is returns true if the type of errors are the same
 func (e ErrMissingKeys) Is(other error) bool {
 	_, ok := other.(ErrMissingKeys)
 	return ok

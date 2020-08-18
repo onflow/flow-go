@@ -129,7 +129,7 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction",
 				timeout.DefaultConfig.VoteAggregationTimeoutFraction,
 				"additional fraction of replica timeout that the primary will wait for votes")
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", 1000*time.Millisecond,
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -358,7 +358,7 @@ func main() {
 			return push, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			builder := builder.NewBuilder(node.DB, colHeaders, colPayloads, pool, node.Tracer,
+			builder := builder.NewBuilder(node.DB, node.Storage.Headers, colHeaders, colPayloads, pool, node.Tracer,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)

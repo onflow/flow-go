@@ -119,7 +119,7 @@ func (m *Middleware) Me() flow.Identifier {
 }
 
 // GetIPPort returns the ip address and port number associated with the middleware
-func (m *Middleware) GetIPPort() (string, string) {
+func (m *Middleware) GetIPPort() (string, string, error) {
 	return m.libP2PNode.GetIPPort()
 }
 
@@ -131,6 +131,18 @@ func (m *Middleware) PublicKey() crypto.PublicKey {
 func (m *Middleware) Start(ov middleware.Overlay) error {
 
 	m.ov = ov
+
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// derive all node addresses from flow identities. Those node address will serve as the network whitelist
+	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
+	if err != nil {
+		return fmt.Errorf("could not derive list of approved peer list: %w", err)
+	}
 
 	// create a discovery object to help libp2p discover peers
 	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
@@ -155,13 +167,23 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// start the libp2p node
-	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, m.rootBlockID, psOptions...)
+	err = m.libP2PNode.Start(m.ctx,
+		nodeAddress,
+		m.log, libp2pKey,
+		m.handleIncomingStream,
+		m.rootBlockID,
+		true,
+		nodeAddrsWhiteList,
+		psOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
 
 	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
-	m.host, m.port = m.libP2PNode.GetIPPort()
+	m.host, m.port, err = m.libP2PNode.GetIPPort()
+	if err != nil {
+		return fmt.Errorf("failed to find IP and port of the libp2p node: %w", err)
+	}
 
 	return nil
 }
@@ -296,6 +318,12 @@ func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) 
 		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
 	}
 
+	return nodeAddressFromIdentity(flowIdentity)
+}
+
+// nodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
+func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
+
 	// split the node address into ip and port
 	ip, port, err := net.SplitHostPort(flowIdentity.Address)
 	if err != nil {
@@ -314,6 +342,19 @@ func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) 
 	return nodeAddress, nil
 }
 
+func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {
+	var nodeAddrs []NodeAddress
+	for _, identity := range identityMap {
+		nodeAddress, err := nodeAddressFromIdentity(identity)
+		if err != nil {
+			return nil, err
+		}
+
+		nodeAddrs = append(nodeAddrs, nodeAddress)
+	}
+	return nodeAddrs, nil
+}
+
 // handleIncomingStream handles an incoming stream from a remote peer
 // this is a blocking call, so that the deferred resource cleanup happens after
 // we are done handling the connection
@@ -322,8 +363,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	defer m.wg.Done()
 
 	log := m.log.With().
-		Str("local_addr", s.Conn().LocalPeer().String()).
-		Str("remote_addr", s.Conn().RemotePeer().String()).
+		Str("local_addr", s.Conn().LocalMultiaddr().String()).
+		Str("remote_addr", s.Conn().RemoteMultiaddr().String()).
 		Logger()
 
 	// initialize the encoder/decoder and create the connection handler
@@ -469,4 +510,25 @@ func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
 	}
 
 	return m.libP2PNode.Ping(m.ctx, nodeAddress)
+}
+
+func (m *Middleware) UpdateAllowList() error {
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// derive all node addresses from flow identities
+	nodeAddrsAllowList, err := nodeAddresses(idsMap)
+	if err != nil {
+		return fmt.Errorf("could not derive list of approved peer list: %w", err)
+	}
+
+	err = m.libP2PNode.UpdateAllowlist(nodeAddrsAllowList...)
+	if err != nil {
+		return fmt.Errorf("failed to update approved peer list: %w", err)
+	}
+
+	return nil
 }

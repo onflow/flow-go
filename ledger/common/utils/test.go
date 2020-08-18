@@ -21,24 +21,28 @@ func TwoBytesPath(inp uint16) ledger.Path {
 	return ledger.Path(b)
 }
 
+// LightPayload returns a payload with 2 byte key and 2 byte value
 func LightPayload(key uint16, value uint16) *ledger.Payload {
 	k := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: Uint16ToBinary(key)}}}
 	v := ledger.Value(Uint16ToBinary(value))
 	return &ledger.Payload{Key: k, Value: v}
 }
 
+// LightPayload8 returns a payload with 1 byte key and 1 byte value
 func LightPayload8(key uint8, value uint8) *ledger.Payload {
 	k := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: []byte{key}}}}
 	v := ledger.Value([]byte{value})
 	return &ledger.Payload{Key: k, Value: v}
 }
 
+// KeyPartFixture returns a key part fixture
 func KeyPartFixture(typ uint16, val string) *ledger.KeyPart {
 	kp1t := uint16(typ)
 	kp1v := []byte(val)
 	return ledger.NewKeyPart(kp1t, kp1v)
 }
 
+// QueryFixture returns a query fixture
 func QueryFixture() *ledger.Query {
 	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
 	k1p1 := ledger.NewKeyPart(uint16(1), []byte("1"))
@@ -53,6 +57,7 @@ func QueryFixture() *ledger.Query {
 	return u
 }
 
+// UpdateFixture returns an update fixture
 func UpdateFixture() *ledger.Update {
 	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
 	k1p1 := ledger.NewKeyPart(uint16(1), []byte("1"))
@@ -69,11 +74,13 @@ func UpdateFixture() *ledger.Update {
 	return u
 }
 
+// RootHashFixture returns a root hash fixture
 func RootHashFixture() ledger.RootHash {
 	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
 	return ledger.RootHash(sc)
 }
 
+// TrieProofFixture returns a trie proof fixture
 func TrieProofFixture() (*ledger.TrieProof, ledger.State) {
 	p := ledger.NewTrieProof()
 	p.Path = TwoBytesPath(330)
@@ -90,6 +97,7 @@ func TrieProofFixture() (*ledger.TrieProof, ledger.State) {
 	return p, ledger.State(sc)
 }
 
+// TrieBatchProofFixture returns a trie batch proof fixture
 func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.State) {
 	p1 := ledger.NewTrieProof()
 	p1.Path = TwoBytesPath(330)
@@ -170,6 +178,7 @@ func RandomPayloads(n int, minByteSize int, maxByteSize int) []*ledger.Payload {
 	return res
 }
 
+// RandomValues returns n random values with variable sizes (minByteSize <= size < maxByteSize)
 func RandomValues(n int, minByteSize, maxByteSize int) []ledger.Value {
 	if minByteSize > maxByteSize {
 		panic("minByteSize cannot be smaller then maxByteSize")

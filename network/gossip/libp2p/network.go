@@ -30,7 +30,6 @@ type Network struct {
 	metrics module.NetworkMetrics
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
-	fanout  int             // used to determine number of nodes' neighbors on overlay
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -53,9 +52,6 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
 
-	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := (len(ids) + 1) / 2
-
 	o := &Network{
 		logger:  log,
 		codec:   codec,
@@ -63,7 +59,6 @@ func NewNetwork(
 		mw:      mw,
 		engines: make(map[uint8]network.Engine),
 		rcache:  rcache,
-		fanout:  fanout,
 		top:     top,
 		metrics: metrics,
 	}
@@ -137,7 +132,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	return n.top.Subset(n.ids, n.fanout, n.me.NodeID().String())
+	return n.top.Subset(n.ids, n.fanout(), n.me.NodeID().String())
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
@@ -154,6 +149,12 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 	// remove this node id from the list of fanout target ids to avoid self-dial
 	idsMinusMe := ids.Filter(n.me.NotMeFilter())
 	n.ids = idsMinusMe
+}
+
+// fanout returns the node fanout derived from the identity list
+func (n *Network) fanout() int {
+	// fanout is currently set to half of the system size for connectivity assurance
+	return (len(n.ids) + 1) / 2
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {

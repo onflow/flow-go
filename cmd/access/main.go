@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -42,6 +43,7 @@ func main() {
 		blockLimit                   uint
 		collectionLimit              uint
 		receiptLimit                 uint
+		collectionGRPCPort           uint
 		pingEnabled                  bool
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
@@ -58,6 +60,7 @@ func main() {
 		collectionsToMarkExecuted    *stdmap.Times
 		blocksToMarkExecuted         *stdmap.Times
 		transactionMetrics           module.TransactionMetrics
+		pingMetrics                  module.PingMetrics
 		logTxTimeToFinalized         bool
 		logTxTimeToExecuted          bool
 		logTxTimeToFinalizedExecuted bool
@@ -68,9 +71,10 @@ func main() {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
+			flags.UintVar(&collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
 			flags.StringVarP(&rpcConf.GRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
-			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
+			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
@@ -78,6 +82,10 @@ func main() {
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
+			// collection node address is optional (if not specified, collection nodes will be chosen at random)
+			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
+				return nil
+			}
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
 
 			collectionRPCConn, err := grpc.Dial(
@@ -135,8 +143,24 @@ func main() {
 				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
 			return nil
 		}).
+		Module("ping metrics", func(node *cmd.FlowNodeBuilder) error {
+			pingMetrics = metrics.NewPingCollector()
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng = rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID, transactionMetrics)
+			rpcEng = rpc.New(
+				node.Logger,
+				node.State,
+				rpcConf,
+				executionRPC,
+				collectionRPC,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.Storage.Collections,
+				node.Storage.Transactions,
+				node.RootChainID,
+				transactionMetrics,
+				collectionGRPCPort)
 			return rpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -248,6 +272,7 @@ func main() {
 				node.Logger,
 				node.State,
 				node.Me,
+				pingMetrics,
 				pingEnabled,
 				node.Middleware,
 			)

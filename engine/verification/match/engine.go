@@ -174,7 +174,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		Int("total_chunks", len(result.Chunks)).
 		Logger()
 
-	log.Debug().Msg("start processing execution result")
+	log.Info().Msg("execution result arrived")
 
 	pendingResult := &flow.PendingResult{
 		ExecutorID:      originID,
@@ -197,8 +197,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
 
-	log.Debug().
-		Int("total_chunks", len(pendingResult.ExecutionResult.Chunks)).
+	log.Info().
 		Int("total_assigned_chunks", len(chunks)).
 		Msg("chunk assignment done")
 
@@ -320,7 +319,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		log.Debug().Msg("chunk data requested")
+		log.Info().Msg("chunk data requested")
 	}
 
 }

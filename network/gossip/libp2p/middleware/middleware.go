@@ -18,6 +18,7 @@ type Middleware interface {
 	Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error
 	Subscribe(channelID uint8) error
 	Ping(targetID flow.Identifier) (time.Duration, error)
+	UpdateAllowList() error
 }
 
 // Overlay represents the interface that middleware uses to interact with the
