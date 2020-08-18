@@ -294,6 +294,9 @@ docker-build-loader:
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
 
+.PHONY: docker-build-benchnet
+docker-build-benchnet: docker-build-flow docker-build-loader
+
 .PHONY: docker-push-collection
 docker-push-collection:
 	docker push "$(CONTAINER_REGISTRY)/collection:latest"
@@ -338,6 +341,9 @@ docker-push-loader:
 
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
+
+.PHONY: docker-push-benchnet
+docker-push-benchnet: docker-push-flow docker-push-loader
 
 .PHONY: docker-run-collection
 docker-run-collection:
