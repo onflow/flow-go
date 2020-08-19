@@ -165,7 +165,7 @@ func init() {
 	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
 		"{\"PublicKey\":\"ABCDEFGHIJK\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}",
 		"encoded json of public key for the service account")
-	finalizeCmd.Flags().Uint64Var(&flagGenesisTokenSupply, "genesis-token-supply", uint64(1000000000000000),
+	finalizeCmd.Flags().StringVar(&flagGenesisTokenSupply, "genesis-token-supply", "10000000.00000000",
 		"genesis flow token supply")
 }
 
