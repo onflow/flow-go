@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -71,7 +72,11 @@ and block seal.`,
 			if err != nil {
 				log.Fatal().Err(err).Msg("unable to parse the service account public key json")
 			}
-			commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, cadence.UFix64(flagGenesisTokenSupply), parseChainID(flagRootChain).Chain())
+			value, err := cadence.NewUFix64(string(flagGenesisTokenSupply))
+			if err != nil {
+				panic(fmt.Errorf("invalid genesis token supply: %w", err))
+			}
+			commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
 			if err != nil {
 				log.Fatal().Err(err).Msg("unable to generate execution state")
 			}
