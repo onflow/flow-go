@@ -237,3 +237,46 @@ func TestAggregatePubKeys(t *testing.T) {
 		fmt.Sprintf("incorrect generator %s, should be %s",
 			aggPk, expectedPk))
 }
+
+// BLS multi-signature
+// public keys aggregation sanity check
+//
+// Aggregate n public keys and their respective private keys and compare
+// the public key of the aggregated private key is equal to the aggregated
+// public key
+func TestRemovePubKeys(t *testing.T) {
+	mrand.Seed(time.Now().UnixNano())
+	// number of keys to aggregate
+	pkNum := mrand.Intn(100) + 1
+	pks := make([]PublicKey, 0, pkNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+
+	// generate public keys
+	for i := 0; i < pkNum; i++ {
+		n, err := rand.Read(seed)
+		require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+		require.NoError(t, err)
+		sk, err := GeneratePrivateKey(BLSBLS12381, seed)
+		require.NoError(t, err)
+		pks = append(pks, sk.PublicKey())
+	}
+	// aggregate public keys
+	aggPk, err := AggregatePublicKeys(pks)
+	require.NoError(t, err)
+
+	// number of keys to remove
+	pkToRemoveNum := mrand.Intn(pkNum)
+
+	partialPk, err := RemovePublicKeys(aggPk, pks[:pkToRemoveNum])
+	require.NoError(t, err)
+	expectedPatrialPk, err := AggregatePublicKeys(pks[pkToRemoveNum:])
+	require.NoError(t, err)
+
+	BLSkey, ok := expectedPatrialPk.(*PubKeyBLSBLS12381)
+	require.True(t, ok)
+
+	assert.True(t, BLSkey.Equals(partialPk),
+		fmt.Sprintf("incorrect key %s, should be %s, keys are %s, index is %d",
+			BLSkey, partialPk, pks, pkToRemoveNum))
+
+}
