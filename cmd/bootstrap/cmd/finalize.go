@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,7 +30,7 @@ var (
 	flagRootTimestamp                                string
 	flagRootCommit                                   string
 	flagServiceAccountPublicKeyJSON                  string
-	flagGenesisTokenSupply                           uint64
+	flagGenesisTokenSupply                           string
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -72,9 +71,9 @@ and block seal.`,
 			if err != nil {
 				log.Fatal().Err(err).Msg("unable to parse the service account public key json")
 			}
-			value, err := cadence.NewUFix64(string(flagGenesisTokenSupply))
+			value, err := cadence.NewUFix64(flagGenesisTokenSupply)
 			if err != nil {
-				panic(fmt.Errorf("invalid genesis token supply: %w", err))
+				log.Fatal().Err(err).Msg("invalid genesis token supply")
 			}
 			commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
 			if err != nil {
