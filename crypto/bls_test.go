@@ -223,7 +223,7 @@ func TestAggregatePubKeys(t *testing.T) {
 	// aggregate public keys
 	aggPk, err := AggregatePublicKeys(pks)
 	assert.NoError(t, err)
-	assert.Equal(t, aggPk, expectedPk,
+	assert.True(t, expectedPk.Equals(aggPk),
 		fmt.Sprintf("incorrect public key %s, should be %s, public keys are %s",
 			aggPk, expectedPk, pks))
 
@@ -233,7 +233,7 @@ func TestAggregatePubKeys(t *testing.T) {
 	expectedPk = aggSk.PublicKey()
 	aggPk, err = AggregatePublicKeys(pks[:0])
 	assert.NoError(t, err)
-	assert.Equal(t, aggPk, expectedPk,
+	assert.True(t, expectedPk.Equals(aggPk),
 		fmt.Sprintf("incorrect generator %s, should be %s",
 			aggPk, expectedPk))
 }

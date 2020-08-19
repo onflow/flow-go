@@ -123,6 +123,46 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 	}, nil
 }
 
+// RemovePublicKeys removes multiple BLS public keys from a given (aggregated) public key.
+//
+// The common use case assumes the aggregated public key was initially formed using
+// the keys to be removed (directly or using other aggregated forms). However the function
+// can still be called in different use cases.
+// The order of the keys to be romoved in the slice does not matter since the removal
+// is commutative. The slice of keys to be romoved can be empty.
+// No check is performed on the input public keys.
+func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
+	_ = newBLSBLS12381()
+	if aggKey.Algorithm() != BLSBLS12381 {
+		return nil, fmt.Errorf("all keys must be BLS keys")
+	}
+	aggPKBLS, _ := aggKey.(*PubKeyBLSBLS12381)
+
+	pointsToSubtract := make([]pointG2, 0, len(keysToRemove))
+	for _, pk := range keysToRemove {
+		if pk.Algorithm() != BLSBLS12381 {
+			return nil, fmt.Errorf("all keys must be BLS keys")
+		}
+		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
+		pointsToSubtract = append(pointsToSubtract, pkBLS.point)
+	}
+
+	var pointsPointer *C.ep2_st
+	if len(pointsToSubtract) != 0 {
+		pointsPointer = (*C.ep2_st)(&pointsToSubtract[0])
+	} else {
+		pointsPointer = (*C.ep2_st)(nil)
+	}
+
+	var resultKey pointG2
+	C.ep2_subtract_vector((*C.ep2_st)(&resultKey), (*C.ep2_st)(&aggPKBLS.point),
+		pointsPointer, (C.int)(len(pointsToSubtract)))
+
+	return &PubKeyBLSBLS12381{
+		point: resultKey,
+	}, nil
+}
+
 // VerifySignatureOneMessage is a multi-signature verification that verifies a
 // BLS signature of a single message against multiple BLS public keys.
 //
