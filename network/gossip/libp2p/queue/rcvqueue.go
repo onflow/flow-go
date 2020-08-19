@@ -189,7 +189,7 @@ func (r *RcvQueue) Size(size float64) int {
 func (r *RcvQueue) Score(s int, p interface{}) int {
 	size := r.Size(float64(s))
 	priority := r.Priority(p)
-	return int(math.Ceil(float64((size + priority) / 2)))
+	return int(math.Ceil(float64(size+priority) / 2))
 }
 
 // Remove the oldest entry in the queue and prioritize it.
