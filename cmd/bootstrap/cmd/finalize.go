@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 var (
@@ -66,16 +66,17 @@ and block seal.`,
 			log.Info().Msg("✨ generating empty execution state")
 
 			var err error
-			serviceAccountPublicKey := flow.AccountPublicKey{}
-			err = serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
-			if err != nil {
-				log.Fatal().Err(err).Msg("unable to parse the service account public key json")
-			}
-			value, err := cadence.NewUFix64(flagGenesisTokenSupply)
-			if err != nil {
-				log.Fatal().Err(err).Msg("invalid genesis token supply")
-			}
-			commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
+			// serviceAccountPublicKey := flow.AccountPublicKey{}
+			// err = serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
+			// if err != nil {
+			// 	log.Fatal().Err(err).Msg("unable to parse the service account public key json")
+			// }
+			// value, err := cadence.NewUFix64(flagGenesisTokenSupply)
+			// if err != nil {
+			// 	log.Fatal().Err(err).Msg("invalid genesis token supply")
+			// }
+			// commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
+			commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, parseChainID(flagRootChain).Chain())
 			if err != nil {
 				log.Fatal().Err(err).Msg("unable to generate execution state")
 			}
