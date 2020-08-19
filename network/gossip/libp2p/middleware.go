@@ -209,8 +209,12 @@ func (m *Middleware) Stop() {
 }
 
 // Send sends the message to the set of target ids
-// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
-// Otherwise, middleware.publish is used, which uses the PubSub method of communication.
+// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.SendDirect
+// Otherwise, middleware.Publish is used, which uses the PubSub method of communication.
+//
+// Deprecated: Send exists for historical compatibility, and should not be used on new
+// developments. It is planned to be cleaned up in near future. Proper utilization of Dispatch or
+// Publish are recommended instead.
 func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error {
 	var err error
 	mode := m.chooseMode(channelID, msg, targetIDs...)
@@ -228,9 +232,9 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 			m.log.Debug().Msg("send to self")
 			return nil
 		}
-		err = m.sendDirect(targetIDs[0], msg)
+		err = m.SendDirect(msg, targetIDs[0])
 	case OneToK:
-		err = m.publish(channelID, msg)
+		err = m.Publish(msg, channelID)
 	default:
 		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
@@ -253,8 +257,13 @@ func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.I
 	}
 }
 
-// sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
-func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) error {
+// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
+// as the router.
+//
+// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
+// a more efficient candidate.
+func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
 
 	targetAddress, err := m.nodeAddressFromID(targetID)
 	if err != nil {
@@ -465,8 +474,10 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	}
 }
 
-// Publish publishes the given payload on the topic
-func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
+// Publish publishes msg on the channel. It models a distributed broadcast where the message is meant for all or
+// a many nodes subscribing to the channel ID. It does not guarantee the delivery though, and operates on a best
+// effort.
+func (m *Middleware) Publish(msg *message.Message, channelID uint8) error {
 
 	// convert the message to bytes to be put on the wire.
 	data, err := msg.Marshal()
@@ -512,6 +523,8 @@ func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
 	return m.libP2PNode.Ping(m.ctx, nodeAddress)
 }
 
+// UpdateAllowList fetches the most recent identity of the nodes from overlay
+// and updates the underlying libp2p node.
 func (m *Middleware) UpdateAllowList() error {
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
