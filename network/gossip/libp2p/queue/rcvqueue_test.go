@@ -67,7 +67,7 @@ func (r *RcvQueueTestSuite) TestPriorityScore() {
 
 	assert.NoError(r.Suite.T(), payloadErr)
 	// All of our mocked messages should have a priority score of 3
-	assert.Equal(r.Suite.T(), 4, score)
+	assert.Equal(r.Suite.T(), 3, score)
 }
 
 // TestSizeScore sends a message size to calculate a size score by message size
@@ -87,7 +87,7 @@ func (r *RcvQueueTestSuite) TestScore() {
 
 	assert.NoError(r.Suite.T(), payloadErr)
 	// All of our mocked messages should have a score of 6
-	assert.Equal(r.Suite.T(), 7, score)
+	assert.Equal(r.Suite.T(), 6, score)
 }
 
 // TestSingleMessageAdd adds a single message to the queue and verifies its existence
