@@ -342,6 +342,9 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	// it won't affect much.
 	go func() {
 		<-time.After(e.cfg.RetryInitial)
+
+		e.unit.Lock()
+		defer e.unit.Unlock()
 		delete(e.requests, req.Nonce)
 	}()
 
