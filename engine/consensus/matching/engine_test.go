@@ -22,6 +22,36 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// 1. Matching engine should validate the incoming receipt (aka ExecutionReceipt):
+//     1. it should stores it to the mempool if valid
+//     2. it should ignore it when:
+//         1. the origin is invalid
+//         2. the role is invalid
+//         3. the result (a receipt has one result, multiple receipts might have the same result) has been sealed already
+//         4. the receipt has been received before
+//         5. the result has been received before
+// 2. Matching engine should validate the incoming approval (aka ResultApproval):
+//     1. it should store it to the mempool if valid
+//     2. it should ignore it when:
+//         1. the origin is invalid
+//         2. the role is invalid
+//         3. the result has been sealed already
+//         4. the receipt has been received before
+//         5. the result has been received before
+// 3. Matching engine should be able to find matched results: (IMO, the `sealableResults` should be renamed to `matchedResults`, because a matched result is not a sealable result when the block is missing)
+//     1. It should find no matched result if there is no result and no approval
+//     2. it should find 1 matched result if we received a receipt, and the block has no payload (impossible now, system every block will have at least one chunk to verify)
+//     3. It should find no matched result if there is only result, but no approval (skip for now, because we seal results without approvals)
+// 4. Matching engine should be able to seal a matched result:
+//     1. It should not seal a matched result if:
+//         1. the block is missing (consensus hasn’t received this executed block yet)
+//         2. the approvals for a certain chunk are insufficient (skip for now, because we seal results without approvals)
+//         3. there is some chunk didn’t receive enough approvals
+//         4. there is no seal for its parent result
+//     2. It should seal a matched result if the approvals are sufficient
+// 5. Matching engine should request results from execution nodes:
+//     1. If there are unsealed and finalized blocks, it should request the execution receipts from the execution nodes.
+
 func TestMatchingEngine(t *testing.T) {
 	suite.Run(t, new(MatchingSuite))
 }

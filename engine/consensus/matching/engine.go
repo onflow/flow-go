@@ -26,8 +26,10 @@ var (
 	errInvalidChunks   = errors.New("invalid chunk number")
 )
 
-// Engine is the propagation engine, which makes sure that new collections are
-// propagated to the other consensus nodes on the network.
+// Engine is the Matching engine, which builds seals by matching receipts
+// (aka ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
+// from verification nodes), and saves the seals into seals mempool for adding into
+// a new block.
 type Engine struct {
 	unit      *engine.Unit             // used to control startup/shutdown
 	log       zerolog.Logger           // used to log relevant actions with context
