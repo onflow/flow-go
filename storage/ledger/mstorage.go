@@ -253,6 +253,10 @@ func (f *MTrieStorage) UpdateRegistersWithProof(
 		return nil, nil, err
 	}
 
+	for i, reg := range ids {
+		fmt.Println("U>>>>>>>>>>", i, hex.EncodeToString(reg), " ~~~~~ ", hex.EncodeToString(values[i]))
+	}
+
 	_, proofs, err = f.GetRegistersWithProof(ids, newStateCommitment)
 	return newStateCommitment, proofs, err
 }
