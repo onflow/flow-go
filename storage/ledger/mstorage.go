@@ -112,6 +112,11 @@ func (f *MTrieStorage) GetRegisters(
 		f.metrics.ReadDurationPerItem(durationPerValue)
 	}
 
+	// TODO(RAMTIN) remove me - this is temporary for testing
+	for i, reg := range registerIDs {
+		fmt.Println("R>>>>>>>>>>", i, string(reg), " ~~~~~ ", string(values[i]))
+	}
+
 	return values, err
 }
 
@@ -163,6 +168,11 @@ func (f *MTrieStorage) UpdateRegisters(
 	if len(ids) > 0 {
 		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(ids))) * time.Nanosecond
 		f.metrics.UpdateDurationPerItem(durationPerValue)
+	}
+
+	// TODO(RAMTIN) remove me - this is temporary for testing
+	for i, reg := range ids {
+		fmt.Println("U>>>>>>>>>>", i, string(reg), " ~~~~~ ", string(values[i]))
 	}
 
 	return newStateCommitment, nil

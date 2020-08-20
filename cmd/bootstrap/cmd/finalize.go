@@ -66,6 +66,7 @@ and block seal.`,
 			log.Info().Msg("✨ generating empty execution state")
 
 			var err error
+			// commented out for furthur testing
 			// serviceAccountPublicKey := flow.AccountPublicKey{}
 			// err = serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
 			// if err != nil {
