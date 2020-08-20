@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -114,7 +115,7 @@ func (f *MTrieStorage) GetRegisters(
 
 	// TODO(RAMTIN) remove me - this is temporary for testing
 	for i, reg := range registerIDs {
-		fmt.Println("R>>>>>>>>>>", i, string(reg), " ~~~~~ ", string(values[i]))
+		fmt.Println("R>>>>>>>>>>", i, hex.EncodeToString(reg), " ~~~~~ ", hex.EncodeToString(values[i]))
 	}
 
 	return values, err
@@ -172,7 +173,7 @@ func (f *MTrieStorage) UpdateRegisters(
 
 	// TODO(RAMTIN) remove me - this is temporary for testing
 	for i, reg := range ids {
-		fmt.Println("U>>>>>>>>>>", i, string(reg), " ~~~~~ ", string(values[i]))
+		fmt.Println("U>>>>>>>>>>", i, hex.EncodeToString(reg), " ~~~~~ ", hex.EncodeToString(values[i]))
 	}
 
 	return newStateCommitment, nil
