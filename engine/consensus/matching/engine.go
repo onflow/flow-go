@@ -5,6 +5,7 @@ package matching
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -21,9 +22,10 @@ import (
 )
 
 var (
-	errUnknownBlock    = errors.New("result block unknown")
-	errUnknownPrevious = errors.New("previous result unknown")
-	errInvalidChunks   = errors.New("invalid chunk number")
+	errUnknownBlock     = errors.New("result block unknown")
+	errUnknownPrevious  = errors.New("previous result unknown")
+	errUnsealedPrevious = errors.New("previous result unknown or unsealed")
+	errInvalidChunks    = errors.New("invalid chunk number")
 )
 
 // Engine is the Matching engine, which builds seals by matching receipts
@@ -45,6 +47,7 @@ type Engine struct {
 	approvals mempool.Approvals        // holds result approvals in memory
 	seals     mempool.Seals            // holds block seals in memory
 	missing   map[flow.Identifier]uint // track how often a block was missing
+	threshold float64                  // proportion of total stake required to validate a chunk
 }
 
 // New creates a new collection propagation engine.
@@ -287,19 +290,19 @@ func (e *Engine) checkSealing() {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	// get all results that are sealable
-	results, err := e.sealableResults()
+	// get all results that have collected enough approvals on a per-chunk basis
+	results, err := e.matchedResults()
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not get sealable execution results")
 		return
 	}
 
-	// skip if no results can be sealed yet
+	// skip if no results have been matched yet
 	if len(results) == 0 {
 		return
 	}
 
-	e.log.Info().Int("num_results", len(results)).Msg("identified sealable execution results")
+	e.log.Info().Int("num_results", len(results)).Msg("matched execution results")
 
 	// process the results results
 	var sealedIDs []flow.Identifier
@@ -314,15 +317,15 @@ func (e *Engine) checkSealing() {
 		err := e.sealResult(result)
 		if err == errInvalidChunks {
 			_ = e.results.Rem(result.ID())
-			log.Warn().Msg("removing sealable result with invalid number of chunks")
+			log.Warn().Msg("removing matched result with invalid number of chunks")
 			continue
 		}
 		if err == errUnknownBlock {
-			log.Debug().Msg("skipping sealable result with unknown sealed block")
+			log.Debug().Msg("skipping matched result with unknown sealed block")
 			continue
 		}
 		if err == errUnknownPrevious {
-			log.Debug().Msg("skipping sealable result with unknown previous result")
+			log.Debug().Msg("skipping matched result with unknown previous result")
 			continue
 		}
 		if err != nil {
@@ -340,11 +343,14 @@ func (e *Engine) checkSealing() {
 	e.clearPools(sealedIDs)
 }
 
-func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
+// matchedResults returns the ExecutionResults from the mempool that have
+// collected enough approvals on a per-chunk basis, as defined by the matchChunk
+// function.
+func (e *Engine) matchedResults() ([]*flow.ExecutionResult, error) {
 
 	var results []*flow.ExecutionResult
 
-	// get all approvers so we have the vote threshold
+	// get current set of staked verifiers
 	verifiers, err := e.state.Final().Identities(filter.And(
 		filter.HasStake(true),
 		filter.HasRole(flow.RoleVerification),
@@ -352,9 +358,18 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
 	}
-	threshold := verifiers.TotalStake() / 3 * 2
+
+	// requiredStake is the minimum collective stake that a set of verifiers
+	// should hold to collectively validate a chunk with their ResultApprovals.
+	requiredStake := uint64(
+		math.Ceil(
+			float64(verifiers.TotalStake()) * e.threshold,
+		),
+	)
 
 	// get all available approvals once, and map them to their result
+	// TODO: byResult gets repopulated each time on each call. use a more
+	// persistant index.
 	byResult := make(map[flow.Identifier]([]*flow.ResultApproval))
 	for _, approval := range e.approvals.All() {
 		resultID := approval.Body.ExecutionResultID
@@ -379,36 +394,9 @@ ResultLoop:
 				Uint64("chunk", chunk.Index).
 				Logger()
 
-			// we use this to check for duplicate approvals by one approver
-			dupCheck := make(map[flow.Identifier]bool)
+			matched := e.matchChunk(approvals, chunk, verifiers, requiredStake)
 
-			// get the node IDs for all approvers of this chunk
-			var approverIDs []flow.Identifier
-			for _, approval := range approvals {
-				if approval.Body.ChunkIndex == chunk.Index {
-					approverID := approval.Body.ApproverID
-					if dupCheck[approverID] {
-						_ = e.approvals.Rem(approval.ID())
-						log.Warn().
-							Hex("approver", approverID[:]).
-							Msg("dropping duplicate approval")
-						continue
-					}
-					dupCheck[approverID] = true
-					approverIDs = append(approverIDs, approverID)
-				}
-			}
-
-			// get all of the approver identities and check threshold
-			approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
-			voted := approvers.TotalStake()
-
-			log = log.With().
-				Uint64("voted", voted).
-				Uint64("threshold", threshold).
-				Logger()
-
-			if voted <= threshold {
+			if !matched {
 				log.Debug().Msg("ignoring result with insufficient verification")
 				continue ResultLoop
 			}
@@ -421,6 +409,47 @@ ResultLoop:
 	}
 
 	return results, nil
+}
+
+// matchChunk checks that the number of ResultApprovals collected by a chunk
+// exceeds the required threshold.
+func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk, verifiers flow.IdentityList, requiredStake uint64) bool {
+
+	// we use this to check for duplicate approvals by one approver
+	dupCheck := make(map[flow.Identifier]bool)
+
+	// get the node IDs for all approvers of this chunk
+	var approverIDs []flow.Identifier
+	for _, approval := range approvals {
+		if approval.Body.ChunkIndex == chunk.Index {
+			approverID := approval.Body.ApproverID
+			if dupCheck[approverID] {
+				_ = e.approvals.Rem(approval.ID())
+				log.Warn().
+					Hex("approver", approverID[:]).
+					Msg("dropping duplicate approval")
+				continue
+			}
+			dupCheck[approverID] = true
+			approverIDs = append(approverIDs, approverID)
+		}
+	}
+
+	// get all of the approver identities and check threshold
+	approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
+	voted := approvers.TotalStake()
+
+	if voted < requiredStake {
+		e.log.Debug().
+			Float64("threshold", e.threshold).
+			Uint64("total_stake", verifiers.TotalStake()).
+			Uint64("required_stake", requiredStake).
+			Uint64("collected_stake", voted).
+			Msg("insufficient verification")
+		return false
+	}
+
+	return true
 }
 
 func (e *Engine) sealResult(result *flow.ExecutionResult) error {
@@ -444,17 +473,12 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	}
 
 	// get the previous result from our mempool or storage
+	// XXX 4.1.4 adds requirement that parent result should be sealed, no need
+	// to look in mempool
 	previousID := result.PreviousResultID
-	previous, found := e.results.ByID(previousID)
-	if !found {
-		var err error
-		previous, err = e.resultsDB.ByID(previousID)
-		if errors.Is(err, storage.ErrNotFound) {
-			return errUnknownPrevious
-		}
-		if err != nil {
-			return fmt.Errorf("could not get previous result: %w", err)
-		}
+	previous, err := e.resultsDB.ByID(previousID)
+	if err != nil {
+		return errUnsealedPrevious
 	}
 
 	// store the result to make it persistent for later checks
