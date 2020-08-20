@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 )
@@ -12,24 +14,29 @@ import (
 const worker_count = 3
 
 type lookUpResult struct {
-	hostname hostnameMa
-	ipAddr ipMa
-	err    error
+	hostname multiaddr.Multiaddr
+	ipAddr   multiaddr.Multiaddr
+	err      error
 }
 
 type DnsResolver struct {
-	resolver madns.Resolver
-	log zerolog.Logger
+	dnsMap   DnsMap
+	resolver *madns.Resolver
+	log      zerolog.Logger
 }
 
-func NewDnsResolver(resolver madns.Resolver, log zerolog.Logger) DnsResolver {
+func NewDnsResolver(resolver *madns.Resolver, dnsMap DnsMap, log zerolog.Logger) DnsResolver {
 	return DnsResolver{
+		dnsMap:   dnsMap,
 		resolver: resolver,
-		log: log,
+		log:      log,
 	}
 }
 
-func (d *DnsResolver) worker(ctx context.Context, hostnames  <- chan hostnameMa, results chan <- lookUpResult, wg *sync.WaitGroup) {
+func (d *DnsResolver) worker(ctx context.Context,
+	hostnames <-chan multiaddr.Multiaddr,
+	results chan<- lookUpResult,
+	wg *sync.WaitGroup) {
 	defer wg.Done()
 	for h := range hostnames {
 		resolvedMa, err := d.resolver.Resolve(ctx, h)
@@ -45,33 +52,33 @@ func (d *DnsResolver) worker(ctx context.Context, hostnames  <- chan hostnameMa,
 				result.err = fmt.Errorf("address for hostname %s not found", h)
 			}
 		}
-
 		results <- result
-		}
+	}
 }
 
+func (d *DnsResolver) refreshDNS(ctx context.Context, hostnamesMA []multiaddr.Multiaddr) {
 
-func (d *DnsResolver) refreshDNS(ctx context.Context, hostnames []hostnameMa) {
-
-	hostnamesCnt := len(hostnames)
-	hostnamesChan := make(chan hostnameMa, hostnamesCnt) // job queue
-	resultsChan := make(chan lookUpResult, hostnamesCnt) // results queue
+	hostnamesCount := len(hostnamesMA)
+	hostnamesChan := make(chan multiaddr.Multiaddr, hostnamesCount)     // job queue
+	resultsChan := make(chan lookUpResult, hostnamesCount) // results queue
 
 	wg := sync.WaitGroup{}
 
 	// spin up workers to do the dns lookup (producers)
 	for w := 0; w < worker_count; w++ {
 		wg.Add(1)
-		d.worker(ctx, hostnamesChan, resultsChan, &wg)
+		go d.worker(ctx, hostnamesChan, resultsChan, &wg)
 	}
 
-	updateMap := func(results <- chan lookUpResult, wg *sync.WaitGroup) {
+	updateMap := func(results <-chan lookUpResult, wg *sync.WaitGroup) {
 		defer wg.Done()
-		for result := range resultsChan {
+		for i := 0; i < hostnamesCount; i++ {
+			result := <-results
 			if result.err != nil {
 				d.log.Err(result.err).Str("hostname", result.hostname.String()).Msg("dns hostname lookup failed")
+				continue
 			}
-			dnsMap.update(result.hostname, result.ipAddr)
+			d.dnsMap.update(result.hostname, result.ipAddr)
 		}
 	}
 
@@ -79,14 +86,26 @@ func (d *DnsResolver) refreshDNS(ctx context.Context, hostnames []hostnameMa) {
 	wg.Add(1)
 	go updateMap(resultsChan, &wg)
 
-	// push hostnames to job queue
-	for _, h := range hostnames {
+	// push hostnames to hostname channel
+	for _, h := range hostnamesMA {
 		hostnamesChan <- h
 	}
 
 	close(hostnamesChan)
-	wg.Done()
+	wg.Wait()
 }
 
-
-
+func (d *DnsResolver) RefreshDNSPeriodically(ctx context.Context, hostnamesMA []multiaddr.Multiaddr, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				d.refreshDNS(ctx, hostnamesMA)
+			}
+		}
+	}()
+}

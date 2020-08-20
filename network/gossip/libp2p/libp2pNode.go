@@ -24,9 +24,11 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
 	netwk "github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/dns"
 )
 
 const (
@@ -40,6 +42,8 @@ const (
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 const maxConnectAttempt = 3
+
+var defaultResolverFreq = time.Hour
 
 // NodeAddress is used to define a libp2p node
 type NodeAddress struct {
@@ -118,8 +122,27 @@ func (p *P2PNode) Start(ctx context.Context,
 			return fmt.Errorf("failed to create approved list of peers: %w", err)
 		}
 
+		// find all addresses which are hostnames (and not ipv4 addresses)
+		var hostnames []multiaddr.Multiaddr
+		for _, pinfo := range allowListPInfos {
+			if len(pinfo.Addrs) <= 0 {
+				return fmt.Errorf("invalid address for peer %s", pinfo.String())
+			}
+			addr := pinfo.Addrs[0]
+			if IsHostname(addr) {
+				hostnames = append(hostnames, addr)
+			}
+		}
+
+		dnsMap := dns.DefaultDnsMap
+
+		// kick off the DNS resolver to resolve hostnames periodically
+		dnsResolver :=  dns.NewDnsResolver(madns.DefaultResolver, dnsMap, p.logger)
+		dnsResolver.RefreshDNSPeriodically(ctx, hostnames, defaultResolverFreq)
+
+
 		// create a connection gater
-		p.connGater = newConnGater(allowListPInfos, p.logger)
+		p.connGater = newConnGater(allowListPInfos, p.logger, dnsMap)
 
 		// provide the connection gater as an option to libp2p
 		options = append(options, libp2p.ConnectionGater(p.connGater))
@@ -322,6 +345,11 @@ func GetPeerInfos(addrs ...NodeAddress) ([]peer.AddrInfo, error) {
 		}
 	}
 	return peerInfos, err
+}
+
+func IsHostname(ma multiaddr.Multiaddr) bool {
+	_, err := ma.ValueForProtocol(multiaddr.P_DNS4)
+	return err != nil
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.

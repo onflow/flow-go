@@ -6,36 +6,54 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-type hostnameMa multiaddr.Multiaddr
-type ipMa multiaddr.Multiaddr
+type hostnameMa string
+type ipMa string
 
-
-var dnsMap = dnsTable{
-	hostnameIPMap: make(map[hostnameMa]ipMa),
-	ipHostnameMap: make(map[ipMa]hostnameMa),
+func hmaStr(ma multiaddr.Multiaddr) hostnameMa {
+	return hostnameMa(ma.String())
 }
 
-type dnsTable struct {
-	sync.Mutex
-	hostnameIPMap map[hostnameMa]ipMa
-	ipHostnameMap map[ipMa]hostnameMa
+func ipmaStr(ma multiaddr.Multiaddr) ipMa {
+	return ipMa(ma.String())
 }
 
-func (d *dnsTable) update(hma hostnameMa, ipma ipMa) {
-	d.Lock()
-	defer d.Unlock()
-	d.hostnameIPMap[hma] = ipma
-	d.ipHostnameMap[ipma] = hma
+
+var DefaultDnsMap = DnsMap{
+	hostnameIPMap: make(map[hostnameMa]multiaddr.Multiaddr),
+	ipHostnameMap: make(map[ipMa]multiaddr.Multiaddr),
 }
 
-func (d *dnsTable) lookUp(hma hostnameMa) ipMa{
-	d.Lock()
-	defer d.Unlock()
-	return d.hostnameIPMap[hma]
+type DnsMap struct {
+	m sync.Mutex
+	hostnameIPMap map[hostnameMa]multiaddr.Multiaddr
+	ipHostnameMap map[ipMa]multiaddr.Multiaddr
 }
 
-func (d *dnsTable) reverseLookUp(ip ipMa) hostnameMa{
-	d.Lock()
-	defer d.Unlock()
-	return d.ipHostnameMap[ip]
+func (d *DnsMap) update(hostname, ip multiaddr.Multiaddr) {
+	hma := hmaStr(hostname)
+	ipma := ipmaStr(ip)
+	d.m.Lock()
+	defer d.m.Unlock()
+	d.hostnameIPMap[hma] = ip
+	d.ipHostnameMap[ipma] = hostname
+}
+
+func (d *DnsMap) LookUp(hostname multiaddr.Multiaddr) multiaddr.Multiaddr{
+	hma := hmaStr(hostname)
+	d.m.Lock()
+	defer d.m.Unlock()
+	if ip, ok := d.hostnameIPMap[hma]; ok {
+		return ip
+	}
+	return nil
+}
+
+func (d *DnsMap) ReverseLookUp(ip multiaddr.Multiaddr) multiaddr.Multiaddr{
+	ipma := ipmaStr(ip)
+	d.m.Lock()
+	defer d.m.Unlock()
+	if h, ok := d.ipHostnameMap[ipma]; ok {
+		return h
+	}
+	return nil
 }
