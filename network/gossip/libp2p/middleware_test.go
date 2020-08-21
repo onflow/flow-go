@@ -164,7 +164,8 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 
 	msg := createMessage(m.ids[firstNode], m.ids[lastNode])
 
-	err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
+	// sends a direct message from first node to the last node
+	err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	select {
@@ -196,7 +197,8 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 				wg.Done()
 			})
 		go func() {
-			err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
+			// sends a direct message from first node to the last node
+			err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode])
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
@@ -231,7 +233,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			err = m.mws[lastNode].Send(0, replyMsg, m.mws[firstNode].me)
+			err = m.mws[lastNode].SendDirect(replyMsg, m.mws[firstNode].me)
 			assert.NoError(m.T(), err)
 
 		})
@@ -242,7 +244,8 @@ func (m *MiddlewareTestSuit) TestEcho() {
 			wg.Done()
 		})
 
-	err = m.mws[firstNode].Send(0, sendMsg, m.ids[lastNode])
+	// sends a direct message from first node to the last node
+	err = m.mws[firstNode].SendDirect(sendMsg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	wg.Wait()

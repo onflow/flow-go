@@ -269,6 +269,10 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, times
 		panic("GetBlockAtHeight is not supported by this environment")
 	}
 
+	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
+		return runtime.BlockHash(e.ctx.BlockHeader.ID()), e.ctx.BlockHeader.Timestamp.UnixNano(), true, nil
+	}
+
 	block, err := e.ctx.Blocks.ByHeight(height)
 	// TODO: remove dependency on storage
 	if errors.Is(err, storage.ErrNotFound) {

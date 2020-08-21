@@ -249,8 +249,14 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 	}
 
 	// TODO: dedup the message here
+	if len(targetIDs) > 1 {
+		err = n.mw.Publish(msg, channelID)
+	} else if len(targetIDs) == 1 {
+		err = n.mw.SendDirect(msg, targetIDs[0])
+	} else {
+		return fmt.Errorf("empty target ID list for the message")
+	}
 
-	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not gossip event: %w", err)
 	}
