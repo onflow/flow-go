@@ -5,11 +5,16 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
-# Image tag
-IMAGE_TAG := ${VERSION}
+
+# Image tag: if image tag is not set, set it with version (or short commit if empty)
+ifndef IMAGE_TAG
+override IMAGE_TAG := ${VERSION}
+endif
+
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
 endif
+
 # Name of the cover profile
 COVER_PROFILE := cover.out
 # Disable go sum database lookup for private repos
@@ -23,6 +28,11 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 # docker container registry 
 ifndef CONTAINER_REGISTRY
 override CONTAINER_REGISTRY=gcr.io/dl-flow
+endif
+
+# docker push tag - tag beside the latest tag to be used to push the image to the container registry
+ifndef EXTRA_DOCKER_TAG
+override EXTRA_DOCKER_TAG=latest
 endif
 
 export DOCKER_BUILDKIT := 1
