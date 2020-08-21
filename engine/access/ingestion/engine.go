@@ -95,7 +95,9 @@ func New(
 // started. For the ingestion engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	// request all missing collection upfront
+	e.unit.Do(e.requestMissingCollections)
+	return e.unit.Done()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
@@ -333,4 +335,60 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 
 // OnDoubleProposeDetected is a noop for this engine since access node is only dealing with finalized blocks
 func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
+}
+
+
+// requestMissingCollections requests missing collections for all blocks in the local db storage
+func (e *Engine)  requestMissingCollections() error {
+
+	finalBlk, err := e.state.Final().Head()
+	if err != nil {
+		return err
+	}
+	finalizedHeight := finalBlk.Height
+
+	e.log.Info().Uint64("height", finalizedHeight).Msg("starting collection catchup")
+	missingCollCount := uint64(0)
+
+	// iterator through the complete chain (but only request collections for blocks we have)
+	for i := finalizedHeight; i >= 0; i-- {
+
+		// for all the blocks in the local db, request missing collections
+		blk, err := e.blocks.ByHeight(i)
+		if err != nil {
+			if !errors.Is(err, storage.ErrNotFound) {
+				e.log.Error().Err(err).Uint64("height", i).Msg("failed to retrieve block")
+			}
+			// if block not found locally, continue
+			continue
+		}
+
+		for _, guarantee := range blk.Payload.Guarantees {
+			collId := guarantee.CollectionID
+			_, err = e.collections.LightByID(collId)
+
+			// if collection found, continue
+			if err != nil {
+				continue
+			}
+
+			if errors.Is(err, storage.ErrNotFound) {
+
+				// requesting the collection from the collection node
+				e.log.Debug().Str("collection_id", collId.String()).Msg("requesting missing collection")
+				e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+				missingCollCount++
+			} else {
+				e.log.Error().Err(err).Str("collection_id", collId.String()).Msg("failed to retrieve collection from storage")
+			}
+		}
+	}
+
+	// the collection catchup needs to happen ASAP when the node starts up. Hence, force the requester to dispatch all request.
+	if missingCollCount > 0 {
+		e.request.Force()
+	}
+
+	e.log.Info().Uint64("total_missing_collections", missingCollCount).Msg("collection catchup done")
+	return nil
 }
