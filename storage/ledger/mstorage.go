@@ -1,7 +1,6 @@
 package ledger
 
 import (
-	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -113,11 +112,6 @@ func (f *MTrieStorage) GetRegisters(
 		f.metrics.ReadDurationPerItem(durationPerValue)
 	}
 
-	// TODO(RAMTIN) remove me - this is temporary for testing
-	for i, reg := range registerIDs {
-		fmt.Println("R>>>>>>>>>>", i, hex.EncodeToString(reg), " ~~~~~ ", hex.EncodeToString(values[i]))
-	}
-
 	return values, err
 }
 
@@ -169,11 +163,6 @@ func (f *MTrieStorage) UpdateRegisters(
 	if len(ids) > 0 {
 		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(ids))) * time.Nanosecond
 		f.metrics.UpdateDurationPerItem(durationPerValue)
-	}
-
-	// TODO(RAMTIN) remove me - this is temporary for testing
-	for i, reg := range ids {
-		fmt.Println("U>>>>>>>>>>", i, hex.EncodeToString(reg), " ~~~~~ ", hex.EncodeToString(values[i]))
 	}
 
 	return newStateCommitment, nil
@@ -251,10 +240,6 @@ func (f *MTrieStorage) UpdateRegistersWithProof(
 	newStateCommitment, err = f.UpdateRegisters(ids, values, stateCommitment)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	for i, reg := range ids {
-		fmt.Println("U>>>>>>>>>>", i, hex.EncodeToString(reg), " ~~~~~ ", hex.EncodeToString(values[i]))
 	}
 
 	_, proofs, err = f.GetRegistersWithProof(ids, newStateCommitment)
