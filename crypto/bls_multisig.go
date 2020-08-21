@@ -106,6 +106,7 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 		if pk.Algorithm() != BLSBLS12381 {
 			return nil, fmt.Errorf("all keys must be BLS keys")
 		}
+		// assertion is guaranteed to be correct after the algorithm check
 		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
 		points = append(points, pkBLS.point)
 	}
@@ -129,14 +130,15 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 // The common use case assumes the aggregated public key was initially formed using
 // the keys to be removed (directly or using other aggregated forms). However the function
 // can still be called in different use cases.
-// The order of the keys to be romoved in the slice does not matter since the removal
-// is commutative. The slice of keys to be romoved can be empty.
+// The order of the keys to be removed in the slice does not matter since the removal
+// is commutative. The slice of keys to be removed can be empty.
 // No check is performed on the input public keys.
 func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
 	_ = newBLSBLS12381()
 	if aggKey.Algorithm() != BLSBLS12381 {
 		return nil, fmt.Errorf("all keys must be BLS keys")
 	}
+	// assertion is guaranteed to be correct after the algorithm check
 	aggPKBLS, _ := aggKey.(*PubKeyBLSBLS12381)
 
 	pointsToSubtract := make([]pointG2, 0, len(keysToRemove))
@@ -144,6 +146,7 @@ func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, er
 		if pk.Algorithm() != BLSBLS12381 {
 			return nil, fmt.Errorf("all keys must be BLS keys")
 		}
+		// assertion is guaranteed to be correct after the algorithm check
 		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
 		pointsToSubtract = append(pointsToSubtract, pkBLS.point)
 	}
