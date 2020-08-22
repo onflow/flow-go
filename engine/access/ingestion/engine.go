@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -318,6 +319,30 @@ func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) 
 		}
 	}
 
+	// update the last received collection block height
+	blk, err := e.blocks.ByCollectionID(light.ID())
+	if err != nil {
+		return fmt.Errorf("could not update last received "+
+			"collection block height for collection (%x): %w", light.ID(), err)
+	}
+	for _, cg := range blk.Payload.Guarantees {
+		_, err := e.collections.LightByID(cg.ID())
+		if err != nil {
+			// if there is at least one collection guarantee that has not yet been received, don't update the height
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil
+			} else {
+				return fmt.Errorf("could not update last received "+
+					"collection block height: %w", err)
+			}
+		}
+	}
+
+	// if we made till here, means all collection guarantees for the block has been received
+	e.operation.UpdateLastCompleteBlockHeight(blk.Header.Height)
+e.
+	}
+
 	return nil
 }
 
@@ -337,9 +362,8 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
 }
 
-
 // requestMissingCollections requests missing collections for all blocks in the local db storage
-func (e *Engine)  requestMissingCollections() error {
+func (e *Engine) requestMissingCollections() error {
 
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {

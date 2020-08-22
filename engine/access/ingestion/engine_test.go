@@ -233,3 +233,23 @@ func (suite *Suite) TestOnCollectionDuplicate() {
 	suite.collections.AssertExpectations(suite.T())
 	suite.transactions.AssertNotCalled(suite.T(), "Store", "should not store any transactions")
 }
+
+
+func (suite *Suite) TestRequestMissingCollections() {
+
+	blkCnt := 3
+	finalizedHeight := 1000
+	startHeight := finalizedHeight - blkCnt
+	blocks := make([]flow.Block, blkCnt)
+	for i := 0;i<blkCnt;i++ {
+		blocks[i] = unittest.BlockFixture()
+		blocks[i].Header.Height = uint64(startHeight + i)
+
+	}
+	block := unittest.BlockFixture()
+	modelBlock := model.Block{
+		BlockID: block.ID(),
+	}
+
+
+}
