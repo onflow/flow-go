@@ -178,7 +178,7 @@ func main() {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, transactionMetrics,
-				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
+				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng, node.RootBlock)
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
 		}).

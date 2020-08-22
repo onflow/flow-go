@@ -18,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -45,6 +44,7 @@ type Engine struct {
 	blocksToMarkExecuted       *stdmap.Times
 
 	rpcEngine *rpc.Engine
+	rootBlk flow.Block
 }
 
 // New creates a new access ingestion engine
@@ -63,6 +63,7 @@ func New(
 	collectionsToMarkExecuted *stdmap.Times,
 	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
+	rootBlk flow.Block,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -81,6 +82,7 @@ func New(
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		rpcEngine:                  rpcEngine,
+		rootBlk: rootBlk,
 	}
 
 	// register engine with the execution receipt provider
@@ -339,9 +341,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) 
 	}
 
 	// if we made till here, means all collection guarantees for the block has been received
-	e.operation.UpdateLastCompleteBlockHeight(blk.Header.Height)
-e.
-	}
+	err := e.blocks.TagCollectionsReceived(blk.ID())
+	return fmt.Errorf("could not tag block (%x) for all collections received: %w", blk.ID(), err)
+
 
 	return nil
 }
@@ -365,23 +367,31 @@ func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
 // requestMissingCollections requests missing collections for all blocks in the local db storage
 func (e *Engine) requestMissingCollections() error {
 
+	var startHeight, endHeight uint64
+
+	startHeight = e.rootBlk.Header.Height
+
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {
 		return err
 	}
-	finalizedHeight := finalBlk.Height
+	endHeight = finalBlk.Height
 
-	e.log.Info().Uint64("height", finalizedHeight).Msg("starting collection catchup")
+	e.log.Info().
+		Uint64("start_height", startHeight).
+		Uint64("end_height", endHeight).
+		Msg("starting collection catchup")
+
 	missingCollCount := uint64(0)
 
-	// iterator through the complete chain (but only request collections for blocks we have)
-	for i := finalizedHeight; i >= 0; i-- {
+	// iterate through the complete chain but only request the missing collections for blocks we have
+	for i := startHeight; i <=endHeight; i++ {
 
 		// for all the blocks in the local db, request missing collections
 		blk, err := e.blocks.ByHeight(i)
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
-				e.log.Error().Err(err).Uint64("height", i).Msg("failed to retrieve block")
+				return fmt.Errorf("failed to retreive block by height %d during collection catchup: %w", i, err)
 			}
 			// if block not found locally, continue
 			continue
@@ -391,19 +401,20 @@ func (e *Engine) requestMissingCollections() error {
 			collId := guarantee.CollectionID
 			_, err = e.collections.LightByID(collId)
 
-			// if collection found, continue
+			// if collection found in local db, continue
 			if err != nil {
 				continue
 			}
 
+			// if collection not found, request it from the collectioin node
 			if errors.Is(err, storage.ErrNotFound) {
 
-				// requesting the collection from the collection node
 				e.log.Debug().Str("collection_id", collId.String()).Msg("requesting missing collection")
 				e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
 				missingCollCount++
+
 			} else {
-				e.log.Error().Err(err).Str("collection_id", collId.String()).Msg("failed to retrieve collection from storage")
+				return fmt.Errorf("failed to retreive collection %s for block height %d during collection catchup: %w", collId.String(), i, err)
 			}
 		}
 	}
