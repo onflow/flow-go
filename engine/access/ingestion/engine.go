@@ -22,6 +22,12 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+const collectionCatchupTimeout = 30 * time.Second
+const collectionCatchupDBPollInterval = 10 * time.Millisecond
+
+var defaultCollectionCatchupTimeout = collectionCatchupTimeout
+var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
+
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
 type Engine struct {
@@ -101,7 +107,7 @@ func New(
 func (e *Engine) Ready() <-chan struct{} {
 	// request all missing collection upfront
 	e.unit.Do(func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
 		return e.requestMissingCollections(ctx)
 	})
@@ -366,6 +372,18 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 	var missingColls = make(map[flow.Identifier]struct{})
 
+	// lookupCollection looks up a collection and returns true if found
+	lookupCollection := func(collId flow.Identifier) (bool, error) {
+		_, err = e.collections.LightByID(collId)
+		if err == nil {
+			return true, nil
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to retreive collection %s during collection catchup: %w", collId.String(), err)
+	}
+
 	// iterate through the complete chain but only request the missing collections for blocks we have
 	for i := startHeight; i <= endHeight; i++ {
 
@@ -387,23 +405,21 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 			}
 
 			collId := guarantee.CollectionID
-			_, err = e.collections.LightByID(collId)
-
-			// if collection found in local db, continue
+			found, err := lookupCollection(collId)
 			if err != nil {
+				return err
+			}
+			// if collection found in local db, continue
+			if found {
 				continue
 			}
 
 			// if collection not found, request it from the collection node
-			if errors.Is(err, storage.ErrNotFound) {
+			e.log.Debug().Str("collection_id", collId.String()).Msg("requesting missing collection")
+			e.request.EntityByID(collId, filter.HasNodeID(guarantee.SignerIDs...))
 
-				e.log.Debug().Str("collection_id", collId.String()).Msg("requesting missing collection")
-				e.request.EntityByID(collId, filter.HasNodeID(guarantee.SignerIDs...))
-				missingColls[collId] = struct{}{}
-
-			} else {
-				return fmt.Errorf("failed to retreive collection %s for block height %d during collection catchup: %w", collId.String(), i, err)
-			}
+			// record the missing collection to track later
+			missingColls[collId] = struct{}{}
 		}
 	}
 
@@ -419,28 +435,39 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	e.request.Force()
 
 	// track progress of retrieving all the missing collections by polling the db periodically
-	ticker := time.NewTicker(10 * time.Millisecond)
+	ticker := time.NewTicker(defaultCollectionCatchupDBPollInterval)
 	defer ticker.Stop()
-	for {
+
+	for missingCollsCnt > 0 {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("timed out before completing collection retreival")
 		case <-ticker.C:
+
+			e.log.Info().Int("total_missing_collections", missingCollsCnt).Msg("retrieving missing collections...")
+
+			var foundColls []flow.Identifier
 			// query db to find if collections are still missing
-			err = e.collections.FindMissingIDs(missingColls)
-			if err != nil {
-				return fmt.Errorf("failed to complete collection retreival")
+			for collId, _ := range missingColls {
+				found, err := lookupCollection(collId)
+				if err != nil {
+					return err
+				}
+				// if collection found in local db, remove it from missingColls later
+				if found {
+					foundColls = append(foundColls, collId)
+				}
+			}
+
+			// update the missingColls list
+			for _, c := range foundColls {
+				delete(missingColls, c)
 			}
 
 			missingCollsCnt = len(missingColls)
-			e.log.Info().Int("total_missing_collections", missingCollsCnt).Msg("missing collections")
-			// if all collections have been received, return
-			if missingCollsCnt == 0 {
-				e.log.Info().Msg("collection catchup done")
-				return nil
-			}
-			// else, continue polling the db
 		}
 	}
+
+	e.log.Info().Msg("collection catchup done")
 	return nil
 }
