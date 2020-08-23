@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -43,6 +44,8 @@ type Suite struct {
 	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
+	rootBlkHeight uint64
+
 
 	eng *Engine
 }
@@ -84,13 +87,14 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
+	suite.rootBlkHeight = 1000
 
 	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
-		blocksToMarkExecuted, rpcEng)
+		blocksToMarkExecuted, rpcEng, suite.rootBlkHeight)
 	require.NoError(suite.T(), err)
 
 	suite.eng = eng
@@ -238,18 +242,76 @@ func (suite *Suite) TestOnCollectionDuplicate() {
 func (suite *Suite) TestRequestMissingCollections() {
 
 	blkCnt := 3
-	finalizedHeight := 1000
-	startHeight := finalizedHeight - blkCnt
+	startHeight := suite.rootBlkHeight
 	blocks := make([]flow.Block, blkCnt)
+	heightMap := make(map[uint64]flow.Block, blkCnt)
+
+
+	var collIDs []flow.Identifier
+	gap := 2
 	for i := 0;i<blkCnt;i++ {
-		blocks[i] = unittest.BlockFixture()
-		blocks[i].Header.Height = uint64(startHeight + i)
-
+		block := unittest.BlockFixture()
+		height := startHeight + uint64(i) + uint64(gap)
+		block.Header.Height = height
+		blocks[i] = block
+		heightMap[height] = block
+		for _, c := range block.Payload.Guarantees {
+			collIDs = append(collIDs, c.CollectionID)
+		}
 	}
-	block := unittest.BlockFixture()
-	modelBlock := model.Block{
-		BlockID: block.ID(),
+
+	// each block should be queried by height
+	var block flow.Block
+	suite.blocks.On("ByHeight", mock.IsType(uint64(0))).Return(&block, nil).Run(func(args mock.Arguments) {
+		h := args.Get(0).(uint64)
+		block = heightMap[h]
+	})
+
+	// all collections will be reported as missing
+	suite.collections.On("LightByID", mock.Anything).Return(storerr.ErrNotFound)
+
+	// consider the last test block as the head
+	suite.proto.snapshot.On("Head").Return(blocks[blkCnt-1].Header, nil).Once()
+
+	compareMaps := func(a, b map[flow.Identifier]struct{}) bool{
+		if len(a) != len(b) {
+			return false
+		}
+		for k, _ := range a {
+			if _, ok := b[k]; !ok {
+				return false
+			}
+		}
+		return true
 	}
 
+	// convert collection ids to a map of missing collection ids
+	missingCollMap := make(map[flow.Identifier]struct{}, len(collIDs))
+	for _, collID := range collIDs  {
+		missingCollMap[collID] = struct{}{}
+	}
 
+	// simulate the collection retrieval process
+	// all but one collection is reported missing each time the collection db is queried
+	for _, collID := range collIDs  {
+
+		// setup the db call expectation
+		suite.collections.On("FilterByNonExistingIDs",
+			mock.MatchedBy(func(actualMap map[flow.Identifier]struct{}) bool {
+				// assert that call is made with all the missing collection ids
+				return compareMaps(actualMap, missingCollMap)
+			})).Return(nil).Run(func(_ mock.Arguments) {
+				// report all but collID as non-existing
+				delete(missingCollMap, collID)
+		})
+
+		// finally, initiate the request for all the missing collections
+		err := suite.eng.requestMissingCollections(context.Background())
+
+		require.NoError(suite.T(), err)
+	}
+
+	suite.collections.AssertNumberOfCalls(suite.T(), "FilterByNonExistingIDs", len(collIDs))
+	suite.proto.snapshot.AssertExpectations(suite.T())
+	suite.blocks.AssertExpectations(suite.T())
 }

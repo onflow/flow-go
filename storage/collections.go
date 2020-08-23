@@ -33,4 +33,6 @@ type Collections interface {
 	// LightByTransactionID returns the collection for the given transaction ID. Only retrieves
 	// transaction hashes.
 	LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error)
+
+	FindMissingIDs(ids map[flow.Identifier]struct{}) error
 }

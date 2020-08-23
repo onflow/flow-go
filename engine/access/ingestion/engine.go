@@ -3,6 +3,7 @@
 package ingestion
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -43,8 +44,8 @@ type Engine struct {
 	collectionsToMarkExecuted  *stdmap.Times
 	blocksToMarkExecuted       *stdmap.Times
 
-	rpcEngine *rpc.Engine
-	rootBlk flow.Block
+	rpcEngine     *rpc.Engine
+	rootBlkHeight uint64
 }
 
 // New creates a new access ingestion engine
@@ -63,7 +64,7 @@ func New(
 	collectionsToMarkExecuted *stdmap.Times,
 	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
-	rootBlk flow.Block,
+	rootBlkHeight uint64,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -82,7 +83,7 @@ func New(
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		rpcEngine:                  rpcEngine,
-		rootBlk: rootBlk,
+		rootBlkHeight:              rootBlkHeight,
 	}
 
 	// register engine with the execution receipt provider
@@ -99,7 +100,12 @@ func New(
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
 	// request all missing collection upfront
-	e.unit.Do(e.requestMissingCollections)
+	e.unit.Do(func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return e.requestMissingCollections(ctx)
+	})
+	e.unit.Quit()
 	return e.unit.Done()
 }
 
@@ -321,30 +327,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) 
 		}
 	}
 
-	// update the last received collection block height
-	blk, err := e.blocks.ByCollectionID(light.ID())
-	if err != nil {
-		return fmt.Errorf("could not update last received "+
-			"collection block height for collection (%x): %w", light.ID(), err)
-	}
-	for _, cg := range blk.Payload.Guarantees {
-		_, err := e.collections.LightByID(cg.ID())
-		if err != nil {
-			// if there is at least one collection guarantee that has not yet been received, don't update the height
-			if errors.Is(err, storage.ErrNotFound) {
-				return nil
-			} else {
-				return fmt.Errorf("could not update last received "+
-					"collection block height: %w", err)
-			}
-		}
-	}
-
-	// if we made till here, means all collection guarantees for the block has been received
-	err := e.blocks.TagCollectionsReceived(blk.ID())
-	return fmt.Errorf("could not tag block (%x) for all collections received: %w", blk.ID(), err)
-
-
 	return nil
 }
 
@@ -365,11 +347,11 @@ func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
 }
 
 // requestMissingCollections requests missing collections for all blocks in the local db storage
-func (e *Engine) requestMissingCollections() error {
+func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 	var startHeight, endHeight uint64
 
-	startHeight = e.rootBlk.Header.Height
+	startHeight = e.rootBlkHeight
 
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {
@@ -382,10 +364,10 @@ func (e *Engine) requestMissingCollections() error {
 		Uint64("end_height", endHeight).
 		Msg("starting collection catchup")
 
-	missingCollCount := uint64(0)
+	var missingColls = make(map[flow.Identifier]struct{})
 
 	// iterate through the complete chain but only request the missing collections for blocks we have
-	for i := startHeight; i <=endHeight; i++ {
+	for i := startHeight; i <= endHeight; i++ {
 
 		// for all the blocks in the local db, request missing collections
 		blk, err := e.blocks.ByHeight(i)
@@ -398,6 +380,12 @@ func (e *Engine) requestMissingCollections() error {
 		}
 
 		for _, guarantee := range blk.Payload.Guarantees {
+
+			// if deadline exceeded or someone cancelled the context
+			if ctx.Err() != nil {
+				return fmt.Errorf("failed to complete requests for missing collections %w", ctx.Err())
+			}
+
 			collId := guarantee.CollectionID
 			_, err = e.collections.LightByID(collId)
 
@@ -406,12 +394,12 @@ func (e *Engine) requestMissingCollections() error {
 				continue
 			}
 
-			// if collection not found, request it from the collectioin node
+			// if collection not found, request it from the collection node
 			if errors.Is(err, storage.ErrNotFound) {
 
 				e.log.Debug().Str("collection_id", collId.String()).Msg("requesting missing collection")
-				e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
-				missingCollCount++
+				e.request.EntityByID(collId, filter.HasNodeID(guarantee.SignerIDs...))
+				missingColls[collId] = struct{}{}
 
 			} else {
 				return fmt.Errorf("failed to retreive collection %s for block height %d during collection catchup: %w", collId.String(), i, err)
@@ -419,11 +407,40 @@ func (e *Engine) requestMissingCollections() error {
 		}
 	}
 
-	// the collection catchup needs to happen ASAP when the node starts up. Hence, force the requester to dispatch all request.
-	if missingCollCount > 0 {
-		e.request.Force()
+	missingCollsCnt := len(missingColls)
+
+	if missingCollsCnt == 0 {
+		// nothing more to do
+		e.log.Info().Msg("no missing collections found")
+		return nil
 	}
 
-	e.log.Info().Uint64("total_missing_collections", missingCollCount).Msg("collection catchup done")
+	// the collection catchup needs to happen ASAP when the node starts up. Hence, force the requester to dispatch all request
+	e.request.Force()
+
+	// track progress of retrieving all the missing collections by polling the db periodically
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out before completing collection retreival")
+		case <-ticker.C:
+			// query db to find if collections are still missing
+			err = e.collections.FindMissingIDs(missingColls)
+			if err != nil {
+				return fmt.Errorf("failed to complete collection retreival")
+			}
+
+			missingCollsCnt = len(missingColls)
+			e.log.Info().Int("total_missing_collections", missingCollsCnt).Msg("missing collections")
+			// if all collections have been received, return
+			if missingCollsCnt == 0 {
+				e.log.Info().Msg("collection catchup done")
+				return nil
+			}
+			// else, continue polling the db
+		}
+	}
 	return nil
 }

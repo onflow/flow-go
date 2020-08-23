@@ -196,6 +196,20 @@ func (mr *MockCollectionsMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockCollections)(nil).ByID), arg0)
 }
 
+// FindMissingIDs mocks base method
+func (m *MockCollections) FindMissingIDs(arg0 map[flow.Identifier]struct{}) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindMissingIDs", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// FindMissingIDs indicates an expected call of FindMissingIDs
+func (mr *MockCollectionsMockRecorder) FindMissingIDs(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindMissingIDs", reflect.TypeOf((*MockCollections)(nil).FindMissingIDs), arg0)
+}
+
 // LightByID mocks base method
 func (m *MockCollections) LightByID(arg0 flow.Identifier) (*flow.LightCollection, error) {
 	m.ctrl.T.Helper()

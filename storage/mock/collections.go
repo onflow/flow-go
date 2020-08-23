@@ -35,6 +35,20 @@ func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	return r0, r1
 }
 
+// FindMissingIDs provides a mock function with given fields: ids
+func (_m *Collections) FindMissingIDs(ids map[flow.Identifier]struct{}) error {
+	ret := _m.Called(ids)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(map[flow.Identifier]struct{}) error); ok {
+		r0 = rf(ids)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // LightByID provides a mock function with given fields: collID
 func (_m *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, error) {
 	ret := _m.Called(collID)
