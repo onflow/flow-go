@@ -359,14 +359,6 @@ func (e *Engine) matchedResults() ([]*flow.ExecutionResult, error) {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
 	}
 
-	// requiredStake is the minimum collective stake that a set of verifiers
-	// should hold to collectively validate a chunk with their ResultApprovals.
-	requiredStake := uint64(
-		math.Ceil(
-			float64(verifiers.TotalStake()) * e.threshold,
-		),
-	)
-
 	// get all available approvals once, and map them to their result
 	// TODO: byResult gets repopulated each time on each call. use a more
 	// persistant index.
@@ -388,16 +380,9 @@ ResultLoop:
 		// have a qualified majority of verifier stake approving
 		for _, chunk := range result.Chunks {
 
-			log := e.log.With().
-				Hex("block", result.BlockID[:]).
-				Hex("result", logging.Entity(result)).
-				Uint64("chunk", chunk.Index).
-				Logger()
-
-			matched := e.matchChunk(approvals, chunk, verifiers, requiredStake)
+			matched := e.matchChunk(approvals, chunk, verifiers)
 
 			if !matched {
-				log.Debug().Msg("ignoring result with insufficient verification")
 				continue ResultLoop
 			}
 		}
@@ -413,7 +398,7 @@ ResultLoop:
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
-func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk, verifiers flow.IdentityList, requiredStake uint64) bool {
+func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk, verifiers flow.IdentityList) bool {
 
 	// we use this to check for duplicate approvals by one approver
 	dupCheck := make(map[flow.Identifier]bool)
@@ -437,19 +422,33 @@ func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk,
 
 	// get all of the approver identities and check threshold
 	approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
-	voted := approvers.TotalStake()
 
-	if voted < requiredStake {
-		e.log.Debug().
-			Float64("threshold", e.threshold).
-			Uint64("total_stake", verifiers.TotalStake()).
-			Uint64("required_stake", requiredStake).
-			Uint64("collected_stake", voted).
-			Msg("insufficient verification")
-		return false
+	return e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
+}
+
+// checkStakes checks that the stakes collected by a set of verifiers exceeds
+// the threshold required to validate a chunk.
+func (e *Engine) checkStakes(totalStake uint64, collectedStake uint64) bool {
+
+	requiredStake := uint64(
+		math.Ceil(
+			float64(totalStake) * e.threshold,
+		),
+	)
+
+	// the happy path is a special case
+	if requiredStake == 0 || collectedStake > requiredStake {
+		return true
 	}
 
-	return true
+	e.log.Debug().
+		Float64("threshold", e.threshold).
+		Uint64("total_stake", totalStake).
+		Uint64("required_stake", requiredStake).
+		Uint64("collected_stake", collectedStake).
+		Msg("insufficient verification")
+
+	return false
 }
 
 func (e *Engine) sealResult(result *flow.ExecutionResult) error {
@@ -472,9 +471,7 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 		return errInvalidChunks
 	}
 
-	// get the previous result from our mempool or storage
-	// XXX 4.1.4 adds requirement that parent result should be sealed, no need
-	// to look in mempool
+	// ensure that previous result is known and sealed.
 	previousID := result.PreviousResultID
 	previous, err := e.resultsDB.ByID(previousID)
 	if err != nil {
