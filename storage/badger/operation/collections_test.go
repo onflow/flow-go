@@ -76,36 +76,5 @@ func TestCollections(t *testing.T) {
 			})
 			assert.Equal(t, expected, actual)
 		})
-		t.Run("FilterByNonExistingIDs", func(t *testing.T) {
-
-			// create and persist 2 collections
-			persistedColl1 := unittest.CollectionFixture(2).Light()
-			persistedColl2 := unittest.CollectionFixture(2).Light()
-
-			err := db.Update(InsertCollection(&persistedColl1))
-			require.NoError(t, err)
-			err = db.Update(InsertCollection(&persistedColl2))
-			require.NoError(t, err)
-
-			// create but do not persist 2 more collections
-			notPersistedColl1 := unittest.CollectionFixture(2).Light()
-			notPersistedColl2 := unittest.CollectionFixture(2).Light()
-
-			// create the input map
-			checkIDMap := make(map[flow.Identifier]struct{})
-			checkIDMap[persistedColl1.ID()] = struct{}{}
-			checkIDMap[persistedColl2.ID()] = struct{}{}
-			checkIDMap[notPersistedColl1.ID()] = struct{}{}
-			checkIDMap[notPersistedColl2.ID()] = struct{}{}
-
-			// call FilterByNonExistingIDs
-			err = db.View(FilterByNonExistingIDs(checkIDMap))
-			assert.NoError(t, err)
-
-			// assert that the map now only has the two non-persisted collection ids
-			assert.Len(t, checkIDMap, 2)
-			assert.Contains(t, checkIDMap, notPersistedColl1.ID())
-			assert.Contains(t, checkIDMap, notPersistedColl2.ID())
-		})
 	})
 }
