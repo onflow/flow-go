@@ -4,6 +4,7 @@ package badger
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -95,4 +96,36 @@ func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flo
 		}
 	}
 	return nil
+}
+
+func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
+	return operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
+
+		// try to update
+		err := operation.RetryOnConflict(b.db.Update, operation.UpdateLastCompleteBlockHeight(height))
+		if err == nil {
+			return nil
+		}
+
+		if !strings.Contains(err.Error(), "key not found") {
+			return fmt.Errorf("could not update LastFullBlockHeight: %w", err)
+		}
+
+		// if key does not exist, try insert.
+		err = operation.RetryOnConflict(b.db.Update, operation.InsertLastCompleteBlockHeight(height))
+		if err != nil {
+			return fmt.Errorf("could not insert LastFullBlockHeight: %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (b *Blocks) GetLastFullBlockHeight() (uint64, error) {
+	var h *uint64
+	err := b.db.View(operation.RetrieveLastCompleteBlockHeight(h))
+	if err != nil {
+		return 0, fmt.Errorf("failed to retrieve LastFullBlockHeight: %w", err)
+	}
+	return *h, nil
 }

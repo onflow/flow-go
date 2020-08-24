@@ -22,13 +22,18 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// time to wait for the all the missing collections to be received
+// time to wait for the all the missing collections to be received at node startup
 const collectionCatchupTimeout = 30 * time.Second
+
 // time to poll the storage to check if missing collections have been received
 const collectionCatchupDBPollInterval = 10 * time.Millisecond
 
+// time to update the FullBlockHeight index
+const fullBlockUpdateInterval = 1 * time.Minute
+
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
 var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
+var defaultFullBlockUpdateInterval = fullBlockUpdateInterval
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
@@ -52,8 +57,7 @@ type Engine struct {
 	collectionsToMarkExecuted  *stdmap.Times
 	blocksToMarkExecuted       *stdmap.Times
 
-	rpcEngine     *rpc.Engine
-	rootBlkHeight uint64
+	rpcEngine *rpc.Engine
 }
 
 // New creates a new access ingestion engine
@@ -72,7 +76,6 @@ func New(
 	collectionsToMarkExecuted *stdmap.Times,
 	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
-	rootBlkHeight uint64,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -91,7 +94,6 @@ func New(
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		rpcEngine:                  rpcEngine,
-		rootBlkHeight:              rootBlkHeight,
 	}
 
 	// register engine with the execution receipt provider
@@ -105,16 +107,17 @@ func New(
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For the ingestion engine, we consider the engine up and running
-// upon initialization.
+// upon syncing all the missing collections
 func (e *Engine) Ready() <-chan struct{} {
-	// request all missing collection upfront
-	e.unit.Do(func() error {
+	// request all the missing collection upfront
+	err := e.unit.Do(func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
 		return e.requestMissingCollections(ctx)
 	})
-	e.unit.Quit()
-	return e.unit.Done()
+	e.log.Error().Err(err).Msg("requesting missing collections failed")
+	e.unit.LaunchPeriodically(e.updateLastFullBlockReceivedIndex, defaultFullBlockUpdateInterval, time.Duration(0))
+	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
@@ -201,8 +204,11 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	}
 
 	// queue requesting each of the collections from the collection node
-	for _, guarantee := range block.Payload.Guarantees {
-		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+	var collections = make([]flow.Identifier, len(block.Payload.Guarantees))
+	for i, guarantee := range block.Payload.Guarantees {
+		collectionID := guarantee.ID()
+		e.request.EntityByID(collectionID, filter.HasNodeID(guarantee.SignerIDs...))
+		collections[i] = collectionID
 	}
 
 	return nil
@@ -354,13 +360,19 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
 }
 
-// requestMissingCollections requests missing collections for all blocks in the local db storage
+// requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
 func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 	var startHeight, endHeight uint64
 
-	// start with the root block
-	startHeight = e.rootBlkHeight
+	// get the height of the last block for which all collections were received
+	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	if err != nil {
+		return fmt.Errorf("failed to complete requests for missing collections: %w", ctx.Err())
+	}
+
+	// start from the next block
+	startHeight = lastFullHeight + 1
 
 	// end at the finalized block
 	finalBlk, err := e.state.Final().Head()
@@ -375,61 +387,32 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 		Msg("starting collection catchup")
 
 	// collect all missing collection ids in a map
-	var missingColls = make(map[flow.Identifier]struct{})
+	var missingCollMap = make(map[flow.Identifier]struct{})
 
-	// lookupCollection looks up a collection and returns true if found
-	lookupCollection := func(collId flow.Identifier) (bool, error) {
-		_, err = e.collections.LightByID(collId)
-		if err == nil {
-			return true, nil
-		}
-		if errors.Is(err, storage.ErrNotFound) {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to retreive collection %s during collection catchup: %w", collId.String(), err)
-	}
-
-	// iterate through the complete chain but only request the missing collections for blocks that we have in local db
+	// iterate through the complete chain and request the missing collections
 	for i := startHeight; i <= endHeight; i++ {
 
-		// for all the blocks in the local db, request missing collections
-		blk, err := e.blocks.ByHeight(i)
+		// if deadline exceeded or someone cancelled the context
+		if ctx.Err() != nil {
+			return fmt.Errorf("failed to complete requests for missing collections: %w", ctx.Err())
+		}
+
+		missingColls, err := e.missingCollectionsAtHeight(i)
 		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("failed to retreive block by height %d during collection catchup: %w", i, err)
-			}
-			// if block not found locally, continue
-			continue
+			return fmt.Errorf("failed to retreive missing collections by height %d during collection catchup: %w", i, err)
 		}
 
-		// for each of the collection guarantee, check if we have it in the local db, if not then request it
-		for _, guarantee := range blk.Payload.Guarantees {
+		for collID, cg := range missingColls {
+			e.log.Debug().Str("collection_id", collID.String()).Msg("requesting missing collection")
+			e.request.EntityByID(collID, filter.HasNodeID(cg.SignerIDs...))
 
-			// if deadline exceeded or someone cancelled the context
-			if ctx.Err() != nil {
-				return fmt.Errorf("failed to complete requests for missing collections: %w", ctx.Err())
-			}
-
-			collId := guarantee.CollectionID
-			found, err := lookupCollection(collId)
-			if err != nil {
-				return err
-			}
-			// if collection found in local db, continue
-			if found {
-				continue
-			}
-
-			// if collection not found, request it from the collection node
-			e.log.Debug().Str("collection_id", collId.String()).Msg("requesting missing collection")
-			e.request.EntityByID(collId, filter.HasNodeID(guarantee.SignerIDs...))
-
-			// record the missing collection to track later
-			missingColls[collId] = struct{}{}
+			// add it to the missing collection id map to track later
+			missingCollMap[collID] = struct{}{}
 		}
+
 	}
 
-	missingCollsCnt := len(missingColls)
+	missingCollsCnt := len(missingCollMap)
 
 	// if no collections were found to be missing we are done.
 	if missingCollsCnt == 0 {
@@ -458,8 +441,8 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 			var foundColls []flow.Identifier
 			// query db to find if collections are still missing
-			for collId, _ := range missingColls {
-				found, err := lookupCollection(collId)
+			for collId := range missingCollMap {
+				found, err := e.lookupCollection(collId)
 				if err != nil {
 					return err
 				}
@@ -471,13 +454,95 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 			// update the missingColls list by removing collections that have now been received
 			for _, c := range foundColls {
-				delete(missingColls, c)
+				delete(missingCollMap, c)
 			}
 
-			missingCollsCnt = len(missingColls)
+			missingCollsCnt = len(missingCollMap)
 		}
 	}
 
 	e.log.Info().Msg("collection catchup done")
 	return nil
+}
+
+// updateLastFullBlockReceivedIndex updates the FullBlockHeight index. The FullBlockHeight index indicates that block
+// for which all collections have been received.
+func (e *Engine) updateLastFullBlockReceivedIndex() {
+
+	logError := func(err error) {
+		e.log.Error().Err(err).Msg("failed to update the last full block height")
+	}
+
+	currentFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	if err != nil {
+		logError(err)
+		return
+	}
+	e.log.Debug().Uint64("current_index", currentFullHeight).Msg("updating LastFullBlockReceived index...")
+
+	finalBlk, err := e.state.Final().Head()
+	if err != nil {
+		logError(err)
+		return
+	}
+	finalizedHeight := finalBlk.Height
+
+	lastFullHeight := currentFullHeight
+	for i := currentFullHeight; i <= finalizedHeight; i++ {
+
+		missingColls, err := e.missingCollectionsAtHeight(i)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		// if there are missing collections for the current height, break out from the current loop
+		if len(missingColls) > 0 {
+			break
+		}
+		// otherwise, i points to the last full block height
+		lastFullHeight = i
+	}
+
+	if lastFullHeight > currentFullHeight {
+		err = e.blocks.UpdateLastFullBlockHeight(lastFullHeight)
+		if err != nil {
+			logError(err)
+			return
+		}
+	}
+
+	e.log.Debug().Uint64("lastFullHeight", lastFullHeight).Msg("updated LastFullBlockReceived index")
+}
+
+func (e *Engine) missingCollectionsAtHeight(h uint64) (map[flow.Identifier]*flow.CollectionGuarantee, error) {
+	blk, err := e.blocks.ByHeight(h)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive block by height %d: %w", h, err)
+	}
+	var missingColls = make(map[flow.Identifier]*flow.CollectionGuarantee)
+	for _, guarantee := range blk.Payload.Guarantees {
+
+		collID := guarantee.CollectionID
+
+		found, err := e.lookupCollection(collID)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			missingColls[collID] = guarantee
+		}
+	}
+	return missingColls, nil
+}
+
+func (e *Engine) lookupCollection(collId flow.Identifier) (bool, error) {
+	_, err := e.collections.LightByID(collId)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, storage.ErrNotFound) {
+		return false, nil
+	}
+	return false, fmt.Errorf("failed to retreive collection %s: %w", collId.String(), err)
 }

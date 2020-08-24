@@ -19,11 +19,12 @@ const (
 	codeVotedView   = 11 // latest view hotstuff voted on
 
 	// code for heights with special meaning
-	codeFinalizedHeight = 20 // latest finalized block height
-	codeSealedHeight    = 21 // latest sealed block height
-	codeClusterHeight   = 22 // latest finalized height on cluster
-	codeExecutedBlock   = 23 // latest executed block with max height
-	codeRootHeight      = 24 // the height of the first loaded block
+	codeFinalizedHeight         = 20 // latest finalized block height
+	codeSealedHeight            = 21 // latest sealed block height
+	codeClusterHeight           = 22 // latest finalized height on cluster
+	codeExecutedBlock           = 23 // latest executed block with max height
+	codeRootHeight              = 24 // the height of the first loaded block
+	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 
 	// codes for single entity storage
 	codeHeader               = 30

@@ -45,7 +45,6 @@ type Suite struct {
 	headers       *storage.Headers
 	collections   *storage.Collections
 	transactions  *storage.Transactions
-	rootBlkHeight uint64
 
 	eng *Engine
 }
@@ -86,14 +85,13 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
-	suite.rootBlkHeight = 1000
 
 	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
-		blocksToMarkExecuted, rpcEng, suite.rootBlkHeight)
+		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
 	suite.eng = eng
@@ -241,17 +239,16 @@ func (suite *Suite) TestOnCollectionDuplicate() {
 func (suite *Suite) TestRequestMissingCollections() {
 
 	blkCnt := 3
-	startHeight := suite.rootBlkHeight
+	startHeight := uint64(1000)
 	blocks := make([]flow.Block, blkCnt)
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 
 	// generate the test blocks and collections
 	var collIDs []flow.Identifier
-	gap := 2
 	for i := 0; i < blkCnt; i++ {
 		block := unittest.BlockFixture()
 		// some blocks may not be present hence add a gap
-		height := startHeight + uint64(i) + uint64(gap)
+		height := startHeight + uint64(i)
 		block.Header.Height = height
 		blocks[i] = block
 		heightMap[height] = &block
@@ -273,7 +270,8 @@ func (suite *Suite) TestRequestMissingCollections() {
 			}
 			return storerr.ErrNotFound
 		})
-
+	// consider collections are missing for all blocks
+	suite.blocks.On("GetLastFullBlockHeight").Return(startHeight - 1, nil)
 	// consider the last test block as the head
 	suite.proto.snapshot.On("Head").Return(blocks[blkCnt-1].Header, nil)
 
