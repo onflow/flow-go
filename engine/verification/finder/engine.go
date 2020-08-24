@@ -132,12 +132,23 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
 	switch resource := event.(type) {
 	case *flow.ExecutionReceipt:
-		return e.handleExecutionReceipt(originID, resource)
+		err = e.handleExecutionReceipt(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	if err != nil {
+		// logs the error instead of returning that.
+		// returning error would be projected at a higher level by network layer.
+		// however, this is an engine-level error, and not network layer error.
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // handleExecutionReceipt receives an execution receipt and adds it to the cached receipt mempool.
@@ -175,8 +186,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	}
 
 	ok = e.cachedReceipts.Add(rdp)
+	if !ok {
+		return fmt.Errorf("duplicate execution receipt. receipt_id: %x", logging.ID(receiptID))
+	}
 	log.Debug().
-		Bool("cached", ok).
 		Msg("execution receipt successfully handled")
 
 	return nil
