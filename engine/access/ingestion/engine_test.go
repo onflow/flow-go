@@ -237,6 +237,7 @@ func (suite *Suite) TestOnCollectionDuplicate() {
 	suite.transactions.AssertNotCalled(suite.T(), "Store", "should not store any transactions")
 }
 
+// TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
 func (suite *Suite) TestRequestMissingCollections() {
 
 	blkCnt := 3
@@ -316,6 +317,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		suite.blocks.AssertExpectations(suite.T())
 	}
 
+	// test 1 - collections are not received before timeout
 	suite.Run("timeout before all missing collections are received", func() {
 
 		// simulate that collection are never received
@@ -332,9 +334,10 @@ func (suite *Suite) TestRequestMissingCollections() {
 
 		assertExpectations()
 	})
+	// test 2 - all collections are eventually received before the deadline
 	suite.Run("all missing collections are received", func() {
 
-		// 90% of the time, collections are reported as not received
+		// 90% of the time, collections are reported as not received when the collection storage is queried
 		p = 0.9
 
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)

@@ -357,8 +357,10 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 	var startHeight, endHeight uint64
 
+	// start with the root block
 	startHeight = e.rootBlkHeight
 
+	// end at the finalized block
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {
 		return err
@@ -370,6 +372,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 		Uint64("end_height", endHeight).
 		Msg("starting collection catchup")
 
+	// collect all missing collection ids in a map
 	var missingColls = make(map[flow.Identifier]struct{})
 
 	// lookupCollection looks up a collection and returns true if found
@@ -384,7 +387,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 		return false, fmt.Errorf("failed to retreive collection %s during collection catchup: %w", collId.String(), err)
 	}
 
-	// iterate through the complete chain but only request the missing collections for blocks we have
+	// iterate through the complete chain but only request the missing collections for blocks that we have in local db
 	for i := startHeight; i <= endHeight; i++ {
 
 		// for all the blocks in the local db, request missing collections
@@ -397,6 +400,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 			continue
 		}
 
+		// for each of the collection guarantee, check if we have it in the local db, if not then request it
 		for _, guarantee := range blk.Payload.Guarantees {
 
 			// if deadline exceeded or someone cancelled the context
@@ -425,6 +429,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 	missingCollsCnt := len(missingColls)
 
+	// if no collections were found to be missing we are done.
 	if missingCollsCnt == 0 {
 		// nothing more to do
 		e.log.Info().Msg("no missing collections found")
@@ -438,12 +443,15 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	ticker := time.NewTicker(defaultCollectionCatchupDBPollInterval)
 	defer ticker.Stop()
 
+	// while there are still missing collections, keep polling
 	for missingCollsCnt > 0 {
 		select {
 		case <-ctx.Done():
+			// context may have expired
 			return fmt.Errorf("failed to complete collection retreival: %w", ctx.Err())
 		case <-ticker.C:
 
+			// log progress
 			e.log.Info().Int("total_missing_collections", missingCollsCnt).Msg("retrieving missing collections...")
 
 			var foundColls []flow.Identifier
@@ -459,7 +467,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 				}
 			}
 
-			// update the missingColls list
+			// update the missingColls list by removing collections that have now been received
 			for _, c := range foundColls {
 				delete(missingColls, c)
 			}
