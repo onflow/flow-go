@@ -401,7 +401,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 			// if deadline exceeded or someone cancelled the context
 			if ctx.Err() != nil {
-				return fmt.Errorf("failed to complete requests for missing collections %w", ctx.Err())
+				return fmt.Errorf("failed to complete requests for missing collections: %w", ctx.Err())
 			}
 
 			collId := guarantee.CollectionID
@@ -441,7 +441,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	for missingCollsCnt > 0 {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out before completing collection retreival")
+			return fmt.Errorf("failed to complete collection retreival: %w", ctx.Err())
 		case <-ticker.C:
 
 			e.log.Info().Int("total_missing_collections", missingCollsCnt).Msg("retrieving missing collections...")

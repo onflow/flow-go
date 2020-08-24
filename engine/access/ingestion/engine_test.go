@@ -244,10 +244,12 @@ func (suite *Suite) TestRequestMissingCollections() {
 	blocks := make([]flow.Block, blkCnt)
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 
+	// generate the test blocks and collections
 	var collIDs []flow.Identifier
 	gap := 2
 	for i := 0; i < blkCnt; i++ {
 		block := unittest.BlockFixture()
+		// some blocks may not be present hence add a gap
 		height := startHeight + uint64(i) + uint64(gap)
 		block.Header.Height = height
 		blocks[i] = block
@@ -257,6 +259,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		}
 	}
 
+	// setup the block storage mock
 	// each block should be queried by height
 	suite.blocks.On("ByHeight", mock.IsType(uint64(0))).Return(
 		func(h uint64) *flow.Block {
@@ -266,14 +269,22 @@ func (suite *Suite) TestRequestMissingCollections() {
 		func(h uint64) error {
 			if _, ok := heightMap[h]; ok {
 				return nil
-			} else {
-				return storerr.ErrNotFound
 			}
+			return storerr.ErrNotFound
 		})
 
-	// for the first lookup call for each collection, it will be reported as missing from db
-	// for the second call, it will be reported as present
+	// consider the last test block as the head
+	suite.proto.snapshot.On("Head").Return(blocks[blkCnt-1].Header, nil)
+
+	// p is the probability of not receiving the collection before the next poll and it
+	// helps simulate the slow trickle of the requested collections being received
+	var p float32
+
+	// rcvdColl is the map simulating the collection storage key-values
 	rcvdColl := make(map[flow.Identifier]struct{})
+
+	// for the first lookup call for each collection, it will be reported as missing from db
+	// for the subsequent calls, it will be reported as present with the probability p
 	suite.collections.On("LightByID", mock.Anything).Return(
 		func(cID flow.Identifier) *flow.LightCollection {
 			return nil // the actual collection object return is never really read
@@ -281,34 +292,59 @@ func (suite *Suite) TestRequestMissingCollections() {
 		func(cID flow.Identifier) error {
 			if _, ok := rcvdColl[cID]; ok {
 				return nil
-			} else {
-				 if rand.Float32() >= 0.8 {
-					 rcvdColl[cID] = struct{}{}
-				 }
-				return storerr.ErrNotFound
 			}
+			if rand.Float32() >= p {
+				rcvdColl[cID] = struct{}{}
+			}
+			return storerr.ErrNotFound
 		}).
 		// simulate some db i/o contention
 		After(time.Millisecond * time.Duration(rand.Intn(5)))
 
-	// consider the last test block as the head
-	suite.proto.snapshot.On("Head").Return(blocks[blkCnt-1].Header, nil).Once()
-
 	// setup the requester engine mock
-	//// entityByID should be called once per collection
+	// entityByID should be called once per collection
 	for _, c := range collIDs {
-		suite.request.On("EntityByID", c, mock.Anything).Return().Once()
+		suite.request.On("EntityByID", c, mock.Anything).Return()
 	}
-	//// force should be called once
-	suite.request.On("Force").Return().Once()
+	// force should be called once
+	suite.request.On("Force").Return()
 
-	// finally, call the function under test
-	err := suite.eng.requestMissingCollections(context.Background())
-	require.NoError(suite.T(), err)
-	require.Len(suite.T(), rcvdColl, len(collIDs))
+	assertExpectations := func() {
+		suite.request.AssertExpectations(suite.T())
+		suite.collections.AssertExpectations(suite.T())
+		suite.proto.snapshot.AssertExpectations(suite.T())
+		suite.blocks.AssertExpectations(suite.T())
+	}
 
-	suite.request.AssertExpectations(suite.T())
-	suite.collections.AssertExpectations(suite.T())
-	suite.proto.snapshot.AssertExpectations(suite.T())
-	suite.blocks.AssertExpectations(suite.T())
+	suite.Run("timeout before all missing collections are received", func() {
+
+		// simulate that collection are never received
+		p = 1
+
+		// timeout after 3 db polls
+		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
+		defer cancel()
+
+		err := suite.eng.requestMissingCollections(ctx)
+
+		require.Error(suite.T(), err)
+		require.Contains(suite.T(), err.Error(), "context deadline exceeded")
+
+		assertExpectations()
+	})
+	suite.Run("all missing collections are received", func() {
+
+		// 90% of the time, collections are reported as not received
+		p = 0.9
+
+		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
+		defer cancel()
+
+		err := suite.eng.requestMissingCollections(ctx)
+
+		require.NoError(suite.T(), err)
+		require.Len(suite.T(), rcvdColl, len(collIDs))
+
+		assertExpectations()
+	})
 }
