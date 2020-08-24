@@ -22,7 +22,9 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+// time to wait for the all the missing collections to be received
 const collectionCatchupTimeout = 30 * time.Second
+// time to poll the storage to check if missing collections have been received
 const collectionCatchupDBPollInterval = 10 * time.Millisecond
 
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout

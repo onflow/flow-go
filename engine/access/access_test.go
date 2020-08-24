@@ -384,7 +384,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
+			transactions, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng, 0)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)

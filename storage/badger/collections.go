@@ -165,13 +165,3 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 
 	return &collection, nil
 }
-
-func (c *Collections) FindMissingIDs(ids map[flow.Identifier]struct{}) error {
-	return c.db.View(func(tx *badger.Txn) error {
-		err := operation.FilterByNonExistingIDs(ids)(tx)
-		if err != nil {
-			return fmt.Errorf("failed to find missing ids: %w", err)
-		}
-		return nil
-	})
-}
