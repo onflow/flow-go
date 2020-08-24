@@ -44,31 +44,3 @@ func IndexCollectionByTransaction(txID flow.Identifier, collectionID flow.Identi
 func RetrieveCollectionID(txID flow.Identifier, collectionID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIndexCollectionByTransaction, txID), collectionID)
 }
-
-func FilterByNonExistingIDs(collIDs map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	return traverse(makePrefix(codeCollection), func() (checkFunc, createFunc, handleFunc) {
-
-		idFilter := make(map[string]flow.Identifier)
-		for id, _ := range collIDs {
-			key := makePrefix(codeCollection, id)
-			idFilter[string(key)] = id
-		}
-
-		check := func(key []byte) bool {
-			if val, found := idFilter[string(key)]; found {
-				delete(collIDs, val)
-			}
-			return false
-		}
-
-		create := func() interface{} {
-			return nil
-		}
-		handle := func() error {
-			return nil
-		}
-
-		return check, create, handle
-
-	})
-}
