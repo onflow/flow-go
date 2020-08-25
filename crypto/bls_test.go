@@ -264,7 +264,7 @@ func TestRemovePubKeys(t *testing.T) {
 	aggPk, err := AggregatePublicKeys(pks)
 	require.NoError(t, err)
 
-	// number of keys to remove
+	// random number of keys to remove
 	pkToRemoveNum := mrand.Intn(pkNum)
 
 	partialPk, err := RemovePublicKeys(aggPk, pks[:pkToRemoveNum])
@@ -277,6 +277,31 @@ func TestRemovePubKeys(t *testing.T) {
 
 	assert.True(t, BLSkey.Equals(partialPk),
 		fmt.Sprintf("incorrect key %s, should be %s, keys are %s, index is %d",
-			BLSkey, partialPk, pks, pkToRemoveNum))
+			partialPk, BLSkey, pks, pkToRemoveNum))
 
+	// specific test to remove all keys
+	partialPk, err = RemovePublicKeys(aggPk, pks)
+	require.NoError(t, err)
+	expectedPatrialPk, err = AggregatePublicKeys([]PublicKey{})
+	require.NoError(t, err)
+
+	BLSkey, ok = expectedPatrialPk.(*PubKeyBLSBLS12381)
+	require.True(t, ok)
+
+	assert.True(t, BLSkey.Equals(partialPk),
+		fmt.Sprintf("incorrect key %s, should be infinity point, keys are %s",
+			partialPk, pks))
+
+	// specific test with an empty slice of keys to remove
+	partialPk, err = RemovePublicKeys(aggPk, pks)
+	require.NoError(t, err)
+	expectedPatrialPk, err = AggregatePublicKeys([]PublicKey{})
+	require.NoError(t, err)
+
+	BLSkey, ok = expectedPatrialPk.(*PubKeyBLSBLS12381)
+	require.True(t, ok)
+
+	assert.True(t, BLSkey.Equals(partialPk),
+		fmt.Sprintf("incorrect key %s, should be %s, keys are %s",
+			partialPk, BLSkey, pks))
 }
