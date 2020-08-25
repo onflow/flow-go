@@ -473,12 +473,21 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		e.log.Error().Err(err).Msg("failed to update the last full block height")
 	}
 
-	currentFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
 	if err != nil {
-		logError(err)
-		return
+		if !errors.Is(err, storage.ErrNotFound) {
+			logError(err)
+			return
+		}
+		// use the root height as the last full height
+		header, err := e.state.Root()
+		if err != nil {
+			logError(err)
+			return
+		}
+		lastFullHeight = header.Height
 	}
-	e.log.Debug().Uint64("current_index", currentFullHeight).Msg("updating LastFullBlockReceived index...")
+	e.log.Debug().Uint64("last_full_block_height", lastFullHeight).Msg("updating LastFullBlockReceived index...")
 
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {
@@ -487,8 +496,10 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 	}
 	finalizedHeight := finalBlk.Height
 
-	lastFullHeight := currentFullHeight
-	for i := currentFullHeight; i <= finalizedHeight; i++ {
+	latestFullHeight := lastFullHeight
+
+	// start from the next block till we either hit the finalized block or a block with missing collection
+	for i := lastFullHeight + 1; i <= finalizedHeight; i++ {
 
 		missingColls, err := e.missingCollectionsAtHeight(i)
 		if err != nil {
@@ -500,19 +511,21 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		if len(missingColls) > 0 {
 			break
 		}
+
 		// otherwise, i points to the last full block height
-		lastFullHeight = i
+		latestFullHeight = i
 	}
 
-	if lastFullHeight > currentFullHeight {
-		err = e.blocks.UpdateLastFullBlockHeight(lastFullHeight)
+	// if more blocks are now complete update db
+	if latestFullHeight > lastFullHeight {
+		err = e.blocks.UpdateLastFullBlockHeight(latestFullHeight)
 		if err != nil {
 			logError(err)
 			return
 		}
 	}
 
-	e.log.Debug().Uint64("lastFullHeight", lastFullHeight).Msg("updated LastFullBlockReceived index")
+	e.log.Debug().Uint64("lastFullHeight", latestFullHeight).Msg("updated LastFullBlockReceived index")
 }
 
 func (e *Engine) missingCollectionsAtHeight(h uint64) (map[flow.Identifier]*flow.CollectionGuarantee, error) {

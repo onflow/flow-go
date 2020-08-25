@@ -38,13 +38,13 @@ type Suite struct {
 		mutator  *protocol.Mutator
 	}
 
-	me            *module.Local
-	request       *module.Requester
-	provider      *network.Engine
-	blocks        *storage.Blocks
-	headers       *storage.Headers
-	collections   *storage.Collections
-	transactions  *storage.Transactions
+	me           *module.Local
+	request      *module.Requester
+	provider     *network.Engine
+	blocks       *storage.Blocks
+	headers      *storage.Headers
+	collections  *storage.Collections
+	transactions *storage.Transactions
 
 	eng *Engine
 }
@@ -271,7 +271,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 			return storerr.ErrNotFound
 		})
 	// consider collections are missing for all blocks
-	suite.blocks.On("GetLastFullBlockHeight").Return(startHeight - 1, nil)
+	suite.blocks.On("GetLastFullBlockHeight").Return(startHeight-1, nil)
 	// consider the last test block as the head
 	suite.proto.snapshot.On("Head").Return(blocks[blkCnt-1].Header, nil)
 
@@ -347,5 +347,87 @@ func (suite *Suite) TestRequestMissingCollections() {
 		require.Len(suite.T(), rcvdColl, len(collIDs))
 
 		assertExpectations()
+	})
+}
+
+func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
+	blkCnt := 3
+	startHeight := uint64(1000)
+	blocks := make([]flow.Block, blkCnt)
+	heightMap := make(map[uint64]*flow.Block, blkCnt)
+
+	// generate the test blocks
+	for i := 0; i < blkCnt; i++ {
+		block := unittest.BlockFixture()
+		// some blocks may not be present hence add a gap
+		height := startHeight + uint64(i)
+		block.Header.Height = height
+		blocks[i] = block
+		heightMap[height] = &block
+	}
+
+	rootBlk := blocks[0]
+	finalizedBlk := blocks[blkCnt-1]
+	finalizedHeight := finalizedBlk.Header.Height
+
+	// setup the block storage mock
+	// each block should be queried by height
+	suite.blocks.On("ByHeight", mock.IsType(uint64(0))).Return(
+		func(h uint64) *flow.Block {
+			// simulate a db lookup
+			return heightMap[h]
+		},
+		func(h uint64) error {
+			if _, ok := heightMap[h]; ok {
+				return nil
+			}
+			return storerr.ErrNotFound
+		})
+
+	// consider no collections are missing
+	suite.collections.On("LightByID", mock.Anything).Return(nil, nil)
+
+	var lastFullBlockHeight uint64
+	var rtnErr error
+	suite.blocks.On("GetLastFullBlockHeight").Return(
+		func() uint64 {
+			return lastFullBlockHeight
+		},
+		func() error {
+			return rtnErr
+		})
+
+	// consider the last test block as the head
+	suite.proto.snapshot.On("Head").Return(finalizedBlk.Header, nil)
+
+	suite.Run("full block height index is created and advanced if not present", func() {
+		// simulate the absence of the full block height index
+		lastFullBlockHeight = 0
+		rtnErr = storerr.ErrNotFound
+		suite.proto.state.On("Root").Return(rootBlk.Header, nil)
+		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+
+		suite.blocks.AssertExpectations(suite.T())
+	})
+
+	suite.Run("full block height index is advanced if newer full blocks are discovered", func() {
+		rtnErr = nil
+		block := blocks[1]
+		lastFullBlockHeight = block.Header.Height
+		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+
+		suite.blocks.AssertExpectations(suite.T())
+	})
+
+	suite.Run("full block height index is not advanced beyond finalized blocks", func() {
+		rtnErr = nil
+		lastFullBlockHeight = finalizedHeight
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 }
