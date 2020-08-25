@@ -37,3 +37,15 @@ func UpdateSealedHeight(height uint64) func(*badger.Txn) error {
 func RetrieveSealedHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeSealedHeight), height)
 }
+
+func InsertLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeLastCompleteBlockHeight), height)
+}
+
+func UpdateLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
+	return update(makePrefix(codeLastCompleteBlockHeight), height)
+}
+
+func RetrieveLastCompleteBlockHeight(height *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeLastCompleteBlockHeight), height)
+}

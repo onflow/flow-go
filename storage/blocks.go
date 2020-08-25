@@ -26,4 +26,11 @@ type Blocks interface {
 	// IndexBlockForCollections indexes the block each collection was
 	// included in.
 	IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error
+
+	// UpdateLastFullBlockHeight updates the FullBlockHeight index
+	// The FullBlockHeight index indicates that block for which all collections have been received
+	UpdateLastFullBlockHeight(height uint64) error
+
+	// GetLastFullBlockHeight retrieves the FullBlockHeight
+	GetLastFullBlockHeight() (height uint64, err error)
 }
