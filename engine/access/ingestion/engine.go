@@ -110,14 +110,14 @@ func New(
 // upon syncing all the missing collections
 func (e *Engine) Ready() <-chan struct{} {
 	// request all the missing collection upfront
-	err := e.unit.Do(func() error {
+	readyChan := e.unit.Ready(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
-		return e.requestMissingCollections(ctx)
+		err := e.requestMissingCollections(ctx)
+		e.log.Error().Err(err).Msg("requesting missing collections failed")
 	})
-	e.log.Error().Err(err).Msg("requesting missing collections failed")
 	e.unit.LaunchPeriodically(e.updateLastFullBlockReceivedIndex, defaultFullBlockUpdateInterval, time.Duration(0))
-	return e.unit.Ready()
+	return readyChan
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
@@ -409,10 +409,8 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 	}
 
-	missingCollsCnt := len(missingCollMap)
-
 	// if no collections were found to be missing we are done.
-	if missingCollsCnt == 0 {
+	if len(missingCollMap) == 0 {
 		// nothing more to do
 		e.log.Info().Msg("no missing collections found")
 		return nil
@@ -426,7 +424,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	defer ticker.Stop()
 
 	// while there are still missing collections, keep polling
-	for missingCollsCnt > 0 {
+	for len(missingCollMap) > 0 {
 		select {
 		case <-ctx.Done():
 			// context may have expired
@@ -434,7 +432,9 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 		case <-ticker.C:
 
 			// log progress
-			e.log.Info().Int("total_missing_collections", missingCollsCnt).Msg("retrieving missing collections...")
+			e.log.Info().
+				Int("total_missing_collections", len(missingCollMap)).
+				Msg("retrieving missing collections...")
 
 			var foundColls []flow.Identifier
 			// query db to find if collections are still missing
@@ -453,8 +453,6 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 			for _, c := range foundColls {
 				delete(missingCollMap, c)
 			}
-
-			missingCollsCnt = len(missingCollMap)
 		}
 	}
 
@@ -530,6 +528,7 @@ func (e *Engine) missingCollectionsAtHeight(h uint64) (map[flow.Identifier]*flow
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive block by height %d: %w", h, err)
 	}
+
 	var missingColls = make(map[flow.Identifier]*flow.CollectionGuarantee)
 	for _, guarantee := range blk.Payload.Guarantees {
 

@@ -3,12 +3,13 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -98,21 +99,22 @@ func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flo
 	return nil
 }
 
+// UpdateLastFullBlockHeight upsert (update or insert) the last full block height
 func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
 	return operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
 
 		// try to update
-		err := operation.RetryOnConflict(b.db.Update, operation.UpdateLastCompleteBlockHeight(height))
+		err := operation.UpdateLastCompleteBlockHeight(height)(tx)
 		if err == nil {
 			return nil
 		}
 
-		if !strings.Contains(err.Error(), "key not found") {
+		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not update LastFullBlockHeight: %w", err)
 		}
 
 		// if key does not exist, try insert.
-		err = operation.RetryOnConflict(b.db.Update, operation.InsertLastCompleteBlockHeight(height))
+		err = operation.InsertLastCompleteBlockHeight(height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert LastFullBlockHeight: %w", err)
 		}
