@@ -36,9 +36,7 @@ import (
 //         1. the origin is invalid
 //         2. the role is invalid
 //         3. the result has been sealed already
-//         4. the receipt has been received before
-//         5. the result has been received before
-// 3. Matching engine should be able to find matched results: (IMO, the `sealableResults` should be renamed to `matchedResults`, because a matched result is not a sealable result when the block is missing)
+// 3. Matching engine should be able to find matched results:
 //     1. It should find no matched result if there is no result and no approval
 //     2. it should find 1 matched result if we received a receipt, and the block has no payload (impossible now, system every block will have at least one chunk to verify)
 //     3. It should find no matched result if there is only result, but no approval (skip for now, because we seal results without approvals)
@@ -51,7 +49,6 @@ import (
 //     2. It should seal a matched result if the approvals are sufficient
 // 5. Matching engine should request results from execution nodes:
 //     1. If there are unsealed and finalized blocks, it should request the execution receipts from the execution nodes.
-
 func TestMatchingEngine(t *testing.T) {
 	suite.Run(t, new(MatchingSuite))
 }
@@ -414,7 +411,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	).Return(true)
 
 	err := ms.matching.onReceipt(originID, receipt)
-	ms.Require().NoError(err, "should ignore receipt for already pending result")
+	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
@@ -494,7 +491,7 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 	).Return(false)
 
 	err := ms.matching.onApproval(originID, approval)
-	ms.Require().NoError(err, "should ignore approval for sealed result")
+	ms.Require().NoError(err, "should ignore approval if already pending")
 
 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -516,22 +513,21 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 	).Return(true)
 
 	err := ms.matching.onApproval(originID, approval)
-	ms.Require().NoError(err, "should ignore approval for sealed result")
+	ms.Require().NoError(err, "should add approval to mempool if valid")
 
 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
+func (ms *MatchingSuite) TestMatchedResultsEmptyMempools() {
 
-	// try to get sealable results with nothing in memory pools
-
-	results, err := ms.matching.sealableResults()
+	// try to get matched results with nothing in memory pools
+	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err, "should not error with empty mempools")
-	ms.Assert().Empty(results, "should not have sealable results with empty mempools")
+	ms.Assert().Empty(results, "should not have matched results with empty mempools")
 }
 
-func (ms *MatchingSuite) TestSealableResultsNoPayload() {
+func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 
 	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
@@ -542,7 +538,7 @@ func (ms *MatchingSuite) TestSealableResultsNoPayload() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	results, err := ms.matching.sealableResults()
+	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
 	if ms.Assert().Len(results, 1, "should select result for empty block") {
 		sealable := results[0]
@@ -550,8 +546,7 @@ func (ms *MatchingSuite) TestSealableResultsNoPayload() {
 	}
 }
 
-func (ms *MatchingSuite) TestSealableResultsNoApprovals() {
-
+func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
 	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
 	ms.blocks[block.Header.ID()] = &block
@@ -560,12 +555,17 @@ func (ms *MatchingSuite) TestSealableResultsNoApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	results, err := ms.matching.sealableResults()
+	// happy path requires 0 approvals per chunk, so the result should be
+	// counted even if we havent received any approvals.
+	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with no approvals")
+	if ms.Assert().Len(results, 1, "should select result in happy path") {
+		sealable := results[0]
+		ms.Assert().Equal(result, sealable)
+	}
 }
 
-func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
+func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 
 	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
@@ -575,7 +575,10 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	// add approvals for each chunk that have insufficient stake
+	// set the engine's threshold to 2/3 of total verifier stake
+	ms.matching.threshold = 2.0 / 3.0
+
+	// add enough approvals for each chunk, except last
 	for n := 0; n < 3; n++ {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
 			// skip last chunk for last approval
@@ -591,12 +594,12 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 		}
 	}
 
-	results, err := ms.matching.sealableResults()
+	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "should not select result with insufficient approvals")
 }
 
-func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
+func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 
 	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
@@ -606,7 +609,10 @@ func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	// add approvals for each chunk that have insufficient stake
+	// set the engine's threshold to 2/3 of total verifier stake
+	ms.matching.threshold = 2.0 / 3.0
+
+	// add enough approvals for each chunk
 	for n := 0; n < 3; n++ {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
 			approval := unittest.ResultApprovalFixture()
@@ -618,7 +624,7 @@ func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 		}
 	}
 
-	results, err := ms.matching.sealableResults()
+	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
 	if ms.Assert().Len(results, 1, "should select result with sufficient approvals") {
 		sealable := results[0]
@@ -655,7 +661,7 @@ func (ms *MatchingSuite) TestSealResultInvalidChunks() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestSealResultMissingPrevious() {
+func (ms *MatchingSuite) TestSealResultUnsealedPrevious() {
 
 	// try to seal a result with a missing previous result
 	block := unittest.BlockFixture()
@@ -663,42 +669,10 @@ func (ms *MatchingSuite) TestSealResultMissingPrevious() {
 	result := unittest.ResultForBlockFixture(&block)
 
 	err := ms.matching.sealResult(result)
-	ms.Require().Equal(errUnknownPrevious, err, "should get unknown previous error on missing previous result")
+	ms.Require().Equal(errUnsealedPrevious, err, "should get unsealed previous error on missing previous result")
 
 	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-func (ms *MatchingSuite) TestSealResultPendingPrevious() {
-
-	// try to seal a result with a missing previous result
-	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
-	result := unittest.ResultForBlockFixture(&block)
-	previous := unittest.ExecutionResultFixture()
-	result.PreviousResultID = previous.ID()
-	ms.pendingResults[previous.ID()] = previous
-
-	// check match when we are storing entities
-	ms.resultsDB.On("Store", mock.Anything).Run(
-		func(args mock.Arguments) {
-			stored := args.Get(0).(*flow.ExecutionResult)
-			ms.Assert().Equal(result, stored)
-		},
-	).Return(nil)
-	ms.sealsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			seal := args.Get(0).(*flow.Seal)
-			ms.Assert().Equal(result.ID(), seal.ResultID)
-			ms.Assert().Equal(result.BlockID, seal.BlockID)
-		},
-	).Return(true)
-
-	err := ms.matching.sealResult(result)
-	ms.Require().NoError(err, "should generate seal on pending previous result")
-
-	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
-	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 }
 
 func (ms *MatchingSuite) TestSealResultValid() {
