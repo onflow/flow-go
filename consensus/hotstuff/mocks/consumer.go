@@ -82,11 +82,6 @@ func (_m *Consumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 	_m.Called(currentView, vote)
 }
 
-// OnSkippedAhead provides a mock function with given fields: viewNumber
-func (_m *Consumer) OnSkippedAhead(viewNumber uint64) {
-	_m.Called(viewNumber)
-}
-
 // OnStartingTimeout provides a mock function with given fields: _a0
 func (_m *Consumer) OnStartingTimeout(_a0 *model.TimerInfo) {
 	_m.Called(_a0)

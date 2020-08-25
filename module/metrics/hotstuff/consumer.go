@@ -29,7 +29,7 @@ func (c *MetricsConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
 	c.metrics.SetQCView(qc.View)
 }
 
-func (c *MetricsConsumer) OnSkippedAhead(view uint64) {
+func (c *MetricsConsumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
 	c.metrics.CountSkipped()
 }
 

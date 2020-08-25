@@ -42,14 +42,6 @@ func (p *Distributor) OnReceiveProposal(currentView uint64, proposal *model.Prop
 	}
 }
 
-func (p *Distributor) OnSkippedAhead(view uint64) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnSkippedAhead(view)
-	}
-}
-
 func (p *Distributor) OnEnteringView(view uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

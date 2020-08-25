@@ -51,9 +51,6 @@ func (p *NitroPaceMaker) gotoView(newView uint64) *model.NewViewEvent {
 		// STRICTLY monotonously increasing view numbers.
 		panic(fmt.Sprintf("cannot move from view %d to %d: currentView must be strictly monotonously increasing", p.currentView, newView))
 	}
-	if newView > p.currentView+1 {
-		p.notifier.OnSkippedAhead(newView)
-	}
 	p.currentView = newView
 	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, newView)
 	p.notifier.OnStartingTimeout(timerInfo)

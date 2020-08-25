@@ -67,12 +67,6 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnEnteringView(viewNumber uint64)
 
-	// OnSkippedAhead notifications are produced by PaceMaker when it decides to skip over one or more view numbers.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnSkippedAhead(viewNumber uint64)
-
 	// OnQcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
 	// based on processing a QC. The arguments specify the qc (first argument), which triggered
 	// the view change, and the newView to which the PaceMaker transitioned (second argument).

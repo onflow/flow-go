@@ -60,12 +60,6 @@ func (lc *LogConsumer) OnEnteringView(view uint64) {
 		Msg("view entered")
 }
 
-func (lc *LogConsumer) OnSkippedAhead(view uint64) {
-	lc.log.Debug().
-		Uint64("view", view).
-		Msg("views skipped")
-}
-
 func (lc *LogConsumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).

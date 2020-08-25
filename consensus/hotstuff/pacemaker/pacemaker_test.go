@@ -81,7 +81,6 @@ func Test_SkipIncreaseViewThroughQC(t *testing.T) {
 	assert.True(t, nveOccurred && nve.View == 4)
 
 	qc = QC(12)
-	notifier.On("OnSkippedAhead", uint64(13)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(13, model.ReplicaTimeout)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", qc, uint64(13)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithQC(qc)
@@ -105,7 +104,6 @@ func Test_SkipViewThroughBlock(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 
 	block := makeBlock(5, 9)
-	notifier.On("OnSkippedAhead", uint64(6)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(6)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, true)
@@ -114,7 +112,6 @@ func Test_SkipViewThroughBlock(t *testing.T) {
 	assert.True(t, nveOccurred && nve.View == 6)
 
 	block = makeBlock(22, 25)
-	notifier.On("OnSkippedAhead", uint64(23)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(23, model.ReplicaTimeout)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(23)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, false)
@@ -130,7 +127,6 @@ func Test_HandlesSkipViewAttack(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 
 	block := makeBlock(5, 9)
-	notifier.On("OnSkippedAhead", uint64(6)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(6)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, true)
@@ -139,7 +135,6 @@ func Test_HandlesSkipViewAttack(t *testing.T) {
 	assert.True(t, nveOccurred && nve.View == 6)
 
 	block = makeBlock(14, 23)
-	notifier.On("OnSkippedAhead", uint64(15)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(15, model.ReplicaTimeout)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(15)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, false)
@@ -213,7 +208,6 @@ func Test_FutureBlockWithQcForFutureView(t *testing.T) {
 	block := makeBlock(13, 14)
 
 	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(14)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(15, model.ReplicaTimeout)).Return().Once()
@@ -223,7 +217,6 @@ func Test_FutureBlockWithQcForFutureView(t *testing.T) {
 	assert.True(t, nveOccurred && nve.View == 15)
 
 	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(14)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.VoteCollectionTimeout)).Return().Once()
@@ -243,7 +236,6 @@ func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 	block := makeBlock(13, 17)
 
 	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(14)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, false)
@@ -252,7 +244,6 @@ func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 	assert.True(t, nveOccurred && nve.View == 14)
 
 	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
 	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(14)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, true)

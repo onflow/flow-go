@@ -25,8 +25,6 @@ func (c *NoopConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
 
 func (*NoopConsumer) OnEnteringView(uint64) {}
 
-func (*NoopConsumer) OnSkippedAhead(uint64) {}
-
 func (c *NoopConsumer) OnQcTriggeredViewChange(*model.QuorumCertificate, uint64) {}
 
 func (c *NoopConsumer) OnProposingBlock(*model.Proposal) {}

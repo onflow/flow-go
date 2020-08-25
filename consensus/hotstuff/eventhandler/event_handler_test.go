@@ -80,9 +80,8 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 	}
 	pm := NewTestPaceMaker(t, view, timeout.NewController(tc), notifier)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
-	notifier.On("OnSkippedAhead", mock.Anything).Return()
-	notifier.On("OnReachedTimeout", mock.Anything).Return()
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
+	notifier.On("OnReachedTimeout", mock.Anything).Return()
 	pm.Start()
 	return pm
 }
