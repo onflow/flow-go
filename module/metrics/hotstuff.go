@@ -24,21 +24,21 @@ const (
 // clusters. We do this by adding the label `committeeID` to the HotStuff metrics and
 // allowing for configurable name space.
 type HotstuffCollector struct {
-	busyDuration                   *prometheus.HistogramVec
-	busyDurationCsCounter          *prometheus.CounterVec
-	idleDuration                   prometheus.Histogram
-	idleDurationCsCounter          prometheus.Counter
-	waitDuration                   *prometheus.HistogramVec
-	waitDurationCsCounter          *prometheus.CounterVec
-	curView                        prometheus.Gauge
-	qcView                         prometheus.Gauge
-	skips                          prometheus.Counter
-	timeouts                       prometheus.Counter
-	timeoutDuration                prometheus.Gauge
-	committeeComputationsCsCounter prometheus.Counter
-	signerComputationsCsCounter    prometheus.Counter
-	validatorComputationsCsCounter prometheus.Counter
-	payloadProductionCsCounter     prometheus.Counter
+	busyDuration                 *prometheus.HistogramVec
+	busyDurationCounter          *prometheus.CounterVec
+	idleDuration                 prometheus.Histogram
+	idleDurationCounter          prometheus.Counter
+	waitDuration                 *prometheus.HistogramVec
+	waitDurationCounter          *prometheus.CounterVec
+	curView                      prometheus.Gauge
+	qcView                       prometheus.Gauge
+	skips                        prometheus.Counter
+	timeouts                     prometheus.Counter
+	timeoutDuration              prometheus.Gauge
+	committeeComputationsCounter prometheus.Counter
+	signerComputationsCounter    prometheus.Counter
+	validatorComputationsCounter prometheus.Counter
+	payloadProductionCounter     prometheus.Counter
 }
 
 func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
@@ -53,8 +53,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
-		busyDurationCsCounter: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:        "busy_duration_cseconds_total",
+		busyDurationCounter: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:        "busy_duration_seconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total wall-clock time [unit: seconds; measured with millisecond resolution] of how long HotStuff's event loop has been busy processing events",
@@ -69,8 +69,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
-		idleDurationCsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Name:        "idle_duration_cseconds_total",
+		idleDurationCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "idle_duration_seconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff's event loop has been idle without processing any event",
@@ -85,8 +85,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
-		waitDurationCsCounter: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:        "wait_duration_cseconds_total",
+		waitDurationCounter: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:        "wait_duration_seconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long an event has been waited in the HotStuff event loop queue before being processed.",
@@ -133,32 +133,32 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		committeeComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Name:        "committee_computations_cseconds_total",
+		committeeComputationsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "committee_computations_seconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff sends computing consensus committee relations",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		signerComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Name:        "crypto_computations_cseconds_total",
+		signerComputationsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "crypto_computations_seconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff sends with crypto-related operations",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		validatorComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Name:        "message_validation_cseconds_total",
+		validatorComputationsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "message_validation_seconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff sends with message-validation",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		payloadProductionCsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Name:        "payload_production_cseconds_total",
+		payloadProductionCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "payload_production_seconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff sends with payload production",
@@ -173,21 +173,21 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 func (hc *HotstuffCollector) HotStuffBusyDuration(duration time.Duration, event string) {
 	d := duration.Seconds() // duration in seconds with resolution as much as float64
 	hc.busyDuration.WithLabelValues(event).Observe(d)
-	hc.busyDurationCsCounter.WithLabelValues(event).Add(d) // we count the number of wall-clock time [unit: seconds]
+	hc.busyDurationCounter.WithLabelValues(event).Add(d) // we count the number of wall-clock time [unit: seconds]
 }
 
 // HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 func (hc *HotstuffCollector) HotStuffIdleDuration(duration time.Duration) {
 	d := duration.Seconds() // duration in seconds with resolution as much as float64
 	hc.idleDuration.Observe(d)
-	hc.idleDurationCsCounter.Add(d) // we count the number of wall-clock time [unit: seconds]
+	hc.idleDurationCounter.Add(d) // we count the number of wall-clock time [unit: seconds]
 }
 
 // HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
 func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event string) {
 	d := duration.Seconds() // duration in seconds with resolution as much as float64
 	hc.waitDuration.WithLabelValues(event).Observe(d)
-	hc.waitDurationCsCounter.WithLabelValues(event).Add(d) // we count the number of wall-clock time [unit: seconds]
+	hc.waitDurationCounter.WithLabelValues(event).Add(d) // we count the number of wall-clock time [unit: seconds]
 }
 
 // HotstuffCollector reports Metrics C8: Current View
@@ -220,14 +220,14 @@ func (hc *HotstuffCollector) SetTimeout(duration time.Duration) {
 // committee relations.
 func (hc *HotstuffCollector) CommitteeProcessingDuration(duration time.Duration) {
 	// we count the number of wall-clock time [unit: seconds] with resolution as much as float64
-	hc.committeeComputationsCsCounter.Add(duration.Seconds())
+	hc.committeeComputationsCounter.Add(duration.Seconds())
 }
 
 // SignerProcessingDuration reports the time which the HotStuff's core logic
 // spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
 func (hc *HotstuffCollector) SignerProcessingDuration(duration time.Duration) {
 	// we count the number of wall-clock time [unit: seconds] with resolution as much as float64
-	hc.signerComputationsCsCounter.Add(duration.Seconds())
+	hc.signerComputationsCounter.Add(duration.Seconds())
 }
 
 // ValidatorProcessingDuration reports the time which the HotStuff's core logic
@@ -235,12 +235,12 @@ func (hc *HotstuffCollector) SignerProcessingDuration(duration time.Duration) {
 // consensus messages.
 func (hc *HotstuffCollector) ValidatorProcessingDuration(duration time.Duration) {
 	// we count the number of wall-clock time [unit: seconds] with resolution as much as float64
-	hc.validatorComputationsCsCounter.Add(duration.Seconds())
+	hc.validatorComputationsCounter.Add(duration.Seconds())
 }
 
 // PayloadProductionDuration reports the time which the HotStuff's core logic
 // spends in the module.Builder component, i.e. the with generating block payloads
 func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
 	// we count the number of wall-clock time [unit: seconds] with resolution as much as float64
-	hc.payloadProductionCsCounter.Add(duration.Seconds())
+	hc.payloadProductionCounter.Add(duration.Seconds())
 }

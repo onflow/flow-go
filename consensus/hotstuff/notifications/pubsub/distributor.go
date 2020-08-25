@@ -26,6 +26,22 @@ func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.subscribers = append(p.subscribers, consumer)
 }
 
+func (p *Distributor) OnReceiveVote(currentView uint64, vote *model.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnReceiveVote(currentView, vote)
+	}
+}
+
+func (p *Distributor) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnReceiveProposal(currentView, proposal)
+	}
+}
+
 func (p *Distributor) OnSkippedAhead(view uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -39,6 +55,38 @@ func (p *Distributor) OnEnteringView(view uint64) {
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
 		subscriber.OnEnteringView(view)
+	}
+}
+
+func (p *Distributor) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnQcTriggeredViewChange(qc, newView)
+	}
+}
+
+func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnProposingBlock(proposal)
+	}
+}
+
+func (p *Distributor) OnVoting(vote *model.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnVoting(vote)
+	}
+}
+
+func (p *Distributor) OnQcConstructedFromVotes(qc *model.QuorumCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnQcConstructedFromVotes(qc)
 	}
 }
 
