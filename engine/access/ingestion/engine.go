@@ -365,7 +365,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	// get the height of the last block for which all collections were received
 	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
 	if err != nil {
-		return fmt.Errorf("failed to complete requests for missing collections: %w", ctx.Err())
+		return fmt.Errorf("failed to complete requests for missing collections: %w", err)
 	}
 
 	// start from the next block
