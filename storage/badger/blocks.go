@@ -124,10 +124,10 @@ func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
 }
 
 func (b *Blocks) GetLastFullBlockHeight() (uint64, error) {
-	var h *uint64
-	err := b.db.View(operation.RetrieveLastCompleteBlockHeight(h))
+	var h uint64
+	err := b.db.View(operation.RetrieveLastCompleteBlockHeight(&h))
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve LastFullBlockHeight: %w", err)
 	}
-	return *h, nil
+	return h, nil
 }
