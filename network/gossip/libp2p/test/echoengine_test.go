@@ -17,26 +17,32 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
-// StubEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
+// EchoEngineSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
 // protocol stack. It creates two instances of a stubengine, connects them through network, and sends a
-// single message from one engine to the other one.
-type StubEngineTestSuite struct {
+// single message from one engine to the other one through different scenarios.
+type EchoEngineSuite struct {
 	suite.Suite
-	nets []*libp2p.Network    // used to keep track of the networks
-	mws  []*libp2p.Middleware // used to keep track of the middlewares associated with networks
-	ids  flow.IdentityList    // used to keep track of the identifiers associated with networks
+	nets             []*libp2p.Network      // used to keep track of the networks
+	mws              []*libp2p.Middleware   // used to keep track of the middlewares associated with networks
+	ids              flow.IdentityList      // used to keep track of the identifiers associated with networks
+	submitWrapper    ConduitSendWrapperFunc // used as a wrapper around conduit's submit method for sake of test
+	publishWrapper   ConduitSendWrapperFunc // used as a wrapper around conduit's publish method for sake of test
+	unicastWrapper   ConduitSendWrapperFunc // used as a wrapper around conduit's unicast method for sake of test
+	multicastWrapper ConduitSendWrapperFunc // used as a wrapper around conduit's multicast method for sake of test
 }
 
 // TestStubEngineTestSuite runs all the test methods in this test suit
 func TestStubEngineTestSuite(t *testing.T) {
-	suite.Run(t, new(StubEngineTestSuite))
+	suite.Run(t, new(EchoEngineSuite))
 }
 
-func (s *StubEngineTestSuite) SetupTest() {
+func (s *EchoEngineSuite) SetupTest() {
 	const count = 2
 	golog.SetAllLoggers(golog.LevelInfo)
 	s.ids = CreateIDs(count)
@@ -49,10 +55,34 @@ func (s *StubEngineTestSuite) SetupTest() {
 	nets, err := CreateNetworks(logger, s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
 	s.nets = nets
+
+	// submitWrapper defines a function that receives a message, conduit of an engine instance, and
+	// a target ID. It then sends the message to the target ID using the Submit method of conduit.
+	s.submitWrapper = func(msg interface{}, conduit network.Conduit, targetID flow.Identifier) error {
+		return conduit.Submit(msg, targetID)
+	}
+
+	// publishWrapper defines a function that receives a message, conduit of an engine instance, and
+	// a target ID. It then sends the message to the target ID using the Publish method of conduit.
+	s.publishWrapper = func(msg interface{}, conduit network.Conduit, targetID flow.Identifier) error {
+		return conduit.Publish(msg, filter.HasNodeID(targetID))
+	}
+
+	// unicastWrapper defines a function that receives a message, conduit of an engine instance, and
+	// a target ID. It then sends the message to the target ID using the Unicast method of conduit.
+	s.unicastWrapper = func(msg interface{}, conduit network.Conduit, targetID flow.Identifier) error {
+		return conduit.Unicast(msg, targetID)
+	}
+
+	// multicastWrapper defines a function that receives a message, conduit of an engine instance, and
+	// a target ID. It then sends the message to the target ID using the Multicast method of conduit.
+	s.multicastWrapper = func(msg interface{}, conduit network.Conduit, targetID flow.Identifier) error {
+		return conduit.Multicast(msg, 1, filter.HasNodeID(targetID))
+	}
 }
 
 // TearDownTest closes the networks within a specified timeout
-func (s *StubEngineTestSuite) TearDownTest() {
+func (s *EchoEngineSuite) TearDownTest() {
 	for _, net := range s.nets {
 		select {
 		// closes the network
@@ -64,61 +94,304 @@ func (s *StubEngineTestSuite) TearDownTest() {
 	}
 }
 
-// TestSingleMessage tests sending a single message from sender to receiver
-func (s *StubEngineTestSuite) TestSingleMessage() {
+// TestSingleMessage_Submit tests sending a single message from sender to receiver using
+// the Submit method of Conduit.
+func (s *EchoEngineSuite) TestSingleMessage_Submit() {
 	// set to false for no echo expectation
-	s.singleMessage(false)
+	s.singleMessage(false, s.submitWrapper)
 }
 
-// TestSingleMessage tests sending a single message from sender to receiver
-// it also evaluates the correct reception of an echo message back
-func (s *StubEngineTestSuite) TestSingleEcho() {
-	// set to true for an echo expectation
-	s.singleMessage(true)
-}
-
-// TestMultiMsgSync tests sending multiple messages from sender to receiver
-// sender and receiver are synced over reception
-func (s *StubEngineTestSuite) TestMultiMsgSync() {
+// TestSingleMessage_Publish tests sending a single message from sender to receiver using
+// the Publish method of Conduit.
+func (s *EchoEngineSuite) TestSingleMessage_Publish() {
 	// set to false for no echo expectation
-	s.multiMessageSync(false, 10)
+	s.singleMessage(false, s.publishWrapper)
 }
 
-// TestEchoMultiMsgSync tests sending multiple messages from sender to receiver
-// it also evaluates the correct reception of an echo message back for each send
-// sender and receiver are synced over reception
-func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
-	// set to true for an echo expectation
-	s.multiMessageSync(true, 10)
-}
-
-// TestMultiMsgAsync tests sending multiple messages from sender to receiver
-// sender and receiver are not synchronized
-func (s *StubEngineTestSuite) TestMultiMsgAsync() {
+// TestSingleMessage_Unicast tests sending a single message from sender to receiver using
+// the Unicast method of Conduit.
+func (s *EchoEngineSuite) TestSingleMessage_Unicast() {
 	// set to false for no echo expectation
-	s.multiMessageAsync(false, 10)
+	s.singleMessage(false, s.unicastWrapper)
 }
 
-// TestEchoMultiMsgAsync tests sending multiple messages from sender to receiver
-// it also evaluates the correct reception of an echo message back for each send
-// sender and receiver are not synchronized
-func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
+// TestSingleMessage_Multicast tests sending a single message from sender to receiver using
+// the Multicast method of Conduit.
+func (s *EchoEngineSuite) TestSingleMessage_Multicast() {
+	// set to false for no echo expectation
+	s.singleMessage(false, s.multicastWrapper)
+}
+
+// TestSingleEcho_Submit tests sending a single message from sender to receiver using
+// the Submit method of its Conduit.
+// It also evaluates the correct reception of an echo message back.
+func (s *EchoEngineSuite) TestSingleEcho_Submit() {
 	// set to true for an echo expectation
-	s.multiMessageAsync(true, 10)
+	s.singleMessage(true, s.submitWrapper)
 }
 
-// TestDuplicateMessageSequential evaluates the correctness of network layer
-// on deduplicating the received messages. Messages are delivered to the receiver
-// in a sequential manner.
-func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
+// TestSingleEcho_Publish tests sending a single message from sender to receiver using
+// the Publish method of its Conduit.
+// It also evaluates the correct reception of an echo message back.
+func (s *EchoEngineSuite) TestSingleEcho_Publish() {
+	// set to true for an echo expectation
+	s.singleMessage(true, s.publishWrapper)
+}
+
+// TestSingleEcho_Unicast tests sending a single message from sender to receiver using
+// the Unicast method of its Conduit.
+// It also evaluates the correct reception of an echo message back.
+func (s *EchoEngineSuite) TestSingleEcho_Unicast() {
+	// set to true for an echo expectation
+	s.singleMessage(true, s.unicastWrapper)
+}
+
+// TestSingleEcho_Multicast tests sending a single message from sender to receiver using
+// the Multicast method of its Conduit.
+// It also evaluates the correct reception of an echo message back.
+func (s *EchoEngineSuite) TestSingleEcho_Multicast() {
+	// set to true for an echo expectation
+	s.singleMessage(true, s.multicastWrapper)
+}
+
+// TestMultiMsgSync_Submit tests sending multiple messages from sender to receiver
+// using the Submit method of its Conduit.
+// Sender and receiver are synced over reception.
+func (s *EchoEngineSuite) TestMultiMsgSync_Submit() {
+	// set to false for no echo expectation
+	s.multiMessageSync(false, 10, s.submitWrapper)
+}
+
+// TestMultiMsgSync_Publish tests sending multiple messages from sender to receiver
+// using the Publish method of its Conduit.
+// Sender and receiver are synced over reception.
+func (s *EchoEngineSuite) TestMultiMsgSync_Publish() {
+	// set to false for no echo expectation
+	s.multiMessageSync(false, 10, s.publishWrapper)
+}
+
+// TestMultiMsgSync_Unicast tests sending multiple messages from sender to receiver
+// using the Unicast method of its Conduit.
+// Sender and receiver are synced over reception.
+func (s *EchoEngineSuite) TestMultiMsgSync_Unicast() {
+	// set to false for no echo expectation
+	s.multiMessageSync(false, 10, s.unicastWrapper)
+}
+
+// TestMultiMsgSync_Multicast tests sending multiple messages from sender to receiver
+// using the Multicast method of its Conduit.
+// Sender and receiver are synced over reception.
+func (s *EchoEngineSuite) TestMultiMsgSync_Multicast() {
+	// set to false for no echo expectation
+	s.multiMessageSync(false, 10, s.multicastWrapper)
+}
+
+// TestEchoMultiMsgSync_Submit tests sending multiple messages from sender to receiver
+// using the Submit method of its Conduit.
+// It also evaluates the correct reception of an echo message back for each send
+// sender and receiver are synced over reception.
+func (s *EchoEngineSuite) TestEchoMultiMsgSync_Submit() {
+	// set to true for an echo expectation
+	s.multiMessageSync(true, 10, s.submitWrapper)
+}
+
+// TestEchoMultiMsgSync_Publish tests sending multiple messages from sender to receiver
+// using the Publish method of its Conduit.
+// It also evaluates the correct reception of an echo message back for each send
+// sender and receiver are synced over reception.
+func (s *EchoEngineSuite) TestEchoMultiMsgSync_Publish() {
+	// set to true for an echo expectation
+	s.multiMessageSync(true, 10, s.publishWrapper)
+}
+
+// TestEchoMultiMsgSync_Unicast tests sending multiple messages from sender to receiver
+// using the Unicast method of its Conduit.
+// It also evaluates the correct reception of an echo message back for each send
+// sender and receiver are synced over reception.
+func (s *EchoEngineSuite) TestEchoMultiMsgSync_Unicast() {
+	// set to true for an echo expectation
+	s.multiMessageSync(true, 10, s.submitWrapper)
+}
+
+// TestEchoMultiMsgSync_Multicast tests sending multiple messages from sender to receiver
+// using the Multicast method of its Conduit.
+// It also evaluates the correct reception of an echo message back for each send
+// sender and receiver are synced over reception.
+func (s *EchoEngineSuite) TestEchoMultiMsgSync_Multicast() {
+	// set to true for an echo expectation
+	s.multiMessageSync(true, 10, s.multicastWrapper)
+}
+
+// TestMultiMsgAsync_Submit tests sending multiple messages from sender to receiver
+// using the Submit method of their Conduit.
+// Sender and receiver are not synchronized.
+func (s *EchoEngineSuite) TestMultiMsgAsync_Submit() {
+	// set to false for no echo expectation
+	s.multiMessageAsync(false, 10, s.submitWrapper)
+}
+
+// TestMultiMsgAsync_Publish tests sending multiple messages from sender to receiver
+// using the Publish method of their Conduit.
+// Sender and receiver are not synchronized
+func (s *EchoEngineSuite) TestMultiMsgAsync_Publish() {
+	// set to false for no echo expectation
+	s.multiMessageAsync(false, 10, s.publishWrapper)
+}
+
+// TestMultiMsgAsync_Unicast tests sending multiple messages from sender to receiver
+// using the Unicast method of their Conduit.
+// Sender and receiver are not synchronized
+func (s *EchoEngineSuite) TestMultiMsgAsync_Unicast() {
+	// set to false for no echo expectation
+	s.multiMessageAsync(false, 10, s.unicastWrapper)
+}
+
+// TestMultiMsgAsync_Multicast tests sending multiple messages from sender to receiver
+// using the Multicast method of their Conduit.
+// Sender and receiver are not synchronized.
+func (s *EchoEngineSuite) TestMultiMsgAsync_Multicast() {
+	// set to false for no echo expectation
+	s.multiMessageAsync(false, 10, s.multicastWrapper)
+}
+
+// TestEchoMultiMsgAsync_Submit tests sending multiple messages from sender to receiver
+// using the Submit method of their Conduit.
+// It also evaluates the correct reception of an echo message back for each send.
+// Sender and receiver are not synchronized
+func (s *EchoEngineSuite) TestEchoMultiMsgAsync_Submit() {
+	// set to true for an echo expectation
+	s.multiMessageAsync(true, 10, s.submitWrapper)
+}
+
+// TestEchoMultiMsgAsync_Publish tests sending multiple messages from sender to receiver
+// using the Publish method of their Conduit.
+// It also evaluates the correct reception of an echo message back for each send.
+// Sender and receiver are not synchronized
+func (s *EchoEngineSuite) TestEchoMultiMsgAsync_Publish() {
+	// set to true for an echo expectation
+	s.multiMessageAsync(true, 10, s.publishWrapper)
+}
+
+// TestEchoMultiMsgAsync_Unicast tests sending multiple messages from sender to receiver
+// using the Unicast method of their Conduit.
+// It also evaluates the correct reception of an echo message back for each send.
+// Sender and receiver are not synchronized
+func (s *EchoEngineSuite) TestEchoMultiMsgAsync_Unicast() {
+	// set to true for an echo expectation
+	s.multiMessageAsync(true, 10, s.unicastWrapper)
+}
+
+// TestEchoMultiMsgAsync_Multicast tests sending multiple messages from sender to receiver
+// using the Multicast method of their Conduit.
+// It also evaluates the correct reception of an echo message back for each send.
+// Sender and receiver are not synchronized
+func (s *EchoEngineSuite) TestEchoMultiMsgAsync_Multicast() {
+	// set to true for an echo expectation
+	s.multiMessageAsync(true, 10, s.multicastWrapper)
+}
+
+// TestDuplicateMessageSequential_Submit evaluates the correctness of network layer on deduplicating
+// the received messages over Submit method of nodes' Conduits.
+// Messages are delivered to the receiver in a sequential manner.
+func (s *EchoEngineSuite) TestDuplicateMessageSequential_Submit() {
+	s.duplicateMessageSequential(s.submitWrapper)
+}
+
+// TestDuplicateMessageSequential_Publish evaluates the correctness of network layer on deduplicating
+// the received messages over Publish method of nodes' Conduits.
+// Messages are delivered to the receiver in a sequential manner.
+func (s *EchoEngineSuite) TestDuplicateMessageSequential_Publish() {
+	s.duplicateMessageSequential(s.publishWrapper)
+}
+
+// TestDuplicateMessageSequential_Unicast evaluates the correctness of network layer on deduplicating
+// the received messages over Unicast method of nodes' Conduits.
+// Messages are delivered to the receiver in a sequential manner.
+func (s *EchoEngineSuite) TestDuplicateMessageSequential_Unicast() {
+	s.duplicateMessageSequential(s.unicastWrapper)
+}
+
+// TestDuplicateMessageSequential_Multicast evaluates the correctness of network layer on deduplicating
+// the received messages over Multicast method of nodes' Conduits.
+// Messages are delivered to the receiver in a sequential manner.
+func (s *EchoEngineSuite) TestDuplicateMessageSequential_Multicast() {
+	s.duplicateMessageSequential(s.multicastWrapper)
+}
+
+// TestDuplicateMessageParallel_Submit evaluates the correctness of network layer
+// on deduplicating the received messages via Submit method of nodes' Conduits.
+// Messages are delivered to the receiver in parallel via the Submit method of Conduits.
+func (s *EchoEngineSuite) TestDuplicateMessageParallel_Submit() {
+	s.duplicateMessageParallel(s.submitWrapper)
+}
+
+// TestDuplicateMessageParallel_Publish evaluates the correctness of network layer
+// on deduplicating the received messages via Publish method of nodes' Conduits.
+// Messages are delivered to the receiver in parallel via the Publish method of Conduits.
+func (s *EchoEngineSuite) TestDuplicateMessageParallel_Publish() {
+	s.duplicateMessageParallel(s.publishWrapper)
+}
+
+// TestDuplicateMessageParallel_Unicast evaluates the correctness of network layer
+// on deduplicating the received messages via Unicast method of nodes' Conduits.
+// Messages are delivered to the receiver in parallel via the Unicast method of Conduits.
+func (s *EchoEngineSuite) TestDuplicateMessageParallel_Unicast() {
+	s.duplicateMessageParallel(s.unicastWrapper)
+}
+
+// TestDuplicateMessageParallel_Multicast evaluates the correctness of network layer
+// on deduplicating the received messages via Multicast method of nodes' Conduits.
+// Messages are delivered to the receiver in parallel via the Multicast method of Conduits.
+func (s *EchoEngineSuite) TestDuplicateMessageParallel_Multicast() {
+	s.duplicateMessageParallel(s.multicastWrapper)
+}
+
+// TestDuplicateMessageDifferentChan_Submit evaluates the correctness of network layer
+// on deduplicating the received messages via Submit method of Conduits against different engine ids. In specific, the
+// desire behavior is that the deduplication should happen based on both eventID and channelID.
+// Messages are sent via the Submit method of the Conduits.
+func (s *EchoEngineSuite) TestDuplicateMessageDifferentChan_Submit() {
+	s.duplicateMessageDifferentChan(s.submitWrapper)
+}
+
+// TestDuplicateMessageDifferentChan_Publish evaluates the correctness of network layer
+// on deduplicating the received messages against different engine ids. In specific, the
+// desire behavior is that the deduplication should happen based on both eventID and channelID.
+// Messages are sent via the Publish methods of the Conduits.
+func (s *EchoEngineSuite) TestDuplicateMessageDifferentChan_Publish() {
+	s.duplicateMessageDifferentChan(s.publishWrapper)
+}
+
+// TestDuplicateMessageDifferentChan_Unicast evaluates the correctness of network layer
+// on deduplicating the received messages against different engine ids. In specific, the
+// desire behavior is that the deduplication should happen based on both eventID and channelID.
+// Messages are sent via the Unicast methods of the Conduits.
+func (s *EchoEngineSuite) TestDuplicateMessageDifferentChan_Unicast() {
+	s.duplicateMessageDifferentChan(s.unicastWrapper)
+}
+
+// TestDuplicateMessageDifferentChan_Multicast evaluates the correctness of network layer
+// on deduplicating the received messages against different engine ids. In specific, the
+// desire behavior is that the deduplication should happen based on both eventID and channelID.
+// Messages are sent via the Multicast methods of the Conduits.
+func (s *EchoEngineSuite) TestDuplicateMessageDifferentChan_Multicast() {
+	s.duplicateMessageDifferentChan(s.multicastWrapper)
+}
+
+// duplicateMessageSequential is a helper function that sends duplicate messages sequentially
+// from a receiver to the sender via the injected send wrapper function of conduit.
+func (s *EchoEngineSuite) duplicateMessageSequential(send ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, false)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, false, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, false)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, false, send)
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -127,7 +400,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 
 	// sends the same message 10 times
 	for i := 0; i < 10; i++ {
-		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
+		require.NoError(s.Suite.T(), send(event, sender.con, s.ids[rcvID].NodeID))
 	}
 
 	time.Sleep(1 * time.Second)
@@ -138,18 +411,20 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 	require.Len(s.Suite.T(), receiver.seen, 1)
 }
 
-// TestDuplicateMessageParallel evaluates the correctness of network layer
-// on deduplicating the received messages. Messages are delivered to the receiver
-// in parallel.
-func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
+// duplicateMessageParallel is a helper function that sends duplicate messages concurrent;u
+// from a receiver to the sender via the injected send wrapper function of conduit.
+func (s *EchoEngineSuite) duplicateMessageParallel(send ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, false)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, false, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, false)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, false, send)
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -162,7 +437,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
+			require.NoError(s.Suite.T(), send(event, sender.con, s.ids[rcvID].NodeID))
 		}()
 	}
 	wg.Wait()
@@ -174,10 +449,9 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 	require.Len(s.Suite.T(), receiver.seen, 1)
 }
 
-// TestDuplicateMessageDifferentChan evaluates the correctness of network layer
-// on deduplicating the received messages against different engine ids. In specific, the
-// desire behavior is that the deduplication should happen based on both eventID and channelID
-func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
+// duplicateMessageDifferentChan is a helper function that sends the same message from two distinct
+// sender engines to the two distinct receiver engines via the send wrapper function of Conduits.
+func (s *EchoEngineSuite) duplicateMessageDifferentChan(send ConduitSendWrapperFunc) {
 	const (
 		sndNode = iota
 		rcvNode
@@ -189,18 +463,21 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 	// registers engines in the network
 	// first type
 	// sender's engine
-	sender1 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel1, false)
+	sender1 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel1, false, send)
 
 	// receiver's engine
-	receiver1 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel1, false)
+	receiver1 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel1, false, send)
 
 	// second type
 	// registers engines in the network
 	// sender's engine
-	sender2 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel2, false)
+	sender2 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel2, false, send)
 
 	// receiver's engine
-	receiver2 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel2, false)
+	receiver2 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel2, false, send)
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -214,10 +491,10 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 		go func() {
 			defer wg.Done()
 			// sender1 to receiver1 on channel1
-			require.NoError(s.Suite.T(), sender1.con.Submit(event, s.ids[rcvNode].NodeID))
+			require.NoError(s.Suite.T(), send(event, sender1.con, s.ids[rcvNode].NodeID))
 
 			// sender2 to receiver2 on channel2
-			require.NoError(s.Suite.T(), sender2.con.Submit(event, s.ids[rcvNode].NodeID))
+			require.NoError(s.Suite.T(), send(event, sender2.con, s.ids[rcvNode].NodeID))
 		}()
 	}
 	wg.Wait()
@@ -235,22 +512,25 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 // singleMessage sends a single message from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the message.
 // in case echo is true, it also evaluates correct reception of the echo message from the receiver side
-func (s *StubEngineTestSuite) singleMessage(echo bool) {
+func (s *EchoEngineSuite) singleMessage(echo bool, send ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, echo, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo, send)
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
 		Text: "hello",
 	}
-	require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
+	require.NoError(s.Suite.T(), send(event, sender.con, s.ids[rcvID].NodeID))
 
 	// evaluates reception of echo request
 	select {
@@ -306,22 +586,26 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 // sender and receiver are sync over reception, i.e., sender sends one message at a time and
 // waits for its reception
 // count defines number of messages
-func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
+func (s *EchoEngineSuite) multiMessageSync(echo bool, count int, send ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, echo, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo, send)
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
 		event := &message.Echo{
 			Text: fmt.Sprintf("hello%d", i),
 		}
-		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
+		// sends a message from sender to receiver using send wrapper function
+		require.NoError(s.Suite.T(), send(event, sender.con, s.ids[rcvID].NodeID))
 
 		select {
 		case <-receiver.received:
@@ -378,16 +662,19 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 // it evaluates the correctness of implementation against correct delivery of the messages.
 // sender and receiver are async, i.e., sender sends all its message at blast
 // count defines number of messages
-func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
+func (s *EchoEngineSuite) multiMessageAsync(echo bool, count int, send ConduitSendWrapperFunc) {
 	sndID := 0
 	rcvID := 1
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestNetwork, echo, send)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo, send)
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})
@@ -400,7 +687,7 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 		event := &message.Echo{
 			Text: fmt.Sprintf("hello%d", i),
 		}
-		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[1].NodeID))
+		require.NoError(s.Suite.T(), send(event, sender.con, s.ids[1].NodeID))
 	}
 
 	for i := 0; i < count; i++ {
