@@ -210,13 +210,13 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 
 #elif (hashToPoint==OPSWU)
 
-const uint64_t a1_data[6] = { 
+const uint64_t a1_data[Fp_DIGITS] = { 
     0x5cf428082d584c1d, 0x98936f8da0e0f97f, 0xd8e8981aefd881ac,
     0xb0ea985383ee66a8, 0x3d693a02c96d4982, 0x00144698a3b8e943,
 };
 
 
-const uint64_t b1_data[6] = { 
+const uint64_t b1_data[Fp_DIGITS] = { 
     0xd1cc48e98e172be0, 0x5a23215a316ceaa5, 0xa0b9c14fcef35ef5,
     0x2016c1f0f24f4070, 0x018b12e8753eee3b, 0x12e2908d11688030, 
 };
@@ -307,7 +307,7 @@ static inline void map_to_E1_swu(ep_t p, const fp_t t) {
 // These constants are taken from https://github.com/kwantam/bls12-381_hash 
 // and converted to the Mongtomery domain. 
 // Copyright 2019 Riad S. Wahby
-const uint64_t iso_Nx_data[ELLP_Nx_LEN][6] = {
+const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS] = {
     {0xaeac1662734649b7, 0x5610c2d5f2e62d6e, 0xf2627b56cdb4e2c8, 
      0x6b303e88a2d7005f, 0xb809101dd9981585, 0x11a05f2b1e833340, },
     {0xe834eef1b3cb83bb, 0x4838f2a6f318c356, 0xf565e33c70d1e86b, 
@@ -334,7 +334,7 @@ const uint64_t iso_Nx_data[ELLP_Nx_LEN][6] = {
      0x31d79d7e22c837bc, 0xbd1e962381edee3d, 0x06e08c248e260e70, },
 };
 
-const uint64_t iso_Dx_data[ELLP_Dx_LEN][6] = {
+const uint64_t iso_Dx_data[ELLP_Dx_LEN][Fp_DIGITS] = {
     {0x993cf9fa40d21b1c, 0xb558d681be343df8, 0x9c9588617fc8ac62,
      0x01d5ef4ba35b48ba, 0x18b2e62f4bd3fa6f, 0x08ca8d548cff19ae, },
     {0xe5c8276ec82b3bff, 0x13daa8846cb026e9, 0x0126c2588c48bf57,
@@ -357,7 +357,7 @@ const uint64_t iso_Dx_data[ELLP_Dx_LEN][6] = {
      0xf682b4ee96f7d037, 0x476d6e3eb3a56680, 0x095fc13ab9e92ad4, }, 
 };
 
-const uint64_t iso_Ny_data[ELLP_Ny_LEN][6] = {
+const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS] = {
     {0xbe9845719707bb33, 0xcd0c7aee9b3ba3c2, 0x2b52af6c956543d3,
      0x11ad138e48a86952, 0x259d1f094980dcfa, 0x090d97c81ba24ee0, },
     {0xe097e75a2e41c696, 0xd6c56711962fa8bf, 0x0f906343eb67ad34,
@@ -392,7 +392,7 @@ const uint64_t iso_Ny_data[ELLP_Ny_LEN][6] = {
      0xcb181d8f84965a39, 0x4ea50b3b42df2eb5, 0x15e6be4e990f03ce, },
 };
 
-const uint64_t iso_Dy_data[ELLP_Dy_LEN][6] = {
+const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS] = {
     {0x01479253b03663c1, 0x07f3688ef60c206d, 0xeec3232b5be72e7a,
      0x601a6de578980be6, 0x52181140fad0eae9, 0x16112c4c3a9c98b2, },
     {0x32f6102c2e49a03d, 0x78a4260763529e35, 0xa4a10356f453e01f,

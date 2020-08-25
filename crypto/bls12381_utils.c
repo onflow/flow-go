@@ -23,12 +23,17 @@ prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
 #if (hashToPoint == OPSWU)
-extern const uint64_t a1_data[6];
-extern const uint64_t b1_data[6];
-extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][6];
-extern const uint64_t iso_Dx_data[ELLP_Dx_LEN][6];
-extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][6];
-extern const uint64_t iso_Dy_data[ELLP_Dy_LEN][6];
+extern const uint64_t a1_data[Fp_DIGITS];
+extern const uint64_t b1_data[Fp_DIGITS];
+extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
+extern const uint64_t iso_Dx_data[ELLP_Dx_LEN][Fp_DIGITS];
+extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
+extern const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS];
+#endif
+
+#if (MEMBERSHIP_CHECK_G1 == BOWE)
+extern const uint64_t beta_data[Fp_DIGITS];
+extern const uint64_t z2_1_by3_data[2];
 #endif
 
 // sets the global variable to input
@@ -68,22 +73,28 @@ static void fp_read_raw(fp_t a, const dig_t *raw, int len) {
 prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
     #if (hashToPoint == OPSWU)
-        fp_read_raw(bls_prec->a1, a1_data, 6);
-        fp_read_raw(bls_prec->b1, b1_data, 6);
+        fp_read_raw(bls_prec->a1, a1_data, Fp_DIGITS);
+        fp_read_raw(bls_prec->b1, b1_data, Fp_DIGITS);
         for (int i=0; i<ELLP_Dx_LEN; i++)  
-            fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i], 6);
+            fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i], Fp_DIGITS);
         for (int i=0; i<ELLP_Nx_LEN; i++)  
-            fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i], 6);
+            fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i], Fp_DIGITS);
         for (int i=0; i<ELLP_Dy_LEN; i++)  
-            fp_read_raw(bls_prec->iso_Dy[i], iso_Dy_data[i], 6);
+            fp_read_raw(bls_prec->iso_Dy[i], iso_Dy_data[i], Fp_DIGITS);
         for (int i=0; i<ELLP_Ny_LEN; i++)  
-            fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i], 6);
+            fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i], Fp_DIGITS);
     #endif
-    // (p-3)/4
+    #if (MEMBERSHIP_CHECK && MEMBERSHIP_CHECK_G1 == BOWE)
+        bn_read_raw(&bls_prec->beta, beta_data, Fp_DIGITS);
+        bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
+    #endif
+    // (p-3)/4 
+    // TODO: hardcode the digits
     bn_read_raw(&bls_prec->p_3div4, fp_prime_get(), Fp_DIGITS);
     bn_sub_dig(&bls_prec->p_3div4, &bls_prec->p_3div4, 3);
     bn_rsh(&bls_prec->p_3div4, &bls_prec->p_3div4, 2);
     // (p-1)/2
+    // TODO: hardcode the digits
     fp_sub_dig(bls_prec->p_1div2, fp_prime_get(), 1);
     fp_rsh(bls_prec->p_1div2, bls_prec->p_1div2, 1);
     return bls_prec;
@@ -162,13 +173,19 @@ void ep2_mult_gen(ep2_t res, const bn_t expo) {
     g2_mul_gen(res, (bn_st*)expo);
 }
 
-
-
 // DEBUG printing functions 
 void bytes_print_(char* s, byte* data, int len) {
     printf("[%s]:\n", s);
     for (int i=0; i<len; i++) 
         printf("%02x,", data[i]);
+    printf("\n");
+}
+
+// DEBUG printing functions 
+void dig_print_(char* s, dig_t* data, int len) {
+    printf("[%s]:\n", s);
+    for (int i=0; i<len; i++) 
+        printf("%016llx,", data[i]);
     printf("\n");
 }
 
@@ -614,3 +631,60 @@ int ep_sum_vector(byte* dest, const byte* sigs, const int len) {
     ep_free(sig);
     return VALID;
 }
+
+#if (MEMBERSHIP_CHECK_G1 == BOWE)
+// beta such that beta^3 == 1 mod p
+// beta is in the Montgomery form
+const uint64_t beta_data[Fp_DIGITS] = { 
+    0xcd03c9e48671f071, 0x5dab22461fcda5d2, 0x587042afd3851b95,
+    0x8eb60ebe01bacb9e, 0x03f97d6e83d050d2, 0x18f0206554638741,
+};
+
+
+// (z^2-1)/3 with z being the parameter of bls12-381
+const uint64_t z2_1_by3_data[2] = { 
+    0x0000000055555555, 0x396c8c005555e156  
+};
+
+// uses Bowe's check from section 3.2 from https://eprint.iacr.org/2019/814.pdf
+// to check whether a point on the curve is in G1
+int bowe_subgroup_check_G1(const ep_t p){
+    if (ep_is_infty(p) == 1) 
+        return VALID;
+    fp_t b;
+    fp_new(b);
+    dv_copy(b, beta_data, Fp_DIGITS); 
+    ep_t sigma, sigma2, p_inv;
+    ep_new(sigma);
+    ep_new(sigma2);
+    ep_new(p_inv);
+
+    // si(p) 
+    ep_copy(sigma, p);
+    fp_mul(sigma[0].x, sigma[0].x, b);
+    // -si^2(p)
+    ep_copy(sigma2, sigma);
+    fp_mul(sigma2[0].x, sigma2[0].x, b);
+    fp_neg(sigma2[0].y, sigma2[0].y);
+    ep_dbl(sigma, sigma);
+    // -p
+    ep_copy(p_inv, p);
+    fp_neg(p_inv[0].y, p_inv[0].y);
+    // (z^2-1)/3 (2*si(p) - p - si^2(p)) - si^2(p)
+    ep_add(sigma, sigma, p_inv);
+    ep_add(sigma, sigma, sigma2);
+    ep_mul(sigma, sigma, &bls_prec->z2_1_by3); // compare lwnaf to basic mult
+    ep_add(sigma, sigma, sigma2);
+    
+    ep_free(sigma2);
+    ep_free(p_inv);
+    // check result against infinity
+    if (!ep_is_infty(sigma)){
+        ep_free(sigma);
+        return INVALID;
+    }
+    ep_free(sigma);
+    return VALID;
+}
+
+#endif
