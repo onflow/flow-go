@@ -204,11 +204,8 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	}
 
 	// queue requesting each of the collections from the collection node
-	var collections = make([]flow.Identifier, len(block.Payload.Guarantees))
-	for i, guarantee := range block.Payload.Guarantees {
-		collectionID := guarantee.ID()
-		e.request.EntityByID(collectionID, filter.HasNodeID(guarantee.SignerIDs...))
-		collections[i] = collectionID
+	for _, guarantee := range block.Payload.Guarantees {
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
 	}
 
 	return nil
