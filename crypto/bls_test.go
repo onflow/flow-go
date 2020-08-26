@@ -34,17 +34,22 @@ func BenchmarkBLSBLS12381Verify(b *testing.B) {
 	benchVerify(b, BLSBLS12381, halg)
 }
 
-// BLS tests
-func TestBLSBLS12381Hasher(t *testing.T) {
-	// generate a key pair
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+func randomSK(t *testing.T, seed []byte) PrivateKey {
 	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.NoError(t, err)
+	return sk
+}
+
+// BLS tests
+func TestBLSBLS12381Hasher(t *testing.T) {
+	// generate a key pair
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	sk := randomSK(t, seed)
 	// empty hasher
-	_, err = sk.Sign(seed, nil)
+	_, err := sk.Sign(seed, nil)
 	assert.Error(t, err)
 	_, err = sk.PublicKey().Verify(Signature{}, seed, nil)
 	assert.Error(t, err)
@@ -69,11 +74,7 @@ func TestBLSEquals(t *testing.T) {
 func TestBLSUtils(t *testing.T) {
 	// generate a key pair
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
-	require.NoError(t, err)
-	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
-	require.NoError(t, err)
+	sk := randomSK(t, seed)
 	// test Algorithm()
 	testKeysAlgorithm(t, sk, BLSBLS12381)
 	// test Size()
@@ -110,11 +111,7 @@ func TestAggregateSignatures(t *testing.T) {
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
-		n, err := rand.Read(seed)
-		require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
-		require.NoError(t, err)
-		sk, err := GeneratePrivateKey(BLSBLS12381, seed)
-		require.NoError(t, err)
+		sk := randomSK(t, seed)
 		s, err := sk.Sign(input, kmac)
 		require.NoError(t, err)
 		sigs = append(sigs, s)
@@ -158,11 +155,7 @@ func TestAggregateSignatures(t *testing.T) {
 	sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
 	// check if one the public keys is not correct
 	randomIndex = mrand.Intn(sigsNum)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
-	require.NoError(t, err)
-	newSk, err := GeneratePrivateKey(BLSBLS12381, seed)
-	require.NoError(t, err)
+	newSk := randomSK(t, seed)
 	sks[randomIndex] = newSk
 	pks[randomIndex] = newSk.PublicKey()
 	aggSk, err = AggregatePrivateKeys(sks)
@@ -208,11 +201,7 @@ func TestAggregatePubKeys(t *testing.T) {
 
 	// create the signatures
 	for i := 0; i < pkNum; i++ {
-		n, err := rand.Read(seed)
-		require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
-		require.NoError(t, err)
-		sk, err := GeneratePrivateKey(BLSBLS12381, seed)
-		require.NoError(t, err)
+		sk := randomSK(t, seed)
 		sks = append(sks, sk)
 		pks = append(pks, sk.PublicKey())
 	}
@@ -253,11 +242,7 @@ func TestRemovePubKeys(t *testing.T) {
 
 	// generate public keys
 	for i := 0; i < pkNum; i++ {
-		n, err := rand.Read(seed)
-		require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
-		require.NoError(t, err)
-		sk, err := GeneratePrivateKey(BLSBLS12381, seed)
-		require.NoError(t, err)
+		sk := randomSK(t, seed)
 		pks = append(pks, sk.PublicKey())
 	}
 	// aggregate public keys
@@ -278,6 +263,14 @@ func TestRemovePubKeys(t *testing.T) {
 	assert.True(t, BLSkey.Equals(partialPk),
 		fmt.Sprintf("incorrect key %s, should be %s, keys are %s, index is %d",
 			partialPk, BLSkey, pks, pkToRemoveNum))
+
+	// remove an extra key and check inequality
+	extraPk := randomSK(t, seed).PublicKey()
+	partialPk, err = RemovePublicKeys(aggPk, []PublicKey{extraPk})
+	assert.NoError(t, err)
+	assert.False(t, BLSkey.Equals(partialPk),
+		fmt.Sprintf("incorrect key %s, should not be %s, keys are %s, index is %d, extra key is %s",
+			partialPk, BLSkey, pks, pkToRemoveNum, extraPk))
 
 	// specific test to remove all keys
 	partialPk, err = RemovePublicKeys(aggPk, pks)
