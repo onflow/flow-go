@@ -333,7 +333,7 @@ func (fnb *FlowNodeBuilder) initDB() {
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithLogger(log).
-		WithValueLogFileSize(128 << 22). // Default is 4 GB
+		WithValueLogFileSize(128 << 23). // Default is 8 GB
 		WithValueLogMaxEntries(100000)   // Default is 1000000
 
 	db, err := badger.Open(opts)
