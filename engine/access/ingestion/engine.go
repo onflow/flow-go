@@ -114,7 +114,9 @@ func (e *Engine) Ready() <-chan struct{} {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
 		err := e.requestMissingCollections(ctx)
-		e.log.Error().Err(err).Msg("requesting missing collections failed")
+		if err != nil {
+			e.log.Error().Err(err).Msg("requesting missing collections failed")
+		}
 	})
 	e.unit.LaunchPeriodically(e.updateLastFullBlockReceivedIndex, defaultFullBlockUpdateInterval, time.Duration(0))
 	return readyChan
