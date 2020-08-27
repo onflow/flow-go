@@ -65,6 +65,15 @@ type Conduit struct {
 }
 
 func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
+	return c.Unicast(event, targetIDs...)
+}
+
+func (c *Conduit) Publish(event interface{}, selector flow.IdentityFilter) error {
+	// Todo: implement publish method
+	return fmt.Errorf("publish has not been implemented")
+}
+
+func (c *Conduit) Unicast(event interface{}, targetIDs ...flow.Identifier) error {
 	for _, targetID := range targetIDs {
 		net, found := c.net.hub.networks[targetID]
 		if !found {
@@ -97,6 +106,11 @@ func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error 
 		}(delay, c.net.originID, con, event)
 	}
 	return nil
+}
+
+func (c *Conduit) Multicast(event interface{}, num uint, selector flow.IdentityFilter) error {
+	// Todo: implement multicast method
+	return fmt.Errorf("multicast has not been implemented")
 }
 
 type message struct {
