@@ -492,7 +492,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		rtnErr = nil
 		lastFullBlockHeight = rootBlkHeight
 
-		// lower the height threshold to request missing collections
+		// raise the height threshold to avoid requesting missing collections
 		defaultMissingCollsForBlkThreshold = 3
 
 		// mark all blocks beyond the root block as incomplete
