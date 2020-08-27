@@ -176,6 +176,7 @@ func main() {
 				receipts,
 				approvals,
 				seals,
+				matching.StakesAlwaysEnough,
 			)
 			requesterEng.WithHandle(match.HandleReceipt)
 			return match, err
