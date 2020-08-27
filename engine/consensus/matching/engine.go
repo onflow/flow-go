@@ -793,6 +793,8 @@ func StakesAlwaysEnough(totalStakes uint64, receivedStakes uint64) bool {
 
 // CheckApproversStakes checks that the stakes collected by a set of verifiers
 // exceeds the threshold required to validate a chunk.
+// TODO: merge with the ComputeStakeThresholdForBuildingQC
+// https://github.com//dapperlabs/flow-go/blob/master/consensus/hotstuff/committee.go#L49
 func CheckApproversStakes(totalStakes uint64, receivedStakes uint64) bool {
 	return receivedStakes >= totalStakes*2/3+1
 }
