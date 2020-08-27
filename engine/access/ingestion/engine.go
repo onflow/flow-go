@@ -514,6 +514,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 			return
 		}
 
+		// if there are missing collections
 		if len(missingColls) > 0 {
 
 			// increment number of incomplete blocks
@@ -542,10 +543,16 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 
 	// additionally, if more than threshold blocks have missing collection, re-request those collections
 	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold {
+		// warn log since this should generally not happen
+		e.log.Warn().
+			Int("missing_collection_blk_count", incompleteBlksCnt).
+			Int("threshold", defaultMissingCollsForBlkThreshold).
+			Uint64("last_full_blk_height", latestFullHeight).
+			Msg("re-requesting missing collections")
 		e.requestCollections(allMissingColls)
 	}
 
-	e.log.Debug().Uint64("lastFullHeight", latestFullHeight).Msg("updated LastFullBlockReceived index")
+	e.log.Debug().Uint64("last_full_blk_height", latestFullHeight).Msg("updated LastFullBlockReceived index")
 }
 
 // missingCollectionsAtHeight returns all missing collection guarantees at a given height
