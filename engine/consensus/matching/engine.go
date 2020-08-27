@@ -553,6 +553,8 @@ func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk,
 	// get all of the approver identities and check threshold
 	approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
 
+	// TODO: Check from the list of approvers that they were all assigned to the chunk
+
 	return e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	chunkmodule "github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
@@ -35,7 +36,7 @@ type Engine struct {
 	me            module.Local
 	results       mempool.PendingResults // used to store all the execution results along with their senders
 	verifier      network.Engine         // the verifier engine
-	assigner      module.ChunkAssigner   // used to determine chunks this node needs to verify
+	assignment    chunkmodule.Assignment // used to determine chunks this node needs to verify
 	state         protocol.State         // used to verify the request origin
 	pendingChunks *Chunks                // used to store all the pending chunks that assigned to this node
 	con           network.Conduit        // used to send the chunk data request
@@ -52,7 +53,7 @@ func New(
 	me module.Local,
 	results mempool.PendingResults,
 	verifier network.Engine,
-	assigner module.ChunkAssigner,
+	assignment chunkmodule.Assignment,
 	state protocol.State,
 	chunks *Chunks,
 	headers storage.Headers,
@@ -67,7 +68,7 @@ func New(
 		me:            me,
 		results:       results,
 		verifier:      verifier,
-		assigner:      assigner,
+		assignment:    assignment,
 		state:         state,
 		pendingChunks: chunks,
 		headers:       headers,
@@ -203,7 +204,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	}
 
 	// different execution results can be chunked in parallel
-	chunks, err := e.myChunkAssignments(ctx, pendingResult.ExecutionResult)
+	chunks, err := e.myChunkAssignments(ctx, result)
 	if err != nil {
 		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
@@ -237,7 +238,7 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
 	}
 
-	mine, err := myAssignements(ctx, e.assigner, e.me.NodeID(), verifiers, result)
+	mine, err := e.assignment.MyChunks(e.me.NodeID(), verifiers, result)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine my assignments: %w", err)
 	}
@@ -245,6 +246,7 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 	return mine, nil
 }
 
+// DEPRECATED: Moved all logic relating to assignment to /module/chunks/assignment.go
 func myAssignements(ctx context.Context, assigner module.ChunkAssigner, myID flow.Identifier,
 	verifiers flow.IdentityList, result *flow.ExecutionResult) (flow.ChunkList, error) {
 
