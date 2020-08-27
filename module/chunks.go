@@ -30,3 +30,8 @@ type ChunkVerifier interface {
 	// non-system chunks.
 	SystemChunkVerify(ch *verification.VerifiableChunkData) ([]byte, chmodels.ChunkFault, error)
 }
+
+// ChunkAssignment provides functionality to assign chunks and chunks related to a specific verifier Identity
+type ChunkAssignment interface {
+	MyChunks(myID flow.Identifier, verifiers flow.IdentityList, result *flow.ExecutionResult) (flow.ChunkList, error)
+}

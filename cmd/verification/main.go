@@ -234,7 +234,7 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assignment, err := chunks.NewAssignment()
+			chunkAssignment, err := chunks.NewChunkAssignment()
 			if err != nil {
 				return nil, err
 			}
@@ -245,7 +245,7 @@ func main() {
 				node.Me,
 				pendingResults,
 				verifierEng,
-				*assignment,
+				*chunkAssignment,
 				node.State,
 				pendingChunks,
 				headerStorage,

@@ -12,12 +12,10 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	chunkmodule "github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
@@ -29,20 +27,20 @@ import (
 // Engine takes processable execution results, finds the chunks the are assigned to me, fetches
 // the chunk data pack from execution nodes, and passes verifiable chunks to Verifier engine
 type Engine struct {
-	unit          *engine.Unit
-	log           zerolog.Logger
-	metrics       module.VerificationMetrics
-	tracer        module.Tracer
-	me            module.Local
-	results       mempool.PendingResults // used to store all the execution results along with their senders
-	verifier      network.Engine         // the verifier engine
-	assignment    chunkmodule.Assignment // used to determine chunks this node needs to verify
-	state         protocol.State         // used to verify the request origin
-	pendingChunks *Chunks                // used to store all the pending chunks that assigned to this node
-	con           network.Conduit        // used to send the chunk data request
-	headers       storage.Headers        // used to fetch the block header when chunk data is ready to be verified
-	retryInterval time.Duration          // determines time in milliseconds for retrying chunk data requests
-	maxAttempt    int                    // max time of retries to fetch the chunk data pack for a chunk
+	unit            *engine.Unit
+	log             zerolog.Logger
+	metrics         module.VerificationMetrics
+	tracer          module.Tracer
+	me              module.Local
+	results         mempool.PendingResults // used to store all the execution results along with their senders
+	verifier        network.Engine         // the verifier engine
+	chunkAssignment module.ChunkAssignment // used to determine chunks this node needs to verify
+	state           protocol.State         // used to verify the request origin
+	pendingChunks   *Chunks                // used to store all the pending chunks that assigned to this node
+	con             network.Conduit        // used to send the chunk data request
+	headers         storage.Headers        // used to fetch the block header when chunk data is ready to be verified
+	retryInterval   time.Duration          // determines time in milliseconds for retrying chunk data requests
+	maxAttempt      int                    // max time of retries to fetch the chunk data pack for a chunk
 }
 
 func New(
@@ -53,7 +51,7 @@ func New(
 	me module.Local,
 	results mempool.PendingResults,
 	verifier network.Engine,
-	assignment chunkmodule.Assignment,
+	chunkAssignment module.ChunkAssignment,
 	state protocol.State,
 	chunks *Chunks,
 	headers storage.Headers,
@@ -61,19 +59,19 @@ func New(
 	maxAttempt int,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:          engine.NewUnit(),
-		metrics:       metrics,
-		tracer:        tracer,
-		log:           log.With().Str("engine", "match").Logger(),
-		me:            me,
-		results:       results,
-		verifier:      verifier,
-		assignment:    assignment,
-		state:         state,
-		pendingChunks: chunks,
-		headers:       headers,
-		retryInterval: retryInterval,
-		maxAttempt:    maxAttempt,
+		unit:            engine.NewUnit(),
+		metrics:         metrics,
+		tracer:          tracer,
+		log:             log.With().Str("engine", "match").Logger(),
+		me:              me,
+		results:         results,
+		verifier:        verifier,
+		chunkAssignment: chunkAssignment,
+		state:           state,
+		pendingChunks:   chunks,
+		headers:         headers,
+		retryInterval:   retryInterval,
+		maxAttempt:      maxAttempt,
 	}
 
 	if maxAttempt == 0 {
@@ -232,48 +230,14 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 	span, ctx = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.Finish()
 
-	verifiers, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleVerification))
+	verifiers, err := e.state.Final().Identities(filter.HasRole(flow.RoleVerification))
 	if err != nil {
 		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
 	}
 
-	mine, err := e.assignment.MyChunks(e.me.NodeID(), verifiers, result)
+	mine, err := e.chunkAssignment.MyChunks(e.me.NodeID(), verifiers, result)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine my assignments: %w", err)
-	}
-
-	return mine, nil
-}
-
-// DEPRECATED: Moved all logic relating to assignment to /module/chunks/assignment.go
-func myAssignements(ctx context.Context, assigner module.ChunkAssigner, myID flow.Identifier,
-	verifiers flow.IdentityList, result *flow.ExecutionResult) (flow.ChunkList, error) {
-
-	// The randomness of the assignment is taken from the result.
-	// TODO: taking the randomness from the random beacon, which is included in it's next block
-	rng, err := utils.NewChunkAssignmentRNG(result)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
-	}
-
-	assignment, err := assigner.Assign(verifiers, result.Chunks, rng)
-	if err != nil {
-		return nil, fmt.Errorf("could not create chunk assignment %w", err)
-	}
-
-	// indices of chunks assigned to this node
-	chunkIndices := assignment.ByNodeID(myID)
-
-	// mine keeps the list of chunks assigned to this node
-	mine := make(flow.ChunkList, 0, len(chunkIndices))
-	for _, index := range chunkIndices {
-		chunk, ok := result.Chunks.ByIndex(index)
-		if !ok {
-			return nil, fmt.Errorf("chunk out of range requested: %v", index)
-		}
-
-		mine = append(mine, chunk)
 	}
 
 	return mine, nil
