@@ -150,7 +150,9 @@ func (ms *MatchingSuite) SetupTest() {
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return ms.approvers
 		},
-		nil,
+		func(selector flow.IdentityFilter) error {
+			return nil
+		},
 	)
 
 	ms.sealedSnapshot = &protocol.Snapshot{}
@@ -846,7 +848,8 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 		},
 	).Return()
 
-	ms.matching.requestPending()
+	err := ms.matching.requestPending()
+	ms.Require().NoError(err, "should request results for pending blocks")
 
 	// should request n-1 blocks if n > requestReceiptThreshold
 	ms.Assert().Equal(len(requestedBlocks), n-1)

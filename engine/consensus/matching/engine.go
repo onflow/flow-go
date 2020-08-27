@@ -7,6 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/atomic"
+
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -17,10 +22,6 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
-	"github.com/opentracing/opentracing-go"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"go.uber.org/atomic"
 )
 
 var (
@@ -488,7 +489,10 @@ func (e *Engine) checkSealing() {
 	}
 
 	// request execution receipts for unsealed finalized blocks
-	e.requestPending()
+	err = e.requestPending()
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not request pending block results")
+	}
 }
 
 // matchedResults returns the ExecutionResults from the mempool that have
