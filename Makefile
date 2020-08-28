@@ -7,9 +7,7 @@ COMMIT := $(shell git rev-parse HEAD)
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
-ifndef IMAGE_TAG
-override IMAGE_TAG := ${VERSION}
-endif
+IMAGE_TAG := ${VERSION}
 
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
@@ -26,9 +24,7 @@ UNAME := $(shell uname)
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
 # docker container registry 
-ifndef CONTAINER_REGISTRY
-override CONTAINER_REGISTRY=gcr.io/dl-flow
-endif
+CONTAINER_REGISTRY=gcr.io/dl-flow
 
 export DOCKER_BUILDKIT := 1
 
