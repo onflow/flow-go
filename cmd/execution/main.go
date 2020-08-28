@@ -83,6 +83,7 @@ func main() {
 			vmCtx := fvm.NewContext(
 				fvm.WithChain(node.RootChainID.Chain()),
 				fvm.WithBlocks(node.Storage.Blocks),
+				fvm.WithRestrictedDeployment(false),
 			)
 
 			manager, err := computation.New(
