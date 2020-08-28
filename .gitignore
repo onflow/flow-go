@@ -44,3 +44,5 @@ language/tools/vscode-extension/out/*
 **/gomock_reflect*/*
 
 
+cmd/util/cmd/replay-transactions/data/**
+cmd/util/cmd/replay-transactions/data_first/**
