@@ -83,7 +83,7 @@ func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when t
 	// we don't need to check whether the transaction timing already exists, it will not be overwritten by the mempool
 	added := tc.transactionTimings.Add(&flow.TransactionTiming{TransactionID: txID, Received: when})
 	if !added {
-		tc.log.Error().
+		tc.log.Warn().
 			Str("transaction_id", txID.String()).
 			Msg("failed to add TransactionReceived metric")
 	}
