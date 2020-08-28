@@ -12,8 +12,8 @@ import (
 	metricsconsumer "github.com/dapperlabs/flow-go/module/metrics/hotstuff"
 )
 
-func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics, chain flow.ChainID) hotstuff.Consumer {
-	telemetryConsumer := notifications.NewTelemetryConsumer(log, chain)
+func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics, clusterID flow.ChainID) hotstuff.Consumer {
+	telemetryConsumer := notifications.NewTelemetryConsumer(log, clusterID)
 	metricsConsumer := metricsconsumer.NewMetricsConsumer(metrics)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(telemetryConsumer)

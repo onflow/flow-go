@@ -401,7 +401,7 @@ func main() {
 			signer := verification.NewSingleSigner(committee, staking, node.Me.NodeID())
 
 			// initialize logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, clusterMetrics)
+			notifier := createNotifier(node.Logger, clusterMetrics, clusterID)
 
 			persist := persister.New(node.DB)
 
