@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/mock"
@@ -26,20 +27,24 @@ type BuilderSuite struct {
 	suite.Suite
 
 	// test helpers
-	firstID      flow.Identifier   // first block in the range we look at
-	finalID      flow.Identifier   // last finalized block
-	parentID     flow.Identifier   // parent block we build on
-	finalizedIDs []flow.Identifier // blocks between first and final
-	pendingIDs   []flow.Identifier // blocks between final and parent
-	chain        []*flow.Seal      // chain of seals starting first
+	firstID           flow.Identifier   // first block in the range we look at
+	finalID           flow.Identifier   // last finalized block
+	parentID          flow.Identifier   // parent block we build on
+	finalizedBlockIDs []flow.Identifier // blocks between first and final
+	pendingBlockIDs   []flow.Identifier // blocks between final and parent
+	chain             []*flow.Seal      // chain of seals starting first
 
 	// stored data
-	last       *flow.Seal
-	guarantees []*flow.CollectionGuarantee
-	seals      []*flow.Seal
-	headers    map[flow.Identifier]*flow.Header
-	heights    map[uint64]*flow.Header
-	index      map[flow.Identifier]*flow.Index
+	pendingGuarantees []*flow.CollectionGuarantee
+	pendingSeals      []*flow.Seal
+	pendingReceipts   []*flow.ExecutionReceipt
+
+	seals   map[flow.Identifier]*flow.Seal
+	headers map[flow.Identifier]*flow.Header
+	heights map[uint64]*flow.Header
+	index   map[flow.Identifier]*flow.Index
+
+	lastSeal *flow.Seal
 
 	// real dependencies
 	dir      string
@@ -52,20 +57,23 @@ type BuilderSuite struct {
 	sealDB   *storage.Seals
 	indexDB  *storage.Index
 	blockDB  *storage.Blocks
+
 	guarPool *mempool.Guarantees
 	sealPool *mempool.Seals
+	recPool  *mempool.Receipts
 
 	// tracking behaviour
 	assembled  *flow.Payload     // built payload
 	remCollIDs []flow.Identifier // guarantees removed from mempool
 	remSealIDs []flow.Identifier // seals removed from mempool
+	remRecIDs  []flow.Identifier // receipts removed from mempool
 
 	// component under test
 	build *Builder
 }
 
 func (bs *BuilderSuite) chainSeal(blockID flow.Identifier) {
-	initial := bs.last.FinalState
+	initial := bs.lastSeal.FinalState
 	final := unittest.StateCommitmentFixture()
 	if len(bs.chain) > 0 {
 		initial = bs.chain[len(bs.chain)-1].FinalState
@@ -79,24 +87,37 @@ func (bs *BuilderSuite) chainSeal(blockID flow.Identifier) {
 	bs.chain = append(bs.chain, seal)
 }
 
+/*
+
+first                   final                    parent
+ |                        |                        |
+[ ]--[ ]--[ ]--[ ]--[ ]--[ ]--[ ]--[ ]--[ ]--[ ]--[ ]--{ }
+ |
+sealed
+
+*/
 func (bs *BuilderSuite) SetupTest() {
 
 	// set up no-op dependencies
 	noop := metrics.NewNoopCollector()
 
 	// set up test parameters
-	numFinalized := 4
-	numPending := 4
+	numFinalizedBlocks := 4
+	numPendingBlocks := 4
 
 	// reset test helpers
-	bs.pendingIDs = nil
-	bs.finalizedIDs = nil
+	bs.pendingBlockIDs = nil
+	bs.finalizedBlockIDs = nil
 	bs.chain = nil
 
-	// initialize the storage
-	bs.last = nil
-	bs.guarantees = nil
-	bs.seals = nil
+	// initialize the pools
+	bs.pendingGuarantees = nil
+	bs.pendingSeals = nil
+	bs.pendingReceipts = nil
+
+	// initialise the dbs
+	bs.lastSeal = nil
+	bs.seals = make(map[flow.Identifier]*flow.Seal)
 	bs.headers = make(map[flow.Identifier]*flow.Header)
 	bs.heights = make(map[uint64]*flow.Header)
 	bs.index = make(map[flow.Identifier]*flow.Index)
@@ -105,6 +126,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.assembled = nil
 	bs.remCollIDs = nil
 	bs.remSealIDs = nil
+	bs.remRecIDs = nil
 
 	// insert the first block in our range
 	first := unittest.BlockHeaderFixture()
@@ -112,18 +134,19 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.headers[first.ID()] = &first
 	bs.heights[first.Height] = &first
 	bs.index[first.ID()] = &flow.Index{}
-	bs.last = &flow.Seal{
+	bs.lastSeal = &flow.Seal{
 		BlockID:      first.ID(),
 		ResultID:     flow.ZeroID,
 		InitialState: unittest.StateCommitmentFixture(),
 		FinalState:   unittest.StateCommitmentFixture(),
 	}
+	bs.seals[first.ID()] = bs.lastSeal
 
 	// insert the finalized blocks between first and final
 	previous := &first
-	for n := 0; n < numFinalized; n++ {
+	for n := 0; n < numFinalizedBlocks; n++ {
 		finalized := unittest.BlockHeaderWithParentFixture(previous)
-		bs.finalizedIDs = append(bs.finalizedIDs, finalized.ID())
+		bs.finalizedBlockIDs = append(bs.finalizedBlockIDs, finalized.ID())
 		bs.headers[finalized.ID()] = &finalized
 		bs.heights[finalized.Height] = &finalized
 		bs.index[finalized.ID()] = &flow.Index{}
@@ -139,11 +162,11 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.index[final.ID()] = &flow.Index{}
 	bs.chainSeal(final.ID())
 
-	// insert the finalized ancestors with empty payload
+	// insert the pending ancestors with empty payload
 	previous = &final
-	for n := 0; n < numPending; n++ {
+	for n := 0; n < numPendingBlocks; n++ {
 		pending := unittest.BlockHeaderWithParentFixture(previous)
-		bs.pendingIDs = append(bs.pendingIDs, pending.ID())
+		bs.pendingBlockIDs = append(bs.pendingBlockIDs, pending.ID())
 		bs.headers[pending.ID()] = &pending
 		bs.index[pending.ID()] = &flow.Index{}
 		bs.chainSeal(pending.ID())
@@ -159,13 +182,22 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
+
 	err := bs.db.Update(operation.InsertFinalizedHeight(final.Height))
 	bs.Require().NoError(err)
 	err = bs.db.Update(operation.IndexBlockHeight(final.Height, bs.finalID))
 	bs.Require().NoError(err)
+
 	err = bs.db.Update(operation.InsertRootHeight(13))
 	bs.Require().NoError(err)
+
+	err = bs.db.Update(operation.InsertSealedHeight(first.Height))
+	bs.Require().NoError(err)
+	err = bs.db.Update(operation.IndexBlockHeight(first.Height, first.ID()))
+	bs.Require().NoError(err)
+
 	bs.sentinel = 1337
+
 	bs.setter = func(header *flow.Header) error {
 		header.View = 1337
 		return nil
@@ -173,7 +205,19 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// set up storage mocks for tests
 	bs.sealDB = &storage.Seals{}
-	bs.sealDB.On("ByBlockID", bs.parentID).Return(bs.last, nil)
+	bs.sealDB.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.Seal {
+			return bs.seals[blockID]
+		},
+		func(blockID flow.Identifier) error {
+			_, exists := bs.seals[blockID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
 	bs.headerDB = &storage.Headers{}
 	bs.headerDB.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Header {
@@ -199,6 +243,7 @@ func (bs *BuilderSuite) SetupTest() {
 			return nil
 		},
 	)
+
 	bs.indexDB = &storage.Index{}
 	bs.indexDB.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Index {
@@ -212,6 +257,7 @@ func (bs *BuilderSuite) SetupTest() {
 			return nil
 		},
 	)
+
 	bs.blockDB = &storage.Blocks{}
 	bs.blockDB.On("Store", mock.Anything).Run(func(args mock.Arguments) {
 		block := args.Get(0).(*flow.Block)
@@ -224,23 +270,36 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.guarPool.On("Size").Return(uint(0)) // only used by metrics
 	bs.guarPool.On("All").Return(
 		func() []*flow.CollectionGuarantee {
-			return bs.guarantees
+			return bs.pendingGuarantees
 		},
 	)
 	bs.guarPool.On("Rem", mock.Anything).Run(func(args mock.Arguments) {
 		collID := args.Get(0).(flow.Identifier)
 		bs.remCollIDs = append(bs.remCollIDs, collID)
 	}).Return(true)
+
 	bs.sealPool = &mempool.Seals{}
 	bs.sealPool.On("Size").Return(uint(0)) // only used by metrics
 	bs.sealPool.On("All").Return(
 		func() []*flow.Seal {
-			return bs.seals
+			return bs.pendingSeals
 		},
 	)
 	bs.sealPool.On("Rem", mock.Anything).Run(func(args mock.Arguments) {
 		sealID := args.Get(0).(flow.Identifier)
 		bs.remSealIDs = append(bs.remSealIDs, sealID)
+	}).Return(true)
+
+	bs.recPool = &mempool.Receipts{}
+	bs.recPool.On("Size").Return(uint(0))
+	bs.recPool.On("All").Return(
+		func() []*flow.ExecutionReceipt {
+			return bs.pendingReceipts
+		},
+	)
+	bs.recPool.On("Rem", mock.Anything).Run(func(args mock.Arguments) {
+		recID := args.Get(0).(flow.Identifier)
+		bs.remRecIDs = append(bs.remRecIDs, recID)
 	}).Return(true)
 
 	// initialize the builder
@@ -253,6 +312,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.blockDB,
 		bs.guarPool,
 		bs.sealPool,
+		bs.recPool,
 	)
 
 	bs.build.cfg.expiry = 11
@@ -278,10 +338,10 @@ func (bs *BuilderSuite) TestPayloadEmptyValid() {
 func (bs *BuilderSuite) TestPayloadGuaranteeValid() {
 
 	// add sixteen guarantees to the pool
-	bs.guarantees = unittest.CollectionGuaranteesFixture(16, unittest.WithCollRef(bs.finalID))
+	bs.pendingGuarantees = unittest.CollectionGuaranteesFixture(16, unittest.WithCollRef(bs.finalID))
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
-	bs.Assert().ElementsMatch(bs.guarantees, bs.assembled.Guarantees, "should have guarantees from mempool in payload")
+	bs.Assert().ElementsMatch(bs.pendingGuarantees, bs.assembled.Guarantees, "should have guarantees from mempool in payload")
 	bs.Assert().Empty(bs.assembled.Seals, "should have no seals in payload with empty mempool")
 	bs.Assert().Empty(bs.remCollIDs, "should not remove any valid guarantees")
 }
@@ -294,14 +354,14 @@ func (bs *BuilderSuite) TestPayloadGuaranteeDuplicateFinalized() {
 	// create some duplicate guarantees and add to random finalized block
 	duplicated := unittest.CollectionGuaranteesFixture(12, unittest.WithCollRef(bs.finalID))
 	for _, guarantee := range duplicated {
-		finalizedID := bs.finalizedIDs[rand.Intn(len(bs.finalizedIDs))]
+		finalizedID := bs.finalizedBlockIDs[rand.Intn(len(bs.finalizedBlockIDs))]
 		index := bs.index[finalizedID]
 		index.CollectionIDs = append(index.CollectionIDs, guarantee.ID())
 		bs.index[finalizedID] = index
 	}
 
 	// add sixteen guarantees to the pool
-	bs.guarantees = append(valid, duplicated...)
+	bs.pendingGuarantees = append(valid, duplicated...)
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid guarantees from mempool in payload")
@@ -317,14 +377,14 @@ func (bs *BuilderSuite) TestPayloadGuaranteeDuplicatePending() {
 	// create some duplicate guarantees and add to random finalized block
 	duplicated := unittest.CollectionGuaranteesFixture(12, unittest.WithCollRef(bs.finalID))
 	for _, guarantee := range duplicated {
-		pendingID := bs.pendingIDs[rand.Intn(len(bs.pendingIDs))]
+		pendingID := bs.pendingBlockIDs[rand.Intn(len(bs.pendingBlockIDs))]
 		index := bs.index[pendingID]
 		index.CollectionIDs = append(index.CollectionIDs, guarantee.ID())
 		bs.index[pendingID] = index
 	}
 
 	// add sixteen guarantees to the pool
-	bs.guarantees = append(valid, duplicated...)
+	bs.pendingGuarantees = append(valid, duplicated...)
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid guarantees from mempool in payload")
@@ -341,7 +401,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceUnknown() {
 	unknown := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(unittest.IdentifierFixture()))
 
 	// add all guarantees to the pool
-	bs.guarantees = append(valid, unknown...)
+	bs.pendingGuarantees = append(valid, unknown...)
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid from mempool in payload")
@@ -361,7 +421,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 	expired := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(header.ID()))
 
 	// add all guarantees to the pool
-	bs.guarantees = append(valid, expired...)
+	bs.pendingGuarantees = append(valid, expired...)
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid from mempool in payload")
@@ -372,11 +432,11 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 func (bs *BuilderSuite) TestPayloadSealAllValid() {
 
 	// use valid chain of seals in mempool
-	bs.seals = bs.chain
+	bs.pendingSeals = bs.chain
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().ElementsMatch(bs.seals, bs.assembled.Seals, "should have included valid chain of seals")
+	bs.Assert().ElementsMatch(bs.pendingSeals, bs.assembled.Seals, "should have included valid chain of seals")
 	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
 }
 
@@ -386,7 +446,7 @@ func (bs *BuilderSuite) TestPayloadSealSomeValid() {
 	invalid := unittest.BlockSealsFixture(8)
 
 	// use both valid and non-valid seals for chain
-	bs.seals = append(bs.chain, invalid...)
+	bs.pendingSeals = append(bs.chain, invalid...)
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
@@ -397,7 +457,7 @@ func (bs *BuilderSuite) TestPayloadSealSomeValid() {
 func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 
 	// remove the seal at the start
-	bs.seals = bs.chain[1:]
+	bs.pendingSeals = bs.chain[1:]
 
 	// use both valid and non-valid seals for chain
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
@@ -410,8 +470,8 @@ func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
 
 	// remove the seal at the start
-	bs.seals = bs.chain[:3]
-	bs.seals = append(bs.seals, bs.chain[4:]...)
+	bs.pendingSeals = bs.chain[:3]
+	bs.pendingSeals = append(bs.pendingSeals, bs.chain[4:]...)
 
 	// use both valid and non-valid seals for chain
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
@@ -419,4 +479,112 @@ func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().ElementsMatch(bs.chain[:3], bs.assembled.Seals, "should have included only beginning of broken chain")
 	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
+}
+
+// Receipts for unknown blocks should not be inserted, and should be removed
+// from the mempool.
+func (bs *BuilderSuite) TestPayloadReceiptUnknownBlock() {
+
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for an unknown block
+	pendingReceiptUnknownBlock := unittest.ExecutionReceiptFixture()
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceiptUnknownBlock)
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are for unknown blocks")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts with unknown blocks")
+}
+
+// Receipts for sealed blocks should not be reinserted, and should be removed
+// from the mempool.
+func (bs *BuilderSuite) TestPayloadReceiptSealedBlock() {
+
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for a known but sealed block
+	pendingReceiptSealedBlock := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceiptSealedBlock.ExecutionResult.BlockID] = &flow.Header{}
+	bs.seals[pendingReceiptSealedBlock.ExecutionResult.BlockID] = &flow.Seal{}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceiptSealedBlock)
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are for sealed blocks")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts with sealed blocks")
+}
+
+// Receipts that are already included in finalized blocks should not be
+// reinserted and should be removed from the mempool.
+func (bs *BuilderSuite) TestPayloadReceiptInFinalizedBlock() {
+
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for a known, unsealed block
+	pendingReceipt := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
+
+	// put the receipt in a finalized block (chosen at random)
+	blockID := bs.finalizedBlockIDs[rand.Intn(len(bs.finalizedBlockIDs))]
+	index := bs.index[blockID]
+	index.ReceiptIDs = append(index.ReceiptIDs, pendingReceipt.ID())
+	bs.index[blockID] = index
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are already included in finalized blocks")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that are already in finalized blocks")
+}
+
+// Receipts that are already included in pending blocks should not be reinserted
+// but should stay in the mempool.
+func (bs *BuilderSuite) TestPayloadReceiptInPendingBlock() {
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for a known, unsealed block
+	pendingReceipt := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
+
+	// put the receipt in a pending block block (chosen at random)
+	blockID := bs.pendingBlockIDs[rand.Intn(len(bs.pendingBlockIDs))]
+	index := bs.index[blockID]
+	index.ReceiptIDs = append(index.ReceiptIDs, pendingReceipt.ID())
+	bs.index[blockID] = index
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are already included in pending blocks")
+	bs.Assert().Empty(bs.remRecIDs, "should not remove receipts that are already in pending blocks")
+}
+
+// Valid receipts should be inserted in the payload, sorted by block height.
+func (bs *BuilderSuite) TestPayloadReceiptSorted() {
+
+	// create valid receipts for known, unsealed blocks
+	receipts := []*flow.ExecutionReceipt{}
+	receiptsMap := make(map[uint64]*flow.ExecutionReceipt)
+	var i uint64
+	for i = 0; i < 5; i++ {
+		pendingReceipt := unittest.ExecutionReceiptFixture()
+		bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{
+			Height: i,
+		}
+		receiptsMap[i] = pendingReceipt
+		receipts = append(receipts, pendingReceipt)
+	}
+
+	sr := make([]*flow.ExecutionReceipt, len(receipts))
+	copy(sr, receipts)
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(sr), func(i, j int) { sr[i], sr[j] = sr[j], sr[i] })
+
+	bs.pendingReceipts = sr
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain receipts ordered by block height")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
 }

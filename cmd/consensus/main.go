@@ -249,6 +249,7 @@ func main() {
 				node.Storage.Blocks,
 				guarantees,
 				seals,
+				receipts,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
