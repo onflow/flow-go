@@ -342,6 +342,8 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	return nil
 }
 
+// addPendingApproval adds the approval to the mempool and to the
+// approvalsByResult map.
 func (e *Engine) addPendingApproval(approval *flow.ResultApproval) {
 	// store in the memory pool
 	added := e.approvals.Add(approval)
@@ -360,6 +362,14 @@ func (e *Engine) addPendingApproval(approval *flow.ResultApproval) {
 	log.Info().Msg("result approval added to mempool")
 }
 
+// removePendingApproval removes the approval from the mempool and from the
+// approvalsByResult map.
+// TODO: There is an edge case whereby approvals can remain in approvalsByResult
+// forever. Indeed, e.approvals is a mempool, which will automatically eject
+// approvals when it's full, and when the ejection happens, it won't notify
+// e.approvalsByResult to remove the same approval. And since e.approvals no
+// longer has that approval, the approval will stay in e.approvalsByResult
+// forever.
 func (e *Engine) removePendingApproval(approval *flow.ResultApproval) {
 	_ = e.approvals.Rem(approval.ID())
 	delete(e.approvalsByResult, approval.Body.ExecutionResultID)
