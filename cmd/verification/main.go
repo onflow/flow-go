@@ -245,7 +245,7 @@ func main() {
 				node.Me,
 				pendingResults,
 				verifierEng,
-				*chunkAssignment,
+				chunkAssignment,
 				node.State,
 				pendingChunks,
 				headerStorage,

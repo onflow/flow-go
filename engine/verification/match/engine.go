@@ -12,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -235,9 +236,32 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
 	}
 
-	mine, err := e.chunkAssignment.MyChunks(e.me.NodeID(), verifiers, result)
+	assignment, err := e.chunkAssignment.Assign(verifiers, result)
+	if err != nil {
+		return nil, fmt.Errorf("could not create assignment: %w", err)
+	}
+
+	mine, err := myChunks(e.me.NodeID(), assignment, result)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine my assignments: %w", err)
+	}
+
+	return mine, nil
+}
+
+func myChunks(myID flow.Identifier, assignment *chmodels.Assignment, result *flow.ExecutionResult) (flow.ChunkList, error) {
+	// indices of chunks assigned to this node
+	chunkIndices := assignment.ByNodeID(myID)
+
+	// mine keeps the list of chunks assigned to this node
+	mine := make(flow.ChunkList, 0, len(chunkIndices))
+	for _, index := range chunkIndices {
+		chunk, ok := result.Chunks.ByIndex(index)
+		if !ok {
+			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		}
+
+		mine = append(mine, chunk)
 	}
 
 	return mine, nil

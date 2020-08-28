@@ -35,35 +35,8 @@ func NewChunkAssignment() (*ChunkAssignment, error) {
 	return assignment, nil
 }
 
-// TODO: should we check if myID is of the role verification?
-
-// MyChunks creates an assignment using the Execution result to generate an RNG then
-// returns the chunks assigned to a specific flow identifier.
-func (ca *ChunkAssignment) MyChunks(myID flow.Identifier, verifiers flow.IdentityList, result *flow.ExecutionResult) (flow.ChunkList, error) {
-	assignment, err := ca.assign(verifiers, result)
-	if err != nil {
-		return nil, fmt.Errorf("could not create chunk assignment %w", err)
-	}
-
-	// indices of chunks assigned to this node
-	chunkIndices := assignment.ByNodeID(myID)
-
-	// mine keeps the list of chunks assigned to this node
-	mine := make(flow.ChunkList, 0, len(chunkIndices))
-	for _, index := range chunkIndices {
-		chunk, ok := result.Chunks.ByIndex(index)
-		if !ok {
-			return nil, fmt.Errorf("chunk out of range requested: %v", index)
-		}
-
-		mine = append(mine, chunk)
-	}
-
-	return mine, nil
-}
-
-// MyChunksForAssignment ...
-func (ca *ChunkAssignment) MyChunksForAssignment(myID flow.Identifier, result *flow.ExecutionResult, assignment chunkmodels.Assignment) (flow.ChunkList, error) {
+// chunks uses an assignment and a flow identity to return the chunks assigned to that identifier.
+func (ca *ChunkAssignment) chunks(myID flow.Identifier, assignment *chunkmodels.Assignment) (flow.ChunkList, error) {
 	// indices of chunks assigned to this node
 	chunkIndices := assignment.ByNodeID(myID)
 
@@ -84,8 +57,8 @@ func (ca *ChunkAssignment) MyChunksForAssignment(myID flow.Identifier, result *f
 // TODO: should we store the assignment for future calls? This could possible go wrong as
 // other execution results are used.
 
-// assign generates the assignment using the execution result to seed the RNG
-func (ca *ChunkAssignment) assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
+// Assign generates the assignment using the execution result to seed the RNG
+func (ca *ChunkAssignment) Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
 	rng, err := utils.NewChunkAssignmentRNG(result)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random generator: %w", err)

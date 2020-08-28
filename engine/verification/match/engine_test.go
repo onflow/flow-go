@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	realModule "github.com/dapperlabs/flow-go/module"
-	realChunkModule "github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -86,7 +85,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	return e, participants, metrics, tracer, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, chunkAssignment
 }
 
-func createExecutionResult(blockID flow.Identifier, myID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, flow.ChunkList) {
+func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
 	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID: blockID,
@@ -94,16 +93,13 @@ func createExecutionResult(blockID flow.Identifier, myID flow.Identifier, option
 		},
 	}
 
-	chunkAssignment, _ := realChunkModule.NewChunkAssignment()
 	assignments := chunks.NewAssignment()
 
 	for _, option := range options {
 		option(result, assignments)
 	}
 
-	myChunks, _ := chunkAssignment.MyChunksForAssignment(myID, result, *assignments)
-
-	return result, myChunks
+	return result, assignments
 }
 
 func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk) func(*flow.ExecutionResult, *chunks.Assignment) {
@@ -239,9 +235,8 @@ func OnVerifiableChunkSentMetricCalledNTimes(metrics *module.VerificationMetrics
 func TestChunkVerified(t *testing.T) {
 	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
-	result, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 		),
@@ -256,7 +251,7 @@ func TestChunkVerified(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("MyChunks", mock.Anything, mock.Anything, result).Return(myChunks, nil).Once()
+	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -300,11 +295,10 @@ func TestChunkVerified(t *testing.T) {
 // No assignment: When receives a ER, and no chunk is assigned to me, then I won’t fetch any collection or chunk,
 // nor produce any verifiable chunk
 func TestNoAssignment(t *testing.T) {
-	e, participants, metrics, _, myID, otherID, head, _, _, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, _, otherID, head, _, _, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
-	result, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(otherID),
 		),
@@ -316,7 +310,7 @@ func TestNoAssignment(t *testing.T) {
 	metrics.On("OnExecutionResultReceived").Return().Once()
 
 	// add MyChunk method to return to assigner
-	assigner.On("MyChunks", mock.Anything, mock.Anything, result).Return(myChunks, nil).Once()
+	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -338,9 +332,8 @@ func TestNoAssignment(t *testing.T) {
 func TestMultiAssignment(t *testing.T) {
 	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
-	result, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 			WithAssignee(otherID),
@@ -357,7 +350,7 @@ func TestMultiAssignment(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Twice()
 
 	// add assignment to assigner
-	assigner.On("MyChunks", mock.Anything, mock.Anything, result).Return(myChunks, nil).Once()
+	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -391,9 +384,8 @@ func TestMultiAssignment(t *testing.T) {
 func TestDuplication(t *testing.T) {
 	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
-	result, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 			WithAssignee(otherID),
@@ -409,7 +401,7 @@ func TestDuplication(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("MyChunks", mock.Anything, mock.Anything, result).Return(myChunks, nil).Once()
+	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -447,9 +439,8 @@ func TestRetry(t *testing.T) {
 	maxTry := 3
 	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, maxTry)
 	// create a execution result that assigns to me
-	result, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 		),
@@ -464,7 +455,7 @@ func TestRetry(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("MyChunks", mock.Anything, mock.Anything, result).Return(myChunks, nil).Once()
+	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -503,9 +494,8 @@ func TestMaxRetry(t *testing.T) {
 	maxAttempt := 3
 	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, maxAttempt)
 	// create a execution result that assigns to me
-	result, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 		),
@@ -516,7 +506,7 @@ func TestMaxRetry(t *testing.T) {
 	metrics.On("OnExecutionResultReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("MyChunks", mock.Anything, mock.Anything, result).Return(myChunks, nil).Once()
+	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -560,15 +550,14 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		header := &flow.Header{View: uint64(i)}
 		// create a execution result that assigns to me
-		result, myChunks := createExecutionResult(
+		result, assignment := createExecutionResult(
 			header.ID(),
-			myID,
 			WithChunks(
 				WithAssignee(myID),
 			),
 		)
 		// add assignment to assigner
-		assigner.On("MyChunks", mock.Anything, mock.Anything, result).Return(myChunks, nil).Once()
+		assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 
 		// block header has been received
 		headerDB[result.BlockID] = header
@@ -608,9 +597,8 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 		SetupTest(t, 1)
 
 	// create a execution result that assigns to me
-	result, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 			WithAssignee(myID),
@@ -630,7 +618,7 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
 
 	// add assignment to assigner
-	assigner.On("MyChunks", mock.Anything, mock.Anything, result).Return(myChunks, nil).Once()
+	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
