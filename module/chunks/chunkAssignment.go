@@ -36,23 +36,23 @@ func NewChunkAssignment() (*ChunkAssignment, error) {
 }
 
 // chunks uses an assignment and a flow identity to return the chunks assigned to that identifier.
-func (ca *ChunkAssignment) chunks(myID flow.Identifier, assignment *chunkmodels.Assignment) (flow.ChunkList, error) {
-	// indices of chunks assigned to this node
-	chunkIndices := assignment.ByNodeID(myID)
+// func (ca *ChunkAssignment) chunks(myID flow.Identifier, assignment *chunkmodels.Assignment) (flow.ChunkList, error) {
+// 	// indices of chunks assigned to this node
+// 	chunkIndices := assignment.ByNodeID(myID)
 
-	// mine keeps the list of chunks assigned to this node
-	mine := make(flow.ChunkList, 0, len(chunkIndices))
-	for _, index := range chunkIndices {
-		chunk, ok := result.Chunks.ByIndex(index)
-		if !ok {
-			return nil, fmt.Errorf("chunk out of range requested: %v", index)
-		}
+// 	// mine keeps the list of chunks assigned to this node
+// 	mine := make(flow.ChunkList, 0, len(chunkIndices))
+// 	for _, index := range chunkIndices {
+// 		chunk, ok := result.Chunks.ByIndex(index)
+// 		if !ok {
+// 			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+// 		}
 
-		mine = append(mine, chunk)
-	}
+// 		mine = append(mine, chunk)
+// 	}
 
-	return mine, nil
-}
+// 	return mine, nil
+// }
 
 // TODO: should we store the assignment for future calls? This could possible go wrong as
 // other execution results are used.

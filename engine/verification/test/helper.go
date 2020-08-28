@@ -76,10 +76,11 @@ func VerificationHappyPath(t *testing.T,
 	// creates an execution receipt and its associated data
 	// with `chunkNum` chunks
 	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain())
+	result := &completeER.Receipt.ExecutionResult
 
 	// mocks the assignment to only assign "some" chunks to the verIdentity
 	// the assignment is done based on `isAssgined` function
-	assigner := &mock.ChunkAssigner{}
+	assigner := &mock.ChunkAssignment{}
 	a := chmodel.NewAssignment()
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
@@ -92,8 +93,7 @@ func VerificationHappyPath(t *testing.T,
 	}
 	assigner.On("Assign",
 		testifymock.Anything,
-		completeER.Receipt.ExecutionResult.Chunks,
-		testifymock.Anything).
+		result).
 		Return(a, nil)
 
 	// nodes and engines

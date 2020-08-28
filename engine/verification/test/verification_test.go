@@ -81,9 +81,10 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	// complete ER counter example
 	completeER := utils.CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain())
+	result := &completeER.Receipt.ExecutionResult
 
 	// assigner and assignment
-	assigner := &mock.ChunkAssigner{}
+	assigner := &mock.ChunkAssignment{}
 	assignment := chmodel.NewAssignment()
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
@@ -95,8 +96,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	assigner.On("Assign",
 		testifymock.Anything,
-		completeER.Receipt.ExecutionResult.Chunks,
-		testifymock.Anything).
+		result).
 		Return(assignment, nil)
 
 	// setup nodes
