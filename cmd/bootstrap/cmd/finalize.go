@@ -63,7 +63,7 @@ and block seal.`,
 
 		var commit []byte
 		if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
-			log.Info().Msg("✨ generating empty execution state")
+			log.Info().Msg("generating empty execution state")
 
 			var err error
 			serviceAccountPublicKey := flow.AccountPublicKey{}
