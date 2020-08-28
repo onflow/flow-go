@@ -23,7 +23,7 @@ func (a *addresses) InitAddressGeneratorState() {
 }
 
 func (a *addresses) GetAddressGeneratorState() (flow.AddressGenerator, error) {
-	stateBytes, err := a.ledger.Get(RegisterID("", "", keyAddressState))
+	stateBytes, err := a.ledger.Get("", "", keyAddressState)
 	if err != nil {
 		return nil, err
 	}
@@ -33,5 +33,5 @@ func (a *addresses) GetAddressGeneratorState() (flow.AddressGenerator, error) {
 
 func (a *addresses) SetAddressGeneratorState(state flow.AddressGenerator) {
 	stateBytes := state.Bytes()
-	a.ledger.Set(RegisterID("", "", keyAddressState), stateBytes)
+	a.ledger.Set("", "", keyAddressState, stateBytes)
 }
