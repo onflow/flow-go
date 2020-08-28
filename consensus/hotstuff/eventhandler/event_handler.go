@@ -93,6 +93,7 @@ func (e *EventHandler) OnReceiveVote(vote *model.Vote) error {
 		return fmt.Errorf("failed processing vote: %w", err)
 	}
 	log.Debug().Msg("block vote processed")
+	e.notifier.OnEventProcessed()
 
 	return nil
 }
@@ -221,7 +222,6 @@ func (e *EventHandler) Start() error {
 // startNewView will only be called when there is a view change from pacemaker.
 // It reads the current view, and check if it needs to propose or vote in this view.
 func (e *EventHandler) startNewView() error {
-
 	curView := e.paceMaker.CurView()
 
 	err := e.persist.PutStarted(curView)
@@ -229,23 +229,20 @@ func (e *EventHandler) startNewView() error {
 		return fmt.Errorf("could not persist current view: %w", err)
 	}
 
-	log := e.log.With().
-		Uint64("cur_view", curView).
-		Uint64("finalized_view", e.forks.FinalizedView()).
-		Logger()
-
-	log.Info().Msg("entering new view")
-
-	e.notifier.OnEnteringView(curView)
-
-	e.pruneSubcomponents()
-
 	currentLeader, err := e.committee.LeaderForView(curView)
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
 	}
 
-	log = log.With().Hex("leader_id", currentLeader[:]).Logger()
+	log := e.log.With().
+		Uint64("cur_view", curView).
+		Hex("leader_id", currentLeader[:]).Logger()
+	log.Info().
+		Uint64("finalized_view", e.forks.FinalizedView()).
+		Msg("entering new view")
+	e.notifier.OnEnteringView(curView, currentLeader)
+
+	e.pruneSubcomponents()
 
 	if e.committee.Self() == currentLeader {
 		startTime := time.Now()
@@ -267,7 +264,7 @@ func (e *EventHandler) startNewView() error {
 
 		span := e.tracer.StartSpan(proposal.Block.BlockID, trace.CONProcessBlock, opentracing.StartTime(startTime))
 		span.SetTag("block_id", proposal.Block.BlockID)
-		span.SetTag("view", proposal.Block.View)
+		span.SetTag("block_view", proposal.Block.View)
 		span.SetTag("proposer", proposal.Block.ProposerID.String())
 		span.SetTag("leader", true)
 		childSpan := e.tracer.StartSpanFromParent(span, trace.CONHotEventHandlerStartNewView, opentracing.StartTime(
@@ -293,9 +290,9 @@ func (e *EventHandler) startNewView() error {
 		// mark our own proposals to avoid double validation
 		e.ownProposal = proposal.Block.BlockID
 
-		// We return here to reflect the HotStuff state machine.
+		// We return here to correspond to the HotStuff state machine.
 		return nil
-		// Algorithmically, the return here is optional:
+		// Algorithmically, this return statement is optional:
 		//  * If this replica is the leader for the current view, there can be no valid proposal from any
 		//    other node. This replica's proposal is the only valid proposal.
 		//  * This replica's proposal got just sent out above. It will enter the HotStuff logic from the

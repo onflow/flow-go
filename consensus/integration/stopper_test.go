@@ -15,7 +15,7 @@ type StopperConsumer struct {
 	onEnteringView func(view uint64)
 }
 
-func (c *StopperConsumer) OnEnteringView(view uint64) {
+func (c *StopperConsumer) OnEnteringView(view uint64, leader flow.Identifier) {
 	c.onEnteringView(view)
 }
 

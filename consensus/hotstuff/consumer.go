@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // FinalizationConsumer consumes outbound notifications produced by the finalization logic.
@@ -49,6 +50,13 @@ type FinalizationConsumer interface {
 type Consumer interface {
 	FinalizationConsumer
 
+	// OnEventProcessed notifications are produced by the EventHandler when it is done processing
+	// and hands control back to the EventLoop to feed the next event.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnEventProcessed()
+
 	// OnReceiveVote notifications are produced by the EventHandler when it receives a vote.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
@@ -65,7 +73,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnEnteringView(viewNumber uint64)
+	OnEnteringView(viewNumber uint64, leader flow.Identifier)
 
 	// OnQcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
 	// based on processing a QC. The arguments specify the qc (first argument), which triggered

@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -18,6 +19,10 @@ func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 		log: log,
 	}
 	return lc
+}
+
+func (lc *LogConsumer) OnEventProcessed() {
+	lc.log.Debug().Msg("event processed")
 }
 
 func (lc *LogConsumer) OnBlockIncorporated(block *model.Block) {
@@ -54,9 +59,10 @@ func (lc *LogConsumer) OnReceiveProposal(currentView uint64, proposal *model.Pro
 		Msg("processing proposal")
 }
 
-func (lc *LogConsumer) OnEnteringView(view uint64) {
+func (lc *LogConsumer) OnEnteringView(view uint64, leader flow.Identifier) {
 	lc.log.Debug().
 		Uint64("view", view).
+		Hex("leader", leader[:]).
 		Msg("view entered")
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Distributor distributes notifications to a list of subscribers (event consumers).
@@ -42,11 +43,11 @@ func (p *Distributor) OnReceiveProposal(currentView uint64, proposal *model.Prop
 	}
 }
 
-func (p *Distributor) OnEnteringView(view uint64) {
+func (p *Distributor) OnEnteringView(view uint64, leader flow.Identifier) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnEnteringView(view)
+		subscriber.OnEnteringView(view, leader)
 	}
 }
 
