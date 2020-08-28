@@ -1,7 +1,6 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -9,9 +8,11 @@ import (
 
 // ChunkAssigner presents an interface for assigning chunks to the verifier nodes
 type ChunkAssigner interface {
-	// Assign receives identity list of verifier nodes, chunk lists and a random generator
-	// it returns a chunk assignment
-	Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chmodels.Assignment, error)
+	// Assign generates the assignment using the execution result to seed the RNG
+	Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chmodels.Assignment, error)
+
+	// GetAssignedChunks returns the list of result chunks assigned to a specifig verifier
+	GetAssignedChunks(verifierID flow.Identifier, assigment *chmodels.Assignment, result *flow.ExecutionResult) (flow.ChunkList, error)
 }
 
 // ChunkVerifier provides functionality to verify chunks
@@ -29,13 +30,4 @@ type ChunkVerifier interface {
 	// Note: Verify should only be executed on system chunks. It returns an error if it is invoked on
 	// non-system chunks.
 	SystemChunkVerify(ch *verification.VerifiableChunkData) ([]byte, chmodels.ChunkFault, error)
-}
-
-// ChunkAssignment provides functionality to assign chunks and get chunks fora specific verifier Identity
-type ChunkAssignment interface {
-	// Chunks uses an assignment and a flow identity to return the chunks assigned to that identifier.
-	// Chunks(myID flow.Identifier, assignment *chmodels.Assignment) (flow.ChunkList, error)
-
-	// Assign generates the assignment using the execution result to seed the RNG
-	Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chmodels.Assignment, error)
 }

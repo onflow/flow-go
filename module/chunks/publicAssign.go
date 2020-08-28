@@ -6,6 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/crypto/random"
+	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -13,18 +14,22 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
-// PublicAssignment implements an instance of the Public Chunk Assignment algorithm
-// for assigning chunks to verifier nodes in a deterministic but unpredictable manner.
+// DefaultchunkAssignmentAlpha is the default number of verifiers that should be
+// assigned to each chunk.
+// DISCLAIMER: alpha down there is not a production-level value
+const DefaultChunkAssignmentAlpha = 1
+
+// PublicAssignment implements an instance of the Public Chunk Assignment
+// algorithm for assigning chunks to verifier nodes in a deterministic but
+// unpredictable manner. It implements the ChunkAssigner interface.
 type PublicAssignment struct {
-	alpha       int // used to indicate the number of verifiers should be assigned to each chunk
+	alpha       int // used to indicate the number of verifiers that should be assigned to each chunk
 	assignments mempool.Assignments
 }
 
-// NewPublicAssignment generates and returns an instance of the Public Chunk Assignment algorithm
-// ids is the list of verifier nodes' identities
-// chunks is the list of chunks aimed to assign
-// rng is an instance of a random generator
-// alpha is the number of assigned verifier nodes to each chunk
+// NewPublicAssignment generates and returns an instance of the Public Chunk
+// Assignment algorithm. Parameter alpha is the number of verifiers that should
+// be assigned to each chunk.
 func NewPublicAssignment(alpha int) (*PublicAssignment, error) {
 	// TODO to have limit of assignment mempool as a parameter (2703)
 	assignment, err := stdmap.NewAssignments(1000)
@@ -42,12 +47,16 @@ func (p *PublicAssignment) Size() uint {
 	return p.assignments.Size()
 }
 
-// Assign receives identity list of verifier nodes, chunk lists and a random generator
-// it returns a chunk assignment
-func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkmodels.Assignment, error) {
+// Assign generates the assignment using the execution result to seed the RNG.
+func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
+	rng, err := utils.NewChunkAssignmentRNG(result)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+
 	// computes a finger print for identities||chunks
-	ids := identities.NodeIDs()
-	hash, err := fingerPrint(ids, chunks, rng, p.alpha)
+	ids := verifiers.NodeIDs()
+	hash, err := fingerPrint(ids, result.Chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
 	}
@@ -60,7 +69,7 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 	}
 
 	// otherwise, it computes the assignment and caches it for future calls
-	a, err = chunkAssignment(ids, chunks, rng, p.alpha)
+	a, err = chunkAssignment(ids, result.Chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not complete chunk assignment: %w", err)
 	}
@@ -72,6 +81,30 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 	}
 
 	return a, nil
+}
+
+// GetAssignedChunks returns the list of result chunks assigned to a specific
+// verifier.
+func (p *PublicAssigment) GetAssignedChunks(
+	verifierID flow.Identifier,
+	assigment *chunkmodels.Assignment,
+	result *flow.ExecutionResult) (flow.ChunkList, error) {
+
+	// indices of chunks assigned to verifier
+	chunkIndices := assignment.ByNodeID(verifierID)
+
+	// chunks keeps the list of chunks assigned to the verifier
+	chunks := make(flow.ChunkList, 0, len(chunkIndices))
+	for _, index := range chunkIndices {
+		chunk, ok := result.Chunks.ByIndex(index)
+		if !ok {
+			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		}
+
+		chunks = append(chunks, chunk)
+	}
+
+	return chunks, nil
 }
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an

@@ -44,7 +44,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	er *stdmap.PendingResults,
 	verifier *network.Engine,
 	chunks *Chunks,
-	chunkAssignment *module.ChunkAssignment,
+	chunkAssigner *module.ChunkAssigner,
 ) {
 	// setup the network with 2 verification nodes, 3 execution nodes
 	// 2 verification nodes are needed to verify chunks, which are assigned to other verification nodes, are ignored.
@@ -72,7 +72,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	// setup other dependencies
 	er = stdmap.NewPendingResults()
 	verifier = &network.Engine{}
-	chunkAssignment = &module.ChunkAssignment{}
+	chunkAssigner = &module.ChunkAssigner{}
 	metrics = &module.VerificationMetrics{}
 	tracer = trace.NewNoopTracer()
 	chunks = NewChunks(10)
@@ -80,9 +80,9 @@ func SetupTest(t *testing.T, maxTry int) (
 	log := zerolog.New(os.Stderr)
 	retryInterval := 100 * time.Millisecond
 
-	e, err := New(log, metrics, tracer, net, me, er, verifier, chunkAssignment, state, chunks, headers, retryInterval, maxTry)
+	e, err := New(log, metrics, tracer, net, me, er, verifier, chunkAssigner, state, chunks, headers, retryInterval, maxTry)
 	require.NoError(t, err)
-	return e, participants, metrics, tracer, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, chunkAssignment
+	return e, participants, metrics, tracer, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, chunkAssigner
 }
 
 func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
@@ -251,7 +251,8 @@ func TestChunkVerified(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("GetAssignedChunks", mock.Anything, mock.Anything, mock.Anything).Return(result.Chunks, nil)
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -311,6 +312,7 @@ func TestNoAssignment(t *testing.T) {
 
 	// add MyChunk method to return to assigner
 	assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
+	assigner.On("GetAssignedChunks", mock.Anything, mock.Anything, mock.Anything).Return(result.Chunks, nil)
 
 	// block header has been received
 	headerDB[result.BlockID] = head
