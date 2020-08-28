@@ -26,12 +26,12 @@ func (lc *LogConsumer) OnEventProcessed() {
 }
 
 func (lc *LogConsumer) OnBlockIncorporated(block *model.Block) {
-	lc.logBasicBlockInfo(lc.log.Debug(), block).
+	lc.logBasicBlockData(lc.log.Debug(), block).
 		Msg("block incorporated")
 }
 
 func (lc *LogConsumer) OnFinalizedBlock(block *model.Block) {
-	lc.logBasicBlockInfo(lc.log.Debug(), block).
+	lc.logBasicBlockData(lc.log.Debug(), block).
 		Msg("block finalized")
 }
 
@@ -54,7 +54,7 @@ func (lc *LogConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 }
 
 func (lc *LogConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
-	lc.logBasicBlockInfo(lc.log.Debug(), proposal.Block).
+	lc.logBasicBlockData(lc.log.Debug(), proposal.Block).
 		Uint64("cur_view", currentView).
 		Msg("processing proposal")
 }
@@ -75,7 +75,7 @@ func (lc *LogConsumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newV
 }
 
 func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
-	lc.logBasicBlockInfo(lc.log.Debug(), block.Block).
+	lc.logBasicBlockData(lc.log.Debug(), block.Block).
 		Msg("proposing block")
 }
 
@@ -141,7 +141,7 @@ func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {
 		Msg("invalid vote detected")
 }
 
-func (lc *LogConsumer) logBasicBlockInfo(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {
+func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {
 	loggerEvent.
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).

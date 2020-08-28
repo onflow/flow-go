@@ -16,6 +16,14 @@ type Distributor struct {
 	lock        sync.RWMutex
 }
 
+func (p *Distributor) OnEventProcessed() {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnEventProcessed()
+	}
+}
+
 func NewDistributor() *Distributor {
 	return &Distributor{}
 }

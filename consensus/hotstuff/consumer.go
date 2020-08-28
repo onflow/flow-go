@@ -51,19 +51,19 @@ type Consumer interface {
 	FinalizationConsumer
 
 	// OnEventProcessed notifications are produced by the EventHandler when it is done processing
-	// and hands control back to the EventLoop to feed the next event.
+	// and hands control back to the EventLoop to wait for the next event.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnEventProcessed()
 
-	// OnReceiveVote notifications are produced by the EventHandler when it receives a vote.
+	// OnReceiveVote notifications are produced by the EventHandler when it starts processing a vote.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnReceiveVote(currentView uint64, vote *model.Vote)
 
-	// OnReceiveProposal notifications are produced by the EventHandler when it receives a block proposal.
+	// OnReceiveProposal notifications are produced by the EventHandler when it starts processing a block.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
