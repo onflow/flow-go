@@ -400,7 +400,7 @@ func main() {
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			signer := verification.NewSingleSigner(committee, staking, node.Me.NodeID())
 
-			// initialize logging notifier for hotstuff
+			// initialize logging notifier for hotstuffpayloadBuilder
 			notifier := createNotifier(node.Logger, clusterMetrics, clusterID)
 
 			persist := persister.New(node.DB)

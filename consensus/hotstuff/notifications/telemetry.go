@@ -40,7 +40,7 @@ func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryCons
 
 func (t *TelemetryConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 	t.pathHandler.StartNextPath(currentView)
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Uint64("voted_block_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
@@ -50,26 +50,26 @@ func (t *TelemetryConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) 
 func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	block := proposal.Block
 	t.pathHandler.StartNextPath(currentView)
-	detail := t.pathHandler.NextDetail()
-	detail.
+	step := t.pathHandler.NextStep()
+	step.
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("block_proposer_id", logging.ID(block.ProposerID)).
 		Time("block_time", block.Timestamp)
 	if block.QC != nil {
-		detail.
+		step.
 			Uint64("qc_block_view", block.QC.View).
 			Hex("qc_block_id", logging.ID(block.QC.BlockID))
 	}
-	detail.Msg("OnReceiveProposal")
+	step.Msg("OnReceiveProposal")
 }
 
 func (t *TelemetryConsumer) OnEventProcessed() {
 	if t.pathHandler.IsCurrentPathClosed() {
 		return
 	}
-	t.pathHandler.NextDetail().Msg("PathCompleted")
-	t.pathHandler.NextDetail().Msg("OnEventProcessed")
+	t.pathHandler.NextStep().Msg("PathCompleted")
+	t.pathHandler.NextStep().Msg("OnEventProcessed")
 	t.pathHandler.CloseCurrentPath()
 }
 
@@ -77,11 +77,11 @@ func (t *TelemetryConsumer) OnStartingTimeout(info *model.TimerInfo) {
 	if info.Mode == model.ReplicaTimeout {
 		// the PaceMarker starts a new ReplicaTimeout if and only if it transitions to a higher view
 		if !t.pathHandler.IsCurrentPathClosed() {
-			t.pathHandler.NextDetail().Msg("PathCompleted")
+			t.pathHandler.NextStep().Msg("PathCompleted")
 		}
 		t.pathHandler.StartNextPath(info.View)
 	}
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Str("timeout_mode", info.Mode.String()).
 		Float64("timeout_duration_seconds", info.Duration.Seconds()).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
@@ -89,14 +89,14 @@ func (t *TelemetryConsumer) OnStartingTimeout(info *model.TimerInfo) {
 }
 
 func (t *TelemetryConsumer) OnEnteringView(viewNumber uint64, leader flow.Identifier) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Uint64("entered_view", viewNumber).
 		Hex("leader", leader[:]).
 		Msg("OnEnteringView")
 }
 
 func (t *TelemetryConsumer) OnReachedTimeout(info *model.TimerInfo) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Str("timeout_mode", info.Mode.String()).
 		Time("timeout_start_time", info.StartTime).
 		Float64("timeout_duration_seconds", info.Duration.Seconds()).
@@ -104,19 +104,19 @@ func (t *TelemetryConsumer) OnReachedTimeout(info *model.TimerInfo) {
 }
 
 func (t *TelemetryConsumer) OnBlockIncorporated(block *model.Block) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Hex("block_id", logging.ID(block.BlockID)).
 		Msg("OnBlockIncorporated")
 }
 
 func (t *TelemetryConsumer) OnFinalizedBlock(block *model.Block) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Hex("block_id", logging.ID(block.BlockID)).
 		Msg("OnFinalizedBlock")
 }
 
 func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Uint64("qc_block_view", qc.View).
 		Uint64("next_view", newView).
 		Hex("qc_block_id", qc.BlockID[:]).
@@ -125,22 +125,22 @@ func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate,
 
 func (t *TelemetryConsumer) OnProposingBlock(proposal *model.Proposal) {
 	block := proposal.Block
-	detail := t.pathHandler.NextDetail()
-	detail.
+	step := t.pathHandler.NextStep()
+	step.
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("block_proposer_id", logging.ID(block.ProposerID)).
 		Time("block_time", block.Timestamp)
 	if block.QC != nil {
-		detail.
+		step.
 			Uint64("qc_block_view", block.QC.View).
 			Hex("qc_block_id", logging.ID(block.QC.BlockID))
 	}
-	detail.Msg("OnProposingBlock")
+	step.Msg("OnProposingBlock")
 }
 
 func (t *TelemetryConsumer) OnVoting(vote *model.Vote) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Uint64("voted_block_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
@@ -148,7 +148,7 @@ func (t *TelemetryConsumer) OnVoting(vote *model.Vote) {
 }
 
 func (t *TelemetryConsumer) OnForkChoiceGenerated(current_view uint64, qc *model.QuorumCertificate) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Uint64("block_view", current_view).
 		Msg("OnForkChoiceGenerated")
 	// Telemetry does not capture the details of the qc as the qc will be included in the
@@ -156,14 +156,14 @@ func (t *TelemetryConsumer) OnForkChoiceGenerated(current_view uint64, qc *model
 }
 
 func (t *TelemetryConsumer) OnQcConstructedFromVotes(qc *model.QuorumCertificate) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Uint64("qc_block_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcIncorporated")
 }
 
 func (t *TelemetryConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
-	t.pathHandler.NextDetail().
+	t.pathHandler.NextStep().
 		Uint64("qc_block_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcIncorporated")
@@ -171,9 +171,11 @@ func (t *TelemetryConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
 
 // PathHandler maintains a notion of the current path through the state machine.
 // It allows to close a path and open new path. Each path is identified by a unique
-// (randomly generated) uuid. Details (each detail is represented by a Zerolog Event)
-// can be added to the current path. In case there is no currently open path, the
-// PathHandler still returns a Detail, but such details are logged as telemetry errors.
+// (randomly generated) uuid. Along each path, we can capture information about relevant
+// Steps (each step is represented by a Zerolog Event).
+// In case there is no currently open path, the
+// PathHandler still returns a Step, but such steps are logged as telemetry errors.
+// PathHandler still returns a Step, but such steps are logged as telemetry errors.
 type PathHandler struct {
 	chain flow.ChainID
 	log   zerolog.Logger
@@ -216,9 +218,9 @@ func (p *PathHandler) IsCurrentPathClosed() bool {
 	return p.currentContext == nil
 }
 
-// NextDetail returns a Zerolog event for the currently open path. If the current path
+// NextStep returns a Zerolog event for the currently open path. If the current path
 // is closed, the event will be logged as telemetry error.
-func (p *PathHandler) NextDetail() *zerolog.Event {
+func (p *PathHandler) NextStep() *zerolog.Event {
 	if p.currentContext == nil {
 		l := log.With().Str("error", "no path").Logger()
 		return l.Error()
