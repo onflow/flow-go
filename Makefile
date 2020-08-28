@@ -30,11 +30,6 @@ ifndef CONTAINER_REGISTRY
 override CONTAINER_REGISTRY=gcr.io/dl-flow
 endif
 
-# docker push tag - tag beside the latest tag to be used to push the image to the container registry
-ifndef EXTRA_DOCKER_TAG
-override EXTRA_DOCKER_TAG=latest
-endif
-
 export DOCKER_BUILDKIT := 1
 
 crypto/relic:
