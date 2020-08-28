@@ -19,6 +19,7 @@ import (
 //  - Non-interactive aggregation of multiple signatures into one.
 //  - Non-interactive aggregation of multiple private keys into one.
 //  - Non-interactive aggregation of multiple public keys into one.
+//  - Non-interactive subtraction of multiple public keys from an aggregated public key.
 //  - Multi-signature verification of an aggregated signatures of a single message under multiple
 //  public keys.
 
@@ -105,6 +106,7 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 		if pk.Algorithm() != BLSBLS12381 {
 			return nil, fmt.Errorf("all keys must be BLS keys")
 		}
+		// assertion is guaranteed to be correct after the algorithm check
 		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
 		points = append(points, pkBLS.point)
 	}
@@ -120,6 +122,48 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 		(C.int)(len(points)))
 	return &PubKeyBLSBLS12381{
 		point: sum,
+	}, nil
+}
+
+// RemovePublicKeys removes multiple BLS public keys from a given (aggregated) public key.
+//
+// The common use case assumes the aggregated public key was initially formed using
+// the keys to be removed (directly or using other aggregated forms). However the function
+// can still be called in different use cases.
+// The order of the keys to be removed in the slice does not matter since the removal
+// is commutative. The slice of keys to be removed can be empty.
+// No check is performed on the input public keys.
+func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
+	_ = newBLSBLS12381()
+	if aggKey.Algorithm() != BLSBLS12381 {
+		return nil, fmt.Errorf("all keys must be BLS keys")
+	}
+	// assertion is guaranteed to be correct after the algorithm check
+	aggPKBLS, _ := aggKey.(*PubKeyBLSBLS12381)
+
+	pointsToSubtract := make([]pointG2, 0, len(keysToRemove))
+	for _, pk := range keysToRemove {
+		if pk.Algorithm() != BLSBLS12381 {
+			return nil, fmt.Errorf("all keys must be BLS keys")
+		}
+		// assertion is guaranteed to be correct after the algorithm check
+		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
+		pointsToSubtract = append(pointsToSubtract, pkBLS.point)
+	}
+
+	var pointsPointer *C.ep2_st
+	if len(pointsToSubtract) != 0 {
+		pointsPointer = (*C.ep2_st)(&pointsToSubtract[0])
+	} else {
+		pointsPointer = (*C.ep2_st)(nil)
+	}
+
+	var resultKey pointG2
+	C.ep2_subtract_vector((*C.ep2_st)(&resultKey), (*C.ep2_st)(&aggPKBLS.point),
+		pointsPointer, (C.int)(len(pointsToSubtract)))
+
+	return &PubKeyBLSBLS12381{
+		point: resultKey,
 	}, nil
 }
 

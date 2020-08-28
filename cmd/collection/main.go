@@ -114,7 +114,7 @@ func main() {
 				"how many additional cluster members we propagate transactions to")
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 25,
 				"expiry buffer for transactions in proposed collections")
-			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 100,
+			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 200,
 				"maximum number of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
 				"the initial timeout for the hotstuff pacemaker")
@@ -129,7 +129,7 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction",
 				timeout.DefaultConfig.VoteAggregationTimeoutFraction,
 				"additional fraction of replica timeout that the primary will wait for votes")
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond,
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
