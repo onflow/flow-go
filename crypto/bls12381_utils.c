@@ -716,6 +716,7 @@ int bowe_subgroup_check_G1(const ep_t p){
     // (z^2-1)/3 (2*si(p) - p - si^2(p)) - si^2(p)
     ep_add(sigma, sigma, p_inv);
     ep_add(sigma, sigma, sigma2);
+    // TODO: multiplication using a chain?
     ep_mul_lwnaf(sigma, sigma, &bls_prec->z2_1_by3);
     ep_add(sigma, sigma, sigma2);
     
