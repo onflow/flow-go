@@ -71,6 +71,7 @@ typedef struct prec_ {
 // Utility functions
 int      get_valid();
 int      get_invalid();
+int      get_checkG1();
 
 ctx_t*   relic_init_BLS12_381();
 prec_st* init_precomputed_data_BLS12_381();
@@ -95,9 +96,15 @@ void     bn_sum_vector(bn_t, bn_st*, int);
 void     ep2_sum_vector(ep2_t, ep2_st* , int);
 void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, int len);
 
+int simple_subgroup_check_G1(const ep_t);
+int simple_subgroup_check_G2(const ep2_t);
+void ep_rand_G1(ep_t);
+void ep_rand_G1complement( ep_t);
 #if  (MEMBERSHIP_CHECK_G1 == BOWE)
 int bowe_subgroup_check_G1(const ep_t);
 #endif
+int subgroup_check_G1_test(int, int);
+int subgroup_check_G1_bench();
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);

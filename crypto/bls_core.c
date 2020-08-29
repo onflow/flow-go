@@ -40,19 +40,12 @@ static int check_membership_G1(const ep_t p){
         return INVALID;
     // check p is in G1
     #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
-    ep_t inf;
-    ep_new(inf);
-    // check p^order == infinity
-    // use basic double & add as lwnaf reduces the expo modulo r
-    ep_mul_basic(inf, p, &core_get()->ep_r);
-    if (!ep_is_infty(inf)){
-        ep_free(inf);
-        return INVALID;
-    }
-    ep_free(inf);
+    return simple_subgroup_check_G1(p);
     #elif MEMBERSHIP_CHECK_G1 == BOWE
     // section 3.2 from https://eprint.iacr.org/2019/814.pdf
     return bowe_subgroup_check_G1(p);
+    #else
+    return INVALID;
     #endif
 #endif
     return VALID;
@@ -69,19 +62,11 @@ int check_membership_G2(const ep2_t p){
         return INVALID;
     // check p is in G2
     #if MEMBERSHIP_CHECK_G2 == EXP_ORDER
-    ep2_t inf;
-    ep2_new(inf);
-    // check p^order == infinity
-    // use basic double & add as lwnaf reduces the expo modulo r
-    // TODO : write a simple lwnaf without reduction
-    ep2_mul_basic(inf, (ep2_st*)p, &core_get()->ep_r);
-    if (!ep2_is_infty(inf)){
-        ep2_free(inf);
-        return INVALID;
-    }
-    ep2_free(inf);
+    return simple_subgroup_check_G2(p);
     #elif MEMBERSHIP_CHECK_G2 == BOWE
     // TODO: implement Bowe's check
+    return INVALID;
+    #else
     return INVALID;
     #endif
 #endif

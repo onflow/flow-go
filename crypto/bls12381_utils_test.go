@@ -137,3 +137,38 @@ func TestOpSwuHashToG1(t *testing.T) {
 	}
 	return
 }
+
+// test Bowe subgroup check in G1
+// The test compares Bowe's check result to multiplying by the group order
+func TestSubgroupCheckG1(t *testing.T) {
+	_ = newBLSBLS12381()
+	// seed Relic PRG
+	seed := make([]byte, securityBits/8)
+	rand.Read(seed)
+	seedRelic(seed)
+
+	simple := 0
+	bowe := 1
+	// tests for simple membership check
+	check := checkG1Test(1, simple) // point in G1
+	assert.True(t, check)
+	check = checkG1Test(0, simple) // point in E1\G1
+	assert.False(t, check)
+
+	// tests for Bowe membership check
+	check = checkG1Test(1, bowe) // point in G1
+	assert.True(t, check)
+	check = checkG1Test(0, bowe) // point in E1\G1
+	assert.False(t, check)
+}
+
+// G1 membership check bench
+func BenchmarkCheckG1(b *testing.B) {
+	_ = newBLSBLS12381()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchG1Test()
+	}
+	b.StopTimer()
+	return
+}

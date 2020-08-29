@@ -18,6 +18,10 @@ int get_invalid() {
     return INVALID;
 }
 
+int get_checkG1() {
+    return MEMBERSHIP_CHECK_G1;
+}
+
 // global variable of the pre-computed data
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
@@ -84,7 +88,7 @@ prec_st* init_precomputed_data_BLS12_381() {
         for (int i=0; i<ELLP_Ny_LEN; i++)  
             fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i], Fp_DIGITS);
     #endif
-    #if (MEMBERSHIP_CHECK && MEMBERSHIP_CHECK_G1 == BOWE)
+    #if (MEMBERSHIP_CHECK_G1 == BOWE)
         bn_read_raw(&bls_prec->beta, beta_data, Fp_DIGITS);
         bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
@@ -639,6 +643,38 @@ int ep_sum_vector(byte* dest, const byte* sigs, const int len) {
     return VALID;
 }
 
+// uses a simple scalar multiplication by G1's order
+// to check whether a point on the curve E1 is in G1.
+int simple_subgroup_check_G1(const ep_t p){
+    ep_t inf;
+    ep_new(inf);
+    // check p^order == infinity
+    // use basic double & add as lwnaf reduces the expo modulo r
+    ep_mul_basic(inf, p, &core_get()->ep_r);
+    if (!ep_is_infty(inf)){
+        ep_free(inf);
+        return INVALID;
+    }
+    ep_free(inf);
+    return VALID;
+}
+
+// uses a simple scalar multiplication by G1's order
+// to check whether a point on the curve E2 is in G2.
+int simple_subgroup_check_G2(const ep2_t p){
+    ep2_t inf;
+    ep2_new(inf);
+    // check p^order == infinity
+    // use basic double & add as lwnaf reduces the expo modulo r
+    ep2_mul_basic(inf, (ep2_st*)p, &core_get()->ep_r);
+    if (!ep2_is_infty(inf)){
+        ep2_free(inf);
+        return INVALID;
+    }
+    ep2_free(inf);
+    return VALID;
+}
+
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
 // beta such that beta^3 == 1 mod p
 // beta is in the Montgomery form
@@ -654,7 +690,7 @@ const uint64_t z2_1_by3_data[2] = {
 };
 
 // uses Bowe's check from section 3.2 from https://eprint.iacr.org/2019/814.pdf
-// to check whether a point on the curve is in G1
+// to check whether a point on the curve E1 is in G1.
 int bowe_subgroup_check_G1(const ep_t p){
     if (ep_is_infty(p) == 1) 
         return VALID;
@@ -680,7 +716,7 @@ int bowe_subgroup_check_G1(const ep_t p){
     // (z^2-1)/3 (2*si(p) - p - si^2(p)) - si^2(p)
     ep_add(sigma, sigma, p_inv);
     ep_add(sigma, sigma, sigma2);
-    ep_mul(sigma, sigma, &bls_prec->z2_1_by3); // compare lwnaf to basic mult
+    ep_mul_lwnaf(sigma, sigma, &bls_prec->z2_1_by3);
     ep_add(sigma, sigma, sigma2);
     
     ep_free(sigma2);
@@ -693,5 +729,58 @@ int bowe_subgroup_check_G1(const ep_t p){
     ep_free(sigma);
     return VALID;
 }
-
 #endif
+
+// generates a random point in G1 and stores it in p
+void ep_rand_G1(ep_t p) {
+    // multiplies G1 generator by a random scalar
+    ep_rand(p);
+}
+
+// generates a random point in E1\G1 and stores it in p
+void ep_rand_G1complement(ep_t p) {
+    // generate a random point in E1
+    fp_rand(p->x); // set x to a random field element
+    byte r;
+    rand_bytes(&r, 1);
+    fp_zero(p->y);
+    fp_set_bit(p->y, 0, r&1); // set y randomly to 0 or 1
+    fp_set_dig(p->z, 1);
+    p->norm = 1;
+    // map the point to E1\G1 by clearing G1 order
+    bn_t order;
+    bn_new(order); 
+    g1_get_ord(order);
+    ep_mul_basic(p, p, order);
+}
+
+int subgroup_check_G1_test(int inG1, int method) {
+    // generate a random p
+    ep_t p;
+	if (inG1) ep_rand_G1(p); // p in G1
+	else ep_rand_G1complement(p); // p in E1\G1
+    switch (method) {
+    case EXP_ORDER: 
+        return simple_subgroup_check_G1(p);
+    #if  (MEMBERSHIP_CHECK_G1 == BOWE)
+    case BOWE:
+        return bowe_subgroup_check_G1(p);
+    #endif
+    default:
+        if (inG1) return VALID;
+        else return INVALID;
+    }
+}
+
+int subgroup_check_G1_bench() {
+    ep_t p;
+	ep_curve_get_gen(p);
+    int res;
+    // check p is in G1
+    #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
+    res = simple_subgroup_check_G1(p);
+    #elif MEMBERSHIP_CHECK_G1 == BOWE
+    res = bowe_subgroup_check_G1(p);
+    #endif
+    return 0;
+}
