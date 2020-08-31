@@ -31,5 +31,3 @@
 # Cryptography Stream
 /crypto/** @tarakby
 
-# Language Stream
-/language/** @turbolent

@@ -8,7 +8,6 @@
 
 # Add all the sub coverages to the cover file
 tail -n +2 crypto/$COVER_PROFILE >> $COVER_PROFILE
-tail -n +2 language/$COVER_PROFILE >> $COVER_PROFILE
 gocov convert $COVER_PROFILE > cover.json
 
 # The summary lines are indicated by a long running set of `-`s, therefore to get the summary lines, we grep the lines with a set of dashes
