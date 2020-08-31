@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	chmodule "github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -80,7 +81,7 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to the verIdentity
 	// the assignment is done based on `isAssgined` function
-	assigner := &mock.ChunkAssignment{}
+	assigner := &mock.ChunkAssigner{}
 	a := chmodel.NewAssignment()
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
@@ -91,16 +92,16 @@ func VerificationHappyPath(t *testing.T,
 		}
 		a.Add(chunk, assignees)
 	}
-	assigner.On("Assign",
-		testifymock.Anything,
-		result).
-		Return(a, nil)
 
 	// nodes and engines
 	//
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
+		myChunks := GetAssignedChunks(verIdentity.NodeID, a, result)
+		assigner.On("Assign", testifymock.Anything, result).Return(a, nil)
+		assigner.On("GetAssignedChunks", testifymock.Anything, a, result).Return(myChunks, nil)
+
 		verNode := testutil.VerificationNode(t,
 			hub,
 			verIdentity,
@@ -474,6 +475,13 @@ func VerifiableDataChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *v
 func IsAssigned(index uint64, chunkNum int) bool {
 	ok := index%2 == 0 || isSystemChunk(index, chunkNum)
 	return ok
+}
+
+// GetAssignedChunks returns assigned chunks to a specific flow identifier
+func GetAssignedChunks(id flow.Identifier, assignment *chmodel.Assignment, result *flow.ExecutionResult) flow.ChunkList {
+	assigner, _ := chmodule.NewPublicAssignment(chmodule.DefaultChunkAssignmentAlpha)
+	myChunks, _ := assigner.GetAssignedChunks(id, assignment, result)
+	return myChunks
 }
 
 // isSystemChunk returns true if the index corresponds to the system chunk, i.e., last chunk in

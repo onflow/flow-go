@@ -84,7 +84,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	result := &completeER.Receipt.ExecutionResult
 
 	// assigner and assignment
-	assigner := &mock.ChunkAssignment{}
+	assigner := &mock.ChunkAssigner{}
 	assignment := chmodel.NewAssignment()
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
@@ -93,11 +93,10 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		}
 		assignment.Add(chunk, assignees)
 	}
+	myChunks := GetAssignedChunks(verIdentity.NodeID, assignment, result)
 
-	assigner.On("Assign",
-		testifymock.Anything,
-		result).
-		Return(assignment, nil)
+	assigner.On("Assign", testifymock.Anything, result).Return(assignment, nil)
+	assigner.On("GetAssignedChunks", verIdentity.NodeID, assignment, result).Return(myChunks, nil)
 
 	// setup nodes
 	//

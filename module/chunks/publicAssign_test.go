@@ -43,7 +43,6 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// j keeps track of chunks
 	j := 0
 	for i := 0; i < size; i++ {
-
 		c, ok := chunks.ByIndex(uint64(j))
 		require.True(a.T(), ok, "chunk out of range requested")
 		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))

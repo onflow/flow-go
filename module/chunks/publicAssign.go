@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
-// DefaultchunkAssignmentAlpha is the default number of verifiers that should be
+// DefaultChunkAssignmentAlpha is the default number of verifiers that should be
 // assigned to each chunk.
 // DISCLAIMER: alpha down there is not a production-level value
 const DefaultChunkAssignmentAlpha = 1
@@ -85,11 +85,7 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.Exec
 
 // GetAssignedChunks returns the list of result chunks assigned to a specific
 // verifier.
-func (p *PublicAssigment) GetAssignedChunks(
-	verifierID flow.Identifier,
-	assigment *chunkmodels.Assignment,
-	result *flow.ExecutionResult) (flow.ChunkList, error) {
-
+func (p *PublicAssignment) GetAssignedChunks(verifierID flow.Identifier, assignment *chunkmodels.Assignment, result *flow.ExecutionResult) (flow.ChunkList, error) {
 	// indices of chunks assigned to verifier
 	chunkIndices := assignment.ByNodeID(verifierID)
 
