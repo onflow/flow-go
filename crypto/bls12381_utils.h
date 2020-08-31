@@ -87,6 +87,7 @@ void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, int len);
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
+void     dig_print_(char*, dig_t*, int);
 void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);

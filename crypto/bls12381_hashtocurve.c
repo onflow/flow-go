@@ -210,15 +210,17 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 
 #elif (hashToPoint==OPSWU)
 
-const uint64_t a1_data[6] = { 
-    0x5cf428082d584c1d, 0x98936f8da0e0f97f, 0xd8e8981aefd881ac,
-    0xb0ea985383ee66a8, 0x3d693a02c96d4982, 0x00144698a3b8e943,
+// Isogeny map constants taken from https://eprint.iacr.org/2019/403.pdf (section 4.3)
+// and converted to the Mongtomery domain.
+const uint64_t a1_data[Fp_DIGITS] = { 
+    0x2f65aa0e9af5aa51, 0x86464c2d1e8416c3, 0xb85ce591b7bd31e2,
+    0x27e11c91b5f24e7c, 0x28376eda6bfc1835, 0x155455c3e5071d85,
 };
 
 
-const uint64_t b1_data[6] = { 
-    0xd1cc48e98e172be0, 0x5a23215a316ceaa5, 0xa0b9c14fcef35ef5,
-    0x2016c1f0f24f4070, 0x018b12e8753eee3b, 0x12e2908d11688030, 
+const uint64_t b1_data[Fp_DIGITS] = {  
+    0xfb996971fe22a1e0, 0x9aa93eb35b742d6f, 0x8c476013de99c5c4,
+    0x873e27c3a221e571, 0xca72b5e45a52d888, 0x06824061418a386b,
 };
 
 // check if (U/V) is a square, return 1 if yes, 0 otherwise 

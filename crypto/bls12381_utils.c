@@ -36,8 +36,9 @@ void precomputed_data_set(prec_st* p) {
     bls_prec = p;
 }
 
-// Reads a prime field element from a digit vector in big endian format.
-static void fp_read_raw(fp_t a, const dig_t *raw, int len) {
+// Reads a prime field element from a digit vector in big endian format
+// and converts it to montgomery form
+static void fp_read_raw_conv(fp_t a, const dig_t *raw, int len) {
      bn_t t;
      bn_null(t); 
      if (len != Fp_DIGITS) {
@@ -64,20 +65,34 @@ static void fp_read_raw(fp_t a, const dig_t *raw, int len) {
      }
  }
 
+// Reads a prime field element from a digit vector in big endian format
+ #define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_DIGITS)
+
+ static void fp_read_raw_(fp_t a, const dig_t *raw, int len) {
+     bn_t t;
+     bn_null(t); 
+     bn_new(t);
+     bn_read_raw(t, raw, len);
+     bn_print_("clear", t);
+     fp_prime_conv(a, t);
+     dig_print_("montg", a, 6);
+     bn_free(t);
+ }
+
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
     #if (hashToPoint == OPSWU)
-        fp_read_raw(bls_prec->a1, a1_data, 6);
-        fp_read_raw(bls_prec->b1, b1_data, 6);
+        fp_read_raw(bls_prec->a1, a1_data);
+        fp_read_raw(bls_prec->b1, b1_data);
         for (int i=0; i<ELLP_Dx_LEN; i++)  
-            fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i], 6);
+            fp_read_raw_conv(bls_prec->iso_Dx[i], iso_Dx_data[i], 6);
         for (int i=0; i<ELLP_Nx_LEN; i++)  
-            fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i], 6);
+            fp_read_raw_conv(bls_prec->iso_Nx[i], iso_Nx_data[i], 6);
         for (int i=0; i<ELLP_Dy_LEN; i++)  
-            fp_read_raw(bls_prec->iso_Dy[i], iso_Dy_data[i], 6);
+            fp_read_raw_conv(bls_prec->iso_Dy[i], iso_Dy_data[i], 6);
         for (int i=0; i<ELLP_Ny_LEN; i++)  
-            fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i], 6);
+            fp_read_raw_conv(bls_prec->iso_Ny[i], iso_Ny_data[i], 6);
     #endif
     // (p-3)/4
     bn_read_raw(&bls_prec->p_3div4, fp_prime_get(), Fp_DIGITS);
@@ -169,6 +184,13 @@ void bytes_print_(char* s, byte* data, int len) {
     printf("[%s]:\n", s);
     for (int i=0; i<len; i++) 
         printf("%02x,", data[i]);
+    printf("\n");
+}
+
+void dig_print_(char* s, dig_t* data, int len) {
+    printf("[%s]:\n", s);
+    for (int i=0; i<len; i++) 
+        printf("%016llx,", data[i]);
     printf("\n");
 }
 
