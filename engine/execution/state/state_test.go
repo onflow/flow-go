@@ -154,4 +154,25 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 		assert.Empty(t, b2)
 	}))
+
+	t.Run("commit delta and persist state commit for the second time should be OK", prepareTest(func(t *testing.T, es state.ExecutionState) {
+		// TODO: use real block ID
+		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
+		assert.NoError(t, err)
+
+		// set initial value
+		view1 := es.NewView(sc1)
+		view1.Set(registerID1, flow.RegisterValue("apple"))
+		view1.Set(registerID2, flow.RegisterValue("apple"))
+
+		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
+		assert.NoError(t, err)
+
+		// committing for the second time should be OK
+		sc2Same, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
+		assert.NoError(t, err)
+
+		require.Equal(t, sc2, sc2Same)
+	}))
+
 }

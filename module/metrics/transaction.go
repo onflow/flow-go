@@ -81,7 +81,12 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 
 func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when time.Time) {
 	// we don't need to check whether the transaction timing already exists, it will not be overwritten by the mempool
-	tc.transactionTimings.Add(&flow.TransactionTiming{TransactionID: txID, Received: when})
+	added := tc.transactionTimings.Add(&flow.TransactionTiming{TransactionID: txID, Received: when})
+	if !added {
+		tc.log.Warn().
+			Str("transaction_id", txID.String()).
+			Msg("failed to add TransactionReceived metric")
+	}
 }
 
 func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when time.Time) {
@@ -90,7 +95,12 @@ func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when 
 		return t
 	})
 
+	// the AN may not have received the original transaction sent by the client in which case the finalized metric
+	// is not updated
 	if !updated {
+		tc.log.Debug().
+			Str("transaction_id", txID.String()).
+			Msg("failed to update TransactionFinalized metric")
 		return
 	}
 
@@ -110,6 +120,9 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 	})
 
 	if !updated {
+		tc.log.Debug().
+			Str("transaction_id", txID.String()).
+			Msg("failed to update TransactionExecuted metric")
 		return
 	}
 
