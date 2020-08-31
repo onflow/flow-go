@@ -31,17 +31,14 @@ type Conduit interface {
 	// However, the set of targeted nodes can be regulated using selector.
 	Publish(event interface{}, selector flow.IdentityFilter) error
 
-	// Unicast sends the event in a reliable way to the given recipients.
+	// Unicast sends the event in a reliable way to the given recipient.
 	// It uses 1-1 direct messaging over the underlying network to deliver the event.
-	// It returns an error if unicasting to any of the target IDs fails.
-	Unicast(event interface{}, targetIDs ...flow.Identifier) error
+	// It returns an error if the unicast fails.
+	Unicast(event interface{}, targetID flow.Identifier) error
 
-	// Multicast reliably sends the specified event over the channelID to the specified number of recipients selected
-	//from
-	// the specified subset.
-	// The recipients are selected randomly from the set of identities defined by selectors.
-	// In this context, reliable means that the event is sent across the network over a 1-1 direct messaging.
-	// It returns an error if it cannot send the event to the specified number of nodes.
+	// Multicast unreliably sends the specified event over the channelID
+	// to the specified number of recipients selected from the specified subset.
+	// The recipients are selected randomly from the set of identifiers defined by selectors.
 	Multicast(event interface{}, num uint, selector flow.IdentityFilter) error
 }
 

@@ -81,20 +81,15 @@ func (mr *MockConduitMockRecorder) Submit(arg0 interface{}, arg1 ...interface{})
 }
 
 // Unicast mocks base method
-func (m *MockConduit) Unicast(arg0 interface{}, arg1 ...flow.Identifier) error {
+func (m *MockConduit) Unicast(arg0 interface{}, arg1 flow.Identifier) error {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0}
-	for _, a := range arg1 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Unicast", varargs...)
+	ret := m.ctrl.Call(m, "Unicast", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Unicast indicates an expected call of Unicast
-func (mr *MockConduitMockRecorder) Unicast(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+func (mr *MockConduitMockRecorder) Unicast(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0}, arg1...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockConduit)(nil).Unicast), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockConduit)(nil).Unicast), arg0, arg1)
 }

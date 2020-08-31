@@ -21,8 +21,8 @@ func (c *Conduit) Publish(event interface{}, selector flow.IdentityFilter) error
 	return c.publish(c.channelID, event, selector)
 }
 
-func (c *Conduit) Unicast(event interface{}, targetIDs ...flow.Identifier) error {
-	return c.unicast(c.channelID, event, targetIDs...)
+func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
+	return c.unicast(c.channelID, event, targetID)
 }
 
 func (c *Conduit) Multicast(event interface{}, num uint, selector flow.IdentityFilter) error {
