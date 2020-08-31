@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/crypto/random"
-	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -47,16 +46,11 @@ func (p *PublicAssignment) Size() uint {
 	return p.assignments.Size()
 }
 
-// Assign generates the assignment using the execution result to seed the RNG.
-func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
-	rng, err := utils.NewChunkAssignmentRNG(result)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
-	}
-
+// Assign generates the assignment
+func (p *PublicAssignment) Assign(verifiers flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkmodels.Assignment, error) {
 	// computes a finger print for identities||chunks
 	ids := verifiers.NodeIDs()
-	hash, err := fingerPrint(ids, result.Chunks, rng, p.alpha)
+	hash, err := fingerPrint(ids, chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
 	}
@@ -69,7 +63,7 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.Exec
 	}
 
 	// otherwise, it computes the assignment and caches it for future calls
-	a, err = chunkAssignment(ids, result.Chunks, rng, p.alpha)
+	a, err = chunkAssignment(ids, chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not complete chunk assignment: %w", err)
 	}
@@ -81,6 +75,16 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.Exec
 	}
 
 	return a, nil
+}
+
+// AssignWithRNG generates the assignment with the RNG computed from the result
+func (p *PublicAssignment) AssignWithRNG(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
+	rng, err := newChunkAssignmentRNG(result)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+
+	return p.Assign(verifiers, result.Chunks, rng)
 }
 
 // GetAssignedChunks returns the list of result chunks assigned to a specific
@@ -103,7 +107,30 @@ func (p *PublicAssignment) GetAssignedChunks(verifierID flow.Identifier, assignm
 	return chunks, nil
 }
 
-// chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
+// NewChunkAssignmentRNG generates and returns a hasher for chunk
+// assignment
+func newChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
+	h := hash.NewSHA3_384()
+
+	// encodes result approval body to byte slice
+	b, err := encoding.DefaultEncoder.Encode(res.ExecutionResultBody)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode execution result body: %w", err)
+	}
+
+	// takes hash of result approval body
+	hash := h.ComputeHash(b)
+
+	// creates a random generator
+	rng, err := random.NewRand(hash)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+
+	return rng, nil
+}
+
+// ChunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
 func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkmodels.Assignment, error) {
 	if len(ids) < alpha {

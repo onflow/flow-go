@@ -235,7 +235,7 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
 	}
 
-	assignment, err := e.chunkAssigner.Assign(verifiers, result)
+	assignment, err := e.chunkAssigner.AssignWithRNG(verifiers, result)
 	if err != nil {
 		return nil, fmt.Errorf("could not create assignment: %w", err)
 	}

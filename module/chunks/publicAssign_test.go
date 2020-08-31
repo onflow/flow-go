@@ -1,7 +1,7 @@
 package chunks_test
 
 import (
-	"crypto/rand"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -182,9 +182,9 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
-	a2, err := chmodule.NewPublicAssignment(alpha)
+	// a2, err := chmodule.NewPublicAssignment(alpha)
 	require.NoError(a.T(), err)
-	p2, err := a2.Assign(nodes2, chunks, rng2)
+	p2, err := a1.Assign(nodes2, chunks, rng2)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
