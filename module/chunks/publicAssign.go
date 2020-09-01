@@ -47,10 +47,15 @@ func (p *PublicAssignment) Size() uint {
 }
 
 // Assign generates the assignment
-func (p *PublicAssignment) Assign(verifiers flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkmodels.Assignment, error) {
+func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
+	rng, err := NewChunkAssignmentRNG(result)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+
 	// computes a finger print for identities||chunks
 	ids := verifiers.NodeIDs()
-	hash, err := fingerPrint(ids, chunks, rng, p.alpha)
+	hash, err := fingerPrint(ids, result.Chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
 	}
@@ -63,7 +68,7 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, chunks flow.Chunk
 	}
 
 	// otherwise, it computes the assignment and caches it for future calls
-	a, err = chunkAssignment(ids, chunks, rng, p.alpha)
+	a, err = chunkAssignment(ids, result.Chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not complete chunk assignment: %w", err)
 	}
@@ -75,16 +80,6 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, chunks flow.Chunk
 	}
 
 	return a, nil
-}
-
-// AssignWithRNG generates the assignment with the RNG computed from the result
-func (p *PublicAssignment) AssignWithRNG(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
-	rng, err := newChunkAssignmentRNG(result)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
-	}
-
-	return p.Assign(verifiers, result.Chunks, rng)
 }
 
 // GetAssignedChunks returns the list of result chunks assigned to a specific
@@ -109,7 +104,7 @@ func (p *PublicAssignment) GetAssignedChunks(verifierID flow.Identifier, assignm
 
 // NewChunkAssignmentRNG generates and returns a hasher for chunk
 // assignment
-func newChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
+func NewChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
 	h := hash.NewSHA3_384()
 
 	// encodes result approval body to byte slice

@@ -34,7 +34,7 @@ type Engine struct {
 	me            module.Local
 	results       mempool.PendingResults // used to store all the execution results along with their senders
 	verifier      network.Engine         // the verifier engine
-	chunkAssigner module.ChunkAssigner   // used to determine chunks this node needs to verify
+	assigner      module.ChunkAssigner   // used to determine chunks this node needs to verify
 	state         protocol.State         // used to verify the request origin
 	pendingChunks *Chunks                // used to store all the pending chunks that assigned to this node
 	con           network.Conduit        // used to send the chunk data request
@@ -51,7 +51,7 @@ func New(
 	me module.Local,
 	results mempool.PendingResults,
 	verifier network.Engine,
-	chunkAssigner module.ChunkAssigner,
+	assigner module.ChunkAssigner,
 	state protocol.State,
 	chunks *Chunks,
 	headers storage.Headers,
@@ -66,7 +66,7 @@ func New(
 		me:            me,
 		results:       results,
 		verifier:      verifier,
-		chunkAssigner: chunkAssigner,
+		assigner:      assigner,
 		state:         state,
 		pendingChunks: chunks,
 		headers:       headers,
@@ -235,12 +235,12 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
 	}
 
-	assignment, err := e.chunkAssigner.AssignWithRNG(verifiers, result)
+	assignment, err := e.assigner.Assign(verifiers, result)
 	if err != nil {
 		return nil, fmt.Errorf("could not create assignment: %w", err)
 	}
 
-	mine, err := e.chunkAssigner.GetAssignedChunks(e.me.NodeID(), assignment, result)
+	mine, err := e.assigner.GetAssignedChunks(e.me.NodeID(), assignment, result)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine my assignments: %w", err)
 	}
