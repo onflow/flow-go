@@ -31,7 +31,7 @@ func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *ReadCon
 func (rc *ReadConnection) ReceiveLoop() {
 	// close and drain the inbound channel
 	defer close(rc.inbound)
-	r := ggio.NewDelimitedReader(rc.stream, 1<<20)
+	r := ggio.NewDelimitedReader(rc.stream, 5 * DefaultMaxPubSubMsgSize)
 RecvLoop:
 	for {
 		// check if we should stop
