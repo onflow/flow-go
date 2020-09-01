@@ -1,4 +1,4 @@
-package chunks_test
+package chunks
 
 import (
 	"math/rand"
@@ -9,7 +9,6 @@ import (
 
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	chmodule "github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/test"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -119,7 +118,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	seed := a.CreateResult(blockID, 4, a.T())
 
 	// Randomness:
-	rng1, err := chmodule.GenerateChunkAssignmentRNG(seed)
+	rng1, err := generateChunkAssignmentRNG(seed)
 	require.NoError(a.T(), err)
 	err = rng1.Shuffle(len(ids), ids.Swap)
 	require.NoError(a.T(), err)
@@ -132,7 +131,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 
 	// Deterministiciy:
 	// shuffling same list with the same seed should generate the same permutation
-	rng2, err := chmodule.GenerateChunkAssignmentRNG(seed)
+	rng2, err := generateChunkAssignmentRNG(seed)
 	require.NoError(a.T(), err)
 	// permutes original list with the same seed
 	err = rng2.Shuffle(len(original), original.Swap)
@@ -158,7 +157,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	seed := a.CreateResult(blockID, 4, a.T())
 
 	// Randomness:
-	rng1, err := chmodule.GenerateChunkAssignmentRNG(seed)
+	rng1, err := generateChunkAssignmentRNG(seed)
 	require.NoError(a.T(), err)
 	err = rng1.Samples(len(ids), subset, ids.Swap)
 	require.NoError(a.T(), err)
@@ -189,13 +188,13 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
 	// chunk assignment of the first set
-	a1, err := chmodule.NewPublicAssignment(alpha)
+	a1, err := NewPublicAssignment(alpha)
 	require.NoError(a.T(), err)
 	p1, err := a1.Assign(nodes1, seed)
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
-	a2, err := chmodule.NewPublicAssignment(alpha)
+	a2, err := NewPublicAssignment(alpha)
 	require.NoError(a.T(), err)
 	p2, err := a2.Assign(nodes1, seed)
 	require.NoError(a.T(), err)
@@ -251,7 +250,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	original := make([]*flow.Identity, verNum)
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
-	a1, err := chmodule.NewPublicAssignment(alpha)
+	a1, err := NewPublicAssignment(alpha)
 	require.NoError(a.T(), err)
 	p1, err := a1.Assign(nodes, seed)
 	require.NoError(a.T(), err)
@@ -271,7 +270,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 
 	// creates nodes and keeps a copy of them
 	nodes := test.CreateIDs(5)
-	assigner, err := chmodule.NewPublicAssignment(3)
+	assigner, err := NewPublicAssignment(3)
 	require.NoError(a.T(), err)
 
 	// initially cache should be empty

@@ -63,7 +63,7 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.Exec
 	}
 
 	// create RNG for assignment
-	rng, err := GenerateChunkAssignmentRNG(result)
+	rng, err := generateChunkAssignmentRNG(result)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random generator: %w", err)
 	}
@@ -103,9 +103,9 @@ func (p *PublicAssignment) GetAssignedChunks(verifierID flow.Identifier, assignm
 	return chunks, nil
 }
 
-// GenerateChunkAssignmentRNG generates and returns a hasher for chunk
+// generateChunkAssignmentRNG generates and returns a hasher for chunk
 // assignment
-func GenerateChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
+func generateChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
 	h := hash.NewSHA3_384()
 
 	// encodes result approval body to byte slice
