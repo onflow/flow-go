@@ -23,12 +23,14 @@ prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
 #if (hashToPoint == OPSWU)
-extern const uint64_t a1_data[6];
-extern const uint64_t b1_data[6];
-extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][6];
-extern const uint64_t iso_Dx_data[ELLP_Dx_LEN][6];
-extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][6];
-extern const uint64_t iso_Dy_data[ELLP_Dy_LEN][6];
+extern const uint64_t p_3div4_data[Fp_DIGITS];
+extern const uint64_t p_1div2_data[Fp_DIGITS];
+extern const uint64_t a1_data[Fp_DIGITS];
+extern const uint64_t b1_data[Fp_DIGITS];
+extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
+extern const uint64_t iso_Dx_data[ELLP_Dx_LEN][Fp_DIGITS];
+extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
+extern const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS];
 #endif
 
 // sets the global variable to input
@@ -36,48 +38,9 @@ void precomputed_data_set(prec_st* p) {
     bls_prec = p;
 }
 
-// Reads a prime field element from a digit vector in big endian format
-// and converts it to montgomery form
-static void fp_read_raw_conv(fp_t a, const dig_t *raw, int len) {
-     bn_t t;
-     bn_null(t); 
-     if (len != Fp_DIGITS) {
-         THROW(ERR_NO_BUFFER);
-     }
-      TRY {
-         bn_new(t);
-         bn_read_raw(t, raw, len);
-         if (bn_is_zero(t)) {
-             fp_zero(a);
-         } else {
-             if (t->used == 1) {
-                 fp_prime_conv_dig(a, t->dp[0]);
-             } else {
-                 fp_prime_conv(a, t);
-             }
-         }
-     }
-     CATCH_ANY {
-         THROW(ERR_CAUGHT);
-     }
-     FINALLY {
-         bn_free(t);
-     }
- }
-
-// Reads a prime field element from a digit vector in big endian format
+// Reads a prime field element from a digit vector in big endian format.
+// There is no conversion to Montgomery domain in this function.
  #define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_DIGITS)
-
- static void fp_read_raw_(fp_t a, const dig_t *raw, int len) {
-     bn_t t;
-     bn_null(t); 
-     bn_new(t);
-     bn_read_raw(t, raw, len);
-     bn_print_("clear", t);
-     fp_prime_conv(a, t);
-     dig_print_("montg", a, 6);
-     bn_free(t);
- }
 
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
@@ -86,21 +49,18 @@ prec_st* init_precomputed_data_BLS12_381() {
         fp_read_raw(bls_prec->a1, a1_data);
         fp_read_raw(bls_prec->b1, b1_data);
         for (int i=0; i<ELLP_Dx_LEN; i++)  
-            fp_read_raw_conv(bls_prec->iso_Dx[i], iso_Dx_data[i], 6);
+            fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i]);
         for (int i=0; i<ELLP_Nx_LEN; i++)  
-            fp_read_raw_conv(bls_prec->iso_Nx[i], iso_Nx_data[i], 6);
+            fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i]);
         for (int i=0; i<ELLP_Dy_LEN; i++)  
-            fp_read_raw_conv(bls_prec->iso_Dy[i], iso_Dy_data[i], 6);
+            fp_read_raw(bls_prec->iso_Dy[i], iso_Dy_data[i]);
         for (int i=0; i<ELLP_Ny_LEN; i++)  
-            fp_read_raw_conv(bls_prec->iso_Ny[i], iso_Ny_data[i], 6);
+            fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i]);
     #endif
     // (p-3)/4
-    bn_read_raw(&bls_prec->p_3div4, fp_prime_get(), Fp_DIGITS);
-    bn_sub_dig(&bls_prec->p_3div4, &bls_prec->p_3div4, 3);
-    bn_rsh(&bls_prec->p_3div4, &bls_prec->p_3div4, 2);
+    bn_read_raw(&bls_prec->p_3div4, p_3div4_data, Fp_DIGITS);
     // (p-1)/2
-    fp_sub_dig(bls_prec->p_1div2, fp_prime_get(), 1);
-    fp_rsh(bls_prec->p_1div2, bls_prec->p_1div2, 1);
+    fp_read_raw(bls_prec->p_1div2, p_1div2_data);
     return bls_prec;
 }
 
@@ -188,10 +148,17 @@ void bytes_print_(char* s, byte* data, int len) {
 }
 
 void dig_print_(char* s, dig_t* data, int len) {
-    printf("[%s]:\n", s);
+    /*printf("[%s]:\n", s);
     for (int i=0; i<len; i++) 
         printf("%016llx,", data[i]);
-    printf("\n");
+    printf("\n");*/
+    printf("    {");
+    for (int i=0; i<len; i++) 
+        { 
+            printf("0x%016llx,", data[i]);
+         if (i == 2) printf("\n     ");
+        }
+    printf("},\n");
 }
 
 void fp_print_(char* s, fp_st a) {
