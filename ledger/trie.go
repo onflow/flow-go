@@ -29,15 +29,13 @@ func (u *TrieUpdate) IsEmpty() bool {
 	return u.Size() == 0
 }
 
-// TODO clean me
 func (u *TrieUpdate) String() string {
 	str := "Trie Update:\n "
 	str += "\t triehash : " + u.RootHash.String() + "\n"
 	tp := 0
 	for i, p := range u.Paths {
 		tp += p.Size()
-		// Temporary
-		str += fmt.Sprintf("\t path %d : %s\n", i, p)
+		str += fmt.Sprintf("\t\t path %d : %s\n", i, p)
 	}
 	str += fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), tp)
 	tp = 0

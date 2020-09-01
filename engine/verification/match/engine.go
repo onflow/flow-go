@@ -139,14 +139,25 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
 	switch resource := event.(type) {
 	case *flow.ExecutionResult:
-		return e.handleExecutionResult(originID, resource)
+		err = e.handleExecutionResult(originID, resource)
 	case *messages.ChunkDataResponse:
-		return e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
+		err = e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	if err != nil {
+		// logs the error instead of returning that.
+		// returning error would be projected at a higher level by network layer.
+		// however, this is an engine-level error, and not network layer error.
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // handleExecutionResult takes a execution result and finds chunks that are assigned to this
@@ -174,7 +185,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		Int("total_chunks", len(result.Chunks)).
 		Logger()
 
-	log.Debug().Msg("start processing execution result")
+	log.Info().Msg("execution result arrived")
 
 	pendingResult := &flow.PendingResult{
 		ExecutorID:      originID,
@@ -197,8 +208,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
 
-	log.Debug().
-		Int("total_chunks", len(pendingResult.ExecutionResult.Chunks)).
+	log.Info().
 		Int("total_assigned_chunks", len(chunks)).
 		Msg("chunk assignment done")
 
@@ -320,7 +330,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		log.Debug().Msg("chunk data requested")
+		log.Info().Msg("chunk data requested")
 	}
 
 }

@@ -8,7 +8,7 @@ import (
 )
 
 // IsBitSet returns if the bit at index `idx` in the byte array `b` is set to 1 (big endian)
-// TODO: remove error return
+// TODO: remove error return to improve performance
 func IsBitSet(b []byte, idx int) (bool, error) {
 	if idx >= len(b)*8 {
 		return false, fmt.Errorf("input (%v) only has %d bits, can't look up bit %d", b, len(b)*8, idx)
@@ -17,7 +17,7 @@ func IsBitSet(b []byte, idx int) (bool, error) {
 }
 
 // SetBit sets the bit at position i in the byte array b to 1
-// TODO: remove error return
+// TODO: remove error return to improve performance
 func SetBit(b []byte, i int) error {
 	if i >= len(b)*8 {
 		return fmt.Errorf("input (%v) only has %d bits, can't set bit %d", b, len(b)*8, i)
@@ -48,22 +48,26 @@ func Uint64ToBinary(integer uint64) []byte {
 	return b
 }
 
+// AppendUint8 appends the value byte to the input slice
 func AppendUint8(input []byte, value uint8) []byte {
 	return append(input, byte(value))
 }
 
+// AppendUint16 appends the value bytes to the input slice (big endian)
 func AppendUint16(input []byte, value uint16) []byte {
 	buffer := make([]byte, 2)
 	binary.BigEndian.PutUint16(buffer, value)
 	return append(input, buffer...)
 }
 
+// AppendUint32 appends the value bytes to the input slice (big endian)
 func AppendUint32(input []byte, value uint32) []byte {
 	buffer := make([]byte, 4)
 	binary.BigEndian.PutUint32(buffer, value)
 	return append(input, buffer...)
 }
 
+// AppendUint64 appends the value bytes to the input slice (big endian)
 func AppendUint64(input []byte, value uint64) []byte {
 	buffer := make([]byte, 8)
 	binary.BigEndian.PutUint64(buffer, value)
@@ -90,6 +94,7 @@ func AppendLongData(input []byte, data []byte) []byte {
 	return input
 }
 
+// ReadSlice reads `size` bytes from the input
 func ReadSlice(input []byte, size int) (value []byte, rest []byte, err error) {
 	if len(input) < size {
 		return nil, input, fmt.Errorf("input size is too small to be splited %d < %d ", len(input), size)
@@ -97,6 +102,7 @@ func ReadSlice(input []byte, size int) (value []byte, rest []byte, err error) {
 	return input[:size], input[size:], nil
 }
 
+// ReadUint8 reads a uint8 from the input and returns the rest
 func ReadUint8(input []byte) (value uint8, rest []byte, err error) {
 	if len(input) < 1 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint8", len(input))
@@ -104,6 +110,7 @@ func ReadUint8(input []byte) (value uint8, rest []byte, err error) {
 	return uint8(input[0]), input[1:], nil
 }
 
+// ReadUint16 reads a uint16 from the input and returns the rest
 func ReadUint16(input []byte) (value uint16, rest []byte, err error) {
 	if len(input) < 2 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint16", len(input))
@@ -111,6 +118,7 @@ func ReadUint16(input []byte) (value uint16, rest []byte, err error) {
 	return binary.BigEndian.Uint16(input[:2]), input[2:], nil
 }
 
+// ReadUint32 reads a uint32 from the input and returns the rest
 func ReadUint32(input []byte) (value uint32, rest []byte, err error) {
 	if len(input) < 4 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint32", len(input))
@@ -118,6 +126,7 @@ func ReadUint32(input []byte) (value uint32, rest []byte, err error) {
 	return binary.BigEndian.Uint32(input[:4]), input[4:], nil
 }
 
+// ReadUint64 reads a uint64 from the input and returns the rest
 func ReadUint64(input []byte) (value uint64, rest []byte, err error) {
 	if len(input) < 8 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint64", len(input))
@@ -185,6 +194,7 @@ func ReadLongDataFromReader(reader io.Reader) ([]byte, error) {
 	return buf, nil
 }
 
+// ReadFromBuffer reads 'length' bytes from the input
 func ReadFromBuffer(reader io.Reader, length int) ([]byte, error) {
 	if length == 0 {
 		return nil, nil

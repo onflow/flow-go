@@ -109,6 +109,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ConnectionFactory' -dir="./engine/access/rpc/backend" -case=underscore -output="./engine/access/rpc/backend/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 
@@ -282,8 +283,8 @@ docker-build-bootstrap-transit:
 
 .PHONY: docker-build-loader
 docker-build-loader:
-	docker build -f ./integration/benchmark/main/Dockerfile --ssh default --build-arg TARGET=benchmark/main --target production \
-		-t gcr.io/dl-flow/loader:latest -t "gcr.io/dl-flow/loader:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/loader:$(IMAGE_TAG)" .
+	docker build -f ./integration/loader/Dockerfile --ssh default --build-arg TARGET=loader --target production \
+		-t gcr.io/dl-flow/benchmark/loader:latest -t "gcr.io/dl-flow/benchmark/loader:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/benchmark/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
@@ -323,6 +324,12 @@ docker-push-ghost:
 	docker push gcr.io/dl-flow/ghost:latest
 	docker push "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/ghost:$(IMAGE_TAG)"
+
+.PHONY: docker-push-loader
+docker-push-loader:
+	docker push gcr.io/dl-flow/benchmark/loader:latest
+	docker push "gcr.io/dl-flow/benchmark/loader:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/benchmark/loader:$(IMAGE_TAG)"
 
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access

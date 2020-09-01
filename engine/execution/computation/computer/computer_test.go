@@ -198,7 +198,7 @@ func generateEvents(eventCount int) []cadence.Event {
 	events := make([]cadence.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := cadence.Event{EventType: cadence.EventType{
+		event := cadence.Event{EventType: &cadence.EventType{
 			Identifier: "whatever",
 		}}
 		events[i] = event

@@ -117,6 +117,20 @@ func (c *Core) RequestBlock(blockID flow.Identifier) {
 	c.queueByBlockID(blockID)
 }
 
+func (c *Core) RequestHeight(height uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// if we already received this block, reset the status so we can re-queue
+	status := c.heights[height]
+	if status.WasReceived() {
+		delete(c.blockIDs, status.Header.ID())
+		delete(c.heights, status.Header.Height)
+	}
+
+	c.queueByHeight(height)
+}
+
 // ScanPending scans all pending block statuses for blocks that should be
 // requested. It apportions requestable items into range and batch requests
 // according to configured maximums, giving precedence to range requests.
@@ -222,6 +236,12 @@ func (c *Core) prune(final *flow.Header) {
 	c.log.Debug().
 		Uint64("final_height", final.Height).
 		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
+}
+
+func (c *Core) Prune(final *flow.Header) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.prune(final)
 }
 
 // getRequestableItems will find all block IDs and heights that are eligible

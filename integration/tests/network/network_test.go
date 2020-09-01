@@ -59,7 +59,7 @@ func TestNetwork(t *testing.T) {
 	sender := ids[0]
 	targets := ids[1:]
 
-	event := &message.Echo{
+	event := &message.TestMessage{
 		Text: fmt.Sprintf("hello"),
 	}
 
@@ -145,7 +145,7 @@ func readLoop(ctx context.Context, id flow.Identifier, net *testnet.FlowNetwork,
 		}
 
 		switch v := event.(type) {
-		case *message.Echo:
+		case *message.TestMessage:
 			t.Logf("%s: %s: %s\n", id.String(), actualOriginID.String(), v.Text)
 			assert.Equal(t, expectedOrigin, actualOriginID)
 			assert.Equal(t, expectedMsg, v.Text)

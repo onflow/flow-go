@@ -19,7 +19,7 @@ import (
 var rootBlockID = unittest.IdentifierFixture().String()
 
 // helper offers a set of functions that are shared among different tests
-// CreateIDs creates and initializes count-many flow identifiers instances
+// CreateIDs creates and initializes count-many flow identifiers instancesd
 func CreateIDs(count int) []*flow.Identity {
 	identities := make([]*flow.Identity, 0)
 	for i := 0; i < count; i++ {
@@ -39,14 +39,14 @@ func CreateIDs(count int) []*flow.Identity {
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
-func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool,
+func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool,
 	tops ...middleware.Topology) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
 	// create an empty identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
 	// identities are set to appropriate IP Port after the network and middleware are started
-	identities := make(flow.IdentityList, len(ids))
+	identities := make(flow.IdentityList, 0)
 
 	// if no topology is passed in, use the default topology for all networks
 	if tops == nil {
@@ -77,14 +77,19 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		}
 	}
 
+	identities = make(flow.IdentityList, len(ids))
 	// set the identities to appropriate ip and port
 	for i := range ids {
 		// retrieves IP and port of the middleware
 		var ip, port string
+		var err error
 		var key crypto.PublicKey
 		if !dryrun {
 			m := mws[i]
-			ip, port = m.GetIPPort()
+			ip, port, err = m.GetIPPort()
+			if err != nil {
+				return nil, err
+			}
 			key = m.PublicKey()
 		}
 
@@ -100,16 +105,26 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	}
 
 	// now that the network has started, address within the identity will have the actual port number
-	// update the network with the new id
+	// update the network with the new ids
 	for _, net := range nets {
 		net.SetIDs(identities)
+	}
+
+	// update whitelist of each of the middleware after the network ids have been updated
+	if !dryrun {
+		for _, m := range mws {
+			err := m.UpdateAllowList()
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return nets, nil
 }
 
-// CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id
-func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2p.Middleware, error) {
+// createMiddleware receives an ids slice and creates and initializes a middleware instances for each id
+func createMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2p.Middleware, error) {
 	metrics := metrics.NewNoopCollector()
 	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
@@ -121,8 +136,15 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 		}
 
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics,
-			libp2p.DefaultMaxPubSubMsgSize, rootBlockID)
+		mw, err := libp2p.NewMiddleware(log,
+			json.NewCodec(),
+			"0.0.0.0:0",
+			identities[i].NodeID,
+			key,
+			metrics,
+			libp2p.DefaultMaxUnicastMsgSize,
+			libp2p.DefaultMaxPubSubMsgSize,
+			rootBlockID)
 		if err != nil {
 			return nil, err
 		}

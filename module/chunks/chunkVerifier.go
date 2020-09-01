@@ -99,7 +99,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	)
 	if err != nil {
 		// TODO provide more details based on the error type
-		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie", err, chIndex, execResID),
+		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", err, chIndex, execResID),
 			nil
 	}
 

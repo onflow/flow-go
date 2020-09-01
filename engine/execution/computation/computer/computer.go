@@ -21,16 +21,6 @@ import (
 
 const SystemChunkASTCacheSize = 64
 
-const systemChunkTransactionTemplate = `
-import FlowServiceAccount from 0x%s
-
-transaction {
-  execute() {
- 	FlowServiceAccount.pulse()
-  }
-}
-`
-
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.Ledger) error
 }
@@ -157,7 +147,7 @@ func (e *blockComputer) executeBlock(
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
 
-	tx := systemChunkTransaction(serviceAddress)
+	tx := fvm.SystemChunkTransaction(serviceAddress)
 
 	txMetrics := fvm.NewMetricsCollector()
 
@@ -180,11 +170,6 @@ func (e *blockComputer) executeBlock(
 		GasUsed:           gasUsed,
 		StateReads:        stateView.ReadsCount(),
 	}, nil
-}
-
-func systemChunkTransaction(serviceAddress flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(systemChunkTransactionTemplate, serviceAddress)))
 }
 
 func (e *blockComputer) executeCollection(

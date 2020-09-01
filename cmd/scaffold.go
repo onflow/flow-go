@@ -116,6 +116,7 @@ type FlowNodeBuilder struct {
 	Storage           Storage
 	State             *protocol.State
 	DKGState          *wrapper.State
+	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
@@ -167,10 +168,13 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxPubSubMsgSize, fnb.RootBlock.ID().String(), fnb.MsgValidators...)
+			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxUnicastMsgSize, libp2p.DefaultMaxPubSubMsgSize,
+			fnb.RootBlock.ID().String(),
+			fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
+		fnb.Middleware = mw
 
 		participants, err := fnb.State.Final().Identities(filter.Any)
 		if err != nil {
@@ -184,7 +188,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		nodeRole := nodeID.Role
 		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e6, topology, fnb.Metrics.Network)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, fnb.Middleware, 10e6, topology, fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -331,8 +335,15 @@ func (fnb *FlowNodeBuilder) initDB() {
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithLogger(log).
-		WithValueLogFileSize(128 << 20). // Default is 1 GB
-		WithValueLogMaxEntries(100000)   // Default is 1000000
+
+		// the ValueLogFileSize option specifies how big the value of a
+		// key-value pair is allowed to be saved into badger.
+		// exceeding this limit, will fail with an error like this:
+		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
+		// Maximum value size is 10G, needed by execution node
+		// TODO: finding a better max value for each node type
+		WithValueLogFileSize(128 << 23).
+		WithValueLogMaxEntries(100000) // Default is 1000000
 
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
@@ -492,7 +503,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	// when this happens during a spork, we could try deleting the protocol state database.
 	// TODO: revisit this check when implementing Epoch
 	if rootBlockHeader.ID() != fnb.RootBlock.ID() {
-		fnb.Logger.Fatal().Msgf("mismatching root block ID, bootstrap root block ID: %v, protocol state block ID: %v",
+		fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
 			rootBlockHeader.ID(),
 			fnb.RootBlock.ID())
 	}
