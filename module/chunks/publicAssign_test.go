@@ -119,7 +119,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	seed := a.CreateResult(blockID, 4, a.T())
 
 	// Randomness:
-	rng1, err := chmodule.NewChunkAssignmentRNG(seed)
+	rng1, err := chmodule.GenerateChunkAssignmentRNG(seed)
 	require.NoError(a.T(), err)
 	err = rng1.Shuffle(len(ids), ids.Swap)
 	require.NoError(a.T(), err)
@@ -132,7 +132,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 
 	// Deterministiciy:
 	// shuffling same list with the same seed should generate the same permutation
-	rng2, err := chmodule.NewChunkAssignmentRNG(seed)
+	rng2, err := chmodule.GenerateChunkAssignmentRNG(seed)
 	require.NoError(a.T(), err)
 	// permutes original list with the same seed
 	err = rng2.Shuffle(len(original), original.Swap)
@@ -158,7 +158,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	seed := a.CreateResult(blockID, 4, a.T())
 
 	// Randomness:
-	rng1, err := chmodule.NewChunkAssignmentRNG(seed)
+	rng1, err := chmodule.GenerateChunkAssignmentRNG(seed)
 	require.NoError(a.T(), err)
 	err = rng1.Samples(len(ids), subset, ids.Swap)
 	require.NoError(a.T(), err)
@@ -285,6 +285,11 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	require.NoError(a.T(), err)
 	require.Equal(a.T(), assigner.Size(), uint(1))
 
+	// repetitive assignment should not be cached
+	_, err = assigner.Assign(nodes, seed)
+	require.NoError(a.T(), err)
+	require.Equal(a.T(), assigner.Size(), uint(1))
+
 	// creates a new set of nodes, hence assigner should cache new assignment
 	newNodes := test.CreateIDs(6)
 	_, err = assigner.Assign(newNodes, seed)
@@ -294,7 +299,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	// performs the assignment using a different seed
 	// should results in a different new assignment
 	// which should be cached
-	otherSeed := a.CreateResult(blockID, 1, a.T())
+	otherSeed := a.CreateResult(blockID, 20, a.T())
 
 	_, err = assigner.Assign(newNodes, otherSeed)
 	require.NoError(a.T(), err)

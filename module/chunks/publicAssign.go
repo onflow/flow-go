@@ -48,14 +48,9 @@ func (p *PublicAssignment) Size() uint {
 
 // Assign generates the assignment
 func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
-	rng, err := NewChunkAssignmentRNG(result)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
-	}
-
 	// computes a finger print for identities||chunks
 	ids := verifiers.NodeIDs()
-	hash, err := fingerPrint(ids, result.Chunks, rng, p.alpha)
+	hash, err := fingerPrint(ids, result, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
 	}
@@ -65,6 +60,12 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.Exec
 	a, exists := p.assignments.ByID(assignmentFingerprint)
 	if exists {
 		return a, nil
+	}
+
+	// create RNG for assignment
+	rng, err := GenerateChunkAssignmentRNG(result)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
 	}
 
 	// otherwise, it computes the assignment and caches it for future calls
@@ -102,9 +103,9 @@ func (p *PublicAssignment) GetAssignedChunks(verifierID flow.Identifier, assignm
 	return chunks, nil
 }
 
-// NewChunkAssignmentRNG generates and returns a hasher for chunk
+// GenerateChunkAssignmentRNG generates and returns a hasher for chunk
 // assignment
-func NewChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
+func GenerateChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
 	h := hash.NewSHA3_384()
 
 	// encodes result approval body to byte slice
@@ -181,11 +182,10 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 
 // Fingerprint computes the SHA3-256 hash value of the inputs to the assignment algorithm:
 // - sorted version of identifier list
-// - sorted version of chunk list
-// - internal state of random generator
+// - result with sorted version of chunk list
 // - alpha
 // the generated fingerprint is deterministic in the set of aforementioned parameters
-func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (hash.Hash, error) {
+func fingerPrint(ids flow.IdentifierList, result *flow.ExecutionResult, alpha int) (hash.Hash, error) {
 	// sorts and encodes ids
 	sort.Sort(ids)
 	encIDs, err := encoding.DefaultEncoder.Encode(ids)
@@ -194,14 +194,11 @@ func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand
 	}
 
 	// sorts and encodes chunks
-	sort.Sort(chunks)
-	encChunks, err := encoding.DefaultEncoder.Encode(chunks)
+	sort.Sort(result.Chunks)
+	encResultBody, err := encoding.DefaultEncoder.Encode(result.ExecutionResultBody)
 	if err != nil {
-		return nil, fmt.Errorf("could not encode chunk list: %w", err)
+		return nil, fmt.Errorf("could not encode result body: %w", err)
 	}
-
-	// encodes random generator
-	encRng := rng.State()
 
 	// encodes alpha parameteer
 	encAlpha, err := encoding.DefaultEncoder.Encode(alpha)
@@ -215,16 +212,10 @@ func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand
 	if err != nil {
 		return nil, fmt.Errorf("could not hash ids: %w", err)
 	}
-	_, err = hasher.Write(encChunks)
+	_, err = hasher.Write(encResultBody)
 	if err != nil {
-		return nil, fmt.Errorf("could not hash chunks: %w", err)
+		return nil, fmt.Errorf("could not hash result body: %w", err)
 	}
-
-	_, err = hasher.Write(encRng)
-	if err != nil {
-		return nil, fmt.Errorf("could not random generator: %w", err)
-	}
-
 	_, err = hasher.Write(encAlpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not hash alpha: %w", err)
