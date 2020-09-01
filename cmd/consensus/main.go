@@ -34,6 +34,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
+	chmodule "github.com/dapperlabs/flow-go/module/chunks"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/ejectors"
@@ -159,6 +160,12 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
+
+			assigner, err := chmodule.NewPublicAssignment(chmodule.DefaultChunkAssignmentAlpha)
+			if err != nil {
+				return nil, fmt.Errorf("could not create public assignment: %w", err)
+			}
+
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -176,6 +183,7 @@ func main() {
 				receipts,
 				approvals,
 				seals,
+				assigner,
 			)
 			requesterEng.WithHandle(match.HandleReceipt)
 			return match, err

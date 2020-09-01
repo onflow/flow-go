@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	chmodule "github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -53,6 +53,7 @@ type Engine struct {
 	approvals               mempool.Approvals        // holds result approvals in memory
 	seals                   mempool.Seals            // holds block seals in memory
 	missing                 map[flow.Identifier]uint // track how often a block was missing
+	assigner                module.ChunkAssigner     //chunk assignment object
 	chunkThreshold          float64                  // proportion of total stake required to validate a chunk
 	checkingSealing         *atomic.Bool             // used to rate limit the checksealing call
 	requestReceiptThreshold uint                     // how many blocks between sealed/finalized before we request execution receipts
@@ -77,6 +78,7 @@ func New(
 	receipts mempool.Receipts,
 	approvals mempool.Approvals,
 	seals mempool.Seals,
+	assigner module.ChunkAssigner,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -101,6 +103,7 @@ func New(
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxUnsealedResults:      200,
+		assigner:                assigner,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
@@ -167,7 +170,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// HandleReceipts pipes explicitely requested receipts to the process function.
+// HandleReceipt pipes explicitely requested receipts to the process function.
 // Receipts can come from this function or the receipt provider setup in the
 // engine constructor.
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
@@ -509,7 +512,12 @@ ResultLoop:
 		// go through all the chunks of this result and check that each of them
 		// have a qualified majority of verifier stake approving
 		for _, chunk := range result.Chunks {
-			matched, err := e.matchChunk(approvals, verifiers, chunk, result)
+			assignment, err := e.assigner.Assign(verifiers, result)
+			if err != nil {
+				return nil, fmt.Errorf("could assign verifiers: %w", err)
+			}
+
+			matched, err := e.matchChunk(approvals, verifiers, chunk, assignment)
 			if err != nil {
 				return nil, fmt.Errorf("could not match chunk: %w", err)
 			}
@@ -530,7 +538,7 @@ ResultLoop:
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
-func (e *Engine) matchChunk(approvals []*flow.ResultApproval, verifiers flow.IdentityList, chunk *flow.Chunk, result *flow.ExecutionResult) (bool, error) {
+func (e *Engine) matchChunk(approvals []*flow.ResultApproval, verifiers flow.IdentityList, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
 	dupCheck := make(map[flow.Identifier]bool)
 
 	// get the node IDs for all approvers of this chunk
@@ -550,44 +558,36 @@ func (e *Engine) matchChunk(approvals []*flow.ResultApproval, verifiers flow.Ide
 		}
 	}
 
-	validApprovers, err := e.checkApprovers(verifiers, approverIDs, result, chunk)
+	validApprovers, err := e.validateApprovers(assignment, approverIDs, chunk)
 	if err != nil {
 		return false, fmt.Errorf("could not check approvers: %w", err)
 	}
 
-	if !validApprovers {
-		// TODO: whats the intended result here?
-		// TODO: Will need to test the checkApprover method for inteded outcome
-		return false, nil
-	}
-
 	// get all of the approver identities and check threshold
-	approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
+	approvers := verifiers.Filter(filter.HasNodeID(validApprovers...))
+
 	stakesMet := e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
 
 	return stakesMet, nil
 }
 
-// checkApprovers checks that the approvers of a specific chunk are the verifiers that were assigned
-func (e *Engine) checkApprovers(verifiers flow.IdentityList, approverIDs flow.IdentifierList, result *flow.ExecutionResult, chunk *flow.Chunk) (bool, error) {
-	assigner, err := chmodule.NewPublicAssignment(chmodule.DefaultChunkAssignmentAlpha)
-	if err != nil {
-		return false, fmt.Errorf("could not create public assignment: %w", err)
-	}
-
-	assignment, err := assigner.Assign(verifiers, result)
-	if err != nil {
-		return false, fmt.Errorf("could assign verifiers: %w", err)
-	}
+// validateApprovers checks that the approvers of a specific chunk are the verifiers that were assigned and returns a valid set of approvers
+func (e *Engine) validateApprovers(assignment *chunks.Assignment, approverIDs flow.IdentifierList, chunk *flow.Chunk) (flow.IdentifierList, error) {
+	var validApprovers flow.IdentifierList
 
 	verifiersMap := assignment.ByChunkIndex(chunk.Index)
-	for _, approverID := range approverIDs {
-		if verifiersMap[approverID] != struct{}{} {
-			return false, nil
+	for index, approverID := range approverIDs {
+		if _, ok := verifiersMap[approverID]; ok {
+			validApprovers = append(validApprovers, approverID)
+		} else {
+			e.log.Debug().
+				Uint64("chunk_index", chunk.Index).
+				Int("approver_index", index).
+				Msg("skipping invalid approver")
 		}
 	}
 
-	return true, nil
+	return validApprovers, nil
 }
 
 // checkStakes checks that the stakes collected by a set of verifiers exceeds

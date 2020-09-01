@@ -15,6 +15,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -93,6 +94,8 @@ type MatchingSuite struct {
 	sealsPL     *mempool.Seals
 
 	requester *module.Requester
+
+	assigner *module.ChunkAssigner
 
 	matching *Engine
 }
@@ -322,6 +325,7 @@ func (ms *MatchingSuite) SetupTest() {
 	)
 
 	ms.requester = new(module.Requester)
+	ms.assigner = &module.ChunkAssigner{}
 
 	ms.matching = &Engine{
 		unit:                    unit,
@@ -341,6 +345,7 @@ func (ms *MatchingSuite) SetupTest() {
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxUnsealedResults:      200,
+		assigner:                ms.assigner,
 	}
 }
 
@@ -623,6 +628,9 @@ func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
+	assginment := chunks.NewAssignment()
+	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
+
 	// happy path requires 0 approvals per chunk, so the result should be
 	// counted even if we havent received any approvals.
 	results, err := ms.matching.matchedResults()
@@ -646,8 +654,15 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	// set the engine's threshold to 2/3 of total verifier stake
 	ms.matching.chunkThreshold = 2.0 / 3.0
 
+	assginment := chunks.NewAssignment()
+
+	var approvers flow.IdentityList
+	approvers = append(approvers, ms.approvers[0])
+	approvers = append(approvers, ms.approvers[1])
+	approvers = append(approvers, ms.approvers[2])
+
 	// add enough approvals for each chunk, except last
-	for n := 0; n < 3; n++ {
+	for n, approver := range approvers {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
 			// skip last chunk for last approval
 			if n == 2 && index == uint64(len(result.Chunks)-1) {
@@ -656,11 +671,17 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 			approval := unittest.ResultApprovalFixture()
 			approval.Body.BlockID = block.Header.ID()
 			approval.Body.ExecutionResultID = result.ID()
-			approval.Body.ApproverID = ms.approvers[n].NodeID
+			approval.Body.ApproverID = approver.NodeID
 			approval.Body.ChunkIndex = index
 			ms.pendingApprovals[approval.ID()] = approval
 		}
 	}
+
+	for _, chunk := range result.Chunks {
+		assginment.Add(chunk, approvers.NodeIDs())
+	}
+
+	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -680,17 +701,30 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	// set the engine's threshold to 2/3 of total verifier stake
 	ms.matching.chunkThreshold = 2.0 / 3.0
 
+	assginment := chunks.NewAssignment()
+
+	var approvers flow.IdentityList
+	approvers = append(approvers, ms.approvers[0])
+	approvers = append(approvers, ms.approvers[1])
+	approvers = append(approvers, ms.approvers[2])
+
 	// add enough approvals for each chunk
-	for n := 0; n < 3; n++ {
+	for _, approver := range approvers {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
 			approval := unittest.ResultApprovalFixture()
 			approval.Body.BlockID = block.Header.ID()
 			approval.Body.ExecutionResultID = result.ID()
-			approval.Body.ApproverID = ms.approvers[n].NodeID
+			approval.Body.ApproverID = approver.NodeID
 			approval.Body.ChunkIndex = index
 			ms.pendingApprovals[approval.ID()] = approval
 		}
 	}
+
+	for _, chunk := range result.Chunks {
+		assginment.Add(chunk, approvers.NodeIDs())
+	}
+
+	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -845,4 +879,41 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 
 	// should request n-1 blocks if n > requestReceiptThreshold
 	ms.Assert().Equal(len(requestedBlocks), n-1)
+}
+
+func (ms *MatchingSuite) TestValidateVerifiers() {
+
+	// add a block with a specific guarantee to the DB
+	block := unittest.BlockFixture()
+	// ms.blocks[block.Header.ID()] = &block
+
+	// add a result for this block to the mempool
+	result := unittest.ResultForBlockFixture(&block)
+	// ms.pendingResults[result.ID()] = result
+
+	// create assignment with 3 verification node assigned to every chunk
+	assignment := chunks.NewAssignment()
+
+	var approvers flow.IdentityList
+	approvers = append(approvers, ms.approvers[0])
+	approvers = append(approvers, ms.approvers[1])
+	approvers = append(approvers, ms.approvers[2])
+
+	ms.Require().Equal(len(approvers), 3)
+
+	// add to assignment
+	for _, chunk := range result.Chunks {
+		assignment.Add(chunk, approvers.NodeIDs())
+	}
+
+	// mock assigner
+	ms.assigner.On("Assign", mock.Anything, result).Return(assignment, nil)
+
+	for _, chunk := range result.Chunks {
+		// give full set of approvers and make sure only 3 of the 4 are returned
+		validatedApprovers, err := ms.matching.validateApprovers(assignment, ms.approvers.NodeIDs(), chunk)
+		ms.Require().NoError(err)
+
+		ms.Require().Equal(len(approvers), validatedApprovers.Len())
+	}
 }
