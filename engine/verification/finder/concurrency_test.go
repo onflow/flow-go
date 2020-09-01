@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -121,10 +120,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	processInterval := 1 * time.Second
 	failureThreshold := uint(2)
 	matchEng, matchEngWG := SetupMockMatchEng(t, exeID, results)
-	assignment := mock.ChunkAssigner{}
+	// assignment := mock.ChunkAssigner{}
 
-	assignment.On("Assign", testifymock.Anything, testifymock.Anything).Return(nil, nil)
-	// assignment := mock.NewMockAssignment(verID.NodeID, IsAssigned)
+	// assignment.On("Assign", testifymock.Anything, testifymock.Anything).Return(nil, nil)
+	assignment := utils.NewMockAssigner(verID.NodeID, IsAssigned)
 
 	// creates a verification node with a real finder engine, and mock matching engine.
 	// no metrics is meant to be collected, hence both verification and mempool collectors are noop

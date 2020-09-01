@@ -38,7 +38,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	modmock "github.com/dapperlabs/flow-go/module/mock"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
@@ -385,7 +384,7 @@ func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
 	identities []*flow.Identity,
-	assigner modmock.ChunkAssigner,
+	assigner module.ChunkAssigner,
 	requestInterval time.Duration,
 	processInterval time.Duration,
 	failureThreshold uint,

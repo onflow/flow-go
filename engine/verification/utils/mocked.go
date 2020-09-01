@@ -7,11 +7,13 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// MockAssigner ...
 type MockAssigner struct {
 	me         flow.Identifier
 	isAssigned func(index uint64) bool
 }
 
+// NewMockAssigner ...
 func NewMockAssigner(id flow.Identifier, f func(index uint64) bool) *MockAssigner {
 	return &MockAssigner{me: id, isAssigned: f}
 }
@@ -29,4 +31,23 @@ func (m *MockAssigner) Assign(ids flow.IdentityList, result *flow.ExecutionResul
 	}
 
 	return a, nil
+}
+
+// GetAssignedChunks ...
+func (m *MockAssigner) GetAssignedChunks(verifierID flow.Identifier, assignment *chmodel.Assignment, result *flow.ExecutionResult) (flow.ChunkList, error) {
+	// indices of chunks assigned to verifier
+	chunkIndices := assignment.ByNodeID(verifierID)
+
+	// chunks keeps the list of chunks assigned to the verifier
+	chunks := make(flow.ChunkList, 0, len(chunkIndices))
+	for _, index := range chunkIndices {
+		chunk, ok := result.Chunks.ByIndex(index)
+		if !ok {
+			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		}
+
+		chunks = append(chunks, chunk)
+	}
+
+	return chunks, nil
 }
