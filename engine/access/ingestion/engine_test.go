@@ -1,6 +1,8 @@
 package ingestion
 
 import (
+	"context"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -12,9 +14,12 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
 
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -62,19 +67,33 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 
+	net := new(module.Network)
+	conduit := new(network.Conduit)
+	net.On("Register", uint8(engine.ReceiveReceipts), mock.Anything).
+		Return(conduit, nil).
+		Once()
 	suite.request = new(module.Requester)
-	suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
 	suite.provider = new(network.Engine)
 	suite.blocks = new(storage.Blocks)
 	suite.headers = new(storage.Headers)
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
-
-	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, flow.Testnet)
-
-	eng, err := New(log, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections, suite.transactions, rpcEng)
+	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
+	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+	require.NoError(suite.T(), err)
+	blocksToMarkExecuted, err := stdmap.NewTimes(100)
+	require.NoError(suite.T(), err)
+
+	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
+		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0)
+
+	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
+		suite.transactions, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
+		blocksToMarkExecuted, rpcEng)
+	require.NoError(suite.T(), err)
+
 	suite.eng = eng
 
 }
@@ -88,7 +107,14 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	}
 
 	// we should query the block once and index the guarantee payload once
-	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
+	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Twice()
+	for _, g := range block.Payload.Guarantees {
+		collection := unittest.CollectionFixture(1)
+		light := collection.Light()
+		suite.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
+	}
+
+	// expect that the block storage is indexed with each of the collection guarantee
 	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
 
 	// for each of the guarantees, we should request the corresponding collection once
@@ -207,4 +233,201 @@ func (suite *Suite) TestOnCollectionDuplicate() {
 	// check that the collection was stored and indexed, and we stored all transactions
 	suite.collections.AssertExpectations(suite.T())
 	suite.transactions.AssertNotCalled(suite.T(), "Store", "should not store any transactions")
+}
+
+// TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
+func (suite *Suite) TestRequestMissingCollections() {
+
+	blkCnt := 3
+	startHeight := uint64(1000)
+	blocks := make([]flow.Block, blkCnt)
+	heightMap := make(map[uint64]*flow.Block, blkCnt)
+
+	// generate the test blocks and collections
+	var collIDs []flow.Identifier
+	for i := 0; i < blkCnt; i++ {
+		block := unittest.BlockFixture()
+		// some blocks may not be present hence add a gap
+		height := startHeight + uint64(i)
+		block.Header.Height = height
+		blocks[i] = block
+		heightMap[height] = &block
+		for _, c := range block.Payload.Guarantees {
+			collIDs = append(collIDs, c.CollectionID)
+		}
+	}
+
+	// setup the block storage mock
+	// each block should be queried by height
+	suite.blocks.On("ByHeight", mock.IsType(uint64(0))).Return(
+		func(h uint64) *flow.Block {
+			// simulate a db lookup
+			return heightMap[h]
+		},
+		func(h uint64) error {
+			if _, ok := heightMap[h]; ok {
+				return nil
+			}
+			return storerr.ErrNotFound
+		})
+	// consider collections are missing for all blocks
+	suite.blocks.On("GetLastFullBlockHeight").Return(startHeight-1, nil)
+	// consider the last test block as the head
+	suite.proto.snapshot.On("Head").Return(blocks[blkCnt-1].Header, nil)
+
+	// p is the probability of not receiving the collection before the next poll and it
+	// helps simulate the slow trickle of the requested collections being received
+	var p float32
+
+	// rcvdColl is the map simulating the collection storage key-values
+	rcvdColl := make(map[flow.Identifier]struct{})
+
+	// for the first lookup call for each collection, it will be reported as missing from db
+	// for the subsequent calls, it will be reported as present with the probability p
+	suite.collections.On("LightByID", mock.Anything).Return(
+		func(cID flow.Identifier) *flow.LightCollection {
+			return nil // the actual collection object return is never really read
+		},
+		func(cID flow.Identifier) error {
+			if _, ok := rcvdColl[cID]; ok {
+				return nil
+			}
+			if rand.Float32() >= p {
+				rcvdColl[cID] = struct{}{}
+			}
+			return storerr.ErrNotFound
+		}).
+		// simulate some db i/o contention
+		After(time.Millisecond * time.Duration(rand.Intn(5)))
+
+	// setup the requester engine mock
+	// entityByID should be called once per collection
+	for _, c := range collIDs {
+		suite.request.On("EntityByID", c, mock.Anything).Return()
+	}
+	// force should be called once
+	suite.request.On("Force").Return()
+
+	assertExpectations := func() {
+		suite.request.AssertExpectations(suite.T())
+		suite.collections.AssertExpectations(suite.T())
+		suite.proto.snapshot.AssertExpectations(suite.T())
+		suite.blocks.AssertExpectations(suite.T())
+	}
+
+	// test 1 - collections are not received before timeout
+	suite.Run("timeout before all missing collections are received", func() {
+
+		// simulate that collection are never received
+		p = 1
+
+		// timeout after 3 db polls
+		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
+		defer cancel()
+
+		err := suite.eng.requestMissingCollections(ctx)
+
+		require.Error(suite.T(), err)
+		require.Contains(suite.T(), err.Error(), "context deadline exceeded")
+
+		assertExpectations()
+	})
+	// test 2 - all collections are eventually received before the deadline
+	suite.Run("all missing collections are received", func() {
+
+		// 90% of the time, collections are reported as not received when the collection storage is queried
+		p = 0.9
+
+		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
+		defer cancel()
+
+		err := suite.eng.requestMissingCollections(ctx)
+
+		require.NoError(suite.T(), err)
+		require.Len(suite.T(), rcvdColl, len(collIDs))
+
+		assertExpectations()
+	})
+}
+
+func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
+	blkCnt := 3
+	startHeight := uint64(1000)
+	blocks := make([]flow.Block, blkCnt)
+	heightMap := make(map[uint64]*flow.Block, blkCnt)
+
+	// generate the test blocks
+	for i := 0; i < blkCnt; i++ {
+		block := unittest.BlockFixture()
+		// some blocks may not be present hence add a gap
+		height := startHeight + uint64(i)
+		block.Header.Height = height
+		blocks[i] = block
+		heightMap[height] = &block
+	}
+
+	rootBlk := blocks[0]
+	finalizedBlk := blocks[blkCnt-1]
+	finalizedHeight := finalizedBlk.Header.Height
+
+	// setup the block storage mock
+	// each block should be queried by height
+	suite.blocks.On("ByHeight", mock.IsType(uint64(0))).Return(
+		func(h uint64) *flow.Block {
+			// simulate a db lookup
+			return heightMap[h]
+		},
+		func(h uint64) error {
+			if _, ok := heightMap[h]; ok {
+				return nil
+			}
+			return storerr.ErrNotFound
+		})
+
+	// consider no collections are missing
+	suite.collections.On("LightByID", mock.Anything).Return(nil, nil)
+
+	var lastFullBlockHeight uint64
+	var rtnErr error
+	suite.blocks.On("GetLastFullBlockHeight").Return(
+		func() uint64 {
+			return lastFullBlockHeight
+		},
+		func() error {
+			return rtnErr
+		})
+
+	// consider the last test block as the head
+	suite.proto.snapshot.On("Head").Return(finalizedBlk.Header, nil)
+
+	suite.Run("full block height index is created and advanced if not present", func() {
+		// simulate the absence of the full block height index
+		lastFullBlockHeight = 0
+		rtnErr = storerr.ErrNotFound
+		suite.proto.state.On("Root").Return(rootBlk.Header, nil)
+		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+
+		suite.blocks.AssertExpectations(suite.T())
+	})
+
+	suite.Run("full block height index is advanced if newer full blocks are discovered", func() {
+		rtnErr = nil
+		block := blocks[1]
+		lastFullBlockHeight = block.Header.Height
+		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+
+		suite.blocks.AssertExpectations(suite.T())
+	})
+
+	suite.Run("full block height index is not advanced beyond finalized blocks", func() {
+		rtnErr = nil
+		lastFullBlockHeight = finalizedHeight
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
+	})
 }

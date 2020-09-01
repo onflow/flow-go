@@ -75,7 +75,7 @@ func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                   
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                  {}
 func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)               {}
-func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)                {}
+func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)            {}
 func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                       {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                         {}
@@ -98,4 +98,8 @@ func (nc *NoopCollector) ExecutionCollectionRequestRetried()                    
 func (nc *NoopCollector) TransactionParsed(dur time.Duration)                       {}
 func (nc *NoopCollector) TransactionChecked(dur time.Duration)                      {}
 func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)                  {}
+func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)  {}
+func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time) {}
+func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)  {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                   {}
+func (ec *NoopCollector) ExecutionSync(syncing bool)                                {}

@@ -1,273 +1,303 @@
-package ingest_test
+package ingest
 
 import (
 	"errors"
+	"io/ioutil"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/network/stub"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/util"
+	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
+	module "github.com/dapperlabs/flow-go/module/mock"
+	network "github.com/dapperlabs/flow-go/network/mock"
+	realprotocol "github.com/dapperlabs/flow-go/state/protocol"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// Malformed, incomplete, unsigned, or otherwise invalid transactions should be
-// detected and should result in an error.
-func TestInvalidTransaction(t *testing.T) {
+type Suite struct {
+	suite.Suite
 
-	chainID := flow.Mainnet
+	N_COLLECTORS int
+	N_CLUSTERS   uint
 
-	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	identity := identities.Filter(filter.HasRole(flow.RoleCollection))[0]
-	hub := stub.NewNetworkHub()
+	con *network.Conduit
+	me  *module.Local
 
-	node := testutil.CollectionNode(t, hub, identity, identities, chainID)
-	defer node.Done()
+	pool *mempool.Transactions
 
-	genesis, err := node.State.Final().Head()
-	require.Nil(t, err)
+	identities flow.IdentityList
+	clusters   flow.ClusterList
+	state      *protocol.State
+	snapshot   *protocol.Snapshot
+	root       *flow.Block
 
-	t.Run("missing field", func(t *testing.T) {
+	// backend for mocks
+	transactions map[flow.Identifier]*flow.TransactionBody
+	blocks       map[flow.Identifier]*flow.Block
+	final        *flow.Block
+
+	engine *Engine
+}
+
+func TestIngest(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (suite *Suite) SetupTest() {
+	var err error
+
+	suite.N_COLLECTORS = 4
+	suite.N_CLUSTERS = 2
+
+	log := zerolog.New(ioutil.Discard)
+	metrics := metrics.NewNoopCollector()
+
+	net := new(module.Network)
+	suite.con = new(network.Conduit)
+	net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil).Once()
+
+	collectors := unittest.IdentityListFixture(suite.N_COLLECTORS, unittest.WithRole(flow.RoleCollection))
+	me := collectors[0]
+	others := unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection))
+	suite.identities = append(collectors, others...)
+
+	suite.me = new(module.Local)
+	suite.me.On("NodeID").Return(me.NodeID)
+
+	suite.pool = new(mempool.Transactions)
+	suite.transactions = make(map[flow.Identifier]*flow.TransactionBody)
+	suite.pool.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			tx := args[0].(*flow.TransactionBody)
+			suite.transactions[tx.ID()] = tx
+		}).Return(true)
+	suite.pool.On("Has", mock.Anything).Return(
+		func(txID flow.Identifier) bool {
+			_, exists := suite.transactions[txID]
+			return exists
+		})
+
+	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
+	suite.clusters, err = flow.NewClusterList(assignments, collectors)
+	suite.Require().Nil(err)
+
+	suite.root = unittest.GenesisFixture(suite.identities)
+	suite.final = suite.root
+	suite.blocks = make(map[flow.Identifier]*flow.Block)
+	suite.blocks[suite.root.ID()] = suite.root
+
+	suite.state = new(protocol.State)
+	suite.snapshot = new(protocol.Snapshot)
+	suite.state.On("Final").Return(suite.snapshot)
+	suite.snapshot.On("Head").Return(
+		func() *flow.Header { return suite.final.Header },
+		func() error { return nil },
+	)
+	suite.snapshot.On("Clusters").Return(suite.clusters, nil)
+	suite.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) realprotocol.Snapshot {
+			snap := new(protocol.Snapshot)
+			block, ok := suite.blocks[blockID]
+			if ok {
+				snap.On("Head").Return(block.Header, nil)
+			} else {
+				snap.On("Head").Return(nil, storage.ErrNotFound)
+			}
+			return snap
+		})
+
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pool, DefaultConfig())
+	suite.Require().Nil(err)
+}
+
+func (suite *Suite) TestInvalidTransaction() {
+
+	suite.Run("missing field", func() {
 		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = genesis.ID()
+		tx.ReferenceBlockID = suite.root.ID()
 		tx.Script = nil
 
-		err := node.IngestionEngine.ProcessLocal(&tx)
-		if assert.Error(t, err) {
-			assert.True(t, errors.As(err, &ingest.IncompleteTransactionError{}))
-		}
+		err := suite.engine.ProcessLocal(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &IncompleteTransactionError{}))
 	})
 
-	t.Run("gas limit exceeds the maximum allowed", func(t *testing.T) {
+	suite.Run("gas limit exceeds the maximum allowed", func() {
 		tx := unittest.TransactionBodyFixture()
 		tx.GasLimit = flow.DefaultMaxGasLimit + 1
 
-		err := node.IngestionEngine.ProcessLocal(&tx)
-		if assert.Error(t, err) {
-			assert.True(t, errors.As(err, &ingest.GasLimitExceededError{}))
-		}
+		err := suite.engine.ProcessLocal(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &GasLimitExceededError{}))
 	})
 
-	t.Run("invalid reference block ID", func(t *testing.T) {
+	suite.Run("invalid reference block ID", func() {
 		tx := unittest.TransactionBodyFixture()
 		tx.ReferenceBlockID = unittest.IdentifierFixture()
 
-		err := node.IngestionEngine.ProcessLocal(&tx)
-		t.Log(err)
-		assert.True(t, errors.As(err, &ingest.ErrUnknownReferenceBlock))
+		err := suite.engine.ProcessLocal(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &ErrUnknownReferenceBlock))
 	})
 
-	t.Run("un-parseable script", func(t *testing.T) {
+	suite.Run("un-parseable script", func() {
 		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = genesis.ID()
+		tx.ReferenceBlockID = suite.root.ID()
 		tx.Script = []byte("definitely a real transaction")
 
-		err := node.IngestionEngine.ProcessLocal(&tx)
-		t.Log(err)
-		assert.True(t, errors.As(err, &ingest.InvalidScriptError{}))
+		err := suite.engine.ProcessLocal(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &InvalidScriptError{}))
 	})
 
-	t.Run("invalid signature", func(t *testing.T) {
+	suite.Run("invalid signature", func() {
 		// TODO cannot check signatures in MVP
-		t.Skip()
+		suite.T().Skip()
 	})
 
-	t.Run("expired reference block ID", func(t *testing.T) {
-		util.RunWithStorageLayer(t, func(_ *badger.DB, _ *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
+	suite.Run("expired reference block ID", func() {
 
-			// build enough blocks to make genesis an expired reference
-			parent := genesis
-			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
-				next := unittest.BlockWithParentFixture(parent)
-				next.Payload.Guarantees = nil
-				next.Header.PayloadHash = next.Payload.Hash()
-				err = node.State.Mutate().Extend(&next)
-				require.Nil(t, err)
-				err = node.State.Mutate().Finalize(next.ID())
-				parent = next.Header
-			}
+		// "finalize" a sufficiently high block that root block is expired
+		final := unittest.BlockFixture()
+		final.Header.Height = suite.root.Header.Height + flow.DefaultTransactionExpiry + 1
+		suite.final = &final
 
-			tx := unittest.TransactionBodyFixture()
-			tx.ReferenceBlockID = genesis.ID()
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.root.ID()
 
-			err := node.IngestionEngine.ProcessLocal(&tx)
-			t.Log(err)
-			assert.True(t, errors.As(err, &ingest.ExpiredTransactionError{}))
-		})
+		err := suite.engine.ProcessLocal(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &ExpiredTransactionError{}))
 	})
 }
 
-// Transactions should be routed to the correct cluster and should not be
-// routed unnecessarily.
-func TestClusterRouting(t *testing.T) {
+// should store transactions for local cluster and propagate to other cluster members
+func (suite *Suite) TestRoutingLocalCluster() {
 
-	const (
-		nNodes    = 3
-		nClusters = 3
-	)
+	local, _, ok := suite.clusters.ByNodeID(suite.me.NodeID())
+	suite.Require().True(ok)
 
-	chainID := flow.Testnet
+	// get a transaction that will be routed to local cluster
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
-	t.Run("should store transaction for local cluster", func(t *testing.T) {
-		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
-		for _, node := range nodes {
-			defer node.Done()
-		}
+	recipient := local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))[0]
 
-		// name the various nodes
-		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
-		genesis, err := localNode.State.Final().Head()
-		require.Nil(t, err)
+	// should route to other node in local cluster
+	suite.con.
+		On("Submit", &tx, recipient.NodeID).
+		Return(nil)
 
-		// get the list of clusters
-		clusters, err := localNode.State.Final().Clusters()
-		require.NoError(t, err)
+	err := suite.engine.ProcessLocal(&tx)
+	suite.Assert().Nil(err)
 
-		// set target cluster to the local cluster
-		localCluster, _, ok := clusters.ByNodeID(localNode.Me.NodeID())
-		require.True(t, ok)
+	// should be added to local mempool
+	stored, ok := suite.transactions[tx.ID()]
+	suite.Assert().True(ok)
+	suite.Assert().Equal(tx.ID(), stored.ID())
+	suite.con.AssertExpectations(suite.T())
+}
 
-		// get a transaction that will be routed to local
-		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = genesis.ID()
-		tx = unittest.AlterTransactionForCluster(tx, clusters, localCluster, func(transaction *flow.TransactionBody) {})
+// should not store transactions for a different cluster and should propagate
+// to the responsible cluster
+func (suite *Suite) TestRoutingRemoteCluster() {
 
-		// submit transaction locally to test storing
-		err = localNode.IngestionEngine.ProcessLocal(&tx)
-		assert.Nil(t, err)
+	// find a remote cluster
+	_, index, ok := suite.clusters.ByNodeID(suite.me.NodeID())
+	suite.Require().True(ok)
+	remote, ok := suite.clusters.ByIndex((index + 1) % suite.N_CLUSTERS)
+	suite.Require().True(ok)
 
-		// flush the network to make sure all messages are sent
-		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.DeliverAll(false)
+	// get a transaction that will be routed to local cluster
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, remote, func(transaction *flow.TransactionBody) {})
 
-		// transaction should be in target cluster's pool, not in other pool
-		assert.EqualValues(t, 1, localNode.Pool.Size())
-		assert.EqualValues(t, 0, remoteNode.Pool.Size())
-		assert.EqualValues(t, 0, noopNode.Pool.Size())
-	})
+	// should route to both nodes in remote cluster
+	suite.con.
+		On("Submit", &tx, mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			lookup := make(map[flow.Identifier]bool)
+			for _, arg := range args[1:] {
+				lookup[arg.(flow.Identifier)] = true
+			}
+			for _, recipientID := range remote.NodeIDs() {
+				suite.Assert().True(lookup[recipientID])
+			}
+			suite.Assert().Equal(len(lookup), len(remote.NodeIDs()))
+		}).
+		Return(nil)
 
-	t.Run("should propagate locally submitted transaction", func(t *testing.T) {
-		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
-		for _, node := range nodes {
-			defer node.Done()
-		}
+	err := suite.engine.ProcessLocal(&tx)
+	suite.Assert().Nil(err)
 
-		// name the various nodes
-		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
+	// should not be added to local mempool
+	_, ok = suite.transactions[tx.ID()]
+	suite.Assert().False(ok)
+	suite.con.AssertExpectations(suite.T())
+}
 
-		genesis, err := localNode.State.Final().Head()
-		require.Nil(t, err)
+// should not propagate transactions received from another node (that node is
+// responsible for propagation)
+func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 
-		// get the list of clusters
-		clusters, err := localNode.State.Final().Clusters()
-		require.NoError(t, err)
+	local, _, ok := suite.clusters.ByNodeID(suite.me.NodeID())
+	suite.Require().True(ok)
 
-		// set target cluster to remote cluster
-		remoteCluster, _, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
-		require.True(t, ok)
+	// another node will send us the transaction
+	sender := local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))[0]
 
-		// get a transaction that will be routed to the target cluster
-		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = genesis.ID()
-		tx = unittest.AlterTransactionForCluster(tx, clusters, remoteCluster, func(*flow.TransactionBody) {})
+	// get a transaction that will be routed to local cluster
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
-		// submit transaction locally to test propagation
-		err = localNode.IngestionEngine.ProcessLocal(&tx)
-		assert.Nil(t, err)
+	// should not route to any node
+	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything)
+	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything, mock.Anything)
 
-		// flush the network to make sure all messages are sent
-		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.DeliverAll(true)
+	err := suite.engine.Process(sender.NodeID, &tx)
+	suite.Assert().Nil(err)
 
-		// transaction should be in target cluster's pool, not in other pool
-		assert.EqualValues(t, 0, localNode.Pool.Size())
-		assert.EqualValues(t, 1, remoteNode.Pool.Size())
-		assert.EqualValues(t, 0, noopNode.Pool.Size())
-	})
+	// should be added to local mempool
+	stored, ok := suite.transactions[tx.ID()]
+	suite.Assert().True(ok)
+	suite.Assert().Equal(tx.ID(), stored.ID())
+	suite.con.AssertExpectations(suite.T())
+}
 
-	t.Run("should not propagate remotely submitted transaction", func(t *testing.T) {
-		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
-		for _, node := range nodes {
-			defer node.Done()
-		}
+// should not route or store invalid transactions
+func (suite *Suite) TestRoutingInvalidTransaction() {
 
-		// name the various nodes
-		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
+	// find a remote cluster
+	_, index, ok := suite.clusters.ByNodeID(suite.me.NodeID())
+	suite.Require().True(ok)
+	remote, ok := suite.clusters.ByIndex((index + 1) % suite.N_CLUSTERS)
+	suite.Require().True(ok)
 
-		genesis, err := localNode.State.Final().Head()
-		require.Nil(t, err)
+	// get transaction for target cluster, but make it invalid
+	tx := unittest.TransactionBodyFixture()
+	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, remote,
+		func(tx *flow.TransactionBody) {
+			tx.GasLimit = 0
+		})
 
-		// get the list of clusters
-		clusters, err := localNode.State.Final().Clusters()
-		require.Nil(t, err)
+	// should not route to any node
+	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything)
+	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything, mock.Anything)
 
-		// set target cluster to remote cluster
-		targetCluster, _, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
-		require.True(t, ok)
+	_ = suite.engine.ProcessLocal(&tx)
 
-		// get a transaction that will be routed to remote cluster
-		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = genesis.ID()
-		tx = unittest.AlterTransactionForCluster(tx, clusters, targetCluster, func(*flow.TransactionBody) {})
-
-		// submit transaction with remote origin to test non-propagation
-		err = localNode.IngestionEngine.Process(remoteNode.Me.NodeID(), &tx)
-		assert.NoError(t, err)
-
-		// flush the network to make sure all messages are sent
-		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.DeliverAll(false)
-
-		// transaction should not be in any pool
-		assert.EqualValues(t, 0, localNode.Pool.Size())
-		assert.EqualValues(t, 0, remoteNode.Pool.Size())
-		assert.EqualValues(t, 0, noopNode.Pool.Size())
-	})
-
-	t.Run("should not process invalid transaction", func(t *testing.T) {
-		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
-		for _, node := range nodes {
-			defer node.Done()
-		}
-
-		// name the various nodes
-		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
-
-		// get the list of clusters
-		clusters, err := localNode.State.Final().Clusters()
-		require.Nil(t, err)
-
-		// set the target cluster to local cluster
-		targetCluster, _, ok := clusters.ByNodeID(localNode.Me.NodeID())
-		require.True(t, ok)
-
-		// get transaction for target cluster, but make it invalid
-		tx := unittest.TransactionBodyFixture()
-		tx = unittest.AlterTransactionForCluster(tx, clusters, targetCluster, func(*flow.TransactionBody) {})
-
-		// submit transaction locally (should not be relevant)
-		err = localNode.IngestionEngine.ProcessLocal(&tx)
-		assert.Error(t, err)
-
-		// flush the network to make sure all messages are sent
-		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.DeliverAll(false)
-
-		// the transaction should not be stored in the ingress, nor routed
-		assert.EqualValues(t, 0, localNode.Pool.Size())
-		assert.EqualValues(t, 0, remoteNode.Pool.Size())
-		assert.EqualValues(t, 0, noopNode.Pool.Size())
-	})
+	// should not be added to local mempool
+	_, ok = suite.transactions[tx.ID()]
+	suite.Assert().False(ok)
+	suite.con.AssertExpectations(suite.T())
 }

@@ -88,6 +88,8 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 // the resulting signature is the concatenation bytes(r)||bytes(s)
 // where r and s are padded to the curve order size
 func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
+	// no need to check the hasher output size as all supported hash algos
+	// have at lease 32 bytes output
 	if alg == nil {
 		return nil, errors.New("Sign requires a Hasher")
 	}
@@ -109,9 +111,12 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 // It only reads the public key. hashers sha2 and sha3 are
 // modified temporarily
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
+	// no need to check the hasher output size as all supported hash algos
+	// have at lease 32 bytes output
 	if alg == nil {
 		return false, errors.New("Verify requires a Hasher")
 	}
+
 	h := alg.ComputeHash(data)
 	return pk.verifyHash(sig, h)
 }

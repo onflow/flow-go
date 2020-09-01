@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // FinalizationConsumer consumes outbound notifications produced by the finalization logic.
@@ -82,7 +83,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcIncorporated(*model.QuorumCertificate)
+	OnQcIncorporated(*flow.QuorumCertificate)
 
 	// OnForkChoiceGenerated notifications are produced by ForkChoice whenever a fork choice is generated.
 	// The arguments specify the view (first argument) of the block which is to be built and the
@@ -90,7 +91,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnForkChoiceGenerated(uint64, *model.QuorumCertificate)
+	OnForkChoiceGenerated(uint64, *flow.QuorumCertificate)
 
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.

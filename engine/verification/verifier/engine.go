@@ -114,12 +114,23 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process receives verifiable chunks, evaluate them and send them for chunk verifier
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
 	switch resource := event.(type) {
 	case *verification.VerifiableChunkData:
-		return e.verifiableChunkHandler(originID, resource)
+		err = e.verifiableChunkHandler(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	if err != nil {
+		// logs the error instead of returning that.
+		// returning error would be projected at a higher level by network layer.
+		// however, this is an engine-level error, and not network layer error.
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // verify handles the core verification process. It accepts a verifiable chunk
@@ -162,7 +173,14 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
-	spockSecret, chFault, err := e.chVerif.Verify(vc)
+
+	var spockSecret []byte
+	var chFault chmodels.ChunkFault
+	if vc.IsSystemChunk {
+		spockSecret, chFault, err = e.chVerif.SystemChunkVerify(vc)
+	} else {
+		spockSecret, chFault, err = e.chVerif.Verify(vc)
+	}
 	span.Finish()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err
@@ -174,6 +192,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
+			e.log.Error().Msg(chFault.String())
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().Msg(chFault.String())
@@ -271,9 +290,21 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	// for sake of metrics
 	e.metrics.OnVerifiableChunkReceived()
 
+	e.log.Info().
+		Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+		Hex("result_id", logging.ID(ch.Result.ID())).
+		Msg("verifiable chunk received")
+
 	// starts verification of chunk
 	err := e.verify(ctx, originID, ch)
 
+	if err != nil {
+		e.log.Debug().
+			Err(err).
+			Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+			Msg("could not verify chunk")
+	}
+
 	// closes verification performance metrics trackers
-	return err
+	return nil
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/dkg"
 )
 
 // CombinedVerifier is a verifier capable of verifying two signatures for each
@@ -19,7 +18,6 @@ import (
 // the reconstructed threshold signature.
 type CombinedVerifier struct {
 	committee hotstuff.Committee
-	dkg       dkg.State
 	staking   module.AggregatingVerifier
 	beacon    module.ThresholdVerifier
 	merger    module.Merger
@@ -31,10 +29,9 @@ type CombinedVerifier struct {
 // - the staking verifier is used to verify single & aggregated staking signatures;
 // - the beacon verifier is used to verify signature shares & threshold signatures;
 // - the merger is used to combined & split staking & random beacon signatures; and
-func NewCombinedVerifier(committee hotstuff.Committee, dkg dkg.State, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger) *CombinedVerifier {
+func NewCombinedVerifier(committee hotstuff.Committee, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger) *CombinedVerifier {
 	c := &CombinedVerifier{
 		committee: committee,
-		dkg:       dkg,
 		staking:   staking,
 		beacon:    beacon,
 		merger:    merger,
@@ -76,7 +73,7 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	beaconShare := splitSigs[1]
 
 	// get the signer dkg key share
-	beaconPubKey, err := c.dkg.ParticipantKey(voterID)
+	beaconPubKey, err := c.committee.DKGKeyShare(block.BlockID, voterID)
 	if err != nil {
 		return false, fmt.Errorf("could not get random beacon key share for %x: %w", voterID, err)
 	}
@@ -108,7 +105,7 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 
 	// get the DKG group key from the DKG state
-	dkgKey, err := c.dkg.GroupKey()
+	dkgKey, err := c.committee.DKGGroupKey(block.BlockID)
 	if err != nil {
 		return false, fmt.Errorf("could not get dkg group key: %w", err)
 	}

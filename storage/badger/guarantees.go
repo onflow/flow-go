@@ -17,12 +17,14 @@ type Guarantees struct {
 
 func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 
-	store := func(collID flow.Identifier, v interface{}) func(*badger.Txn) error {
-		guarantee := v.(*flow.CollectionGuarantee)
+	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+		collID := key.(flow.Identifier)
+		guarantee := val.(*flow.CollectionGuarantee)
 		return operation.SkipDuplicates(operation.InsertGuarantee(collID, guarantee))
 	}
 
-	retrieve := func(collID flow.Identifier) func(*badger.Txn) (interface{}, error) {
+	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
+		collID := key.(flow.Identifier)
 		var guarantee flow.CollectionGuarantee
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := operation.RetrieveGuarantee(collID, &guarantee)(tx)
@@ -48,11 +50,11 @@ func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*badger.T
 
 func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow.CollectionGuarantee, error) {
 	return func(tx *badger.Txn) (*flow.CollectionGuarantee, error) {
-		v, err := g.cache.Get(collID)(tx)
+		val, err := g.cache.Get(collID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return v.(*flow.CollectionGuarantee), nil
+		return val.(*flow.CollectionGuarantee), nil
 	}
 }
 

@@ -470,7 +470,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
                 ?? panic("Unable to borrow reference to administrator resource")
         }
         execute {
-            // Add account to account creator whitelist.
+            // Add account to account creator allow list.
             //
             // Will emit AccountCreatorAdded(accountCreator: accountCreator).
             //
@@ -513,7 +513,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
                 ?? panic("Unable to borrow reference to administrator resource")
         }
         execute {
-            // Remove account from account creator whitelist.
+            // Remove account from account creator allow list.
             //
             // Will emit AccountCreatorRemoved(accountCreator: accountCreator).
             //
@@ -1263,9 +1263,9 @@ func TestWithServiceAccount(t *testing.T) {
 	ctxA := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithASTCache(cache),
-		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
+		fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvocator(),
-		}),
+		),
 	)
 
 	ledger := state.NewMapLedger()

@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // NoopConsumer is an implementation of the notifications consumer that
@@ -27,9 +28,9 @@ func (*NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
 
 func (*NoopConsumer) OnReachedTimeout(*model.TimerInfo) {}
 
-func (*NoopConsumer) OnQcIncorporated(*model.QuorumCertificate) {}
+func (*NoopConsumer) OnQcIncorporated(*flow.QuorumCertificate) {}
 
-func (*NoopConsumer) OnForkChoiceGenerated(uint64, *model.QuorumCertificate) {}
+func (*NoopConsumer) OnForkChoiceGenerated(uint64, *flow.QuorumCertificate) {}
 
 func (*NoopConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 

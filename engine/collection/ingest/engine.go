@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/parser"
+	"github.com/onflow/cadence/runtime/parser2"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -245,7 +245,7 @@ func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
 
 	if e.config.CheckScriptsParse {
 		// ensure the script is at least parse-able
-		_, _, err = parser.ParseProgram(string(tx.Script))
+		_, err = parser2.ParseProgram(string(tx.Script))
 		if err != nil {
 			return InvalidScriptError{ParserErr: err}
 		}
@@ -286,6 +286,7 @@ func (e *Engine) checkTransactionExpiry(tx *flow.TransactionBody) error {
 	if ref.Height > final.Height {
 		diff = 0
 	}
+
 	// discard transactions that are expired, or that will expire sooner than
 	// our configured buffer allows
 	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {

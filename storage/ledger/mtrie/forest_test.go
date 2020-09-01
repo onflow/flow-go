@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
-// TestTrieOperations tests adding removing and retrieving Trie from Forrest
+// TestTrieOperations tests adding removing and retrieving Trie from the forest
 func TestTrieOperations(t *testing.T) {
 	keyByteSize := 2 // key size of 16 bits
 

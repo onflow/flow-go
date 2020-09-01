@@ -9,10 +9,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/fingerprint"
 )
 
-// List of built-in account event types.
+// List of built-in event types.
 const (
 	EventAccountCreated EventType = "flow.AccountCreated"
 	EventAccountUpdated EventType = "flow.AccountUpdated"
+	EventEpochSetup     EventType = "flow.EpochSetup"
+	EventEpochCommit    EventType = "flow.EpochCommit"
 )
 
 type EventType string
@@ -68,4 +70,11 @@ func wrapEvent(e Event) eventWrapper {
 		TxID:  e.TransactionID[:],
 		Index: e.EventIndex,
 	}
+}
+
+// BlockEvents contains events emitted in a single block.
+type BlockEvents struct {
+	BlockID     Identifier
+	BlockHeight uint64
+	Events      []Event
 }

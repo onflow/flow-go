@@ -29,15 +29,13 @@ func (u *TrieUpdate) IsEmpty() bool {
 	return u.Size() == 0
 }
 
-// TODO clean me
 func (u *TrieUpdate) String() string {
 	str := "Trie Update:\n "
 	str += "\t triehash : " + u.RootHash.String() + "\n"
 	tp := 0
 	for i, p := range u.Paths {
 		tp += p.Size()
-		// Temporary
-		str += fmt.Sprintf("\t path %d : %s\n", i, p)
+		str += fmt.Sprintf("\t\t path %d : %s\n", i, p)
 	}
 	str += fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), tp)
 	tp = 0
@@ -212,9 +210,9 @@ func (p *TrieProof) String() string {
 	proofStr += fmt.Sprintf("\t path: %v payload: %v\n", p.Path, p.Payload)
 
 	if p.Inclusion {
-		proofStr += fmt.Sprint("\t inclusion proof:\n")
+		proofStr += "\t inclusion proof:\n"
 	} else {
-		proofStr += fmt.Sprint("\t noninclusion proof:\n")
+		proofStr += "\t noninclusion proof:\n"
 	}
 	interimIndex := 0
 	for j := 0; j < int(p.Steps); j++ {

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
@@ -37,23 +39,27 @@ import (
 func main() {
 
 	var (
-		ledgerStorage       *ledger.MTrieStorage
-		events              *storage.Events
-		txResults           *storage.TransactionResults
-		results             *storage.ExecutionResults
-		receipts            *storage.ExecutionReceipts
-		providerEngine      *exeprovider.Engine
-		syncCore            *chainsync.Core
-		computationManager  *computation.Manager
-		collectionRequester *requester.Engine
-		ingestionEng        *ingestion.Engine
-		rpcConf             rpc.Config
-		err                 error
-		executionState      state.ExecutionState
-		triedir             string
-		collector           module.ExecutionMetrics
-		mTrieCacheSize      uint32
-		checkpointDistance  uint
+		ledgerStorage         *ledger.MTrieStorage
+		events                *storage.Events
+		txResults             *storage.TransactionResults
+		results               *storage.ExecutionResults
+		receipts              *storage.ExecutionReceipts
+		providerEngine        *exeprovider.Engine
+		syncCore              *chainsync.Core
+		syncEngine            *synchronization.Engine
+		computationManager    *computation.Manager
+		collectionRequester   *requester.Engine
+		ingestionEng          *ingestion.Engine
+		rpcConf               rpc.Config
+		err                   error
+		executionState        state.ExecutionState
+		triedir               string
+		collector             module.ExecutionMetrics
+		mTrieCacheSize        uint32
+		checkpointDistance    uint
+		requestInterval       time.Duration
+		preferredExeNodeIDStr string
+		syncByBlocks          bool
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -65,6 +71,9 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
+			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
+			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
+			flags.BoolVar(&syncByBlocks, "sync-by-blocks", false, "sync by blocks instead of execution state deltas")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -76,7 +85,7 @@ func main() {
 				fvm.WithBlocks(node.Storage.Blocks),
 			)
 
-			computationManager = computation.New(
+			manager, err := computation.New(
 				node.Logger,
 				collector,
 				node.Tracer,
@@ -85,8 +94,9 @@ func main() {
 				vm,
 				vmCtx,
 			)
+			computationManager = manager
 
-			return nil
+			return err
 		}).
 		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
@@ -186,8 +196,18 @@ func main() {
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
-				requester.WithBatchInterval(24*time.Hour), // we are manually triggering batches in execution
+				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
+				requester.WithBatchInterval(requestInterval),
 			)
+
+			preferredExeFilter := filter.Any
+			preferredExeNodeID, err := flow.HexStringToIdentifier(preferredExeNodeIDStr)
+			if err == nil {
+				node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
+				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
+			} else if err != nil && preferredExeNodeIDStr != "" {
+				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
+			}
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.DB)
@@ -208,6 +228,8 @@ func main() {
 				syncCore,
 				executionState,
 				6, // TODO - config param maybe?
+				preferredExeFilter,
+				syncByBlocks,
 				collector,
 				node.Tracer,
 				true,
@@ -242,26 +264,28 @@ func main() {
 			return eng, err
 		}).
 		// TODO: currently issues with this engine on the EXE node, as there is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
-		// Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		// 	// initialize the synchronization engine
-		// 	syncEngine, err = synchronization.New(
-		// 		node.Logger,
-		// 		node.Metrics.Engine,
-		// 		node.Network,
-		// 		node.Me,
-		// 		node.State,
-		// 		node.Storage.Blocks,
-		// 		ingestionEng,
-		// 		syncCore,
-		// 	)
-		// 	if err != nil {
-		// 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
-		// 	}
+		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// initialize the synchronization engine
+			syncEngine, err = synchronization.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				ingestionEng,
+				syncCore,
+				// Right now, only used to sync, so never poll
+				synchronization.WithPollInterval(time.Duration(0)),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
 
-		// 	return syncEngine, nil
-		// }).
+			return syncEngine, nil
+		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults, node.RootChainID)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
 }

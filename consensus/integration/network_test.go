@@ -99,6 +99,20 @@ func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error 
 	return nil
 }
 
+func (c *Conduit) Publish(event interface{}, selector flow.IdentityFilter) error {
+	// Todo: implement publish method
+	return fmt.Errorf("publish has not been implemented")
+}
+
+func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
+	return c.Submit(event, targetID)
+}
+
+func (c *Conduit) Multicast(event interface{}, num uint, selector flow.IdentityFilter) error {
+	// Todo: implement multicast method
+	return fmt.Errorf("multicast has not been implemented")
+}
+
 type message struct {
 	originID flow.Identifier
 	event    interface{}

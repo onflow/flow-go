@@ -8,8 +8,13 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
-// Ledger takes care of storing and reading registers (key, value pairs)
+// Ledger is a stateful fork-aware key/value storage.
+// Any update (value change for a key) to the ledger generates a new ledger state.
+// Updates can be applied to any recent states. These changes don't have to be sequential and ledger supports a tree of states.
+// Ledger provides value lookup by key at a particular state (historic lookups) and can prove the existence/non-existence of a key-value pair at the given state.
+// Ledger assumes the initial state includes all keys with an empty bytes slice as value.
 type Ledger interface {
+	// ledger implements methods needed to be ReadyDone aware
 	module.ReadyDoneAware
 
 	// InitState returns the initial state of the ledger

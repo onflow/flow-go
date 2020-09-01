@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -89,14 +90,14 @@ func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
 		Msg("timeout reached")
 }
 
-func (lc *LogConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
+func (lc *LogConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).
 		Hex("qc_id", qc.BlockID[:]).
 		Msg("QC incorporated")
 }
 
-func (lc *LogConsumer) OnForkChoiceGenerated(view uint64, qc *model.QuorumCertificate) {
+func (lc *LogConsumer) OnForkChoiceGenerated(view uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("fork_view", view).
 		Uint64("qc_view", qc.View).

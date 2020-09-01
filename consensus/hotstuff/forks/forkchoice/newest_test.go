@@ -27,8 +27,8 @@ type Blocks struct {
 }
 
 type QCs struct {
-	qcMap  map[uint64]*model.QuorumCertificate
-	qcList []*model.QuorumCertificate
+	qcMap  map[uint64]*flow.QuorumCertificate
+	qcList []*flow.QuorumCertificate
 }
 
 // NOTATION:
@@ -258,16 +258,16 @@ func TestOnQcIncorporated(t *testing.T) {
 	notifier.AssertExpectations(t)
 }
 
-func generateBlocks(rootQC *model.QuorumCertificate, viewPairs ...ViewPair) *Blocks {
+func generateBlocks(rootQC *flow.QuorumCertificate, viewPairs ...ViewPair) *Blocks {
 	blocks := &Blocks{
 		blockMap: make(map[uint64]*model.Block),
 	}
 	qcs := &QCs{
-		qcMap: make(map[uint64]*model.QuorumCertificate),
+		qcMap: make(map[uint64]*flow.QuorumCertificate),
 	}
 	var lastBlockView uint64
 	for _, viewPair := range viewPairs {
-		var qc *model.QuorumCertificate
+		var qc *flow.QuorumCertificate
 		if viewPair.qcView == 1 {
 			qc = rootQC
 		} else {
@@ -311,8 +311,8 @@ func initNewestForkChoice(t *testing.T, view uint64) (hs.Forks, *mocks.Consumer,
 	return f, notifier, root
 }
 
-func makeQC(view uint64, blockID flow.Identifier) *model.QuorumCertificate {
-	return &model.QuorumCertificate{
+func makeQC(view uint64, blockID flow.Identifier) *flow.QuorumCertificate {
+	return &flow.QuorumCertificate{
 		View:    view,
 		BlockID: blockID,
 	}
@@ -323,7 +323,7 @@ func (b *Blocks) AddBlock(block *model.Block) {
 	b.blockList = append(b.blockList, block)
 }
 
-func (q *QCs) AddQC(qc *model.QuorumCertificate) {
+func (q *QCs) AddQC(qc *flow.QuorumCertificate) {
 	q.qcMap[qc.View] = qc
 	q.qcList = append(q.qcList, qc)
 }

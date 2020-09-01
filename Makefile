@@ -100,7 +100,6 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="state/protocol" -case=underscore -output="state/protocol/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir="state/dkg" -case=underscore -output="state/dkg/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/sync -case=underscore -output="./engine/execution/sync/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
@@ -109,6 +108,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ConnectionFactory' -dir="./engine/access/rpc/backend" -case=underscore -output="./engine/access/rpc/backend/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 
@@ -119,7 +119,6 @@ tidy:
 	cd integration; go mod tidy
 	cd crypto; go mod tidy
 	cd cmd/testclient; go mod tidy
-	cd protobuf; go mod tidy
 	git diff --exit-code
 
 .PHONY: lint
@@ -280,6 +279,11 @@ docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap/transit --target production-nocgo \
 		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
 
+.PHONY: docker-build-loader
+docker-build-loader:
+	docker build -f ./integration/loader/Dockerfile --ssh default --build-arg TARGET=loader --target production \
+		-t gcr.io/dl-flow/benchmark/loader:latest -t "gcr.io/dl-flow/benchmark/loader:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/benchmark/loader:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
 
@@ -318,6 +322,12 @@ docker-push-ghost:
 	docker push gcr.io/dl-flow/ghost:latest
 	docker push "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/ghost:$(IMAGE_TAG)"
+
+.PHONY: docker-push-loader
+docker-push-loader:
+	docker push gcr.io/dl-flow/benchmark/loader:latest
+	docker push "gcr.io/dl-flow/benchmark/loader:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/benchmark/loader:$(IMAGE_TAG)"
 
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access

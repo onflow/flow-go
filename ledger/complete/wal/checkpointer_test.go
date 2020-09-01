@@ -6,6 +6,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -53,6 +54,7 @@ var (
 	valueMaxByteSize   = 2 << 16 //16kB
 	size               = 10
 	metricsCollector   = &metrics.NoopCollector{}
+	logger             = zerolog.Logger{}
 	segmentSize        = 32 * 1024
 	pathByteSize       = 32
 	pathFinderVersion  = uint8(0)
@@ -62,7 +64,7 @@ func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		led, err := complete.NewLedger(dir, size*10, metricsCollector, nil)
+		led, err := complete.NewLedger(dir, size*10, metricsCollector, logger, nil)
 		require.NoError(t, err)
 
 		var state = led.InitState()
@@ -93,7 +95,7 @@ func Test_WAL(t *testing.T) {
 
 		<-led.Done()
 
-		led2, err := complete.NewLedger(dir, (size*10)+10, metricsCollector, nil)
+		led2, err := complete.NewLedger(dir, (size*10)+10, metricsCollector, logger, nil)
 		require.NoError(t, err)
 
 		// random map iteration order is a benefit here

@@ -83,8 +83,7 @@ func (suite *Suite) SetupTest() {
 	suite.cluster.snapshot.On("Head").Return(&flow.Header{}, nil)
 
 	// create a fake cluster
-	clusters := flow.NewClusterList(1)
-	clusters.Add(0, me)
+	clusters := flow.ClusterList{flow.IdentityList{me}}
 	suite.proto.snapshot.On("Clusters").Return(clusters, nil)
 
 	suite.me = new(module.Local)

@@ -33,7 +33,7 @@ func TestAggregator(t *testing.T) {
 type AggregatorSuite struct {
 	suite.Suite
 	participants flow.IdentityList
-	qcs          map[flow.Identifier]*model.QuorumCertificate
+	qcs          map[flow.Identifier]*flow.QuorumCertificate
 	protocol     *protomock.State
 	snapshot     *protomock.Snapshot
 	signer       *mocks.Signer
@@ -49,7 +49,7 @@ func (as *AggregatorSuite) SetupTest() {
 
 	// generate the validator set with qualified majority threshold of 5
 	as.participants = unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))
-	as.qcs = make(map[flow.Identifier]*model.QuorumCertificate)
+	as.qcs = make(map[flow.Identifier]*flow.QuorumCertificate)
 
 	// create a mocked snapshot
 	as.snapshot = &protomock.Snapshot{}
@@ -81,7 +81,7 @@ func (as *AggregatorSuite) SetupTest() {
 	combined, err := c.Join(sig1, sig2)
 	require.NoError(as.T(), err)
 
-	rootQC := &model.QuorumCertificate{
+	rootQC := &flow.QuorumCertificate{
 		View:      rootHeader.View,
 		BlockID:   rootHeader.ID(),
 		SignerIDs: nil,
@@ -102,7 +102,7 @@ func (as *AggregatorSuite) SetupTest() {
 	as.signer.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("CreateQC", mock.AnythingOfType("[]*model.Vote")).Return(
-		func(votes []*model.Vote) *model.QuorumCertificate {
+		func(votes []*model.Vote) *flow.QuorumCertificate {
 			qc, _ := as.qcs[votes[0].BlockID]
 			return qc
 		},
@@ -137,7 +137,7 @@ func (as *AggregatorSuite) RegisterProposal(proposal *model.Proposal) {
 func (as *AggregatorSuite) RegisterVote(vote *model.Vote) {
 	qc, ok := as.qcs[vote.BlockID]
 	if !ok {
-		qc = &model.QuorumCertificate{
+		qc = &flow.QuorumCertificate{
 			View:    vote.View,
 			BlockID: vote.BlockID,
 			SigData: []byte{},
@@ -204,7 +204,7 @@ func (as *AggregatorSuite) TestReceiveVoteAfterQCBuilt() {
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
 	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	var qc *model.QuorumCertificate
+	var qc *flow.QuorumCertificate
 	for i := 0; i < 4; i++ {
 		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
 		qc, _, _ = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)

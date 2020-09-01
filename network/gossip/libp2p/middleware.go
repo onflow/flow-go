@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/libp2p/go-libp2p-core/helpers"
@@ -34,7 +35,13 @@ const (
 	OneToK
 )
 
-const DefaultMaxPubSubMsgSize = 1 << 21 //2mb
+const (
+	// defines maximum message size in publish and multicast modes
+	DefaultMaxPubSubMsgSize = 1 << 21 // 2 mb
+
+	// defines maximum message size in unicast mode
+	DefaultMaxUnicastMsgSize = 5 * DefaultMaxPubSubMsgSize // 10 mb
+)
 
 // the inbound message queue size for One to One and One to K messages (each)
 const InboundMessageQueueSize = 100
@@ -43,28 +50,29 @@ const InboundMessageQueueSize = 100
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx              context.Context
-	cancel           context.CancelFunc
-	log              zerolog.Logger
-	codec            network.Codec
-	ov               middleware.Overlay
-	wg               *sync.WaitGroup
-	libP2PNode       *P2PNode
-	stop             chan struct{}
-	me               flow.Identifier
-	host             string
-	port             string
-	key              crypto.PrivateKey
-	metrics          module.NetworkMetrics
-	maxPubSubMsgSize int
-	rootBlockID      string
-	validators       []validators.MessageValidator
+	ctx               context.Context
+	cancel            context.CancelFunc
+	log               zerolog.Logger
+	codec             network.Codec
+	ov                middleware.Overlay
+	wg                *sync.WaitGroup
+	libP2PNode        *P2PNode
+	stop              chan struct{}
+	me                flow.Identifier
+	host              string
+	port              string
+	key               crypto.PrivateKey
+	metrics           module.NetworkMetrics
+	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
+	maxUnicastMsgSize int // used to define maximum message size in unicast mode
+	rootBlockID       string
+	validators        []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, metrics module.NetworkMetrics, maxPubSubMsgSize int,
+	key crypto.PrivateKey, metrics module.NetworkMetrics, maxUnicastMsgSize int, maxPubSubMsgSize int,
 	rootBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
@@ -83,23 +91,28 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		maxPubSubMsgSize = DefaultMaxPubSubMsgSize
 	}
 
+	if maxUnicastMsgSize <= 0 {
+		maxUnicastMsgSize = DefaultMaxUnicastMsgSize
+	}
+
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
-		ctx:              ctx,
-		cancel:           cancel,
-		log:              log,
-		codec:            codec,
-		libP2PNode:       p2p,
-		wg:               &sync.WaitGroup{},
-		stop:             make(chan struct{}),
-		me:               flowID,
-		host:             ip,
-		port:             port,
-		key:              key,
-		metrics:          metrics,
-		maxPubSubMsgSize: maxPubSubMsgSize,
-		rootBlockID:      rootBlockID,
-		validators:       validators,
+		ctx:               ctx,
+		cancel:            cancel,
+		log:               log,
+		codec:             codec,
+		libP2PNode:        p2p,
+		wg:                &sync.WaitGroup{},
+		stop:              make(chan struct{}),
+		me:                flowID,
+		host:              ip,
+		port:              port,
+		key:               key,
+		metrics:           metrics,
+		maxPubSubMsgSize:  maxPubSubMsgSize,
+		maxUnicastMsgSize: maxUnicastMsgSize,
+		rootBlockID:       rootBlockID,
+		validators:        validators,
 	}
 
 	return m, err
@@ -118,7 +131,7 @@ func (m *Middleware) Me() flow.Identifier {
 }
 
 // GetIPPort returns the ip address and port number associated with the middleware
-func (m *Middleware) GetIPPort() (string, string) {
+func (m *Middleware) GetIPPort() (string, string, error) {
 	return m.libP2PNode.GetIPPort()
 }
 
@@ -130,6 +143,18 @@ func (m *Middleware) PublicKey() crypto.PublicKey {
 func (m *Middleware) Start(ov middleware.Overlay) error {
 
 	m.ov = ov
+
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// derive all node addresses from flow identities. Those node address will serve as the network whitelist
+	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
+	if err != nil {
+		return fmt.Errorf("could not derive list of approved peer list: %w", err)
+	}
 
 	// create a discovery object to help libp2p discover peers
 	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
@@ -154,13 +179,23 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// start the libp2p node
-	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, m.rootBlockID, psOptions...)
+	err = m.libP2PNode.Start(m.ctx,
+		nodeAddress,
+		m.log, libp2pKey,
+		m.handleIncomingStream,
+		m.rootBlockID,
+		true,
+		nodeAddrsWhiteList,
+		psOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
 
 	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
-	m.host, m.port = m.libP2PNode.GetIPPort()
+	m.host, m.port, err = m.libP2PNode.GetIPPort()
+	if err != nil {
+		return fmt.Errorf("failed to find IP and port of the libp2p node: %w", err)
+	}
 
 	return nil
 }
@@ -186,8 +221,12 @@ func (m *Middleware) Stop() {
 }
 
 // Send sends the message to the set of target ids
-// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
-// Otherwise, middleware.publish is used, which uses the PubSub method of communication.
+// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.SendDirect
+// Otherwise, middleware.Publish is used, which uses the PubSub method of communication.
+//
+// Deprecated: Send exists for historical compatibility, and should not be used on new
+// developments. It is planned to be cleaned up in near future. Proper utilization of Dispatch or
+// Publish are recommended instead.
 func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error {
 	var err error
 	mode := m.chooseMode(channelID, msg, targetIDs...)
@@ -205,9 +244,9 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 			m.log.Debug().Msg("send to self")
 			return nil
 		}
-		err = m.sendDirect(targetIDs[0], msg)
+		err = m.SendDirect(msg, targetIDs[0])
 	case OneToK:
-		err = m.publish(channelID, msg)
+		err = m.Publish(msg, channelID)
 	default:
 		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
@@ -230,26 +269,32 @@ func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.I
 	}
 }
 
-// sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
-func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) error {
-
-	// get an identity to connect to. The identity provides the destination TCP address.
-	idsMap, err := m.ov.Identity()
+// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
+// as the router.
+//
+// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
+// a more efficient candidate.
+func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
+	targetAddress, err := m.nodeAddressFromID(targetID)
 	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
+		return err
 	}
-	flowIdentity, found := idsMap[targetID]
-	if !found {
-		return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
+
+	if msg.Size() > m.maxUnicastMsgSize {
+		// message size goes beyond maximum size that the serializer can handle.
+		// proceeding with this message results in closing the connection by the target side, and
+		// delivery failure.
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), m.maxUnicastMsgSize)
 	}
 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the the receiver
-	stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
+	stream, err := m.libP2PNode.CreateStream(m.ctx, targetAddress)
 	if err != nil {
-		return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to create stream for %s :%w", targetAddress.Name, err)
 	}
 
 	// create a gogo protobuf writer
@@ -285,31 +330,56 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 	return nil
 }
 
-// connect creates a new stream
-func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey) (libp2pnetwork.Stream, error) {
+// nodeAddressFromID returns the libp2p.NodeAddress for the given flow.id.
+func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) {
 
-	ip, port, err := net.SplitHostPort(address)
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
 	if err != nil {
-		return nil, fmt.Errorf("could not parse address %s: %w", address, err)
+		return NodeAddress{}, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// retrieve the flow.Identity for the give flow.ID
+	flowIdentity, found := idsMap[id]
+	if !found {
+		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
+	}
+
+	return nodeAddressFromIdentity(flowIdentity)
+}
+
+// nodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
+func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
+
+	// split the node address into ip and port
+	ip, port, err := net.SplitHostPort(flowIdentity.Address)
+	if err != nil {
+		return NodeAddress{}, fmt.Errorf("could not parse address %s: %w", flowIdentity.Address, err)
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := PublicKey(key)
+	lkey, err := PublicKey(flowIdentity.NetworkPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
+		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
 
-	// Create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port, PubKey: lkey}
+	// create a new NodeAddress
+	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
 
-	// Create a stream for it
-	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stream for %s :%w", nodeAddress.Name, err)
+	return nodeAddress, nil
+}
+
+func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {
+	var nodeAddrs []NodeAddress
+	for _, identity := range identityMap {
+		nodeAddress, err := nodeAddressFromIdentity(identity)
+		if err != nil {
+			return nil, err
+		}
+
+		nodeAddrs = append(nodeAddrs, nodeAddress)
 	}
-
-	m.log.Info().Str("target_id", flowID).Str("address", address).Msg("stream created")
-	return stream, nil
+	return nodeAddrs, nil
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -320,12 +390,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	defer m.wg.Done()
 
 	log := m.log.With().
-		Str("local_addr", s.Conn().LocalPeer().String()).
-		Str("remote_addr", s.Conn().RemotePeer().String()).
+		Str("local_addr", s.Conn().LocalMultiaddr().String()).
+		Str("remote_addr", s.Conn().RemoteMultiaddr().String()).
 		Logger()
 
 	// initialize the encoder/decoder and create the connection handler
-	conn := NewReadConnection(log, s)
+	conn := NewReadConnection(log, s, m.maxUnicastMsgSize)
 
 	// make sure we close the connection when we are done handling the peer
 	defer conn.stop()
@@ -422,8 +492,10 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	}
 }
 
-// Publish publishes the given payload on the topic
-func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
+// Publish publishes msg on the channel. It models a distributed broadcast where the message is meant for all or
+// a many nodes subscribing to the channel ID. It does not guarantee the delivery though, and operates on a best
+// effort.
+func (m *Middleware) Publish(msg *message.Message, channelID uint8) error {
 
 	// convert the message to bytes to be put on the wire.
 	data, err := msg.Marshal()
@@ -457,4 +529,37 @@ func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
 
 func (m *Middleware) reportInboundMsgSize(size int, channel string) {
 	m.metrics.NetworkMessageReceived(size, channel)
+}
+
+// Ping pings the target node and returns the ping RTT or an error
+func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
+	nodeAddress, err := m.nodeAddressFromID(targetID)
+	if err != nil {
+		return -1, err
+	}
+
+	return m.libP2PNode.Ping(m.ctx, nodeAddress)
+}
+
+// UpdateAllowList fetches the most recent identity of the nodes from overlay
+// and updates the underlying libp2p node.
+func (m *Middleware) UpdateAllowList() error {
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// derive all node addresses from flow identities
+	nodeAddrsAllowList, err := nodeAddresses(idsMap)
+	if err != nil {
+		return fmt.Errorf("could not derive list of approved peer list: %w", err)
+	}
+
+	err = m.libP2PNode.UpdateAllowlist(nodeAddrsAllowList...)
+	if err != nil {
+		return fmt.Errorf("failed to update approved peer list: %w", err)
+	}
+
+	return nil
 }

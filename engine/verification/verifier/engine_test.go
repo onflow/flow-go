@@ -3,6 +3,7 @@ package verifier_test
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -102,7 +103,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1, suite.chain)
+	completeRA := utils.LightExecutionResultFixture(1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
@@ -202,6 +203,10 @@ type ChunkVerifierMock struct {
 }
 
 func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
+	if vc.IsSystemChunk {
+		return nil, nil, fmt.Errorf("wrong method invoked for verifying system chunk")
+	}
+
 	switch vc.Chunk.Index {
 	case 0:
 		return []byte{}, nil, nil
@@ -232,4 +237,11 @@ func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte,
 		return nil, nil, nil
 	}
 
+}
+
+func (v ChunkVerifierMock) SystemChunkVerify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
+	if !vc.IsSystemChunk {
+		return nil, nil, fmt.Errorf("wrong method invoked for verifying non-system chunk")
+	}
+	return nil, nil, nil
 }

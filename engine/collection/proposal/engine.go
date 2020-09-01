@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
@@ -51,9 +50,9 @@ type EpochLifecycle struct {
 	notifer hotstuff.Consumer    // needs to be different across epochs (diff. cluster ID)
 	persist *persister.Persister // needs to be different across epochs (at least reset)
 
-	clusterRootHeader *flow.Header             // will be in the service events
-	clusterRootQC     *model.QuorumCertificate // will be in the service events
-	seed              []byte                   // either QC for first block of epoch, or seed from service event
+	clusterRootHeader *flow.Header            // will be in the service events
+	clusterRootQC     *flow.QuorumCertificate // will be in the service events
+	seed              []byte                  // either QC for first block of epoch, or seed from service event
 }
 
 // Engine is the collection proposal engine, which packages pending
@@ -73,7 +72,7 @@ type Engine struct {
 	headers        storage.Headers
 	payloads       storage.ClusterPayloads
 	pending        module.PendingClusterBlockBuffer // pending block cache
-	participants   flow.IdentityList                // consensus participants in our cluster
+	cluster        flow.IdentityList                // consensus participants in our cluster
 
 	sync     module.BlockRequester
 	hotstuff module.HotStuff
@@ -111,10 +110,14 @@ func New(
 	hot module.HotStuff,
 ) (*Engine, error) {
 
-	// determine the participants in our cluster
-	participants, clusterIndex, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
+	clusters, err := protoState.Final().Clusters()
 	if err != nil {
-		return nil, fmt.Errorf("could not get cluster participants: %w", err)
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	cluster, _, found := clusters.ByNodeID(me.NodeID())
+	if !found {
+		return nil, fmt.Errorf("could not find cluster for self")
 	}
 	clusterID := protocol.ChainIDForCluster(participants)
 
@@ -171,7 +174,7 @@ func New(
 		headers:        headers,
 		payloads:       payloads,
 		pending:        cache,
-		participants:   participants,
+		cluster:        cluster,
 		sync:           sync,
 		hotstuff:       nil,
 	}
@@ -341,7 +344,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := e.protoState.Final().Identities(filter.And(
-		filter.In(e.participants),
+		filter.In(e.cluster),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {

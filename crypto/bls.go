@@ -20,7 +20,7 @@ package crypto
 //  - membership checks in G1 and G2 are using a naive scalar multiplication with the group order
 
 // future features:
-//  - multi signature and batch verification
+//  - multi-signature and batch verification
 //  - membership checks in G1 and G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
@@ -73,6 +73,11 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	if kmac == nil {
 		return nil, errors.New("Sign requires a Hasher")
 	}
+	// check hasher output size
+	if kmac.Size() < opSwUInputLenBLSBLS12381 {
+		return nil, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+			opSwUInputLenBLSBLS12381, kmac.Size())
+	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 	return newBLSBLS12381().blsSign(&sk.scalar, h), nil
@@ -101,6 +106,11 @@ func NewBLSKMAC(tag string) hash.Hasher {
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if kmac == nil {
 		return false, errors.New("VerifyBytes requires a Hasher")
+	}
+	// check hasher output size
+	if kmac.Size() < opSwUInputLenBLSBLS12381 {
+		return false, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+			opSwUInputLenBLSBLS12381, kmac.Size())
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)

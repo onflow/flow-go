@@ -19,15 +19,16 @@ const (
 	codeVotedView   = 11 // latest view hotstuff voted on
 
 	// code for heights with special meaning
-	codeFinalizedHeight = 20 // latest finalized block height
-	codeSealedHeight    = 21 // latest sealed block height
-	codeClusterHeight   = 22 // latest finalized height on cluster
-	codeExecutedBlock   = 23 // latest executed block with max height
-	codeRootHeight      = 24 // the height of the first loaded block
+	codeFinalizedHeight         = 20 // latest finalized block height
+	codeSealedHeight            = 21 // latest sealed block height
+	codeClusterHeight           = 22 // latest finalized height on cluster
+	codeExecutedBlock           = 23 // latest executed block with max height
+	codeRootHeight              = 24 // the height of the first loaded block
+	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 
 	// codes for single entity storage
+	// 31 was used for identities before epochs
 	codeHeader               = 30
-	codeIdentity             = 31
 	codeGuarantee            = 32
 	codeSeal                 = 33
 	codeTransaction          = 34
@@ -40,14 +41,21 @@ const (
 	codeBlockToSeal         = 41 // index mapping a block its last payload seal
 	codeCollectionReference = 42 // index reference block ID for collection
 	codeBlockValidity       = 43 // validity of block per HotStuff
+	codeEpochHeight         = 44 // index mapping epoch to latest finalized block
 
 	// codes for indexing multiple identifiers by identifier
+	// 51 was used for identity indexes before epochs
 	codeBlockChildren         = 50 // index mapping block ID to children blocks
-	codePayloadIdentities     = 51 // index mapping block ID to payload identities
 	codePayloadGuarantees     = 52 // index mapping block ID to payload guarantees
 	codePayloadSeals          = 53 // index mapping block ID to payload seals
 	codeCollectionBlock       = 54 // index mapping collection ID to block ID
 	codeBlockExecutionReceipt = 55 // index mapping block ID to execution receipt ID
+
+	// codes related to epoch information
+	codeEpochCounter = 60 // current epoch counter
+	codeEpochStart   = 61 // index for start views of epochs
+	codeEpochSetup   = 62 // setup events by epoch counter
+	codeEpochCommit  = 63 // commit events by epoch counter
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

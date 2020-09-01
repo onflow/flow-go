@@ -16,6 +16,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	message2 "github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
@@ -126,7 +127,8 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 			target = 0
 		}
 
-		ip, port := m.mws[target].GetIPPort()
+		ip, port, err := m.mws[target].GetIPPort()
+		require.NoError(m.Suite.T(), err)
 		key := m.mws[target].PublicKey()
 
 		// mocks an identity
@@ -138,6 +140,10 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		}
 		idMap := idMaps[i]
 		idMap[flowID.NodeID] = flowID
+
+		// update whitelist so that nodes can talk to each other
+		err = m.mws[i].UpdateAllowList()
+		require.NoError(m.Suite.T(), err)
 	}
 }
 
@@ -159,7 +165,8 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 
 	msg := createMessage(m.ids[firstNode], m.ids[lastNode])
 
-	err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
+	// sends a direct message from first node to the last node
+	err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	select {
@@ -191,7 +198,8 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 				wg.Done()
 			})
 		go func() {
-			err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
+			// sends a direct message from first node to the last node
+			err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode])
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
@@ -226,7 +234,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			err = m.mws[lastNode].Send(0, replyMsg, m.mws[firstNode].me)
+			err = m.mws[lastNode].SendDirect(replyMsg, m.mws[firstNode].me)
 			assert.NoError(m.T(), err)
 
 		})
@@ -237,7 +245,8 @@ func (m *MiddlewareTestSuit) TestEcho() {
 			wg.Done()
 		})
 
-	err = m.mws[firstNode].Send(0, sendMsg, m.ids[lastNode])
+	// sends a direct message from first node to the last node
+	err = m.mws[firstNode].SendDirect(sendMsg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	wg.Wait()
@@ -246,6 +255,66 @@ func (m *MiddlewareTestSuit) TestEcho() {
 	for i := 1; i < m.size; i++ {
 		m.ov[i].AssertExpectations(m.T())
 	}
+}
+
+// TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
+// size beyond the permissible unicast message size returns an error.
+func (m *MiddlewareTestSuit) TestMaxMessageSize_SendDirect() {
+	firstNode := 0
+	lastNode := m.size - 1
+
+	msg := createMessage(m.ids[firstNode], m.ids[lastNode], "")
+
+	// creates a network payload beyond the maximum message size
+	// Note: NetworkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
+	// so the generated payload is 1000 bytes below the maximum unicast message size.
+	// We hence add up 1000 bytes to the input of network payload fixture to make
+	// sure that payload is beyond the permissible size.
+	payload := NetworkPayloadFixture(m.T(), uint(DefaultMaxUnicastMsgSize)+1000)
+	event := &message2.TestMessage{
+		Text: string(payload),
+	}
+
+	codec := json.NewCodec()
+	encodedEvent, err := codec.Encode(event)
+	require.NoError(m.T(), err)
+
+	msg.Payload = encodedEvent
+
+	// sends a direct message from first node to the last node
+	err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode])
+	require.Error(m.Suite.T(), err)
+}
+
+// TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
+// size beyond the permissible publish message size returns an error.
+func (m *MiddlewareTestSuit) TestMaxMessageSize_Publish() {
+	firstNode := 0
+	lastNode := m.size - 1
+
+	msg := createMessage(m.ids[firstNode], m.ids[lastNode], "")
+	// adds another node as the target id to imitate publishing
+	msg.TargetIDs = append(msg.TargetIDs, m.ids[lastNode-1][:])
+
+	// creates a network payload beyond the maximum message size
+	// Note: NetworkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
+	// so the generated payload is 1000 bytes below the maximum publish message size.
+	// We hence add up 1000 bytes to the input of network payload fixture to make
+	// sure that payload is beyond the permissible size.
+	payload := NetworkPayloadFixture(m.T(), uint(DefaultMaxPubSubMsgSize)+1000)
+	event := &message2.TestMessage{
+		Text: string(payload),
+	}
+
+	codec := json.NewCodec()
+	encodedEvent, err := codec.Encode(event)
+	require.NoError(m.T(), err)
+
+	msg.Payload = encodedEvent
+
+	// sends a direct message from first node to the last node
+	err = m.mws[firstNode].Publish(msg, 0)
+	require.Error(m.Suite.T(), err)
 }
 
 // createMiddelwares creates middlewares with mock overlay for each middleware
@@ -269,7 +338,14 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		key := m.generateNetworkingKey(target[:])
 
 		// creates new middleware (with an arbitrary genesis block id)
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize,
+		mw, err := NewMiddleware(logger,
+			codec,
+			"0.0.0.0:0",
+			targetID,
+			key,
+			m.metrics,
+			DefaultMaxUnicastMsgSize,
+			DefaultMaxPubSubMsgSize,
 			rootID)
 		require.NoError(m.Suite.T(), err)
 
@@ -292,15 +368,13 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 		payload = msg[0]
 	}
 
-	message := &message.Message{
+	return &message.Message{
 		ChannelID: 1,
 		EventID:   []byte("1"),
 		OriginID:  originID[:],
 		TargetIDs: [][]byte{targetID[:]},
 		Payload:   []byte(payload),
 	}
-
-	return message
 }
 
 func (m *MiddlewareTestSuit) StopMiddlewares() {

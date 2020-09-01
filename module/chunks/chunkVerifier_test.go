@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -106,6 +107,27 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 	assert.NotNil(s.T(), spockSecret)
 }
 
+// TestVerifyWrongChunkType evaluates that following invocations return an error:
+// - verifying a system chunk with Verify method.
+// - verifying a non-system chunk with SystemChunkVerify method.
+func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
+	// defines verifiable chunk for a system chunk
+	svc := &verification.VerifiableChunkData{
+		IsSystemChunk: true,
+	}
+	// invoking Verify method with system chunk should return an error
+	_, _, err := s.verifier.Verify(svc)
+	require.Error(s.T(), err)
+
+	// defines verifiable chunk for a non-system chunk
+	vc := &verification.VerifiableChunkData{
+		IsSystemChunk: false,
+	}
+	// invoking SystemChunkVerify method with a non-system chunk should return an error
+	_, _, err = s.verifier.SystemChunkVerify(vc)
+	require.Error(s.T(), err)
+}
+
 // TestEmptyCollection tests verification behaviour if a
 // collection doesn't have any transaction.
 func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
@@ -133,7 +155,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	// Block setup
 	payload := flow.Payload{
-		Identities: unittest.IdentityListFixture(32),
 		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
 	header := unittest.BlockHeaderFixture()
@@ -194,6 +215,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		}
 
 		verifiableChunkData = verification.VerifiableChunkData{
+			IsSystemChunk: false,
 			Chunk:         &chunk,
 			Header:        &header,
 			Result:        &result,

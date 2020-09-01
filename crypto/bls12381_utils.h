@@ -80,6 +80,11 @@ void     bn_randZr(bn_t);
 void     bn_randZr_star(bn_t);
 void     bn_map_to_Zr_star(bn_t, const uint8_t*, int);
 
+int      ep_sum_vector(byte*, const byte*, const int);
+void     bn_sum_vector(bn_t, bn_st*, int);
+void     ep2_sum_vector(ep2_t, ep2_st* , int);
+void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, int len);
+
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
 void     fp_print_(char*, fp_t);

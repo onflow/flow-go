@@ -3,12 +3,15 @@
 package flow
 
 type Seal struct {
-	BlockID      Identifier
-	ResultID     Identifier
-	InitialState StateCommitment
-	FinalState   StateCommitment
+	BlockID       Identifier
+	ResultID      Identifier
+	InitialState  StateCommitment
+	FinalState    StateCommitment
+	ServiceEvents []ServiceEvent
 }
 
+// TODO need to include service events in hash, omitted for now as they are not
+// encodable with RLP
 func (s Seal) Body() interface{} {
 	return struct {
 		BlockID      Identifier

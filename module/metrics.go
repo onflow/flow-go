@@ -262,8 +262,8 @@ type ExecutionMetrics interface {
 	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
 	ExecutionStorageStateCommitment(bytes int64)
 
-	// ExecutionLastExecutedBlockView reports last executed block view
-	ExecutionLastExecutedBlockView(view uint64)
+	// ExecutionLastExecutedBlockHeight reports last executed block height
+	ExecutionLastExecutedBlockHeight(height uint64)
 
 	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
 	ExecutionTotalExecutedTransactions(numExecuted int)
@@ -271,4 +271,23 @@ type ExecutionMetrics interface {
 	ExecutionCollectionRequestSent()
 
 	ExecutionCollectionRequestRetried()
+
+	ExecutionSync(syncing bool)
+}
+
+type TransactionMetrics interface {
+	// TransactionReceived starts tracking of transaction execution/finalization/sealing
+	TransactionReceived(txID flow.Identifier, when time.Time)
+
+	// TransactionFinalized reports the time spent between the transaction being received and finalized. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionFinalized(txID flow.Identifier, when time.Time)
+
+	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionExecuted(txID flow.Identifier, when time.Time)
+}
+
+type PingMetrics interface {
+	NodeReachable(node *flow.Identity, reachable bool)
 }

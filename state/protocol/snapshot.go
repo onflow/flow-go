@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/signature"
 )
@@ -30,10 +31,16 @@ type Snapshot interface {
 	// Commit return the sealed execution state commitment at this block.
 	Commit() (flow.StateCommitment, error)
 
-	// Cluster selects the given cluster from the node selection. You have to
-	// manually filter the identities to the desired set of nodes before
-	// clustering them.
-	Clusters() (*flow.ClusterList, error)
+	// Clusters returns the list of collector clusters for the current epoch.
+	Clusters() (flow.ClusterList, error)
+
+	// ClusterRootBlock returns the root block for the given cluster in the
+	// current epoch.
+	ClusterRootBlock(cluster flow.IdentityList) (*cluster.Block, error)
+
+	// ClusterRootQC returns the quorum certificate for the root block for the
+	// given cluster in the current epoch.
+	ClusterRootQC(cluster flow.IdentityList) (*flow.QuorumCertificate, error)
 
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,
@@ -51,12 +58,19 @@ type Snapshot interface {
 	// In order to deterministically derive task specific seeds, indices must
 	// be specified.
 	// Refer to module/indices/rand.go for different indices.
+	// NOTE: not to be confused with the epoch seed.
 	Seed(indices ...uint32) ([]byte, error)
+
+	// Epoch will return the counter of the epoch for the given snapshot.
+	Epoch() (uint64, error)
+
+	// DKG provides access to DKG information for the selected snapshot.
+	DKG() DKG
 }
 
 // SeedFromParentSignature reads the raw random seed from a combined signature.
-// the combinedSig must be from a QuorumCertificate.
-// the indices is for generating task specific random seed
+// the combinedSig must be from a QuorumCertificate. The indices can be used to
+// generate task-specific seeds from the same signature.
 func SeedFromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
 	if len(indices)*4 > hash.KmacMaxParamsLen {
 		return nil, fmt.Errorf("unsupported number of indices")

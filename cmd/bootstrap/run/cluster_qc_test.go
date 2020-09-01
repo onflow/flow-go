@@ -15,15 +15,6 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
 	block := unittest.BlockFixture()
-	block.Payload.Identities = flow.IdentityList{
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection)),
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus)),
-	}
-	for _, participant := range participants {
-		block.Payload.Identities = append(block.Payload.Identities, participant.Identity())
-	}
 
 	block.Payload.Seals = nil
 	block.Payload.Guarantees = nil
@@ -41,7 +32,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	_, err := GenerateClusterRootQC(participants, &block, &clusterBlock)
+	_, err := GenerateClusterRootQC(participants, &clusterBlock)
 	require.NoError(t, err)
 }
 

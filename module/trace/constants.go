@@ -19,6 +19,16 @@ const (
 	CONHotEventHandlerStartNewView SpanName = "con.hotstuff.eventHandler.startNewView"
 	CONHotFinalizeBlock            SpanName = "con.hotstuff.finalizeBlock"
 
+	// Collection Node
+
+	COLBuildOn                  = "col.builder"
+	COLBuildOnSetup             = "col.builder.setup"
+	COLBuildOnUnfinalizedLookup = "col.builder.unfinalizedLookup"
+	COLBuildOnFinalizedLookup   = "col.builder.finalizedLookup"
+	COLBuildOnCreatePayload     = "col.builder.createPayload"
+	COLBuildOnCreateHeader      = "col.builder.createHeader"
+	COLBuildOnDBInsert          = "col.builder.dbInsert"
+
 	// Execution Node
 
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
@@ -27,9 +37,10 @@ const (
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
-	EXEComputeBlock       SpanName = "exe.computer.computeBlock"
-	EXEComputeCollection  SpanName = "exe.computer.computeCollection"
-	EXEComputeTransaction SpanName = "exe.computer.computeTransaction"
+	EXEComputeBlock            SpanName = "exe.computer.computeBlock"
+	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
+	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
+	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
 
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
 	EXEGetRegisters                       SpanName = "exe.state.getRegisters"

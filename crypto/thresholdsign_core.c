@@ -89,7 +89,7 @@ static void Zr_lagrangeCoefficientAtZero(bn_t res, const int i, const uint8_t* s
 // Computes the Langrange interpolation at zero LI(0) with regards to the points [signers(1)+1..signers(t+1)+1] 
 // and their images [shares(1)..shares(t+1)], and stores the result in dest
 // len is the polynomial degree 
-void G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t* signers, const int len) {
+int G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t* signers, const int len) {
     // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
     // powers of x
     bn_t bn_lagr_coef;
@@ -105,7 +105,7 @@ void G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t*
 
     for (int i=0; i < len; i++) {
         if (ep_read_bin_compact(share, &shares[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK)
-            return;
+            return INVALID;
         Zr_lagrangeCoefficientAtZero(bn_lagr_coef, signers[i], signers, len);
         ep_mul_lwnaf(mult, share, bn_lagr_coef);
         ep_add_projc(acc, acc, mult);
@@ -118,5 +118,5 @@ void G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t*
     ep2_free(mult);
     ep2_free(share);
     bn_free(bn_lagr_coef);
-    return;
+    return VALID;
 }
