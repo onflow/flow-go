@@ -9,11 +9,6 @@ pushd "$DIR"
 # Ensure the directory is writeable
 chmod -R +w "$(pwd)"
 
-# Clone RELIC if needed
-if [ ! -d "relic" ]; then
-git clone --depth 1 --branch relic-toolkit-0.5.0 git@github.com:relic-toolkit/relic.git
-fi
-
 mkdir -p "$DIR/relic/build"
 pushd "$DIR/relic/build"
 
