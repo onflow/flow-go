@@ -3,8 +3,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -36,7 +34,7 @@ func (t *TransactionTimings) ByID(txID flow.Identifier) (*flow.TransactionTiming
 	}
 	tt, ok := entity.(*flow.TransactionTiming)
 	if !ok {
-		panic(fmt.Sprintf("invalid entity in transaction timings pool (%T)", entity))
+		return nil, false
 	}
 	return tt, true
 }
@@ -48,13 +46,16 @@ func (t *TransactionTimings) Adjust(txID flow.Identifier, f func(*flow.Transacti
 	e, updated := t.Backend.Adjust(txID, func(e flow.Entity) flow.Entity {
 		tt, ok := e.(*flow.TransactionTiming)
 		if !ok {
-			panic(fmt.Sprintf("invalid entity in transaction timings pool (%T)", e))
+			return nil
 		}
 		return f(tt)
 	})
+	if !updated {
+		return nil, false
+	}
 	tt, ok := e.(*flow.TransactionTiming)
 	if !ok {
-		panic(fmt.Sprintf("invalid entity in transaction timings pool (%T)", e))
+		return nil, false
 	}
 	return tt, updated
 }

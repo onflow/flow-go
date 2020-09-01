@@ -28,7 +28,6 @@ import (
 // distinct chunk by each verification node. The result approvals should be
 // sent to the consensus nodes
 func TestHappyPath(t *testing.T) {
-	t.Skip("CompleteExecutionResultFixture needs to get fixed.")
 	var mu sync.Mutex
 	testcases := []struct {
 		verNodeCount,
@@ -63,7 +62,6 @@ func TestHappyPath(t *testing.T) {
 // path assuming a single collection (including transactions on counter example)
 // are submitted to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
-	t.Skip("CompleteExecutionResultFixture needs to get fixed.")
 	chainID := flow.Testnet
 
 	// finder and match engine parameters

@@ -12,16 +12,22 @@ import (
 
 type ReadConnection struct {
 	*Connection
-	inbound chan *message.Message
+	inbound    chan *message.Message
+	maxMsgSize int
 }
 
 // NewConnection creates a new connection to a peer on the flow network, using
 // the provided encoder and decoder to read and write messages.
-func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *ReadConnection {
+func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream, maxMsgSize int) *ReadConnection {
+	if maxMsgSize <= 0 {
+		maxMsgSize = DefaultMaxUnicastMsgSize
+	}
+
 	connection := NewConnection(log, stream)
 	c := ReadConnection{
 		Connection: connection,
 		inbound:    make(chan *message.Message, InboundMessageQueueSize),
+		maxMsgSize: maxMsgSize,
 	}
 	return &c
 }
@@ -31,7 +37,7 @@ func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *ReadCon
 func (rc *ReadConnection) ReceiveLoop() {
 	// close and drain the inbound channel
 	defer close(rc.inbound)
-	r := ggio.NewDelimitedReader(rc.stream, 1<<20)
+	r := ggio.NewDelimitedReader(rc.stream, rc.maxMsgSize)
 RecvLoop:
 	for {
 		// check if we should stop

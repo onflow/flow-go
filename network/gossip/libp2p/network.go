@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
@@ -30,7 +31,6 @@ type Network struct {
 	metrics module.NetworkMetrics
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
-	fanout  int             // used to determine number of nodes' neighbors on overlay
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -53,9 +53,6 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
 
-	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := (len(ids) + 1) / 2
-
 	o := &Network{
 		logger:  log,
 		codec:   codec,
@@ -63,7 +60,6 @@ func NewNetwork(
 		mw:      mw,
 		engines: make(map[uint8]network.Engine),
 		rcache:  rcache,
-		fanout:  fanout,
 		top:     top,
 		metrics: metrics,
 	}
@@ -119,6 +115,9 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 	conduit := &Conduit{
 		channelID: channelID,
 		submit:    n.submit,
+		publish:   n.publish,
+		unicast:   n.unicast,
+		multicast: n.multicast,
 	}
 
 	// register engine with provided engineID
@@ -137,7 +136,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	return n.top.Subset(n.ids, n.fanout, n.me.NodeID().String())
+	return n.top.Subset(n.ids, n.fanout(), n.me.NodeID().String())
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
@@ -154,6 +153,12 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 	// remove this node id from the list of fanout target ids to avoid self-dial
 	idsMinusMe := ids.Filter(n.me.NotMeFilter())
 	n.ids = idsMinusMe
+}
+
+// fanout returns the node fanout derived from the identity list
+func (n *Network) fanout() int {
+	// fanout is currently set to half of the system size for connectivity assurance
+	return (len(n.ids) + 1) / 2
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
@@ -248,11 +253,103 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 	}
 
 	// TODO: dedup the message here
+	if len(targetIDs) > 1 {
+		err = n.mw.Publish(msg, channelID)
+	} else if len(targetIDs) == 1 {
+		err = n.mw.SendDirect(msg, targetIDs[0])
+	} else {
+		return fmt.Errorf("empty target ID list for the message")
+	}
 
-	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not gossip event: %w", err)
 	}
+
+	return nil
+}
+
+// publish sends the message in an unreliable way to the given recipients.
+// In this context, unreliable means that the message is published over a libp2p pub-sub
+// channel and can be read by any node subscribed to that channel.
+// The selector could be used to optimize or restrict delivery.
+func (n *Network) publish(channelID uint8, message interface{}, selector flow.IdentityFilter) error {
+	// excludes this instance of network from list of targeted ids (if any)
+	// to avoid self loop on delivering this message.
+	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
+
+	// extracts list of recipient identities
+	recipients := n.ids.Filter(selector)
+	if len(recipients) == 0 {
+		return fmt.Errorf("empty target ID list for the message")
+	}
+
+	// generates network message (encoding) based on list of recipients
+	msg, err := n.genNetworkMessage(channelID, message, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("publish could not generate network message: %w", err)
+	}
+
+	// publishes the message through the channelID, however, the message
+	// is only restricted to recipients (if they subscribed to channel ID).
+	err = n.mw.Publish(msg, channelID)
+	if err != nil {
+		return fmt.Errorf("could not publish event: %w", err)
+	}
+
+	return nil
+}
+
+// unicast sends the message in a reliable way to the given recipient.
+// It uses 1-1 direct messaging over the underlying network to deliver the message.
+// It returns an error if unicasting fails.
+func (n *Network) unicast(channelID uint8, message interface{}, targetID flow.Identifier) error {
+	if targetID == n.me.NodeID() {
+		n.logger.Debug().Msg("network skips self unicasting")
+		return nil
+	}
+
+	// generates network message (encoding) based on list of recipients
+	msg, err := n.genNetworkMessage(channelID, message, targetID)
+	if err != nil {
+		return fmt.Errorf("unicast could not generate network message: %w", err)
+	}
+
+	err = n.mw.SendDirect(msg, targetID)
+	if err != nil {
+		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
+	}
+
+	n.logger.Debug().
+		Msg("message successfully unicasted")
+
+	return nil
+}
+
+// multicast unreliably sends the specified event over the channelID to the specified number of recipients selected from
+// the specified subset.
+// The recipients are selected randomly from the set of identities defined by selectors.
+func (n *Network) multicast(channelID uint8, message interface{}, num uint, selector flow.IdentityFilter) error {
+	// excludes this instance of network from list of targeted ids (if any)
+	// to avoid self loop on delivering this message.
+	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
+
+	// NOTE: this is where we can add our own selectors, for example to
+	// apply a blacklist or exclude nodes that are in exponential backoff
+	// because they were unavailable
+
+	// chooses `num`-many recipients based on selector
+	recipients := n.ids.Filter(selector).Sample(num).NodeIDs()
+	if len(recipients) < int(num) {
+		return fmt.Errorf("could not find recepients based on selector: Requested: %d, Found: %d", num, len(recipients))
+	}
+
+	// publishes the message to the recipients
+	if err := n.publish(channelID, message, filter.HasNodeID(recipients...)); err != nil {
+		return fmt.Errorf("could not multicast message: %w", err)
+	}
+
+	n.logger.Debug().
+		Msg("message successfully multicasted")
 
 	return nil
 }

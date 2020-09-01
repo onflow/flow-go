@@ -83,6 +83,27 @@ func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return r0, r1
 }
 
+// GetLastFullBlockHeight provides a mock function with given fields:
+func (_m *Blocks) GetLastFullBlockHeight() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IndexBlockForCollections provides a mock function with given fields: blockID, collIDs
 func (_m *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	ret := _m.Called(blockID, collIDs)
@@ -122,6 +143,20 @@ func (_m *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(func(*badger.Txn) error)
 		}
+	}
+
+	return r0
+}
+
+// UpdateLastFullBlockHeight provides a mock function with given fields: height
+func (_m *Blocks) UpdateLastFullBlockHeight(height uint64) error {
+	ret := _m.Called(height)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(height)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0
