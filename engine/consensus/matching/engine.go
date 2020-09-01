@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	chmodule "github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -476,7 +477,6 @@ func (e *Engine) checkSealing() {
 // collected enough approvals on a per-chunk basis, as defined by the matchChunk
 // function.
 func (e *Engine) matchedResults() ([]*flow.ExecutionResult, error) {
-
 	var results []*flow.ExecutionResult
 
 	// get current set of staked verifiers
@@ -509,8 +509,10 @@ ResultLoop:
 		// go through all the chunks of this result and check that each of them
 		// have a qualified majority of verifier stake approving
 		for _, chunk := range result.Chunks {
-
-			matched := e.matchChunk(approvals, chunk, verifiers)
+			matched, err := e.matchChunk(approvals, verifiers, chunk, result)
+			if err != nil {
+				return nil, fmt.Errorf("could not match chunk: %w", err)
+			}
 
 			if !matched {
 				continue ResultLoop
@@ -528,9 +530,7 @@ ResultLoop:
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
-func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk, verifiers flow.IdentityList) bool {
-
-	// we use this to check for duplicate approvals by one approver
+func (e *Engine) matchChunk(approvals []*flow.ResultApproval, verifiers flow.IdentityList, chunk *flow.Chunk, result *flow.ExecutionResult) (bool, error) {
 	dupCheck := make(map[flow.Identifier]bool)
 
 	// get the node IDs for all approvers of this chunk
@@ -550,18 +550,49 @@ func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk,
 		}
 	}
 
+	validApprovers, err := e.checkApprovers(verifiers, approverIDs, result, chunk)
+	if err != nil {
+		return false, fmt.Errorf("could not check approvers: %w", err)
+	}
+
+	if !validApprovers {
+		// TODO: whats the intended result here?
+		// TODO: Will need to test the checkApprover method for inteded outcome
+		return false, nil
+	}
+
 	// get all of the approver identities and check threshold
 	approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
+	stakesMet := e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
 
-	// TODO: Check from the list of approvers that they were all assigned to the chunk
+	return stakesMet, nil
+}
 
-	return e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
+// checkApprovers checks that the approvers of a specific chunk are the verifiers that were assigned
+func (e *Engine) checkApprovers(verifiers flow.IdentityList, approverIDs flow.IdentifierList, result *flow.ExecutionResult, chunk *flow.Chunk) (bool, error) {
+	assigner, err := chmodule.NewPublicAssignment(chmodule.DefaultChunkAssignmentAlpha)
+	if err != nil {
+		return false, fmt.Errorf("could not create public assignment: %w", err)
+	}
+
+	assignment, err := assigner.Assign(verifiers, result)
+	if err != nil {
+		return false, fmt.Errorf("could assign verifiers: %w", err)
+	}
+
+	verifiersMap := assignment.ByChunkIndex(chunk.Index)
+	for _, approverID := range approverIDs {
+		if verifiersMap[approverID] != struct{}{} {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // checkStakes checks that the stakes collected by a set of verifiers exceeds
 // the threshold required to validate a chunk.
 func (e *Engine) checkStakes(totalStake uint64, collectedStake uint64) bool {
-
 	requiredStake := uint64(
 		math.Ceil(
 			float64(totalStake) * e.chunkThreshold,

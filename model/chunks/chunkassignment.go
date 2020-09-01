@@ -51,6 +51,17 @@ func (a *Assignment) ByNodeID(this flow.Identifier) []uint64 {
 	return chunks
 }
 
+func (a *Assignment) ByChunkIndex(index uint64) map[flow.Identifier]struct{} {
+	// iterates over pairs of (chunk, assigned verifiers)
+	for c, vList := range a.table {
+		if c == index {
+			return vList
+		}
+	}
+
+	return nil
+}
+
 // AssignmentDataPack
 //
 // AssignmentDataPack provides a storable representation of chunk assignments on
