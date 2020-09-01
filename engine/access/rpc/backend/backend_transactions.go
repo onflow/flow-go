@@ -57,7 +57,9 @@ func (b *backendTransactions) SendTransaction(
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
-	go b.registerTransactionForRetry(tx)
+	if b.retry.IsActive() {
+		go b.registerTransactionForRetry(tx)
+	}
 
 	return nil
 }

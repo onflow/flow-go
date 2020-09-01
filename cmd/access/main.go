@@ -64,6 +64,7 @@ func main() {
 		logTxTimeToFinalized         bool
 		logTxTimeToExecuted          bool
 		logTxTimeToFinalizedExecuted bool
+		retryEnabled                 bool
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -80,6 +81,7 @@ func main() {
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
+			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
@@ -160,7 +162,9 @@ func main() {
 				node.Storage.Transactions,
 				node.RootChainID,
 				transactionMetrics,
-				collectionGRPCPort)
+				collectionGRPCPort,
+				retryEnabled,
+			)
 			return rpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
