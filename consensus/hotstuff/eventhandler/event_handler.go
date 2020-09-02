@@ -534,7 +534,6 @@ func (e *EventHandler) processQC(qc *model.QuorumCertificate) error {
 		return nil
 	}
 	log.Debug().Msg("QC triggered view change, starting new view now")
-	// TODO: change ^ to debug
 
 	// current view has changed, go to new view
 	return e.startNewView()

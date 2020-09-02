@@ -173,7 +173,7 @@ func (t *TelemetryConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
 // It allows to close a path and open new path. Each path is identified by a unique
 // (randomly generated) uuid. Along each path, we can capture information about relevant
 // Steps (each step is represented by a Zerolog Event).
-// In case there is no currently open path, the PathHandler still returns a Step, 
+// In case there is no currently open path, the PathHandler still returns a Step,
 // but such steps are logged as telemetry errors.
 type PathHandler struct {
 	chain flow.ChainID
@@ -186,8 +186,8 @@ type PathHandler struct {
 
 // NewPathHandler instantiate a new PathHandler.
 // The PathHandler has no currently open path
-func NewPathHandler(log zerolog.Logger, chain flow.ChainID) PathHandler {
-	return PathHandler{
+func NewPathHandler(log zerolog.Logger, chain flow.ChainID) *PathHandler {
+	return &PathHandler{
 		chain:          chain,
 		log:            log.With().Str("hotstuff", "telemetry").Str("chain", chain.String()).Logger(),
 		currentContext: nil,
