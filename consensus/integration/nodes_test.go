@@ -108,7 +108,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 		SigData:   combined,
 	}
 
-	hub := NewHub()
+	hub := NewNetworkHub()
 	stopper := NewStopper(stopAtView, stopCountAt)
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
