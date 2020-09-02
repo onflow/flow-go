@@ -6,8 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 )
 
-// LogConsumer is an implementation of the notifications consumer that logs a
-// message for each event.
+// SlashingViolationsConsumer is an implementation of the notifications consumer that logs a
+// message for any slashable offences.
 type SlashingViolationsConsumer struct {
 	NoopConsumer
 	log zerolog.Logger
@@ -33,7 +33,7 @@ func (c *SlashingViolationsConsumer) OnInvalidVoteDetected(vote *model.Vote) {
 		Uint64("vote_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
-		Msg("OnInvalidVoteDete ted")
+		Msg("OnInvalidVoteDetected")
 }
 
 func (c *SlashingViolationsConsumer) OnDoubleProposeDetected(block1 *model.Block, block2 *model.Block) {

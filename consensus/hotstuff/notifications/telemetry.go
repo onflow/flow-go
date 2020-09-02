@@ -29,7 +29,7 @@ import (
 // Telemetry does NOT capture slashing notifications
 type TelemetryConsumer struct {
 	NoopConsumer
-	pathHandler PathHandler
+	pathHandler *PathHandler
 }
 
 func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryConsumer {
@@ -173,9 +173,8 @@ func (t *TelemetryConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
 // It allows to close a path and open new path. Each path is identified by a unique
 // (randomly generated) uuid. Along each path, we can capture information about relevant
 // Steps (each step is represented by a Zerolog Event).
-// In case there is no currently open path, the
-// PathHandler still returns a Step, but such steps are logged as telemetry errors.
-// PathHandler still returns a Step, but such steps are logged as telemetry errors.
+// In case there is no currently open path, the PathHandler still returns a Step, 
+// but such steps are logged as telemetry errors.
 type PathHandler struct {
 	chain flow.ChainID
 	log   zerolog.Logger
