@@ -88,7 +88,6 @@ func (e *EventHandler) OnReceiveVote(vote *model.Vote) error {
 		return fmt.Errorf("failed processing vote: %w", err)
 	}
 	log.Debug().Msg("block vote processed")
-	e.notifier.OnEventProcessed()
 
 	return nil
 }
