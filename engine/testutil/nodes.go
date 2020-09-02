@@ -211,7 +211,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewPublicAssignment(node.State, chunks.DefaultChunkAssignmentAlpha)
 	require.Nil(t, err)
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals, assigner)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals, assigner, matching.StakesAlwaysEnough)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{

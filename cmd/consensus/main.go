@@ -184,6 +184,7 @@ func main() {
 				approvals,
 				seals,
 				assigner,
+				matching.StakesAlwaysEnough,
 			)
 			requesterEng.WithHandle(match.HandleReceipt)
 			return match, err

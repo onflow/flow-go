@@ -153,7 +153,9 @@ func (ms *MatchingSuite) SetupTest() {
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return ms.approvers
 		},
-		nil,
+		func(selector flow.IdentityFilter) error {
+			return nil
+		},
 	)
 
 	ms.sealedSnapshot = &protocol.Snapshot{}
@@ -311,6 +313,7 @@ func (ms *MatchingSuite) SetupTest() {
 			return approvals
 		},
 	)
+	ms.approvalsPL.On("Add", mock.Anything).Return(true)
 
 	ms.sealsPL = &mempool.Seals{}
 	ms.sealsPL.On("Size").Return(uint(0)) // only for metrics
@@ -341,6 +344,7 @@ func (ms *MatchingSuite) SetupTest() {
 		results:                 ms.resultsPL,
 		receipts:                ms.receiptsPL,
 		approvals:               ms.approvalsPL,
+		approvalsByResult:       make(map[flow.Identifier]([]*flow.ResultApproval)),
 		seals:                   ms.sealsPL,
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
@@ -634,6 +638,9 @@ func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
 	assginment := chunks.NewAssignment()
 	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
 
+	// use the happy-path stake checking function which always accepts
+	ms.matching.checkStakes = StakesAlwaysEnough
+
 	// happy path requires 0 approvals per chunk, so the result should be
 	// counted even if we havent received any approvals.
 	results, err := ms.matching.matchedResults()
@@ -654,8 +661,8 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	// set the engine's threshold to 2/3 of total verifier stake
-	ms.matching.chunkThreshold = 2.0 / 3.0
+	// use the real stake checking function which requires +2/3 of total stakes
+	ms.matching.checkStakes = CheckApproversStakes
 
 	assginment := chunks.NewAssignment()
 
@@ -676,7 +683,7 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 			approval.Body.ExecutionResultID = result.ID()
 			approval.Body.ApproverID = approver.NodeID
 			approval.Body.ChunkIndex = index
-			ms.pendingApprovals[approval.ID()] = approval
+			ms.matching.addPendingApproval(approval)
 		}
 	}
 
@@ -701,8 +708,8 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	// set the engine's threshold to 2/3 of total verifier stake
-	ms.matching.chunkThreshold = 2.0 / 3.0
+	// use the real stake checking function which requires +2/3 of total stakes
+	ms.matching.checkStakes = CheckApproversStakes
 
 	assginment := chunks.NewAssignment()
 
@@ -719,7 +726,7 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 			approval.Body.ExecutionResultID = result.ID()
 			approval.Body.ApproverID = approver.NodeID
 			approval.Body.ChunkIndex = index
-			ms.pendingApprovals[approval.ID()] = approval
+			ms.matching.addPendingApproval(approval)
 		}
 	}
 
@@ -878,7 +885,8 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 		},
 	).Return()
 
-	ms.matching.requestPending()
+	err := ms.matching.requestPending()
+	ms.Require().NoError(err, "should request results for pending blocks")
 
 	// should request n-1 blocks if n > requestReceiptThreshold
 	ms.Assert().Equal(len(requestedBlocks), n-1)
