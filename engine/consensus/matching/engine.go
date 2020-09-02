@@ -544,7 +544,7 @@ func (e *Engine) matchChunk(approvals []*flow.ResultApproval, verifiers flow.Ide
 	return e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
 }
 
-// validateApprovers checks all approvals for a chunk and returns a list of all valid approvals
+// validateApprovers checks all approvals for a chunk and returns a list of all valid approverIds
 // also drops any duplicate approvals in the mempool
 func (e *Engine) validateApprovers(assignment *chunks.Assignment, approvals []*flow.ResultApproval, chunk *flow.Chunk) flow.IdentifierList {
 	dupCheck := make(map[flow.Identifier]bool)

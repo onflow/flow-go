@@ -926,8 +926,7 @@ func (ms *MatchingSuite) TestValidateVerifiers() {
 	// check if each chunk only has 3 validated approvers
 	for _, chunk := range result.Chunks {
 		// give full set of approvers and make sure only 3 of the 4 are returned
-		validatedApprovers, err := ms.matching.validateApprovers(assignment, approvals, chunk)
-		ms.Require().NoError(err)
+		validatedApprovers := ms.matching.validateApprovers(assignment, approvals, chunk)
 
 		ms.Require().Equal(len(approvers), validatedApprovers.Len())
 	}

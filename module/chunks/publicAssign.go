@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/dapperlabs/flow-go/model/indices"
+
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
@@ -11,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 // DefaultChunkAssignmentAlpha is the default number of verifiers that should be
@@ -24,12 +27,14 @@ const DefaultChunkAssignmentAlpha = 1
 type PublicAssignment struct {
 	alpha       int // used to indicate the number of verifiers that should be assigned to each chunk
 	assignments mempool.Assignments
+
+	state protocol.State
 }
 
 // NewPublicAssignment generates and returns an instance of the Public Chunk
 // Assignment algorithm. Parameter alpha is the number of verifiers that should
 // be assigned to each chunk.
-func NewPublicAssignment(alpha int) (*PublicAssignment, error) {
+func NewPublicAssignment(state protocol.State, alpha int) (*PublicAssignment, error) {
 	// TODO to have limit of assignment mempool as a parameter (2703)
 	assignment, err := stdmap.NewAssignments(1000)
 	if err != nil {
@@ -38,6 +43,7 @@ func NewPublicAssignment(alpha int) (*PublicAssignment, error) {
 	return &PublicAssignment{
 		alpha:       alpha,
 		assignments: assignment,
+		state:       state,
 	}, nil
 }
 
@@ -63,7 +69,7 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.Exec
 	}
 
 	// create RNG for assignment
-	rng, err := generateChunkAssignmentRNG(result)
+	rng, err := generateChunkAssignmentRNG(p.state, result)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random generator: %w", err)
 	}
@@ -105,20 +111,14 @@ func (p *PublicAssignment) GetAssignedChunks(verifierID flow.Identifier, assignm
 
 // generateChunkAssignmentRNG generates and returns a hasher for chunk
 // assignment
-func generateChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
-	h := hash.NewSHA3_384()
-
-	// encodes result approval body to byte slice
-	b, err := encoding.DefaultEncoder.Encode(res.ExecutionResultBody)
+func generateChunkAssignmentRNG(state protocol.State, res *flow.ExecutionResult) (random.Rand, error) {
+	snapshot := state.AtBlockID(res.BlockID)
+	seed, err := snapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
 	if err != nil {
-		return nil, fmt.Errorf("could not encode execution result body: %w", err)
+		return nil, fmt.Errorf("could not generate seed: %v", err)
 	}
 
-	// takes hash of result approval body
-	hash := h.ComputeHash(b)
-
-	// creates a random generator
-	rng, err := random.NewRand(hash)
+	rng, err := random.NewRand(seed)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random generator: %w", err)
 	}

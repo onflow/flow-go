@@ -28,6 +28,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -97,8 +98,12 @@ func VerificationHappyPath(t *testing.T,
 	//
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
+
+	state := &protocol.State{}
+
 	for _, verIdentity := range verIdentities {
-		myChunks := GetAssignedChunks(verIdentity.NodeID, a, result)
+
+		myChunks := GetAssignedChunks(state, verIdentity.NodeID, a, result)
 		assigner.On("Assign", testifymock.Anything, result).Return(a, nil)
 		assigner.On("GetAssignedChunks", testifymock.Anything, a, result).Return(myChunks, nil)
 
@@ -478,8 +483,8 @@ func IsAssigned(index uint64, chunkNum int) bool {
 }
 
 // GetAssignedChunks returns assigned chunks to a specific flow identifier
-func GetAssignedChunks(id flow.Identifier, assignment *chmodel.Assignment, result *flow.ExecutionResult) flow.ChunkList {
-	assigner, _ := chmodule.NewPublicAssignment(chmodule.DefaultChunkAssignmentAlpha)
+func GetAssignedChunks(state *protocol.State, id flow.Identifier, assignment *chmodel.Assignment, result *flow.ExecutionResult) flow.ChunkList {
+	assigner, _ := chmodule.NewPublicAssignment(state, chmodule.DefaultChunkAssignmentAlpha)
 	myChunks, _ := assigner.GetAssignedChunks(id, assignment, result)
 	return myChunks
 }

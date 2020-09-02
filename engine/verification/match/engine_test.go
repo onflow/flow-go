@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -86,7 +88,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	return e, participants, metrics, tracer, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, chunkAssigner
 }
 
-func createExecutionResult(blockID flow.Identifier, myID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment, flow.ChunkList) {
+func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
 	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID: blockID,
@@ -95,15 +97,30 @@ func createExecutionResult(blockID flow.Identifier, myID flow.Identifier, option
 	}
 
 	assignments := chunks.NewAssignment()
-
 	for _, option := range options {
 		option(result, assignments)
 	}
 
-	chunkAssigner, _ := chunkmodule.NewPublicAssignment(chunkmodule.DefaultChunkAssignmentAlpha)
-	myChunks, _ := chunkAssigner.GetAssignedChunks(myID, assignments, result)
+	return result, assignments
+}
 
-	return result, assignments, myChunks
+func hashResult(res *flow.ExecutionResult) []byte {
+	h := hash.NewSHA3_384()
+
+	// encodes result approval body to byte slice
+	b, _ := encoding.DefaultEncoder.Encode(res.ExecutionResultBody)
+
+	// takes hash of result approval body
+	hash := h.ComputeHash(b)
+
+	return hash
+}
+
+func myChunksAndSeed(state *protocol.State, myID flow.Identifier, assignment *chunks.Assignment, result *flow.ExecutionResult) (flow.ChunkList, []byte) {
+	chunkAssigner, _ := chunkmodule.NewPublicAssignment(state, chunkmodule.DefaultChunkAssignmentAlpha)
+	myChunks, _ := chunkAssigner.GetAssignedChunks(myID, assignment, result)
+
+	return myChunks, hashResult(result)
 }
 
 func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk) func(*flow.ExecutionResult, *chunks.Assignment) {
@@ -237,15 +254,17 @@ func OnVerifiableChunkSentMetricCalledNTimes(metrics *module.VerificationMetrics
 // Happy Path: When receives a ER, and 1 chunk is assigned to me,
 // it will fetch that collection and chunk data, and produces a verifiable chunk
 func TestChunkVerified(t *testing.T) {
-	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, state, snapshot, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
-	result, assignment, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 		),
 	)
+
+	myChunks, seed := myChunksAndSeed(state, myID, assignment, result)
+	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// metrics
 	// receiving an execution result
@@ -301,15 +320,17 @@ func TestChunkVerified(t *testing.T) {
 // No assignment: When receives a ER, and no chunk is assigned to me, then I won’t fetch any collection or chunk,
 // nor produce any verifiable chunk
 func TestNoAssignment(t *testing.T) {
-	e, participants, metrics, _, myID, otherID, head, _, _, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, otherID, head, _, _, _, _, headerDB, state, snapshot, _, _, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
-	result, assignment, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(otherID),
 		),
 	)
+
+	myChunks, seed := myChunksAndSeed(state, myID, assignment, result)
+	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// metrics
 
@@ -338,17 +359,19 @@ func TestNoAssignment(t *testing.T) {
 // Multiple Assignments: When receives a ER, and 2 chunks out of 3 are assigned to me,
 // it will produce 2 verifiable chunks.
 func TestMultiAssignment(t *testing.T) {
-	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, state, snapshot, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
-	result, assignment, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 			WithAssignee(otherID),
 			WithAssignee(myID),
 		),
 	)
+
+	myChunks, seed := myChunksAndSeed(state, myID, assignment, result)
+	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// metrics
 	// receiving an execution result
@@ -392,16 +415,18 @@ func TestMultiAssignment(t *testing.T) {
 
 // Duplication: When receives 2 ER for the same block, which only has 1 chunk, only 1 verifiable chunk will be produced.
 func TestDuplication(t *testing.T) {
-	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, state, snapshot, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
-	result, assignment, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 			WithAssignee(otherID),
 		),
 	)
+
+	myChunks, seed := myChunksAndSeed(state, myID, assignment, result)
+	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// metrics
 	// receiving an execution result
@@ -449,15 +474,17 @@ func TestDuplication(t *testing.T) {
 // and successful to return in the 3rd try, a verifiable chunk will be produced
 func TestRetry(t *testing.T) {
 	maxTry := 3
-	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, maxTry)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, state, snapshot, _, verifier, _, assigner := SetupTest(t, maxTry)
 	// create a execution result that assigns to me
-	result, assignment, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 		),
 	)
+
+	myChunks, seed := myChunksAndSeed(state, myID, assignment, result)
+	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// metrics
 	// receiving an execution result
@@ -506,15 +533,17 @@ func TestRetry(t *testing.T) {
 // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
 func TestMaxRetry(t *testing.T) {
 	maxAttempt := 3
-	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, maxAttempt)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, state, snapshot, _, _, _, assigner := SetupTest(t, maxAttempt)
 	// create a execution result that assigns to me
-	result, assignment, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 		),
 	)
+
+	myChunks, seed := myChunksAndSeed(state, myID, assignment, result)
+	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// metrics
 	// receiving an execution result
@@ -548,7 +577,7 @@ func TestMaxRetry(t *testing.T) {
 // Concurrency: When 10 different ER are received concurrently, chunks from both
 // results will be processed
 func TestProcessExecutionResultConcurrently(t *testing.T) {
-	e, participants, metrics, _, myID, _, _, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
+	e, participants, metrics, _, myID, _, _, _, con, _, _, headerDB, state, snapshot, _, verifier, _, assigner :=
 		SetupTest(t, 1)
 
 	ers := make([]*flow.ExecutionResult, 0)
@@ -566,13 +595,16 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		header := &flow.Header{View: uint64(i)}
 		// create a execution result that assigns to me
-		result, assignment, myChunks := createExecutionResult(
+		result, assignment := createExecutionResult(
 			header.ID(),
-			myID,
 			WithChunks(
 				WithAssignee(myID),
 			),
 		)
+
+		myChunks, seed := myChunksAndSeed(state, myID, assignment, result)
+		snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
 		// add assignment to assigner
 		assigner.On("Assign", mock.Anything, result).Return(assignment, nil).Once()
 		assigner.On("GetAssignedChunks", myID, assignment, result).Return(myChunks, nil).Once()
@@ -611,13 +643,12 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 // Concurrency: When chunk data pack are sent concurrently, match engine is able to receive
 // all of them, and process concurrently.
 func TestProcessChunkDataPackConcurrently(t *testing.T) {
-	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, state, snapshot, _, verifier, _, assigner :=
 		SetupTest(t, 1)
 
 	// create a execution result that assigns to me
-	result, assignment, myChunks := createExecutionResult(
+	result, assignment := createExecutionResult(
 		head.ID(),
-		myID,
 		WithChunks(
 			WithAssignee(myID),
 			WithAssignee(myID),
@@ -627,6 +658,9 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 			WithAssignee(myID),
 		),
 	)
+
+	myChunks, seed := myChunksAndSeed(state, myID, assignment, result)
+	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// metrics
 	// receiving `len(result.Chunk)`-many result
