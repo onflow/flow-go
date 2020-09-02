@@ -227,7 +227,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 // verification node is assigned to.
 func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionResult) (flow.ChunkList, error) {
 	var span opentracing.Span
-	span, ctx = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
+	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.Finish()
 
 	verifiers, err := e.state.Final().Identities(filter.HasRole(flow.RoleVerification))
