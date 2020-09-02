@@ -509,19 +509,15 @@ ResultLoop:
 		// get the approvals for this result
 		approvals := byResult[resultID]
 
+		assignment, err := e.assigner.Assign(verifiers, result)
+		if err != nil {
+			return nil, fmt.Errorf("could assign verifiers: %w", err)
+		}
+
 		// go through all the chunks of this result and check that each of them
 		// have a qualified majority of verifier stake approving
 		for _, chunk := range result.Chunks {
-			assignment, err := e.assigner.Assign(verifiers, result)
-			if err != nil {
-				return nil, fmt.Errorf("could assign verifiers: %w", err)
-			}
-
-			matched, err := e.matchChunk(approvals, verifiers, chunk, assignment)
-			if err != nil {
-				return nil, fmt.Errorf("could not match chunk: %w", err)
-			}
-
+			matched := e.matchChunk(approvals, verifiers, chunk, assignment)
 			if !matched {
 				continue ResultLoop
 			}
@@ -538,14 +534,28 @@ ResultLoop:
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
-func (e *Engine) matchChunk(approvals []*flow.ResultApproval, verifiers flow.IdentityList, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
-	dupCheck := make(map[flow.Identifier]bool)
+func (e *Engine) matchChunk(approvals []*flow.ResultApproval, verifiers flow.IdentityList, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
+	// get valid approver IDs per chunk
+	validApprovers := e.validateApprovers(assignment, approvals, chunk)
 
-	// get the node IDs for all approvers of this chunk
-	var approverIDs []flow.Identifier
-	for _, approval := range approvals {
+	// get all of the approver identities and check threshold
+	approvers := verifiers.Filter(filter.HasNodeID(validApprovers...))
+
+	return e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
+}
+
+// validateApprovers checks all approvals for a chunk and returns a list of all valid approvals
+// also drops any duplicate approvals in the mempool
+func (e *Engine) validateApprovers(assignment *chunks.Assignment, approvals []*flow.ResultApproval, chunk *flow.Chunk) flow.IdentifierList {
+	dupCheck := make(map[flow.Identifier]bool)
+	verifiersMap := assignment.ByChunkIndex(chunk.Index)
+
+	var validApprovers flow.IdentifierList
+	for index, approval := range approvals {
 		if approval.Body.ChunkIndex == chunk.Index {
 			approverID := approval.Body.ApproverID
+
+			// check if already in dupCheck map
 			if dupCheck[approverID] {
 				_ = e.approvals.Rem(approval.ID())
 				e.log.Warn().
@@ -553,41 +563,22 @@ func (e *Engine) matchChunk(approvals []*flow.ResultApproval, verifiers flow.Ide
 					Msg("dropping duplicate approval")
 				continue
 			}
+
 			dupCheck[approverID] = true
-			approverIDs = append(approverIDs, approverID)
+
+			// check if verifier is part of the assignment to this chunk
+			if _, ok := verifiersMap[approverID]; ok {
+				validApprovers = append(validApprovers, approverID)
+			} else {
+				e.log.Debug().
+					Uint64("chunk_index", chunk.Index).
+					Int("approver_index", index).
+					Msg("skipping invalid approver")
+			}
 		}
 	}
 
-	validApprovers, err := e.validateApprovers(assignment, approverIDs, chunk)
-	if err != nil {
-		return false, fmt.Errorf("could not check approvers: %w", err)
-	}
-
-	// get all of the approver identities and check threshold
-	approvers := verifiers.Filter(filter.HasNodeID(validApprovers...))
-
-	stakesMet := e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
-
-	return stakesMet, nil
-}
-
-// validateApprovers checks that the approvers of a specific chunk are the verifiers that were assigned and returns a valid set of approvers
-func (e *Engine) validateApprovers(assignment *chunks.Assignment, approverIDs flow.IdentifierList, chunk *flow.Chunk) (flow.IdentifierList, error) {
-	var validApprovers flow.IdentifierList
-
-	verifiersMap := assignment.ByChunkIndex(chunk.Index)
-	for index, approverID := range approverIDs {
-		if _, ok := verifiersMap[approverID]; ok {
-			validApprovers = append(validApprovers, approverID)
-		} else {
-			e.log.Debug().
-				Uint64("chunk_index", chunk.Index).
-				Int("approver_index", index).
-				Msg("skipping invalid approver")
-		}
-	}
-
-	return validApprovers, nil
+	return validApprovers
 }
 
 // checkStakes checks that the stakes collected by a set of verifiers exceeds

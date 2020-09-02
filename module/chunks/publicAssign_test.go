@@ -139,171 +139,171 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	require.Equal(a.T(), ids, original)
 }
 
-// TestPermuteSublist tests permuting an a sublist of an
-// IdentityList against randomness and deterministicity
-func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
-	blockID := a.SetupTest()
+// // TestPermuteSublist tests permuting an a sublist of an
+// // IdentityList against randomness and deterministicity
+// func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
+// 	blockID := a.SetupTest()
 
-	// creates random ids
-	count := 10
-	subset := 4
+// 	// creates random ids
+// 	count := 10
+// 	subset := 4
 
-	var idList flow.IdentityList = test.CreateIDs(count)
-	var ids flow.IdentifierList = idList.NodeIDs()
-	original := make([]flow.Identifier, count)
-	copy(original, ids)
+// 	var idList flow.IdentityList = test.CreateIDs(count)
+// 	var ids flow.IdentifierList = idList.NodeIDs()
+// 	original := make([]flow.Identifier, count)
+// 	copy(original, ids)
 
-	// create result seed with 4 chunks
-	seed := a.CreateResult(blockID, 4, a.T())
+// 	// create result seed with 4 chunks
+// 	seed := a.CreateResult(blockID, 4, a.T())
 
-	// Randomness:
-	rng1, err := generateChunkAssignmentRNG(seed)
-	require.NoError(a.T(), err)
-	err = rng1.Samples(len(ids), subset, ids.Swap)
-	require.NoError(a.T(), err)
+// 	// Randomness:
+// 	rng1, err := generateChunkAssignmentRNG(seed)
+// 	require.NoError(a.T(), err)
+// 	err = rng1.Samples(len(ids), subset, ids.Swap)
+// 	require.NoError(a.T(), err)
 
-	// permutation should not change length of the list
-	require.Len(a.T(), ids, count)
+// 	// permutation should not change length of the list
+// 	require.Len(a.T(), ids, count)
 
-	// the initial subset of the list that is permuted should
-	// be different than the original
-	require.NotEqual(a.T(), ids[:subset], original[:subset])
-}
+// 	// the initial subset of the list that is permuted should
+// 	// be different than the original
+// 	require.NotEqual(a.T(), ids[:subset], original[:subset])
+// }
 
-// TestDeterministicy evaluates deterministic behavior of chunk assignment when
-// chunks, random generator, and nodes are the same
-func (a *PublicAssignmentTestSuite) TestDeterministicy() {
-	blockID := a.SetupTest()
+// // TestDeterministicy evaluates deterministic behavior of chunk assignment when
+// // chunks, random generator, and nodes are the same
+// func (a *PublicAssignmentTestSuite) TestDeterministicy() {
+// 	blockID := a.SetupTest()
 
-	c := 10    // keeps number of chunks
-	n := 10    // keeps number of verifier nodes
-	alpha := 1 // each chunk requires alpha verifiers
+// 	c := 10    // keeps number of chunks
+// 	n := 10    // keeps number of verifier nodes
+// 	alpha := 1 // each chunk requires alpha verifiers
 
-	// create seed
-	seed := a.CreateResult(blockID, c, a.T())
+// 	// create seed
+// 	seed := a.CreateResult(blockID, c, a.T())
 
-	// creates two set of the same nodes
-	nodes1 := test.CreateIDs(n)
-	nodes2 := make([]*flow.Identity, n)
-	require.Equal(a.T(), copy(nodes2, nodes1), n)
+// 	// creates two set of the same nodes
+// 	nodes1 := test.CreateIDs(n)
+// 	nodes2 := make([]*flow.Identity, n)
+// 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
-	// chunk assignment of the first set
-	a1, err := NewPublicAssignment(alpha)
-	require.NoError(a.T(), err)
-	p1, err := a1.Assign(nodes1, seed)
-	require.NoError(a.T(), err)
+// 	// chunk assignment of the first set
+// 	a1, err := NewPublicAssignment(alpha)
+// 	require.NoError(a.T(), err)
+// 	p1, err := a1.Assign(nodes1, seed)
+// 	require.NoError(a.T(), err)
 
-	// chunk assignment of the second set
-	a2, err := NewPublicAssignment(alpha)
-	require.NoError(a.T(), err)
-	p2, err := a2.Assign(nodes1, seed)
-	require.NoError(a.T(), err)
+// 	// chunk assignment of the second set
+// 	a2, err := NewPublicAssignment(alpha)
+// 	require.NoError(a.T(), err)
+// 	p2, err := a2.Assign(nodes1, seed)
+// 	require.NoError(a.T(), err)
 
-	// list of nodes should get shuffled after public assignment
-	// but it should contain same elements
-	require.Equal(a.T(), p1, p2)
-}
+// 	// list of nodes should get shuffled after public assignment
+// 	// but it should contain same elements
+// 	require.Equal(a.T(), p1, p2)
+// }
 
-// TestChunkAssignmentOneToOne evaluates chunk assignment against
-// several single chunk to single node assignment
-func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToOne() {
-	// covers an edge case assigning 1 chunk to a single verifier node
-	a.ChunkAssignmentScenario(1, 1, 1)
+// // TestChunkAssignmentOneToOne evaluates chunk assignment against
+// // several single chunk to single node assignment
+// func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToOne() {
+// 	// covers an edge case assigning 1 chunk to a single verifier node
+// 	a.ChunkAssignmentScenario(1, 1, 1)
 
-	// assigning 10 chunks to one node
-	a.ChunkAssignmentScenario(10, 1, 1)
-	// assigning 10 chunks to 2 nodes
-	// each chunk to one verifier
-	a.ChunkAssignmentScenario(10, 2, 1)
-	// each chunk to 2 verifiers
-	a.ChunkAssignmentScenario(10, 2, 2)
+// 	// assigning 10 chunks to one node
+// 	a.ChunkAssignmentScenario(10, 1, 1)
+// 	// assigning 10 chunks to 2 nodes
+// 	// each chunk to one verifier
+// 	a.ChunkAssignmentScenario(10, 2, 1)
+// 	// each chunk to 2 verifiers
+// 	a.ChunkAssignmentScenario(10, 2, 2)
 
-	// assigning 10 chunks to 10 nodes
-	// each chunk to one verifier
-	a.ChunkAssignmentScenario(10, 10, 1)
-	// each chunk to 6 verifiers
-	a.ChunkAssignmentScenario(10, 10, 6)
-	// each chunk to 9 verifiers
-	a.ChunkAssignmentScenario(10, 10, 9)
-}
+// 	// assigning 10 chunks to 10 nodes
+// 	// each chunk to one verifier
+// 	a.ChunkAssignmentScenario(10, 10, 1)
+// 	// each chunk to 6 verifiers
+// 	a.ChunkAssignmentScenario(10, 10, 6)
+// 	// each chunk to 9 verifiers
+// 	a.ChunkAssignmentScenario(10, 10, 9)
+// }
 
-// TestChunkAssignmentOneToMay evaluates chunk assignment
-func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToMany() {
-	//  against assigning 52 chunks to 7 nodes
-	//  each chunk to 5 verifiers
-	a.ChunkAssignmentScenario(52, 7, 5)
-	//  against assigning 49 chunks to 9 nodes
-	//  each chunk to 8 verifiers
-	a.ChunkAssignmentScenario(52, 9, 8)
-}
+// // TestChunkAssignmentOneToMay evaluates chunk assignment
+// func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToMany() {
+// 	//  against assigning 52 chunks to 7 nodes
+// 	//  each chunk to 5 verifiers
+// 	a.ChunkAssignmentScenario(52, 7, 5)
+// 	//  against assigning 49 chunks to 9 nodes
+// 	//  each chunk to 8 verifiers
+// 	a.ChunkAssignmentScenario(52, 9, 8)
+// }
 
-// ChunkAssignmentScenario is a test helper that creates chunkNum chunks, verNum verifiers
-// and then assign each chunk to alpha randomly chosen verifiers
-// it also evaluates that each chuck is assigned to alpha many unique verifier nodes
-func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, alpha int) {
-	blockID := a.SetupTest()
+// // ChunkAssignmentScenario is a test helper that creates chunkNum chunks, verNum verifiers
+// // and then assign each chunk to alpha randomly chosen verifiers
+// // it also evaluates that each chuck is assigned to alpha many unique verifier nodes
+// func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, alpha int) {
+// 	blockID := a.SetupTest()
 
-	seed := a.CreateResult(blockID, chunkNum, a.T())
+// 	seed := a.CreateResult(blockID, chunkNum, a.T())
 
-	// creates nodes and keeps a copy of them
-	nodes := test.CreateIDs(verNum)
-	original := make([]*flow.Identity, verNum)
-	require.Equal(a.T(), copy(original, nodes), verNum)
+// 	// creates nodes and keeps a copy of them
+// 	nodes := test.CreateIDs(verNum)
+// 	original := make([]*flow.Identity, verNum)
+// 	require.Equal(a.T(), copy(original, nodes), verNum)
 
-	a1, err := NewPublicAssignment(alpha)
-	require.NoError(a.T(), err)
-	p1, err := a1.Assign(nodes, seed)
-	require.NoError(a.T(), err)
+// 	a1, err := NewPublicAssignment(alpha)
+// 	require.NoError(a.T(), err)
+// 	p1, err := a1.Assign(nodes, seed)
+// 	require.NoError(a.T(), err)
 
-	// list of nodes should get shuffled after public assignment
-	require.ElementsMatch(a.T(), nodes, original)
+// 	// list of nodes should get shuffled after public assignment
+// 	require.ElementsMatch(a.T(), nodes, original)
 
-	for _, chunk := range seed.Chunks {
-		// each chunk should be assigned to alpha verifiers
-		require.Equal(a.T(), p1.Verifiers(chunk).Len(), alpha)
-	}
-}
+// 	for _, chunk := range seed.Chunks {
+// 		// each chunk should be assigned to alpha verifiers
+// 		require.Equal(a.T(), p1.Verifiers(chunk).Len(), alpha)
+// 	}
+// }
 
-func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
-	blockID := a.SetupTest()
-	seed := a.CreateResult(blockID, 20, a.T())
+// func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
+// 	blockID := a.SetupTest()
+// 	seed := a.CreateResult(blockID, 20, a.T())
 
-	// creates nodes and keeps a copy of them
-	nodes := test.CreateIDs(5)
-	assigner, err := NewPublicAssignment(3)
-	require.NoError(a.T(), err)
+// 	// creates nodes and keeps a copy of them
+// 	nodes := test.CreateIDs(5)
+// 	assigner, err := NewPublicAssignment(3)
+// 	require.NoError(a.T(), err)
 
-	// initially cache should be empty
-	require.Equal(a.T(), assigner.Size(), uint(0))
+// 	// initially cache should be empty
+// 	require.Equal(a.T(), assigner.Size(), uint(0))
 
-	// new assignment should be cached
-	// random generators are stateful and we need to
-	// generate a new one if we want to have the same
-	// state
-	_, err = assigner.Assign(nodes, seed)
-	require.NoError(a.T(), err)
-	require.Equal(a.T(), assigner.Size(), uint(1))
+// 	// new assignment should be cached
+// 	// random generators are stateful and we need to
+// 	// generate a new one if we want to have the same
+// 	// state
+// 	_, err = assigner.Assign(nodes, seed)
+// 	require.NoError(a.T(), err)
+// 	require.Equal(a.T(), assigner.Size(), uint(1))
 
-	// repetitive assignment should not be cached
-	_, err = assigner.Assign(nodes, seed)
-	require.NoError(a.T(), err)
-	require.Equal(a.T(), assigner.Size(), uint(1))
+// 	// repetitive assignment should not be cached
+// 	_, err = assigner.Assign(nodes, seed)
+// 	require.NoError(a.T(), err)
+// 	require.Equal(a.T(), assigner.Size(), uint(1))
 
-	// creates a new set of nodes, hence assigner should cache new assignment
-	newNodes := test.CreateIDs(6)
-	_, err = assigner.Assign(newNodes, seed)
-	require.NoError(a.T(), err)
-	require.Equal(a.T(), assigner.Size(), uint(2))
+// 	// creates a new set of nodes, hence assigner should cache new assignment
+// 	newNodes := test.CreateIDs(6)
+// 	_, err = assigner.Assign(newNodes, seed)
+// 	require.NoError(a.T(), err)
+// 	require.Equal(a.T(), assigner.Size(), uint(2))
 
-	// performs the assignment using a different seed
-	// should results in a different new assignment
-	// which should be cached
-	otherSeed := a.CreateResult(blockID, 20, a.T())
+// 	// performs the assignment using a different seed
+// 	// should results in a different new assignment
+// 	// which should be cached
+// 	otherSeed := a.CreateResult(blockID, 20, a.T())
 
-	_, err = assigner.Assign(newNodes, otherSeed)
-	require.NoError(a.T(), err)
-	require.Equal(a.T(), assigner.Size(), uint(3))
-}
+// 	_, err = assigner.Assign(newNodes, otherSeed)
+// 	require.NoError(a.T(), err)
+// 	require.Equal(a.T(), assigner.Size(), uint(3))
+// }
 
 // CreateChunk creates and returns num chunks. It only fills the Index part of
 // chunks to make them distinct from each other.

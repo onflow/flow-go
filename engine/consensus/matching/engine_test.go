@@ -611,6 +611,9 @@ func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
+	assginment := chunks.NewAssignment()
+	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
+
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
 	if ms.Assert().Len(results, 1, "should select result for empty block") {
@@ -885,15 +888,11 @@ func (ms *MatchingSuite) TestValidateVerifiers() {
 
 	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
-	// ms.blocks[block.Header.ID()] = &block
 
 	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
-	// ms.pendingResults[result.ID()] = result
 
-	// create assignment with 3 verification node assigned to every chunk
-	assignment := chunks.NewAssignment()
-
+	// list of 3 approvers
 	var approvers flow.IdentityList
 	approvers = append(approvers, ms.approvers[0])
 	approvers = append(approvers, ms.approvers[1])
@@ -901,17 +900,33 @@ func (ms *MatchingSuite) TestValidateVerifiers() {
 
 	ms.Require().Equal(len(approvers), 3)
 
-	// add to assignment
+	// create assignment with 3 verification node assigned to every chunk
+	assignment := chunks.NewAssignment()
 	for _, chunk := range result.Chunks {
 		assignment.Add(chunk, approvers.NodeIDs())
+	}
+
+	// go through all approvers and approve every chunk even if not assigned.
+	var approvals []*flow.ResultApproval
+	for _, approver := range ms.approvers {
+		for _, chunk := range result.Chunks {
+			approval := unittest.ResultApprovalFixture()
+			approval.Body.BlockID = block.Header.ID()
+			approval.Body.ExecutionResultID = result.ID()
+			approval.Body.ApproverID = approver.NodeID
+			approval.Body.ChunkIndex = chunk.Index
+
+			approvals = append(approvals, approval)
+		}
 	}
 
 	// mock assigner
 	ms.assigner.On("Assign", mock.Anything, result).Return(assignment, nil)
 
+	// check if each chunk only has 3 validated approvers
 	for _, chunk := range result.Chunks {
 		// give full set of approvers and make sure only 3 of the 4 are returned
-		validatedApprovers, err := ms.matching.validateApprovers(assignment, ms.approvers.NodeIDs(), chunk)
+		validatedApprovers, err := ms.matching.validateApprovers(assignment, approvals, chunk)
 		ms.Require().NoError(err)
 
 		ms.Require().Equal(len(approvers), validatedApprovers.Len())
