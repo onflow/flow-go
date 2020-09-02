@@ -108,7 +108,6 @@ int subgroup_check_G1_bench();
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
-void     dig_print_(char*, dig_t*, int);
 void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);

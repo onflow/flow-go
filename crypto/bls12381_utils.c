@@ -186,13 +186,6 @@ void bytes_print_(char* s, byte* data, int len) {
 }
 
 // DEBUG printing functions 
-void dig_print_(char* s, dig_t* data, int len) {
-    printf("[%s]:\n", s);
-    for (int i=0; i<len; i++) 
-        printf("%016llx,", data[i]);
-    printf("\n");
-}
-
 void fp_print_(char* s, fp_st a) {
     char* str = malloc(sizeof(char) * fp_size_str(a, 16));
     fp_write_str(str, 100, a, 16);
@@ -783,5 +776,5 @@ int subgroup_check_G1_bench() {
     #elif MEMBERSHIP_CHECK_G1 == BOWE
     res = bowe_subgroup_check_G1(p);
     #endif
-    return 0;
+    return res;
 }
