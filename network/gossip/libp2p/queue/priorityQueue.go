@@ -1,13 +1,15 @@
 package queue
 
-import "container/heap"
-
+import (
+	"time"
+)
 
 type item struct {
-	message interface{}
-	priority       int // The priority of the item in the queue.
+	message  interface{}
+	priority int // The priority of the item in the queue.
 	// The index is needed by update and is maintained by the heap.Interface methods.
-	index int // The index of the item in the heap.
+	index     int   // The index of the item in the heap.
+	timestamp int64 // timestamp to maintain insertions order for items with the same priority and for telemetry
 
 }
 
@@ -18,7 +20,14 @@ func (pq priorityQueue) Len() int { return len(pq) }
 
 func (pq priorityQueue) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
-	return pq[i].priority > pq[j].priority
+	if pq[i].priority > pq[j].priority {
+		return true
+	}
+	if pq[i].priority < pq[j].priority {
+		return false
+	}
+	// if both items have the same priority, then pop the oldest
+	return pq[i].timestamp < pq[j].timestamp
 }
 
 func (pq priorityQueue) Swap(i, j int) {
@@ -31,6 +40,7 @@ func (pq *priorityQueue) Push(x interface{}) {
 	n := len(*pq)
 	item := x.(*item)
 	item.index = n
+	item.timestamp = time.Now().UnixNano()
 	*pq = append(*pq, item)
 }
 
@@ -42,11 +52,4 @@ func (pq *priorityQueue) Pop() interface{} {
 	item.index = -1 // for safety
 	*pq = old[0 : n-1]
 	return item
-}
-
-// update modifies the priority and value of an item in the queue.
-func (pq *priorityQueue) update(item *item, message interface{}, priority int) {
-	item.message = message
-	item.priority = priority
-	heap.Fix(pq, item.index)
 }

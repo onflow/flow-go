@@ -7,6 +7,7 @@ import (
 // SubmitFunc is a function that submits the given event for the given engine to
 // the overlay network, which should take care of delivering it to the given
 // recipients.
+// Deprecated::
 type SubmitFunc func(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error
 
 // PublishFunc is a function that broadcasts the specified event
