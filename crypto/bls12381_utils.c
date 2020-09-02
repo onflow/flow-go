@@ -138,27 +138,12 @@ void ep2_mult_gen(ep2_t res, const bn_t expo) {
 }
 
 
-
 // DEBUG printing functions 
 void bytes_print_(char* s, byte* data, int len) {
     printf("[%s]:\n", s);
     for (int i=0; i<len; i++) 
         printf("%02x,", data[i]);
     printf("\n");
-}
-
-void dig_print_(char* s, dig_t* data, int len) {
-    /*printf("[%s]:\n", s);
-    for (int i=0; i<len; i++) 
-        printf("%016llx,", data[i]);
-    printf("\n");*/
-    printf("    {");
-    for (int i=0; i<len; i++) 
-        { 
-            printf("0x%016llx,", data[i]);
-         if (i == 2) printf("\n     ");
-        }
-    printf("},\n");
 }
 
 void fp_print_(char* s, fp_st a) {
