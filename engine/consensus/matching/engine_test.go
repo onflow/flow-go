@@ -73,14 +73,12 @@ type MatchingSuite struct {
 	sealedSnapshot *protocol.Snapshot
 	finalSnapshot  *protocol.Snapshot
 
-	results map[flow.Identifier]*flow.ExecutionResult
-	blocks  map[flow.Identifier]*flow.Block
-	seals   map[flow.Identifier]*flow.Seal
+	sealedResults map[flow.Identifier]*flow.ExecutionResult
+	blocks        map[flow.Identifier]*flow.Block
 
-	resultsDB *storage.ExecutionResults
-	headersDB *storage.Headers
-	indexDB   *storage.Index
-	sealsDB   *storage.Seals
+	sealedResultsDB *storage.ExecutionResults
+	headersDB       *storage.Headers
+	indexDB         *storage.Index
 
 	pendingResults   map[flow.Identifier]*flow.ExecutionResult
 	pendingReceipts  map[flow.Identifier]*flow.ExecutionReceipt
@@ -157,24 +155,23 @@ func (ms *MatchingSuite) SetupTest() {
 
 	ms.sealedSnapshot = &protocol.Snapshot{}
 
-	ms.results = make(map[flow.Identifier]*flow.ExecutionResult)
+	ms.sealedResults = make(map[flow.Identifier]*flow.ExecutionResult)
 	ms.blocks = make(map[flow.Identifier]*flow.Block)
-	ms.seals = make(map[flow.Identifier]*flow.Seal)
 
-	ms.resultsDB = &storage.ExecutionResults{}
-	ms.resultsDB.On("ByID", mock.Anything).Return(
+	ms.sealedResultsDB = &storage.ExecutionResults{}
+	ms.sealedResultsDB.On("ByID", mock.Anything).Return(
 		func(resultID flow.Identifier) *flow.ExecutionResult {
-			return ms.results[resultID]
+			return ms.sealedResults[resultID]
 		},
 		func(resultID flow.Identifier) error {
-			_, found := ms.results[resultID]
+			_, found := ms.sealedResults[resultID]
 			if !found {
 				return storerr.ErrNotFound
 			}
 			return nil
 		},
 	)
-	ms.resultsDB.On("Index", mock.Anything, mock.Anything).Return(
+	ms.sealedResultsDB.On("Index", mock.Anything, mock.Anything).Return(
 		func(blockID, resultID flow.Identifier) error {
 			return nil
 		},
@@ -227,24 +224,6 @@ func (ms *MatchingSuite) SetupTest() {
 		},
 		func(blockID flow.Identifier) error {
 			_, found := ms.blocks[blockID]
-			if !found {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	)
-
-	ms.sealsDB = &storage.Seals{}
-	ms.sealsDB.On("ByID", mock.Anything).Return(
-		func(sealID flow.Identifier) *flow.Seal {
-			seal, found := ms.seals[sealID]
-			if !found {
-				return nil
-			}
-			return seal
-		},
-		func(sealID flow.Identifier) error {
-			_, found := ms.seals[sealID]
 			if !found {
 				return storerr.ErrNotFound
 			}
@@ -333,10 +312,9 @@ func (ms *MatchingSuite) SetupTest() {
 		mempool:                 metrics,
 		state:                   ms.state,
 		requester:               ms.requester,
-		resultsDB:               ms.resultsDB,
+		sealedResultsDB:         ms.sealedResultsDB,
 		headersDB:               ms.headersDB,
 		indexDB:                 ms.indexDB,
-		sealsDB:                 ms.sealsDB,
 		results:                 ms.resultsPL,
 		receipts:                ms.receiptsPL,
 		approvals:               ms.approvalsPL,
@@ -399,7 +377,7 @@ func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 	originID := ms.exeID
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
-	ms.results[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+	ms.sealedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for sealed result")
@@ -538,7 +516,7 @@ func (ms *MatchingSuite) TestOnApprovalSealedResult() {
 	originID := ms.verID
 	approval := unittest.ResultApprovalFixture()
 	approval.Body.ApproverID = originID
-	ms.results[approval.Body.ExecutionResultID] = unittest.ExecutionResultFixture()
+	ms.sealedResults[approval.Body.ExecutionResultID] = unittest.ExecutionResultFixture()
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().NoError(err, "should ignore approval for sealed result")
@@ -715,7 +693,7 @@ func (ms *MatchingSuite) TestSealResultMissingBlock() {
 	err := ms.matching.sealResult(result)
 	ms.Require().Equal(errUnknownBlock, err, "should get unknown block error on missing block")
 
-	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -732,7 +710,7 @@ func (ms *MatchingSuite) TestSealResultInvalidChunks() {
 	err := ms.matching.sealResult(result)
 	ms.Require().Equal(errInvalidChunks, err, "should get invalid chunks error on wrong chunk count")
 
-	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -746,7 +724,7 @@ func (ms *MatchingSuite) TestSealResultUnsealedPrevious() {
 	err := ms.matching.sealResult(result)
 	ms.Require().Equal(errUnsealedPrevious, err, "should get unsealed previous error on missing previous result")
 
-	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -758,10 +736,10 @@ func (ms *MatchingSuite) TestSealResultValid() {
 	result := unittest.ResultForBlockFixture(&block)
 	previous := unittest.ExecutionResultFixture()
 	result.PreviousResultID = previous.ID()
-	ms.results[previous.ID()] = previous
+	ms.sealedResults[previous.ID()] = previous
 
 	// check match when we are storing entities
-	ms.resultsDB.On("Store", mock.Anything).Run(
+	ms.sealedResultsDB.On("Store", mock.Anything).Run(
 		func(args mock.Arguments) {
 			stored := args.Get(0).(*flow.ExecutionResult)
 			ms.Assert().Equal(result, stored)
@@ -778,7 +756,7 @@ func (ms *MatchingSuite) TestSealResultValid() {
 	err := ms.matching.sealResult(result)
 	ms.Require().NoError(err, "should generate seal on persisted previous result")
 
-	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 }
 
@@ -837,7 +815,7 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 	)
 
 	// the results are not in the DB, which will trigger request
-	ms.resultsDB.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
+	ms.sealedResultsDB.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
 	// keep track of requested blocks
 	requestedBlocks := []flow.Identifier{}

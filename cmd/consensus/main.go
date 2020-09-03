@@ -143,8 +143,7 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			resultsDB := bstorage.NewExecutionResults(node.DB)
-			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
+			sealedResultsDB := bstorage.NewExecutionResults(node.DB)
 			requesterEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -168,8 +167,7 @@ func main() {
 				node.State,
 				node.Me,
 				requesterEng,
-				resultsDB,
-				sealsDB,
+				sealedResultsDB,
 				node.Storage.Headers,
 				node.Storage.Index,
 				results,
