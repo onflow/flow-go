@@ -25,7 +25,6 @@ import (
 )
 
 // NewParticipant initialize the EventLoop instance and recover the forks' state with all pending block
-<<<<<<< HEAD
 func NewParticipant(
 	log zerolog.Logger,
 	tracer module.Tracer,
