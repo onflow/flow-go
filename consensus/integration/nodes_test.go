@@ -229,7 +229,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 
 	pending := []*flow.Header{}
 	// initialize the block finalizer
-	hot, err := consensus.NewParticipant(log, tracer, dis, metrics, headersDB,
+	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
 		com, build, final, persist, signer, comp, rootHeader,
 		rootQC, rootHeader, pending, consensus.WithInitialTimeout(hotstuffTimeout))
 

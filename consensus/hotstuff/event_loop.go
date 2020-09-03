@@ -104,7 +104,7 @@ func (el *EventLoop) loop() {
 
 		// same as before
 		case <-timeoutChannel:
-			// meansure how long the event loop was idle waiting for an
+			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
