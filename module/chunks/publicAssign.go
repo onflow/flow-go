@@ -28,22 +28,22 @@ type PublicAssignment struct {
 	alpha       int // used to indicate the number of verifiers that should be assigned to each chunk
 	assignments mempool.Assignments
 
-	state protocol.State
+	rngByBlockID func(flow.Identifier) (random.Rand, error)
 }
 
 // NewPublicAssignment generates and returns an instance of the Public Chunk
 // Assignment algorithm. Parameter alpha is the number of verifiers that should
 // be assigned to each chunk.
-func NewPublicAssignment(state protocol.State, alpha int) (*PublicAssignment, error) {
+func NewPublicAssignment(alpha int, rngByBlockID func(flow.Identifier) (random.Rand, error)) (*PublicAssignment, error) {
 	// TODO to have limit of assignment mempool as a parameter (2703)
 	assignment, err := stdmap.NewAssignments(1000)
 	if err != nil {
 		return nil, fmt.Errorf("could not create an assignment mempool: %w", err)
 	}
 	return &PublicAssignment{
-		alpha:       alpha,
-		assignments: assignment,
-		state:       state,
+		alpha:        alpha,
+		assignments:  assignment,
+		rngByBlockID: rngByBlockID,
 	}, nil
 }
 
@@ -53,10 +53,21 @@ func (p *PublicAssignment) Size() uint {
 }
 
 // Assign generates the assignment
-func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunkmodels.Assignment, error) {
+func (p *PublicAssignment) Assign(verifiers flow.IdentityList, chunks flow.ChunkList, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
+	// TODO: rng could be cached to optimize performance
+	// create RNG for assignment
+	rng, err := p.rngByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+
+	return p.assign(verifiers, chunks, rng)
+}
+
+func (p *PublicAssignment) assign(verifiers flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkmodels.Assignment, error) {
 	// computes a finger print for identities||chunks
 	ids := verifiers.NodeIDs()
-	hash, err := fingerPrint(ids, result, p.alpha)
+	hash, err := fingerPrint(ids, chunks, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
 	}
@@ -68,14 +79,8 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.Exec
 		return a, nil
 	}
 
-	// create RNG for assignment
-	rng, err := generateChunkAssignmentRNG(p.state, result)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
-	}
-
 	// otherwise, it computes the assignment and caches it for future calls
-	a, err = chunkAssignment(ids, result.Chunks, rng, p.alpha)
+	a, err = chunkAssignment(ids, chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not complete chunk assignment: %w", err)
 	}
@@ -87,43 +92,6 @@ func (p *PublicAssignment) Assign(verifiers flow.IdentityList, result *flow.Exec
 	}
 
 	return a, nil
-}
-
-// GetAssignedChunks returns the list of result chunks assigned to a specific
-// verifier.
-func (p *PublicAssignment) GetAssignedChunks(verifierID flow.Identifier, assignment *chunkmodels.Assignment, result *flow.ExecutionResult) (flow.ChunkList, error) {
-	// indices of chunks assigned to verifier
-	chunkIndices := assignment.ByNodeID(verifierID)
-
-	// chunks keeps the list of chunks assigned to the verifier
-	chunks := make(flow.ChunkList, 0, len(chunkIndices))
-	for _, index := range chunkIndices {
-		chunk, ok := result.Chunks.ByIndex(index)
-		if !ok {
-			return nil, fmt.Errorf("chunk out of range requested: %v", index)
-		}
-
-		chunks = append(chunks, chunk)
-	}
-
-	return chunks, nil
-}
-
-// generateChunkAssignmentRNG generates and returns a hasher for chunk
-// assignment
-func generateChunkAssignmentRNG(state protocol.State, res *flow.ExecutionResult) (random.Rand, error) {
-	snapshot := state.AtBlockID(res.BlockID)
-	seed, err := snapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate seed: %v", err)
-	}
-
-	rng, err := random.NewRand(seed)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
-	}
-
-	return rng, nil
 }
 
 // ChunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
@@ -185,7 +153,7 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 // - result with sorted version of chunk list
 // - alpha
 // the generated fingerprint is deterministic in the set of aforementioned parameters
-func fingerPrint(ids flow.IdentifierList, result *flow.ExecutionResult, alpha int) (hash.Hash, error) {
+func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, alpha int) (hash.Hash, error) {
 	// sorts and encodes ids
 	sort.Sort(ids)
 	encIDs, err := encoding.DefaultEncoder.Encode(ids)
@@ -194,10 +162,10 @@ func fingerPrint(ids flow.IdentifierList, result *flow.ExecutionResult, alpha in
 	}
 
 	// sorts and encodes chunks
-	sort.Sort(result.Chunks)
-	encResultBody, err := encoding.DefaultEncoder.Encode(result.ExecutionResultBody)
+	sort.Sort(chunks)
+	encChunks, err := encoding.DefaultEncoder.Encode(chunks)
 	if err != nil {
-		return nil, fmt.Errorf("could not encode result body: %w", err)
+		return nil, fmt.Errorf("could not encode chunk list: %w", err)
 	}
 
 	// encodes alpha parameteer
@@ -212,9 +180,9 @@ func fingerPrint(ids flow.IdentifierList, result *flow.ExecutionResult, alpha in
 	if err != nil {
 		return nil, fmt.Errorf("could not hash ids: %w", err)
 	}
-	_, err = hasher.Write(encResultBody)
+	_, err = hasher.Write(encChunks)
 	if err != nil {
-		return nil, fmt.Errorf("could not hash result body: %w", err)
+		return nil, fmt.Errorf("could not hash chunks: %w", err)
 	}
 	_, err = hasher.Write(encAlpha)
 	if err != nil {
@@ -222,4 +190,22 @@ func fingerPrint(ids flow.IdentifierList, result *flow.ExecutionResult, alpha in
 	}
 
 	return hasher.SumHash(), nil
+}
+
+// CreateRNGByBlockIDClosure returns a function to get an RNG by blockID
+func CreateRNGByBlockIDClosure(state protocol.State) func(flow.Identifier) (random.Rand, error) {
+	return func(blockID flow.Identifier) (random.Rand, error) {
+		snapshot := state.AtBlockID(blockID)
+		seed, err := snapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
+		if err != nil {
+			return nil, fmt.Errorf("could not generate seed: %v", err)
+		}
+
+		rng, err := random.NewRand(seed)
+		if err != nil {
+			return nil, fmt.Errorf("could not generate random generator: %w", err)
+		}
+
+		return rng, nil
+	}
 }

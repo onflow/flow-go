@@ -14,13 +14,13 @@ type ChunkAssigner struct {
 	mock.Mock
 }
 
-// Assign provides a mock function with given fields: verifiers, result
-func (_m *ChunkAssigner) Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chunks.Assignment, error) {
-	ret := _m.Called(verifiers, result)
+// Assign provides a mock function with given fields: verifiers, _a1, blockID
+func (_m *ChunkAssigner) Assign(verifiers flow.IdentityList, _a1 flow.ChunkList, blockID flow.Identifier) (*chunks.Assignment, error) {
+	ret := _m.Called(verifiers, _a1, blockID)
 
 	var r0 *chunks.Assignment
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, *flow.ExecutionResult) *chunks.Assignment); ok {
-		r0 = rf(verifiers, result)
+	if rf, ok := ret.Get(0).(func(flow.IdentityList, flow.ChunkList, flow.Identifier) *chunks.Assignment); ok {
+		r0 = rf(verifiers, _a1, blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*chunks.Assignment)
@@ -28,31 +28,8 @@ func (_m *ChunkAssigner) Assign(verifiers flow.IdentityList, result *flow.Execut
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.IdentityList, *flow.ExecutionResult) error); ok {
-		r1 = rf(verifiers, result)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetAssignedChunks provides a mock function with given fields: verifierID, assigment, result
-func (_m *ChunkAssigner) GetAssignedChunks(verifierID flow.Identifier, assigment *chunks.Assignment, result *flow.ExecutionResult) (flow.ChunkList, error) {
-	ret := _m.Called(verifierID, assigment, result)
-
-	var r0 flow.ChunkList
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *chunks.Assignment, *flow.ExecutionResult) flow.ChunkList); ok {
-		r0 = rf(verifierID, assigment, result)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.ChunkList)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, *chunks.Assignment, *flow.ExecutionResult) error); ok {
-		r1 = rf(verifierID, assigment, result)
+	if rf, ok := ret.Get(1).(func(flow.IdentityList, flow.ChunkList, flow.Identifier) error); ok {
+		r1 = rf(verifiers, _a1, blockID)
 	} else {
 		r1 = ret.Error(1)
 	}

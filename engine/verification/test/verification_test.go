@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -84,9 +83,6 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	completeER := utils.CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain())
 	result := &completeER.Receipt.ExecutionResult
 
-	// state
-	state := &protocol.State{}
-
 	// assigner and assignment
 	assigner := &mock.ChunkAssigner{}
 	assignment := chmodel.NewAssignment()
@@ -97,10 +93,8 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		}
 		assignment.Add(chunk, assignees)
 	}
-	myChunks := GetAssignedChunks(state, verIdentity.NodeID, assignment, result)
 
-	assigner.On("Assign", testifymock.Anything, result).Return(assignment, nil)
-	assigner.On("GetAssignedChunks", verIdentity.NodeID, assignment, result).Return(myChunks, nil)
+	assigner.On("Assign", testifymock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
 
 	// setup nodes
 	//

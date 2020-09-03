@@ -120,9 +120,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	processInterval := 1 * time.Second
 	failureThreshold := uint(2)
 	matchEng, matchEngWG := SetupMockMatchEng(t, exeID, results)
-	// assignment := mock.ChunkAssigner{}
 
-	// assignment.On("Assign", testifymock.Anything, testifymock.Anything).Return(nil, nil)
 	assignment := utils.NewMockAssigner(verID.NodeID, IsAssigned)
 
 	// creates a verification node with a real finder engine, and mock matching engine.

@@ -615,8 +615,8 @@ func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	assginment := chunks.NewAssignment()
-	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
+	assignment := chunks.NewAssignment()
+	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -635,8 +635,8 @@ func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	assginment := chunks.NewAssignment()
-	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
+	assignment := chunks.NewAssignment()
+	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
 
 	// use the happy-path stake checking function which always accepts
 	ms.matching.checkStakes = StakesAlwaysEnough
@@ -664,7 +664,7 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	// use the real stake checking function which requires +2/3 of total stakes
 	ms.matching.checkStakes = CheckApproversStakes
 
-	assginment := chunks.NewAssignment()
+	assignment := chunks.NewAssignment()
 
 	var approvers flow.IdentityList
 	approvers = append(approvers, ms.approvers[0])
@@ -688,10 +688,10 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	}
 
 	for _, chunk := range result.Chunks {
-		assginment.Add(chunk, approvers.NodeIDs())
+		assignment.Add(chunk, approvers.NodeIDs())
 	}
 
-	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
+	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -711,7 +711,7 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	// use the real stake checking function which requires +2/3 of total stakes
 	ms.matching.checkStakes = CheckApproversStakes
 
-	assginment := chunks.NewAssignment()
+	assignment := chunks.NewAssignment()
 
 	var approvers flow.IdentityList
 	approvers = append(approvers, ms.approvers[0])
@@ -731,10 +731,10 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	}
 
 	for _, chunk := range result.Chunks {
-		assginment.Add(chunk, approvers.NodeIDs())
+		assignment.Add(chunk, approvers.NodeIDs())
 	}
 
-	ms.assigner.On("Assign", mock.Anything, result).Return(assginment, nil)
+	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -929,7 +929,7 @@ func (ms *MatchingSuite) TestValidateVerifiers() {
 	}
 
 	// mock assigner
-	ms.assigner.On("Assign", mock.Anything, result).Return(assignment, nil)
+	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
 
 	// check if each chunk only has 3 validated approvers
 	for _, chunk := range result.Chunks {

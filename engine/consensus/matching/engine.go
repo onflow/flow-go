@@ -533,7 +533,7 @@ ResultLoop:
 		// get the approvals for this result
 		approvals := e.approvalsByResult[resultID]
 
-		assignment, err := e.assigner.Assign(verifiers, result)
+		assignment, err := e.assigner.Assign(verifiers, result.Chunks, result.BlockID)
 		if err != nil {
 			return nil, fmt.Errorf("could assign verifiers: %w", err)
 		}
@@ -593,7 +593,7 @@ func (e *Engine) validateApprovers(assignment *chunks.Assignment, approvals []*f
 			if _, ok := verifiersMap[approverID]; ok {
 				validApprovers = append(validApprovers, approverID)
 			} else {
-				e.log.Debug().
+				e.log.Error().
 					Uint64("chunk_index", chunk.Index).
 					Int("approver_index", index).
 					Msg("skipping invalid approver")

@@ -161,7 +161,7 @@ func main() {
 				return nil, err
 			}
 
-			assigner, err := chmodule.NewPublicAssignment(node.State, chmodule.DefaultChunkAssignmentAlpha)
+			assigner, err := chmodule.NewPublicAssignment(chmodule.DefaultChunkAssignmentAlpha, chmodule.CreateRNGByBlockIDClosure(node.State))
 			if err != nil {
 				return nil, fmt.Errorf("could not create public assignment: %w", err)
 			}

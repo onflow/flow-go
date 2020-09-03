@@ -8,11 +8,8 @@ import (
 
 // ChunkAssigner presents an interface for assigning chunks to the verifier nodes
 type ChunkAssigner interface {
-	// Assign generates the assignment using the execution result to seed the RNG
-	Assign(verifiers flow.IdentityList, result *flow.ExecutionResult) (*chmodels.Assignment, error)
-
-	// GetAssignedChunks returns the list of result chunks assigned to a specifig verifier
-	GetAssignedChunks(verifierID flow.Identifier, assigment *chmodels.Assignment, result *flow.ExecutionResult) (flow.ChunkList, error)
+	// Assign generates the assignment
+	Assign(verifiers flow.IdentityList, chunks flow.ChunkList, blockID flow.Identifier) (*chmodels.Assignment, error)
 }
 
 // ChunkVerifier provides functionality to verify chunks
