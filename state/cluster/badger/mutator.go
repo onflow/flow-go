@@ -23,8 +23,8 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
 		// check chain ID
-		if genesis.Header.ChainID != m.state.chainID {
-			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.Header.ChainID, m.state.chainID)
+		if genesis.Header.ChainID != m.state.clusterID {
+			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.Header.ChainID, m.state.clusterID)
 		}
 
 		// check header number
@@ -72,8 +72,8 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		payload := block.Payload
 
 		// check chain ID
-		if header.ChainID != m.state.chainID {
-			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
+		if header.ChainID != m.state.clusterID {
+			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.clusterID)
 		}
 
 		// get the chain ID, which determines which cluster state to query
