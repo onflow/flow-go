@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -321,103 +320,56 @@ func (n *Network) publish(channelID uint8, message interface{}, selector flow.Id
 	return nil
 }
 
-// unicast sends the message in a reliable way to the given recipients.
+// unicast sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
-// It returns an error if unicasting to any of the target IDs fails.
-func (n *Network) unicast(channelID uint8, message interface{}, targetIDs ...flow.Identifier) error {
-	if len(targetIDs) == 0 {
-		return fmt.Errorf("empty target ID list for the message")
+// It returns an error if unicasting fails.
+func (n *Network) unicast(channelID uint8, message interface{}, targetID flow.Identifier) error {
+	if targetID == n.me.NodeID() {
+		n.logger.Debug().Msg("network skips self unicasting")
+		return nil
 	}
 
 	// generates network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channelID, message, targetIDs...)
+	msg, err := n.genNetworkMessage(channelID, message, targetID)
 	if err != nil {
 		return fmt.Errorf("unicast could not generate network message: %w", err)
 	}
 
-	// sends message via direct 1-1 connections to target IDs
-	errors := &multierror.Error{}
-	for _, recipientID := range targetIDs {
-		if recipientID == n.me.NodeID() {
-			n.logger.Debug().Msg("network skips self unicasting")
-			continue
-		}
-
-		err = n.mw.SendDirect(msg, recipientID)
-		if err != nil {
-			errors = multierror.Append(errors, fmt.Errorf("failed to send message to %x: %w", recipientID, err))
-		}
-	}
-
-	if errors.Len() > 0 {
-		return fmt.Errorf("failed to unicast the message successfully: %s", errors.Error())
+	err = n.mw.SendDirect(msg, targetID)
+	if err != nil {
+		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
 	n.logger.Debug().
-		Int("successfully_sent_num", len(targetIDs)).
 		Msg("message successfully unicasted")
 
 	return nil
 }
 
-// multicast reliably sends the specified event over the channelID to the specified number of recipients selected from
+// multicast unreliably sends the specified event over the channelID to the specified number of recipients selected from
 // the specified subset.
 // The recipients are selected randomly from the set of identities defined by selectors.
-// In this context, reliable means that the event is sent across the network over a 1-1 direct messaging.
-// It returns an error if it cannot send the event to the specified number of nodes.
 func (n *Network) multicast(channelID uint8, message interface{}, num uint, selector flow.IdentityFilter) error {
 	// excludes this instance of network from list of targeted ids (if any)
 	// to avoid self loop on delivering this message.
 	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
 
-	// generates network message for the channel ID
-	msg, err := n.genNetworkMessage(channelID, message)
-	if err != nil {
-		return fmt.Errorf("multicast could not generate network message: %w", err)
-	}
-
 	// NOTE: this is where we can add our own selectors, for example to
 	// apply a blacklist or exclude nodes that are in exponential backoff
 	// because they were unavailable
 
-	// gets the set of identities from the protocol state using the selector
-	recipients := n.ids.Filter(selector)
+	// chooses `num`-many recipients based on selector
+	recipients := n.ids.Filter(selector).Sample(num).NodeIDs()
 	if len(recipients) < int(num) {
-		return fmt.Errorf("could not find recepients based on selector: Requested: %d, Found: %d", num,
-			len(recipients))
+		return fmt.Errorf("could not find recepients based on selector: Requested: %d, Found: %d", num, len(recipients))
 	}
 
-	// executes the delivery function to select a recipient until done
-	for sent := uint(0); sent < num; {
-		// selects a random recipient
-		recipientID := recipients.Sample(1)[0].NodeID
-		// if there are no valid recipients left, bail
-		if len(recipients) == 0 {
-			return fmt.Errorf("no valid recipients available (%d of %d sent)", num, sent)
-		}
-
-		// removes recipient from the list of recipients
-		recipients = recipients.Filter(filter.Not(filter.HasNodeID(recipientID)))
-
-		// sends the message and log if it skips due to an error
-		msg.TargetIDs = [][]byte{recipientID[:]}
-		err = n.mw.SendDirect(msg, recipientID)
-		if err != nil {
-			// TODO: mark as unavailable, start exponential backoff
-			n.logger.Debug().
-				Hex("recipient_id", recipientID[:]).
-				Int("requested_num", int(num)).
-				Int("successfully_sent_num", int(sent)).
-				Msg("skipping unavailable recipient on multicast")
-			continue
-		}
-
-		// increase the sent count
-		sent++
+	// publishes the message to the recipients
+	if err := n.publish(channelID, message, filter.HasNodeID(recipients...)); err != nil {
+		return fmt.Errorf("could not multicast message: %w", err)
 	}
 
 	n.logger.Debug().
-		Int("successfully_sent_num", int(num)).
 		Msg("message successfully multicasted")
 
 	return nil

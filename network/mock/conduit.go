@@ -61,20 +61,13 @@ func (_m *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error
 	return r0
 }
 
-// Unicast provides a mock function with given fields: event, targetIDs
-func (_m *Conduit) Unicast(event interface{}, targetIDs ...flow.Identifier) error {
-	_va := make([]interface{}, len(targetIDs))
-	for _i := range targetIDs {
-		_va[_i] = targetIDs[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, event)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+// Unicast provides a mock function with given fields: event, targetID
+func (_m *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
+	ret := _m.Called(event, targetID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(interface{}, ...flow.Identifier) error); ok {
-		r0 = rf(event, targetIDs...)
+	if rf, ok := ret.Get(0).(func(interface{}, flow.Identifier) error); ok {
+		r0 = rf(event, targetID)
 	} else {
 		r0 = ret.Error(0)
 	}

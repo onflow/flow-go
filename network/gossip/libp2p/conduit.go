@@ -15,12 +15,11 @@ type SubmitFunc func(channelID uint8, event interface{}, targetIDs ...flow.Ident
 type PublishFunc func(channelID uint8, event interface{}, selector flow.IdentityFilter) error
 
 // UnicastFunc is a function that reliably sends the event via reliable 1-1 direct
-// connections in  the underlying network to each of the target IDs.
-type UnicastFunc func(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error
+// connection in  the underlying network to the target ID.
+type UnicastFunc func(channelID uint8, event interface{}, targetID flow.Identifier) error
 
-// MulticastFunc is a function that reliably sends the event via reliable 1-1 direct
-// connections in the underlying network to randomly chosen subset of nodes specified by the
-// selector.
+// MulticastFunc is a function that unreliably sends the event in the underlying
+// network to randomly chosen subset of nodes specified by the selector.
 type MulticastFunc func(channelID uint8, event interface{}, num uint, selector flow.IdentityFilter) error
 
 // Conduit is a helper of the overlay layer which functions as an accessor for
@@ -48,18 +47,15 @@ func (c *Conduit) Publish(event interface{}, selector flow.IdentityFilter) error
 	return c.publish(c.channelID, event, selector)
 }
 
-// Unicast sends an event in a reliable way to the given recipients.
+// Unicast sends an event in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the event.
-// It returns an error if unicasting to any of the target IDs fails.
-func (c *Conduit) Unicast(event interface{}, targetIDs ...flow.Identifier) error {
-	return c.unicast(c.channelID, event, targetIDs...)
+// It returns an error if the unicast fails.
+func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
+	return c.unicast(c.channelID, event, targetID)
 }
 
-// Multicast reliably sends the specified event to
-// the specified number of recipients selected from the specified subset.
-// The recipients are selected randomly from the set of identities selected by the selectors.
-// In this context, reliable means that the event is sent across the network over a 1-1 direct messaging.
-// It returns an error if it cannot send the event to a randomly chosen subset of nodes based on selector.
+// Multicast unreliably sends the specified event to the specified number of recipients selected from the specified subset.
+// The recipients are selected randomly from the set of identifiers selected by the selectors.
 func (c *Conduit) Multicast(event interface{}, num uint, selector flow.IdentityFilter) error {
 	return c.multicast(c.channelID, event, num, selector)
 }
