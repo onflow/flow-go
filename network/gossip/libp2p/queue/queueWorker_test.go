@@ -52,7 +52,8 @@ func testWorkers(t *testing.T, maxPriority int, messageCnt int, workerCnt int) {
 		if priority == 0 {
 			priority = maxPriority
 		}
-		q.Insert(priority)
+		err := q.Insert(priority)
+		assert.NoError(t, err)
 	}
 
 	// create all the workers

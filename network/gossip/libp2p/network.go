@@ -433,5 +433,12 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	}
 
 	// submit the message to the engine synchronously
-	en.Process(qm.SenderID, qm.Payload)
+	err := en.Process(qm.SenderID, qm.Payload)
+	if err != nil {
+		n.logger.Error().
+			Uint8("channel_ID", qm.ChannelID).
+			Str("sender_id", qm.SenderID.String()).
+			Err(err).
+			Msg("failed to process message")
+	}
 }

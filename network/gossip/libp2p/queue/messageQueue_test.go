@@ -45,7 +45,8 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 	// insert all elements in the queue
 	for msg, p := range messages {
 
-		mq.Insert(msg)
+		err := mq.Insert(msg)
+		assert.NoError(t, err)
 
 		// remember insertion order to check later
 		queues[p] = append(queues[p], msg)
@@ -75,11 +76,17 @@ func BenchmarkPush(b *testing.B) {
 	b.StopTimer()
 	var mq = queue.NewMessageQueue(randomPriority)
 	for i := 0; i < b.N; i++ {
-		mq.Insert("test")
+		err := mq.Insert("test")
+		if err != nil {
+			b.Error(err)
+		}
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		mq.Insert("test")
+		err := mq.Insert("test")
+		if err != nil {
+			b.Error(err)
+		}
 	}
 }
 
@@ -87,7 +94,10 @@ func BenchmarkPop(b *testing.B) {
 	b.StopTimer()
 	var mq = queue.NewMessageQueue(randomPriority)
 	for i := 0; i < b.N; i++ {
-		mq.Insert("test")
+		err := mq.Insert("test")
+		if err != nil {
+			b.Error(err)
+		}
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
