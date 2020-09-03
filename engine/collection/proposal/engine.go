@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/engine"
-	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -46,13 +44,6 @@ type Engine struct {
 	payloads       storage.ClusterPayloads
 	pending        module.PendingClusterBlockBuffer // pending block cache
 	cluster        flow.IdentityList                // consensus participants in our cluster
-
-	// dependencies we need to bootstrap new chain when crossing epoch boundaries
-	db           *badger.DB
-	net          module.Network   //
-	builder      module.Builder   // used by HotStuff to build block payloads
-	finalizer    module.Finalizer // used by HotStuff to mark blocks as finalized
-	hotstuffOpts []consensus.Option
 
 	sync     module.BlockRequester
 	hotstuff module.HotStuff
@@ -282,7 +273,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Msg("broadcast proposal from hotstuff")
 
 		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
-		block := &clustermodel.Block{
+		block := &cluster.Block{
 			Header:  header,
 			Payload: payload,
 		}
@@ -474,7 +465,7 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 
 	// extend the state with the proposal -- if it is an invalid extension,
 	// we will throw an error here
-	block := &clustermodel.Block{
+	block := &cluster.Block{
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
