@@ -184,8 +184,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node := GenericNode(t, hub, identity, identities, chainID)
 
-	resultsDB := storage.NewExecutionResults(node.DB)
-	sealsDB := storage.NewSeals(node.Metrics, node.DB)
+	sealedResultsDB := storage.NewExecutionResults(node.DB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -211,7 +210,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, chunks.CreateRNGByBlockIDClosure(node.State))
 	require.Nil(t, err)
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals, assigner, matching.StakesAlwaysEnough)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, sealedResultsDB, node.Headers, node.Index, results, receipts, approvals, seals, assigner, matching.StakesAlwaysEnough)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{

@@ -45,8 +45,7 @@ type Engine struct {
 	state                   protocol.State                                       // used to access the  protocol state
 	me                      module.Local                                         // used to access local node information
 	requester               module.Requester                                     // used to request missing execution receipts by block ID
-	resultsDB               storage.ExecutionResults                             // used to permanently store results
-	sealsDB                 storage.Seals                                        // used to check existing seals
+	sealedResultsDB         storage.ExecutionResults                             // used to permanently store sealed results
 	headersDB               storage.Headers                                      // used to check sealed headers
 	indexDB                 storage.Index                                        // used to check payloads for results
 	results                 mempool.Results                                      // holds execution results in memory
@@ -72,8 +71,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	requester module.Requester,
-	resultsDB storage.ExecutionResults,
-	sealsDB storage.Seals,
+	sealedResultsDB storage.ExecutionResults,
 	headersDB storage.Headers,
 	indexDB storage.Index,
 	results mempool.Results,
@@ -94,8 +92,7 @@ func New(
 		state:                   state,
 		me:                      me,
 		requester:               requester,
-		resultsDB:               resultsDB,
-		sealsDB:                 sealsDB,
+		sealedResultsDB:         sealedResultsDB,
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
 		results:                 results,
@@ -251,9 +248,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return engine.NewInvalidInputErrorf("executor has zero stake (%x)", identity.NodeID)
 	}
 
-	// check if the result of this receipt is already in the DB
+	// check if the result of this receipt is already sealed.
 	result := &receipt.ExecutionResult
-	_, err = e.resultsDB.ByID(result.ID())
+	_, err = e.sealedResultsDB.ByID(result.ID())
 	if err == nil {
 		log.Debug().Msg("discarding receipt for sealed result")
 		return nil
@@ -327,8 +324,8 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return engine.NewInvalidInputErrorf("verifier has zero stake (%x)", identity.NodeID)
 	}
 
-	// check if the result of this approval is already in the dB
-	_, err = e.resultsDB.ByID(approval.Body.ExecutionResultID)
+	// check if the result of this approval is already sealed
+	_, err = e.sealedResultsDB.ByID(approval.Body.ExecutionResultID)
 	if err == nil {
 		log.Debug().Msg("discarding approval for sealed result")
 		return nil
@@ -629,17 +626,17 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
 	// ensure that previous result is known and sealed.
 	previousID := result.PreviousResultID
-	previous, err := e.resultsDB.ByID(previousID)
+	previous, err := e.sealedResultsDB.ByID(previousID)
 	if err != nil {
 		return errUnsealedPrevious
 	}
 
 	// store the result to make it persistent for later checks
-	err = e.resultsDB.Store(result)
+	err = e.sealedResultsDB.Store(result)
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
 	}
-	err = e.resultsDB.Index(result.BlockID, result.ID())
+	err = e.sealedResultsDB.Index(result.BlockID, result.ID())
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not index sealing result: %w", err)
 	}
@@ -650,13 +647,6 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 		ResultID:     result.ID(),
 		InitialState: previous.FinalStateCommit,
 		FinalState:   result.FinalStateCommit,
-	}
-
-	// don't add the seal if it's already been included in a proposal
-	sealID := seal.ID()
-	_, err = e.sealsDB.ByID(sealID)
-	if err == nil {
-		return nil
 	}
 
 	// we don't care whether the seal is already in the mempool
@@ -787,7 +777,7 @@ func (e *Engine) requestPending() error {
 		blockID := header.ID()
 
 		// check if we have an execution result for the block at this height
-		_, err = e.resultsDB.ByBlockID(blockID)
+		_, err = e.sealedResultsDB.ByBlockID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
 			continue
