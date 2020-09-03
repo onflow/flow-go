@@ -11,22 +11,14 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 )
 
-func randomPriority (_ interface{}) (queue.Priority, error) {
-	rand.Seed(time.Now().UnixNano())
-	p := rand.Intn(int(queue.High_Priority - queue.Low_Priority + 1)) + int(queue.Low_Priority)
-	return queue.Priority(p), nil
-}
-
-func fixedPriority (_ interface{}) (queue.Priority, error) {
-	return queue.Priority_5, nil
-}
-
+// TestRetrievalByPriority tests that message can be retrieved in priority order
 func TestRetrievalByPriority(t *testing.T) {
 	// create a map of messages -> priority with messages assigned random priorities
 	messages := createMessages(1000, randomPriority)
 	testQueue(t, messages)
 }
 
+// TestRetrievalByInsertionOrder tests that messages with the same priority can be retrieved in insertion order
 func TestRetrievalByInsertionOrder(t *testing.T) {
 
 	// create a map of messages -> priority with messages assigned fixed priorities
@@ -37,13 +29,13 @@ func TestRetrievalByInsertionOrder(t *testing.T) {
 func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 	// create the priority function
-	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) (queue.Priority, error) {
-		return messages[message.(string)], nil
+	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) queue.Priority {
+		return messages[message.(string)]
 	}
 
 	// create queues for each priority to check expectations later
 	queues := make(map[queue.Priority][]string)
-	for p:=queue.Low_Priority;p<=queue.High_Priority;p++ {
+	for p := queue.Low_Priority; p <= queue.High_Priority; p++ {
 		queues[p] = make([]string, 0)
 	}
 
@@ -61,16 +53,17 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 		time.Sleep(1 * time.Millisecond)
 	}
 
+	// create a slice of the expected messages in the order in which they are expected
 	var expectedMessages []string
-	for p:= queue.High_Priority;p>=queue.Low_Priority;p-- {
+	for p := queue.High_Priority; p >= queue.Low_Priority; p-- {
 		expectedMessages = append(expectedMessages, queues[p]...)
 	}
 
 	// check queue length
 	assert.Equal(t, len(expectedMessages), mq.Len())
 
-	// check that elements are retrieved in priority order
-	for i:=0;i<len(expectedMessages);i++{
+	// check that elements are retrieved in order
+	for i := 0; i < len(expectedMessages); i++ {
 
 		item := mq.Remove()
 
@@ -78,8 +71,7 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 	}
 }
 
-
-func  BenchmarkPush(b *testing.B) {
+func BenchmarkPush(b *testing.B) {
 	b.StopTimer()
 	var mq = queue.NewMessageQueue(randomPriority)
 	for i := 0; i < b.N; i++ {
@@ -91,8 +83,7 @@ func  BenchmarkPush(b *testing.B) {
 	}
 }
 
-
-func  BenchmarkPop(b *testing.B) {
+func BenchmarkPop(b *testing.B) {
 	b.StopTimer()
 	var mq = queue.NewMessageQueue(randomPriority)
 	for i := 0; i < b.N; i++ {
@@ -104,18 +95,28 @@ func  BenchmarkPop(b *testing.B) {
 	}
 }
 
-func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[string]queue.Priority{
+func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[string]queue.Priority {
 	msgPrefix := "message"
 	// create a map of messages -> priority
 	messages := make(map[string]queue.Priority, messageCnt)
 
-	for i:=0;i<messageCnt;i++ {
+	for i := 0; i < messageCnt; i++ {
 		// choose a random priority
-		p, _ := priorityFunc(nil)
+		p := priorityFunc(nil)
 		// create a message
 		msg := msgPrefix + strconv.Itoa(i)
 		messages[msg] = p
 	}
 
 	return messages
+}
+
+func randomPriority(_ interface{}) queue.Priority {
+	rand.Seed(time.Now().UnixNano())
+	p := rand.Intn(int(queue.High_Priority-queue.Low_Priority+1)) + int(queue.Low_Priority)
+	return queue.Priority(p)
+}
+
+func fixedPriority(_ interface{}) queue.Priority {
+	return queue.Priority_5
 }

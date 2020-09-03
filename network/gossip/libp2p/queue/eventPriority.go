@@ -1,21 +1,38 @@
 package queue
 
 import (
+	"math"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/network"
 )
 
-type EventPriority struct {
-	codec network.Codec
+const (
+	_   = iota
+	KiB = 1 << (10 * iota)
+	MiB
+)
+
+// QueueMessage is the message that is enqueued for each incoming message
+type QueueMessage struct {
+	Payload   interface{}     // the decoded message
+	Size      int             // the size of the message in bytes
+	ChannelID uint8           // the channel id to use to lookup the engine
+	SenderID  flow.Identifier // senderID for logging
 }
 
-func GetEventPriority(message interface{}) (Priority, error) {
-
+// GetEventPriority returns the priority of the flow event message.
+// It is an average of the priority by message type and priority by message size
+func GetEventPriority(message interface{}) Priority {
+	qm := message.(QueueMessage)
+	priorityByType := getPriorityByType(qm.Payload)
+	priorityBySize := getPriorityBySize(qm.Size)
+	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2))
 }
 
+// getPriorityByType returns the priority of a message by it's type
 func getPriorityByType(message interface{}) Priority {
-	switch v.(type) {
+	switch message.(type) {
 	// consensus
 	case *messages.BlockProposal:
 		return High_Priority
@@ -76,5 +93,17 @@ func getPriorityByType(message interface{}) Priority {
 
 	default:
 		return Medium_Priority
+	}
+}
+
+// getPriorityBySize returns a priority of a message by size. Smaller messages have higher priority than larger ones.
+func getPriorityBySize(size int) Priority {
+	switch {
+	case size > MiB:
+		return Low_Priority
+	case size > KiB:
+		return Medium_Priority
+	default:
+		return High_Priority
 	}
 }

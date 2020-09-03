@@ -5,13 +5,19 @@ import (
 	"sync"
 )
 
+// MessageQueue is the interface of the inbound message queue
 type MessageQueue interface {
+	// Insert inserts the message in queue
 	Insert(message interface{}) error
+	// Remove removes the message from the queue in priority order. If no message is found, this call blocks.
+	// If two messages have the same priority, items are de-queued in insertion order
 	Remove() interface{}
+	// Len gives the current length of the queue
 	Len() int
 }
 
 type Priority int
+
 const Priority_1 Priority = 1
 const Priority_2 Priority = 2
 const Priority_3 Priority = 3
@@ -27,21 +33,20 @@ const Low_Priority = Priority_1
 const Medium_Priority = Priority_5
 const High_Priority = Priority_10
 
-type MessagePriorityFunc func(message interface{}) (Priority, error)
+// MessagePriorityFunc - the callback function to derive priority of a message
+type MessagePriorityFunc func(message interface{}) Priority
 
+// MessageQueueImpl is the heap based priority queue implementation of the MessageQueue implementation
 type MessageQueueImpl struct {
-	pq   *priorityQueue
-	cond *sync.Cond
+	pq           *priorityQueue
+	cond         *sync.Cond
 	priorityFunc MessagePriorityFunc
 }
 
 func (mq *MessageQueueImpl) Insert(message interface{}) error {
 
 	// determine the message priority
-	priority, err := mq.priorityFunc(message)
-	if err != nil {
-		return err
-	}
+	priority := mq.priorityFunc(message)
 
 	// create the queue item
 	item := &item{
@@ -83,7 +88,7 @@ func NewMessageQueue(priorityFunc MessagePriorityFunc) *MessageQueueImpl {
 	var items = make([]*item, 0)
 	pq := priorityQueue(items)
 	mq := &MessageQueueImpl{
-		pq:   &pq,
+		pq:           &pq,
 		priorityFunc: priorityFunc,
 	}
 	m := sync.Mutex{}
