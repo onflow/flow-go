@@ -112,6 +112,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not lookup sealed block: %w", err)
 	}
 
+	// lastSeal is passed by reference to buildNextPayload which will move it as
+	// it iterates throught the seal mempool. So after buildNextPayload,
+	// lastSeal will point to the last seal from storage OR mempool.
 	lastSeal, err := b.seals.ByBlockID(sealedID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve last seal (%x): %w", sealedID, err)
@@ -175,7 +178,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	blockID := proposal.ID()
 	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
 
-		// XXX Why is this necessary?
+		// Index the last sealed height for this block, so that we could know
+		// the highest sealed block at this block. The last sealed height is
+		// useful for matching engine to reject execution results or result
+		// approvals if the block has already been sealed.
 		err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index proposal seal: %w", err)
