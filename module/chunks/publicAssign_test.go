@@ -171,8 +171,9 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	copy(original, ids)
 
 	// create result seed with 4 chunks
-	result = a.CreateResult(head, 4, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	result2 := a.CreateResult(head, 4, a.T())
+	seed2 := a.HashResult(result2, a.T())
+	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed2, nil)
 
 	// Randomness:
 	rng1, err := a.rngByBlockID(head.ID())
