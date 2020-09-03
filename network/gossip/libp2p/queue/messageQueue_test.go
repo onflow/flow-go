@@ -3,6 +3,8 @@ package queue_test
 import (
 	"math/rand"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,6 +26,68 @@ func TestRetrievalByInsertionOrder(t *testing.T) {
 	// create a map of messages -> priority with messages assigned fixed priorities
 	messages := createMessages(1000, fixedPriority)
 	testQueue(t, messages)
+}
+
+// TestConcurrentQueueAccess tests that the queue can be safely accessed concurrently
+func TestConcurrentQueueAccess(t *testing.T) {
+	writerCnt := 5
+	readerCnt := 5
+	messageCnt := 1000
+
+	messages := createMessages(messageCnt, randomPriority)
+
+	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) queue.Priority {
+		return messages[message.(string)]
+	}
+
+	msgChan := make(chan string, len(messages))
+	for k := range messages {
+		msgChan <- k
+	}
+	close(msgChan)
+
+	mq := queue.NewMessageQueue(priorityFunc)
+
+	writeWg := sync.WaitGroup{}
+	write := func() {
+		defer writeWg.Done()
+		for msg := range msgChan {
+			err := mq.Insert(msg)
+			assert.NoError(t, err)
+		}
+	}
+	var readMsgCnt int64
+	done := make(chan struct{})
+	defer close(done)
+	read := func() {
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				mq.Remove()
+				atomic.AddInt64(&readMsgCnt, 1)
+			}
+		}
+	}
+
+	// kick off writers
+	for i:=0;i<writerCnt;i++{
+		writeWg.Add(1)
+		go write()
+	}
+
+	// kick off readers
+	for i:=0;i<readerCnt;i++{
+		go read()
+	}
+
+	writeWg.Wait()
+
+	assert.Eventually(t, func() bool {
+		actualCnt := atomic.LoadInt64(&readMsgCnt)
+		return int64(messageCnt) ==  actualCnt
+	}, 5 * time.Second, 5 * time.Millisecond)
 }
 
 func testQueue(t *testing.T, messages map[string]queue.Priority) {

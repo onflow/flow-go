@@ -10,9 +10,14 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 )
 
+// TestSingleQueueWorkers tests that a single worker can successfully read all elements from the queue
+func TestSingleQueueWorker(t *testing.T) {
+	testWorkers(t, 10, 100, 1)
+}
+
 // TestMultipleQueueWorkers tests that multiple workers can successfully read all elements from the queue
 func TestMultipleQueueWorkers(t *testing.T) {
-	for i := 1; i < 10; i++ {
+	for i := 2; i < 10; i++ {
 		testWorkers(t, 10, 100, i)
 	}
 }
