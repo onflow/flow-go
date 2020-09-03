@@ -22,8 +22,8 @@ type Conduit interface {
 	// nodes on its path across the network. The network codec needs to be aware
 	// of how to encode the given event type, otherwise the send will fail.
 	//
-	// Deprecated: Submit method is deprecated and is planned to be removed
-	// soon. Alternative methods are recommended, e.g., Publish, Unicast, and Multicast.
+	// Note: Submit method is planned for deprecation soon.
+	// Alternative methods are recommended, e.g., Publish, Unicast, and Multicast.
 	Submit(event interface{}, targetIDs ...flow.Identifier) error
 
 	// Publish submits an event to the network layer for unreliable delivery
