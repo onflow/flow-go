@@ -98,6 +98,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 			metrics,
 			uint(9000),
 			nil,
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -209,6 +210,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			metrics,
 			collectionGrpcPort,
 			connFactory, // passing in the connection factory
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -276,6 +278,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			metrics.NewNoopCollector(),
 			0,
 			nil,
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -380,7 +383,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			suite.chainID, metrics, 0)
+			suite.chainID, metrics, 0, false)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
@@ -400,6 +403,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			metrics,
 			0,
 			nil,
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -471,6 +475,7 @@ func (suite *Suite) TestExecuteScript() {
 			metrics.NewNoopCollector(),
 			0,
 			nil,
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())

@@ -25,10 +25,10 @@ type flowAccount struct {
 	signerLock sync.Mutex
 }
 
-func newFlowAccount(i int, address *flowsdk.Address,
-	accountKey *flowsdk.AccountKey,
-	signer crypto.InMemorySigner) *flowAccount {
-	return &flowAccount{address: address,
+func newFlowAccount(i int, address *flowsdk.Address, accountKey *flowsdk.AccountKey, signer crypto.InMemorySigner) *flowAccount {
+	return &flowAccount{
+		i:          i,
+		address:    address,
 		accountKey: accountKey,
 		signer:     signer,
 		seqNumber:  uint64(0),

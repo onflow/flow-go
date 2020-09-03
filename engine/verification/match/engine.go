@@ -139,14 +139,25 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
 	switch resource := event.(type) {
 	case *flow.ExecutionResult:
-		return e.handleExecutionResult(originID, resource)
+		err = e.handleExecutionResult(originID, resource)
 	case *messages.ChunkDataResponse:
-		return e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
+		err = e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	if err != nil {
+		// logs the error instead of returning that.
+		// returning error would be projected at a higher level by network layer.
+		// however, this is an engine-level error, and not network layer error.
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // handleExecutionResult takes a execution result and finds chunks that are assigned to this

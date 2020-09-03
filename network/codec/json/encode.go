@@ -78,7 +78,7 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeEntityResponse
 
 	// testing
-	case *message.Echo:
+	case *message.TestMessage:
 		code = CodeEcho
 
 	default:

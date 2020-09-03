@@ -283,6 +283,7 @@ func MessageToAccountKey(m *entities.AccountKey) (*flow.AccountPublicKey, error)
 	}
 
 	return &flow.AccountPublicKey{
+		Index:     int(m.GetIndex()),
 		PublicKey: publicKey,
 		SignAlgo:  sigAlgo,
 		HashAlgo:  hashAlgo,

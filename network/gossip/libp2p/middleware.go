@@ -35,7 +35,13 @@ const (
 	OneToK
 )
 
-const DefaultMaxPubSubMsgSize = 1 << 21 //2mb
+const (
+	// defines maximum message size in publish and multicast modes
+	DefaultMaxPubSubMsgSize = 1 << 21 // 2 mb
+
+	// defines maximum message size in unicast mode
+	DefaultMaxUnicastMsgSize = 5 * DefaultMaxPubSubMsgSize // 10 mb
+)
 
 // the inbound message queue size for One to One and One to K messages (each)
 const InboundMessageQueueSize = 100
@@ -44,28 +50,29 @@ const InboundMessageQueueSize = 100
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx              context.Context
-	cancel           context.CancelFunc
-	log              zerolog.Logger
-	codec            network.Codec
-	ov               middleware.Overlay
-	wg               *sync.WaitGroup
-	libP2PNode       *P2PNode
-	stop             chan struct{}
-	me               flow.Identifier
-	host             string
-	port             string
-	key              crypto.PrivateKey
-	metrics          module.NetworkMetrics
-	maxPubSubMsgSize int
-	rootBlockID      string
-	validators       []validators.MessageValidator
+	ctx               context.Context
+	cancel            context.CancelFunc
+	log               zerolog.Logger
+	codec             network.Codec
+	ov                middleware.Overlay
+	wg                *sync.WaitGroup
+	libP2PNode        *P2PNode
+	stop              chan struct{}
+	me                flow.Identifier
+	host              string
+	port              string
+	key               crypto.PrivateKey
+	metrics           module.NetworkMetrics
+	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
+	maxUnicastMsgSize int // used to define maximum message size in unicast mode
+	rootBlockID       string
+	validators        []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, metrics module.NetworkMetrics, maxPubSubMsgSize int,
+	key crypto.PrivateKey, metrics module.NetworkMetrics, maxUnicastMsgSize int, maxPubSubMsgSize int,
 	rootBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
@@ -84,23 +91,28 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		maxPubSubMsgSize = DefaultMaxPubSubMsgSize
 	}
 
+	if maxUnicastMsgSize <= 0 {
+		maxUnicastMsgSize = DefaultMaxUnicastMsgSize
+	}
+
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
-		ctx:              ctx,
-		cancel:           cancel,
-		log:              log,
-		codec:            codec,
-		libP2PNode:       p2p,
-		wg:               &sync.WaitGroup{},
-		stop:             make(chan struct{}),
-		me:               flowID,
-		host:             ip,
-		port:             port,
-		key:              key,
-		metrics:          metrics,
-		maxPubSubMsgSize: maxPubSubMsgSize,
-		rootBlockID:      rootBlockID,
-		validators:       validators,
+		ctx:               ctx,
+		cancel:            cancel,
+		log:               log,
+		codec:             codec,
+		libP2PNode:        p2p,
+		wg:                &sync.WaitGroup{},
+		stop:              make(chan struct{}),
+		me:                flowID,
+		host:              ip,
+		port:              port,
+		key:               key,
+		metrics:           metrics,
+		maxPubSubMsgSize:  maxPubSubMsgSize,
+		maxUnicastMsgSize: maxUnicastMsgSize,
+		rootBlockID:       rootBlockID,
+		validators:        validators,
 	}
 
 	return m, err
@@ -264,10 +276,16 @@ func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.I
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-
 	targetAddress, err := m.nodeAddressFromID(targetID)
 	if err != nil {
 		return err
+	}
+
+	if msg.Size() > m.maxUnicastMsgSize {
+		// message size goes beyond maximum size that the serializer can handle.
+		// proceeding with this message results in closing the connection by the target side, and
+		// delivery failure.
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), m.maxUnicastMsgSize)
 	}
 
 	// create new stream
@@ -377,7 +395,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		Logger()
 
 	// initialize the encoder/decoder and create the connection handler
-	conn := NewReadConnection(log, s)
+	conn := NewReadConnection(log, s, m.maxUnicastMsgSize)
 
 	// make sure we close the connection when we are done handling the peer
 	defer conn.stop()

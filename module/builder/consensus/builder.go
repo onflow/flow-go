@@ -38,9 +38,10 @@ func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.He
 
 	// initialize default config
 	cfg := Config{
-		minInterval: 500 * time.Millisecond,
-		maxInterval: 10 * time.Second,
-		expiry:      flow.DefaultTransactionExpiry,
+		minInterval:  500 * time.Millisecond,
+		maxInterval:  10 * time.Second,
+		maxSealCount: 100,
+		expiry:       flow.DefaultTransactionExpiry,
 	}
 
 	// apply option parameters
@@ -216,10 +217,18 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// enter this loop, because last sealed height is higher than finalized
 	unchained := false
 	var seals []*flow.Seal
+	var sealCount uint
 	for height := sealed.Height + 1; height <= finalized; height++ {
 		if len(byBlock) == 0 {
 			break
 		}
+
+		// add at most <maxSealCount> number of seals in a new block proposal
+		// in order to prevent the block payload from being too big.
+		if sealCount >= b.cfg.maxSealCount {
+			break
+		}
+
 		header, err := b.headers.ByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block for height (%d): %w", height, err)
@@ -234,6 +243,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			return nil, fmt.Errorf("seal execution states do not connect in finalized")
 		}
 		seals = append(seals, next)
+		sealCount++
 		delete(byBlock, blockID)
 		last = next
 	}

@@ -53,12 +53,19 @@ func (n *TopologyTestSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	// creates a middleware instance
-	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID, key, metrics,
-		libp2p.DefaultMaxPubSubMsgSize, unittest.IdentifierFixture().String())
+	mw, err := libp2p.NewMiddleware(logger,
+		json.NewCodec(),
+		"0.0.0.0:0",
+		me.NodeID,
+		key,
+		metrics,
+		libp2p.DefaultMaxUnicastMsgSize,
+		libp2p.DefaultMaxPubSubMsgSize,
+		unittest.IdentifierFixture().String())
 	require.NoError(n.Suite.T(), err)
 
 	// creates and mocks a network instance
-	nets, err := CreateNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
+	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
 	require.NoError(n.Suite.T(), err)
 	require.Len(n.Suite.T(), nets, 1)
 	n.nets = nets[0]
