@@ -21,8 +21,7 @@ import (
 //      - a block is received
 //      - a new view is started
 //      - a timeout is processed
-//   * Each path through the state machine is identified by a unique id. As ID, we use the
-//     id of the respective trigger (vote, block,
+//   * Each path through the state machine is identified by a unique id.
 // Generally, the TelemetryConsumer could export the collected data to a variety of backends.
 // For now, we export the data to a logger.
 //
