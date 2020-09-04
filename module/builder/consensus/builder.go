@@ -32,6 +32,7 @@ type Builder struct {
 	guarPool mempool.Guarantees
 	sealPool mempool.Seals
 	recPool  mempool.Receipts
+	resPool  mempool.Results
 	cfg      Config
 }
 
@@ -45,6 +46,7 @@ func NewBuilder(metrics module.MempoolMetrics,
 	guarPool mempool.Guarantees,
 	sealPool mempool.Seals,
 	recPool mempool.Receipts,
+	resPool mempool.Results,
 	options ...func(*Config)) *Builder {
 
 	// initialize default config
@@ -70,6 +72,7 @@ func NewBuilder(metrics module.MempoolMetrics,
 		guarPool: guarPool,
 		sealPool: sealPool,
 		recPool:  recPool,
+		resPool:  resPool,
 		cfg:      cfg,
 	}
 	return b
@@ -162,6 +165,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 		return nil
 	})
+
+	// add execution results to the mempool for the matching engine to seal
+	// them
+	for _, rec := range payload.Receipts {
+		b.resPool.Add(&rec.ExecutionResult)
+	}
 
 	return header, err
 }

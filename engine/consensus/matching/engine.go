@@ -265,17 +265,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
-	// store the result belonging to the receipt in the memory pool
-	added = e.results.Add(result)
-	if !added {
-		e.log.Debug().Msg("skipping result already in mempool")
-		return nil
-	}
-
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
-
-	e.log.Info().Msg("execution result added to mempool")
-
 	// kick off a check for potential seal formation
 	go e.checkSealing()
 
@@ -369,32 +358,32 @@ func (e *Engine) checkSealing() {
 	start := time.Now()
 
 	// get all results that have collected enough approvals on a per-chunk basis
-	results, err := e.matchedResults()
+	matchedResults, err := e.matchedResults()
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not get sealable execution results")
 		return
 	}
 
 	// skip if no results can be sealed yet
-	if len(results) == 0 {
+	if len(matchedResults) == 0 {
 		return
 	}
 
 	// don't overflow the seal mempool
 	space := e.seals.Limit() - e.seals.Size()
-	if len(results) > int(space) {
+	if len(matchedResults) > int(space) {
 		e.log.Debug().
 			Int("space", int(space)).
-			Int("results", len(results)).
+			Int("results", len(matchedResults)).
 			Msg("cut and return the first x results")
-		results = results[:space]
+		matchedResults = matchedResults[:space]
 	}
 
-	e.log.Info().Int("num_results", len(results)).Msg("identified sealable execution results")
+	e.log.Info().Int("num_results", len(matchedResults)).Msg("identified sealable execution results")
 
 	// Start spans for tracing within the parent spans trace.CONProcessBlock and
 	// trace.CONProcessCollection
-	for _, result := range results {
+	for _, result := range matchedResults {
 		// For each execution result, we load the trace.CONProcessBlock span for the executed block. If we find it, we
 		// start a child span that will run until this function returns.
 		if span, ok := e.tracer.GetSpan(result.BlockID, trace.CONProcessBlock); ok {
@@ -422,7 +411,7 @@ func (e *Engine) checkSealing() {
 	// seal the matched results
 	var sealedResultIDs []flow.Identifier
 	var sealedBlockIDs []flow.Identifier
-	for _, result := range results {
+	for _, result := range matchedResults {
 
 		log := e.log.With().
 			Hex("result_id", logging.Entity(result)).
@@ -722,13 +711,9 @@ func (e *Engine) requestPending() error {
 		blockID := header.ID()
 
 		// check if we have an execution result for the block at this height
-		_, err = e.sealedResultsDB.ByBlockID(blockID)
-		if errors.Is(err, storage.ErrNotFound) {
+		_, ok := e.results.ByID(blockID)
+		if !ok {
 			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("could not get execution result (block_id=%x): %w", blockID, err)
 		}
 	}
 

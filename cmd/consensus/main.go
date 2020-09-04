@@ -255,6 +255,7 @@ func main() {
 				guarantees,
 				seals,
 				receipts,
+				results,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)

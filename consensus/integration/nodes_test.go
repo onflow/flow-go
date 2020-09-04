@@ -190,9 +190,11 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 	receipts, err := stdmap.NewReceipts(receiptLimit)
 	require.NoError(t, err)
+	results, err := stdmap.NewResults(receiptLimit)
+	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, indexDB, blocksDB, guarantees, seals, receipts)
+	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, indexDB, blocksDB, guarantees, seals, receipts, results)
 
 	signer := &Signer{identity.ID()}
 

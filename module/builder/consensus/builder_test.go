@@ -35,9 +35,10 @@ type BuilderSuite struct {
 	chain             []*flow.Seal      // chain of seals starting first
 
 	// stored data
-	pendingGuarantees []*flow.CollectionGuarantee
-	pendingSeals      []*flow.Seal
-	pendingReceipts   []*flow.ExecutionReceipt
+	pendingGuarantees   []*flow.CollectionGuarantee
+	pendingSeals        []*flow.Seal
+	pendingReceipts     []*flow.ExecutionReceipt
+	incorporatedResults []*flow.ExecutionResult
 
 	seals   map[flow.Identifier]*flow.Seal
 	headers map[flow.Identifier]*flow.Header
@@ -61,6 +62,7 @@ type BuilderSuite struct {
 	guarPool *mempool.Guarantees
 	sealPool *mempool.Seals
 	recPool  *mempool.Receipts
+	resPool  *mempool.Results
 
 	// tracking behaviour
 	assembled  *flow.Payload     // built payload
@@ -114,6 +116,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.pendingGuarantees = nil
 	bs.pendingSeals = nil
 	bs.pendingReceipts = nil
+	bs.incorporatedResults = nil
 
 	// initialise the dbs
 	bs.lastSeal = nil
@@ -302,6 +305,15 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.remRecIDs = append(bs.remRecIDs, recID)
 	}).Return(true)
 
+	bs.resPool = &mempool.Results{}
+	bs.resPool.On("Size").Return(uint(0))
+	bs.resPool.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*flow.ExecutionResult)
+			bs.incorporatedResults = append(bs.incorporatedResults, res)
+		},
+	).Return(true)
+
 	// initialize the builder
 	bs.build = NewBuilder(
 		noop,
@@ -313,6 +325,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.guarPool,
 		bs.sealPool,
 		bs.recPool,
+		bs.resPool,
 	)
 
 	bs.build.cfg.expiry = 11
@@ -565,6 +578,7 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 
 	// create valid receipts for known, unsealed blocks
 	receipts := []*flow.ExecutionReceipt{}
+	results := []*flow.ExecutionResult{}
 	var i uint64
 	for i = 0; i < 5; i++ {
 		pendingReceipt := unittest.ExecutionReceiptFixture()
@@ -572,6 +586,7 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 			Height: i,
 		}
 		receipts = append(receipts, pendingReceipt)
+		results = append(results, &pendingReceipt.ExecutionResult)
 	}
 
 	// shuffle receipts
@@ -586,6 +601,7 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 	bs.Require().NoError(err)
 	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain receipts ordered by block height")
 	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
+	bs.Assert().ElementsMatch(bs.incorporatedResults, results, "should insert incorporated results in mempool")
 }
 
 // Payloads can contain multiple receipts for a given block.

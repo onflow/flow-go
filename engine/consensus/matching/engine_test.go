@@ -389,36 +389,6 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore already pending receipt")
 
-	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
-	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-func (ms *MatchingSuite) TestOnReceiptPendingResult() {
-
-	// try to submit a receipt for a sealed result
-	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
-	receipt.ExecutorID = originID
-
-	// check parameters are correct for calls
-	ms.receiptsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			added := args.Get(0).(*flow.ExecutionReceipt)
-			ms.Assert().Equal(receipt, added)
-		},
-	).Return(true)
-	ms.resultsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			result := args.Get(0).(*flow.ExecutionResult)
-			ms.Assert().Equal(result, &receipt.ExecutionResult)
-		},
-	).Return(false)
-
-	err := ms.matching.onReceipt(originID, receipt)
-	ms.Require().NoError(err, "should ignore receipt for already pending result")
-
-	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -437,17 +407,10 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 			ms.Assert().Equal(receipt, added)
 		},
 	).Return(true)
-	ms.resultsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			result := args.Get(0).(*flow.ExecutionResult)
-			ms.Assert().Equal(result, &receipt.ExecutionResult)
-		},
-	).Return(true)
 
 	err := ms.matching.onReceipt(originID, receipt)
-	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
+	ms.Require().NoError(err, "should add receipt to mempool if valid")
 
-	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -824,9 +787,6 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 		},
 		nil,
 	)
-
-	// the results are not in the DB, which will trigger request
-	ms.sealedResultsDB.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
 	// keep track of requested blocks
 	requestedBlocks := []flow.Identifier{}
