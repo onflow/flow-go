@@ -33,7 +33,7 @@ type Network struct {
 	metrics module.NetworkMetrics
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
-	q       queue.MessageQueue
+	queue   queue.MessageQueue
 	cancel  context.CancelFunc
 }
 
@@ -70,14 +70,15 @@ func NewNetwork(
 
 	o.SetIDs(ids)
 
-	// setup the message queue
-	// create priority queue
-	o.q = queue.NewMessageQueue(queue.GetEventPriority)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	o.cancel = cancel
+
+	// setup the message queue
+	// create priority queue
+	o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority)
+
 	// create workers to read from the queue and call queueSubmitFunc
-	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.q, o.queueSubmitFunc)
+	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
 
 	return o, nil
 }
@@ -211,7 +212,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	}
 
 	// insert the message in the queue
-	err = n.q.Insert(qm)
+	err = n.queue.Insert(qm)
 	if err != nil {
 		return fmt.Errorf("failed to insert message in queue: %w", err)
 	}

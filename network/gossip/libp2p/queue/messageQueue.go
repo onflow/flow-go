@@ -2,6 +2,7 @@ package queue
 
 import (
 	"container/heap"
+	"context"
 	"sync"
 )
 
@@ -18,20 +19,9 @@ type MessageQueue interface {
 
 type Priority int
 
-const Priority_1 Priority = 1
-const Priority_2 Priority = 2
-const Priority_3 Priority = 3
-const Priority_4 Priority = 4
-const Priority_5 Priority = 5
-const Priority_6 Priority = 6
-const Priority_7 Priority = 7
-const Priority_8 Priority = 8
-const Priority_9 Priority = 9
-const Priority_10 Priority = 10
-
-const Low_Priority = Priority_1
-const Medium_Priority = Priority_5
-const High_Priority = Priority_10
+const Low_Priority = 1
+const Medium_Priority = 5
+const High_Priority = 10
 
 // MessagePriorityFunc - the callback function to derive priority of a message
 type MessagePriorityFunc func(message interface{}) Priority
@@ -41,9 +31,14 @@ type MessageQueueImpl struct {
 	pq           *priorityQueue
 	cond         *sync.Cond
 	priorityFunc MessagePriorityFunc
+	ctx          context.Context
 }
 
 func (mq *MessageQueueImpl) Insert(message interface{}) error {
+
+	if err := mq.ctx.Err(); err != nil {
+		return err
+	}
 
 	// determine the message priority
 	priority := mq.priorityFunc(message)
@@ -73,6 +68,12 @@ func (mq *MessageQueueImpl) Remove() interface{} {
 	mq.cond.L.Lock()
 	defer mq.cond.L.Unlock()
 	for mq.pq.Len() == 0 {
+
+		// if the context has been canceled, don't wait
+		if err := mq.ctx.Err(); err != nil {
+			return nil
+		}
+
 		mq.cond.Wait()
 	}
 	return heap.Pop(mq.pq).(*item).message
@@ -84,14 +85,23 @@ func (mq *MessageQueueImpl) Len() int {
 	return mq.pq.Len()
 }
 
-func NewMessageQueue(priorityFunc MessagePriorityFunc) *MessageQueueImpl {
+func NewMessageQueue(ctx context.Context, priorityFunc MessagePriorityFunc) *MessageQueueImpl {
 	var items = make([]*item, 0)
 	pq := priorityQueue(items)
 	mq := &MessageQueueImpl{
 		pq:           &pq,
 		priorityFunc: priorityFunc,
+		ctx:          ctx,
 	}
 	m := sync.Mutex{}
 	mq.cond = sync.NewCond(&m)
+
+	// kick off a go routine to unblock queue readers on shutdown
+	go func() {
+		<-ctx.Done()
+		// unblock receive
+		mq.cond.Broadcast()
+	}()
+
 	return mq
 }

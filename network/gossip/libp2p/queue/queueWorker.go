@@ -8,14 +8,13 @@ const DefaultNumWorkers = 5
 // if no item is available, it blocks
 func worker(ctx context.Context, queue MessageQueue, callback func(interface{})) {
 	for {
+		// blocking call
+		item := queue.Remove()
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			// blocking call
-			item := queue.Remove()
 			callback(item)
-
 		}
 	}
 }

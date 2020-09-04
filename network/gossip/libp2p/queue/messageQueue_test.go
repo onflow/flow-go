@@ -1,6 +1,7 @@
 package queue_test
 
 import (
+	"context"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -46,7 +47,8 @@ func TestConcurrentQueueAccess(t *testing.T) {
 	}
 	close(msgChan)
 
-	mq := queue.NewMessageQueue(priorityFunc)
+	ctx, cancel := context.WithCancel(context.Background())
+	mq := queue.NewMessageQueue(ctx, priorityFunc)
 
 	writeWg := sync.WaitGroup{}
 	write := func() {
@@ -72,13 +74,13 @@ func TestConcurrentQueueAccess(t *testing.T) {
 	}
 
 	// kick off writers
-	for i:=0;i<writerCnt;i++{
+	for i := 0; i < writerCnt; i++ {
 		writeWg.Add(1)
 		go write()
 	}
 
 	// kick off readers
-	for i:=0;i<readerCnt;i++{
+	for i := 0; i < readerCnt; i++ {
 		go read()
 	}
 
@@ -86,8 +88,34 @@ func TestConcurrentQueueAccess(t *testing.T) {
 
 	assert.Eventually(t, func() bool {
 		actualCnt := atomic.LoadInt64(&readMsgCnt)
-		return int64(messageCnt) ==  actualCnt
-	}, 5 * time.Second, 5 * time.Millisecond)
+		return int64(messageCnt) == actualCnt
+	}, 5*time.Second, 5*time.Millisecond)
+
+	cancel()
+
+	assert.Equal(t, 0, mq.Len())
+}
+
+// TestQueueShutdown tests that Remove unblocks when the context is shutdown
+func TestQueueShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	mq := queue.NewMessageQueue(ctx, fixedPriority)
+	ch := make(chan struct{})
+
+	go func() {
+		mq.Remove()
+		close(ch)
+	}()
+
+	cancel()
+	assert.Eventually(t, func() bool {
+		select {
+		case <-ch:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, time.Millisecond)
 }
 
 func testQueue(t *testing.T, messages map[string]queue.Priority) {
@@ -100,11 +128,13 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 	// create queues for each priority to check expectations later
 	queues := make(map[queue.Priority][]string)
 	for p := queue.Low_Priority; p <= queue.High_Priority; p++ {
-		queues[p] = make([]string, 0)
+		queues[queue.Priority(p)] = make([]string, 0)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// create the queue
-	mq := queue.NewMessageQueue(priorityFunc)
+	mq := queue.NewMessageQueue(ctx, priorityFunc)
 
 	// insert all elements in the queue
 	for msg, p := range messages {
@@ -115,13 +145,14 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 		// remember insertion order to check later
 		queues[p] = append(queues[p], msg)
 
+		// sleep to make sure two consecutive elements don't get the same timestamp
 		time.Sleep(1 * time.Millisecond)
 	}
 
 	// create a slice of the expected messages in the order in which they are expected
 	var expectedMessages []string
 	for p := queue.High_Priority; p >= queue.Low_Priority; p-- {
-		expectedMessages = append(expectedMessages, queues[p]...)
+		expectedMessages = append(expectedMessages, queues[queue.Priority(p)]...)
 	}
 
 	// check queue length
@@ -134,11 +165,15 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 		assert.Equal(t, expectedMessages[i], item.(string))
 	}
+
+	assert.Equal(t, 0, mq.Len())
 }
 
 func BenchmarkPush(b *testing.B) {
 	b.StopTimer()
-	var mq = queue.NewMessageQueue(randomPriority)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var mq = queue.NewMessageQueue(ctx, randomPriority)
 	for i := 0; i < b.N; i++ {
 		err := mq.Insert("test")
 		if err != nil {
@@ -156,7 +191,9 @@ func BenchmarkPush(b *testing.B) {
 
 func BenchmarkPop(b *testing.B) {
 	b.StopTimer()
-	var mq = queue.NewMessageQueue(randomPriority)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var mq = queue.NewMessageQueue(ctx, randomPriority)
 	for i := 0; i < b.N; i++ {
 		err := mq.Insert("test")
 		if err != nil {
@@ -187,10 +224,10 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 
 func randomPriority(_ interface{}) queue.Priority {
 	rand.Seed(time.Now().UnixNano())
-	p := rand.Intn(int(queue.High_Priority-queue.Low_Priority+1)) + int(queue.Low_Priority)
+	p := rand.Intn(queue.High_Priority-queue.Low_Priority+1) + queue.Low_Priority
 	return queue.Priority(p)
 }
 
 func fixedPriority(_ interface{}) queue.Priority {
-	return queue.Priority_5
+	return queue.Medium_Priority
 }
