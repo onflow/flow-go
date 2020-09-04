@@ -88,41 +88,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// nextHeight is the height of the new header we are building
 	nextHeight := parent.Height + 1
 
-	var finalHeight uint64
-	err = b.db.View(operation.RetrieveFinalizedHeight(&finalHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
-	}
-
-	var finalID flow.Identifier
-	err = b.db.View(operation.LookupBlockHeight(finalHeight, &finalID))
-	if err != nil {
-		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
-	}
-
-	var sealedHeight uint64
-	err = b.db.View(operation.RetrieveSealedHeight(&sealedHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could no retrieve sealed height: %w", err)
-	}
-
-	var sealedID flow.Identifier
-	err = b.db.View(operation.LookupBlockHeight(sealedHeight, &sealedID))
-	if err != nil {
-		return nil, fmt.Errorf("could not lookup sealed block: %w", err)
-	}
-
-	// lastSeal is passed by reference to buildNextPayload which will move it as
-	// it iterates throught the seal mempool. So after buildNextPayload,
-	// lastSeal will point to the last seal from storage OR mempool.
-	lastSeal, err := b.seals.ByBlockID(sealedID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve last seal (%x): %w", sealedID, err)
-	}
-
 	// create the payload with guarantees, seals, and receipts, taken from the
 	// mempools.
-	payload, err := b.buildNextPayload(parentID, finalID, finalHeight, nextHeight, lastSeal)
+	payload, lastSeal, err := b.buildNextPayload(parentID, nextHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not build payload")
 	}
@@ -199,10 +167,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 }
 
 // buildNextPayload creates the payload of the next block with guarantees,
-// seals, and receipts taken from the mempools.
-//
-// NOTE : Has side effect on lastSeal. It will point to the lastSeal that will
-//        be inserted in the payload.
+// seals, and receipts taken from the mempools. It returns the payload and the
+// last created seal.
 //
 // TODO :
 //
@@ -212,29 +178,36 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 //
 // * Use a common loop for finding duplicates in the blockchain for guarantees,
 //   seals, and receipts.
-func (b *Builder) buildNextPayload(
-	parentID flow.Identifier,
-	finalID flow.Identifier,
-	finalHeight uint64,
-	nextHeight uint64,
-	lastSeal *flow.Seal) (*flow.Payload, error) {
+func (b *Builder) buildNextPayload(parentID flow.Identifier, nextHeight uint64) (*flow.Payload, *flow.Seal, error) {
+
+	var finalHeight uint64
+	err := b.db.View(operation.RetrieveFinalizedHeight(&finalHeight))
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not retrieve finalized height: %w", err)
+	}
+
+	var finalID flow.Identifier
+	err = b.db.View(operation.LookupBlockHeight(finalHeight, &finalID))
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not lookup finalized block: %w", err)
+	}
 
 	// get list of guarantees to insert
 	guarantees, err := b.getInsertableGuarantees(parentID, finalID, finalHeight, nextHeight)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve the list of guarantees to insert in next payload")
+		return nil, nil, fmt.Errorf("could not retrieve the list of guarantees to insert in next payload")
 	}
 
 	// get list of seals to insert
-	seals, err := b.getInsertableSeals(parentID, finalID, finalHeight, lastSeal)
+	seals, lastSeal, err := b.getInsertableSeals(parentID, finalID, finalHeight)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve the list of seals to insert in next payload")
+		return nil, nil, fmt.Errorf("could not retrieve the list of seals to insert in next payload")
 	}
 
 	// get list of receipts to insert
 	receipts, err := b.getInsertableReceipts(parentID, finalID, finalHeight)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve the list of receipts to insert in nex payload")
+		return nil, nil, fmt.Errorf("could not retrieve the list of receipts to insert in nex payload")
 	}
 
 	// build the payload so we can get the hash
@@ -245,7 +218,7 @@ func (b *Builder) buildNextPayload(
 		Receipts:   receipts,
 	}
 
-	return payload, nil
+	return payload, lastSeal, nil
 }
 
 // getInsertableGuarantees returns the list of CollectionGuarantees that should
@@ -380,23 +353,18 @@ func (b *Builder) getInsertableGuarantees(
 	return guarantees, nil
 }
 
-// getInsertableSeals returns the list of Seals that should be inserted in the
-// next payload. It looks in the seal mempool and applies the following filters:
+// getInsertableSeals returns the list of Seals from the mempool that should be
+// inserted in the next payload, as well as the last created seal (which doesn't
+// necessarily belong to the insertable seals if nothing was taken from the
+// mempool).  It looks in the seal mempool and applies the following filters:
 //
 // 1) Do not collect more than maxSealCount items.
 //
 // 2) The seals should form a valid chain.
-//
-// NOTE:
-//
-// * This function has a side-effect on lastSeal, which could end-up pointing
-//   to a new value as we collect seals for new higher blocks. This side-effect
-//   is intended by the calling function.
 func (b *Builder) getInsertableSeals(
 	parentID flow.Identifier,
 	finalID flow.Identifier,
-	finalHeight uint64,
-	lastSeal *flow.Seal) ([]*flow.Seal, error) {
+	finalHeight uint64) ([]*flow.Seal, *flow.Seal, error) {
 
 	// STEP ONE: We try to get all ancestors from last sealed block all the way
 	// to the parent. Then we try to get seals for each of them until we don't
@@ -409,14 +377,24 @@ func (b *Builder) getInsertableSeals(
 		byBlock[seal.BlockID] = seal
 	}
 	if int(b.sealPool.Size()) > len(byBlock) {
-		return nil, fmt.Errorf("multiple seals for the same block")
+		return nil, nil, fmt.Errorf("multiple seals for the same block")
 	}
 
-	// get the last sealed block; we use its height to iterate forwards through
-	// the finalized blocks which still need sealing
-	sealed, err := b.headers.ByBlockID(lastSeal.BlockID)
+	var sealedHeight uint64
+	err := b.db.View(operation.RetrieveSealedHeight(&sealedHeight))
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", lastSeal.BlockID, err)
+		return nil, nil, fmt.Errorf("could no retrieve sealed height: %w", err)
+	}
+
+	var sealedID flow.Identifier
+	err = b.db.View(operation.LookupBlockHeight(sealedHeight, &sealedID))
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not lookup sealed block: %w", err)
+	}
+
+	lastSeal, err := b.seals.ByBlockID(sealedID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not retrieve last seal (%x): %w", sealedID, err)
 	}
 
 	// we now go from last sealed height plus one to finalized height and check
@@ -425,7 +403,7 @@ func (b *Builder) getInsertableSeals(
 	stop := false
 	var seals []*flow.Seal
 	var sealCount uint
-	for height := sealed.Height + 1; height <= finalHeight; height++ {
+	for height := sealedHeight + 1; height <= finalHeight; height++ {
 		if len(byBlock) == 0 {
 			break
 		}
@@ -439,7 +417,7 @@ func (b *Builder) getInsertableSeals(
 
 		header, err := b.headers.ByHeight(height)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block for height (%d): %w", height, err)
+			return nil, nil, fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
 
 		blockID := header.ID()
@@ -451,7 +429,7 @@ func (b *Builder) getInsertableSeals(
 		}
 
 		if !bytes.Equal(next.InitialState, lastSeal.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect in finalized")
+			return nil, nil, fmt.Errorf("seal execution states do not connect in finalized")
 		}
 
 		seals = append(seals, next)
@@ -460,7 +438,6 @@ func (b *Builder) getInsertableSeals(
 
 		delete(byBlock, blockID)
 
-		// NOTE: side effect on lastSeal, which is passed by reference
 		lastSeal = next
 	}
 
@@ -481,7 +458,7 @@ func (b *Builder) getInsertableSeals(
 			pendingIDs = append(pendingIDs, ancestorID)
 			ancestor, err := b.headers.ByBlockID(ancestorID)
 			if err != nil {
-				return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
+				return nil, nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 			}
 			ancestorID = ancestor.ParentID
 		}
@@ -506,7 +483,7 @@ func (b *Builder) getInsertableSeals(
 			}
 
 			if !bytes.Equal(next.InitialState, lastSeal.FinalState) {
-				return nil, fmt.Errorf("seal execution states do not connect in pending")
+				return nil, nil, fmt.Errorf("seal execution states do not connect in pending")
 			}
 
 			seals = append(seals, next)
@@ -519,7 +496,7 @@ func (b *Builder) getInsertableSeals(
 		}
 	}
 
-	return seals, nil
+	return seals, lastSeal, nil
 }
 
 // getInsertableReceipts returns the list of ExecutionReceipts that should be
@@ -646,6 +623,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 // sortReceipts takes a map of block-height to execution receipt, and returns
 // the receipts in a slice sorted by block-height.
 func sortReceipts(receipts map[uint64]*flow.ExecutionReceipt) []*flow.ExecutionReceipt {
+
 	keys := make([]uint64, 0, len(receipts))
 	for k := range receipts {
 		keys = append(keys, k)
