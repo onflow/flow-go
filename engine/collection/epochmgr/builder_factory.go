@@ -24,6 +24,7 @@ func NewBuilderFactory(
 	db *badger.DB,
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,
+	metrics module.CollectionMetrics,
 	opts ...builder.Opt,
 ) (*BuilderFactory, error) {
 
@@ -31,6 +32,7 @@ func NewBuilderFactory(
 		db:               db,
 		mainChainHeaders: mainChainHeaders,
 		trace:            trace,
+		metrics:          metrics,
 		opts:             opts,
 	}
 	return factory, nil

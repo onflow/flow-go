@@ -129,18 +129,12 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.sync == nil {
 		panic("must initialize compliance engine with synchronization module")
 	}
-	return e.unit.Ready(func() {
-		<-e.hotstuff.Ready()
-	})
+	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		e.log.Debug().Msg("shutting down hotstuff eventloop")
-		<-e.hotstuff.Done()
-		e.log.Debug().Msg("all components have been shut down")
-	})
+	return e.unit.Done()
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -209,13 +203,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 // for the next collection) to all the collection nodes in our cluster.
 func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
 
-	log := e.log.With().
-		Hex("block_id", logging.ID(header.ID())).
-		Uint64("block_height", header.Height).
-		Logger()
-
-	log.Debug().Msg("preparing to broadcast proposal from hotstuff")
-
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -232,6 +219,13 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
+
+	log := e.log.With().
+		Hex("block_id", logging.ID(header.ID())).
+		Uint64("block_height", header.Height).
+		Logger()
+
+	log.Debug().Msg("preparing to broadcast proposal from hotstuff")
 
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByBlockID(header.ID())

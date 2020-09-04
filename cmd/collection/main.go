@@ -266,6 +266,7 @@ func main() {
 				node.DB,
 				node.Storage.Headers,
 				node.Tracer,
+				colMetrics,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
