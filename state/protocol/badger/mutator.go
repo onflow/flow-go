@@ -128,11 +128,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 
 		// 4) initialize the current protocol state values
-		err = operation.InsertStartedView(root.Header.View)(tx)
+		err = operation.InsertStartedView(root.Header.ChainID, root.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertVotedView(root.Header.ChainID.String(), root.Header.View)(tx)
+		err = operation.InsertVotedView(root.Header.ChainID, root.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
