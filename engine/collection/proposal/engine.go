@@ -30,7 +30,6 @@ import (
 type Engine struct {
 	unit           *engine.Unit
 	log            zerolog.Logger
-	trace          module.Tracer
 	colMetrics     module.CollectionMetrics
 	engMetrics     module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
@@ -57,7 +56,6 @@ func New(
 	colMetrics module.CollectionMetrics,
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
-	trace module.Tracer,
 	protoState protocol.State,
 	clusterState clusterkv.State,
 	pool mempool.Transactions,
@@ -68,6 +66,7 @@ func New(
 ) (*Engine, error) {
 
 	// find my cluster for the current epoch
+	// TODO this should flow from cluster state as source of truth
 	clusters, err := protoState.Final().Clusters()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters: %w", err)
@@ -81,7 +80,6 @@ func New(
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "proposal").Logger(),
-		trace:          trace,
 		colMetrics:     colMetrics,
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,

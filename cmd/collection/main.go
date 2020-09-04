@@ -280,7 +280,6 @@ func main() {
 				colMetrics,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
-				node.Tracer,
 				node.State,
 				pool,
 				node.Storage.Transactions,

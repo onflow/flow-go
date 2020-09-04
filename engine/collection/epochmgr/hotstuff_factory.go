@@ -32,7 +32,6 @@ type HotStuffFactory struct {
 	db         *badger.DB
 	tracer     module.Tracer
 	protoState protocol.State
-	translator committee.BlockTranslator
 	opts       []consensus.Option
 }
 

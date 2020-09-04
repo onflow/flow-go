@@ -16,7 +16,6 @@ type ProposalEngineFactory struct {
 	log            zerolog.Logger
 	me             module.Local
 	net            module.Network
-	trace          module.Tracer
 	colMetrics     module.CollectionMetrics
 	engMetrics     module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
@@ -33,7 +32,6 @@ func NewProposalEngineFactory(
 	colMetrics module.CollectionMetrics,
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
-	trace module.Tracer,
 	protoState protocol.State,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
@@ -43,7 +41,6 @@ func NewProposalEngineFactory(
 		log:            log,
 		me:             me,
 		net:            net,
-		trace:          trace,
 		colMetrics:     colMetrics,
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,
@@ -64,7 +61,6 @@ func (f *ProposalEngineFactory) Create(clusterState cluster.State, headers stora
 		f.colMetrics,
 		f.engMetrics,
 		f.mempoolMetrics,
-		f.trace,
 		f.protoState,
 		clusterState,
 		f.pool,

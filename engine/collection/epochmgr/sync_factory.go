@@ -13,12 +13,11 @@ import (
 )
 
 type SyncEngineFactory struct {
-	log          zerolog.Logger
-	net          module.Network
-	me           module.Local
-	metrics      module.EngineMetrics
-	participants flow.IdentityList
-	conf         chainsync.Config
+	log     zerolog.Logger
+	net     module.Network
+	me      module.Local
+	metrics module.EngineMetrics
+	conf    chainsync.Config
 }
 
 func NewSyncEngineFactory(

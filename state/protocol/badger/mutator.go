@@ -132,7 +132,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertVotedView(root.Header.View)(tx)
+		err = operation.InsertVotedView(root.Header.ChainID.String(), root.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}

@@ -85,6 +85,8 @@ func New(
 	}
 
 	e.epoch = reqs
+	_ = e.state       // TODO lint
+	_ = e.epoch.state // TODO lint
 	return e, nil
 }
 
@@ -121,7 +123,7 @@ func (e *Engine) setupEpoch(epoch uint64) (*epochreqs, error) {
 	// determine this node's cluster for the epoch
 	clusters, err := e.state.AtEpoch(epoch).Clusters()
 	if err != nil {
-		return nil, fmt.Errorf("could not get clusters for epoch: %w")
+		return nil, fmt.Errorf("could not get clusters for epoch: %w", err)
 	}
 	cluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
@@ -193,7 +195,7 @@ func (e *Engine) createClusterState(epoch uint64) (cluster.State, storage.Header
 	// determine this node's cluster for the epoch
 	clusters, err := e.state.AtEpoch(epoch).Clusters()
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not get clusters for epoch: %w")
+		return nil, nil, nil, nil, fmt.Errorf("could not get clusters for epoch: %w", err)
 	}
 	cluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
@@ -226,7 +228,7 @@ func (e *Engine) createClusterState(epoch uint64) (cluster.State, storage.Header
 	// no existing cluster state, bootstrap with root block for epoch
 	err = clusterState.Mutate().Bootstrap(root)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not bootstrap cluster state: %w")
+		return nil, nil, nil, nil, fmt.Errorf("could not bootstrap cluster state: %w", err)
 	}
 
 	return clusterState, headers, payloads, blocks, nil
