@@ -127,7 +127,7 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 	// create queues for each priority to check expectations later
 	queues := make(map[queue.Priority][]string)
-	for p := queue.Low_Priority; p <= queue.High_Priority; p++ {
+	for p := queue.LowPriority; p <= queue.HighPriority; p++ {
 		queues[queue.Priority(p)] = make([]string, 0)
 	}
 
@@ -151,7 +151,7 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 	// create a slice of the expected messages in the order in which they are expected
 	var expectedMessages []string
-	for p := queue.High_Priority; p >= queue.Low_Priority; p-- {
+	for p := queue.HighPriority; p >= queue.LowPriority; p-- {
 		expectedMessages = append(expectedMessages, queues[queue.Priority(p)]...)
 	}
 
@@ -224,10 +224,10 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 
 func randomPriority(_ interface{}) queue.Priority {
 	rand.Seed(time.Now().UnixNano())
-	p := rand.Intn(queue.High_Priority-queue.Low_Priority+1) + queue.Low_Priority
+	p := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
 	return queue.Priority(p)
 }
 
 func fixedPriority(_ interface{}) queue.Priority {
-	return queue.Medium_Priority
+	return queue.MediumPriority
 }

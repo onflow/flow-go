@@ -19,9 +19,9 @@ type MessageQueue interface {
 
 type Priority int
 
-const Low_Priority = 1
-const Medium_Priority = 5
-const High_Priority = 10
+const LowPriority = Priority(1)
+const MediumPriority = Priority(5)
+const HighPriority = Priority(10)
 
 // MessagePriorityFunc - the callback function to derive priority of a message
 type MessagePriorityFunc func(message interface{}) Priority

@@ -35,64 +35,64 @@ func getPriorityByType(message interface{}) Priority {
 	switch message.(type) {
 	// consensus
 	case *messages.BlockProposal:
-		return High_Priority
+		return HighPriority
 	case *messages.BlockVote:
-		return High_Priority
+		return HighPriority
 
 	// protocol state sync
 	case *messages.SyncRequest:
-		return Low_Priority
+		return LowPriority
 	case *messages.SyncResponse:
-		return Low_Priority
+		return LowPriority
 	case *messages.RangeRequest:
-		return Low_Priority
+		return LowPriority
 	case *messages.BatchRequest:
-		return Low_Priority
+		return LowPriority
 	case *messages.BlockResponse:
-		return Low_Priority
+		return LowPriority
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
-		return High_Priority
+		return HighPriority
 	case *messages.ClusterBlockVote:
-		return High_Priority
+		return HighPriority
 	case *messages.ClusterBlockResponse:
-		return High_Priority
+		return HighPriority
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
-		return High_Priority
+		return HighPriority
 	case *flow.TransactionBody:
-		return High_Priority
+		return HighPriority
 	case *flow.Transaction:
-		return High_Priority
+		return HighPriority
 
 	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
-		return High_Priority
+		return HighPriority
 	case *flow.ResultApproval:
-		return High_Priority
+		return HighPriority
 
 	// execution state synchronization
 	case *messages.ExecutionStateSyncRequest:
-		return Medium_Priority
+		return MediumPriority
 	case *messages.ExecutionStateDelta:
-		return Medium_Priority
+		return MediumPriority
 
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
-		return High_Priority
+		return HighPriority
 	case *messages.ChunkDataResponse:
-		return High_Priority
+		return HighPriority
 
 	// generic entity exchange engines
 	case *messages.EntityRequest:
-		return Low_Priority
+		return LowPriority
 	case *messages.EntityResponse:
-		return Low_Priority
+		return LowPriority
 
 	default:
-		return Medium_Priority
+		return MediumPriority
 	}
 }
 
@@ -100,10 +100,10 @@ func getPriorityByType(message interface{}) Priority {
 func getPriorityBySize(size int) Priority {
 	switch {
 	case size > MiB:
-		return Low_Priority
+		return LowPriority
 	case size > KiB:
-		return Medium_Priority
+		return MediumPriority
 	default:
-		return High_Priority
+		return HighPriority
 	}
 }
