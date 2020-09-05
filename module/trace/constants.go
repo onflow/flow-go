@@ -16,8 +16,7 @@ const (
 
 	CONProcessBlock SpanName = "con.processBlock"
 	// children of CONProcessBlock
-	CONHotEventHandlerStartNewView SpanName = "con.hotstuff.eventHandler.startNewView"
-	CONHotFinalizeBlock            SpanName = "con.hotstuff.finalizeBlock"
+	CONHotFinalizeBlock SpanName = "con.hotstuff.finalizeBlock"
 
 	// Collection Node
 

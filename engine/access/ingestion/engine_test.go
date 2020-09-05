@@ -87,7 +87,7 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0)
+		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0, false)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,

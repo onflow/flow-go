@@ -63,4 +63,13 @@ func TestTransactionTimingsPool(t *testing.T) {
 		assert.Len(t, items, 1)
 		assert.Equal(t, item1, items[0])
 	})
+
+	t.Run("should not panic if item does not exist yet", func(t *testing.T) {
+		entity, updated := pool.Adjust(unittest.IdentifierFixture(), func(tt *flow.TransactionTiming) *flow.TransactionTiming {
+			assert.Fail(t, "should not have found this item")
+			return tt
+		})
+		assert.False(t, updated)
+		assert.Nil(t, entity)
+	})
 }
