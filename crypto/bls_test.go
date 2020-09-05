@@ -182,7 +182,7 @@ func TestAggregateSignatures(t *testing.T) {
 	valid, err = VerifySignatureOneMessage(pks[:0], aggSig, input, kmac)
 	assert.Error(t, err)
 	assert.False(t, valid,
-		fmt.Sprintf("verification should pass with empty list key %s", sks))
+		fmt.Sprintf("verification should fail with empty list key %s", sks))
 }
 
 // BLS multi-signature
@@ -297,4 +297,64 @@ func TestRemovePubKeys(t *testing.T) {
 	assert.True(t, BLSkey.Equals(partialPk),
 		fmt.Sprintf("incorrect key %s, should be %s, keys are %s",
 			partialPk, BLSkey, pks))
+}
+
+// BLS multi-signature
+// batch verification
+//
+// Verify n signatures of the same message under different keys using the fast
+// batch verification technique and compares the result to verifying each signature
+// separately.
+func TestBatchVerify(t *testing.T) {
+	// random message
+	input := make([]byte, 100)
+	_, err := rand.Read(input)
+	require.NoError(t, err)
+	// hasher
+	kmac := NewBLSKMAC("test tag")
+	// number of signatures to aggregate
+	mrand.Seed(time.Now().UnixNano())
+	sigsNum := 3 // mrand.Intn(100) + 1
+	sigs := make([]Signature, 0, sigsNum)
+	sks := make([]PrivateKey, 0, sigsNum)
+	pks := make([]PublicKey, 0, sigsNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	expectedValid := make([]bool, 0, sigsNum)
+
+	// create the signatures
+	for i := 0; i < sigsNum; i++ {
+		sk := randomSK(t, seed)
+		s, err := sk.Sign(input, kmac)
+		require.NoError(t, err)
+		sigs = append(sigs, s)
+		sks = append(sks, sk)
+		pks = append(pks, sk.PublicKey())
+		expectedValid = append(expectedValid, true)
+	}
+	// Batch verify the signatures
+	// all signatures are correct
+	valid, err := BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	require.NoError(t, err)
+	assert.Equal(t, valid, expectedValid,
+		fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
+			sigs, sks, input, valid))
+
+	// test the empty list case
+	/*valid, err = BatchVerifySignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
+	assert.Error(t, err)
+	assert.Equal(t, valid, []bool{},
+		fmt.Sprintf("verification should fail with empty list key, got %v", valid))
+	// test incorrect inputs
+	valid, err = BatchVerifySignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
+	assert.Error(t, err)
+	assert.Equal(t, valid, []bool{},
+		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
+	// test wrong hasher
+	for i := 0; i < sigsNum; i++ {
+		expectedValid[i] = false
+	}
+	valid, err = BatchVerifySignaturesOneMessage(pks, sigs, input, nil)
+	assert.Error(t, err)
+	assert.Equal(t, valid, expectedValid,
+		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))*/
 }
