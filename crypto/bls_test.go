@@ -314,7 +314,7 @@ func TestBatchVerify(t *testing.T) {
 	kmac := NewBLSKMAC("test tag")
 	// number of signatures to aggregate
 	mrand.Seed(time.Now().UnixNano())
-	sigsNum := 3 // mrand.Intn(100) + 1
+	sigsNum := 5 // mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)

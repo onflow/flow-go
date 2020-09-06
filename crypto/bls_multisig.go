@@ -253,10 +253,9 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)))
 
-	fmt.Println(verifBool)
 	for i, v := range verifInt {
 		verifBool[i] = ((C.int)(v) == valid)
 	}
-	fmt.Println(verifBool)
+	fmt.Println(verifInt)
 	return verifBool, nil
 }

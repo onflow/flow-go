@@ -11,8 +11,9 @@
 
 typedef uint8_t byte;
 
-#define VALID   RLC_OK
-#define INVALID RLC_ERR
+#define VALID     RLC_OK
+#define INVALID   RLC_ERR
+#define UNDEFINED (VALID^1 | INVALID^2)
 
 #define BITS_TO_BYTES(x) ((x+7)>>3)
 #define BITS_TO_DIGITS(x) ((x+63)>>6)

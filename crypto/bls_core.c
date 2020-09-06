@@ -181,7 +181,7 @@ static node* new_node(const ep2_st* pk, const ep_st* sig){
     return t;
 }
 
-// builds a binary tree of aggregation of signatures and public keys
+// builds a binary tree of aggregation of signatures and public keys recursivley.
 static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
     // check if a leave is reached
     if (len == 1) {
@@ -205,26 +205,59 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
     return t;
 }
 
+// verify the binary tree and fill the results using recursive batch verification.
+static void bls_batchVerify_tree(node* root, const int len, byte* results, 
+        const byte* data, const int data_len) {
+
+    // verify the aggregated signature against the aggregated public key.
+    int res =  bls_verify_ep(root->pk, root->sig, data, data_len);
+
+    // if the result is valid, all the subtree signatures are valid.
+    if (res == VALID) {
+        for (int i=0; i < len; i++) {
+            if (results[i] == UNDEFINED) results[i] = VALID; // do not overwrite invalid results
+        }
+        return;
+    }
+
+    // check if root is a leave
+    if (root->left == NULL) {
+        *results = INVALID;
+        return;
+    }
+
+    // otherwise, at least one of the subtree signatures if invalid. 
+    // use the binary tree structure to find the invalid signatures. 
+    int right_len = len/2;
+    int left_len = len - right_len;
+    bls_batchVerify_tree(root->left, left_len, results, data, data_len);
+    bls_batchVerify_tree(root->right, right_len, results + left_len, data, data_len);
+}
+
 // Batch verifies the validity of a multiple BLS signatures of the 
 // same message under multiple public keys.
 void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
      const byte* sigs_bytes, const byte* data, const int data_len) {  
+         //TODO: update to return the aggregation of all valid signatures
+
+    // initialize results to undefined
+    memset(results, UNDEFINED, sigs_len);
+
 
     // convert the signature points
     ep_st* sigs = (ep_st*) malloc(sigs_len * sizeof(ep_st));
     for (int i=0; i < sigs_len; i++) {
         ep_new(sigs[i]);
         if (ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK) {
-            // set a signature that doesn't verify with the public key
-            if (ep2_is_infty((ep2_st*)&pks[i])) 
-                ep_set_infty(&sigs[i]);
-            else 
-                ep_curve_get_gen(&sigs[i]);
+            // set signature as infinity and set result as invald
+            ep_set_infty(&sigs[i]);
+            results[i] = INVALID;
             }
     }
 
     // build a binary tree of aggreagtions
     node* root = build_tree(sigs_len, pks, sigs);
-    int res =  bls_verify_ep(root->pk, root->sig, data, data_len);
-    for (int i=0; i < sigs_len; i++) results[i] = res;
+
+    // verify the binary tree and fill the results using batch verification
+    bls_batchVerify_tree(root, sigs_len, results, data, data_len);
 }
