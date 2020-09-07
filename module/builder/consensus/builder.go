@@ -571,8 +571,10 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 	}
 
 	// Go through mempool and collect valid receipts. We store them by block
-	// height so as to sort them later.
-	receipts := make(map[uint64]*flow.ExecutionReceipt) // [height] -> receipt
+	// height so as to sort them later. There can be multiple receipts per block
+	// if they correspond to different results.
+	receipts := make(map[uint64][]*flow.ExecutionReceipt) // [height] -> []receipt
+	dupResults := make(map[flow.Identifier]bool)
 	for _, receipt := range b.recPool.All() {
 
 		// if block is unknown, remove from mempool and continue
@@ -610,8 +612,20 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 			continue
 		}
 
+		// if the receipt corresponds to an execution result that has already
+		// been inserted, remove it from mempool and continue.
+		_, ok = dupResults[receipt.ExecutionResult.ID()]
+		if ok {
+			_ = b.recPool.Rem(receipt.ID())
+			continue
+		}
+
+		receipts[height] = append(receipts[height], receipt)
+
+		// record that we already have a receipt for this result.
+		dupResults[receipt.ExecutionResult.ID()] = true
+
 		_ = b.recPool.Rem(receipt.ID())
-		receipts[height] = receipt
 	}
 
 	// sort receipts by block height
@@ -622,7 +636,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 
 // sortReceipts takes a map of block-height to execution receipt, and returns
 // the receipts in a slice sorted by block-height.
-func sortReceipts(receipts map[uint64]*flow.ExecutionReceipt) []*flow.ExecutionReceipt {
+func sortReceipts(receipts map[uint64][]*flow.ExecutionReceipt) []*flow.ExecutionReceipt {
 
 	keys := make([]uint64, 0, len(receipts))
 	for k := range receipts {
@@ -633,7 +647,7 @@ func sortReceipts(receipts map[uint64]*flow.ExecutionReceipt) []*flow.ExecutionR
 
 	res := make([]*flow.ExecutionReceipt, 0, len(keys))
 	for _, k := range keys {
-		res = append(res, receipts[k])
+		res = append(res, receipts[k]...)
 	}
 
 	return res

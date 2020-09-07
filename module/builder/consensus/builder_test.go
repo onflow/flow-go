@@ -565,17 +565,16 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 
 	// create valid receipts for known, unsealed blocks
 	receipts := []*flow.ExecutionReceipt{}
-	receiptsMap := make(map[uint64]*flow.ExecutionReceipt)
 	var i uint64
 	for i = 0; i < 5; i++ {
 		pendingReceipt := unittest.ExecutionReceiptFixture()
 		bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{
 			Height: i,
 		}
-		receiptsMap[i] = pendingReceipt
 		receipts = append(receipts, pendingReceipt)
 	}
 
+	// shuffle receipts
 	sr := make([]*flow.ExecutionReceipt, len(receipts))
 	copy(sr, receipts)
 	rand.Seed(time.Now().UnixNano())
@@ -587,4 +586,76 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 	bs.Require().NoError(err)
 	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain receipts ordered by block height")
 	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
+}
+
+// Payloads should not contain multiple receipts for the same block if they
+// correspond to the same result.
+func (bs *BuilderSuite) TestPayloadReceiptMultipleReceiptsWithSameResults() {
+
+	// create MULTIPLE valid receipts for known, unsealed blocks
+	uniqueReceipts := []*flow.ExecutionReceipt{}
+	allReceipts := []*flow.ExecutionReceipt{}
+
+	var i uint64
+	for i = 0; i < 5; i++ {
+		// receipt template
+		pendingReceipt := unittest.ExecutionReceiptFixture()
+		uniqueReceipts = append(uniqueReceipts, pendingReceipt)
+		allReceipts = append(allReceipts, pendingReceipt)
+
+		// insert 3 receipts with the same result
+		for j := 0; j < 3; j++ {
+			dupReceipt := flow.ExecutionReceipt{
+				ExecutorID:        unittest.IdentifierFixture(),
+				ExecutionResult:   pendingReceipt.ExecutionResult,
+				Spocks:            nil,
+				ExecutorSignature: unittest.SignatureFixture(),
+			}
+			allReceipts = append(allReceipts, &dupReceipt)
+		}
+
+		bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{
+			Height: i,
+		}
+	}
+
+	bs.pendingReceipts = allReceipts
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.assembled.Receipts, uniqueReceipts, "payload should not contain receipts for duplicate results")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload or duplicate results")
+}
+
+// Payloads can contain multiple receipts for a given block as long as they
+// refer to different results.
+func (bs *BuilderSuite) TestPayloadReceiptMultipleReceiptsWithDifferentResults() {
+
+	// create MULTIPLE valid receipts for known, unsealed blocks
+	receipts := []*flow.ExecutionReceipt{}
+
+	var i uint64
+	for i = 0; i < 5; i++ {
+		// receipt template
+		pendingReceipt := unittest.ExecutionReceiptFixture()
+		receipts = append(receipts, pendingReceipt)
+
+		// insert 3 receipts for the same block but different results
+		for j := 0; j < 3; j++ {
+			dupReceipt := unittest.ExecutionReceiptFixture()
+			dupReceipt.ExecutionResult.BlockID = pendingReceipt.ExecutionResult.BlockID
+			receipts = append(receipts, dupReceipt)
+		}
+
+		bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{
+			Height: i,
+		}
+	}
+
+	bs.pendingReceipts = receipts
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain all receipts for a given block as long as the results are different")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload or duplicate results")
 }
