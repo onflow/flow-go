@@ -333,19 +333,19 @@ func TestBatchVerify(t *testing.T) {
 	}
 	// Batch verify the signatures
 	// all signatures are correct
-	valid, err := BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	valid, _, err := BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
 	require.NoError(t, err)
 	assert.Equal(t, valid, expectedValid,
 		fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
 			sigs, sks, input, valid))
 
 	// test the empty list case
-	/*valid, err = BatchVerifySignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
+	/*valid, _, err = BatchVerifySignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
 	assert.Error(t, err)
 	assert.Equal(t, valid, []bool{},
 		fmt.Sprintf("verification should fail with empty list key, got %v", valid))
 	// test incorrect inputs
-	valid, err = BatchVerifySignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
+	valid, _, err = BatchVerifySignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
 	assert.Error(t, err)
 	assert.Equal(t, valid, []bool{},
 		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
@@ -353,7 +353,7 @@ func TestBatchVerify(t *testing.T) {
 	for i := 0; i < sigsNum; i++ {
 		expectedValid[i] = false
 	}
-	valid, err = BatchVerifySignaturesOneMessage(pks, sigs, input, nil)
+	valid, _, err = BatchVerifySignaturesOneMessage(pks, sigs, input, nil)
 	assert.Error(t, err)
 	assert.Equal(t, valid, expectedValid,
 		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))*/

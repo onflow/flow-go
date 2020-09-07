@@ -37,8 +37,8 @@ int      get_sk_len();
 
 void     bls_sign(byte*, const bn_t, const byte*, const int);
 int      bls_verify(const ep2_t, const byte*, const byte*, const int);
-void      bls_batchVerify(const int sigs_len, byte* result, const ep2_st* pks,
-            const byte* sigs, const byte* data, const int data_len);
+void      bls_batchVerify(const int, byte*, const ep2_st*,
+            const byte*, const byte*, const int, byte*);
 
 int      check_membership_Zr(const bn_t);
 int      check_membership_G2(const ep2_t);

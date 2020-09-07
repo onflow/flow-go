@@ -207,28 +207,28 @@ func VerifySignatureOneMessage(pks []PublicKey, s Signature,
 // key generation or bytes decode function).
 // An error is returned if the key slice is empty.
 func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
-	message []byte, kmac hash.Hasher) ([]bool, error) {
+	message []byte, kmac hash.Hasher) ([]bool, Signature, error) {
 
 	// public keys check
 	if len(pks) == 0 || len(pks) != len(sigs) {
-		return []bool{}, fmt.Errorf("key list length is not valid")
+		return []bool{}, nil, fmt.Errorf("key list length is not valid")
 	}
 
 	verifBool := make([]bool, len(sigs))
 	// hasher check
 	if kmac == nil {
-		return verifBool, errors.New("VerifyBytes requires a Hasher")
+		return verifBool, nil, errors.New("VerifyBytes requires a Hasher")
 	}
 
 	if kmac.Size() < opSwUInputLenBLSBLS12381 {
-		return verifBool, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+		return verifBool, nil, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
 			opSwUInputLenBLSBLS12381, kmac.Size())
 	}
 
 	pkPoints := make([]pointG2, 0, len(pks))
 	for _, pk := range pks {
 		if pk.Algorithm() != BLSBLS12381 {
-			return verifBool, fmt.Errorf("all keys must be BLS keys")
+			return verifBool, nil, fmt.Errorf("all keys must be BLS keys")
 		}
 		// assertion is guaranteed to be correct after the algorithm check
 		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
@@ -244,6 +244,7 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(message)
 	verifInt := make([]byte, len(verifBool))
+	aggSig := make([]byte, signatureLengthBLSBLS12381)
 
 	C.bls_batchVerify(
 		(C.int)(len(verifInt)),
@@ -251,11 +252,13 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 		(*C.ep2_st)(&pkPoints[0]),
 		(*C.uchar)(&flatSigs[0]),
 		(*C.uchar)(&h[0]),
-		(C.int)(len(h)))
+		(C.int)(len(h)),
+		(*C.uchar)(&aggSig[0]),
+	)
 
 	for i, v := range verifInt {
 		verifBool[i] = ((C.int)(v) == valid)
 	}
 	fmt.Println(verifInt)
-	return verifBool, nil
+	return verifBool, aggSig, nil
 }

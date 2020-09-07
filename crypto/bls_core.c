@@ -226,7 +226,7 @@ static void bls_batchVerify_tree(node* root, const int len, byte* results,
         return;
     }
 
-    // otherwise, at least one of the subtree signatures if invalid. 
+    // otherwise, at least one of the subtree signatures is invalid. 
     // use the binary tree structure to find the invalid signatures. 
     int right_len = len/2;
     int left_len = len - right_len;
@@ -237,7 +237,7 @@ static void bls_batchVerify_tree(node* root, const int len, byte* results,
 // Batch verifies the validity of a multiple BLS signatures of the 
 // same message under multiple public keys.
 void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
-     const byte* sigs_bytes, const byte* data, const int data_len) {  
+     const byte* sigs_bytes, const byte* data, const int data_len, byte* agg_sig) {  
          //TODO: update to return the aggregation of all valid signatures
 
     // initialize results to undefined
@@ -260,4 +260,17 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
 
     // verify the binary tree and fill the results using batch verification
     bls_batchVerify_tree(root, sigs_len, results, data, data_len);
+
+    // return the aggregation of the valid signatures,
+    // assuming there are more valid signatures. 
+    ep_t invalid_sigs;
+    ep_new(invalid_sigs);
+    for (int i=0; i < sigs_len; i++) {
+        if (results[i] == INVALID )
+            ep_add_projc(invalid_sigs, invalid_sigs, &sigs[i]);
+    }
+    ep_neg(invalid_sigs, invalid_sigs);
+    ep_add_projc(invalid_sigs, root->sig, invalid_sigs);
+    ep_write_bin_compact(agg_sig, invalid_sigs, SIGNATURE_LEN);
+    ep_free(invalid_sigs);
 }
