@@ -318,7 +318,7 @@ func (ms *MatchingSuite) SetupTest() {
 		results:                 ms.resultsPL,
 		receipts:                ms.receiptsPL,
 		approvals:               ms.approvalsPL,
-		approvalsByResult:       make(map[flow.Identifier]([]*flow.ResultApproval)),
+		chunkApprovals:          make(map[string]map[flow.Identifier]flow.Identifier),
 		seals:                   ms.sealsPL,
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
@@ -596,28 +596,6 @@ func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 	}
 }
 
-func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
-	// add a block with a specific guarantee to the DB
-	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
-
-	// add a result for this block to the mempool
-	result := unittest.ResultForBlockFixture(&block)
-	ms.pendingResults[result.ID()] = result
-
-	// use the happy-path stake checking function which always accepts
-	ms.matching.checkStakes = StakesAlwaysEnough
-
-	// happy path requires 0 approvals per chunk, so the result should be
-	// counted even if we havent received any approvals.
-	results, err := ms.matching.matchedResults()
-	ms.Require().NoError(err)
-	if ms.Assert().Len(results, 1, "should select result in happy path") {
-		sealable := results[0]
-		ms.Assert().Equal(result, sealable)
-	}
-}
-
 func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 
 	// add a block with a specific guarantee to the DB
@@ -627,25 +605,6 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
-
-	// use the real stake checking function which requires +2/3 of total stakes
-	ms.matching.checkStakes = CheckApproversStakes
-
-	// add enough approvals for each chunk, except last
-	for n := 0; n < 3; n++ {
-		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
-			// skip last chunk for last approval
-			if n == 2 && index == uint64(len(result.Chunks)-1) {
-				break
-			}
-			approval := unittest.ResultApprovalFixture()
-			approval.Body.BlockID = block.Header.ID()
-			approval.Body.ExecutionResultID = result.ID()
-			approval.Body.ApproverID = ms.approvers[n].NodeID
-			approval.Body.ChunkIndex = index
-			ms.matching.addPendingApproval(approval)
-		}
-	}
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -661,9 +620,6 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
-
-	// use the real stake checking function which requires +2/3 of total stakes
-	ms.matching.checkStakes = CheckApproversStakes
 
 	// add enough approvals for each chunk
 	for n := 0; n < 3; n++ {

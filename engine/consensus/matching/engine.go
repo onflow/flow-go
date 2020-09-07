@@ -36,27 +36,38 @@ var (
 // from verification nodes), and saves the seals into seals mempool for adding
 // into a new block.
 type Engine struct {
-	unit                    *engine.Unit                                         // used to control startup/shutdown
-	log                     zerolog.Logger                                       // used to log relevant actions with context
-	metrics                 module.EngineMetrics                                 // used to track sent and received messages
-	tracer                  module.Tracer                                        // used to trace execution
-	mempool                 module.MempoolMetrics                                // used to track mempool size
-	state                   protocol.State                                       // used to access the  protocol state
-	me                      module.Local                                         // used to access local node information
-	requester               module.Requester                                     // used to request missing execution receipts by block ID
-	sealedResultsDB         storage.ExecutionResults                             // used to permanently store sealed results
-	headersDB               storage.Headers                                      // used to check sealed headers
-	indexDB                 storage.Index                                        // used to check payloads for results
-	results                 mempool.Results                                      // holds execution results in memory
-	receipts                mempool.Receipts                                     // holds execution receipts in memory
-	approvals               mempool.Approvals                                    // holds result approvals in memory
-	seals                   mempool.Seals                                        // holds block seals in memory
-	missing                 map[flow.Identifier]uint                             // track how often a block was missing
-	approvalsByResult       map[flow.Identifier][]*flow.ResultApproval           // track approvals by execution result
-	checkingSealing         *atomic.Bool                                         // used to rate limit the checksealing call
-	requestReceiptThreshold uint                                                 // how many blocks between sealed/finalized before we request execution receipts
-	maxUnsealedResults      int                                                  // how many unsealed results to check when check sealing
-	checkStakes             func(totalStakes uint64, receivedStakes uint64) bool // used to check if a chunk collects enough stakes
+	unit                    *engine.Unit             // used to control startup/shutdown
+	log                     zerolog.Logger           // used to log relevant actions with context
+	metrics                 module.EngineMetrics     // used to track sent and received messages
+	tracer                  module.Tracer            // used to trace execution
+	mempool                 module.MempoolMetrics    // used to track mempool size
+	state                   protocol.State           // used to access the  protocol state
+	me                      module.Local             // used to access local node information
+	requester               module.Requester         // used to request missing execution receipts by block ID
+	sealedResultsDB         storage.ExecutionResults // used to permanently store sealed results
+	headersDB               storage.Headers          // used to check sealed headers
+	indexDB                 storage.Index            // used to check payloads for results
+	results                 mempool.Results          // holds execution results in memory
+	receipts                mempool.Receipts         // holds execution receipts in memory
+	approvals               mempool.Approvals        // holds result approvals in memory
+	seals                   mempool.Seals            // holds block seals in memory
+	missing                 map[flow.Identifier]uint // track how often a block was missing
+	checkingSealing         *atomic.Bool             // used to rate limit the checksealing call
+	requestReceiptThreshold uint                     // how many blocks between sealed/finalized before we request execution receipts
+	maxUnsealedResults      int                      // how many unsealed results to check when check sealing
+
+	// chunkApprovals is used in conjunction with the approvals mempool to
+	// efficiently track approvals by chunk.
+	//
+	// ["result-id_chunk-index"] => ( [approver-id] => approval-id )
+	//
+	// for each chunk (uniquely identified by result ID and chunk Index), we
+	// track the approvals that were collected for it in a map indexed by
+	// approver ID. The nested map, indexed by approver ID, ensures that we
+	// don't collect duplicate approvals. To verify if a chunk has collected
+	// enough approvals, we simply check the length of the corresponding nested
+	// map. Approvals are referenced by ID, and actually stored in the mempool.
+	chunkApprovals map[string]map[flow.Identifier]flow.Identifier
 }
 
 // New creates a new collection propagation engine.
@@ -76,7 +87,6 @@ func New(
 	receipts mempool.Receipts,
 	approvals mempool.Approvals,
 	seals mempool.Seals,
-	checkStakes func(totalStakes uint64, receivedStakes uint64) bool,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -97,11 +107,10 @@ func New(
 		approvals:               approvals,
 		seals:                   seals,
 		missing:                 make(map[flow.Identifier]uint),
-		approvalsByResult:       make(map[flow.Identifier]([]*flow.ResultApproval)),
+		chunkApprovals:          make(map[string]map[flow.Identifier]flow.Identifier),
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxUnsealedResults:      200,
-		checkStakes:             checkStakes,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
@@ -122,6 +131,12 @@ func New(
 	}
 
 	return e, nil
+}
+
+// chunkKey returns the composite key used to index an approval in the
+// chunkApprovals lookup table.
+func chunkKey(resultID flow.Identifier, chunkIndex uint64) string {
+	return fmt.Sprintf("%s_%d", resultID.String(), chunkIndex)
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -339,37 +354,52 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	return nil
 }
 
-// addPendingApproval adds the approval to the mempool and to the
-// approvalsByResult map.
+// addPendingApproval adds the approval to the mempool and to the lookup table.
 func (e *Engine) addPendingApproval(approval *flow.ResultApproval) {
-	// store in the memory pool
-	added := e.approvals.Add(approval)
-	if !added {
+
+	// determine the lookup key for the corresponding chunk
+	key := chunkKey(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
+
+	// skip if we already collected this approval
+	_, ok := e.chunkApprovals[key][approval.Body.ApproverID]
+	if ok {
 		log.Debug().Msg("skipping approval already in mempool")
 		return
 	}
 
-	// store in the mapping by result
-	e.approvalsByResult[approval.Body.ExecutionResultID] = append(
-		e.approvalsByResult[approval.Body.ExecutionResultID],
-		approval)
+	// store in the memory pool (it won't be added if it is already in there).
+	e.approvals.Add(approval)
+
+	// store in the lookup table
+	_, ok = e.chunkApprovals[key]
+	if !ok {
+		e.chunkApprovals[key] = make(map[flow.Identifier]flow.Identifier)
+	}
+	e.chunkApprovals[key][approval.Body.ApproverID] = approval.ID()
 
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
-
 	log.Info().Msg("result approval added to mempool")
 }
 
-// removePendingApproval removes the approval from the mempool and from the
-// approvalsByResult map.
-// TODO: There is an edge case whereby approvals can remain in approvalsByResult
-// forever. Indeed, e.approvals is a mempool, which will automatically eject
-// approvals when it's full, and when the ejection happens, it won't notify
-// e.approvalsByResult to remove the same approval. And since e.approvals no
-// longer has that approval, the approval will stay in e.approvalsByResult
-// forever.
+// removePendingApproval removes an approval from the mempool and from the
+// lookup table.
+// TODO: There is an edge case where items will remain in the lookup table
+// forever. ResultApprovals are contained in a mempool which automatically
+// evicts items when it reaches a certain size. These automatic evictions will
+// not be reflected in the lookup table. Implement lookup table directly in
+// approvals mempool to handle things correctly?
 func (e *Engine) removePendingApproval(approval *flow.ResultApproval) {
-	_ = e.approvals.Rem(approval.ID())
-	delete(e.approvalsByResult, approval.Body.ExecutionResultID)
+	// remove from mempool
+	e.approvals.Rem(approval.ID())
+
+	// remove from lookup table
+	key := chunkKey(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
+
+	if _, ok := e.chunkApprovals[key]; !ok {
+		return
+	}
+
+	delete(e.chunkApprovals[key], approval.Body.ApproverID)
 }
 
 // checkSealing checks if there is anything worth sealing at the moment.
@@ -519,29 +549,26 @@ func (e *Engine) matchedResults() ([]*flow.ExecutionResult, error) {
 	}
 
 	// go through the results mempool and check which ones we have collected
-	// enough approvals
-ResultLoop:
+	// enough approvals for
 	for _, result := range e.results.All() {
-		resultID := result.ID()
 
-		// get the approvals for this result
-		approvals := e.approvalsByResult[resultID]
-
-		// go through all the chunks of this result and check that each of them
-		// have a qualified majority of verifier stake approving
+		// check that each chunk collected enough approvals
+		allChunksMatched := true
 		for _, chunk := range result.Chunks {
 
-			matched := e.matchChunk(approvals, chunk, verifiers)
+			matched := e.matchChunk(result.ID(), chunk, verifiers)
 
 			if !matched {
-				continue ResultLoop
+				allChunksMatched = false
+				break
 			}
 		}
 
-		e.log.Info().Msg("adding result with sufficient verification")
-
 		// add the result to the results that should be sealed
-		results = append(results, result)
+		if allChunksMatched {
+			e.log.Info().Msg("adding result with sufficient verification")
+			results = append(results, result)
+		}
 	}
 
 	return results, nil
@@ -549,33 +576,18 @@ ResultLoop:
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
-func (e *Engine) matchChunk(approvals []*flow.ResultApproval,
-	chunk *flow.Chunk,
-	verifiers flow.IdentityList) bool {
+func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, verifiers flow.IdentityList) bool {
 
-	// we use this to check for duplicate approvals by one approver
-	dupCheck := make(map[flow.Identifier]bool)
+	key := chunkKey(resultID, chunk.Index)
 
-	// get the node IDs for all approvers of this chunk
-	var approverIDs []flow.Identifier
-	for _, approval := range approvals {
-		if approval.Body.ChunkIndex == chunk.Index {
-			approverID := approval.Body.ApproverID
-			if dupCheck[approverID] {
-				e.log.Warn().
-					Hex("approver", approverID[:]).
-					Msg("dropping duplicate approval")
-				continue
-			}
-			dupCheck[approverID] = true
-			approverIDs = append(approverIDs, approverID)
-		}
+	approvals, ok := e.chunkApprovals[key]
+	if !ok {
+		return false
 	}
 
-	// get all of the approver identities and check threshold
-	approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
-
-	return e.checkStakes(verifiers.TotalStake(), approvers.TotalStake())
+	// TODO: This is the happy path (requires just one approval per chunk).
+	// Should be +2/3 of all currently staked verifiers
+	return len(approvals) > 0
 }
 
 // sealResult records a matched result in the result database, creates a seal
@@ -783,18 +795,4 @@ func (e *Engine) requestPending() error {
 	}
 
 	return nil
-}
-
-// StakesAlwaysEnough implements the happy path whereby chunks are always
-// accepted.
-func StakesAlwaysEnough(totalStakes uint64, receivedStakes uint64) bool {
-	return true
-}
-
-// CheckApproversStakes checks that the stakes collected by a set of verifiers
-// exceeds the threshold required to validate a chunk.
-// TODO: merge with the ComputeStakeThresholdForBuildingQC
-// https://github.com//dapperlabs/flow-go/blob/master/consensus/hotstuff/committee.go#L49
-func CheckApproversStakes(totalStakes uint64, receivedStakes uint64) bool {
-	return receivedStakes >= totalStakes*2/3+1
 }
