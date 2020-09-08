@@ -59,17 +59,13 @@ func TestConcurrentQueueAccess(t *testing.T) {
 		}
 	}
 	var readMsgCnt int64
-	done := make(chan struct{})
-	defer close(done)
 	read := func() {
 		for {
-			select {
-			case <-done:
+			elem := mq.Remove()
+			if elem == nil {
 				return
-			default:
-				mq.Remove()
-				atomic.AddInt64(&readMsgCnt, 1)
 			}
+			atomic.AddInt64(&readMsgCnt, 1)
 		}
 	}
 

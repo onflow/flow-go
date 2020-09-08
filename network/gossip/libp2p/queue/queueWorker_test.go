@@ -19,7 +19,7 @@ func TestSingleQueueWorker(t *testing.T) {
 
 // TestMultipleQueueWorkers tests that multiple workers can successfully read all elements from the queue
 func TestMultipleQueueWorkers(t *testing.T) {
-	testWorkers(t, 10, 100, rand.Intn(8)+2)
+	testWorkers(t, 10, 100, rand.Intn(9)+2)
 
 }
 
