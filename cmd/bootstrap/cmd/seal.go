@@ -18,7 +18,10 @@ func constructRootResultAndSeal(
 	dkgData model.DKGData,
 ) {
 
-	stateCommit, err := hex.DecodeString(rootCommit
+	stateCommit, err := hex.DecodeString(rootCommit)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not decode state commitment")
+	}
 
 	participants := model.ToIdentityList(participantNodes)
 	blockID := block.ID()
