@@ -304,7 +304,6 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.DB,
-				node.Tracer,
 				node.State,
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithInitialTimeout(hotstuffTimeout),

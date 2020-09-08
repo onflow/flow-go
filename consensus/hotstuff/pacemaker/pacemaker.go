@@ -52,9 +52,6 @@ func (p *NitroPaceMaker) gotoView(newView uint64) *model.NewViewEvent {
 		// STRICTLY monotonously increasing view numbers.
 		panic(fmt.Sprintf("cannot move from view %d to %d: currentView must be strictly monotonously increasing", p.currentView, newView))
 	}
-	if newView > p.currentView+1 {
-		p.notifier.OnSkippedAhead(newView)
-	}
 	p.currentView = newView
 	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
@@ -85,7 +82,10 @@ func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model
 	// => 2/3 of replicas are at least in view qc.view + 1.
 	// => replica can skip ahead to view qc.view + 1
 	p.timeoutControl.OnProgressBeforeTimeout()
-	return p.gotoView(qc.View + 1), true
+
+	newView := qc.View + 1
+	p.notifier.OnQcTriggeredViewChange(qc, newView)
+	return p.gotoView(newView), true
 }
 
 // UpdateCurViewWithBlock indicates the pacermaker that the block for the current view has received.

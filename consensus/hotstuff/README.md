@@ -164,9 +164,26 @@ Many HotStuff data models are built on top of basic data models defined in `/mod
 * `/consensus/hotstuff/voteaggregator` caches votes on a per-block basis and builds a QC if enough votes have been accumulated.
 * `/consensus/hotstuff/voter` tracks the view of the latest vote and determines whether or not to vote for a block
 
-
 ## Pending Extensions  
 * BLS Aggregation of the `StakingSignatures`
 * include Epochs 
 * upgrade PaceMaker to include Timeout Certificates 
 * refactor crypto integration (code in `verification` and dependent modules) for better auditability
+
+## Telemetry
+
+The HotStuff state machine exposes some details about its internal progress as notification through the `hotstuff.Consumer`.
+The following figure depicts at which points notifications are emitted. 
+
+![](/docs/StateMachine_wirth_notifications.png)
+
+We have implemented a telemetry system (`hotstuff.notifications.TelemetryConsumer`) which implements the `Consumer` interface.
+The `TelemetryConsumer` tracks all events as belonging together that were emitted during a path through the state machine.
+Each `path` through the state machine is identified by a unique id.
+Generally, the `TelemetryConsumer` could export the collected data to a variety of backends.
+For now, we export the data to a logger.
+
+
+ 
+
+

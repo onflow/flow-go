@@ -30,7 +30,6 @@ type HotStuffFactory struct {
 	log        zerolog.Logger
 	me         module.Local
 	db         *badger.DB
-	tracer     module.Tracer
 	protoState protocol.State
 	opts       []consensus.Option
 }
@@ -39,7 +38,6 @@ func NewHotStuffFactory(
 	log zerolog.Logger,
 	me module.Local,
 	db *badger.DB,
-	tracer module.Tracer,
 	protoState protocol.State,
 	opts ...consensus.Option,
 ) (*HotStuffFactory, error) {
@@ -48,7 +46,6 @@ func NewHotStuffFactory(
 		log:        log,
 		me:         me,
 		db:         db,
-		tracer:     tracer,
 		protoState: protoState,
 		opts:       opts,
 	}
@@ -97,7 +94,6 @@ func (f *HotStuffFactory) Create(
 
 	participant, err := consensus.NewParticipant(
 		f.log,
-		f.tracer,
 		notifier,
 		metrics,
 		headers,
