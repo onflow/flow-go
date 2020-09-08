@@ -1,9 +1,5 @@
 package queue
 
-import (
-	"time"
-)
-
 type item struct {
 	message  interface{}
 	priority int // The priority of the item in the queue.
@@ -40,7 +36,6 @@ func (pq *priorityQueue) Push(x interface{}) {
 	n := len(*pq)
 	item := x.(*item)
 	item.index = n
-	item.timestamp = time.Now().UnixNano()
 	*pq = append(*pq, item)
 }
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 )
 
@@ -36,7 +37,8 @@ func testWorkers(t *testing.T, maxPriority int, messageCnt int, workerCnt int) {
 		i, ok := m.(int)
 		assert.True(t, ok)
 		return queue.Priority(i)
-	})
+	},
+		metrics.NewNoopCollector())
 
 	messagesPerPriority := messageCnt / maxPriority // messages per priority
 	expectedPriority := maxPriority - 1             // when dequeing, the priority can be the current highest priority or one less

@@ -17,6 +17,9 @@ func NewNoopCollector() *NoopCollector {
 func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)            {}
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
 func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string)              {}
+func (nc *NoopCollector) ElementAdded(priority string)                              {}
+func (nc *NoopCollector) ElementRemoved(priority string)                            {}
+func (nc *NoopCollector) QueueDuration(duration time.Duration, priority string)     {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)              {}

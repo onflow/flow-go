@@ -75,7 +75,7 @@ func NewNetwork(
 
 	// setup the message queue
 	// create priority queue
-	o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority)
+	o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
 
 	// create workers to read from the queue and call queueSubmitFunc
 	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)

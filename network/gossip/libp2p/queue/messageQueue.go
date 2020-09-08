@@ -4,6 +4,9 @@ import (
 	"container/heap"
 	"context"
 	"sync"
+	"time"
+
+	"github.com/dapperlabs/flow-go/module"
 )
 
 // MessageQueue is the interface of the inbound message queue
@@ -32,6 +35,7 @@ type MessageQueueImpl struct {
 	cond         *sync.Cond
 	priorityFunc MessagePriorityFunc
 	ctx          context.Context
+	metrics      module.NetworkMetrics
 }
 
 func (mq *MessageQueueImpl) Insert(message interface{}) error {
@@ -45,8 +49,9 @@ func (mq *MessageQueueImpl) Insert(message interface{}) error {
 
 	// create the queue item
 	item := &item{
-		message:  message,
-		priority: int(priority),
+		message:   message,
+		priority:  int(priority),
+		timestamp: time.Now().UnixNano(),
 	}
 
 	// lock the underlying mutex
@@ -54,6 +59,9 @@ func (mq *MessageQueueImpl) Insert(message interface{}) error {
 
 	// push message to the underlying priority queue
 	heap.Push(mq.pq, item)
+
+	// record metrics
+	mq.metrics.ElementAdded(string(priority))
 
 	// signal a waiting routine that a message is now available
 	mq.cond.Signal()
@@ -76,7 +84,13 @@ func (mq *MessageQueueImpl) Remove() interface{} {
 
 		mq.cond.Wait()
 	}
-	return heap.Pop(mq.pq).(*item).message
+	item := heap.Pop(mq.pq).(*item)
+
+	// record metrics
+	mq.metrics.ElementRemoved(string(item.priority))
+	mq.metrics.QueueDuration(time.Duration(time.Now().UnixNano()-item.timestamp), string(item.priority))
+
+	return item.message
 }
 
 func (mq *MessageQueueImpl) Len() int {
@@ -85,13 +99,14 @@ func (mq *MessageQueueImpl) Len() int {
 	return mq.pq.Len()
 }
 
-func NewMessageQueue(ctx context.Context, priorityFunc MessagePriorityFunc) *MessageQueueImpl {
+func NewMessageQueue(ctx context.Context, priorityFunc MessagePriorityFunc, nm module.NetworkMetrics) *MessageQueueImpl {
 	var items = make([]*item, 0)
 	pq := priorityQueue(items)
 	mq := &MessageQueueImpl{
 		pq:           &pq,
 		priorityFunc: priorityFunc,
 		ctx:          ctx,
+		metrics:      nm,
 	}
 	m := sync.Mutex{}
 	mq.cond = sync.NewCond(&m)
