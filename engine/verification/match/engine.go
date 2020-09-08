@@ -231,12 +231,10 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.Finish()
 
-	verifiers, err := e.state.Final().Identities(filter.HasRole(flow.RoleVerification))
-	if err != nil {
-		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
-	}
-
-	assignment, err := e.assigner.Assign(verifiers, result.Chunks, result.BlockID)
+	// TODO: As a temporary shortcut, we can just use the block the Execution receipt is for, i.e. blockID = result.BlockID
+	// However, in the full protocol, blockID is the first block in its fork, which references an
+	// Execution Receipt with an Execution Result identical to result. (were blockID != result.BlockID)
+	assignment, err := e.assigner.Assign(result, result.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not create assignment: %w", err)
 	}

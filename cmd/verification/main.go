@@ -234,7 +234,7 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, chunks.CreateRNGByBlockIDClosure(node.State))
+			assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, node.State)
 			if err != nil {
 				return nil, err
 			}

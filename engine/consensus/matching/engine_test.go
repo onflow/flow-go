@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -594,7 +595,7 @@ func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 	ms.pendingResults[result.ID()] = result
 
 	assignment := chunks.NewAssignment()
-	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -614,10 +615,10 @@ func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
 	ms.pendingResults[result.ID()] = result
 
 	assignment := chunks.NewAssignment()
-	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	// use the happy-path stake checking function which always accepts
-	ms.matching.checkStakes = StakesAlwaysEnough
+	// ms.matching.checkStakes = StakesAlwaysEnough
 
 	// happy path requires 0 approvals per chunk, so the result should be
 	// counted even if we havent received any approvals.
@@ -639,15 +640,13 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	// use the real stake checking function which requires +2/3 of total stakes
-	ms.matching.checkStakes = CheckApproversStakes
+	// set required approvals to 3
+	ms.matching.requiredApprovalCount = 3
 
 	assignment := chunks.NewAssignment()
 
 	var approvers flow.IdentityList
-	approvers = append(approvers, ms.approvers[0])
-	approvers = append(approvers, ms.approvers[1])
-	approvers = append(approvers, ms.approvers[2])
+	approvers = ms.approvers[:3]
 
 	// add enough approvals for each chunk, except last
 	for n, approver := range approvers {
@@ -669,7 +668,7 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 		assignment.Add(chunk, approvers.NodeIDs())
 	}
 
-	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -687,14 +686,12 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	ms.pendingResults[result.ID()] = result
 
 	// use the real stake checking function which requires +2/3 of total stakes
-	ms.matching.checkStakes = CheckApproversStakes
+	// ms.matching.checkStakes = CheckApproversStakes
 
 	assignment := chunks.NewAssignment()
 
 	var approvers flow.IdentityList
-	approvers = append(approvers, ms.approvers[0])
-	approvers = append(approvers, ms.approvers[1])
-	approvers = append(approvers, ms.approvers[2])
+	approvers = ms.approvers[:3]
 
 	// add enough approvals for each chunk
 	for _, approver := range approvers {
@@ -712,7 +709,7 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 		assignment.Add(chunk, approvers.NodeIDs())
 	}
 
-	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -880,11 +877,7 @@ func (ms *MatchingSuite) TestValidateVerifiers() {
 
 	// list of 3 approvers
 	var approvers flow.IdentityList
-	approvers = append(approvers, ms.approvers[0])
-	approvers = append(approvers, ms.approvers[1])
-	approvers = append(approvers, ms.approvers[2])
-
-	ms.Require().Equal(len(approvers), 3)
+	approvers = ms.approvers[:3]
 
 	// create assignment with 3 verification node assigned to every chunk
 	assignment := chunks.NewAssignment()
@@ -907,13 +900,14 @@ func (ms *MatchingSuite) TestValidateVerifiers() {
 	}
 
 	// mock assigner
-	ms.assigner.On("Assign", mock.Anything, result.Chunks, result.BlockID).Return(assignment, nil)
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	// check if each chunk only has 3 validated approvers
 	for _, chunk := range result.Chunks {
 		// give full set of approvers and make sure only 3 of the 4 are returned
 		validatedApprovers := ms.matching.validateApprovers(assignment, approvals, chunk)
+		intersection := approvers.Filter(filter.HasNodeID(validatedApprovers...))
 
-		ms.Require().Equal(len(approvers), validatedApprovers.Len())
+		ms.Require().Equal(len(approvers), len(intersection))
 	}
 }

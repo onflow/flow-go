@@ -9,7 +9,7 @@ import (
 // ChunkAssigner presents an interface for assigning chunks to the verifier nodes
 type ChunkAssigner interface {
 	// Assign generates the assignment
-	Assign(verifiers flow.IdentityList, chunks flow.ChunkList, blockID flow.Identifier) (*chmodels.Assignment, error)
+	Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chmodels.Assignment, error)
 }
 
 // ChunkVerifier provides functionality to verify chunks

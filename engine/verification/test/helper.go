@@ -97,10 +97,9 @@ func VerificationHappyPath(t *testing.T,
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 
+	assigner.On("Assign", result, result.BlockID).Return(a, nil)
+
 	for _, verIdentity := range verIdentities {
-
-		assigner.On("Assign", testifymock.Anything, result.Chunks, result.BlockID).Return(a, nil)
-
 		verNode := testutil.VerificationNode(t,
 			hub,
 			verIdentity,

@@ -267,7 +267,7 @@ func TestChunkVerified(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -329,7 +329,7 @@ func TestNoAssignment(t *testing.T) {
 	metrics.On("OnExecutionResultReceived").Return().Once()
 
 	// add MyChunk method to return to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -372,7 +372,7 @@ func TestMultiAssignment(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Twice()
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -426,7 +426,7 @@ func TestDuplication(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -483,7 +483,7 @@ func TestRetry(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -537,7 +537,7 @@ func TestMaxRetry(t *testing.T) {
 	metrics.On("OnExecutionResultReceived").Return().Once()
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -592,7 +592,7 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 		snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 		// add assignment to assigner
-		assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+		assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 		// block header has been received
 		headerDB[result.BlockID] = header
@@ -656,7 +656,7 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head

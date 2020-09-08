@@ -19,12 +19,12 @@ func NewMockAssigner(id flow.Identifier, f func(index uint64) bool) *MockAssigne
 }
 
 // Assign assigns all input chunks to the verifier node
-func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, blockID flow.Identifier) (*chmodel.Assignment, error) {
-	if len(chunks) == 0 {
+func (m *MockAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chmodel.Assignment, error) {
+	if len(result.Chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}
 	a := chmodel.NewAssignment()
-	for _, c := range chunks {
+	for _, c := range result.Chunks {
 		if m.isAssigned(c.Index) {
 			a.Add(c, flow.IdentifierList{m.me})
 		}

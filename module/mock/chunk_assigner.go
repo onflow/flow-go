@@ -14,13 +14,13 @@ type ChunkAssigner struct {
 	mock.Mock
 }
 
-// Assign provides a mock function with given fields: verifiers, _a1, blockID
-func (_m *ChunkAssigner) Assign(verifiers flow.IdentityList, _a1 flow.ChunkList, blockID flow.Identifier) (*chunks.Assignment, error) {
-	ret := _m.Called(verifiers, _a1, blockID)
+// Assign provides a mock function with given fields: result, blockID
+func (_m *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunks.Assignment, error) {
+	ret := _m.Called(result, blockID)
 
 	var r0 *chunks.Assignment
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, flow.ChunkList, flow.Identifier) *chunks.Assignment); ok {
-		r0 = rf(verifiers, _a1, blockID)
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult, flow.Identifier) *chunks.Assignment); ok {
+		r0 = rf(result, blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*chunks.Assignment)
@@ -28,8 +28,8 @@ func (_m *ChunkAssigner) Assign(verifiers flow.IdentityList, _a1 flow.ChunkList,
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.IdentityList, flow.ChunkList, flow.Identifier) error); ok {
-		r1 = rf(verifiers, _a1, blockID)
+	if rf, ok := ret.Get(1).(func(*flow.ExecutionResult, flow.Identifier) error); ok {
+		r1 = rf(result, blockID)
 	} else {
 		r1 = ret.Error(1)
 	}
