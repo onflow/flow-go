@@ -59,7 +59,6 @@ type Engine struct {
 	checkingSealing         *atomic.Bool                               // used to rate limit the checksealing call
 	requestReceiptThreshold uint                                       // how many blocks between sealed/finalized before we request execution receipts
 	maxUnsealedResults      int                                        // how many unsealed results to check when check sealing
-	requiredApprovalCount   int                                        // the number of approvals required to match a chunks
 }
 
 // New creates a new collection propagation engine.

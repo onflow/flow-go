@@ -645,8 +645,7 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 
 	assignment := chunks.NewAssignment()
 
-	var approvers flow.IdentityList
-	approvers = ms.approvers[:3]
+	approvers := ms.approvers[:3]
 
 	// add enough approvals for each chunk, except last
 	for n, approver := range approvers {
@@ -690,8 +689,7 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 
 	assignment := chunks.NewAssignment()
 
-	var approvers flow.IdentityList
-	approvers = ms.approvers[:3]
+	approvers := ms.approvers[:3]
 
 	// add enough approvals for each chunk
 	for _, approver := range approvers {
@@ -876,8 +874,7 @@ func (ms *MatchingSuite) TestValidateVerifiers() {
 	result := unittest.ResultForBlockFixture(&block)
 
 	// list of 3 approvers
-	var approvers flow.IdentityList
-	approvers = ms.approvers[:3]
+	approvers := ms.approvers[:3]
 
 	// create assignment with 3 verification node assigned to every chunk
 	assignment := chunks.NewAssignment()
