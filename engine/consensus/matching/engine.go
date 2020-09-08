@@ -551,10 +551,11 @@ ResultLoop:
 func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
 	// get valid approver IDs per chunk
 	validApprovers := e.validateApprovers(assignment, approvals, chunk)
+	requiredApprovers := assignment.Verifiers(chunk)
 
-	// check if there are atleast 1 approval
-	// for the happy path we allow chunks to be matched with 0 approvals
-	return validApprovers.Len() >= e.requiredApprovalCount
+	// check if there are atleast 1 approval for happy path
+	// require chunk to be approvedby all approvers
+	return validApprovers.Len() == 1 || validApprovers.Len() >= requiredApprovers.Len()
 }
 
 // validateApprovers checks all approvals for a chunk and returns a list of all valid approverIds

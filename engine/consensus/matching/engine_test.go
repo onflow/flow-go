@@ -641,7 +641,7 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	ms.pendingResults[result.ID()] = result
 
 	// set required approvals to 3
-	ms.matching.requiredApprovalCount = 3
+	// ms.matching.requiredApprovalCount = 3
 
 	assignment := chunks.NewAssignment()
 
