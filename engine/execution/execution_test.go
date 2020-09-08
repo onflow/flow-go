@@ -217,12 +217,12 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal1b)
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2) // block 2 cannot be executed if parent (block1 is missing)
 
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 2
 	})
 
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal1)
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 6
 	}) // now block 3 and 2 can be executed
 
@@ -360,7 +360,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe1Node.IngestionEngine.Submit(conID.NodeID, proposal1)
 
 	// ensure block 1 has been executed
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return receiptsReceived == 1
 	})
 	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
@@ -384,7 +384,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	assert.NoError(t, err)
 
 	// ensure block 1, 2 and 3 have been executed
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return receiptsReceived == 3
 	})
 
@@ -541,7 +541,7 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 	exeNode.IngestionEngine.Submit(conID.NodeID, proposal2)
 
 	// ensure block 1 has been executed
-	hub.EventuallyUntil(t, func() bool {
+	hub.DeliverAllEventuallyUntil(t, func() bool {
 		return receiptsReceived == 2
 	}, 30*time.Second, 500*time.Millisecond)
 
@@ -603,7 +603,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	exeNode.IngestionEngine.SubmitLocal(proposal)
 
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 2
 	})
 
