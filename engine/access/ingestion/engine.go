@@ -479,7 +479,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 			return
 		}
 		// use the root height as the last full height
-		header, err := e.state.Root()
+		header, err := e.state.Params().Root()
 		if err != nil {
 			logError(err)
 			return

@@ -59,7 +59,7 @@ func (p *Distributor) OnEnteringView(view uint64, leader flow.Identifier) {
 	}
 }
 
-func (p *Distributor) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
+func (p *Distributor) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
@@ -83,7 +83,7 @@ func (p *Distributor) OnVoting(vote *model.Vote) {
 	}
 }
 
-func (p *Distributor) OnQcConstructedFromVotes(qc *model.QuorumCertificate) {
+func (p *Distributor) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
