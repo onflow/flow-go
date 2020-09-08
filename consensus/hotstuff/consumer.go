@@ -81,7 +81,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64)
+	OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64)
 
 	// OnProposingBlock notifications are produced by the EventHandler when the replica, as
 	// leader for the respective view, proposing a block.
@@ -101,7 +101,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcConstructedFromVotes(*model.QuorumCertificate)
+	OnQcConstructedFromVotes(*flow.QuorumCertificate)
 
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.

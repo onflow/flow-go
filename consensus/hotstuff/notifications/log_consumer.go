@@ -66,7 +66,7 @@ func (lc *LogConsumer) OnEnteringView(view uint64, leader flow.Identifier) {
 		Msg("view entered")
 }
 
-func (lc *LogConsumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
+func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).
 		Hex("qc_id", qc.BlockID[:]).
@@ -86,7 +86,7 @@ func (lc *LogConsumer) OnVoting(vote *model.Vote) {
 		Msg("voting for block")
 }
 
-func (lc *LogConsumer) OnQcConstructedFromVotes(qc *model.QuorumCertificate) {
+func (lc *LogConsumer) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
 	lc.log.Debug().
 		Uint64("qc_view", qc.View).
 		Hex("qc_id", qc.BlockID[:]).

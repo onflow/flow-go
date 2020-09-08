@@ -28,13 +28,13 @@ func (c *NoopConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
 
 func (*NoopConsumer) OnEnteringView(uint64, flow.Identifier) {}
 
-func (c *NoopConsumer) OnQcTriggeredViewChange(*model.QuorumCertificate, uint64) {}
+func (c *NoopConsumer) OnQcTriggeredViewChange(*flow.QuorumCertificate, uint64) {}
 
 func (c *NoopConsumer) OnProposingBlock(*model.Proposal) {}
 
 func (c *NoopConsumer) OnVoting(*model.Vote) {}
 
-func (c *NoopConsumer) OnQcConstructedFromVotes(*model.QuorumCertificate) {}
+func (c *NoopConsumer) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
 
 func (*NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
 

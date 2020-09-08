@@ -61,7 +61,7 @@ func (_m *Consumer) OnProposingBlock(proposal *model.Proposal) {
 }
 
 // OnQcConstructedFromVotes provides a mock function with given fields: _a0
-func (_m *Consumer) OnQcConstructedFromVotes(_a0 *model.QuorumCertificate) {
+func (_m *Consumer) OnQcConstructedFromVotes(_a0 *flow.QuorumCertificate) {
 	_m.Called(_a0)
 }
 
@@ -71,7 +71,7 @@ func (_m *Consumer) OnQcIncorporated(_a0 *flow.QuorumCertificate) {
 }
 
 // OnQcTriggeredViewChange provides a mock function with given fields: qc, newView
-func (_m *Consumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
+func (_m *Consumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	_m.Called(qc, newView)
 }
 
