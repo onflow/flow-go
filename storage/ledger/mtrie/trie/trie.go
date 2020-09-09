@@ -453,6 +453,7 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, writer *bufio.Writer) error {
 		if err != nil {
 			return err
 		}
+		writer.Flush()
 	}
 
 	if lChild := n.LeftChild(); lChild != nil {
