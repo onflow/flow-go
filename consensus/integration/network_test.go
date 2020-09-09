@@ -66,7 +66,7 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 	con := &Conduit{
 		net:       n,
 		channelID: channelID,
-		queue:     make(chan message, 128),
+		queue:     make(chan message, 1024),
 	}
 	go func() {
 		for msg := range con.queue {

@@ -383,6 +383,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 		n.logger.Error().
 			Err(libp2perrors.NewInvalidEngineError(qm.ChannelID, qm.SenderID.String())).
 			Msg("failed to submit message")
+		return
 	}
 
 	// submit the message to the engine synchronously

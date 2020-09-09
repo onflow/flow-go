@@ -1,9 +1,11 @@
 package queue
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	testmessage "github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/model/messages"
 )
 
@@ -23,14 +25,17 @@ type QueueMessage struct {
 
 // GetEventPriority returns the priority of the flow event message.
 // It is an average of the priority by message type and priority by message size
-func GetEventPriority(message interface{}) Priority {
-	qm := message.(QueueMessage)
+func GetEventPriority(message interface{}) (Priority, error) {
+	qm, ok := message.(QueueMessage)
+	if !ok {
+		return 0, fmt.Errorf("invalid message format: %T", message)
+	}
 	priorityByType := getPriorityByType(qm.Payload)
 	priorityBySize := getPriorityBySize(qm.Size)
-	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2))
+	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2)), nil
 }
 
-// getPriorityByType returns the priority of a message by it's type
+// getPriorityByType maps a message type to its priority
 func getPriorityByType(message interface{}) Priority {
 	switch message.(type) {
 	// consensus
@@ -91,6 +96,11 @@ func getPriorityByType(message interface{}) Priority {
 	case *messages.EntityResponse:
 		return LowPriority
 
+	// test message
+	case *testmessage.TestMessage:
+		return LowPriority
+
+	// anything else
 	default:
 		return MediumPriority
 	}

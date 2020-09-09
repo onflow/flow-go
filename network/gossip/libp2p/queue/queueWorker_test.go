@@ -33,10 +33,10 @@ func testWorkers(t *testing.T, maxPriority int, messageCnt int, workerCnt int) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// the priority function just returns the message as the priority itself (message = priority)
-	var q queue.MessageQueue = queue.NewMessageQueue(ctx, func(m interface{}) queue.Priority {
+	var q queue.MessageQueue = queue.NewMessageQueue(ctx, func(m interface{}) (queue.Priority, error) {
 		i, ok := m.(int)
 		assert.True(t, ok)
-		return queue.Priority(i)
+		return queue.Priority(i), nil
 	},
 		metrics.NewNoopCollector())
 

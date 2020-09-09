@@ -5,39 +5,62 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func runNodes(nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
 			n.compliance.Ready()
+			n.sync.Ready()
 		}(n)
 	}
 }
 
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
-	// the current stop condition is not thread-safe,
-	// if a node is the first to reach view 100, it will stop, and
-	// also stop sending the last block to other nodes, and
-	// causing other blocks unable to reach view 100, then the tests
-	// will timeout and fail
-	t.Skip("flaky tests")
-
-	nodes, stopper, hub := createNodes(t, 3, 100, 1000)
+	nodes, stopper, hub := createNodes(t, 3, 5, 0)
 
 	hub.WithFilter(blockNothing)
 	runNodes(nodes)
 
-	<-stopper.stopped
+	assert.Eventually(t, func() bool {
+		select {
+		case <-stopper.stopped:
+			return true
+		default:
+			return false
+		}
+	}, 30*time.Second, 20*time.Millisecond)
 
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 90)
+
+	cleanupNodes(nodes)
+}
+
+// with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
+func Test5Nodes(t *testing.T) {
+
+	// 4 nodes should be able finalize at least 3 blocks.
+	nodes, stopper, hub := createNodes(t, 5, 2, 1)
+
+	hub.WithFilter(blockNodes(nodes[0]))
+	runNodes(nodes)
+
+	<-stopper.stopped
+
+	header, err := nodes[0].state.Final().Head()
+	require.NoError(t, err)
+
+	// the first node was blocked, never finalize any block
+	require.Equal(t, uint64(0), header.View)
+
+	allViews := allFinalizedViews(t, nodes[1:])
+	assertSafety(t, allViews)
 
 	cleanupNodes(nodes)
 }
@@ -73,33 +96,6 @@ func assertSafety(t *testing.T, allViews [][]uint64) {
 	}
 }
 
-// assert all finalized views must have reached a given view to ensure enough process has been made
-func assertLiveness(t *testing.T, allViews [][]uint64, view uint64) {
-	// the shortest chain must made enough progress
-	shortest := allViews[0]
-	require.Greater(t, len(shortest), 0, "no block was finalized")
-	highestView := shortest[len(shortest)-1]
-	require.Greater(t, highestView, view, "did not finalize enough block")
-}
-
-func printState(t *testing.T, nodes []*Node, i int) {
-	n := nodes[i]
-	headerN, err := n.state.Final().Head()
-	require.NoError(t, err)
-
-	n.log.Info().
-		Uint64("finalview", headerN.View).
-		Uint64("finalheight", headerN.Height).
-		Int("proposal", n.blockproposal).
-		Int("vote", n.blockvote).
-		Int("syncreq", n.syncreq).
-		Int("syncresp", n.syncresp).
-		Int("rangereq", n.rangereq).
-		Int("batchreq", n.batchreq).
-		Int("batchresp", n.batchresp).
-		Msg("stats")
-}
-
 func chainViews(t *testing.T, node *Node) []uint64 {
 	views := make([]uint64, 0)
 
@@ -125,4 +121,22 @@ type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver 
 // block nothing
 func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 	return false, 0
+}
+
+// block all messages sent by or received by a list of denied nodes
+func blockNodes(denyList ...*Node) BlockOrDelayFunc {
+	blackList := make(map[flow.Identifier]*Node, len(denyList))
+	for _, n := range denyList {
+		blackList[n.id.ID()] = n
+	}
+	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		block, notBlock := true, false
+		if _, ok := blackList[sender.id.ID()]; ok {
+			return block, 0
+		}
+		if _, ok := blackList[receiver.id.ID()]; ok {
+			return block, 0
+		}
+		return notBlock, 0
+	}
 }

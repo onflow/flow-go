@@ -38,8 +38,8 @@ func TestConcurrentQueueAccess(t *testing.T) {
 
 	messages := createMessages(messageCnt, randomPriority)
 
-	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) queue.Priority {
-		return messages[message.(string)]
+	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) (queue.Priority, error) {
+		return messages[message.(string)], nil
 	}
 
 	msgChan := make(chan string, len(messages))
@@ -118,8 +118,8 @@ func TestQueueShutdown(t *testing.T) {
 func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 	// create the priority function
-	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) queue.Priority {
-		return messages[message.(string)]
+	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) (queue.Priority, error) {
+		return messages[message.(string)], nil
 	}
 
 	// create queues for each priority to check expectations later
@@ -210,7 +210,7 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 
 	for i := 0; i < messageCnt; i++ {
 		// choose a random priority
-		p := priorityFunc(nil)
+		p, _ := priorityFunc(nil)
 		// create a message
 		msg := msgPrefix + strconv.Itoa(i)
 		messages[msg] = p
@@ -219,12 +219,12 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 	return messages
 }
 
-func randomPriority(_ interface{}) queue.Priority {
+func randomPriority(_ interface{}) (queue.Priority, error) {
 	rand.Seed(time.Now().UnixNano())
 	p := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
-	return queue.Priority(p)
+	return queue.Priority(p), nil
 }
 
-func fixedPriority(_ interface{}) queue.Priority {
-	return queue.MediumPriority
+func fixedPriority(_ interface{}) (queue.Priority, error) {
+	return queue.MediumPriority, nil
 }
