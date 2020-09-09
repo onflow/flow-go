@@ -30,12 +30,15 @@ type epochreqs struct {
 // when a new epoch is about to start and spinning down engines for an epoch that
 // has ended.
 type Engine struct {
-	unit  *engine.Unit
-	epoch *epochreqs // requirements for the current epoch
+	unit *engine.Unit
 
 	log   zerolog.Logger
 	me    module.Local
 	state protocol.State
+
+	// mapping from epoch counter to running engines for that epoch. When engines
+	// are spun down, the relevant entry is deleted.
+	epochs map[uint64]*epochreqs
 
 	// TODO should be per-epoch eventually, cache here for now
 	pool mempool.Transactions
@@ -84,9 +87,8 @@ func New(
 		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
 	}
 
-	e.epoch = reqs
-	_ = e.state       // TODO lint
-	_ = e.epoch.state // TODO lint
+	e.epochs[epoch] = reqs
+	_ = e.epochs[epoch].state // TODO lint
 	return e, nil
 }
 
@@ -95,19 +97,51 @@ func New(
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
-		<-e.epoch.hotstuff.Ready()
-		<-e.epoch.proposal.Ready()
-		<-e.epoch.sync.Ready()
+		for _, epoch := range e.epochs {
+			<-epoch.hotstuff.Ready()
+			<-epoch.proposal.Ready()
+			<-epoch.sync.Ready()
+		}
 	})
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		<-e.epoch.hotstuff.Done()
-		<-e.epoch.proposal.Done()
-		<-e.epoch.sync.Done()
+		for _, epoch := range e.epochs {
+			<-epoch.hotstuff.Done()
+			<-epoch.proposal.Done()
+			<-epoch.sync.Done()
+		}
 	})
+}
+
+// onEpochTransition handles the transition to a new epoch. The counter for the
+// new epoch is denoted by the epoch parameter.
+func (e *Engine) onEpochTransition(epoch uint64) {
+
+	// we must have already set up the previous epoch
+	_, ok := e.epochs[epoch-1]
+	if !ok {
+		e.log.Error().Msgf("cannot set up epoch %d without previous epoch", epoch)
+		return
+	}
+
+	// if we've already set up this epoch, log a warning
+	_, ok = e.epochs[epoch]
+	if ok {
+		e.log.Warn().Msgf("cannot set up already setup epoch %d", epoch)
+		return
+	}
+
+	// instantiate the requirements for the given epoch
+	reqs, err := e.setupEpoch(epoch)
+	if err != nil {
+		// failure to prepare for the upcoming epoch is a fatal error
+		e.log.Fatal().Err(err).Msg("failed to setup epoch")
+	}
+
+	e.epochs[epoch] = reqs
 }
 
 // setupEpoch sets up cluster state and HotStuff for a new chain for the given
