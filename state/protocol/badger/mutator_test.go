@@ -10,16 +10,21 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/protocol/events"
+	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/state/protocol/util"
 	stoerr "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	storeutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -599,14 +604,27 @@ func TestExtendInvalidChainID(t *testing.T) {
 	})
 }
 
-// tests the full flow of transitioning between epochs by finalizing a setup
-// event, then a commit event, then finalizing the first block of the next epoch
+// Tests the full flow of transitioning between epochs by finalizing a setup
+// event, then a commit event, then finalizing the first block of the next epoch.
+// Also tests that appropriate epoch transition events are fired.
 func TestExtendEpochTransitionValid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		metrics := metrics.NewNoopCollector()
+		headers, _, seals, index, payloads, blocks, setups, commits := storeutil.StorageLayer(t, db)
+
+		// create a event consumer to test epoch transition events
+		distributor := events.NewDistributor()
+		consumer := new(mockprotocol.Consumer)
+		consumer.On("BlockFinalized", mock.Anything)
+		distributor.AddConsumer(consumer)
+
+		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, distributor)
+		require.Nil(t, err)
 
 		// first bootstrap with the initial epoch
 		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
-		err := state.Mutate().Bootstrap(root, rootResult, rootSeal)
+		err = state.Mutate().Bootstrap(root, rootResult, rootSeal)
 		require.Nil(t, err)
 
 		// add a block for the first seal to reference
@@ -652,6 +670,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		_, err = state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
 		require.Error(t, err)
 
+		// expect epoch phase transition
+		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block2.Header).Once()
+
 		err = state.Mutate().Finalize(block2.ID())
 		require.Nil(t, err)
 
@@ -661,6 +682,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		assert.Equal(t, epoch2Participants, gotIdentities)
 		clusters, err := state.AtEpoch(epoch2Setup.Counter).Clusters()
 		require.Nil(t, err)
+		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block2.Header)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
 		_, err = state.AtEpoch(epoch2Setup.Counter).ClusterRootQC(clusters[0])
@@ -690,6 +712,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		_, err = state.AtEpoch(epoch2Setup.Counter).ClusterRootQC(clusters[0])
 		assert.Error(t, err)
 
+		// expect epoch phase transition
+		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block3.Header)
+
 		err = state.Mutate().Finalize(block3.ID())
 		require.Nil(t, err)
 
@@ -698,6 +723,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		assert.Nil(t, err)
 		_, err = state.AtEpoch(epoch2Setup.Counter).DKG().GroupKey()
 		assert.Nil(t, err)
+		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block3.Header)
 
 		// we should still be in epoch 1
 		epochCounter, err := state.Final().Epoch()
@@ -724,7 +750,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(flow.Payload{})
 		// we should handle view that aren't exactly the first valid view of the epoch
-		block5.Header.View = epoch1FinalView + uint64(rand.Intn(10))
+		block5.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
 
 		err = state.Mutate().Extend(&block5)
 		require.Nil(t, err)
@@ -735,6 +761,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Nil(t, err)
 		assert.Equal(t, epoch1Setup.Counter, epochCounter)
 
+		// expect epoch transition
+		consumer.On("EpochTransition", epoch2Setup.Counter, block5.Header).Once()
+
 		// finalize the first block of epoch 2
 		err = state.Mutate().Finalize(block5.ID())
 		require.Nil(t, err)
@@ -743,6 +772,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		epochCounter, err = state.Final().Epoch()
 		require.Nil(t, err)
 		assert.Equal(t, epoch2Setup.Counter, epochCounter)
+		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block5.Header)
 	})
 }
 
