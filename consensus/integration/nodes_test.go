@@ -39,30 +39,32 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const hotstuffTimeout = 2 * time.Second
+const hotstuffTimeout = 100 * time.Millisecond
 
 type Node struct {
-	db            *badger.DB
-	dbDir         string
-	index         int
-	log           zerolog.Logger
-	id            *flow.Identity
-	compliance    *compliance.Engine
-	sync          *synceng.Engine
-	hot           *hotstuff.EventLoop
-	state         *protocol.State
-	headers       *storage.Headers
-	net           *Network
-	blockproposal int
-	blockvote     int
-	syncreq       int
-	syncresp      int
-	rangereq      int
-	batchreq      int
-	batchresp     int
+	db         *badger.DB
+	dbDir      string
+	index      int
+	log        zerolog.Logger
+	id         *flow.Identity
+	compliance *compliance.Engine
+	sync       *synceng.Engine
+	hot        *hotstuff.EventLoop
+	state      *protocol.State
+	headers    *storage.Headers
+	net        *Network
 }
 
-func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*Node, *Stopper, *Hub) {
+func (n *Node) Shutdown() {
+	<-n.sync.Done()
+	<-n.compliance.Done()
+}
+
+// n - the total number of nodes to be created
+// finalizedCount - the number of finalized blocks before stopping the tests
+// tolerate - the number of node to tolerate that don't need to reach the finalization count
+// 						before stopping the tests
+func createNodes(t *testing.T, n int, finalizedCount uint, tolerate int) ([]*Node, *Stopper, *Hub) {
 
 	// create n consensus node participants
 	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
@@ -97,7 +99,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 	}
 
 	hub := NewNetworkHub()
-	stopper := NewStopper(stopAtView, stopCountAt)
+	stopper := NewStopper(finalizedCount, tolerate)
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
 		node := createNode(t, i, identity, participants, root, result, seal, rootQC, hub, stopper)
@@ -151,14 +153,11 @@ func createNode(
 
 	// log with node index an ID
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(os.Stderr).Level(zerolog.WarnLevel).With().Timestamp().Int("index", index).Hex("node_id", localID[:]).Logger()
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("node_id", localID[:]).Logger()
 
 	stopConsumer := stopper.AddNode(node)
 
 	counterConsumer := &CounterConsumer{
-		log:      log,
-		interval: time.Second,
-		next:     time.Now().Add(time.Second),
 		finalized: func(total uint) {
 			stopper.onFinalizedTotal(node.id.ID(), total)
 		},
@@ -210,7 +209,7 @@ func createNode(
 	final := finalizer.NewFinalizer(db, headersDB, state)
 
 	// initialize the persister
-	persist := persister.New(db)
+	persist := persister.New(db, rootHeader.ChainID)
 
 	prov := &networkmock.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
@@ -230,7 +229,7 @@ func createNode(
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
 		com, build, final, persist, signer, comp, rootHeader,
-		rootQC, rootHeader, pending, consensus.WithInitialTimeout(hotstuffTimeout))
+		rootQC, rootHeader, pending, consensus.WithInitialTimeout(hotstuffTimeout), consensus.WithMinTimeout(hotstuffTimeout))
 
 	require.NoError(t, err)
 
