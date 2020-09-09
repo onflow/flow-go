@@ -7,6 +7,10 @@ import (
 // Noop is a no-op implementation of protocol.Events.
 type Noop struct{}
 
+func NewNoop() *Noop {
+	return &Noop{}
+}
+
 func (n Noop) BlockFinalized(block *flow.Header) {
 }
 

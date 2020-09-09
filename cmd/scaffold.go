@@ -29,6 +29,7 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/protocol/events"
 	"github.com/dapperlabs/flow-go/storage"
 	storerr "github.com/dapperlabs/flow-go/storage"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
@@ -112,6 +113,7 @@ type FlowNodeBuilder struct {
 	Metrics           Metrics
 	DB                *badger.DB
 	Storage           Storage
+	ProtocolEvents    *events.Distributor
 	State             *protocol.State
 	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
@@ -367,8 +369,9 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	}
 }
 
-// must be called after `initNClusters`
 func (fnb *FlowNodeBuilder) initState() {
+
+	distributor := events.NewDistributor()
 	state, err := protocol.NewState(
 		fnb.Metrics.Compliance,
 		fnb.DB,
@@ -379,6 +382,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Blocks,
 		fnb.Storage.Setups,
 		fnb.Storage.Commits,
+		distributor,
 	)
 
 	fnb.MustNot(err).Msg("could not initialize flow state")
@@ -510,6 +514,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		Msg("last finalized block")
 
 	fnb.State = state
+	fnb.ProtocolEvents = distributor
 }
 
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
