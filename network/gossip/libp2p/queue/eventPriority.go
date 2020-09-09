@@ -50,11 +50,11 @@ func getPriorityByType(message interface{}) Priority {
 	case *messages.SyncResponse:
 		return LowPriority
 	case *messages.RangeRequest:
-		return LowPriority
+		return MediumPriority
 	case *messages.BatchRequest:
-		return LowPriority
+		return MediumPriority
 	case *messages.BlockResponse:
-		return LowPriority
+		return HighPriority
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
