@@ -336,6 +336,7 @@ func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*model.QuorumCert
 	}
 
 	va.createdQC[blockID] = qc
+	va.notifier.OnQcConstructedFromVotes(qc)
 	return qc, true, nil
 }
 

@@ -9,6 +9,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
+
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
@@ -358,10 +360,14 @@ func main() {
 			return push, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			builder := builder.NewBuilder(node.DB, node.Storage.Headers, colHeaders, colPayloads, pool, node.Tracer,
+			// initialize the block payload builder
+			var payloadBuilder module.Builder
+			payloadBuilder = builder.NewBuilder(node.DB, node.Storage.Headers, colHeaders, colPayloads, pool, node.Tracer,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
+			payloadBuilder = blockproducer.NewMetricsWrapper(payloadBuilder, clusterMetrics) // wrapper for measuring time spent building block payload component
+
 			finalizer := colfinalizer.NewFinalizer(node.DB, pool, push, colMetrics, clusterID)
 
 			proposalEng, err = proposal.New(
@@ -395,7 +401,7 @@ func main() {
 			signer := verification.NewSingleSigner(committee, staking, node.Me.NodeID())
 
 			// initialize logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, clusterMetrics)
+			notifier := createNotifier(node.Logger, clusterMetrics, clusterID)
 
 			persist := persister.New(node.DB)
 
@@ -406,12 +412,11 @@ func main() {
 
 			hot, err := consensus.NewParticipant(
 				node.Logger,
-				node.Tracer,
 				notifier,
 				clusterMetrics,
 				colHeaders,
 				committee,
-				builder,
+				payloadBuilder,
 				finalizer,
 				persist,
 				signer,

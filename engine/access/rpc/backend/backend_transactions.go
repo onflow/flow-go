@@ -57,7 +57,9 @@ func (b *backendTransactions) SendTransaction(
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
-	go b.registerTransactionForRetry(tx)
+	if b.retry.IsActive() {
+		go b.registerTransactionForRetry(tx)
+	}
 
 	return nil
 }
@@ -299,9 +301,11 @@ func (b *backendTransactions) lookupTransactionResult(
 			// No result yet, indicate that it has not been executed
 			return false, nil, 0, "", nil
 		}
+		// Other Error trying to retrieve the result, return with err
+		return false, nil, 0, "", err
 	}
 
-	// considered executed as long as some result is returned, even if it's an error
+	// considered executed as long as some result is returned, even if it's an error message
 	return true, events, txStatus, message, nil
 }
 
