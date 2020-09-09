@@ -52,13 +52,14 @@ func NewNetworkCollector() *NetworkCollector {
 		queueSize: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
+			Name:      "message_queue_size",
 			Help:      "the number of elements in the message receive queue",
 		}, []string{LabelPriority}),
 
 		queueDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Name:      "queue_duration_seconds",
 			Namespace: namespaceNetwork,
-			Subsystem: subsystemHotstuff,
+			Subsystem: subsystemQueue,
+			Name:      "message_queue_duration_seconds",
 			Help:      "duration [millis; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
 			Buckets:   []float64{10, 100, 500, 1000, 2000, 5000},
 		}, []string{LabelPriority}),

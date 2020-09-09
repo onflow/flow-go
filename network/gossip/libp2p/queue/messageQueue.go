@@ -3,6 +3,7 @@ package queue
 import (
 	"container/heap"
 	"context"
+	"strconv"
 	"sync"
 	"time"
 
@@ -61,7 +62,7 @@ func (mq *MessageQueueImpl) Insert(message interface{}) error {
 	heap.Push(mq.pq, item)
 
 	// record metrics
-	mq.metrics.ElementAdded(string(priority))
+	mq.metrics.ElementAdded(strconv.Itoa(item.priority))
 
 	// signal a waiting routine that a message is now available
 	mq.cond.Signal()
@@ -87,8 +88,9 @@ func (mq *MessageQueueImpl) Remove() interface{} {
 	item := heap.Pop(mq.pq).(*item)
 
 	// record metrics
-	mq.metrics.ElementRemoved(string(item.priority))
-	mq.metrics.QueueDuration(time.Duration(time.Now().UnixNano()-item.timestamp), string(item.priority))
+	priority := strconv.Itoa(item.priority)
+	mq.metrics.ElementRemoved(priority)
+	mq.metrics.QueueDuration(time.Duration(time.Now().UnixNano()-item.timestamp), priority)
 
 	return item.message
 }

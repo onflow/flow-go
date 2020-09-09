@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -10,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
 	"github.com/dapperlabs/flow-go/module/trace"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -46,6 +48,12 @@ func main() {
 			collector.NetworkMessageReceived(rand.Intn(1000), topic1)
 			collector.NetworkMessageReceived(rand.Intn(1000), topic2)
 
+			priority1 := strconv.Itoa(rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority))
+			collector.ElementRemoved(priority1)
+			collector.QueueDuration(time.Millisecond*time.Duration(rand.Intn(1000)), priority1)
+
+			priority2 := strconv.Itoa(rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority))
+			collector.ElementAdded(priority2)
 			time.Sleep(1 * time.Second)
 		}
 	})
