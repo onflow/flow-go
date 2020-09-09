@@ -30,82 +30,79 @@ func GetEventPriority(message interface{}) (Priority, error) {
 	if !ok {
 		return 0, fmt.Errorf("invalid message format: %T", message)
 	}
-	priorityByType, err := getPriorityByType(qm.Payload)
-	if err != nil {
-		return 0, err
-	}
+	priorityByType := getPriorityByType(qm.Payload)
 	priorityBySize := getPriorityBySize(qm.Size)
 	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2)), nil
 }
 
 // getPriorityByType returns maps a message type to its priority
-func getPriorityByType(message interface{}) (Priority, error) {
+func getPriorityByType(message interface{}) Priority {
 	switch t := message.(type) {
 	// consensus
 	case *messages.BlockProposal:
-		return HighPriority, nil
+		return HighPriority
 	case *messages.BlockVote:
-		return HighPriority, nil
+		return HighPriority
 
 	// protocol state sync
 	case *messages.SyncRequest:
-		return LowPriority, nil
+		return LowPriority
 	case *messages.SyncResponse:
-		return LowPriority, nil
+		return LowPriority
 	case *messages.RangeRequest:
-		return LowPriority, nil
+		return LowPriority
 	case *messages.BatchRequest:
-		return LowPriority, nil
+		return LowPriority
 	case *messages.BlockResponse:
-		return LowPriority, nil
+		return LowPriority
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
-		return HighPriority, nil
+		return HighPriority
 	case *messages.ClusterBlockVote:
-		return HighPriority, nil
+		return HighPriority
 	case *messages.ClusterBlockResponse:
-		return HighPriority, nil
+		return HighPriority
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
-		return HighPriority, nil
+		return HighPriority
 	case *flow.TransactionBody:
-		return HighPriority, nil
+		return HighPriority
 	case *flow.Transaction:
-		return HighPriority, nil
+		return HighPriority
 
 	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
-		return HighPriority, nil
+		return HighPriority
 	case *flow.ResultApproval:
-		return HighPriority, nil
+		return HighPriority
 
 	// execution state synchronization
 	case *messages.ExecutionStateSyncRequest:
-		return MediumPriority, nil
+		return MediumPriority
 	case *messages.ExecutionStateDelta:
-		return MediumPriority, nil
+		return MediumPriority
 
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
-		return HighPriority, nil
+		return HighPriority
 	case *messages.ChunkDataResponse:
-		return HighPriority, nil
+		return HighPriority
 
 	// generic entity exchange engines
 	case *messages.EntityRequest:
-		return LowPriority, nil
+		return LowPriority
 	case *messages.EntityResponse:
-		return LowPriority, nil
+		return LowPriority
 
 	// test message
 	case *testmessage.TestMessage:
-		return LowPriority, nil
+		return LowPriority
 
 	// anything else
 	default:
-		return 0, fmt.Errorf("priroity not found for %T", t)
+		return MediumPriority
 	}
 }
 
