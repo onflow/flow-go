@@ -53,19 +53,6 @@ func (p *PublicAssignment) Size() uint {
 
 // Assign generates the assignment
 func (p *PublicAssignment) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
-	// create RNG for assignment
-	rng, err := p.rngByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
-	}
-
-	// Get a list of verifiers
-	snapshot := p.protocolState.AtBlockID(blockID)
-	verifiers, err := snapshot.Identities(filter.HasRole(flow.RoleVerification))
-	if err != nil {
-		return nil, fmt.Errorf("could not get verifiers: %w", err)
-	}
-
 	// computes a finger print for blockID||resultID||alpha
 	hash, err := fingerPrint(blockID, result.ID(), p.alpha)
 	if err != nil {
@@ -79,6 +66,19 @@ func (p *PublicAssignment) Assign(result *flow.ExecutionResult, blockID flow.Ide
 		return a, nil
 	}
 
+	// Get a list of verifiers
+	snapshot := p.protocolState.AtBlockID(blockID)
+	verifiers, err := snapshot.Identities(filter.HasRole(flow.RoleVerification))
+	if err != nil {
+		return nil, fmt.Errorf("could not get verifiers: %w", err)
+	}
+
+	// create RNG for assignment
+	rng, err := p.rngByBlockID(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+
 	// otherwise, it computes the assignment and caches it for future calls
 	a, err = chunkAssignment(verifiers.NodeIDs(), result.Chunks, rng, p.alpha)
 	if err != nil {
@@ -86,19 +86,15 @@ func (p *PublicAssignment) Assign(result *flow.ExecutionResult, blockID flow.Ide
 	}
 
 	// adds assignment to mempool
-	added := p.assignments.Add(assignmentFingerprint, a)
-	if !added {
-		return nil, fmt.Errorf("could not add generated assignment to mempool")
-	}
+	_ = p.assignments.Add(assignmentFingerprint, a)
 
 	return a, nil
 }
 
-func (p *PublicAssignment) rngByBlockID(blockID flow.Identifier) (random.Rand, error) {
+func (p *PublicAssignment) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
 	// TODO: rng could be cached to optimize performance
 
-	snapshot := p.protocolState.AtBlockID(blockID)
-	seed, err := snapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
+	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed: %v", err)
 	}

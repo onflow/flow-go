@@ -127,7 +127,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	copy(original, ids)
 
 	// Randomness:
-	rng1, err := assigner.rngByBlockID(head.ID())
+	rng1, err := assigner.rngByBlockID(snapshot)
 	require.NoError(a.T(), err)
 	err = rng1.Shuffle(len(ids), ids.Swap)
 	require.NoError(a.T(), err)
@@ -140,7 +140,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 
 	// Deterministiciy:
 	// shuffling same list with the same seed should generate the same permutation
-	rng2, err := assigner.rngByBlockID(head.ID())
+	rng2, err := assigner.rngByBlockID(snapshot)
 	require.NoError(a.T(), err)
 	// permutes original list with the same seed
 	err = rng2.Shuffle(len(original), original.Swap)
@@ -172,7 +172,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	copy(original, ids)
 
 	// Randomness:
-	rng1, err := assigner.rngByBlockID(head.ID())
+	rng1, err := assigner.rngByBlockID(snapshot)
 	require.NoError(a.T(), err)
 	err = rng1.Samples(len(ids), subset, ids.Swap)
 	require.NoError(a.T(), err)

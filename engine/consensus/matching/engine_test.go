@@ -618,7 +618,6 @@ func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
 	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	// use the happy-path stake checking function which always accepts
-	// ms.matching.checkStakes = StakesAlwaysEnough
 
 	// happy path requires 0 approvals per chunk, so the result should be
 	// counted even if we havent received any approvals.
@@ -685,7 +684,6 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	ms.pendingResults[result.ID()] = result
 
 	// use the real stake checking function which requires +2/3 of total stakes
-	// ms.matching.checkStakes = CheckApproversStakes
 
 	assignment := chunks.NewAssignment()
 
