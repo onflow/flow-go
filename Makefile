@@ -23,7 +23,7 @@ UNAME := $(shell uname)
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
-# docker container registry 
+# docker container registry
 CONTAINER_REGISTRY=gcr.io/dl-flow
 
 export DOCKER_BUILDKIT := 1
