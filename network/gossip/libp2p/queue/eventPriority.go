@@ -35,9 +35,9 @@ func GetEventPriority(message interface{}) (Priority, error) {
 	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2)), nil
 }
 
-// getPriorityByType returns maps a message type to its priority
+// getPriorityByType maps a message type to its priority
 func getPriorityByType(message interface{}) Priority {
-	switch t := message.(type) {
+	switch message.(type) {
 	// consensus
 	case *messages.BlockProposal:
 		return HighPriority
