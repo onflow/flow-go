@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -24,7 +25,10 @@ type QueueMessage struct {
 // GetEventPriority returns the priority of the flow event message.
 // It is an average of the priority by message type and priority by message size
 func GetEventPriority(message interface{}) (Priority, error) {
-	qm := message.(QueueMessage)
+	qm, ok := message.(QueueMessage)
+	if !ok {
+		return 0, fmt.Errorf("invalid message format: %T", message)
+	}
 	priorityByType := getPriorityByType(qm.Payload)
 	priorityBySize := getPriorityBySize(qm.Size)
 	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2)), nil
