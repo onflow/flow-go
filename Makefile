@@ -23,7 +23,7 @@ UNAME := $(shell uname)
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
-# docker container registry 
+# docker container registry
 CONTAINER_REGISTRY=gcr.io/dl-flow
 
 export DOCKER_BUILDKIT := 1
@@ -134,9 +134,9 @@ lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
-# Runs unit tests, coverage, linter
+# Runs linter, unit tests, SKIP FOR NOW coverage
 .PHONY: ci
-ci: install-tools tidy lint test coverage
+ci: install-tools tidy lint test # coverage
 
 # Runs integration tests
 # NOTE: we do not need `docker-build-flow` as this is run as a separate step
