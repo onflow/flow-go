@@ -455,7 +455,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 					return fmt.Errorf("invalid epoch setup: %w", err)
 				}
 
-				// Make sure to disallow multiple commit events per payload.
+				// Make sure to disallow multiple setup events per payload.
 				didSetup = true
 
 			case *flow.EpochCommit:
@@ -567,16 +567,17 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	// list of operations to be applied on top of the rest.
 
 	payload := block.Payload
-	var ops []func(*badger.Txn) error
+	var ops []func(*badger.Txn) error // track database operations on top of block finalization
+	var events []func()               // track protocol events that should be emitted
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				fmt.Println("inserting setup", ev.Counter)
 				ops = append(ops, m.state.setups.StoreTx(ev))
+				events = append(events, func() { m.state.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
 			case *flow.EpochCommit:
-				fmt.Println("inserting commit", ev.Counter)
 				ops = append(ops, m.state.commits.StoreTx(ev))
+				events = append(events, func() { m.state.consumer.EpochCommittedPhaseStarted(ev.Counter-1, header) })
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
@@ -611,6 +612,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		ops = append(ops, operation.UpdateEpochCounter(counter))
 		ops = append(ops, operation.IndexEpochStart(counter, header.View))
 		ops = append(ops, operation.InsertEpochHeight(counter, header.Height))
+		events = append(events, func() { m.state.consumer.EpochTransition(counter, header) })
 	} else {
 		ops = append(ops, operation.UpdateEpochHeight(counter, header.Height))
 	}
@@ -650,12 +652,16 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not execute finalization: %w", err)
 	}
 
-	// FOURTH: metrics
+	// FOURTH: metrics and events
 
 	m.state.metrics.FinalizedHeight(header.Height)
 	m.state.metrics.SealedHeight(sealed.Height)
-
 	m.state.metrics.BlockFinalized(block)
+
+	m.state.consumer.BlockFinalized(header)
+	for _, emit := range events {
+		emit()
+	}
 
 	for _, seal := range block.Payload.Seals {
 
