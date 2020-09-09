@@ -25,10 +25,23 @@ import (
 )
 
 // NewParticipant initialize the EventLoop instance and recover the forks' state with all pending block
-func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.HotstuffMetrics, headers storage.Headers,
-	committee hotstuff.Committee, builder module.Builder, updater module.Finalizer, persist hotstuff.Persister,
-	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *flow.QuorumCertificate,
-	finalized *flow.Header, pending []*flow.Header, options ...Option) (*hotstuff.EventLoop, error) {
+func NewParticipant(
+	log zerolog.Logger,
+	notifier hotstuff.Consumer,
+	metrics module.HotstuffMetrics,
+	headers storage.Headers,
+	committee hotstuff.Committee,
+	builder module.Builder,
+	updater module.Finalizer,
+	persist hotstuff.Persister,
+	signer hotstuff.Signer,
+	communicator hotstuff.Communicator,
+	rootHeader *flow.Header,
+	rootQC *flow.QuorumCertificate,
+	finalized *flow.Header,
+	pending []*flow.Header,
+	options ...Option,
+) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
