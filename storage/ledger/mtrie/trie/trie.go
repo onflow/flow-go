@@ -436,6 +436,7 @@ func (mt *MTrie) store(n *node.Node, writer *bufio.Writer) error {
 		}
 
 		b := make([]byte, 8)
+		fmt.Println(">>> ", len(n.Value()))
 		binary.LittleEndian.PutUint64(b, uint64(len(n.Value())))
 		_, err = writer.Write(b)
 		if err != nil {
