@@ -3,6 +3,7 @@ package queue
 import (
 	"container/heap"
 	"context"
+	"fmt"
 	"sync"
 )
 
@@ -24,7 +25,7 @@ const MediumPriority = Priority(5)
 const HighPriority = Priority(10)
 
 // MessagePriorityFunc - the callback function to derive priority of a message
-type MessagePriorityFunc func(message interface{}) Priority
+type MessagePriorityFunc func(message interface{}) (Priority, error)
 
 // MessageQueueImpl is the heap based priority queue implementation of the MessageQueue implementation
 type MessageQueueImpl struct {
@@ -41,7 +42,10 @@ func (mq *MessageQueueImpl) Insert(message interface{}) error {
 	}
 
 	// determine the message priority
-	priority := mq.priorityFunc(message)
+	priority, err := mq.priorityFunc(message)
+	if err != nil {
+		return fmt.Errorf("failed to dervie message priority: %w", err)
+	}
 
 	// create the queue item
 	item := &item{

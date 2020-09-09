@@ -23,11 +23,11 @@ type QueueMessage struct {
 
 // GetEventPriority returns the priority of the flow event message.
 // It is an average of the priority by message type and priority by message size
-func GetEventPriority(message interface{}) Priority {
+func GetEventPriority(message interface{}) (Priority, error) {
 	qm := message.(QueueMessage)
 	priorityByType := getPriorityByType(qm.Payload)
 	priorityBySize := getPriorityBySize(qm.Size)
-	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2))
+	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2)), nil
 }
 
 // getPriorityByType returns the priority of a message by it's type
