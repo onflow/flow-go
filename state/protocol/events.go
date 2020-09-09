@@ -4,12 +4,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Events defines a set of events that occur within the protocol state, that
+// Consumer defines a set of events that occur within the protocol state, that
 // can be propagated to other components via an implementation of this interface.
 //
 // NOTE: These methods are only called once the fork containing the relevant
 // event has been finalized.
-type Events interface {
+type Consumer interface {
 
 	// BlockFinalized is called when a block is finalized.
 	BlockFinalized(block *flow.Header)
