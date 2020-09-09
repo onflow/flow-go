@@ -337,10 +337,21 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 }
 
 func TestExtendValid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		metrics := metrics.NewNoopCollector()
+		headers, _, seals, index, payloads, blocks, setups, commits := storeutil.StorageLayer(t, db)
+
+		// create a event consumer to test epoch transition events
+		distributor := events.NewDistributor()
+		consumer := new(mockprotocol.Consumer)
+		distributor.AddConsumer(consumer)
+
+		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, distributor)
+		require.Nil(t, err)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Mutate().Bootstrap(block, result, seal)
+		err = state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
 		extend := unittest.BlockFixture()
@@ -357,6 +368,11 @@ func TestExtendValid(t *testing.T) {
 		finalCommit, err := state.Final().Commit()
 		assert.NoError(t, err)
 		assert.Equal(t, seal.FinalState, finalCommit)
+
+		consumer.On("BlockFinalized", extend.Header).Once()
+		err = state.Mutate().Finalize(extend.ID())
+		require.Nil(t, err)
+		consumer.AssertExpectations(t)
 	})
 }
 
