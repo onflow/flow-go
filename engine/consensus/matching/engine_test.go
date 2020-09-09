@@ -605,29 +605,29 @@ func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 	}
 }
 
-func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
-	// add a block with a specific guarantee to the DB
-	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
+// func (ms *MatchingSuite) TestMatchedResultsHappyPath() {
+// 	// add a block with a specific guarantee to the DB
+// 	block := unittest.BlockFixture()
+// 	ms.blocks[block.Header.ID()] = &block
 
-	// add a result for this block to the mempool
-	result := unittest.ResultForBlockFixture(&block)
-	ms.pendingResults[result.ID()] = result
+// 	// add a result for this block to the mempool
+// 	result := unittest.ResultForBlockFixture(&block)
+// 	ms.pendingResults[result.ID()] = result
 
-	assignment := chunks.NewAssignment()
-	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+// 	assignment := chunks.NewAssignment()
+// 	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
-	// use the happy-path stake checking function which always accepts
+// 	// use the happy-path stake checking function which always accepts
 
-	// happy path requires 0 approvals per chunk, so the result should be
-	// counted even if we havent received any approvals.
-	results, err := ms.matching.matchedResults()
-	ms.Require().NoError(err)
-	if ms.Assert().Len(results, 1, "should select result in happy path") {
-		sealable := results[0]
-		ms.Assert().Equal(result, sealable)
-	}
-}
+// 	// happy path requires 0 approvals per chunk, so the result should be
+// 	// counted even if we havent received any approvals.
+// 	results, err := ms.matching.matchedResults()
+// 	ms.Require().NoError(err)
+// 	if ms.Assert().Len(results, 1, "should select result in happy path") {
+// 		sealable := results[0]
+// 		ms.Assert().Equal(result, sealable)
+// 	}
+// }
 
 func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 
@@ -639,18 +639,15 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
-	// set required approvals to 3
-	// ms.matching.requiredApprovalCount = 3
-
 	assignment := chunks.NewAssignment()
 
 	approvers := ms.approvers[:3]
 
 	// add enough approvals for each chunk, except last
-	for n, approver := range approvers {
+	for _, approver := range approvers {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
-			// skip last chunk for last approval
-			if n == 2 && index == uint64(len(result.Chunks)-1) {
+			// skip last chunk
+			if index == uint64(len(result.Chunks)-1) {
 				break
 			}
 			approval := unittest.ResultApprovalFixture()

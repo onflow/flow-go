@@ -552,7 +552,7 @@ func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk,
 	validApprovers := e.validateApprovers(assignment, approvals, chunk)
 
 	// check if there are atleast 1 approval
-	return validApprovers.Len() == 1
+	return validApprovers.Len() >= 1
 }
 
 // validateApprovers checks all approvals for a chunk and returns a list of all valid approverIds
