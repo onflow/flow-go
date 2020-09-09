@@ -99,7 +99,7 @@ func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	return snapshot
 }
 
-func (s *State) AtEpoch(counter uint64) protocol.Snapshot {
+func (s *State) AtEpoch(counter uint64) protocol.EpochSnapshot {
 	snapshot := &EpochSnapshot{
 		state:   s,
 		counter: counter,

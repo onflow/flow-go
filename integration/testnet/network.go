@@ -26,7 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encodable"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	clusterstate "github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -749,7 +749,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 
 	for _, cluster := range clusters {
 		// generate root cluster block
-		block := protocol.CanonicalClusterRootBlock(epochCounter, cluster)
+		block := clusterstate.CanonicalClusterRootBlock(epochCounter, cluster)
 
 		lookup := make(map[flow.Identifier]struct{})
 		for _, node := range cluster {

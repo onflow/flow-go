@@ -10,7 +10,13 @@ import (
 )
 
 func validSetup(setup *flow.EpochSetup) error {
+	// STEP 1: general sanity checks
+	// the seed needs to be at least minimum length
+	if len(setup.Seed) < crypto.MinSeedLength {
+		return fmt.Errorf("seed has insufficient length (%d < %d)", len(setup.Seed), crypto.MinSeedLength)
+	}
 
+	// STEP 2: sanity checks of all nodes listed as participants
 	// there should be no duplicate node IDs
 	identLookup := make(map[flow.Identifier]struct{})
 	for _, participant := range setup.Participants {
@@ -32,15 +38,22 @@ func validSetup(setup *flow.EpochSetup) error {
 	}
 
 	// there should be no nodes with zero stake
+	// TODO: we might want to remove the following as we generally want to allow nodes with
+	// zero weight in the protocol state.
 	for _, participant := range setup.Participants {
 		if participant.Stake == 0 {
 			return fmt.Errorf("node with zero stake (%x)", participant.NodeID)
 		}
 	}
 
+	// STEP 3: sanity checks for individual roles
+	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
+	// in communication but not in respective node functions
+	activeParticipants := setup.Participants.Filter(filter.HasStake(true))
+
 	// we need at least one node of each role
 	roles := make(map[flow.Role]uint)
-	for _, participant := range setup.Participants {
+	for _, participant := range activeParticipants {
 		roles[participant.Role]++
 	}
 	if roles[flow.RoleConsensus] < 1 {
@@ -62,14 +75,9 @@ func validSetup(setup *flow.EpochSetup) error {
 	}
 
 	// the collection cluster assignments need to be valid
-	_, err := flow.NewClusterList(setup.Assignments, setup.Participants.Filter(filter.HasRole(flow.RoleCollection)))
+	_, err := flow.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole(flow.RoleCollection)))
 	if err != nil {
 		return fmt.Errorf("invalid cluster assignments: %w", err)
-	}
-
-	// the seed needs to be at least minimum length
-	if len(setup.Seed) < crypto.MinSeedLength {
-		return fmt.Errorf("seed has insufficient length (%d < %d)", len(setup.Seed), crypto.MinSeedLength)
 	}
 
 	return nil

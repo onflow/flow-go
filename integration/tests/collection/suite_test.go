@@ -20,8 +20,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	clusterstate "github.com/dapperlabs/flow-go/state/cluster"
+	clusterstateimpl "github.com/dapperlabs/flow-go/state/cluster/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -306,14 +306,14 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 
 // ClusterStateFor returns a cluster state instance for the collector node
 // with the given ID.
-func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.State {
+func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateimpl.State {
 
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
 	setup, ok := suite.net.Seal().ServiceEvents[1].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
-	rootBlock := protocol.CanonicalClusterRootBlock(setup.Counter, myCluster)
+	rootBlock := clusterstate.CanonicalClusterRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
 
 	db, err := node.DB()
@@ -324,7 +324,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	headers := storage.NewHeaders(metrics, db)
 	payloads := storage.NewClusterPayloads(metrics, db)
 
-	state, err := clusterstate.NewState(db, rootBlock.Header.ChainID, headers, payloads)
+	state, err := clusterstateimpl.NewState(db, rootBlock.Header.ChainID, headers, payloads)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state
