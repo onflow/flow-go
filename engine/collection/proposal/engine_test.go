@@ -106,9 +106,23 @@ func (suite *Suite) SetupTest() {
 	suite.sync = new(module.BlockRequester)
 	suite.hotstuff = new(module.HotStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, metrics, suite.proto.state, suite.cluster.state, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending, suite.sync)
+	eng, err := proposal.New(
+		log,
+		suite.net,
+		suite.me,
+		metrics,
+		metrics,
+		metrics,
+		suite.proto.state,
+		suite.cluster.state,
+		suite.pool,
+		suite.transactions,
+		suite.headers,
+		suite.payloads,
+		suite.pending,
+	)
 	require.NoError(suite.T(), err)
-	suite.eng = eng.WithConsensus(suite.hotstuff)
+	suite.eng = eng.WithHotStuff(suite.hotstuff).WithSync(suite.sync)
 }
 
 func (suite *Suite) TestHandleProposal() {

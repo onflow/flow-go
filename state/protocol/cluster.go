@@ -7,15 +7,21 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// CanonicalClusterID returns the canonical chain ID for the given cluster in
+// the given epoch.
+func CanonicalClusterID(epoch uint64, participants flow.IdentityList) flow.ChainID {
+	return flow.ChainID(fmt.Sprintf("cluster-%d-%s", epoch, participants.Fingerprint()))
+}
+
 // CanonicalClusterRootBlock returns the canonical root block for the given
 // cluster in the given epoch. It contains an empty collection referencing
 func CanonicalClusterRootBlock(epoch uint64, participants flow.IdentityList) *cluster.Block {
 
-	chainID := fmt.Sprintf("cluster-%d-%s", epoch, participants.Fingerprint())
+	chainID := CanonicalClusterID(epoch, participants)
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	payload.ReferenceEpoch = epoch
 	header := &flow.Header{
-		ChainID:        flow.ChainID(chainID),
+		ChainID:        chainID,
 		ParentID:       flow.ZeroID,
 		Height:         0,
 		PayloadHash:    payload.Hash(),
