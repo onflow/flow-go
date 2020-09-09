@@ -103,6 +103,6 @@ func exportExecutionState(dir string, targetHash flow.StateCommitment, outputDir
 	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished seeking")
 	log.Info().Msg("writing root checkpoint")
 
-	mForest.StoreTrie(targetHash, outputDir+"/"+hex.EncodeToString(targetHash)+".trie")
+	mForest.DumpAsJSON(targetHash, outputDir+"/"+hex.EncodeToString(targetHash)+".trie.txt")
 	return nil
 }
