@@ -206,7 +206,7 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
 }
 
 // verify the binary tree and fill the results using recursive batch verification.
-static void bls_batchVerify_tree(node* root, const int len, byte* results, 
+static void bls_batchVerify_tree(const node* root, const int len, byte* results, 
         const byte* data, const int data_len) {
 
     // verify the aggregated signature against the aggregated public key.
@@ -220,7 +220,7 @@ static void bls_batchVerify_tree(node* root, const int len, byte* results,
         return;
     }
 
-    // check if root is a leave
+    // check if root is a leaf
     if (root->left == NULL) {
         *results = INVALID;
         return;
@@ -243,7 +243,6 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
     // initialize results to undefined
     memset(results, UNDEFINED, sigs_len);
 
-
     // convert the signature points
     ep_st* sigs = (ep_st*) malloc(sigs_len * sizeof(ep_st));
     for (int i=0; i < sigs_len; i++) {
@@ -252,7 +251,8 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
             // set signature as infinity and set result as invald
             ep_set_infty(&sigs[i]);
             results[i] = INVALID;
-            }
+            printf("%d is incorrect", i);
+        }
     }
 
     // build a binary tree of aggreagtions
@@ -262,15 +262,22 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
     bls_batchVerify_tree(root, sigs_len, results, data, data_len);
 
     // return the aggregation of the valid signatures,
-    // assuming there are more valid signatures. 
+    // assuming there are more valid signatures than invalid ones. 
     ep_t invalid_sigs;
     ep_new(invalid_sigs);
+    ep_set_infty(invalid_sigs);
     for (int i=0; i < sigs_len; i++) {
-        if (results[i] == INVALID )
+        if (results[i] == INVALID ) {
             ep_add_projc(invalid_sigs, invalid_sigs, &sigs[i]);
+            //printf("V: %d\n", i);
+        }
+        else if (results[i] == VALID) {
+            //printf("I: %d\n", i);
+        }
     }
     ep_neg(invalid_sigs, invalid_sigs);
     ep_add_projc(invalid_sigs, root->sig, invalid_sigs);
+    ep_norm(root->sig, root->sig); fp_print_("root", root->sig->x);
     ep_write_bin_compact(agg_sig, invalid_sigs, SIGNATURE_LEN);
     ep_free(invalid_sigs);
 }

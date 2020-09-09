@@ -314,7 +314,7 @@ func TestBatchVerify(t *testing.T) {
 	kmac := NewBLSKMAC("test tag")
 	// number of signatures to aggregate
 	mrand.Seed(time.Now().UnixNano())
-	sigsNum := 5 // mrand.Intn(100) + 1
+	sigsNum := 3 // mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
@@ -331,30 +331,82 @@ func TestBatchVerify(t *testing.T) {
 		pks = append(pks, sk.PublicKey())
 		expectedValid = append(expectedValid, true)
 	}
+	// aggregated signature
+	expectedAggSig, err := AggregateSignatures(sigs)
+	require.NoError(t, err)
+	fmt.Println(expectedAggSig)
+
 	// Batch verify the signatures
-	// all signatures are correct
-	valid, _, err := BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	// all signatures are valid
+	valid, aggSig, err := BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
 	require.NoError(t, err)
 	assert.Equal(t, valid, expectedValid,
 		fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
 			sigs, sks, input, valid))
+	assert.Equal(t, aggSig, expectedAggSig,
+		fmt.Sprintf("wrong aggregated signature %s, expected %s, signatures are %s, results are %v",
+			aggSig, expectedAggSig, sigs, valid))
+
+	// some signatures are invalid
+	invalidSigsNum := 1                //mrand.Intn(sigsNum-1) + 1 // pick a random number of invalid signatures
+	indices := make([]int, 0, sigsNum) // pick invalidSigsNum random indices
+	for i := 0; i < sigsNum; i++ {
+		indices = append(indices, i)
+	}
+	mrand.Shuffle(sigsNum, func(i, j int) {
+		indices[i], indices[j] = indices[j], indices[i]
+	})
+	fmt.Println(indices)
+	for i := 0; i < invalidSigsNum; i++ { // alter invalidSigsNum random signatures
+		changeSignature(sigs[indices[i]])
+		expectedValid[indices[i]] = false
+	}
+	validSigs := make([]Signature, 0, sigsNum-invalidSigsNum) // gather the valid signatureS to compute the aggregation
+	for i := invalidSigsNum; i < sigsNum; i++ {
+		validSigs = append(validSigs, sigs[indices[i]])
+		//fmt.Println(indices[i])
+	}
+	//fmt.Println(validSigs)
+
+	expectedAggSig, err = AggregateSignatures(sigs) // compute the aggregation
+	require.NoError(t, err)
+	fmt.Println(expectedAggSig)
+
+	valid, aggSig, err = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	require.NoError(t, err)
+	assert.Equal(t, valid, expectedValid,
+		fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
+			sigs, sks, input, valid))
+	assert.Equal(t, aggSig, expectedAggSig,
+		fmt.Sprintf("wrong aggregated signature %s, expected %s, signatures are %s, results are %v",
+			aggSig, expectedAggSig, validSigs, valid))
+
+	// all signatures are invalid
 
 	// test the empty list case
-	/*valid, _, err = BatchVerifySignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
-	assert.Error(t, err)
+	/*valid, aggSig, err = BatchVerifySignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
+	require.Error(t, err)
+	require.Nil(t, aggSig)
 	assert.Equal(t, valid, []bool{},
 		fmt.Sprintf("verification should fail with empty list key, got %v", valid))
 	// test incorrect inputs
-	valid, _, err = BatchVerifySignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
-	assert.Error(t, err)
+	valid, aggSig, err = BatchVerifySignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
+	require.Error(t, err)
+	require.Nil(t, aggSig)
 	assert.Equal(t, valid, []bool{},
 		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
 	// test wrong hasher
 	for i := 0; i < sigsNum; i++ {
 		expectedValid[i] = false
 	}
-	valid, _, err = BatchVerifySignaturesOneMessage(pks, sigs, input, nil)
-	assert.Error(t, err)
+	valid, aggSig, err = BatchVerifySignaturesOneMessage(pks, sigs, input, nil)
+	require.Error(t, err)
+	require.Nil(t, aggSig)
 	assert.Equal(t, valid, expectedValid,
 		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))*/
+}
+
+// alter or fix a signature
+func changeSignature(s Signature) {
+	s[10] ^= 1
 }
