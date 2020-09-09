@@ -9,7 +9,6 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -55,19 +54,6 @@ type Engine struct {
 	checkingSealing         *atomic.Bool             // used to rate limit the checksealing call
 	requestReceiptThreshold uint                     // how many blocks between sealed/finalized before we request execution receipts
 	maxUnsealedResults      int                      // how many unsealed results to check when check sealing
-
-	// chunkApprovals is used in conjunction with the approvals mempool to
-	// efficiently track approvals by chunk.
-	//
-	// ["result-id_chunk-index"] => ( [approver-id] => approval-id )
-	//
-	// for each chunk (uniquely identified by result ID and chunk Index), we
-	// track the approvals that were collected for it in a map indexed by
-	// approver ID. The nested map, indexed by approver ID, ensures that we
-	// don't collect duplicate approvals. To verify if a chunk has collected
-	// enough approvals, we simply check the length of the corresponding nested
-	// map. Approvals are referenced by ID, and actually stored in the mempool.
-	chunkApprovals map[string]map[flow.Identifier]flow.Identifier
 }
 
 // New creates a new collection propagation engine.
@@ -107,7 +93,6 @@ func New(
 		approvals:               approvals,
 		seals:                   seals,
 		missing:                 make(map[flow.Identifier]uint),
-		chunkApprovals:          make(map[string]map[flow.Identifier]flow.Identifier),
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxUnsealedResults:      200,
@@ -131,12 +116,6 @@ func New(
 	}
 
 	return e, nil
-}
-
-// chunkKey returns the composite key used to index an approval in the
-// chunkApprovals lookup table.
-func chunkKey(resultID flow.Identifier, chunkIndex uint64) string {
-	return fmt.Sprintf("%s_%d", resultID.String(), chunkIndex)
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -345,61 +324,23 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return fmt.Errorf("could not check result: %w", err)
 	}
 
-	// store in the memory pool
-	e.addPendingApproval(approval)
+	// store in the memory pool (it won't be added if it is already in there).
+	added, err := e.approvals.Add(approval)
+	if err != nil {
+		return err
+	}
+
+	if !added {
+		e.log.Debug().Msg("skipping approval already in mempool")
+		return nil
+	}
+
+	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
 	// kick off a check for potential seal formation
 	go e.checkSealing()
 
 	return nil
-}
-
-// addPendingApproval adds the approval to the mempool and to the lookup table.
-func (e *Engine) addPendingApproval(approval *flow.ResultApproval) {
-
-	// determine the lookup key for the corresponding chunk
-	key := chunkKey(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
-
-	// skip if we already collected this approval
-	_, ok := e.chunkApprovals[key][approval.Body.ApproverID]
-	if ok {
-		log.Debug().Msg("skipping approval already in mempool")
-		return
-	}
-
-	// store in the memory pool (it won't be added if it is already in there).
-	e.approvals.Add(approval)
-
-	// store in the lookup table
-	_, ok = e.chunkApprovals[key]
-	if !ok {
-		e.chunkApprovals[key] = make(map[flow.Identifier]flow.Identifier)
-	}
-	e.chunkApprovals[key][approval.Body.ApproverID] = approval.ID()
-
-	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
-	log.Info().Msg("result approval added to mempool")
-}
-
-// removePendingApproval removes an approval from the mempool and from the
-// lookup table.
-// TODO: There is an edge case where items will remain in the lookup table
-// forever. ResultApprovals are contained in a mempool which automatically
-// evicts items when it reaches a certain size. These automatic evictions will
-// not be reflected in the lookup table. Implement lookup table directly in
-// approvals mempool to handle things correctly?
-func (e *Engine) removePendingApproval(approval *flow.ResultApproval) {
-	// remove from mempool
-	e.approvals.Rem(approval.ID())
-
-	// remove from lookup table
-	key := chunkKey(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
-
-	if _, ok := e.chunkApprovals[key]; !ok {
-		return
-	}
-
-	delete(e.chunkApprovals[key], approval.Body.ApproverID)
 }
 
 // checkSealing checks if there is anything worth sealing at the moment.
@@ -578,15 +519,15 @@ func (e *Engine) matchedResults() ([]*flow.ExecutionResult, error) {
 // exceeds the required threshold.
 func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, verifiers flow.IdentityList) bool {
 
-	key := chunkKey(resultID, chunk.Index)
-
-	approvals, ok := e.chunkApprovals[key]
+	approvals, ok := e.approvals.ByChunk(resultID, chunk.Index)
 	if !ok {
 		return false
 	}
 
-	// TODO: This is the happy path (requires just one approval per chunk).
-	// Should be +2/3 of all currently staked verifiers
+	// TODO:
+	//  * This is the happy path (requires just one approval per chunk). Should
+	//    be +2/3 of all currently staked verifiers.
+	//  * Sync with Danu's chunk assignment verification logic.
 	return len(approvals) > 0
 }
 
@@ -697,7 +638,8 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	}
 	for _, approval := range e.approvals.All() {
 		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
-			e.removePendingApproval(approval)
+			// delete all the approvals for the corresponding chunk
+			e.approvals.Rem(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 		}
 	}
 	for _, seal := range e.seals.All() {

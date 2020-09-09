@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	realproto "github.com/dapperlabs/flow-go/state/protocol"
@@ -80,10 +81,9 @@ type MatchingSuite struct {
 	headersDB       *storage.Headers
 	indexDB         *storage.Index
 
-	pendingResults   map[flow.Identifier]*flow.ExecutionResult
-	pendingReceipts  map[flow.Identifier]*flow.ExecutionReceipt
-	pendingApprovals map[flow.Identifier]*flow.ResultApproval
-	pendingSeals     map[flow.Identifier]*flow.Seal
+	pendingResults  map[flow.Identifier]*flow.ExecutionResult
+	pendingReceipts map[flow.Identifier]*flow.ExecutionReceipt
+	pendingSeals    map[flow.Identifier]*flow.Seal
 
 	resultsPL   *mempool.Results
 	receiptsPL  *mempool.Receipts
@@ -233,7 +233,6 @@ func (ms *MatchingSuite) SetupTest() {
 
 	ms.pendingResults = make(map[flow.Identifier]*flow.ExecutionResult)
 	ms.pendingReceipts = make(map[flow.Identifier]*flow.ExecutionReceipt)
-	ms.pendingApprovals = make(map[flow.Identifier]*flow.ResultApproval)
 	ms.pendingSeals = make(map[flow.Identifier]*flow.Seal)
 
 	ms.resultsPL = &mempool.Results{}
@@ -271,25 +270,6 @@ func (ms *MatchingSuite) SetupTest() {
 
 	ms.approvalsPL = &mempool.Approvals{}
 	ms.approvalsPL.On("Size").Return(uint(0)) // only for metrics
-	ms.approvalsPL.On("ByID", mock.Anything).Return(
-		func(approvalID flow.Identifier) *flow.ResultApproval {
-			return ms.pendingApprovals[approvalID]
-		},
-		func(approvalID flow.Identifier) bool {
-			_, found := ms.pendingApprovals[approvalID]
-			return found
-		},
-	)
-	ms.approvalsPL.On("All").Return(
-		func() []*flow.ResultApproval {
-			approvals := make([]*flow.ResultApproval, 0, len(ms.pendingApprovals))
-			for _, approval := range ms.pendingApprovals {
-				approvals = append(approvals, approval)
-			}
-			return approvals
-		},
-	)
-	ms.approvalsPL.On("Add", mock.Anything).Return(true)
 
 	ms.sealsPL = &mempool.Seals{}
 	ms.sealsPL.On("Size").Return(uint(0)) // only for metrics
@@ -318,7 +298,6 @@ func (ms *MatchingSuite) SetupTest() {
 		results:                 ms.resultsPL,
 		receipts:                ms.receiptsPL,
 		approvals:               ms.approvalsPL,
-		chunkApprovals:          make(map[string]map[flow.Identifier]flow.Identifier),
 		seals:                   ms.sealsPL,
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
@@ -538,7 +517,7 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 			added := args.Get(0).(*flow.ResultApproval)
 			ms.Assert().Equal(approval, added)
 		},
-	).Return(false)
+	).Return(false, nil)
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().NoError(err, "should ignore approval if already pending")
@@ -560,7 +539,7 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 			added := args.Get(0).(*flow.ResultApproval)
 			ms.Assert().Equal(approval, added)
 		},
-	).Return(true)
+	).Return(true, nil)
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().NoError(err, "should add approval to mempool if valid")
@@ -606,6 +585,14 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
+	// check calls have the correct parameters, and return 0 approvals
+	ms.approvalsPL.On("ByChunk", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			resultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(result.ID(), resultID)
+		},
+	).Return(nil, false)
+
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "should not select result with insufficient approvals")
@@ -621,6 +608,11 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
+	realApprovalPool, err := stdmap.NewApprovals(1000)
+	ms.Require().NoError(err)
+
+	ms.matching.approvals = realApprovalPool
+
 	// add enough approvals for each chunk
 	for n := 0; n < 3; n++ {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
@@ -629,7 +621,8 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 			approval.Body.ExecutionResultID = result.ID()
 			approval.Body.ApproverID = ms.approvers[n].NodeID
 			approval.Body.ChunkIndex = index
-			ms.matching.addPendingApproval(approval)
+			_, err := ms.matching.approvals.Add(approval)
+			ms.Require().NoError(err)
 		}
 	}
 
