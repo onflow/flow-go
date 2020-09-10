@@ -166,8 +166,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 	})
 }
 
-func (m *Mutator) Extend(candidate *flow.Block) error {
-
+func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks. Currently, only the
 	// root block can contain identities. We also want to make sure that the
 	// payload hash has been set correctly.
@@ -226,6 +225,24 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		ancestorID = ancestor.ParentID
 	}
 
+	return nil
+}
+
+func (m *Mutator) payloadExtend(candidate *flow.Block) error {
+	header := candidate.Header
+	payload := candidate.Payload
+
+	var finalized uint64
+	err := m.state.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	if err != nil {
+		return fmt.Errorf("could not retrieve finalized height: %w", err)
+	}
+	var finalID flow.Identifier
+	err = m.state.db.View(operation.LookupBlockHeight(finalized, &finalID))
+	if err != nil {
+		return fmt.Errorf("could not lookup finalized block: %w", err)
+	}
+
 	// FOURTH: The header is now fully validated. Next is the guarantee part of
 	// the payload compliance check. None of the blocks should have included a
 	// guarantee that was expired at the block height, nor should it have been
@@ -251,7 +268,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
-	ancestorID = header.ParentID
+	ancestorID := header.ParentID
 	lookup := make(map[flow.Identifier]struct{})
 	for {
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
@@ -415,6 +432,21 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("could not execute state extension: %w", err)
 	}
 
+	return nil
+}
+
+func (m *Mutator) Extend(candidate *flow.Block) error {
+	// check if the block header is a valid extension of the finalized state
+	err := m.HeaderExtend(candidate)
+	if err != nil {
+		return err
+	}
+
+	// check if the block payload is a valid extension of the finalized state
+	err = m.payloadExtend(candidate)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
