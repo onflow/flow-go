@@ -32,7 +32,7 @@ func (es *EpochSetupSnapshot) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
 }
 
-func (es *EpochSetupSnapshot) InitialIdentities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (es *EpochSetupSnapshot) InitialIdentities() (flow.IdentityList, error) {
 	identities := es.setupEvent.Participants.Filter(selector)
 
 	// apply a deterministic sort to the participants
@@ -52,7 +52,7 @@ func (es *EpochSetupSnapshot) Clustering() (flow.ClusterList, error) {
 	return clustering, nil
 }
 
-func (es *EpochSetupSnapshot) ClusterInformation(index uint32) (protocol.Cluster, error) {
+func (es *EpochSetupSnapshot) Cluster(index uint32) (protocol.Cluster, error) {
 	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
 }
 
@@ -84,7 +84,7 @@ type EpochCommitSnapshot struct {
 	commitEvent *flow.EpochCommit
 }
 
-func (es *EpochCommitSnapshot) ClusterInformation(index uint32) (protocol.Cluster, error) {
+func (es *EpochCommitSnapshot) Cluster(index uint32) (protocol.Cluster, error) {
 	qcs := es.commitEvent.ClusterQCs
 	if uint32(len(qcs)) <= index {
 		return nil, fmt.Errorf("no cluster with index %d", index)
@@ -149,7 +149,7 @@ func (u *UndefinedEpochSnapshot) FinalView() (uint64, error) {
 	return 0, u.err
 }
 
-func (u *UndefinedEpochSnapshot) InitialIdentities(flow.IdentityFilter) (flow.IdentityList, error) {
+func (u *UndefinedEpochSnapshot) InitialIdentities() (flow.IdentityList, error) {
 	return nil, u.err
 }
 
@@ -157,7 +157,7 @@ func (u *UndefinedEpochSnapshot) Clustering() (flow.ClusterList, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedEpochSnapshot) ClusterInformation(uint32) (protocol.Cluster, error) {
+func (u *UndefinedEpochSnapshot) Cluster(uint32) (protocol.Cluster, error) {
 	return nil, u.err
 }
 

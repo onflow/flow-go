@@ -74,7 +74,7 @@ func New(
 	}
 
 	// get the current epoch
-	epoch, err := e.state.Final().Epoch()
+	epoch, err := e.state.Final().EpochCounter()
 	if err != nil {
 		return nil, fmt.Errorf("could not get current epoch number: %w", err)
 	}

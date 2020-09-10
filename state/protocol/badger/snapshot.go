@@ -43,7 +43,7 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return s.header, nil
 }
 
-func (s *Snapshot) Epoch() (uint64, error) {
+func (s *Snapshot) EpochCounter() (uint64, error) {
 	return s.setupEvent.Counter, nil
 }
 
@@ -158,7 +158,7 @@ func (s *Snapshot) RandomBeaconSeed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
-func (s *Snapshot) EpochSnapshot(counter uint64) protocol.EpochSnapshot {
+func (s *Snapshot) EpochSnapshot(counter uint64) protocol.Epoch {
 	switch {
 	case counter < s.setupEvent.Counter:
 		// we currently only support snapshots of the current and next Epoch
@@ -207,7 +207,7 @@ func (u *UndefinedSnapshot) Head() (*flow.Header, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) Epoch() (uint64, error) {
+func (u *UndefinedSnapshot) EpochCounter() (uint64, error) {
 	return 0, u.err
 }
 
@@ -231,6 +231,6 @@ func (u *UndefinedSnapshot) RandomBeaconSeed(indices ...uint32) ([]byte, error) 
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) EpochSnapshot(counter uint64) protocol.EpochSnapshot {
+func (u *UndefinedSnapshot) EpochSnapshot(counter uint64) protocol.Epoch {
 	return NewUndefinedEpochSnapshot(u.err)
 }

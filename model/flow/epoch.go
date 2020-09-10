@@ -10,6 +10,27 @@ import (
 	"github.com/dapperlabs/flow-go/model/encodable"
 )
 
+// EpochPhase represents a phase of the Epoch Preparation Protocol. The phase
+// of an epoch is resolved based on a block reference and is fork-dependent.
+// An epoch begins in the staking phase, then transitions to the setup phase in
+// the block containing the EpochSetup service event, then to the committed
+// phase in the block containing the EpochCommit service event.
+type EpochPhase int
+
+const (
+	EpochPhaseStaking EpochPhase = iota
+	EpochPhaseSetup
+	EpochPhaseCommitted
+)
+
+func (p EpochPhase) String() string {
+	return [...]string{
+		"EpochStakingPhase",
+		"EpochSetupPhase",
+		"EpochCommittedPhase",
+	}[p]
+}
+
 // EpochSetup is a service event emitted when the network is ready to set up
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
