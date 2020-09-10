@@ -61,7 +61,7 @@ func (es *EpochSetupSnapshot) DKG() (protocol.DKG, error) {
 }
 
 func (es *EpochSetupSnapshot) LeaderSelectionSeed(indices ...uint32) ([]byte, error) {
-	return protocol.SeedFromSourceOfRandomness(indices, es.setupEvent.RandomSource)
+	return protocol.SeedFromRandomSource(indices, es.setupEvent.RandomSource)
 }
 
 func (es *EpochSetupSnapshot) Phase() (protocol.EpochPhase, error) {

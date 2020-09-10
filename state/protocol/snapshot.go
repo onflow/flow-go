@@ -145,11 +145,11 @@ func SeedFromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]
 		return nil, fmt.Errorf("invalid block signature split")
 	}
 
-	return SeedFromSourceOfRandomness(indices, sigs[1])
+	return SeedFromRandomSource(indices, sigs[1])
 }
 
-// SeedFromSourceOfRandomness generates a task-specific seed (task is determined by indices).
-func SeedFromSourceOfRandomness(indices []uint32, sor []byte) ([]byte, error) {
+// SeedFromRandomSource generates a task-specific seed (task is determined by indices).
+func SeedFromRandomSource(indices []uint32, sor []byte) ([]byte, error) {
 	if len(indices)*4 > hash.KmacMaxParamsLen {
 		return nil, fmt.Errorf("unsupported number of indices")
 	}
