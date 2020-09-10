@@ -170,3 +170,32 @@ func (part *DKGParticipant) UnmarshalMsgpack(b []byte) error {
 	*part = dkgParticipantFromEncodable(enc)
 	return nil
 }
+
+// EpochState is contains IDs of the service events for preparing the
+// current and next Epoch to the extend they are known. Events not yet emitted
+// are represented by ZeroID.
+type EpochState struct {
+	CurrentEpoch EventIDs // Epoch Preparation Events for the current Epoch
+	NextEpoch    EventIDs // Epoch Preparation Events for the next Epoch
+}
+
+func NewEpochState(currentSetup, currentCommit, nextSetup, nextCommit Identifier) *EpochState {
+	return &EpochState{
+		CurrentEpoch: EventIDs{
+			SetupEventID:  currentSetup,
+			CommitEventID: currentCommit,
+		},
+		NextEpoch: EventIDs{
+			SetupEventID:  nextSetup,
+			CommitEventID: nextCommit,
+		},
+	}
+}
+
+type EventIDs struct {
+	// SetupEventID is the ID of the EpochSetup event for the respective Epoch
+	SetupEventID Identifier
+
+	// CommitEventID is the ID of the EpochCommit event for the respective Epoch
+	CommitEventID Identifier
+}

@@ -371,6 +371,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 func (fnb *FlowNodeBuilder) initState() {
 	state, err := protocol.NewState(
 		fnb.Metrics.Compliance,
+		fnb.Metrics.Cache,
 		fnb.DB,
 		fnb.Storage.Headers,
 		fnb.Storage.Seals,

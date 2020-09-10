@@ -11,41 +11,44 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	cache "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 type State struct {
-	metrics  module.ComplianceMetrics
-	db       *badger.DB
-	headers  storage.Headers
-	seals    storage.Seals
-	index    storage.Index
-	payloads storage.Payloads
-	blocks   storage.Blocks
-	setups   storage.EpochSetups
-	commits  storage.EpochCommits
-	cfg      Config
+	metrics     module.ComplianceMetrics
+	db          *badger.DB
+	headers     storage.Headers
+	seals       storage.Seals
+	index       storage.Index
+	payloads    storage.Payloads
+	blocks      storage.Blocks
+	setups      storage.EpochSetups
+	commits     storage.EpochCommits
+	epochStates storage.EpochStates
+	cfg         Config
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
 func NewState(
-	metrics module.ComplianceMetrics, db *badger.DB,
+	metrics module.ComplianceMetrics, cacheMetrics module.CacheMetrics, db *badger.DB,
 	headers storage.Headers, seals storage.Seals, index storage.Index, payloads storage.Payloads, blocks storage.Blocks,
 	setups storage.EpochSetups, commits storage.EpochCommits,
 ) (*State, error) {
 
 	s := &State{
-		metrics:  metrics,
-		db:       db,
-		headers:  headers,
-		seals:    seals,
-		index:    index,
-		payloads: payloads,
-		blocks:   blocks,
-		setups:   setups,
-		commits:  commits,
-		cfg:      DefaultConfig(),
+		metrics:     metrics,
+		db:          db,
+		headers:     headers,
+		seals:       seals,
+		index:       index,
+		payloads:    payloads,
+		blocks:      blocks,
+		setups:      setups,
+		commits:     commits,
+		epochStates: cache.NewEpochStates(cacheMetrics, db), // TODO (?) we might have to inject this in scaffold to avoid circular dependency
+		cfg:         DefaultConfig(),
 	}
 
 	return s, nil

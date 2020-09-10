@@ -6,8 +6,8 @@ import (
 )
 
 type DKG interface {
-	Size() (uint, error)
-	GroupKey() (crypto.PublicKey, error)
+	Size() uint
+	GroupKey() crypto.PublicKey
 	Index(nodeID flow.Identifier) (uint, error)
 	KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error)
 }

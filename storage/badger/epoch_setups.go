@@ -17,16 +17,16 @@ type EpochSetups struct {
 func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
 	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
-		counter := key.(uint64)
+		id := key.(flow.Identifier)
 		setup := val.(*flow.EpochSetup)
-		return operation.InsertEpochSetup(counter, setup)
+		return operation.InsertEpochSetup(id, setup)
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		counter := key.(uint64)
+		id := key.(flow.Identifier)
 		var setup flow.EpochSetup
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := operation.RetrieveEpochSetup(counter, &setup)(tx)
+			err := operation.RetrieveEpochSetup(id, &setup)(tx)
 			return &setup, err
 		}
 	}
@@ -34,22 +34,22 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 	es := &EpochSetups{
 		db: db,
 		cache: newCache(collector,
-			withLimit(16),
+			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve),
-			withResource(metrics.ResourceSeal)),
+			withResource(metrics.ResourceEpochSetup)),
 	}
 
 	return es
 }
 
 func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *badger.Txn) error {
-	return es.cache.Put(setup.Counter, setup)
+	return es.cache.Put(setup.ID(), setup)
 }
 
-func (es *EpochSetups) retrieveTx(counter uint64) func(tx *badger.Txn) (*flow.EpochSetup, error) {
+func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) (*flow.EpochSetup, error) {
 	return func(tx *badger.Txn) (*flow.EpochSetup, error) {
-		val, err := es.cache.Get(counter)(tx)
+		val, err := es.cache.Get(setupID)(tx)
 		if err != nil {
 			return nil, err
 		}
@@ -57,12 +57,13 @@ func (es *EpochSetups) retrieveTx(counter uint64) func(tx *badger.Txn) (*flow.Ep
 	}
 }
 
+// TODO: can we remove this method? Its not contained in the interface.
 func (es *EpochSetups) Store(setup *flow.EpochSetup) error {
 	return operation.RetryOnConflict(es.db.Update, es.StoreTx(setup))
 }
 
-func (es *EpochSetups) ByCounter(counter uint64) (*flow.EpochSetup, error) {
+func (es *EpochSetups) BySetupID(setupID flow.Identifier) (*flow.EpochSetup, error) {
 	tx := es.db.NewTransaction(false)
 	defer tx.Discard()
-	return es.retrieveTx(counter)(tx)
+	return es.retrieveTx(setupID)(tx)
 }

@@ -43,10 +43,4 @@ type ReadOnlyState interface {
 	// the protocol state, and can thus represent an ambiguous state that was or
 	// will never be finalized.
 	AtBlockID(blockID flow.Identifier) Snapshot
-
-	// AtEpoch returns an EpochSnapshot for the Epoch with specified epoch counter.
-	// The state is respective to block B, where B is the latest finalized block
-	// whose protocol state covers epoch. If the preparation for the specified
-	// epoch is still ongoing, some of EpochSnapshot's methods will return errors.
-	AtEpoch(counter uint64) EpochSnapshot
 }

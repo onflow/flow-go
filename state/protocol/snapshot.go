@@ -12,10 +12,21 @@ import (
 	"github.com/dapperlabs/flow-go/module/signature"
 )
 
-// Snapshot represents an immutable snapshot at a specific point of the
-// protocol state history. It allows us to read the parameters at the selected
-// point in a deterministic manner.
+// Snapshot represents an immutable snapshot of the protocol state
+// at a specific block, denoted as the Head block.
+// The Snapshot is fork-specific and only accounts for the information contained
+// in blocks along this fork up to (including) Head.
+// It allows us to read the parameters at the selected block in a deterministic manner.
 type Snapshot interface {
+
+	// Head returns the latest block at the selected point of the protocol state
+	// history. It can represent either a finalized or ambiguous block,
+	// depending on our selection criteria. Either way, it's the block on which
+	// we should build the next block in the context of the selected state.
+	Head() (*flow.Header, error)
+
+	// Epoch returns the Epoch counter for the Head block.
+	Epoch() (uint64, error)
 
 	// Identities returns a list of identities at the selected point of
 	// the protocol state history. It allows us to provide optional upfront
@@ -30,27 +41,94 @@ type Snapshot interface {
 	// Commit return the sealed execution state commitment at this block.
 	Commit() (flow.StateCommitment, error)
 
-	// Head returns the latest block at the selected point of the protocol state
-	// history. It can represent either a finalized or ambiguous block,
-	// depending on our selection criteria. Either way, it's the block on which
-	// we should build the next block in the context of the selected state.
-	Head() (*flow.Header, error)
-
-	// Pending returns all children IDs for the snapshot head, which thus were
-	// potential extensions of the protocol state at this snapshot. The result
-	// is ordered such that parents are included before their children. These
+	// Pending returns the IDs of all descendants of the Head block. The IDs
+	// are ordered such that parents are included before their children. These
 	// are NOT guaranteed to have been validated by HotStuff.
 	Pending() ([]flow.Identifier, error)
 
-	// Seed returns the random seed for a certain snapshot.
+	// Seed returns a deterministic seed for a pseudo random number generator.
+	// The seed is derived from the Source of Randomness for the Head block.
 	// In order to deterministically derive task specific seeds, indices must
-	// be specified.
-	// Refer to module/indices/rand.go for different indices.
+	// be specified. Refer to module/indices/rand.go for different indices.
 	// NOTE: not to be confused with the epoch seed.
 	Seed(indices ...uint32) ([]byte, error)
 
-	// Epoch will return the counter of the epoch for the given snapshot.
-	Epoch() (uint64, error)
+	// EpochSnapshot returns an snapshot of all information for the specified Epoch,
+	// which is available along the fork ending with the Head block.
+	// CAUTION: at the moment, we only consider finalized information.
+	// If the preparation for the specified epoch is still ongoing as of the Head block,
+	// some of EpochSnapshot's methods will return errors.
+	EpochSnapshot(counter uint64) EpochSnapshot
+}
+
+// EpochSnapshot contains the information specific to a certain Epoch (defined
+// by the epoch Counter). Note that the Epoch preparation can differ along
+// different forks. Therefore, an EpochSnapshot is tied to the Head of one
+// specific fork and only accounts for the information contained in blocks
+// along this fork up to (including) Head.
+// An EpochSnapshot instance is constant and reports the identical information
+// even if progress is made later and more information becomes available in
+// subsequent blocks.
+//
+// Methods error if epoch preparation has not progressed far enough for
+// this information to be determined by a finalized block.
+// CAUTION: at the moment, we only consider finalized information.
+type EpochSnapshot interface {
+
+	// Counter returns the Epoch's counter.
+	Counter() (uint64, error)
+
+	// Head returns a block. An EpochSnapshot is tied to the Head (block)
+	// of one specific fork and only accounts for the information contained
+	// in blocks along this fork up to (including) Head.
+	Head() (*flow.Header, error)
+
+	// FinalView returns the largest view number which still belongs to this Epoch.
+	FinalView() (uint64, error)
+
+	// InitialIdentities returns the identities for this epoch as they were
+	// specified in the EpochSetup Event.
+	InitialIdentities(selector flow.IdentityFilter) (flow.IdentityList, error)
+
+	Clustering() (flow.ClusterList, error)
+
+	ClusterInformation(index uint32) (ClusterInformation, error)
+
+	DKG() (DKG, error)
+
+	EpochSetupSeed(indices ...uint32) ([]byte, error)
+
+	// Phase returns the epoch's preparation phase as of the Head block.
+	// CAUTION: at the moment, we only consider finalized information.
+	Phase() (EpochPhase, error)
+}
+
+// EpochPreparationState represents a state of the Epoch preparation protocol.
+// An EpochPreparationState is always respective to a certain block, aka the
+// Head block, and only accounts for information contained in blocks along
+// this fork up to (including) Head.
+// For example, we say that Epoch N is in state SetUp, iff:
+//   * the EpochSetup service event is contained in Head or one of its ancestors
+//   * the EpochCommitted event in _not_ in the fork up to (including) Head
+//
+// CAUTION: at the moment, we only consider finalized information.
+type EpochPhase int
+
+const (
+	// Integer values: in our docs, we referred to the Staking Auction Phase as
+	// 'Phase 0'. During Phase 0, no information about the upcoming Epoch is available
+	// on the protocol level. Hence, we omit Phase 0 here.
+
+	Setup     = 1 + iota // fork includes EpochSetup event (in seal) but _not_ EpochCommitted event
+	Committed            // fork includes EpochSetup _and_ EpochCommitted events (in seals)
+)
+
+func (s EpochPhase) String() string {
+	names := [...]string{
+		"SetUp",
+		"Committed",
+	}
+	return names[s-1]
 }
 
 // SeedFromParentSignature reads the raw random seed from a combined signature.
