@@ -286,6 +286,12 @@ type TransactionMetrics interface {
 	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
 	// works if the transaction was earlier added as received.
 	TransactionExecuted(txID flow.Identifier, when time.Time)
+
+	// TransactionExpired tracks number of expired transactions
+	TransactionExpired(txID flow.Identifier)
+
+	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
+	TransactionSubmissionFailed()
 }
 
 type PingMetrics interface {

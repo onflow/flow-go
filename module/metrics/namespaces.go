@@ -28,7 +28,8 @@ const (
 
 // Access subsystem
 const (
-	subsystemTransactionTiming = "transaction_timing"
+	subsystemTransactionTiming     = "transaction_timing"
+	subsystemTransactionSubmission = "transaction_submission"
 )
 
 // Collection subsystem
