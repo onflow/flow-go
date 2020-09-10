@@ -46,12 +46,12 @@ type Snapshot interface {
 	// are NOT guaranteed to have been validated by HotStuff.
 	Pending() ([]flow.Identifier, error)
 
-	// Seed returns a deterministic seed for a pseudo random number generator.
+	// RandomBeacon returns a deterministic seed for a pseudo random number generator.
 	// The seed is derived from the Source of Randomness for the Head block.
 	// In order to deterministically derive task specific seeds, indices must
 	// be specified. Refer to module/indices/rand.go for different indices.
 	// NOTE: not to be confused with the epoch seed.
-	Seed(indices ...uint32) ([]byte, error)
+	RandomBeacon(indices ...uint32) ([]byte, error)
 
 	// EpochSnapshot returns an snapshot of all information for the specified Epoch,
 	// which is available along the fork ending with the Head block.

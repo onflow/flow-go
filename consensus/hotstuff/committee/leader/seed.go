@@ -26,7 +26,7 @@ func ReadSeed(indices []uint32, rootHeader *flow.Header, rootQC *flow.QuorumCert
 	}
 
 	snapshot := st.AtBlockID(rootHeader.ID())
-	seedFromState, err := snapshot.Seed(indices...)
+	seedFromState, err := snapshot.RandomBeacon(indices...)
 
 	// when the genesis has no child in protocol state yet, we can't get the seed.
 	// In which case, we will use the seed from the root QC.
