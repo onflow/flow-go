@@ -37,62 +37,20 @@ func (_m *Snapshot) Commit() ([]byte, error) {
 	return r0, r1
 }
 
-// Epoch provides a mock function with given fields: counter
-func (_m *Snapshot) Epoch(counter uint64) protocol.Epoch {
-	ret := _m.Called(counter)
+// Epochs provides a mock function with given fields:
+func (_m *Snapshot) Epochs() protocol.EpochQuery {
+	ret := _m.Called()
 
-	var r0 protocol.Epoch
-	if rf, ok := ret.Get(0).(func(uint64) protocol.Epoch); ok {
-		r0 = rf(counter)
+	var r0 protocol.EpochQuery
+	if rf, ok := ret.Get(0).(func() protocol.EpochQuery); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.Epoch)
+			r0 = ret.Get(0).(protocol.EpochQuery)
 		}
 	}
 
 	return r0
-}
-
-// EpochCounter provides a mock function with given fields:
-func (_m *Snapshot) EpochCounter() (uint64, error) {
-	ret := _m.Called()
-
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// EpochPhase provides a mock function with given fields:
-func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
-	ret := _m.Called()
-
-	var r0 flow.EpochPhase
-	if rf, ok := ret.Get(0).(func() flow.EpochPhase); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(flow.EpochPhase)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // Head provides a mock function with given fields:
@@ -187,7 +145,28 @@ func (_m *Snapshot) Pending() ([]flow.Identifier, error) {
 	return r0, r1
 }
 
-// RandomBeaconSeed provides a mock function with given fields: indices
+// Phase provides a mock function with given fields:
+func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
+	ret := _m.Called()
+
+	var r0 flow.EpochPhase
+	if rf, ok := ret.Get(0).(func() flow.EpochPhase); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(flow.EpochPhase)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Seed provides a mock function with given fields: indices
 func (_m *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	_va := make([]interface{}, len(indices))
 	for _i := range indices {

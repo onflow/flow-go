@@ -14,6 +14,20 @@ type Cluster struct {
 	mock.Mock
 }
 
+// ChainID provides a mock function with given fields:
+func (_m *Cluster) ChainID() flow.ChainID {
+	ret := _m.Called()
+
+	var r0 flow.ChainID
+	if rf, ok := ret.Get(0).(func() flow.ChainID); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(flow.ChainID)
+	}
+
+	return r0
+}
+
 // EpochCounter provides a mock function with given fields:
 func (_m *Cluster) EpochCounter() uint64 {
 	ret := _m.Called()

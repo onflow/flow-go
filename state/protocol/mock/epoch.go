@@ -19,7 +19,7 @@ func (_m *Epoch) Cluster(index uint) (protocol.Cluster, error) {
 	ret := _m.Called(index)
 
 	var r0 protocol.Cluster
-	if rf, ok := ret.Get(0).(func(uint32) protocol.Cluster); ok {
+	if rf, ok := ret.Get(0).(func(uint) protocol.Cluster); ok {
 		r0 = rf(index)
 	} else {
 		if ret.Get(0) != nil {
@@ -28,7 +28,7 @@ func (_m *Epoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint32) error); ok {
+	if rf, ok := ret.Get(1).(func(uint) error); ok {
 		r1 = rf(index)
 	} else {
 		r1 = ret.Error(1)
@@ -113,29 +113,6 @@ func (_m *Epoch) FinalView() (uint64, error) {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Head provides a mock function with given fields:
-func (_m *Epoch) Head() (*flow.Header, error) {
-	ret := _m.Called()
-
-	var r0 *flow.Header
-	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
-		}
 	}
 
 	var r1 error
