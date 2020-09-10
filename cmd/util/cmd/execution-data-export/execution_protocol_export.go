@@ -49,17 +49,17 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 	// tracer := &trace.NoopTracer{}
 
 	events := badger.NewEvents(db)
-	// index := badger.NewIndex(cacheMetrics, db)
-	// identities := badger.NewIdentities(cacheMetrics, db)
-	// guarantees := badger.NewGuarantees(cacheMetrics, db)
-	// seals := badger.NewSeals(cacheMetrics, db)
-	// transactions := badger.NewTransactions(cacheMetrics, db)
+	index := badger.NewIndex(cacheMetrics, db)
+	identities := badger.NewIdentities(cacheMetrics, db)
+	guarantees := badger.NewGuarantees(cacheMetrics, db)
+	seals := badger.NewSeals(cacheMetrics, db)
+	transactions := badger.NewTransactions(cacheMetrics, db)
 	headers := badger.NewHeaders(cacheMetrics, db)
 
 	// commits := badger.NewCommits(cacheMetrics, db)
-	// payloads := badger.NewPayloads(db, index, identities, guarantees, seals)
-	// blocks := badger.NewBlocks(db, headers, payloads)
-	// collections := badger.NewCollections(db, transactions)
+	payloads := badger.NewPayloads(db, index, identities, guarantees, seals)
+	blocks := badger.NewBlocks(db, headers, payloads)
+	collections := badger.NewCollections(db, transactions)
 	// chunkDataPacks := badger.NewChunkDataPacks(db)
 	// executionResults := badger.NewExecutionResults(db)
 	// executionState := state.NewExecutionState(nil, commits, blocks, collections, chunkDataPacks, executionResults, db, tracer)
@@ -90,14 +90,23 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 	activeBlockID = blockID
 	done := false
 
-	outputFile := outputPath + "/events.txt"
-	fi, err := os.Create(outputFile)
+	eventOutputFile := outputPath + "/events.txt"
+	efi, err := os.Create(eventOutputFile)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not create output file")
+		log.Fatal().Err(err).Msg("could not create event output file")
 	}
-	defer fi.Close()
-	writer := bufio.NewWriter(fi)
-	defer writer.Flush()
+	defer efi.Close()
+	eventWriter := bufio.NewWriter(efi)
+	defer eventWriter.Flush()
+
+	txOutputFile := outputPath + "/transactions.txt"
+	tfi, err := os.Create(txOutputFile)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not create collection output file")
+	}
+	defer tfi.Close()
+	txWriter := bufio.NewWriter(tfi)
+	defer txWriter.Flush()
 
 	for !done {
 		header, err := headers.ByBlockID(activeBlockID)
@@ -105,11 +114,37 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 			log.Fatal().Err(err).Msg("could not load header")
 			done = true
 		}
-		// block, err := blocks.ByID(activeBlockID)
-		// if err != nil {
-		// 	log.Fatal().Err(err).Msg("could not load block")
-		// 	done = true
-		// }
+
+		block, err := blocks.ByID(activeBlockID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not load block")
+			done = true
+		}
+
+		for _, g := range block.Payload.Guarantees {
+			col, err := collections.ByID(g.CollectionID)
+			if err != nil {
+				log.Fatal().Err(err).Msg("could not fetch collection")
+			}
+			for i, tx := range col.Transactions {
+				// TODO add tx.Payer, ...
+				txID := tx.ID()
+				colID := col.ID()
+				str := "{\"script\": \"" + hex.EncodeToString(tx.Script) + "\", " +
+					" \"tx_id\": \"" + hex.EncodeToString(txID[:]) + "\", " +
+					" \"col_id\": \"" + hex.EncodeToString(colID[:]) + "\", " +
+					" \"block_id\": \"" + hex.EncodeToString(activeBlockID[:]) + "\", " +
+					" \"col_index\": " + fmt.Sprint(i) + ", " +
+					" \"block_height\": " + fmt.Sprint(header.Height) + ", " +
+					" \"ref_block_id\": \"" + hex.EncodeToString(tx.ReferenceBlockID[:]) + "\" }\n"
+				_, err := txWriter.WriteString(str)
+				if err != nil {
+					log.Fatal().Err(err).Msg("could not write transaction")
+					done = true
+				}
+				txWriter.Flush()
+			}
+		}
 
 		evs, err := events.ByBlockID(activeBlockID)
 		if err != nil {
@@ -121,18 +156,15 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 				" \"tx_index\": " + fmt.Sprint(ev.TransactionIndex) + ", " +
 				" \"event_index\": " + fmt.Sprint(ev.EventIndex) + ", " +
 				" \"payload\": \"" + hex.EncodeToString(ev.Payload) + "\" }\n"
-			_, err := writer.WriteString(str)
+			_, err := eventWriter.WriteString(str)
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not fetch events")
 				done = true
 			}
-			writer.Flush()
-			fmt.Println(str)
+			eventWriter.Flush()
 		}
 
-		// activeBlockID = block.Header.ParentID
 		activeBlockID = header.ParentID
-
 	}
 
 	// genesisState, err := commits.ByBlockID(genesis.ID())
