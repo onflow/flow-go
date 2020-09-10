@@ -118,10 +118,9 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 		for _, ev := range evs {
 			str := "{\"event_type\": \"" + string(ev.Type) + "\", " +
 				" \"tx_id\": \"" + hex.EncodeToString(ev.TransactionID[:]) + "\", " +
-				" \"tx_index\": " + string(ev.TransactionIndex) + ", " +
-				" \"event_index\": " + string(ev.EventIndex) + ", " +
-				" \"payload\": \"" + hex.EncodeToString(ev.Payload) + "\", " +
-				"}\n"
+				" \"tx_index\": " + fmt.Sprint(ev.TransactionIndex) + ", " +
+				" \"event_index\": " + fmt.Sprint(ev.EventIndex) + ", " +
+				" \"payload\": \"" + hex.EncodeToString(ev.Payload) + "\" }\n"
 			_, err := writer.WriteString(str)
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not fetch events")
