@@ -62,7 +62,7 @@ func NewNetworkCollector() *NetworkCollector {
 			Subsystem: subsystemQueue,
 			Name:      "message_queue_duration_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
-			Buckets:   []float64{0.1, 0.5, 1, 2, 5}, // 100ms, 500ms, 1s, 2s, 5s
+			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5}, // 10ms, 100ms, 500ms, 1s, 2s, 5s
 		}, []string{LabelPriority}),
 	}
 
@@ -95,5 +95,5 @@ func (nc *NetworkCollector) MessageRemoved(priority int) {
 }
 
 func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) {
-	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(float64(duration.Milliseconds()) / float64(1000))
+	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
 }
