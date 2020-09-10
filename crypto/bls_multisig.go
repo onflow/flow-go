@@ -208,6 +208,7 @@ func VerifySignatureOneMessage(pks []PublicKey, s Signature,
 // An error is returned if the key slice is empty.
 func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	message []byte, kmac hash.Hasher) ([]bool, Signature, error) {
+	_ = newBLSBLS12381()
 
 	// public keys check
 	if len(pks) == 0 || len(pks) != len(sigs) {
@@ -259,6 +260,5 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	for i, v := range verifInt {
 		verifBool[i] = ((C.int)(v) == valid)
 	}
-	fmt.Println(verifInt)
 	return verifBool, aggSig, nil
 }

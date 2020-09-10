@@ -201,9 +201,11 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
     t->right = build_tree(right_len, pks + left_len, sigs + left_len);
     // sum the children
     ep_add_projc(t->sig, t->left->sig, t->right->sig);
-    ep2_add_projc(t->pk, t->left->pk, t->right->pk);  
+    ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
     return t;
 }
+
+//static free_tree
 
 // verify the binary tree and fill the results using recursive batch verification.
 static void bls_batchVerify_tree(const node* root, const int len, byte* results, 
@@ -251,7 +253,6 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
             // set signature as infinity and set result as invald
             ep_set_infty(&sigs[i]);
             results[i] = INVALID;
-            printf("%d is incorrect", i);
         }
     }
 
@@ -269,15 +270,10 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
     for (int i=0; i < sigs_len; i++) {
         if (results[i] == INVALID ) {
             ep_add_projc(invalid_sigs, invalid_sigs, &sigs[i]);
-            //printf("V: %d\n", i);
         }
-        else if (results[i] == VALID) {
-            //printf("I: %d\n", i);
-        }
-    }
+    }  
     ep_neg(invalid_sigs, invalid_sigs);
     ep_add_projc(invalid_sigs, root->sig, invalid_sigs);
-    ep_norm(root->sig, root->sig); fp_print_("root", root->sig->x);
     ep_write_bin_compact(agg_sig, invalid_sigs, SIGNATURE_LEN);
     ep_free(invalid_sigs);
 }
