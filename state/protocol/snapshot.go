@@ -44,17 +44,14 @@ type Snapshot interface {
 	// NOTE: not to be confused with the epoch source of randomness!
 	Seed(indices ...uint32) ([]byte, error)
 
-	// EpochCounter returns the epoch counter for the current epoch, as of the Head block.
-	EpochCounter() (uint64, error)
+	// Phase returns the epoch phase for the current epoch, as of the Head block.
+	Phase() (flow.EpochPhase, error)
 
-	// EpochPhase returns the epoch phase for the current epoch, as of the Head block.
-	EpochPhase() (flow.EpochPhase, error)
-
-	// Epoch returns detailed information for the epoch with the given counter
-	// which is available along the fork ending with the Head block.
+	// Epochs returns a query object enabling querying detailed information about
+	// various epochs.
 	//
 	// For epochs that are in the future w.r.t. the Head block, some of Epoch's
 	// methods may return errors, since the Epoch Preparation Protocol may be
 	// in-progress and incomplete for the epoch.
-	Epoch(counter uint64) Epoch
+	Epochs() EpochQuery
 }

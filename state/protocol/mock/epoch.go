@@ -15,7 +15,7 @@ type Epoch struct {
 }
 
 // Cluster provides a mock function with given fields: index
-func (_m *Epoch) Cluster(index uint32) (protocol.Cluster, error) {
+func (_m *Epoch) Cluster(index uint) (protocol.Cluster, error) {
 	ret := _m.Called(index)
 
 	var r0 protocol.Cluster

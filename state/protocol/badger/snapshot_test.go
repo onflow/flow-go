@@ -99,7 +99,7 @@ func TestClusters(t *testing.T) {
 
 		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
 		require.NoError(t, err)
-		actualClusters, err := state.Final().Clusters()
+		actualClusters, err := state.Final().Epochs().Current().Clustering()
 		require.NoError(t, err)
 
 		require.Equal(t, nClusters, len(expectedClusters))
@@ -126,7 +126,7 @@ func TestSeed(t *testing.T) {
 			err := state.Mutate().Bootstrap(root, result, seal)
 			require.NoError(t, err)
 
-			_, err = state.Final().(*protocol.BlockSnapshot).Seed(1, 2, 3, 4)
+			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
 			assert.Error(t, err)
 		})
@@ -150,7 +150,7 @@ func TestSeed(t *testing.T) {
 			err = state.Mutate().Extend(&unvalidatedChild)
 			assert.Nil(t, err)
 
-			_, err = state.Final().(*protocol.BlockSnapshot).Seed(1, 2, 3, 4)
+			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
 			assert.Error(t, err)
 		})

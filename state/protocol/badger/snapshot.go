@@ -43,11 +43,7 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return s.header, nil
 }
 
-func (s *Snapshot) EpochCounter() (uint64, error) {
-	return s.setupEvent.Counter, nil
-}
-
-func (s *Snapshot) EpochPhase() (flow.EpochPhase, error) {
+func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 
 	epochState, err := s.state.epochStatuses.ByBlockID(s.header.ID())
 	if err != nil {
@@ -167,15 +163,37 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
-func (s *Snapshot) Epoch(counter uint64) protocol.Epoch {
+func (s *Snapshot) Epochs() protocol.EpochQuery {
+	return &EpochQuery{
+		snap: s,
+	}
+}
+
+// EpochQuery simplifies querying epochs w.r.t. a snapshot.
+type EpochQuery struct {
+	snap *Snapshot
+}
+
+// Current returns the current epoch.
+func (q *EpochQuery) Current() protocol.Epoch {
+	return q.ByCounter(q.snap.setupEvent.Counter)
+}
+
+// Next returns the next epoch.
+func (q *EpochQuery) Next() protocol.Epoch {
+	return q.ByCounter(q.snap.setupEvent.Counter + 1)
+}
+
+// ByCounter returns the epoch with the given counter.
+func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 	switch {
-	case counter < s.setupEvent.Counter:
+	case counter < q.snap.setupEvent.Counter:
 		// we currently only support snapshots of the current and next Epoch
 		return NewInvalidEpoch(fmt.Errorf("past epoch"))
-	case counter == s.setupEvent.Counter:
-		return NewCommittedEpoch(s.setupEvent, s.commitEvent)
-	case counter == s.setupEvent.Counter+1:
-		epochState, err := s.state.epochStatuses.ByBlockID(s.header.ID())
+	case counter == q.snap.setupEvent.Counter:
+		return NewCommittedEpoch(q.snap.setupEvent, q.snap.commitEvent)
+	case counter == q.snap.setupEvent.Counter+1:
+		epochState, err := q.snap.state.epochStatuses.ByBlockID(q.snap.header.ID())
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve epoch state for head: %w", err))
 		}
@@ -183,7 +201,7 @@ func (s *Snapshot) Epoch(counter uint64) protocol.Epoch {
 		if epochState.NextEpoch.Setup == flow.ZeroID {
 			return NewInvalidEpoch(fmt.Errorf("epoch still undefined"))
 		}
-		setupEvent, err := s.state.setups.BySetupID(epochState.NextEpoch.Setup)
+		setupEvent, err := q.snap.state.setups.BySetupID(epochState.NextEpoch.Setup)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for epoch: %w", err))
 		}
@@ -191,7 +209,7 @@ func (s *Snapshot) Epoch(counter uint64) protocol.Epoch {
 		if epochState.NextEpoch.Commit == flow.ZeroID {
 			return NewSetupEpoch(setupEvent)
 		}
-		commitEvent, err := s.state.commits.ByCommitID(epochState.NextEpoch.Commit)
+		commitEvent, err := q.snap.state.commits.ByCommitID(epochState.NextEpoch.Commit)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for epoch: %w", err))
 		}
@@ -220,7 +238,7 @@ func (u *InvalidSnapshot) EpochCounter() (uint64, error) {
 	return 0, u.err
 }
 
-func (u *InvalidSnapshot) EpochPhase() (flow.EpochPhase, error) {
+func (u *InvalidSnapshot) Phase() (flow.EpochPhase, error) {
 	return 0, u.err
 }
 

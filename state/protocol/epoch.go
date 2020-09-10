@@ -4,6 +4,20 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// EpochQuery defines the different ways to query for epoch information
+// given a Snapshot. It only exists to simplify the main Snapshot interface.
+type EpochQuery interface {
+
+	// Current returns the current epoch as of this snapshot.
+	Current() Epoch
+
+	// Next returns the next epoch as of this snapshot.
+	Next() Epoch
+
+	// ByCounter returns an arbitrary epoch by counter.
+	ByCounter(counter uint64) Epoch
+}
+
 // Epoch contains the information specific to a certain Epoch (defined
 // by the epoch Counter). Note that the Epoch preparation can differ along
 // different forks, since the emission of service events is fork-dependent.
@@ -40,7 +54,7 @@ type Epoch interface {
 
 	// Cluster returns the detailed cluster information for the cluster with the
 	// given index, in this epoch.
-	Cluster(index uint32) (Cluster, error)
+	Cluster(index uint) (Cluster, error)
 
 	// DKG returns the result of the distributed key generation procedure.
 	DKG() (DKG, error)

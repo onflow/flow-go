@@ -75,7 +75,7 @@ func (_m *Snapshot) EpochCounter() (uint64, error) {
 }
 
 // EpochPhase provides a mock function with given fields:
-func (_m *Snapshot) EpochPhase() (flow.EpochPhase, error) {
+func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
 	ret := _m.Called()
 
 	var r0 flow.EpochPhase

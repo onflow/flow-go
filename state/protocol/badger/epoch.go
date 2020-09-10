@@ -49,7 +49,7 @@ func (es *SetupEpoch) Clustering() (flow.ClusterList, error) {
 	return clustering, nil
 }
 
-func (es *SetupEpoch) Cluster(index uint32) (protocol.Cluster, error) {
+func (es *SetupEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
 }
 
@@ -77,7 +77,7 @@ type CommittedEpoch struct {
 	commitEvent *flow.EpochCommit
 }
 
-func (es *CommittedEpoch) Cluster(index uint32) (protocol.Cluster, error) {
+func (es *CommittedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 
 	qcs := es.commitEvent.ClusterQCs
 	if uint32(len(qcs)) <= index {
@@ -145,7 +145,7 @@ func (u *InvalidEpoch) Clustering() (flow.ClusterList, error) {
 	return nil, u.err
 }
 
-func (u *InvalidEpoch) Cluster(uint32) (protocol.Cluster, error) {
+func (u *InvalidEpoch) Cluster(uint) (protocol.Cluster, error) {
 	return nil, u.err
 }
 

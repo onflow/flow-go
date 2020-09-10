@@ -16,6 +16,7 @@ type Cluster struct {
 }
 
 func (c Cluster) Index() uint32                   { return c.index }
+func (c Cluster) ChainID() flow.ChainID           { return c.rootBlock.Header.ChainID }
 func (c Cluster) EpochCounter() uint64            { return c.counter }
 func (c Cluster) Members() flow.IdentityList      { return c.members }
 func (c Cluster) RootBlock() *cluster.Block       { return c.rootBlock }

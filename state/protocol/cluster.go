@@ -14,6 +14,9 @@ type Cluster interface {
 	// Index returns the index for this cluster.
 	Index() uint32
 
+	// ChainID returns chain ID for the cluster's chain.
+	ChainID() flow.ChainID
+
 	// EpochCounter returns the epoch counter for this cluster.
 	EpochCounter() uint64
 

@@ -649,19 +649,19 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Nil(t, err)
 
 		// we should NOT be able to query epoch 2 wrt block 1
-		_, err = state.AtBlockID(block1.ID()).Epoch(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
 		require.Error(t, err)
-		_, err = state.AtBlockID(block1.ID()).Epoch(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
 		require.Error(t, err)
 
 		// we should be able to query epoch 2 wrt block 2
-		_, err = state.AtBlockID(block2.ID()).Epoch(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block2.ID()).Epoch(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
 		require.Nil(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
-		_, err = state.AtBlockID(block2.ID()).Epoch(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
 		assert.Error(t, err)
 
 		epoch2Commit := unittest.EpochCommitFixture(
@@ -685,19 +685,19 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Nil(t, err)
 
 		// we should NOT be able to query epoch 2 commit info wrt block 2
-		_, err = state.AtBlockID(block2.ID()).Epoch(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
 		assert.Error(t, err)
 
 		// now epoch 2 is fully ready, we can query anything we want about it wrt block 3 (or later)
-		_, err = state.AtBlockID(block3.ID()).Epoch(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epoch(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epoch(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
 		assert.Nil(t, err)
 
 		// we should still be in epoch 1
-		epochCounter, err := state.AtBlockID(block3.ID()).EpochCounter()
+		epochCounter, err := state.AtBlockID(block3.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
 		assert.Equal(t, epoch1Setup.Counter, epochCounter)
 
@@ -710,7 +710,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Nil(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
-		epochCounter, err = state.AtBlockID(block4.ID()).EpochCounter()
+		epochCounter, err = state.AtBlockID(block4.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
 		assert.Equal(t, epoch1Setup.Counter, epochCounter)
 
@@ -724,7 +724,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Nil(t, err)
 
 		// now, at long last, we are in epoch 2
-		epochCounter, err = state.AtBlockID(block5.ID()).EpochCounter()
+		epochCounter, err = state.AtBlockID(block5.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
 		assert.Equal(t, epoch2Setup.Counter, epochCounter)
 	})
