@@ -11,7 +11,8 @@ func InitStorage(datadir string) *badger.DB {
 	opts := badger.
 		DefaultOptions(datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(nil)
+		WithLogger(nil).
+		WithReadOnly(true)
 
 	db, err := badger.Open(opts)
 	if err != nil {

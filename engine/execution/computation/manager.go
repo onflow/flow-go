@@ -52,6 +52,7 @@ func New(
 	protoState protocol.State,
 	vm VirtualMachine,
 	vmCtx fvm.Context,
+	systemChunk bool,
 ) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -67,6 +68,7 @@ func New(
 			metrics,
 			tracer,
 			log.With().Str("component", "block_computer").Logger(),
+			systemChunk,
 		),
 	}
 

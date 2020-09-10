@@ -29,7 +29,7 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.0
 	github.com/multiformats/go-multiaddr v0.2.2
-	github.com/onflow/cadence v0.7.0
+	github.com/onflow/cadence v0.8.0
 	github.com/onflow/flow-go-sdk v0.8.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/opentracing/opentracing-go v1.1.0
@@ -37,7 +37,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.3.0
 	github.com/prometheus/tsdb v0.7.1
-	github.com/r3labs/diff v1.1.0
+	github.com/r3labs/diff v1.1.0 // indirect
 	github.com/rs/zerolog v1.19.0
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3

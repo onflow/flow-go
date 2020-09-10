@@ -180,6 +180,18 @@ func (e *ExecutionError) Code() uint32 {
 	return errCodeExecution
 }
 
+type InitialExecutionError struct {
+	Err runtime.Error
+}
+
+func (e *InitialExecutionError) Error() string {
+	return fmt.Sprintf("code execution failed: %s", e.Err)
+}
+
+func (e *InitialExecutionError) Code() uint32 {
+	return errCodeExecution
+}
+
 func handleError(err error) (vmErr Error, fatalErr error) {
 	switch typedErr := err.(type) {
 	case runtime.Error:
@@ -237,5 +249,5 @@ func handleInitialRuntimeError(err initialRuntime.Error) (vmErr Error, fatalErr 
 	}
 
 	// All other errors are non-fatal Cadence errors.
-	return &ExecutionError{Err: runtime.Error{Err: err.Err}}, nil
+	return &InitialExecutionError{Err: runtime.Error{Err: err.Err}}, nil
 }

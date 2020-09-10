@@ -3,9 +3,9 @@ package wal
 import (
 	"fmt"
 
-	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusWAL "github.com/prometheus/tsdb/wal"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
@@ -19,11 +19,22 @@ type LedgerWAL struct {
 	wal            *prometheusWAL.WAL
 	forestCapacity int
 	keyByteSize    int
+	logger         zerolog.Logger
+}
+
+type ZerologToGoKit struct {
+	logger zerolog.Logger
+}
+
+func (l *ZerologToGoKit) Log(keyvals ...interface{}) error {
+	l.logger.Info().Interface("whatever", keyvals[0])
+
+	return nil
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, keyByteSize int, segmentSize int) (*LedgerWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize)
+func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forestCapacity int, keyByteSize int, segmentSize int) (*LedgerWAL, error) {
+	w, err := prometheusWAL.NewSize(&ZerologToGoKit{logger: logger}, reg, dir, segmentSize)
 	if err != nil {
 		return nil, err
 	}
@@ -31,6 +42,7 @@ func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapa
 		wal:            w,
 		forestCapacity: forestCapacity,
 		keyByteSize:    keyByteSize,
+		logger:         logger,
 	}, nil
 }
 

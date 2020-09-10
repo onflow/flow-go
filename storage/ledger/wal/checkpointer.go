@@ -260,11 +260,13 @@ func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writ
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedForest, error) {
 	filepath := path.Join(c.dir, numberToFilename(checkpoint))
+	c.wal.logger.Debug().Str("filename", filepath).Msg("loading checkpoint")
 	return LoadCheckpoint(filepath)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() (*flattener.FlattenedForest, error) {
 	filepath := path.Join(c.dir, RootCheckpointFilename)
+	c.wal.logger.Debug().Str("filename", filepath).Msg("loading checkpoint")
 	return LoadCheckpoint(filepath)
 }
 

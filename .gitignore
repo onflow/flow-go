@@ -37,6 +37,7 @@ git
 language/tools/vscode-extension/cadence-*.vsix
 language/tools/vscode-extension/out/*
 
+
 # Go mod ignores
 .history
 
@@ -45,4 +46,17 @@ language/tools/vscode-extension/out/*
 
 
 cmd/util/cmd/replay-transactions/data/**
+cmd/util/cmd/replay-transactions/data4/**
 cmd/util/cmd/replay-transactions/data_first/**
+cmd/util/cmd/replay-transactions/blocks/**
+cmd/util/cmd/replay-transactions/block-ids/**
+
+blocks/**
+cmd/util/cmd/replay-transactions/failed-txs/**
+cmd/util/cmd/replay-transactions/complete-data1/**
+cmd/util/cmd/replay-transactions/complete-data4/**
+cmd/util/cmd/replay-transactions/complete-data5/**
+cmd/util/cmd/replay-transactions/data1/**
+cmd/util/cmd/replay-transactions/data5/**
+cmd/util/cmd/replay-transactions/data6/**
+cmd/util/cmd/replay-transactions/data7/**

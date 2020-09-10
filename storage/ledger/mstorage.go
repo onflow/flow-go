@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -39,9 +40,9 @@ type MTrieStorage struct {
 const CacheSize = 1000
 
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
-func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
+func NewMTrieStorage(dbDir string, capacity int, logger zerolog.Logger, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, RegisterKeySize, wal.SegmentSize)
+	w, err := wal.NewWAL(logger, reg, dbDir, capacity, RegisterKeySize, wal.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
@@ -160,7 +161,6 @@ func (f *MTrieStorage) UpdateRegisters(
 	for i, d := range values {
 		vid[i] = d
 	}
-
 
 	err = f.wal.RecordUpdate(stateCommitment, rid, vid)
 	if err != nil {

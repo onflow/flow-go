@@ -403,6 +403,7 @@ github.com/klauspost/compress v1.9.5 h1:U+CaK85mrNNb4k8BNOfgJtJ/gr6kswUCFj6miSzV
 github.com/klauspost/compress v1.9.5/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGiHgQ4OO8tzTaLawm8vnODuwDk=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
+github.com/konsorten/go-windows-terminal-sequences v1.0.2 h1:DB17ag19krx9CFsz4o3enTrPXyIXCl+2iCXH/aMAp9s=
 github.com/konsorten/go-windows-terminal-sequences v1.0.2/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d h1:68u9r4wEvL3gYg2jvAOgROwZ3H+Y3hIDk4tbbmIjcYQ=
 github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d/go.mod h1:5Ky9EC2xfoUKUor0Hjgi2BJhCSXJfMOFlmyYrVKGQMk=
@@ -707,7 +708,9 @@ github.com/onflow/cadence v0.6.0/go.mod h1:VCZ/aqMjf84JQDkCOGqGRQslVwFjx/7PJrH/z
 github.com/onflow/cadence v0.7.0 h1:qJcDJJP7GFy7jq3uPM2ZnaDISQWCkRg0XI77ntrMVAo=
 github.com/onflow/cadence v0.7.0/go.mod h1:R43uGnqQsTcnFf1fMPCcMjDPplBIzbR5XkFZRF2OH3Y=
 github.com/onflow/cadence v0.8.0 h1:7qMjZ3QJBdHZO+/HsxAJaLAXBJWVwT60Zw7t2PmJ/pY=
+github.com/onflow/cadence v0.8.0/go.mod h1:R43uGnqQsTcnFf1fMPCcMjDPplBIzbR5XkFZRF2OH3Y=
 github.com/onflow/cadence v0.8.1 h1:e8gFsTLxVHYuwIK0djADWQ9Vg1KQehTFZ0iimOhq9Uc=
+github.com/onflow/cadence v0.8.2 h1:+7Xe92wme8KjwVcnH9OjDwJecz1P96RbJx2cbrzwFdw=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce h1:I8SaLOFlQN7Jr+aU1mZB0mnsq2qlaaJPeji4PmkTWfA=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
 github.com/onflow/flow-go-sdk v0.3.0-beta1 h1:HmAqosPHLoNmYfhUECsSFpvSD4kWIkJ+Xs8LAJijKDc=
@@ -885,6 +888,7 @@ github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
 github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d/go.mod h1:9OrXJhf154huy1nPWmuSrkgjPUtUNhA+Zmy+6AESzuA=
 github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07/go.mod h1:kDXzergiv9cbyO7IOYJZWg1U88JhDg3PB6klq9Hg2pA=
+github.com/tidwall/pretty v1.0.0 h1:HsD+QiTn7sK6flMKIvNmpqz1qrpP3Ps6jOKIKMooyg4=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tyler-smith/go-bip39 v1.0.1-0.20181017060643-dbb3b84ba2ef/go.mod h1:sJ5fKU0s6JVwZjjcUEX2zFOnvq0ASQ2K9Zr6cf67kNs=
