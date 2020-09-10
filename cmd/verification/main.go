@@ -33,12 +33,6 @@ import (
 )
 
 const (
-	// following lists the operational parameters of verification node
-	//
-	// chunkAssignmentAlpha represents number of verification
-	// DISCLAIMER: alpha down there is not a production-level value
-	chunkAssignmentAlpha = 1
-
 	// requestInterval represents the time interval in milliseconds that the
 	// match engine retries sending resource requests to the network
 	// this value is set following this issue (3443)
@@ -240,7 +234,7 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
+			assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, node.State)
 			if err != nil {
 				return nil, err
 			}

@@ -15,6 +15,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -91,6 +92,8 @@ type MatchingSuite struct {
 	sealsPL     *mempool.Seals
 
 	requester *module.Requester
+
+	assigner *module.ChunkAssigner
 
 	matching *Engine
 }
@@ -284,6 +287,7 @@ func (ms *MatchingSuite) SetupTest() {
 	)
 
 	ms.requester = new(module.Requester)
+	ms.assigner = &module.ChunkAssigner{}
 
 	ms.matching = &Engine{
 		unit:                    unit,
@@ -302,6 +306,7 @@ func (ms *MatchingSuite) SetupTest() {
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxUnsealedResults:      200,
+		assigner:                ms.assigner,
 	}
 }
 
@@ -567,6 +572,9 @@ func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
+	assignment := chunks.NewAssignment()
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
 	if ms.Assert().Len(results, 1, "should select result for empty block") {
@@ -593,6 +601,13 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 		},
 	).Return(nil, false)
 
+	assignment := chunks.NewAssignment()
+	approvers := ms.approvers[:3]
+	for _, chunk := range result.Chunks {
+		assignment.Add(chunk, approvers.NodeIDs())
+	}
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "should not select result with insufficient approvals")
@@ -608,18 +623,24 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	result := unittest.ResultForBlockFixture(&block)
 	ms.pendingResults[result.ID()] = result
 
+	assignment := chunks.NewAssignment()
+	approvers := ms.approvers[:3]
+	for _, chunk := range result.Chunks {
+		assignment.Add(chunk, approvers.NodeIDs())
+	}
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+
 	realApprovalPool, err := stdmap.NewApprovals(1000)
 	ms.Require().NoError(err)
-
 	ms.matching.approvals = realApprovalPool
 
 	// add enough approvals for each chunk
-	for n := 0; n < 3; n++ {
+	for _, approver := range approvers {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
 			approval := unittest.ResultApprovalFixture()
 			approval.Body.BlockID = block.Header.ID()
 			approval.Body.ExecutionResultID = result.ID()
-			approval.Body.ApproverID = ms.approvers[n].NodeID
+			approval.Body.ApproverID = approver.NodeID
 			approval.Body.ChunkIndex = index
 			_, err := ms.matching.approvals.Add(approval)
 			ms.Require().NoError(err)
@@ -632,6 +653,47 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 		sealable := results[0]
 		ms.Assert().Equal(result, sealable)
 	}
+}
+
+func (ms *MatchingSuite) TestMatchedResultsUnassignedVerifiers() {
+
+	// add a block with a specific guarantee to the DB
+	block := unittest.BlockFixture()
+
+	// add a result for this block to the mempool
+	result := unittest.ResultForBlockFixture(&block)
+
+	// list of 3 approvers
+	assignedApprovers := ms.approvers[:3]
+
+	// create assignment with 3 verification node assigned to every chunk
+	assignment := chunks.NewAssignment()
+	for _, chunk := range result.Chunks {
+		assignment.Add(chunk, assignedApprovers.NodeIDs())
+	}
+
+	realApprovalPool, err := stdmap.NewApprovals(1000)
+	ms.Require().NoError(err)
+	ms.matching.approvals = realApprovalPool
+
+	// approve every chunk by an unassigned verifier.
+	unassignedApprover := ms.approvers[3]
+	for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
+		approval := unittest.ResultApprovalFixture()
+		approval.Body.BlockID = block.Header.ID()
+		approval.Body.ExecutionResultID = result.ID()
+		approval.Body.ApproverID = unassignedApprover.NodeID
+		approval.Body.ChunkIndex = index
+		_, err := ms.matching.approvals.Add(approval)
+		ms.Require().NoError(err)
+	}
+
+	// mock assigner
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+
+	results, err := ms.matching.matchedResults()
+	ms.Require().NoError(err)
+	ms.Assert().Len(results, 0, "should not count approvals from unassigned verifiers")
 }
 
 func (ms *MatchingSuite) TestSealResultMissingBlock() {
