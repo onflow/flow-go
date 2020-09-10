@@ -74,7 +74,7 @@ func New(
 	}
 
 	// get the current epoch
-	epoch, err := e.state.Final().EpochCounter()
+	epoch, err := e.state.Final().Epochs().Current().Counter()
 	if err != nil {
 		return nil, fmt.Errorf("could not get current epoch number: %w", err)
 	}
@@ -113,34 +113,27 @@ func (e *Engine) Done() <-chan struct{} {
 // setupEpoch sets up cluster state and HotStuff for a new chain for the given
 // epoch. This can be used for in-progress chains (for example, when restarting
 // mid-epoch) or to bootstrap the chain for a new epoch.
-func (e *Engine) setupEpoch(epoch uint64) (*epochreqs, error) {
+func (e *Engine) setupEpoch(epochCounter uint64) (*epochreqs, error) {
 
-	clusterState, headers, payloads, blocks, err := e.createClusterState(epoch)
+	clusterState, headers, payloads, blocks, err := e.createClusterState(epochCounter)
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster state: %w", err)
 	}
 
 	// determine this node's cluster for the epoch
-	clusters, err := e.state.AtEpoch(epoch).Clusters()
+	epoch := e.state.Final().Epochs().ByCounter(epochCounter)
+	clusters, err := epoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters for epoch: %w", err)
 	}
-	cluster, _, ok := clusters.ByNodeID(e.me.NodeID())
+	_, clusterIndex, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
 		return nil, fmt.Errorf("could not find my cluster")
 	}
-
-	// retrieve the root block and QC for the epoch
-	root, err := e.state.AtEpoch(epoch).ClusterRootBlock(cluster)
+	cluster, err := epoch.Cluster(clusterIndex)
 	if err != nil {
-		return nil, fmt.Errorf("could not get cluster root block: %w", err)
+		return nil, fmt.Errorf("could not get cluster: %w", err)
 	}
-	qc, err := e.state.AtEpoch(epoch).ClusterRootQC(cluster)
-	if err != nil {
-		return nil, fmt.Errorf("could not get cluster root qc: %w", err)
-	}
-
-	clusterID := root.Header.ChainID
 
 	builder, finalizer, err := e.builderFactory.Create(headers, payloads, e.pool)
 	if err != nil {
@@ -149,20 +142,20 @@ func (e *Engine) setupEpoch(epoch uint64) (*epochreqs, error) {
 
 	// TODO need a protocol state method for this - for now fake it with root ID
 	//seed, err := e.state.AtEpoch(epoch).LeaderSelectionSeed()
-	rootID := root.ID()
+	rootID := cluster.RootBlock().ID()
 	seed := rootID[:]
 
 	proposalEngine, err := e.proposalFactory.Create(clusterState, headers, payloads)
 	if err != nil {
 		return nil, fmt.Errorf("could not create proposal engine: %w", err)
 	}
-	syncCore, syncEngine, err := e.syncFactory.Create(cluster, clusterState, blocks, proposalEngine)
+	syncCore, syncEngine, err := e.syncFactory.Create(cluster.Members(), clusterState, blocks, proposalEngine)
 	if err != nil {
 		return nil, fmt.Errorf("could not create sync engine: %w", err)
 	}
 	hotstuff, err := e.hotstuffFactory.Create(
-		clusterID,
-		cluster,
+		cluster.ChainID(),
+		cluster.Members(),
 		clusterState,
 		headers,
 		payloads,
@@ -170,8 +163,8 @@ func (e *Engine) setupEpoch(epoch uint64) (*epochreqs, error) {
 		builder,
 		finalizer,
 		proposalEngine,
-		root.Header,
-		qc,
+		cluster.RootBlock().Header,
+		cluster.RootQC(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create hotstuff: %w", err)
@@ -190,28 +183,26 @@ func (e *Engine) setupEpoch(epoch uint64) (*epochreqs, error) {
 	return engines, nil
 }
 
-func (e *Engine) createClusterState(epoch uint64) (cluster.State, storage.Headers, storage.ClusterPayloads, storage.ClusterBlocks, error) {
+func (e *Engine) createClusterState(epochCounter uint64) (cluster.State, storage.Headers, storage.ClusterPayloads, storage.ClusterBlocks, error) {
+
+	epoch := e.state.Final().Epochs().ByCounter(epochCounter)
 
 	// determine this node's cluster for the epoch
-	clusters, err := e.state.AtEpoch(epoch).Clusters()
+	clusters, err := epoch.Clustering()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get clusters for epoch: %w", err)
 	}
-	cluster, _, ok := clusters.ByNodeID(e.me.NodeID())
+	_, clusterIndex, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
 		return nil, nil, nil, nil, fmt.Errorf("could not find my cluster")
 	}
-
-	// retrieve the root block and QC for the epoch
-	root, err := e.state.AtEpoch(epoch).ClusterRootBlock(cluster)
+	cluster, err := epoch.Cluster(clusterIndex)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not get cluster root block: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("could not get cluster info: %w", err)
 	}
 
-	clusterID := root.Header.ChainID
-
 	// create the cluster state
-	clusterState, headers, payloads, blocks, err := e.clusterStateFactory.Create(clusterID)
+	clusterState, headers, payloads, blocks, err := e.clusterStateFactory.Create(cluster.ChainID())
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not create cluster state: %w", err)
 	}
@@ -226,7 +217,7 @@ func (e *Engine) createClusterState(epoch uint64) (cluster.State, storage.Header
 	}
 
 	// no existing cluster state, bootstrap with root block for epoch
-	err = clusterState.Mutate().Bootstrap(root)
+	err = clusterState.Mutate().Bootstrap(cluster.RootBlock())
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not bootstrap cluster state: %w", err)
 	}
