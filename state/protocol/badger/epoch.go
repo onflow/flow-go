@@ -80,7 +80,7 @@ type CommittedEpoch struct {
 func (es *CommittedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 
 	qcs := es.commitEvent.ClusterQCs
-	if uint32(len(qcs)) <= index {
+	if uint(len(qcs)) <= index {
 		return nil, fmt.Errorf("no cluster with index %d", index)
 	}
 	rootQC := qcs[index]
@@ -90,7 +90,7 @@ func (es *CommittedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 		return nil, fmt.Errorf("failed to generate clustering: %w", err)
 	}
 
-	members, ok := clustering.ByIndex(uint(index))
+	members, ok := clustering.ByIndex(index)
 	if !ok {
 		return nil, fmt.Errorf("failed to get members of cluster %d: %w", index, err)
 	}

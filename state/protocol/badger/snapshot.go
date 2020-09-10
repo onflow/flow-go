@@ -234,10 +234,6 @@ func (u *InvalidSnapshot) Head() (*flow.Header, error) {
 	return nil, u.err
 }
 
-func (u *InvalidSnapshot) EpochCounter() (uint64, error) {
-	return 0, u.err
-}
-
 func (u *InvalidSnapshot) Phase() (flow.EpochPhase, error) {
 	return 0, u.err
 }
@@ -262,6 +258,22 @@ func (u *InvalidSnapshot) Seed(indices ...uint32) ([]byte, error) {
 	return nil, u.err
 }
 
-func (u *InvalidSnapshot) Epoch(counter uint64) protocol.Epoch {
+type InvalidEpochQuery struct {
+	err error
+}
+
+func (u *InvalidSnapshot) Epochs() protocol.EpochQuery {
+	return &InvalidEpochQuery{err: u.err}
+}
+
+func (u *InvalidEpochQuery) Current() protocol.Epoch {
+	return NewInvalidEpoch(u.err)
+}
+
+func (u *InvalidEpochQuery) Next() protocol.Epoch {
+	return NewInvalidEpoch(u.err)
+}
+
+func (u *InvalidEpochQuery) ByCounter(_ uint64) protocol.Epoch {
 	return NewInvalidEpoch(u.err)
 }

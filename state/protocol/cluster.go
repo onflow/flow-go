@@ -12,7 +12,7 @@ import (
 type Cluster interface {
 
 	// Index returns the index for this cluster.
-	Index() uint32
+	Index() uint
 
 	// ChainID returns chain ID for the cluster's chain.
 	ChainID() flow.ChainID
