@@ -14,8 +14,8 @@ import (
 
 func ProtocolState(t testing.TB, db *badger.DB) *pbadger.State {
 	metrics := metrics.NewNoopCollector()
-	headers, _, seals, index, payloads, blocks, setups, commits := util.StorageLayer(t, db)
-	proto, err := pbadger.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits)
+	headers, _, seals, index, payloads, blocks, setups, commits, statuses := util.StorageLayer(t, db)
+	proto, err := pbadger.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses)
 	require.NoError(t, err)
 	return proto
 }

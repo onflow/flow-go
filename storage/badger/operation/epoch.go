@@ -54,10 +54,10 @@ func RetrieveEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(
 	return retrieve(makePrefix(codeEpochCommit, eventID), event)
 }
 
-func InsertEpochState(blockID flow.Identifier, state *flow.EpochState) func(*badger.Txn) error {
-	return insert(makePrefix(codeBlockEpochPreparation, blockID), state)
+func InsertEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func(*badger.Txn) error {
+	return insert(makePrefix(codeBlockEpochStatus, blockID), status)
 }
 
-func RetrieveEpochState(blockID flow.Identifier, state *flow.EpochState) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeBlockEpochPreparation, blockID), state)
+func RetrieveEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeBlockEpochStatus, blockID), status)
 }

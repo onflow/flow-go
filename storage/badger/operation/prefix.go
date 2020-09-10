@@ -49,7 +49,7 @@ const (
 	codePayloadSeals          = 53 // index mapping block ID to payload seals
 	codeCollectionBlock       = 54 // index mapping collection ID to block ID
 	codeBlockExecutionReceipt = 55 // index mapping block ID to execution receipt ID
-	codeBlockEpochPreparation = 56 // index mapping block ID to EpochState
+	codeBlockEpochStatus      = 56 // index mapping block ID to epoch status
 
 	// codes related to epoch information
 	codeEpochCounter = 60 // epoch counter of latest finalized block

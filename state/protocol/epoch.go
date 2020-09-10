@@ -24,11 +24,6 @@ type Epoch interface {
 	// Counter returns the Epoch's counter.
 	Counter() (uint64, error)
 
-	// Head returns a block. An Epoch is tied to the Head (block)
-	// of one specific fork and only accounts for the information contained
-	// in blocks along this fork up to (including) Head.
-	Head() (*flow.Header, error)
-
 	// FinalView returns the largest view number which still belongs to this Epoch.
 	FinalView() (uint64, error)
 

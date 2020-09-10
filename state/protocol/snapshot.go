@@ -37,12 +37,12 @@ type Snapshot interface {
 	// are NOT guaranteed to have been validated by HotStuff.
 	Pending() ([]flow.Identifier, error)
 
-	// RandomBeacon returns a deterministic seed for a pseudo random number generator.
+	// Seed returns a deterministic seed for a pseudo random number generator.
 	// The seed is derived from the source of randomness for the Head block.
 	// In order to deterministically derive task specific seeds, indices must
 	// be specified. Refer to module/indices/rand.go for different indices.
 	// NOTE: not to be confused with the epoch source of randomness!
-	RandomBeaconSeed(indices ...uint32) ([]byte, error)
+	Seed(indices ...uint32) ([]byte, error)
 
 	// EpochCounter returns the epoch counter for the current epoch, as of the Head block.
 	EpochCounter() (uint64, error)
@@ -50,10 +50,11 @@ type Snapshot interface {
 	// EpochPhase returns the epoch phase for the current epoch, as of the Head block.
 	EpochPhase() (flow.EpochPhase, error)
 
-	// Epochreturns an snapshot of all information for the specified epoch,
+	// Epoch returns detailed information for the epoch with the given counter
 	// which is available along the fork ending with the Head block.
-	// CAUTION: at the moment, we only consider finalized information.
-	// If the preparation for the specified epoch is still ongoing as of the Head block,
-	// some of Epoch's methods will return errors.
+	//
+	// For epochs that are in the future w.r.t. the Head block, some of Epoch's
+	// methods may return errors, since the Epoch Preparation Protocol may be
+	// in-progress and incomplete for the epoch.
 	Epoch(counter uint64) Epoch
 }

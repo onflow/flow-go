@@ -188,7 +188,7 @@ func (_m *Snapshot) Pending() ([]flow.Identifier, error) {
 }
 
 // RandomBeaconSeed provides a mock function with given fields: indices
-func (_m *Snapshot) RandomBeaconSeed(indices ...uint32) ([]byte, error) {
+func (_m *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	_va := make([]interface{}, len(indices))
 	for _i := range indices {
 		_va[_i] = indices[_i]

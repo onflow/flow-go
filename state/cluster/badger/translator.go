@@ -47,9 +47,9 @@ func (t *Translator) Translate(blockID flow.Identifier) (flow.Identifier, error)
 	// translation changes to be f(blockID) -> IdentityList rather than
 	// f(blockID) -> blockID.
 	// REF: https://github.com/dapperlabs/flow-go/issues/4655
-	epochBlock, err := t.state.AtEpoch(payload.ReferenceEpoch).Head()
+	head, err := t.state.Final().Head()
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not retrieve blo")
+		return flow.ZeroID, fmt.Errorf("could not retrieve block: %w", err)
 	}
-	return epochBlock.ID(), nil
+	return head.ID(), nil
 }

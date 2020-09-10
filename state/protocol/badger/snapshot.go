@@ -47,6 +47,15 @@ func (s *Snapshot) EpochCounter() (uint64, error) {
 	return s.setupEvent.Counter, nil
 }
 
+func (s *Snapshot) EpochPhase() (flow.EpochPhase, error) {
+
+	epochState, err := s.state.epochStatuses.ByBlockID(s.header.ID())
+	if err != nil {
+		return flow.EpochPhaseUnknown, fmt.Errorf("could not get epoch state: %w", err)
+	}
+	return epochState.Phase(), nil
+}
+
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 	// TODO: CAUTION SHORTCUT
 	// We report the initial identities as of the EpochSetup event here.
@@ -108,7 +117,7 @@ func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 }
 
 // Seed returns the random seed at the given indices for the current block snapshot.
-func (s *Snapshot) RandomBeaconSeed(indices ...uint32) ([]byte, error) {
+func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
 	// get the current state snapshot head
 	var childrenIDs []flow.Identifier
@@ -158,79 +167,83 @@ func (s *Snapshot) RandomBeaconSeed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
-func (s *Snapshot) EpochSnapshot(counter uint64) protocol.Epoch {
+func (s *Snapshot) Epoch(counter uint64) protocol.Epoch {
 	switch {
 	case counter < s.setupEvent.Counter:
 		// we currently only support snapshots of the current and next Epoch
-		return NewUndefinedEpochSnapshot(fmt.Errorf("past epoch"))
+		return NewInvalidEpoch(fmt.Errorf("past epoch"))
 	case counter == s.setupEvent.Counter:
-		return NewEpochCommitSnapshot(s.header, s.setupEvent, s.commitEvent)
+		return NewCommittedEpoch(s.setupEvent, s.commitEvent)
 	case counter == s.setupEvent.Counter+1:
-		epochState, err := s.state.epochStates.ByBlockID(s.header.ID())
+		epochState, err := s.state.epochStatuses.ByBlockID(s.header.ID())
 		if err != nil {
-			return NewUndefinedEpochSnapshot(fmt.Errorf("failed to retrieve epoch state for head: %w", err))
+			return NewInvalidEpoch(fmt.Errorf("failed to retrieve epoch state for head: %w", err))
 		}
 
-		if epochState.NextEpoch.SetupEventID == flow.ZeroID {
-			return NewUndefinedEpochSnapshot(fmt.Errorf("epoch still undefined"))
+		if epochState.NextEpoch.Setup == flow.ZeroID {
+			return NewInvalidEpoch(fmt.Errorf("epoch still undefined"))
 		}
-		setupEvent, err := s.state.setups.BySetupID(epochState.NextEpoch.SetupEventID)
+		setupEvent, err := s.state.setups.BySetupID(epochState.NextEpoch.Setup)
 		if err != nil {
-			return NewUndefinedEpochSnapshot(fmt.Errorf("failed to retrieve setup event for epoch: %w", err))
+			return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for epoch: %w", err))
 		}
 
-		if epochState.NextEpoch.CommitEventID == flow.ZeroID {
-			return NewEpochSetupSnapshot(s.header, setupEvent)
+		if epochState.NextEpoch.Commit == flow.ZeroID {
+			return NewSetupEpoch(setupEvent)
 		}
-		commitEvent, err := s.state.commits.ByCommitID(epochState.NextEpoch.CommitEventID)
+		commitEvent, err := s.state.commits.ByCommitID(epochState.NextEpoch.Commit)
 		if err != nil {
-			return NewUndefinedEpochSnapshot(fmt.Errorf("failed to retrieve commit event for epoch: %w", err))
+			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for epoch: %w", err))
 		}
-		return NewEpochCommitSnapshot(s.header, setupEvent, commitEvent)
+		return NewCommittedEpoch(setupEvent, commitEvent)
 	default:
 		// we currently only support snapshots of the current and next Epoch
-		return NewUndefinedEpochSnapshot(fmt.Errorf("epoch too far in future"))
+		return NewInvalidEpoch(fmt.Errorf("epoch too far in future"))
 	}
 }
 
 // ****************************************
 
-type UndefinedSnapshot struct {
+type InvalidSnapshot struct {
 	err error
 }
 
-func NewUndefinedSnapshot(err error) *UndefinedSnapshot {
-	return &UndefinedSnapshot{err: err}
+func NewInvalidSnapshot(err error) *InvalidSnapshot {
+	return &InvalidSnapshot{err: err}
 }
 
-func (u *UndefinedSnapshot) Head() (*flow.Header, error) {
+func (u *InvalidSnapshot) Head() (*flow.Header, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) EpochCounter() (uint64, error) {
+func (u *InvalidSnapshot) EpochCounter() (uint64, error) {
 	return 0, u.err
 }
 
-func (u *UndefinedSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (u *InvalidSnapshot) EpochPhase() (flow.EpochPhase, error) {
+	return 0, u.err
+}
+
+func (u *InvalidSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+func (u *InvalidSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) Commit() (flow.StateCommitment, error) {
+func (u *InvalidSnapshot) Commit() (flow.StateCommitment, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) Pending() ([]flow.Identifier, error) {
+func (u *InvalidSnapshot) Pending() ([]flow.Identifier, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) RandomBeaconSeed(indices ...uint32) ([]byte, error) {
+func (u *InvalidSnapshot) Seed(indices ...uint32) ([]byte, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) EpochSnapshot(counter uint64) protocol.Epoch {
-	return NewUndefinedEpochSnapshot(u.err)
+func (u *InvalidSnapshot) Epoch(counter uint64) protocol.Epoch {
+	return NewInvalidEpoch(u.err)
 }

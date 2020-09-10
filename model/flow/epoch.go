@@ -18,13 +18,15 @@ import (
 type EpochPhase int
 
 const (
-	EpochPhaseStaking EpochPhase = iota
+	EpochPhaseUnknown EpochPhase = iota
+	EpochPhaseStaking
 	EpochPhaseSetup
 	EpochPhaseCommitted
 )
 
 func (p EpochPhase) String() string {
 	return [...]string{
+		"EpochPhaseUnknown",
 		"EpochStakingPhase",
 		"EpochSetupPhase",
 		"EpochCommittedPhase",
@@ -192,31 +194,53 @@ func (part *DKGParticipant) UnmarshalMsgpack(b []byte) error {
 	return nil
 }
 
-// EpochState is contains IDs of the service events for preparing the
-// current and next Epoch to the extend they are known. Events not yet emitted
-// are represented by ZeroID.
-type EpochState struct {
+// EpochStatus represents the status of the current and next epoch with respect
+// to a reference block. Concretely, it contains the IDs for all relevant
+// service events emitted as of the reference block. Events not yet emitted are
+// represented by ZeroID.
+type EpochStatus struct {
 	CurrentEpoch EventIDs // Epoch Preparation Events for the current Epoch
 	NextEpoch    EventIDs // Epoch Preparation Events for the next Epoch
 }
 
-func NewEpochState(currentSetup, currentCommit, nextSetup, nextCommit Identifier) *EpochState {
-	return &EpochState{
+func NewEpochState(currentSetup, currentCommit, nextSetup, nextCommit Identifier) *EpochStatus {
+	return &EpochStatus{
 		CurrentEpoch: EventIDs{
-			SetupEventID:  currentSetup,
-			CommitEventID: currentCommit,
+			Setup:  currentSetup,
+			Commit: currentCommit,
 		},
 		NextEpoch: EventIDs{
-			SetupEventID:  nextSetup,
-			CommitEventID: nextCommit,
+			Setup:  nextSetup,
+			Commit: nextCommit,
 		},
 	}
 }
 
+// Phase returns the phase for the CURRENT epoch, given this epoch status.
+func (es *EpochStatus) Phase() EpochPhase {
+
+	// invalid for any current epoch events to be empty
+	if es.CurrentEpoch.Setup == ZeroID || es.CurrentEpoch.Commit == ZeroID {
+		return EpochPhaseUnknown
+	}
+	// invalid for commit to have been emitted before setup
+	if es.NextEpoch.Setup == ZeroID && es.NextEpoch.Commit != ZeroID {
+		return EpochPhaseUnknown
+	}
+
+	if es.NextEpoch.Setup == ZeroID {
+		return EpochPhaseStaking
+	}
+	if es.NextEpoch.Commit == ZeroID {
+		return EpochPhaseSetup
+	}
+	return EpochPhaseCommitted
+}
+
 type EventIDs struct {
 	// SetupEventID is the ID of the EpochSetup event for the respective Epoch
-	SetupEventID Identifier
+	Setup Identifier
 
 	// CommitEventID is the ID of the EpochCommit event for the respective Epoch
-	CommitEventID Identifier
+	Commit Identifier
 }
