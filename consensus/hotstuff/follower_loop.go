@@ -68,7 +68,8 @@ func (fl *FollowerLoop) loop() {
 				fl.log.Error().
 					Hex("block_id", logging.ID(p.Block.BlockID)).
 					Uint64("view", p.Block.View).
-					Msgf("terminating FollowerLoop: %s", err.Error())
+					Err(err).
+					Msg("terminating FollowerLoop")
 				return
 			}
 		case <-shutdownSignal:
