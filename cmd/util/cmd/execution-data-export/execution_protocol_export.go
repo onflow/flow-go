@@ -33,12 +33,13 @@ import (
 
 // TODO add events
 
-func ExportEvents(blockID flow.Identifier, dbpath string) {
+func ExportEvents(blockID flow.Identifier, dbPath string) {
 	// TODO
 	// blockHash :=
 	// traverse backward (parent block) and fetch by blockHash
 
-	db := common.InitStorage(dbpath)
+	fmt.Println(">>>>", dbPath)
+	db := common.InitStorage(dbPath)
 	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
