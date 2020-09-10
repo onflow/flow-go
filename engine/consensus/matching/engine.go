@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -633,18 +634,48 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 		return fmt.Errorf("could not index sealing result: %w", err)
 	}
 
+	// collect aggregate signatures
+	aggregatedSigs := e.collectAggregateSignatures(result)
+
 	// generate & store seal
 	seal := &flow.Seal{
-		BlockID:      result.BlockID,
-		ResultID:     result.ID(),
-		InitialState: previous.FinalStateCommit,
-		FinalState:   result.FinalStateCommit,
+		BlockID:                result.BlockID,
+		ResultID:               result.ID(),
+		InitialState:           previous.FinalStateCommit,
+		FinalState:             result.FinalStateCommit,
+		AggregatedApprovalSigs: aggregatedSigs,
 	}
 
 	// we don't care whether the seal is already in the mempool
 	_ = e.seals.Add(seal)
 
 	return nil
+}
+
+func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
+	approvals := e.approvalsByResult[result.ID()]
+	signatures := make([]flow.AggregatedSignature, 0)
+
+	for _, chunk := range result.Chunks {
+		for _, approval := range approvals {
+			if approval.Body.ChunkIndex == chunk.Index {
+				var sigs []crypto.Signature
+				var ids []flow.Identifier
+				for _, approval := range approvals {
+					ids = append(ids, approval.Body.ApproverID)
+					sigs = append(sigs, approval.Body.AttestationSignature)
+				}
+
+				aggSign := flow.AggregatedSignature{
+					VerifierSignatures: sigs,
+					SignerIDs:          ids,
+				}
+				signatures = append(signatures, aggSign)
+			}
+		}
+	}
+
+	return signatures
 }
 
 // clearPools clears the memory pools of all entities related to blocks that are
