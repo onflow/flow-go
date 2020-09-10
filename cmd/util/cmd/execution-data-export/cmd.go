@@ -53,7 +53,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("malformed block hash")
 	}
 
-	ExportEvents(blockID)
+	ExportEvents(blockID, flagDatadir)
 
 	// db := common.InitStorage(flagDatadir)
 	// defer db.Close()

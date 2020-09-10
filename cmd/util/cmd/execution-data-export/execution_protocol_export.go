@@ -33,12 +33,12 @@ import (
 
 // TODO add events
 
-func ExportEvents(blockID flow.Identifier) {
+func ExportEvents(blockID flow.Identifier, dbpath string) {
 	// TODO
 	// blockHash :=
 	// traverse backward (parent block) and fetch by blockHash
 
-	db := common.InitStorage("/home/m4ks/candidate1-execution/protocol")
+	db := common.InitStorage(dbpath)
 	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
