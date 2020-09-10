@@ -648,22 +648,20 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Mutate().Extend(&block2)
 		require.Nil(t, err)
 
-		// we should not be able to query epoch 2, since block 2 is un-finalized
-		_, err = state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
+		// we should NOT be able to query epoch 2 wrt block 1
+		_, err = state.AtBlockID(block1.ID()).EpochSnapshot(epoch2Setup.Counter).InitialIdentities(filter.Any)
+		require.Error(t, err)
+		_, err = state.AtBlockID(block1.ID()).EpochSnapshot(epoch2Setup.Counter).Clustering()
 		require.Error(t, err)
 
-		err = state.Mutate().Finalize(block2.ID())
+		// we should be able to query epoch 2 wrt block 2
+		_, err = state.AtBlockID(block2.ID()).EpochSnapshot(epoch2Setup.Counter).InitialIdentities(filter.Any)
 		require.Nil(t, err)
-
-		// block 2 is finalized, we should be able to get setup info for epoch 2
-		gotIdentities, err := state.AtEpoch(epoch2Setup.Counter).Identities(filter.Any)
-		require.Nil(t, err)
-		assert.Equal(t, epoch2Participants, gotIdentities)
-		clusters, err := state.AtEpoch(epoch2Setup.Counter).Clusters()
+		_, err = state.AtBlockID(block2.ID()).EpochSnapshot(epoch2Setup.Counter).Clustering()
 		require.Nil(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
-		_, err = state.AtEpoch(epoch2Setup.Counter).ClusterRootQC(clusters[0])
+		_, err = state.AtBlockID(block2.ID()).EpochSnapshot(epoch2Setup.Counter).DKG()
 		assert.Error(t, err)
 
 		epoch2Commit := unittest.EpochCommitFixture(
@@ -686,21 +684,20 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Mutate().Extend(&block3)
 		require.Nil(t, err)
 
-		// we should not be able to query commit-only info for epoch 2, since block3 is unfinalized
-		_, err = state.AtEpoch(epoch2Setup.Counter).ClusterRootQC(clusters[0])
+		// we should NOT be able to query epoch 2 commit info wrt block 2
+		_, err = state.AtBlockID(block2.ID()).EpochSnapshot(epoch2Setup.Counter).DKG()
 		assert.Error(t, err)
 
-		err = state.Mutate().Finalize(block3.ID())
+		// now epoch 2 is fully ready, we can query anything we want about it wrt block 3 (or later)
+		_, err = state.AtBlockID(block3.ID()).EpochSnapshot(epoch2Setup.Counter).InitialIdentities(filter.Any)
 		require.Nil(t, err)
-
-		// now epoch 2 is fully ready, we can query anything we want about it
-		_, err = state.AtEpoch(epoch2Setup.Counter).ClusterRootQC(clusters[0])
-		assert.Nil(t, err)
-		_, err = state.AtEpoch(epoch2Setup.Counter).DKG().GroupKey()
+		_, err = state.AtBlockID(block3.ID()).EpochSnapshot(epoch2Setup.Counter).Clustering()
+		require.Nil(t, err)
+		_, err = state.AtBlockID(block3.ID()).EpochSnapshot(epoch2Setup.Counter).DKG()
 		assert.Nil(t, err)
 
 		// we should still be in epoch 1
-		epochCounter, err := state.Final().Epoch()
+		epochCounter, err := state.AtBlockID(block3.ID()).Epoch()
 		require.Nil(t, err)
 		assert.Equal(t, epoch1Setup.Counter, epochCounter)
 
@@ -711,36 +708,23 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		err = state.Mutate().Extend(&block4)
 		require.Nil(t, err)
-		err = state.Mutate().Finalize(block4.ID())
-		require.Nil(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
-		epochCounter, err = state.Final().Epoch()
+		epochCounter, err = state.AtBlockID(block4.ID()).Epoch()
 		require.Nil(t, err)
 		assert.Equal(t, epoch1Setup.Counter, epochCounter)
 
-		// block 5 has a view > final view of epoch 1, it will be considered the
-		// first block of epoch 2
+		// block 5 has a view > final view of epoch 1, it will be considered the first block of epoch 2
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(flow.Payload{})
 		// we should handle view that aren't exactly the first valid view of the epoch
-		block5.Header.View = epoch1FinalView + uint64(rand.Intn(10))
+		block5.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
 
 		err = state.Mutate().Extend(&block5)
 		require.Nil(t, err)
 
-		// we should STILL be in epoch 1, since the first block of epoch 2 has not
-		// yet been finalized
-		epochCounter, err = state.Final().Epoch()
-		require.Nil(t, err)
-		assert.Equal(t, epoch1Setup.Counter, epochCounter)
-
-		// finalize the first block of epoch 2
-		err = state.Mutate().Finalize(block5.ID())
-		require.Nil(t, err)
-
 		// now, at long last, we are in epoch 2
-		epochCounter, err = state.Final().Epoch()
+		epochCounter, err = state.AtBlockID(block5.ID()).Epoch()
 		require.Nil(t, err)
 		assert.Equal(t, epoch2Setup.Counter, epochCounter)
 	})
