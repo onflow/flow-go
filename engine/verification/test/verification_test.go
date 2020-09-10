@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	testifymock "github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
@@ -81,6 +80,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	// complete ER counter example
 	completeER := utils.CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain())
+	result := &completeER.Receipt.ExecutionResult
 
 	// assigner and assignment
 	assigner := &mock.ChunkAssigner{}
@@ -93,11 +93,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		assignment.Add(chunk, assignees)
 	}
 
-	assigner.On("Assign",
-		testifymock.Anything,
-		completeER.Receipt.ExecutionResult.Chunks,
-		testifymock.Anything).
-		Return(assignment, nil)
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	// setup nodes
 	//
