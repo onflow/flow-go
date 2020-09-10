@@ -5,9 +5,11 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"sort"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -15,77 +17,102 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
-// protocolStateSnapshot represents a read-only immutable snapshot of the protocol state at the
+// Snapshot implements the protocol.Snapshot interface.
+// It represents a read-only immutable snapshot of the protocol state at the
 // block it is constructed with. It allows efficient access to data associated directly
 // with blocks at a given state (finalized, sealed), such as the related header, commit,
 // seed or pending children. A block snapshot can lazily convert to an epoch snapshot in
 // order to make data associated directly with epochs accessible through its API.
-type protocolStateSnapshot struct {
-	err     error
-	state   *State
-	blockID flow.Identifier
+type Snapshot struct {
+	state       *State
+	header      *flow.Header
+	setupEvent  *flow.EpochSetup
+	commitEvent *flow.EpochCommit
 }
 
-// Identities will convert the block snapshot into an epoch snapshot to retrieve the list of
-// identities for the epoch active at the current block snapshot.
-func (ps *protocolStateSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return bs.EpochSnapshot().Identities(selector)
+func NewSnapshot(state *State, header *flow.Header, setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *Snapshot {
+	return &Snapshot{
+		state:       state,
+		header:      header,
+		setupEvent:  setupEvent,
+		commitEvent: commitEvent,
+	}
 }
 
-// Identity will convert the block snapshot to an epoch snapshot to retrieve the identity with
-// the given node ID for the epoch active at the current block snapshot.
-func (ps *protocolStateSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
-	return bs.EpochSnapshot().Identity(nodeID)
+func (s *Snapshot) Head() (*flow.Header, error) {
+	return s.header, nil
+}
+
+func (s *Snapshot) Epoch() (uint64, error) {
+	return s.setupEvent.Counter, nil
+}
+
+func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+	// TODO: CAUTION SHORTCUT
+	// We report the initial identities as of the EpochSetup event here.
+	// Only valid as long as we don't have slashing
+	identities := s.setupEvent.Participants.Filter(selector)
+
+	// apply a deterministic sort to the participants
+	sort.Slice(identities, func(i int, j int) bool {
+		return order.ByNodeIDAsc(identities[i], identities[j])
+	})
+
+	return identities, nil
+}
+
+func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+	// filter identities at snapshot for node ID
+	identities, err := s.Identities(filter.HasNodeID(nodeID))
+	if err != nil {
+		return nil, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// check if node ID is part of identities
+	if len(identities) == 0 {
+		return nil, protocol.IdentityNotFoundErr{NodeID: nodeID}
+	}
+	return identities[0], nil
 }
 
 // Commit retrieves the latest execution state commitment at the current block snapshot. This
 // commitment represents the execution state as currently finalized.
-func (ps *protocolStateSnapshot) Commit() (flow.StateCommitment, error) {
-	if bs.err != nil {
-		return nil, bs.err
-	}
-
+func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	// get the ID of the sealed block
-	seal, err := bs.state.seals.ByBlockID(bs.blockID)
+	seal, err := s.state.seals.ByBlockID(s.header.ID())
 	if err != nil {
 		return nil, fmt.Errorf("could not get look up sealed commit: %w", err)
 	}
-
 	return seal.FinalState, nil
 }
 
-// Clusters will convert the block snapshot to an epoch snapshot to retrieve the list of
-// clusters for the epoch active at the current block snapshot.
-func (ps *protocolStateSnapshot) Clusters() (flow.ClusterList, error) {
-	return bs.EpochSnapshot().Clusters()
+func (s *Snapshot) Pending() ([]flow.Identifier, error) {
+	return s.pending(s.header.ID())
 }
 
-func (ps *protocolStateSnapshot) ClusterRootBlock(cluster flow.IdentityList) (*cluster.Block, error) {
-	return bs.EpochSnapshot().ClusterRootBlock(cluster)
-}
-
-func (ps *protocolStateSnapshot) ClusterRootQC(cluster flow.IdentityList) (*flow.QuorumCertificate, error) {
-	return bs.EpochSnapshot().ClusterRootQC(cluster)
-}
-
-// Head returns the header associated with the current block snapshot.
-func (ps *protocolStateSnapshot) Head() (*flow.Header, error) {
-	if bs.err != nil {
-		return nil, bs.err
+func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
+	var pendingIDs []flow.Identifier
+	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
+	if err != nil {
+		return nil, fmt.Errorf("could not get pending children: %w", err)
 	}
 
-	return bs.state.headers.ByBlockID(bs.blockID)
+	for _, pendingID := range pendingIDs {
+		additionalIDs, err := s.pending(pendingID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
+		}
+		pendingIDs = append(pendingIDs, additionalIDs...)
+	}
+	return pendingIDs, nil
 }
 
 // Seed returns the random seed at the given indices for the current block snapshot.
-func (ps *protocolStateSnapshot) Seed(indices ...uint32) ([]byte, error) {
-	if bs.err != nil {
-		return nil, bs.err
-	}
+func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
 	// get the current state snapshot head
 	var childrenIDs []flow.Identifier
-	err := bs.state.db.View(procedure.LookupBlockChildren(bs.blockID, &childrenIDs))
+	err := s.state.db.View(procedure.LookupBlockChildren(s.header.ID(), &childrenIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}
@@ -99,7 +126,7 @@ func (ps *protocolStateSnapshot) Seed(indices ...uint32) ([]byte, error) {
 	var validChildID flow.Identifier
 	for _, childID := range childrenIDs {
 		var valid bool
-		err = bs.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
+		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
 		// skip blocks whose validity hasn't been checked yet
 		if errors.Is(err, storage.ErrNotFound) {
 			continue
@@ -118,7 +145,7 @@ func (ps *protocolStateSnapshot) Seed(indices ...uint32) ([]byte, error) {
 	}
 
 	// get the header of the first child (they all have the same threshold sig)
-	head, err := bs.state.headers.ByBlockID(validChildID)
+	head, err := s.state.headers.ByBlockID(validChildID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}
@@ -131,108 +158,79 @@ func (ps *protocolStateSnapshot) Seed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
-// Pending returns a list of block IDs for blocks that are pending finalization at the
-// given block snapshot.
-func (ps *protocolStateSnapshot) Pending() ([]flow.Identifier, error) {
-	if bs.err != nil {
-		return nil, bs.err
-	}
-	return bs.pending(bs.blockID)
-}
-
-func (ps *protocolStateSnapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
-
-	var pendingIDs []flow.Identifier
-	err := bs.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
-	if err != nil {
-		return nil, fmt.Errorf("could not get pending children: %w", err)
-	}
-
-	for _, pendingID := range pendingIDs {
-		additionalIDs, err := bs.pending(pendingID)
+func (s *Snapshot) EpochSnapshot(counter uint64) protocol.EpochSnapshot {
+	switch {
+	case counter < s.setupEvent.Counter:
+		// we currently only support snapshots of the current and next Epoch
+		return NewUndefinedEpochSnapshot(fmt.Errorf("past epoch"))
+	case counter == s.setupEvent.Counter:
+		return NewEpochCommitSnapshot(s.header, s.setupEvent, s.commitEvent)
+	case counter == s.setupEvent.Counter+1:
+		epochState, err := s.state.epochStates.ByBlockID(s.header.ID())
 		if err != nil {
-			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
+			return NewUndefinedEpochSnapshot(fmt.Errorf("failed to retrieve epoch state for head: %w", err))
 		}
-		pendingIDs = append(pendingIDs, additionalIDs...)
-	}
-	return pendingIDs, nil
-}
 
-// Epoch converts the block snapshot into an epoch snapshot in order to return the
-// epoch counter associated with the active epoch.
-func (ps *protocolStateSnapshot) Epoch() (uint64, error) {
-	return bs.EpochSnapshot().Epoch()
-}
-
-// DKG converts the block snapshot into an epoch snapshot in order to return the epoch
-// DKG data associated with the active epoch.
-func (ps *protocolStateSnapshot) DKG() protocol.DKG {
-	return bs.EpochSnapshot().DKG()
-}
-
-// EpochSnapshot converts the block snapshot into an epoch snapshot. Snapshots can
-// be created by providing a block ID or an epoch counter. Depending on the accessed
-// data, either one of them can be more efficient. We thus implement the function on
-// the type that does it more efficiently and lazily convert between the two as needed.
-func (ps *protocolStateSnapshot) EpochSnapshot() *EpochSnapshot {
-
-	// If we already have an error, don't bother converting.
-	if bs.err != nil {
-		return &EpochSnapshot{err: bs.err}
-	}
-
-	// NOTE: We will often access epoch information through block snapshots, so it
-	// would make sense to introduce a simple caching layer here that maps view
-	// ranges to epochs in order to bypass any database calls and even the storage
-	// caching layer. We only need to load this once upon construction and update it
-	// as we mutate the protocol state.
-
-	// Retrieve the current header to get its view, as well as the current
-	// epoch counter as a starting point.
-	header, err := bs.state.headers.ByBlockID(bs.blockID)
-	if err != nil {
-		return &EpochSnapshot{err: fmt.Errorf("could not retrieve snapshot header: %w", err)}
-	}
-	var counter uint64
-	err = bs.state.db.View(operation.RetrieveEpochCounter(&counter))
-	if err != nil {
-		return &EpochSnapshot{err: fmt.Errorf("could not retrieve epoch counter: %w", err)}
-	}
-
-	// If the header's view is after the current epoch's view, we are dealing
-	// with a header for the next epoch (it could be pending). We should never
-	// have pending headers from two epochs in the future, so it's safe to
-	// return here.
-	var setup flow.EpochSetup
-	err = bs.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
-	if err != nil {
-		return &EpochSnapshot{err: fmt.Errorf("could not retrieve epoch setup: %w", err)}
-	}
-	if header.View > setup.FinalView {
-		return &EpochSnapshot{
-			state:   bs.state,
-			counter: counter + 1,
+		if epochState.NextEpoch.SetupEventID == flow.ZeroID {
+			return NewUndefinedEpochSnapshot(fmt.Errorf("epoch still undefined"))
 		}
-	}
-
-	// we can now iterate backwards through the epochs until we find the one the
-	// header's view falls within
-	var start uint64 // first view of the epoch, inclusive
-	for {
-
-		// get the start view of the epoch
-		err = bs.state.db.View(operation.LookupEpochStart(counter, &start))
+		setupEvent, err := s.state.setups.BySetupID(epochState.NextEpoch.SetupEventID)
 		if err != nil {
-			return &EpochSnapshot{err: fmt.Errorf("could not look up epoch start (counter: %d): %w", counter, err)}
+			return NewUndefinedEpochSnapshot(fmt.Errorf("failed to retrieve setup event for epoch: %w", err))
 		}
 
-		if header.View >= start {
-			return &EpochSnapshot{
-				state:   bs.state,
-				counter: counter,
-			}
+		if epochState.NextEpoch.CommitEventID == flow.ZeroID {
+			return NewEpochSetupSnapshot(s.header, setupEvent)
 		}
-
-		counter--
+		commitEvent, err := s.state.commits.ByCommitID(epochState.NextEpoch.CommitEventID)
+		if err != nil {
+			return NewUndefinedEpochSnapshot(fmt.Errorf("failed to retrieve commit event for epoch: %w", err))
+		}
+		return NewEpochCommitSnapshot(s.header, setupEvent, commitEvent)
+	default:
+		// we currently only support snapshots of the current and next Epoch
+		return NewUndefinedEpochSnapshot(fmt.Errorf("epoch too far in future"))
 	}
+}
+
+// ****************************************
+
+type UndefinedSnapshot struct {
+	err error
+}
+
+func NewUndefinedSnapshot(err error) *UndefinedSnapshot {
+	return &UndefinedSnapshot{err: err}
+}
+
+func (u *UndefinedSnapshot) Head() (*flow.Header, error) {
+	return nil, u.err
+}
+
+func (u *UndefinedSnapshot) Epoch() (uint64, error) {
+	return 0, u.err
+}
+
+func (u *UndefinedSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+	return nil, u.err
+}
+
+func (u *UndefinedSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+	return nil, u.err
+}
+
+func (u *UndefinedSnapshot) Commit() (flow.StateCommitment, error) {
+	return nil, u.err
+}
+
+func (u *UndefinedSnapshot) Pending() ([]flow.Identifier, error) {
+	return nil, u.err
+}
+
+func (u *UndefinedSnapshot) Seed(indices ...uint32) ([]byte, error) {
+	return nil, u.err
+}
+
+func (u *UndefinedSnapshot) EpochSnapshot(counter uint64) protocol.EpochSnapshot {
+	return NewUndefinedEpochSnapshot(u.err)
 }
