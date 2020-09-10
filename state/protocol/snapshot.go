@@ -92,7 +92,7 @@ type EpochSnapshot interface {
 
 	Clustering() (flow.ClusterList, error)
 
-	ClusterInformation(index uint32) (ClusterInformation, error)
+	ClusterInformation(index uint32) (Cluster, error)
 
 	DKG() (DKG, error)
 
