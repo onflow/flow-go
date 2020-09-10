@@ -82,16 +82,25 @@ func ExportEvents(blockID flow.Identifier, dbpath string) {
 	// 	ctx:              context.Background(),
 	// }
 
-	genesis, err := blocks.ByID(blockID)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not load genesis")
+	var activeBlockID flow.Identifier
+	done := false
+
+	for !done {
+		block, err := blocks.ByID(activeBlockID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not load block")
+			done = true
+		}
+
+		evs, err := events.ByBlockID(block.ID())
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not fetch events")
+		}
+		fmt.Println(evs)
+
+		activeBlockID = block.Header.ParentID
 	}
 
-	evs, err := events.ByBlockID(genesis.ID())
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not fetch events")
-	}
-	fmt.Println(evs)
 	// genesisState, err := commits.ByBlockID(genesis.ID())
 	// if err != nil {
 	// 	log.Fatal().Err(err).Msg("could not load genesis state")
