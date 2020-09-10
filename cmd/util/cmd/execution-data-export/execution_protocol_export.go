@@ -44,17 +44,17 @@ func ExportEvents(blockID flow.Identifier, dbpath string) {
 	cacheMetrics := &metrics.NoopCollector{}
 	// tracer := &trace.NoopTracer{}
 
-	index := badger.NewIndex(cacheMetrics, db)
 	events := badger.NewEvents(db)
-	identities := badger.NewIdentities(cacheMetrics, db)
-	guarantees := badger.NewGuarantees(cacheMetrics, db)
-	seals := badger.NewSeals(cacheMetrics, db)
+	// index := badger.NewIndex(cacheMetrics, db)
+	// identities := badger.NewIdentities(cacheMetrics, db)
+	// guarantees := badger.NewGuarantees(cacheMetrics, db)
+	// seals := badger.NewSeals(cacheMetrics, db)
 	// transactions := badger.NewTransactions(cacheMetrics, db)
 	headers := badger.NewHeaders(cacheMetrics, db)
 
 	// commits := badger.NewCommits(cacheMetrics, db)
-	payloads := badger.NewPayloads(db, index, identities, guarantees, seals)
-	blocks := badger.NewBlocks(db, headers, payloads)
+	// payloads := badger.NewPayloads(db, index, identities, guarantees, seals)
+	// blocks := badger.NewBlocks(db, headers, payloads)
 	// collections := badger.NewCollections(db, transactions)
 	// chunkDataPacks := badger.NewChunkDataPacks(db)
 	// executionResults := badger.NewExecutionResults(db)
@@ -86,19 +86,26 @@ func ExportEvents(blockID flow.Identifier, dbpath string) {
 	done := false
 
 	for !done {
-		block, err := blocks.ByID(activeBlockID)
+		header, err := headers.ByBlockID(activeBlockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not load block")
+			log.Fatal().Err(err).Msg("could not load header")
 			done = true
 		}
+		// block, err := blocks.ByID(activeBlockID)
+		// if err != nil {
+		// 	log.Fatal().Err(err).Msg("could not load block")
+		// 	done = true
+		// }
 
-		evs, err := events.ByBlockID(block.ID())
+		evs, err := events.ByBlockID(activeBlockID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not fetch events")
 		}
 		fmt.Println(evs)
 
-		activeBlockID = block.Header.ParentID
+		// activeBlockID = block.Header.ParentID
+		activeBlockID = header.ParentID
+
 	}
 
 	// genesisState, err := commits.ByBlockID(genesis.ID())
