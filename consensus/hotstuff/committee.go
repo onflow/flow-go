@@ -1,8 +1,8 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 // Committee accounts for the fact that we might have multiple HotStuff instances
@@ -45,17 +45,12 @@ type Committee interface {
 	//       This would require some refactoring of EventHandler (postponed to later)
 	Self() flow.Identifier
 
-	// DKGSize returns the group size of DKG at the given block ID.
-	DKGSize(blockID flow.Identifier) (uint, error)
+	// DKG returns the DKG info for the given block.
+	DKG(blockID flow.Identifier) (DKG, error)
+}
 
-	// DKGGroupKey returns the DKG group public key.
-	DKGGroupKey(blockID flow.Identifier) (crypto.PublicKey, error)
-
-	// DKGIndex returns the DKG index of the node with the given ID at the given block ID.
-	DKGIndex(blockID flow.Identifier, nodeID flow.Identifier) (uint, error)
-
-	// DKGKeyShare returns the DKG public key share of the node with the given ID at the given block.
-	DKGKeyShare(blockID flow.Identifier, nodeID flow.Identifier) (crypto.PublicKey, error)
+type DKG interface {
+	protocol.DKG
 }
 
 // ComputeStakeThresholdForBuildingQC returns the stake that is minimally required for building a QC

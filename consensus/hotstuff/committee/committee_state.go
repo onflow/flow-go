@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -114,56 +113,15 @@ func (c *Committee) Self() flow.Identifier {
 	return c.myID
 }
 
-// DKGSize returns the size of the DKG group.
-func (c *Committee) DKGSize(blockID flow.Identifier) (uint, error) {
-	mainConsensusBlockID, err := c.blockTranslator.Translate(blockID)
-	if err != nil {
-		return 0, fmt.Errorf("error determining the protocol state for block %s: %w", blockID, err)
-	}
-	size, err := c.protocolState.AtBlockID(mainConsensusBlockID).DKG().Size()
-	if err != nil {
-		return 0, fmt.Errorf("could not get DKG group size: %w", err)
-	}
-	return size, nil
-}
+// DKG returns the DKG info for the given block.
+func (c *Committee) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
 
-// DKGGroupKey returns the DKG public group key at the given block.
-func (c *Committee) DKGGroupKey(blockID flow.Identifier) (crypto.PublicKey, error) {
-	mainConsensusBlockID, err := c.blockTranslator.Translate(blockID)
+	epoch, err := c.protocolState.AtBlockID(blockID).EpochCounter()
 	if err != nil {
-		return nil, fmt.Errorf("error determining the protocol state for block %s: %w", blockID, err)
+		return nil, fmt.Errorf("could not get epoch counter: %w", err)
 	}
-	groupKey, err := c.protocolState.AtBlockID(mainConsensusBlockID).DKG().GroupKey()
-	if err != nil {
-		return nil, fmt.Errorf("could not get DKG group key: %w", err)
-	}
-	return groupKey, nil
-}
-
-// DKGIndex returns the DKG public key share of the given participant at the given block.
-func (c *Committee) DKGIndex(blockID flow.Identifier, nodeID flow.Identifier) (uint, error) {
-	mainConsensusBlockID, err := c.blockTranslator.Translate(blockID)
-	if err != nil {
-		return 0, fmt.Errorf("error determining the protocol state for block %s: %w", blockID, err)
-	}
-	index, err := c.protocolState.AtBlockID(mainConsensusBlockID).DKG().Index(nodeID)
-	if err != nil {
-		return 0, fmt.Errorf("could not get DKG public key share: %w", err)
-	}
-	return index, nil
-}
-
-// DKGKeyShare returns the DKG public key share of the given participant at the given block.
-func (c *Committee) DKGKeyShare(blockID flow.Identifier, nodeID flow.Identifier) (crypto.PublicKey, error) {
-	mainConsensusBlockID, err := c.blockTranslator.Translate(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("error determining the protocol state for block %s: %w", blockID, err)
-	}
-	keyShare, err := c.protocolState.AtBlockID(mainConsensusBlockID).DKG().KeyShare(nodeID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get DKG public key share: %w", err)
-	}
-	return keyShare, nil
+	dkg, err := c.protocolState.AtBlockID(blockID).Epoch(epoch).DKG()
+	return dkg, err
 }
 
 // New creates HotStuff committee. This is the generic constructor covering all potential cases.

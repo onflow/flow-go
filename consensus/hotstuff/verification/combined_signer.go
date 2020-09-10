@@ -97,13 +97,13 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 
 	// get the DKG group size
 	blockID := votes[0].BlockID
-	groupSize, err := c.committee.DKGSize(blockID)
+	dkg, err := c.committee.DKG(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get DKG group size: %w", err)
+		return nil, fmt.Errorf("could not get DKG: %w", err)
 	}
 
 	// check if we have sufficient threshold signature shares
-	if !crypto.EnoughShares(signature.RandomBeaconThreshold(int(groupSize)), len(votes)) {
+	if !crypto.EnoughShares(signature.RandomBeaconThreshold(int(dkg.Size())), len(votes)) {
 		return nil, ErrInsufficientShares
 	}
 
@@ -130,7 +130,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 		beaconShare := splitSigs[1]
 
 		// get the dkg index from the dkg state
-		dkgIndex, err := c.committee.DKGIndex(vote.BlockID, vote.SignerID)
+		dkgIndex, err := dkg.Index(vote.SignerID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get dkg index (signer: %x): %w", vote.SignerID, err)
 		}
@@ -149,7 +149,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	}
 
 	// construct the threshold signature from the shares
-	beaconThresSig, err := c.beacon.Combine(groupSize, beaconShares, dkgIndices)
+	beaconThresSig, err := c.beacon.Combine(dkg.Size(), beaconShares, dkgIndices)
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate second signatures: %w", err)
 	}
