@@ -11,7 +11,7 @@ import (
 // cluster in the given epoch. It contains an empty collection referencing
 func CanonicalClusterRootBlock(epoch uint64, participants flow.IdentityList) *cluster.Block {
 
-	chainID := fmt.Sprintf("cluster-%d-%s", epoch, participants.Fingerprint())
+	chainID := fmt.Sprintf("epoch-%d_cluster-%s", epoch, participants.Fingerprint())
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	payload.ReferenceEpoch = epoch
 	header := &flow.Header{

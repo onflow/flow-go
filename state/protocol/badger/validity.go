@@ -12,8 +12,8 @@ import (
 func validSetup(setup *flow.EpochSetup) error {
 	// STEP 1: general sanity checks
 	// the seed needs to be at least minimum length
-	if len(setup.Seed) < crypto.MinSeedLength {
-		return fmt.Errorf("seed has insufficient length (%d < %d)", len(setup.Seed), crypto.MinSeedLength)
+	if len(setup.SourceOfRandomness) < crypto.MinSeedLength {
+		return fmt.Errorf("seed has insufficient length (%d < %d)", len(setup.SourceOfRandomness), crypto.MinSeedLength)
 	}
 
 	// STEP 2: sanity checks of all nodes listed as participants

@@ -14,11 +14,11 @@ import (
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
-	Counter      uint64         // the number of the epoch
-	FinalView    uint64         // the final view of the epoch
-	Participants IdentityList   // all participants of the epoch
-	Assignments  AssignmentList // cluster assignment for the epoch
-	Seed         []byte         // random seed for leader selection
+	Counter            uint64         // the number of the epoch
+	FinalView          uint64         // the final view of the epoch
+	Participants       IdentityList   // all participants of the epoch
+	Assignments        AssignmentList // cluster assignment for the epoch
+	SourceOfRandomness []byte         // source of randomness for epoch-specific setup tasks
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {

@@ -119,14 +119,14 @@ const (
 	// 'Phase 0'. During Phase 0, no information about the upcoming Epoch is available
 	// on the protocol level. Hence, we omit Phase 0 here.
 
-	Setup     = 1 + iota // fork includes EpochSetup event (in seal) but _not_ EpochCommitted event
-	Committed            // fork includes EpochSetup _and_ EpochCommitted events (in seals)
+	EpochSetupPhase     EpochPhase = 1 + iota // fork includes EpochSetup event (in seal) but _not_ EpochCommitted event
+	EpochCommittedPhase                       // fork includes EpochSetup _and_ EpochCommitted events (in seals)
 )
 
 func (s EpochPhase) String() string {
 	names := [...]string{
 		"SetUp",
-		"Committed",
+		"EpochCommittedPhase",
 	}
 	return names[s-1]
 }
@@ -135,6 +135,21 @@ func (s EpochPhase) String() string {
 // the combinedSig must be from a QuorumCertificate. The indices can be used to
 // generate task-specific seeds from the same signature.
 func SeedFromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
+	// split the parent voter sig into staking & beacon parts
+	combiner := signature.NewCombiner()
+	sigs, err := combiner.Split(combinedSig)
+	if err != nil {
+		return nil, fmt.Errorf("could not split block signature: %w", err)
+	}
+	if len(sigs) != 2 {
+		return nil, fmt.Errorf("invalid block signature split")
+	}
+
+	return SeedFromSourceOfRandomness(indices, sigs[1])
+}
+
+// SeedFromSourceOfRandomness generates a task-specific seed (task is determined by indices).
+func SeedFromSourceOfRandomness(indices []uint32, sor []byte) ([]byte, error) {
 	if len(indices)*4 > hash.KmacMaxParamsLen {
 		return nil, fmt.Errorf("unsupported number of indices")
 	}
@@ -151,19 +166,5 @@ func SeedFromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]
 		return nil, fmt.Errorf("could not create kmac: %w", err)
 	}
 
-	// split the parent voter sig into staking & beacon parts
-	combiner := signature.NewCombiner()
-	sigs, err := combiner.Split(combinedSig)
-	if err != nil {
-		return nil, fmt.Errorf("could not split block signature: %w", err)
-	}
-	if len(sigs) != 2 {
-		return nil, fmt.Errorf("invalid block signature split")
-	}
-
-	// generate the seed by hashing the random beacon threshold signature
-	beaconSig := sigs[1]
-	seed := kmac.ComputeHash(beaconSig)
-
-	return seed, nil
+	return kmac.ComputeHash(sor), nil
 }

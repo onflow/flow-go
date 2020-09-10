@@ -27,11 +27,11 @@ func constructRootResultAndSeal(
 	blockID := block.ID()
 
 	epochSetup := &flow.EpochSetup{
-		Counter:      flagEpochCounter,
-		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
-		Participants: participants,
-		Assignments:  assignments,
-		Seed:         blockID[:],
+		Counter:            flagEpochCounter,
+		FinalView:          block.Header.View + leader.EstimatedSixMonthOfViews,
+		Participants:       participants,
+		Assignments:        assignments,
+		SourceOfRandomness: blockID[:],
 	}
 
 	dkgLookup := model.ToDKGLookup(dkgData, participants)

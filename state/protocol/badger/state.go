@@ -59,55 +59,53 @@ func (s *State) Params() protocol.Params {
 }
 
 func (s *State) Sealed() protocol.Snapshot {
-
 	// retrieve the latest sealed height
 	var sealed uint64
 	err := s.db.View(operation.RetrieveSealedHeight(&sealed))
 	if err != nil {
-		return &BlockSnapshot{err: fmt.Errorf("could not retrieve sealed height: %w", err)}
+		return NewUndefinedSnapshot(fmt.Errorf("could not retrieve sealed height: %w", err))
 	}
-
 	return s.AtHeight(sealed)
 }
 
 func (s *State) Final() protocol.Snapshot {
-
 	// retrieve the latest finalized height
 	var finalized uint64
 	err := s.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
-		return &BlockSnapshot{err: fmt.Errorf("could not retrieve finalized height: %w", err)}
+		return NewUndefinedSnapshot(fmt.Errorf("could not retrieve finalized height: %w", err))
 	}
-
 	return s.AtHeight(finalized)
 }
 
 func (s *State) AtHeight(height uint64) protocol.Snapshot {
-
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
 	err := s.db.View(operation.LookupBlockHeight(height, &blockID))
 	if err != nil {
-		return &BlockSnapshot{err: fmt.Errorf("could not look up block by height: %w", err)}
+		return NewUndefinedSnapshot(fmt.Errorf("could not look up block by height: %w", err))
 	}
-
 	return s.AtBlockID(blockID)
 }
 
 func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
-	snapshot := &BlockSnapshot{
-		state:   s,
-		blockID: blockID,
+	header, err := s.headers.ByBlockID(blockID)
+	if err != nil {
+		return NewUndefinedSnapshot(fmt.Errorf("failed to retrieve block header: %w", err))
 	}
-	return snapshot
-}
-
-func (s *State) AtEpoch(counter uint64) protocol.EpochSnapshot {
-	snapshot := &EpochSnapshot{
-		state:   s,
-		counter: counter,
+	epochState, err := s.epochStates.ByBlockID(blockID)
+	if err != nil {
+		return NewUndefinedSnapshot(fmt.Errorf("failed to retrieve epoch state: %w", err))
 	}
-	return snapshot
+	setupEvent, err := s.setups.BySetupID(epochState.CurrentEpoch.SetupEventID)
+	if err != nil {
+		return NewUndefinedSnapshot(fmt.Errorf("failed to retrieve setup event for epoch: %w", err))
+	}
+	commitEvent, err := s.commits.ByCommitID(epochState.CurrentEpoch.CommitEventID)
+	if err != nil {
+		return NewUndefinedSnapshot(fmt.Errorf("failed to retrieve commit event for epoch: %w", err))
+	}
+	return NewSnapshot(s, header, setupEvent, commitEvent)
 }
 
 func (s *State) Mutate() protocol.Mutator {

@@ -614,6 +614,9 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
 	setup, err := m.state.setups.BySetupID(epochState.CurrentEpoch.SetupEventID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
+	}
 
 	var ops []func(*badger.Txn) error
 	if header.View > setup.FinalView { // first block of next Epoch in this fork
