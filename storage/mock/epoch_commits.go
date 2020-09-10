@@ -14,13 +14,13 @@ type EpochCommits struct {
 	mock.Mock
 }
 
-// ByCounter provides a mock function with given fields: counter
-func (_m *EpochCommits) ByCounter(counter uint64) (*flow.EpochCommit, error) {
-	ret := _m.Called(counter)
+// ByCommitID provides a mock function with given fields: _a0
+func (_m *EpochCommits) ByCommitID(_a0 flow.Identifier) (*flow.EpochCommit, error) {
+	ret := _m.Called(_a0)
 
 	var r0 *flow.EpochCommit
-	if rf, ok := ret.Get(0).(func(uint64) *flow.EpochCommit); ok {
-		r0 = rf(counter)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.EpochCommit); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.EpochCommit)
@@ -28,8 +28,8 @@ func (_m *EpochCommits) ByCounter(counter uint64) (*flow.EpochCommit, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint64) error); ok {
-		r1 = rf(counter)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}

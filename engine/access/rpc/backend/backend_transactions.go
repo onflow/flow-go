@@ -97,7 +97,11 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sampleSize uint) ([]string, error) {
 
 	// retrieve the set of collector clusters
-	clusters, err := b.state.Final().Clusters()
+	epoch, err := b.state.Final().EpochCounter()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch counter: %w", err)
+	}
+	clusters, err := b.state.Final().Epoch(epoch).Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
