@@ -128,6 +128,7 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 			}
 			for i, tx := range col.Transactions {
 				// TODO add tx.Payer, ...
+				// TODO envelope content byte size
 				txID := tx.ID()
 				colID := col.ID()
 				str := "{\"script\": \"" + hex.EncodeToString(tx.Script) + "\", " +
