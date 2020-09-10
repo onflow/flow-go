@@ -91,8 +91,8 @@ func (mq *MessageQueueImpl) Remove() interface{} {
 	item := heap.Pop(mq.pq).(*item)
 
 	// record metrics
-	mq.metrics.MessageRemoved(item.priority)
 	mq.metrics.QueueDuration(time.Since(item.timestamp), item.priority)
+	mq.metrics.MessageRemoved(item.priority)
 
 	return item.message
 }

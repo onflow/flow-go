@@ -376,6 +376,8 @@ func (n *Network) multicast(channelID uint8, message interface{}, num uint, sele
 	return nil
 }
 
+// queueSubmitFunc submits the message to the engine synchronously. It is the callback for the queue worker
+// when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QueueMessage)
 	en, found := n.engines[qm.ChannelID]
