@@ -61,7 +61,7 @@ func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
 }
 
 func (e *hostEnv) seedRNG(header *flow.Header) {
-	// SourceOfRandomness the random number generator with entropy created from the block header ID. The random number generator will
+	// Seed the random number generator with entropy created from the block header ID. The random number generator will
 	// be used by the UnsafeRandom function.
 	id := header.ID()
 	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))

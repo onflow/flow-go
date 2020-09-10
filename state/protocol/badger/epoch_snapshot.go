@@ -60,8 +60,8 @@ func (es *EpochSetupSnapshot) DKG() (protocol.DKG, error) {
 	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
 }
 
-func (es *EpochSetupSnapshot) EpochSetupSeed(indices ...uint32) ([]byte, error) {
-	return protocol.SeedFromSourceOfRandomness(indices, es.setupEvent.SourceOfRandomness)
+func (es *EpochSetupSnapshot) LeaderSelectionSeed(indices ...uint32) ([]byte, error) {
+	return protocol.SeedFromSourceOfRandomness(indices, es.setupEvent.RandomSource)
 }
 
 func (es *EpochSetupSnapshot) Phase() (protocol.EpochPhase, error) {
@@ -165,7 +165,7 @@ func (u *UndefinedEpochSnapshot) DKG() (protocol.DKG, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedEpochSnapshot) EpochSetupSeed(...uint32) ([]byte, error) {
+func (u *UndefinedEpochSnapshot) LeaderSelectionSeed(...uint32) ([]byte, error) {
 	return nil, u.err
 }
 

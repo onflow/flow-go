@@ -602,11 +602,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
-		Counter:            epochCounter,
-		FinalView:          root.Header.View + leader.EstimatedSixMonthOfViews,
-		Participants:       participants,
-		Assignments:        clusterAssignments,
-		SourceOfRandomness: rootID[:],
+		Counter:      epochCounter,
+		FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
+		Participants: participants,
+		Assignments:  clusterAssignments,
+		RandomSource: rootID[:],
 	}
 
 	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)

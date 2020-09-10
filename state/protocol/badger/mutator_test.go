@@ -274,7 +274,7 @@ func TestBootstrapInvalidEpochSetup(t *testing.T) {
 		t.Run("empty seed", func(t *testing.T) {
 			root, result, seal := unittest.BootstrapFixture(participants)
 			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-			setup.SourceOfRandomness = nil
+			setup.RandomSource = nil
 
 			err := state.Mutate().Bootstrap(root, result, seal)
 			require.Error(t, err)
@@ -796,7 +796,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 		t.Run("empty seed", func(t *testing.T) {
 			setup, seal := createSetup()
-			setup.SourceOfRandomness = nil
+			setup.RandomSource = nil
 
 			block := unittest.BlockWithParentFixture(block1.Header)
 			block.SetPayload(flow.Payload{

@@ -47,11 +47,11 @@ type Snapshot interface {
 	Pending() ([]flow.Identifier, error)
 
 	// RandomBeacon returns a deterministic seed for a pseudo random number generator.
-	// The seed is derived from the Source of Randomness for the Head block.
+	// The seed is derived from the source of randomness for the Head block.
 	// In order to deterministically derive task specific seeds, indices must
 	// be specified. Refer to module/indices/rand.go for different indices.
-	// NOTE: not to be confused with the epoch seed.
-	RandomBeacon(indices ...uint32) ([]byte, error)
+	// NOTE: not to be confused with the epoch source of randomness!
+	RandomBeaconSeed(indices ...uint32) ([]byte, error)
 
 	// EpochSnapshot returns an snapshot of all information for the specified Epoch,
 	// which is available along the fork ending with the Head block.
@@ -96,7 +96,7 @@ type EpochSnapshot interface {
 
 	DKG() (DKG, error)
 
-	EpochSetupSeed(indices ...uint32) ([]byte, error)
+	LeaderSelectionSeed(indices ...uint32) ([]byte, error)
 
 	// Phase returns the epoch's preparation phase as of the Head block.
 	// CAUTION: at the moment, we only consider finalized information.

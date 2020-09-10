@@ -108,7 +108,7 @@ func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 }
 
 // Seed returns the random seed at the given indices for the current block snapshot.
-func (s *Snapshot) RandomBeacon(indices ...uint32) ([]byte, error) {
+func (s *Snapshot) RandomBeaconSeed(indices ...uint32) ([]byte, error) {
 
 	// get the current state snapshot head
 	var childrenIDs []flow.Identifier
@@ -227,7 +227,7 @@ func (u *UndefinedSnapshot) Pending() ([]flow.Identifier, error) {
 	return nil, u.err
 }
 
-func (u *UndefinedSnapshot) RandomBeacon(indices ...uint32) ([]byte, error) {
+func (u *UndefinedSnapshot) RandomBeaconSeed(indices ...uint32) ([]byte, error) {
 	return nil, u.err
 }
 
