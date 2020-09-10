@@ -228,12 +228,14 @@ PollLoop:
 			break PollLoop
 
 		case <-ticker.C:
-			_, err := e.dispatchRequest()
+			dispatched, err := e.dispatchRequest()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not dispatch requests")
 				continue PollLoop
 			}
-			e.log.Debug().Uint("requests", 1).Msg("regular request dispatch")
+			if dispatched {
+				e.log.Debug().Uint("requests", 1).Msg("regular request dispatch")
+			}
 		}
 	}
 

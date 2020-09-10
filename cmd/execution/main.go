@@ -8,13 +8,19 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/dapperlabs/flow-go/consensus"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine"
+	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/provider"
 	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
@@ -23,13 +29,16 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/fvm"
 	bootstrapFilenames "github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/buffer"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/signature"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -46,7 +55,9 @@ func main() {
 		receipts              *storage.ExecutionReceipts
 		providerEngine        *exeprovider.Engine
 		syncCore              *chainsync.Core
+		pendingBlocks         *buffer.PendingBlocks // used in follower engine
 		syncEngine            *synchronization.Engine
+		followerEng           *followereng.Engine // to sync blocks from consensus nodes
 		computationManager    *computation.Manager
 		collectionRequester   *requester.Engine
 		ingestionEng          *ingestion.Engine
@@ -109,6 +120,10 @@ func main() {
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
 			results = storage.NewExecutionResults(node.DB)
 			receipts = storage.NewExecutionReceipts(node.DB, results)
+			return nil
+		}).
+		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -175,8 +190,6 @@ func main() {
 				node.Tracer,
 			)
 
-			stateSync := sync.NewStateSynchronizer(executionState)
-
 			providerEngine, err = exeprovider.New(
 				node.Logger,
 				node.Tracer,
@@ -184,7 +197,6 @@ func main() {
 				node.State,
 				node.Me,
 				executionState,
-				stateSync,
 				collector,
 			)
 
@@ -200,15 +212,6 @@ func main() {
 				requester.WithBatchInterval(requestInterval),
 			)
 
-			preferredExeFilter := filter.Any
-			preferredExeNodeID, err := flow.HexStringToIdentifier(preferredExeNodeIDStr)
-			if err == nil {
-				node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
-				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
-			} else if err != nil && preferredExeNodeIDStr != "" {
-				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
-			}
-
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
@@ -219,20 +222,16 @@ func main() {
 				collectionRequester,
 				node.State,
 				node.Storage.Blocks,
-				node.Storage.Payloads,
 				node.Storage.Collections,
 				events,
 				txResults,
 				computationManager,
 				providerEngine,
-				syncCore,
 				executionState,
-				6, // TODO - config param maybe?
-				preferredExeFilter,
-				syncByBlocks,
 				collector,
 				node.Tracer,
 				true,
+				node.RootBlock.Header,
 			)
 
 			// TODO: we should solve these mutual dependencies better
@@ -240,6 +239,69 @@ func main() {
 			collectionRequester = collectionRequester.WithHandle(ingestionEng.OnCollection)
 
 			return ingestionEng, err
+		}).
+		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+
+			// create a finalizer that handles updating the protocol
+			// state when the follower detects newly finalized blocks
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// initialize and pre-generate leader selections from the seed
+			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
+			}
+
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
+			if err != nil {
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+			}
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			if err != nil {
+				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
+			}
+
+			// creates a consensus follower with ingestEngine as the notifier
+			// so that it gets notified upon each new finalized block
+			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, ingestionEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower core logic: %w", err)
+			}
+
+			followerEng, err = followereng.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				pendingBlocks,
+				followerCore,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower engine: %w", err)
+			}
+
+			return followerEng, nil
 		}).
 		Component("collection requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
@@ -273,7 +335,7 @@ func main() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				ingestionEng,
+				followerEng,
 				syncCore,
 				// Right now, only used to sync, so never poll
 				synchronization.WithPollInterval(time.Duration(0)),

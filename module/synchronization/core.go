@@ -47,7 +47,7 @@ type Core struct {
 
 func New(log zerolog.Logger, config Config) (*Core, error) {
 	core := &Core{
-		log:      log,
+		log:      log.With().Str("module", "synchronization").Logger(),
 		Config:   config,
 		heights:  make(map[uint64]*Status),
 		blockIDs: make(map[flow.Identifier]*Status),

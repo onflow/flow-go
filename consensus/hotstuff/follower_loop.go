@@ -65,10 +65,10 @@ func (fl *FollowerLoop) loop() {
 		case p := <-fl.proposals:
 			err := fl.followerLogic.AddBlock(p)
 			if err != nil { // all errors are fatal
-				fl.log.Error().Hex("block_id", logging.ID(p.Block.BlockID)).
+				fl.log.Error().
+					Hex("block_id", logging.ID(p.Block.BlockID)).
 					Uint64("view", p.Block.View).
-					Msg("fatal error processing proposal")
-				fl.log.Error().Msgf("terminating FollowerLoop: %s", err.Error())
+					Msgf("terminating FollowerLoop: %s", err.Error())
 				return
 			}
 		case <-shutdownSignal:

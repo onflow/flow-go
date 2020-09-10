@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	engineCommon "github.com/dapperlabs/flow-go/engine"
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	provider "github.com/dapperlabs/flow-go/engine/execution/provider/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
@@ -21,15 +20,12 @@ import (
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	module2 "github.com/dapperlabs/flow-go/module/mock"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realStorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -73,7 +69,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
 	collectionConduit := network.NewMockConduit(ctrl)
-	syncConduit := network.NewMockConduit(ctrl)
+	// syncConduit := network.NewMockConduit(ctrl)
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -132,9 +128,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	request.EXPECT().Force().Return().AnyTimes()
 
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.PushBlocks)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.SyncExecution)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
-	blockSync := new(module2.BlockRequester)
+	// net.EXPECT().Register(gomock.Eq(uint8(engineCommon.SyncExecution)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	engine, err = New(
 		log,
@@ -143,20 +137,16 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		request,
 		protocolState,
 		blocks,
-		payloads,
 		collections,
 		events,
 		txResults,
 		computationManager,
 		providerEngine,
-		blockSync,
 		executionState,
-		21,
-		filter.Any,
-		false,
 		metrics,
 		tracer,
 		false,
+		&flow.Header{},
 	)
 	require.NoError(t, err)
 
@@ -275,6 +265,53 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		Return(nil)
 }
 
+func TestExecuteBlockInOrder(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		// A <- B
+		// A <- C <- D
+		executableBlockA := unittest.ExecutableBlockFixture(nil)
+		executableBlockB := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
+		executableBlockC := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
+		executableBlockD := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockC.Block.Header)
+		executableBlockA.StartState = unittest.StateCommitmentFixture()
+
+		// blocks has no collections, so state is essentially the same
+		executableBlockC.StartState = executableBlockA.StartState
+		executableBlockB.StartState = executableBlockA.StartState
+		executableBlockD.StartState = executableBlockC.StartState
+
+		// since no block has any collection, the statecommitment for any block is the same
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, mock.Anything).
+			Return(executableBlockA.StartState, nil)
+
+		ctx.executionState.On("PersistExecutionReceipt", mock.Anything, mock.Anything).Return(nil)
+
+		err := ctx.engine.handleBlock(context.Background(), executableBlockA.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleBlock(context.Background(), executableBlockB.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleBlock(context.Background(), executableBlockC.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleBlock(context.Background(), executableBlockD.Block)
+		require.NoError(t, err)
+
+		// once block A is computed, it should trigger B and C being sent to compute, which in turn should trigger D
+		blockAExecutionResultID := unittest.IdentifierFixture()
+		ctx.assertSuccessfulBlockComputation(executableBlockA, unittest.IdentifierFixture())
+		ctx.assertSuccessfulBlockComputation(executableBlockB, blockAExecutionResultID)
+		ctx.assertSuccessfulBlockComputation(executableBlockC, blockAExecutionResultID)
+		ctx.assertSuccessfulBlockComputation(executableBlockD, unittest.IdentifierFixture())
+
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		assert.False(t, more)
+	})
+}
+
 func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
 	execState := new(state.ExecutionState)
@@ -297,89 +334,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	assert.Equal(t, previousExecutionResultID, er.PreviousResultID)
 
 	execState.AssertExpectations(t)
-}
-
-func TestBlockOutOfOrder(t *testing.T) {
-
-	runWithEngine(t, func(ctx testingContext) {
-
-		executableBlockA := unittest.ExecutableBlockFixture(nil)
-		executableBlockB := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
-		executableBlockC := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
-		executableBlockD := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockC.Block.Header)
-		executableBlockA.StartState = unittest.StateCommitmentFixture()
-
-		// blocks has no collections, so state is essentially the same
-		executableBlockC.StartState = executableBlockA.StartState
-		executableBlockB.StartState = executableBlockA.StartState
-		executableBlockD.StartState = executableBlockC.StartState
-
-		/* Artists recreation of the blocks structure:
-
-		  b
-		   \
-		    a
-		   /
-		d-c
-
-		*/
-
-		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockA.Block))
-		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockB.Block))
-		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockC.Block))
-		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockD.Block))
-
-		// initialize the proposals
-		proposalA := unittest.ProposalFromBlock(executableBlockA.Block)
-		proposalB := unittest.ProposalFromBlock(executableBlockB.Block)
-		proposalC := unittest.ProposalFromBlock(executableBlockC.Block)
-		proposalD := unittest.ProposalFromBlock(executableBlockD.Block)
-
-		// no execution state, so puts to waiting queue
-		ctx.executionState.
-			On("StateCommitmentByBlockID", mock.Anything, executableBlockB.Block.Header.ParentID).
-			Return(nil, realStorage.ErrNotFound)
-
-		err := ctx.engine.handleBlockProposal(context.Background(), proposalB)
-		require.NoError(t, err)
-
-		// no execution state, no connection to other nodes
-		ctx.executionState.
-			On("StateCommitmentByBlockID", mock.Anything, executableBlockC.Block.Header.ParentID).
-			Return(nil, realStorage.ErrNotFound)
-
-		err = ctx.engine.handleBlockProposal(context.Background(), proposalC)
-		require.NoError(t, err)
-
-		// child of c so no need to query execution state
-
-		// we account for every call, so if this call would have happen, test will fail
-		// ctx.executionState.On("StateCommitmentByBlockID", executableBlockD.Block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlockProposal(context.Background(), proposalD)
-		require.NoError(t, err)
-
-		// make sure there were no extra calls at this point in test
-		ctx.executionState.AssertExpectations(t)
-		ctx.computationManager.AssertExpectations(t)
-
-		// once block A is computed, it should trigger B and C being sent to compute, which in turn should trigger D
-		blockAExecutionResultID := unittest.IdentifierFixture()
-		ctx.assertSuccessfulBlockComputation(executableBlockA, unittest.IdentifierFixture())
-		ctx.assertSuccessfulBlockComputation(executableBlockB, blockAExecutionResultID)
-		ctx.assertSuccessfulBlockComputation(executableBlockC, blockAExecutionResultID)
-		ctx.assertSuccessfulBlockComputation(executableBlockD, unittest.IdentifierFixture())
-
-		ctx.executionState.
-			On("StateCommitmentByBlockID", mock.Anything, executableBlockA.Block.Header.ParentID).
-			Return(executableBlockA.StartState, nil)
-
-		err = ctx.engine.handleBlockProposal(context.Background(), proposalA)
-		require.NoError(t, err)
-
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
-		assert.False(t, more)
-	})
-
 }
 
 func TestExecuteScriptAtBlockID(t *testing.T) {
