@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,7 +60,7 @@ func NewNetworkCollector() *NetworkCollector {
 		queueDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "message_queue_duration_seconds",
+			Name:      "message_queue_duration_millis",
 			Help:      "duration [millis; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
 			Buckets:   []float64{10, 100, 500, 1000, 2000, 5000},
 		}, []string{LabelPriority}),
@@ -85,14 +86,14 @@ func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic string) {
 	nc.duplicateMessagesDropped.WithLabelValues(topic).Add(1)
 }
 
-func (nc *NetworkCollector) ElementAdded(priority string) {
-	nc.queueSize.WithLabelValues(priority).Inc()
+func (nc *NetworkCollector) MessageAdded(priority int) {
+	nc.queueSize.WithLabelValues(strconv.Itoa(priority)).Inc()
 }
 
-func (nc *NetworkCollector) ElementRemoved(priority string) {
-	nc.queueSize.WithLabelValues(priority).Dec()
+func (nc *NetworkCollector) MessageRemoved(priority int) {
+	nc.queueSize.WithLabelValues(strconv.Itoa(priority)).Dec()
 }
 
-func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority string) {
-	nc.queueDuration.WithLabelValues(priority).Observe(float64(duration.Milliseconds()))
+func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) {
+	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(float64(duration.Milliseconds()))
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"math/rand"
-	"strconv"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -48,12 +47,12 @@ func main() {
 			collector.NetworkMessageReceived(rand.Intn(1000), topic1)
 			collector.NetworkMessageReceived(rand.Intn(1000), topic2)
 
-			priority1 := strconv.Itoa(rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority))
-			collector.ElementRemoved(priority1)
+			priority1 := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
+			collector.MessageRemoved(priority1)
 			collector.QueueDuration(time.Millisecond*time.Duration(rand.Intn(1000)), priority1)
 
-			priority2 := strconv.Itoa(rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority))
-			collector.ElementAdded(priority2)
+			priority2 := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
+			collector.MessageAdded(priority2)
 			time.Sleep(1 * time.Second)
 		}
 	})

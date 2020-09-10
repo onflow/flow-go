@@ -13,13 +13,13 @@ type NetworkMetrics struct {
 	mock.Mock
 }
 
-// ElementAdded provides a mock function with given fields: priority
-func (_m *NetworkMetrics) ElementAdded(priority string) {
+// MessageAdded provides a mock function with given fields: priority
+func (_m *NetworkMetrics) MessageAdded(priority int) {
 	_m.Called(priority)
 }
 
-// ElementRemoved provides a mock function with given fields: priority
-func (_m *NetworkMetrics) ElementRemoved(priority string) {
+// MessageRemoved provides a mock function with given fields: priority
+func (_m *NetworkMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
 }
 
@@ -39,6 +39,6 @@ func (_m *NetworkMetrics) NetworkMessageSent(sizeBytes int, topic string) {
 }
 
 // QueueDuration provides a mock function with given fields: duration, priority
-func (_m *NetworkMetrics) QueueDuration(duration time.Duration, priority string) {
+func (_m *NetworkMetrics) QueueDuration(duration time.Duration, priority int) {
 	_m.Called(duration, priority)
 }

@@ -20,14 +20,14 @@ type NetworkMetrics interface {
 	NetworkDuplicateMessagesDropped(topic string)
 
 	// Message receive queue metrics
-	// ElementAdded increments the metric tracking the number of messages in the queue with the given priority
-	ElementAdded(priority string)
+	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
+	MessageAdded(priority int)
 
-	// ElementRemoved decrements the metric tracking the number of messages in the queue with the given priority
-	ElementRemoved(priority string)
+	// MessageRemoved decrements the metric tracking the number of messages in the queue with the given priority
+	MessageRemoved(priority int)
 
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
-	QueueDuration(duration time.Duration, priority string)
+	QueueDuration(duration time.Duration, priority int)
 }
 
 type EngineMetrics interface {
