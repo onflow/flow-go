@@ -148,7 +148,7 @@ func ChunkDataPackIsRequestedNTimes(t *testing.T, timeout time.Duration, con *ne
 	// chunk data was requested once, and return the chunk data pack when requested
 	// called with 3 mock.Anything, the first is the request, the second and third are the 2
 	// execution nodes
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	con.On("Publish", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		mutex.Lock()
 		defer mutex.Unlock()
 
