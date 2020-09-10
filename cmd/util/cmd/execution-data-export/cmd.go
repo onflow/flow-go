@@ -1,16 +1,19 @@
 package export
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/badger"
 )
+
+// "github.com/rs/zerolog/log"
+// "github.com/spf13/cobra"
+
+// "github.com/dapperlabs/flow-go/cmd/util/cmd/common"
+// "github.com/dapperlabs/flow-go/model/flow"
+// "github.com/dapperlabs/flow-go/module/metrics"
+// "github.com/dapperlabs/flow-go/storage/badger"
 
 var (
 	flagExecutionStateDir string
@@ -50,21 +53,23 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("malformed block hash")
 	}
 
-	db := common.InitStorage(flagDatadir)
-	defer db.Close()
+	ExportEvents(blockID)
 
-	cache := &metrics.NoopCollector{}
-	commits := badger.NewCommits(cache, db)
+	// db := common.InitStorage(flagDatadir)
+	// defer db.Close()
 
-	stateCommitment, err := getStateCommitment(commits, blockID)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get state commitment for block")
-	}
+	// cache := &metrics.NoopCollector{}
+	// commits := badger.NewCommits(cache, db)
 
-	fmt.Printf("%x\n", stateCommitment)
+	// stateCommitment, err := getStateCommitment(commits, blockID)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msg("cannot get state commitment for block")
+	// }
 
-	err = exportExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot export trie with state commitment")
-	}
+	// fmt.Printf("%x\n", stateCommitment)
+
+	// err = exportExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msg("cannot export trie with state commitment")
+	// }
 }
