@@ -42,6 +42,7 @@ type Suite struct {
 	suite.Suite
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
+	epochQuery *protocol.EpochQuery
 	log        zerolog.Logger
 	net        *module.Network
 	request    *module.Requester
@@ -62,8 +63,10 @@ func (suite *Suite) SetupTest() {
 	suite.net = new(module.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 	suite.request = new(module.Requester)
@@ -165,7 +168,9 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		suite.Require().Nil(err)
 		collNode1 := clusters[0][0]
 		collNode2 := clusters[1][0]
-		suite.snapshot.On("Clusters").Return(clusters, nil).Twice()
+		epoch := new(protocol.Epoch)
+		suite.epochQuery.On("Current").Return(epoch)
+		epoch.On("Clustering").Return(clusters, nil)
 
 		// create two transactions bound for each of the cluster
 		cluster1 := clusters[0]
@@ -228,7 +233,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		// verify that a collection node in the correct cluster was contacted exactly once
 		col1ApiClient.AssertExpectations(suite.T())
 		col2ApiClient.AssertExpectations(suite.T())
-		suite.snapshot.AssertNumberOfCalls(suite.T(), "Clusters", 2)
+		epoch.AssertNumberOfCalls(suite.T(), "Clustering", 2)
 
 		// additionally do a GetTransaction request for the two transactions
 		getTx := func(tx flow.TransactionBody) {

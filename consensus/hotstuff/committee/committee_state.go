@@ -115,12 +115,7 @@ func (c *Committee) Self() flow.Identifier {
 
 // DKG returns the DKG info for the given block.
 func (c *Committee) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
-
-	epoch, err := c.protocolState.AtBlockID(blockID).EpochCounter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch counter: %w", err)
-	}
-	dkg, err := c.protocolState.AtBlockID(blockID).Epoch(epoch).DKG()
+	dkg, err := c.protocolState.AtBlockID(blockID).Epochs().Current().DKG()
 	return dkg, err
 }
 
