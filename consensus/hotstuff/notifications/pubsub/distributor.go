@@ -16,6 +16,14 @@ type Distributor struct {
 	lock        sync.RWMutex
 }
 
+func (p *Distributor) OnEventProcessed() {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnEventProcessed()
+	}
+}
+
 func NewDistributor() *Distributor {
 	return &Distributor{}
 }
@@ -27,19 +35,59 @@ func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.subscribers = append(p.subscribers, consumer)
 }
 
-func (p *Distributor) OnSkippedAhead(view uint64) {
+func (p *Distributor) OnReceiveVote(currentView uint64, vote *model.Vote) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnSkippedAhead(view)
+		subscriber.OnReceiveVote(currentView, vote)
 	}
 }
 
-func (p *Distributor) OnEnteringView(view uint64) {
+func (p *Distributor) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnEnteringView(view)
+		subscriber.OnReceiveProposal(currentView, proposal)
+	}
+}
+
+func (p *Distributor) OnEnteringView(view uint64, leader flow.Identifier) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnEnteringView(view, leader)
+	}
+}
+
+func (p *Distributor) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnQcTriggeredViewChange(qc, newView)
+	}
+}
+
+func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnProposingBlock(proposal)
+	}
+}
+
+func (p *Distributor) OnVoting(vote *model.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnVoting(vote)
+	}
+}
+
+func (p *Distributor) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnQcConstructedFromVotes(qc)
 	}
 }
 

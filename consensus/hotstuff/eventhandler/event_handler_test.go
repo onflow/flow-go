@@ -19,7 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/trace"
 )
 
 const (
@@ -80,7 +79,7 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 	}
 	pm := NewTestPaceMaker(t, view, timeout.NewController(tc), notifier)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
-	notifier.On("OnSkippedAhead", mock.Anything).Return()
+	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnReachedTimeout", mock.Anything).Return()
 	pm.Start()
 	return pm
@@ -351,7 +350,6 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	eventhandler, err := eventhandler.New(
 		zerolog.New(os.Stderr),
-		trace.NewNoopTracer(),
 		es.paceMaker,
 		es.blockProducer,
 		es.forks,

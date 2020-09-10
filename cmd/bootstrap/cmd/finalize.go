@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"encoding/hex"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
@@ -13,17 +16,19 @@ import (
 )
 
 var (
-	flagConfig             string
-	flagCollectionClusters uint
-	flagPartnerNodeInfoDir string
-	flagPartnerStakes      string
-	flagFastKG             bool
-	flagRootChain          string
-	flagRootParent         string
-	flagRootHeight         uint64
-	flagRootTimestamp      string
-	flagRootCommit         string
-	flagEpochCounter       uint64
+	flagConfig                      string
+	flagCollectionClusters          uint
+	flagPartnerNodeInfoDir          string
+	flagPartnerStakes               string
+	flagFastKG                      bool
+	flagRootChain                   string
+	flagRootParent                  string
+	flagRootHeight                  uint64
+	flagRootTimestamp               string
+	flagRootCommit                  string
+	flagEpochCounter                uint64
+	flagServiceAccountPublicKeyJSON string
+	flagGenesisTokenSupply          string
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -57,6 +62,28 @@ and block seal.`,
 		log.Info().Msg("running DKG for consensus nodes")
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
+
+		var commit []byte
+		if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
+			log.Info().Msg("generating empty execution state")
+
+			var err error
+			serviceAccountPublicKey := flow.AccountPublicKey{}
+			err = serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
+			if err != nil {
+				log.Fatal().Err(err).Msg("unable to parse the service account public key json")
+			}
+			value, err := cadence.NewUFix64(flagGenesisTokenSupply)
+			if err != nil {
+				log.Fatal().Err(err).Msg("invalid genesis token supply")
+			}
+			commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
+			if err != nil {
+				log.Fatal().Err(err).Msg("unable to generate execution state")
+			}
+			flagRootCommit = hex.EncodeToString(commit)
+			log.Info().Msg("")
+		}
 
 		log.Info().Msg("constructing root block")
 		block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
@@ -127,6 +154,12 @@ func init() {
 	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation "+
 		"instead of DKG")
 
+	// these two flags are only used when setup a network from genesis
+	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
+		"{\"PublicKey\":\"ABCDEFGHIJK\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}",
+		"encoded json of public key for the service account")
+	finalizeCmd.Flags().StringVar(&flagGenesisTokenSupply, "genesis-token-supply", "10000000.00000000",
+		"genesis flow token supply")
 }
 
 func assemblePartnerNodes() []model.NodeInfo {

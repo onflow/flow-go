@@ -106,7 +106,7 @@ func (es *EpochCommitSnapshot) ClusterInformation(index uint32) (protocol.Cluste
 		index:     index,
 		counter:   epochCounter,
 		members:   members,
-		rootBlock: cluster.CanonicalClusterRootBlock(epochCounter, members),
+		rootBlock: cluster.CanonicalRootBlock(epochCounter, members),
 		rootQC:    rootQC,
 	}
 

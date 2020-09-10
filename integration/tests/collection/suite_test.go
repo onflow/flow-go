@@ -313,7 +313,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 
 	setup, ok := suite.net.Seal().ServiceEvents[1].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
-	rootBlock := clusterstate.CanonicalClusterRootBlock(setup.Counter, myCluster)
+	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
 
 	db, err := node.DB()

@@ -16,7 +16,7 @@ func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*clust
 			panic(fmt.Sprintf("failed to get cluster by index: %v", i))
 		}
 
-		clusterBlocks[i] = clusterstate.CanonicalClusterRootBlock(epoch, cluster)
+		clusterBlocks[i] = clusterstate.CanonicalRootBlock(epoch, cluster)
 	}
 	return clusterBlocks
 }

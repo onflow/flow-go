@@ -16,6 +16,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/integration/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -34,6 +35,8 @@ func main() {
 	access := flag.String("access", "localhost:3569", "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
+	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
+	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 	flag.Parse()
 
 	// parse log level and apply to logger
@@ -43,6 +46,10 @@ func main() {
 		log.Fatal().Err(err).Msg("invalid log level")
 	}
 	log = log.Level(lvl)
+
+	server := metrics.NewServer(log, *metricport, *profilerEnabled)
+	<-server.Ready()
+	loaderMetrics := metrics.NewLoaderCollector()
 
 	accessNodeAddrs := strings.Split(*access, ",")
 
@@ -76,9 +83,19 @@ func main() {
 		time.Sleep(*sleep)
 	}
 
-	flowClient, err := client.New(accessNodeAddrs[0], grpc.WithInsecure())
+	loadedAccessAddr := accessNodeAddrs[0]
+	flowClient, err := client.New(loadedAccessAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
+	}
+
+	supervisorAccessAddr := accessNodeAddrs[0]
+	if len(accessNodeAddrs) > 1 {
+		supervisorAccessAddr = accessNodeAddrs[1]
+	}
+	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure())
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
 	}
 
 	go func() {
@@ -86,11 +103,17 @@ func main() {
 		for i, c := range cases {
 			log.Info().Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
+			loaderMetrics.SetTPSConfigured(c.tps)
+
+			var lg *utils.ContLoadGenerator
 			if c.tps > 0 {
-				lg, err := utils.NewContLoadGenerator(
+				var err error
+				lg, err = utils.NewContLoadGenerator(
 					log,
+					loaderMetrics,
 					flowClient,
-					accessNodeAddrs[0],
+					supervisorClient,
+					loadedAccessAddr,
 					priv,
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
@@ -114,6 +137,10 @@ func main() {
 			}
 
 			time.Sleep(c.duration)
+
+			if lg != nil {
+				lg.Stop()
+			}
 		}
 	}()
 
@@ -135,10 +162,16 @@ func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []Loa
 	}
 
 	tpsDurationsStrings := strings.Split(*tpsDurationsFlag, ",")
-	for i, _ := range cases {
+	for i := range cases {
 		if i >= len(tpsDurationsStrings) {
 			break
 		}
+
+		// ignore empty entries (implying that case will run indefinitely)
+		if tpsDurationsStrings[i] == "" {
+			continue
+		}
+
 		d, err := time.ParseDuration(tpsDurationsStrings[i])
 		if err != nil {
 			log.Fatal().Err(err).Str("value", tpsDurationsStrings[i]).

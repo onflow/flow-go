@@ -216,7 +216,7 @@ func TestSyncFlow(t *testing.T) {
 	exeNode2.IngestionEngine.Submit(conID.NodeID, proposal2)
 
 	// wait for block2 to be executed on execNode2
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		ebMutex.RLock()
 		defer ebMutex.RUnlock()
 
@@ -235,7 +235,7 @@ func TestSyncFlow(t *testing.T) {
 	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal4)
 
 	// wait for block3/4 to be executed on execNode1
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		ebMutex.RLock()
 		defer ebMutex.RUnlock()
 
@@ -279,7 +279,7 @@ func TestSyncFlow(t *testing.T) {
 
 	// submit block5, to make sure we're still processing any incoming blocks after sync is complete
 	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal5)
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		ebMutex.RLock()
 		defer ebMutex.RUnlock()
 

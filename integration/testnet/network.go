@@ -749,7 +749,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 
 	for _, cluster := range clusters {
 		// generate root cluster block
-		block := clusterstate.CanonicalClusterRootBlock(epochCounter, cluster)
+		block := clusterstate.CanonicalRootBlock(epochCounter, cluster)
 
 		lookup := make(map[flow.Identifier]struct{})
 		for _, node := range cluster {

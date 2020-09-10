@@ -21,6 +21,9 @@ type Conduit interface {
 	// nodes. It's possible that the event traverses other nodes than the target
 	// nodes on its path across the network. The network codec needs to be aware
 	// of how to encode the given event type, otherwise the send will fail.
+	//
+	// Note: Submit method is planned for deprecation soon.
+	// Alternative methods are recommended, e.g., Publish, Unicast, and Multicast.
 	Submit(event interface{}, targetIDs ...flow.Identifier) error
 
 	// Publish submits an event to the network layer for unreliable delivery
