@@ -132,7 +132,7 @@ func (as *AggregatorSuite) SetupTest() {
 
 func (as *AggregatorSuite) MockProtocolByBlockID(id flow.Identifier) {
 	// force reading the seed from root qc instead of protocol state
-	as.snapshot.On("RandomSource", mock.Anything, mock.Anything, mock.Anything).Return(nil, state.NewNoValidChildBlockError(""))
+	as.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nil, state.NewNoValidChildBlockError(""))
 	as.protocol.On("AtBlockID", id).Return(as.snapshot)
 }
 
