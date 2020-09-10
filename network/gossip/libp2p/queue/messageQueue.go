@@ -55,7 +55,7 @@ func (mq *MessageQueueImpl) Insert(message interface{}) error {
 	item := &item{
 		message:   message,
 		priority:  int(priority),
-		timestamp: time.Now().UnixNano(),
+		timestamp: time.Now(),
 	}
 
 	// lock the underlying mutex
@@ -92,7 +92,7 @@ func (mq *MessageQueueImpl) Remove() interface{} {
 
 	// record metrics
 	mq.metrics.MessageRemoved(item.priority)
-	mq.metrics.QueueDuration(time.Duration(time.Now().UnixNano()-item.timestamp), item.priority)
+	mq.metrics.QueueDuration(time.Since(item.timestamp), item.priority)
 
 	return item.message
 }

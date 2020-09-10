@@ -141,9 +141,6 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 		// remember insertion order to check later
 		queues[p] = append(queues[p], msg)
-
-		// sleep to make sure two consecutive elements don't get the same timestamp
-		time.Sleep(1 * time.Millisecond)
 	}
 
 	// create a slice of the expected messages in the order in which they are expected

@@ -60,9 +60,9 @@ func NewNetworkCollector() *NetworkCollector {
 		queueDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "message_queue_duration_millis",
-			Help:      "duration [millis; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
-			Buckets:   []float64{10, 100, 500, 1000, 2000, 5000},
+			Name:      "message_queue_duration_seconds",
+			Help:      "duration [seconds; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
+			Buckets:   []float64{0.1, 0.5, 1, 2, 5}, // 100ms, 500ms, 1s, 2s, 5s
 		}, []string{LabelPriority}),
 	}
 
@@ -95,5 +95,5 @@ func (nc *NetworkCollector) MessageRemoved(priority int) {
 }
 
 func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) {
-	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(float64(duration.Milliseconds()))
+	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(float64(duration.Milliseconds()) / float64(1000))
 }
