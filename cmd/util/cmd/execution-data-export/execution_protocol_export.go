@@ -84,6 +84,7 @@ func ExportEvents(blockID flow.Identifier, dbPath string) {
 	// }
 
 	var activeBlockID flow.Identifier
+	activeBlockID = blockID
 	done := false
 
 	for !done {
