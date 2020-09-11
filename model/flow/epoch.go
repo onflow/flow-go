@@ -257,6 +257,9 @@ func NewEpochStatus(currentSetup, currentCommit, nextSetup, nextCommit Identifie
 // Phase returns the phase for the CURRENT epoch, given this epoch status.
 func (es *EpochStatus) Phase() EpochPhase {
 
+	if es == nil {
+		return EpochPhaseUnknown
+	}
 	// invalid for any current epoch events to be empty
 	if es.CurrentEpoch.Setup == ZeroID || es.CurrentEpoch.Commit == ZeroID {
 		return EpochPhaseUnknown

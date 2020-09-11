@@ -24,39 +24,44 @@ import (
 // seed or pending children. A block snapshot can lazily convert to an epoch snapshot in
 // order to make data associated directly with epochs accessible through its API.
 type Snapshot struct {
-	state       *State
-	header      *flow.Header
-	setupEvent  *flow.EpochSetup
-	commitEvent *flow.EpochCommit
+	state   *State
+	err     error           // cache any errors on the snapshot
+	blockID flow.Identifier // reference block for this snapshot
 }
 
-func NewSnapshot(state *State, header *flow.Header, setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *Snapshot {
+func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
-		state:       state,
-		header:      header,
-		setupEvent:  setupEvent,
-		commitEvent: commitEvent,
+		state:   state,
+		blockID: blockID,
 	}
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
-	return s.header, nil
+	head, err := s.state.headers.ByBlockID(s.blockID)
+	return head, err
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
-
-	epochState, err := s.state.epochStatuses.ByBlockID(s.header.ID())
-	if err != nil {
-		return flow.EpochPhaseUnknown, fmt.Errorf("could not get epoch state: %w", err)
-	}
-	return epochState.Phase(), nil
+	status, err := s.state.epochStatuses.ByBlockID(s.blockID)
+	return status.Phase(), err
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+
+	status, err := s.state.epochStatuses.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	setup, err := s.state.setups.ByID(status.CurrentEpoch.Setup)
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: CAUTION SHORTCUT
 	// We report the initial identities as of the EpochSetup event here.
 	// Only valid as long as we don't have slashing
-	identities := s.setupEvent.Participants.Filter(selector)
+	identities := setup.Participants.Filter(selector)
 
 	// apply a deterministic sort to the participants
 	sort.Slice(identities, func(i int, j int) bool {
@@ -84,7 +89,7 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 // commitment represents the execution state as currently finalized.
 func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	// get the ID of the sealed block
-	seal, err := s.state.seals.ByBlockID(s.header.ID())
+	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get look up sealed commit: %w", err)
 	}
@@ -92,7 +97,7 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 }
 
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
-	return s.pending(s.header.ID())
+	return s.pending(s.blockID)
 }
 
 func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
@@ -117,7 +122,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
 	// get the current state snapshot head
 	var childrenIDs []flow.Identifier
-	err := s.state.db.View(procedure.LookupBlockChildren(s.header.ID(), &childrenIDs))
+	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childrenIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}
@@ -176,44 +181,74 @@ type EpochQuery struct {
 
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
-	return q.ByCounter(q.snap.setupEvent.Counter)
+	status, err := q.snap.state.epochStatuses.ByBlockID(q.snap.blockID)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	setup, err := q.snap.state.setups.ByID(status.CurrentEpoch.Setup)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	commit, err := q.snap.state.commits.ByID(status.CurrentEpoch.Commit)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	return NewCommittedEpoch(setup, commit)
 }
 
 // Next returns the next epoch.
 func (q *EpochQuery) Next() protocol.Epoch {
-	return q.ByCounter(q.snap.setupEvent.Counter + 1)
+	status, err := q.snap.state.epochStatuses.ByBlockID(q.snap.blockID)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	setup, err := q.snap.state.setups.ByID(status.CurrentEpoch.Setup)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	return q.ByCounter(setup.Counter + 1)
 }
 
 // ByCounter returns the epoch with the given counter.
 func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
+
+	// get the current setup/commit events
+	status, err := q.snap.state.epochStatuses.ByBlockID(q.snap.blockID)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	currentSetup, err := q.snap.state.setups.ByID(status.CurrentEpoch.Setup)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	currentCommit, err := q.snap.state.commits.ByID(status.CurrentEpoch.Commit)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+
 	switch {
-	case counter < q.snap.setupEvent.Counter:
+	case counter < currentSetup.Counter:
 		// we currently only support snapshots of the current and next Epoch
 		return NewInvalidEpoch(fmt.Errorf("past epoch"))
-	case counter == q.snap.setupEvent.Counter:
-		return NewCommittedEpoch(q.snap.setupEvent, q.snap.commitEvent)
-	case counter == q.snap.setupEvent.Counter+1:
-		epochStatus, err := q.snap.state.epochStatuses.ByBlockID(q.snap.header.ID())
-		if err != nil {
-			return NewInvalidEpoch(fmt.Errorf("failed to retrieve epoch state for head: %w", err))
-		}
-
-		if epochStatus.NextEpoch.Setup == flow.ZeroID {
+	case counter == currentSetup.Counter:
+		return NewCommittedEpoch(currentSetup, currentCommit)
+	case counter == currentSetup.Counter+1:
+		if status.NextEpoch.Setup == flow.ZeroID {
 			return NewInvalidEpoch(fmt.Errorf("epoch still undefined"))
 		}
-		setupEvent, err := q.snap.state.setups.ByID(epochStatus.NextEpoch.Setup)
+		nextSetup, err := q.snap.state.setups.ByID(status.NextEpoch.Setup)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
 		}
 
-		if epochStatus.NextEpoch.Commit == flow.ZeroID {
-			return NewSetupEpoch(setupEvent)
+		if status.NextEpoch.Commit == flow.ZeroID {
+			return NewSetupEpoch(nextSetup)
 		}
-		commitEvent, err := q.snap.state.commits.ByID(epochStatus.NextEpoch.Commit)
+		nextCommit, err := q.snap.state.commits.ByID(status.NextEpoch.Commit)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
 		}
-		return NewCommittedEpoch(setupEvent, commitEvent)
+		return NewCommittedEpoch(nextSetup, nextCommit)
 	default:
 		// we currently only support snapshots of the current and next Epoch
 		return NewInvalidEpoch(fmt.Errorf("epoch too far in future"))

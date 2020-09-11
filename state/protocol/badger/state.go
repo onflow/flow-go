@@ -88,23 +88,7 @@ func (s *State) AtHeight(height uint64) protocol.Snapshot {
 }
 
 func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
-	header, err := s.headers.ByBlockID(blockID)
-	if err != nil {
-		return NewInvalidSnapshot(fmt.Errorf("failed to retrieve block header: %w", err))
-	}
-	epochStatus, err := s.epochStatuses.ByBlockID(blockID)
-	if err != nil {
-		return NewInvalidSnapshot(fmt.Errorf("failed to retrieve epoch state: %w", err))
-	}
-	setupEvent, err := s.setups.ByID(epochStatus.CurrentEpoch.Setup)
-	if err != nil {
-		return NewInvalidSnapshot(fmt.Errorf("failed to retrieve setup event for epoch: %w", err))
-	}
-	commitEvent, err := s.commits.ByID(epochStatus.CurrentEpoch.Commit)
-	if err != nil {
-		return NewInvalidSnapshot(fmt.Errorf("failed to retrieve commit event for epoch: %w", err))
-	}
-	return NewSnapshot(s, header, setupEvent, commitEvent)
+	return NewSnapshot(s, blockID)
 }
 
 func (s *State) Mutate() protocol.Mutator {
