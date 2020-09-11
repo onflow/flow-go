@@ -40,7 +40,8 @@ type transactionInContext struct {
 
 // ExportExecutedTransactions exports executed transactions
 func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPath string) error {
-	// traverse backward (parent block) and fetch by blockHash
+
+	// traverse backward from the given block (parent block) and fetch by blockHash
 	db := common.InitStorage(dbPath)
 	defer db.Close()
 
