@@ -1,6 +1,9 @@
 package delta
 
 import (
+	"fmt"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -103,10 +106,9 @@ func (v *View) NewChild() *View {
 func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	value, exists := v.delta.Get(owner, controller, key)
 	if exists {
-		// every time we read a value (order preserving)
-		// we append the value to the end of the SpocksSecret byte slice
-		v.spockSecret = append(v.spockSecret, value...)
-		return value, nil
+		// every time we read a value (order preserving) we update spock
+		err := v.updateSpock(value)
+		return value, err
 	}
 
 	value, err := v.readFunc(owner, controller, key)
@@ -120,24 +122,40 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	// increase reads
 	v.readsCount++
 
-	// every time we read a value (order preserving)
-	// we append the value to the end of the SpocksSecret byte slice
-	v.spockSecret = append(v.spockSecret, value...)
-	return value, nil
+	// every time we read a value (order preserving) we update spock
+	err = v.updateSpock(value)
+	return value, err
 }
 
 // Set sets a register value in this view.
 func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
-	// every time we write something to delta (order preserving)
-	// we append the value to the end of the SpocksSecret byte slice
-	v.spockSecret = append(v.spockSecret, value...)
-	// capture register touch
+	// every time we write something to delta (order preserving) we update spock
+	// TODO return the error and handle it properly on other places
+	err := v.updateSpock(value)
+	if err != nil {
+		panic(err)
+	}
 
+	// capture register touch
 	k := state.RegisterID(owner, controller, key)
 
 	v.regTouchSet[string(k)] = true
 	// add key value to delta
 	v.delta.Set(owner, controller, key, value)
+}
+
+func (v *View) updateSpock(value []byte) error {
+	hasher := hash.NewSHA3_256()
+	_, err := hasher.Write(v.spockSecret)
+	if err != nil {
+		return fmt.Errorf("error updating spock secret data (step1): %w", err)
+	}
+	_, err = hasher.Write(value)
+	if err != nil {
+		return fmt.Errorf("error updating spock secret data (step2): %w", err)
+	}
+	v.spockSecret = hasher.SumHash()
+	return nil
 }
 
 // Touch explicitly adds a register to the touched registers set.
@@ -153,7 +171,6 @@ func (v *View) Touch(owner, controller, key string) {
 
 // Delete removes a register in this view.
 func (v *View) Delete(owner, controller, key string) {
-
 	v.delta.Delete(owner, controller, key)
 }
 
@@ -170,7 +187,7 @@ func (v *View) MergeView(child *View) {
 		v.regTouchSet[string(k)] = true
 	}
 	// SpockSecret is order aware
-	v.spockSecret = append(v.spockSecret, child.spockSecret...)
+	v.updateSpock(child.spockSecret)
 	v.delta.MergeWith(child.delta)
 }
 
