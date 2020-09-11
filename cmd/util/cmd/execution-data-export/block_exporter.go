@@ -45,8 +45,6 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) err
 	blocks := badger.NewBlocks(db, headers, payloads)
 
 	activeBlockID := blockID
-	done := false
-
 	outputFile := filepath.Join(outputPath, "blocks.jsonl")
 
 	fi, err := os.Create(outputFile)
@@ -58,17 +56,17 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) err
 	blockWriter := bufio.NewWriter(fi)
 	defer blockWriter.Flush()
 
-	for !done {
+	for {
 		header, err := headers.ByBlockID(activeBlockID)
 		if err != nil {
 			// no more header is available
-			done = true
+			return nil
 		}
 
 		block, err := blocks.ByID(activeBlockID)
 		if err != nil {
 			// log.Fatal().Err(err).Msg("could not load block")
-			done = true
+			return nil
 		}
 
 		parentVoterIDs := make([]string, 0)
@@ -114,5 +112,4 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) err
 
 		activeBlockID = header.ParentID
 	}
-	return nil
 }

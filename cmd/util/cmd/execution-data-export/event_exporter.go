@@ -35,10 +35,8 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 	headers := badger.NewHeaders(cacheMetrics, db)
 	events := badger.NewEvents(db)
 	activeBlockID := blockID
-	done := false
 
 	outputFile := filepath.Join(outputPath, "events.jsonl")
-
 	fi, err := os.Create(outputFile)
 	if err != nil {
 		return fmt.Errorf("could not create event output file %w", err)
@@ -48,11 +46,11 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 	eventWriter := bufio.NewWriter(fi)
 	defer eventWriter.Flush()
 
-	for !done {
+	for {
 		header, err := headers.ByBlockID(activeBlockID)
 		if err != nil {
 			// no more header is available
-			done = true
+			return nil
 		}
 
 		evs, err := events.ByBlockID(activeBlockID)
@@ -82,5 +80,4 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 		}
 		activeBlockID = header.ParentID
 	}
-	return nil
 }

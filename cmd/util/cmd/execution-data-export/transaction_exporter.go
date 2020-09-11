@@ -59,8 +59,6 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	collections := badger.NewCollections(db, transactions)
 
 	activeBlockID := blockID
-	done := false
-
 	outputFile := filepath.Join(outputPath, "transactions.jsonl")
 
 	fi, err := os.Create(outputFile)
@@ -72,11 +70,11 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	txWriter := bufio.NewWriter(fi)
 	defer txWriter.Flush()
 
-	for !done {
+	for {
 		header, err := headers.ByBlockID(activeBlockID)
 		if err != nil {
 			// no more header is available
-			done = true
+			return nil
 		}
 
 		block, err := blocks.ByID(activeBlockID)
@@ -151,7 +149,6 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 		}
 		activeBlockID = header.ParentID
 	}
-	return nil
 }
 
 func computeEnvelopeSize(tx *flow.TransactionBody) int {
