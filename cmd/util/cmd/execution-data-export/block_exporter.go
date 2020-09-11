@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/rs/zerolog/log"
 )
 
 type blockSummary struct {
@@ -68,7 +67,7 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) err
 
 		block, err := blocks.ByID(activeBlockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not load block")
+			// log.Fatal().Err(err).Msg("could not load block")
 			done = true
 		}
 
