@@ -17,17 +17,17 @@ type EpochStatuses struct {
 func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatuses {
 
 	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
-		id := key.(flow.Identifier)
-		state := val.(*flow.EpochStatus)
-		return operation.InsertEpochStatus(id, state)
+		blockID := key.(flow.Identifier)
+		status := val.(*flow.EpochStatus)
+		return operation.InsertEpochStatus(blockID, status)
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		id := key.(flow.Identifier)
-		var state flow.EpochStatus
+		blockID := key.(flow.Identifier)
+		var status flow.EpochStatus
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := operation.RetrieveEpochStatus(id, &state)(tx)
-			return &state, err
+			err := operation.RetrieveEpochStatus(blockID, &status)(tx)
+			return &status, err
 		}
 	}
 
@@ -37,19 +37,14 @@ func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatus
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve),
-			withResource(metrics.ResourceEpochState)),
+			withResource(metrics.ResourceEpochStatus)),
 	}
 
 	return es
 }
 
-// TODO: can we remove this method? Its not contained in the interface.
-func (es *EpochStatuses) Store(blockID flow.Identifier, state *flow.EpochStatus) error {
-	return operation.RetryOnConflict(es.db.Update, es.StoreTx(blockID, state))
-}
-
-func (es *EpochStatuses) StoreTx(blockID flow.Identifier, state *flow.EpochStatus) func(tx *badger.Txn) error {
-	return es.cache.Put(blockID, state)
+func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStatus) func(tx *badger.Txn) error {
+	return es.cache.Put(blockID, status)
 }
 
 func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*flow.EpochStatus, error) {

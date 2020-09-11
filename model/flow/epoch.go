@@ -203,7 +203,7 @@ type EpochStatus struct {
 	NextEpoch    EventIDs // Epoch Preparation Events for the next Epoch
 }
 
-func NewEpochState(currentSetup, currentCommit, nextSetup, nextCommit Identifier) *EpochStatus {
+func NewEpochStatus(currentSetup, currentCommit, nextSetup, nextCommit Identifier) *EpochStatus {
 	return &EpochStatus{
 		CurrentEpoch: EventIDs{
 			Setup:  currentSetup,
