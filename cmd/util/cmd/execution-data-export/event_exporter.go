@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/rs/zerolog/log"
 )
 
 type event struct {
@@ -42,7 +41,7 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 
 	fi, err := os.Create(outputFile)
 	if err != nil {
-		return fmt.Errorf("could not create transaction output file %w", err)
+		return fmt.Errorf("could not create event output file %w", err)
 	}
 	defer fi.Close()
 
@@ -58,7 +57,7 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 
 		evs, err := events.ByBlockID(activeBlockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not fetch events")
+			return fmt.Errorf("could not fetch events %w", err)
 		}
 
 		for _, ev := range evs {

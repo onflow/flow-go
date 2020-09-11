@@ -5,27 +5,35 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
 
-	"github.com/rs/zerolog"
-
+	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+	"github.com/rs/zerolog/log"
 )
 
-func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
-	return commits.ByBlockID(blockHash)
-}
+// ExportLedger exports ledger key value pairs at the given blockID
+func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, outputPath string) error {
+	db := common.InitStorage(dbPath)
+	defer db.Close()
 
-func exportExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
+	cache := &metrics.NoopCollector{}
+	commits := badger.NewCommits(cache, db)
 
-	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, ledger.RegisterKeySize, wal.SegmentSize)
+	targetHash, err := commits.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("cannot get state commitment for block: %w", err)
+	}
+
+	w, err := wal.NewWAL(nil, nil, ledgerPath, ledger.CacheSize, ledger.RegisterKeySize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -33,19 +41,17 @@ func exportExecutionState(dir string, targetHash flow.StateCommitment, outputDir
 		_ = w.Close()
 	}()
 
-	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, outputDir, 1000, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
+	// TODO port this to use new forest
+	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, outputPath, 1000, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
 	if err != nil {
 		return fmt.Errorf("cannot create mForest: %w", err)
 	}
 
 	i := 0
-
 	valuesSize := 0
 	valuesCount := 0
 	startTime := time.Now()
-
 	found := false
-
 	FoundHashError := fmt.Errorf("found hash %s", targetHash)
 
 	err = w.ReplayLogsOnly(
@@ -103,6 +109,6 @@ func exportExecutionState(dir string, targetHash flow.StateCommitment, outputDir
 	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished seeking")
 	log.Info().Msg("writing root checkpoint")
 
-	mForest.DumpTrieAsJSON(targetHash, outputDir+"/"+hex.EncodeToString(targetHash)+".trie.txt")
+	mForest.DumpTrieAsJSON(targetHash, filepath.Join(outputPath, hex.EncodeToString(targetHash)+".trie.jsonl"))
 	return nil
 }

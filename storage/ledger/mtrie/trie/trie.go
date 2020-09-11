@@ -448,7 +448,8 @@ func (mt *MTrie) DumpAsJSON(path string) error {
 
 func (mt *MTrie) dumpAsJSON(n *node.Node, writer *bufio.Writer) error {
 	if key := n.Key(); key != nil {
-		str := "{\"key\": \"" + hex.EncodeToString(key) + "\", \"value\": \"" + hex.EncodeToString(n.Value()) + "\"}\n"
+		str := "{\"key\": \"" + hex.EncodeToString(key) +
+			"\", \"value\": \"" + hex.EncodeToString(n.Value()) + "\"}\n"
 		_, err := writer.WriteString(str)
 		if err != nil {
 			return err
