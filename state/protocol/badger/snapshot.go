@@ -25,7 +25,6 @@ import (
 // order to make data associated directly with epochs accessible through its API.
 type Snapshot struct {
 	state   *State
-	err     error           // cache any errors on the snapshot
 	blockID flow.Identifier // reference block for this snapshot
 }
 
