@@ -57,9 +57,6 @@ func (m *MeshEngineTestSuite) SetupTest() {
 	nets, err := createNetworks(logger, m.mws, m.ids, cacheSize, false)
 	require.NoError(m.Suite.T(), err)
 	m.nets = nets
-
-	// allows nodes to find each other
-	time.Sleep(5 * time.Second)
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -152,6 +149,9 @@ func (m *MeshEngineTestSuite) TestMaxMessageSize_Publish() {
 // each engine x then sends a "hello from node x" to other engines
 // it evaluates the correctness of message delivery as well as content of the message
 func (m *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) {
+	// allows nodes to find each other in case of Mulitcast and Publish
+	optionalSleep(send)
+
 	// creating engines
 	count := len(m.nets)
 	engs := make([]*MeshEngine, 0)

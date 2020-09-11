@@ -8,6 +8,7 @@ const (
 	LabelMessage  = "message"
 	LabelNodeID   = "nodeid"
 	LabelNodeRole = "noderole"
+	LabelPriority = "priority"
 )
 
 const (
