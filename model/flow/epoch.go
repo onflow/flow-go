@@ -2,7 +2,9 @@ package flow
 
 import (
 	"encoding/json"
+	"io"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -126,6 +128,35 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 	return nil
 }
 
+// EncodeRLP encodes the commit as RLP. The RLP encoding needs to be handled
+// differently from JSON/msgpack, because it does not handle custom encoders
+// within map types.
+func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
+	rlpEncodable := struct {
+		Counter         uint64
+		ClusterQCs      []*QuorumCertificate
+		DKGGroupKey     []byte
+		DKGParticipants []struct {
+			NodeID []byte
+			Part   encodableDKGParticipant
+		}
+	}{
+		Counter:     commit.Counter,
+		ClusterQCs:  commit.ClusterQCs,
+		DKGGroupKey: commit.DKGGroupKey.Encode(),
+	}
+	for nodeID, part := range commit.DKGParticipants {
+		rlpEncodable.DKGParticipants = append(rlpEncodable.DKGParticipants, struct {
+			NodeID []byte
+			Part   encodableDKGParticipant
+		}{
+			NodeID: nodeID[:],
+			Part:   encodableFromDKGParticipant(part),
+		})
+	}
+	return rlp.Encode(w, rlpEncodable)
+}
+
 // ID returns the hash of the event contents.
 func (commit *EpochCommit) ID() Identifier {
 	return MakeID(commit)
@@ -183,6 +214,10 @@ func (part *DKGParticipant) UnmarshalMsgpack(b []byte) error {
 	}
 	*part = dkgParticipantFromEncodable(enc)
 	return nil
+}
+
+func (part DKGParticipant) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, encodableFromDKGParticipant(part))
 }
 
 // EpochStatus represents the status of the current and next epoch with respect

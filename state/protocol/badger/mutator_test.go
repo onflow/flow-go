@@ -609,12 +609,15 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err := state.Mutate().Bootstrap(root, rootResult, rootSeal)
 		require.Nil(t, err)
 
+		// we should begin the epoch in the staking phase
+		phase, err := state.AtBlockID(root.ID()).Phase()
+		assert.Nil(t, err)
+		assert.Equal(t, flow.EpochPhaseStaking, phase)
+
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(root.Header)
 		block1.SetPayload(flow.Payload{})
 		err = state.Mutate().Extend(&block1)
-		require.Nil(t, err)
-		err = state.Mutate().Finalize(block1.ID())
 		require.Nil(t, err)
 
 		epoch1Setup := rootSeal.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -648,17 +651,22 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Mutate().Extend(&block2)
 		require.Nil(t, err)
 
+		// now that the setup event has been emitted, we should be in the setup phase
+		phase, err = state.AtBlockID(block2.ID()).Phase()
+		assert.Nil(t, err)
+		assert.Equal(t, flow.EpochPhaseSetup, phase)
+
 		// we should NOT be able to query epoch 2 wrt block 1
 		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
-		require.Error(t, err)
+		assert.Error(t, err)
 		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
-		require.Error(t, err)
+		assert.Error(t, err)
 
 		// we should be able to query epoch 2 wrt block 2
 		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
-		require.Nil(t, err)
+		assert.Nil(t, err)
 		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
-		require.Nil(t, err)
+		assert.Nil(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
 		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
@@ -696,6 +704,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
 		assert.Nil(t, err)
 
+		// how that the commit event has been emitted, we should be in the committed phase
+		phase, err = state.AtBlockID(block3.ID()).Phase()
+		assert.Nil(t, err)
+		assert.Equal(t, flow.EpochPhaseCommitted, phase)
+
 		// we should still be in epoch 1
 		epochCounter, err := state.AtBlockID(block3.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
@@ -727,6 +740,92 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		epochCounter, err = state.AtBlockID(block5.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
 		assert.Equal(t, epoch2Setup.Counter, epochCounter)
+
+		// we should begin epoch 2 in staking phase
+		// how that the commit event has been emitted, we should be in the committed phase
+		phase, err = state.AtBlockID(block5.ID()).Phase()
+		assert.Nil(t, err)
+		assert.Equal(t, flow.EpochPhaseStaking, phase)
+	})
+}
+
+// we should be able to have conflicting forks with two different instances of
+// the same service event for the same epoch
+//
+//        /-->BLOCK1-->BLOCK3
+// ROOT --+
+//        \-->BLOCK2-->BLOCK4
+//
+func TestExtendConflictingEpochEvents(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		// first bootstrap with the initial epoch
+		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(root, rootResult, rootSeal)
+		require.Nil(t, err)
+
+		// add two conflicting blocks for each service event to reference
+		block1 := unittest.BlockWithParentFixture(root.Header)
+		block1.SetPayload(flow.Payload{})
+		err = state.Mutate().Extend(&block1)
+		require.Nil(t, err)
+		block2 := unittest.BlockWithParentFixture(root.Header)
+		block2.SetPayload(flow.Payload{})
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		rootSetup := rootSeal.ServiceEvents[0].Event.(*flow.EpochSetup)
+
+		// create two conflicting epoch setup events for the next epoch (final view differs)
+		nextEpochSetup1 := unittest.EpochSetupFixture(
+			unittest.WithParticipants(rootSetup.Participants),
+			unittest.SetupWithCounter(rootSetup.Counter+1),
+			unittest.WithFinalView(rootSetup.FinalView+1000),
+		)
+		nextEpochSetup2 := unittest.EpochSetupFixture(
+			unittest.WithParticipants(rootSetup.Participants),
+			unittest.SetupWithCounter(rootSetup.Counter+1),
+			unittest.WithFinalView(rootSetup.FinalView+2000),
+		)
+
+		// create one seal containing the first setup event
+		seal1 := unittest.SealFixture(
+			unittest.SealWithBlockID(block1.ID()),
+			unittest.WithInitalState(rootSeal.FinalState),
+			unittest.WithServiceEvents(nextEpochSetup1.ServiceEvent()),
+		)
+
+		// create another seal containing the second setup event
+		seal2 := unittest.SealFixture(
+			unittest.SealWithBlockID(block2.ID()),
+			unittest.WithInitalState(rootSeal.FinalState),
+			unittest.WithServiceEvents(nextEpochSetup2.ServiceEvent()),
+		)
+
+		// block 3 builds on block 1, contains setup event 1
+		block3 := unittest.BlockWithParentFixture(block1.Header)
+		block3.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal1},
+		})
+		err = state.Mutate().Extend(&block3)
+		require.Nil(t, err)
+
+		// block 4 builds on block 2, contains setup event 2
+		block4 := unittest.BlockWithParentFixture(block2.Header)
+		block4.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal2},
+		})
+		err = state.Mutate().Extend(&block4)
+		require.Nil(t, err)
+
+		// should be able query each epoch from the appropriate reference block
+		setup1FinalView, err := state.AtBlockID(block3.ID()).Epochs().Next().FinalView()
+		assert.Nil(t, err)
+		assert.Equal(t, nextEpochSetup1.FinalView, setup1FinalView)
+
+		setup2FinalView, err := state.AtBlockID(block4.ID()).Epochs().Next().FinalView()
+		assert.Nil(t, err)
+		assert.Equal(t, nextEpochSetup2.FinalView, setup2FinalView)
 	})
 }
 
