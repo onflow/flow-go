@@ -572,9 +572,8 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 
 	// Go through mempool and collect valid receipts. We store them by block
 	// height so as to sort them later. There can be multiple receipts per block
-	// if they correspond to different results.
+	// even if they correspond to the same result.
 	receipts := make(map[uint64][]*flow.ExecutionReceipt) // [height] -> []receipt
-	dupResults := make(map[flow.Identifier]bool)
 	for _, receipt := range b.recPool.All() {
 
 		// if block is unknown, remove from mempool and continue
@@ -612,18 +611,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 			continue
 		}
 
-		// if the receipt corresponds to an execution result that has already
-		// been inserted, remove it from mempool and continue.
-		_, ok = dupResults[receipt.ExecutionResult.ID()]
-		if ok {
-			_ = b.recPool.Rem(receipt.ID())
-			continue
-		}
-
 		receipts[height] = append(receipts[height], receipt)
-
-		// record that we already have a receipt for this result.
-		dupResults[receipt.ExecutionResult.ID()] = true
 
 		_ = b.recPool.Rem(receipt.ID())
 	}
