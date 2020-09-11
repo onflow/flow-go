@@ -187,7 +187,11 @@ func (v *View) MergeView(child *View) {
 		v.regTouchSet[string(k)] = true
 	}
 	// SpockSecret is order aware
-	v.updateSpock(child.spockSecret)
+	// TODO return the error and handle it properly on other places
+	err := v.updateSpock(child.spockSecret)
+	if err != nil {
+		panic(err)
+	}
 	v.delta.MergeWith(child.delta)
 }
 
