@@ -3,6 +3,7 @@ package export
 import (
 	"bufio"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -64,6 +65,32 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 	// executionResults := badger.NewExecutionResults(db)
 	// executionState := state.NewExecutionState(nil, commits, blocks, collections, chunkDataPacks, executionResults, db, tracer)
 
+	type transactionInContext struct {
+		TxIDHex                string   `json:"tx_id_hex"`
+		TxIndex                uint64   `json:"tx_index"`
+		CollectionIDHex        string   `json:"col_id_hex"`
+		CollectionIndex        uint64   `json:"col_index"`
+		BlockIDHex             string   `json:"block_id_hex"`
+		BlockHeight            uint64   `json:"block_height"`
+		ScriptHex              string   `json:"script_hex"`
+		ReferenceBlockIDHex    string   `json:"reference_block_id_hex"`
+		ArgumentsHex           []string `json:"arguments_hex"`
+		GasLimit               uint64   `json:"gas_limit"`
+		PayerAddressHex        string   `json:"payer_address_hex"`
+		ProposalKeyAddressHex  string   `json:"proposal_key_address_hex"`
+		ProposalKeyID          uint64   `json:"proposal_key_id"`
+		ProposalSequenceNumber uint64   `json:"proposal_sequence_number"`
+		AuthorizersAddressHex  []string `json:"authorizers_address_hex"`
+		EnvelopeSize           int      `json:"envelope_size"`
+		// Address(hex) + ~ + SignerIndex + ~ + KeyID + ~ + Signature(hex)
+		CompactPayloadSignatures  []string `json:"compact_payload_signatures"`
+		CompactEnvelopeSignatures []string `json:"compact_envelope_signatures"`
+		ErrorMessage              string   `json:"error_message"`
+	}
+
+	// status
+	// TODO gas used, status
+
 	// initialRT := initialRuntime.NewInterpreterRuntime()
 	// vm := fvm.NewWithInitial(initialRT)
 
@@ -121,24 +148,97 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 			done = true
 		}
 
-		for _, g := range block.Payload.Guarantees {
+		for i, g := range block.Payload.Guarantees {
 			col, err := collections.ByID(g.CollectionID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not fetch collection")
 			}
-			for i, tx := range col.Transactions {
-				// TODO add tx.Payer, ...
-				// TODO envelope content byte size
+			for j, tx := range col.Transactions {
 				txID := tx.ID()
 				colID := col.ID()
-				str := "{\"script\": \"" + hex.EncodeToString(tx.Script) + "\", " +
-					" \"tx_id\": \"" + hex.EncodeToString(txID[:]) + "\", " +
-					" \"col_id\": \"" + hex.EncodeToString(colID[:]) + "\", " +
-					" \"block_id\": \"" + hex.EncodeToString(activeBlockID[:]) + "\", " +
-					" \"col_index\": " + fmt.Sprint(i) + ", " +
-					" \"block_height\": " + fmt.Sprint(header.Height) + ", " +
-					" \"ref_block_id\": \"" + hex.EncodeToString(tx.ReferenceBlockID[:]) + "\" }\n"
-				_, err := txWriter.WriteString(str)
+
+				args := make([]string, 0)
+				for _, a := range tx.Arguments {
+					arg := hex.EncodeToString(a)
+					args = append(args, arg)
+				}
+
+				auths := make([]string, 0)
+				for _, a := range tx.Authorizers {
+					auth := hex.EncodeToString(a[:])
+					auths = append(auths, auth)
+				}
+
+				psig := make([]string, 0)
+				for _, s := range tx.PayloadSignatures {
+					cs := hex.EncodeToString(s.Address[:]) + "~" + fmt.Sprint(s.SignerIndex) + "~" + fmt.Sprint(s.KeyID) + "~" + hex.EncodeToString(s.Signature)
+					psig = append(psig, cs)
+				}
+
+				esig := make([]string, 0)
+				for _, s := range tx.EnvelopeSignatures {
+					cs := hex.EncodeToString(s.Address[:]) + "~" + fmt.Sprint(s.SignerIndex) + "~" + fmt.Sprint(s.KeyID) + "~" + hex.EncodeToString(s.Signature)
+					esig = append(esig, cs)
+				}
+
+				envelopeSize := 0
+				envelopeSize += 32             // ReferenceBlockID
+				envelopeSize += len(tx.Script) // Script
+				for _, arg := range tx.Arguments {
+					envelopeSize += len(arg) // arg size
+				}
+				envelopeSize += 8                          // GasLimit
+				envelopeSize += flow.AddressLength + 8 + 8 // ProposalKey
+				envelopeSize += flow.AddressLength         // Payer
+				for _ = range tx.Authorizers {
+					envelopeSize += flow.AddressLength // per authorizer
+				}
+				for _, sig := range tx.PayloadSignatures {
+					envelopeSize += flow.AddressLength + 8 + 8 + len(sig.Signature) // per payload sig
+				}
+				for _, sig := range tx.EnvelopeSignatures {
+					envelopeSize += flow.AddressLength + 8 + 8 + len(sig.Signature) // per env sig
+				}
+
+				// TODO
+				// ErrorMessage                 string   `json:"error_message"`
+
+				tic := transactionInContext{
+					TxIDHex:                   hex.EncodeToString(txID[:]),
+					TxIndex:                   uint64(j),
+					CollectionIDHex:           hex.EncodeToString(colID[:]),
+					CollectionIndex:           uint64(i),
+					BlockIDHex:                hex.EncodeToString(activeBlockID[:]),
+					BlockHeight:               header.Height,
+					ScriptHex:                 hex.EncodeToString(tx.Script),
+					ReferenceBlockIDHex:       hex.EncodeToString(tx.ReferenceBlockID[:]),
+					ArgumentsHex:              args,
+					GasLimit:                  tx.GasLimit,
+					PayerAddressHex:           hex.EncodeToString(tx.Payer[:]),
+					ProposalKeyAddressHex:     hex.EncodeToString(tx.ProposalKey.Address[:]),
+					ProposalKeyID:             tx.ProposalKey.KeyID,
+					ProposalSequenceNumber:    tx.ProposalKey.SequenceNumber,
+					AuthorizersAddressHex:     auths,
+					EnvelopeSize:              envelopeSize,
+					CompactPayloadSignatures:  psig,
+					CompactEnvelopeSignatures: esig,
+				}
+
+				// str := "{\"script\": \"" + hex.EncodeToString(tx.Script) + "\", " +
+				// 	" \"tx_id\": \"" + hex.EncodeToString(txID[:]) + "\", " +
+				// 	" \"col_id\": \"" + hex.EncodeToString(colID[:]) + "\", " +
+				// 	" \"block_id\": \"" + hex.EncodeToString(activeBlockID[:]) + "\", " +
+				// 	" \"col_index\": " + fmt.Sprint(i) + ", " +
+				// 	" \"block_height\": " + fmt.Sprint(header.Height) + ", " +
+				// 	" \"ref_block_id\": \"" + hex.EncodeToString(tx.ReferenceBlockID[:]) + "\" }\n"
+
+				jsonData, err := json.Marshal(tic)
+				if err != nil {
+					log.Fatal().Err(err).Msg("could not create a json obj for a transaction")
+				}
+				str := string(jsonData)
+
+				_, err = txWriter.WriteString(str)
 				if err != nil {
 					log.Fatal().Err(err).Msg("could not write transaction")
 					done = true
@@ -146,6 +246,13 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 				txWriter.Flush()
 			}
 		}
+
+		// TransactionBody
+		// Status           TransactionStatus
+		// Events           []Event
+		// ComputationSpent uint64
+		// StartState       StateCommitment
+		// EndState         StateCommitment
 
 		evs, err := events.ByBlockID(activeBlockID)
 		if err != nil {
