@@ -362,8 +362,8 @@ func (s *EchoEngineTestSuite) duplicateMessageSequential(send ConduitSendWrapper
 	// receiver's engine
 	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, false, send)
 
-	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	// allow nodes to heartbeat and discover each other if using PubSub
+	optionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -396,7 +396,7 @@ func (s *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapperFu
 	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, false, send)
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	optionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -449,7 +449,7 @@ func (s *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSendWrap
 	receiver2 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel2, false, send)
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	optionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -496,7 +496,7 @@ func (s *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapperFu
 	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	optionalSleep(send)
 
 	// Sends a message from sender to receiver
 	event := &message.TestMessage{
@@ -569,7 +569,7 @@ func (s *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Condui
 	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	optionalSleep(send)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
@@ -646,7 +646,7 @@ func (s *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send Condu
 	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestNetwork, echo, send)
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	optionalSleep(send)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})
