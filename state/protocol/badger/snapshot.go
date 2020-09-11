@@ -203,7 +203,7 @@ func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 		}
 		setupEvent, err := q.snap.state.setups.ByID(epochStatus.NextEpoch.Setup)
 		if err != nil {
-			return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for epoch: %w", err))
+			return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
 		}
 
 		if epochStatus.NextEpoch.Commit == flow.ZeroID {
@@ -211,7 +211,7 @@ func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 		}
 		commitEvent, err := q.snap.state.commits.ByID(epochStatus.NextEpoch.Commit)
 		if err != nil {
-			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for epoch: %w", err))
+			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
 		}
 		return NewCommittedEpoch(setupEvent, commitEvent)
 	default:

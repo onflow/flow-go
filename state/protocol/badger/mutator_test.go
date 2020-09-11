@@ -512,12 +512,12 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		extend.Header.ParentID = block.Header.ID()
 
 		err = state.Mutate().Extend(&extend)
-		require.Error(t, err)
+		assert.Error(t, err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
-		require.Error(t, err)
+		assert.Error(t, err)
 		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
 	})
 }

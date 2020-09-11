@@ -3,6 +3,7 @@ package flow
 import (
 	"encoding/json"
 	"io"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack"
@@ -146,14 +147,25 @@ func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 		DKGGroupKey: commit.DKGGroupKey.Encode(),
 	}
 	for nodeID, part := range commit.DKGParticipants {
+		// must copy the node ID, since the loop variable references the same
+		// backing memory for each iteration
+		nodeIDRaw := make([]byte, len(nodeID))
+		copy(nodeIDRaw, nodeID[:])
+
 		rlpEncodable.DKGParticipants = append(rlpEncodable.DKGParticipants, struct {
 			NodeID []byte
 			Part   encodableDKGParticipant
 		}{
-			NodeID: nodeID[:],
+			NodeID: nodeIDRaw,
 			Part:   encodableFromDKGParticipant(part),
 		})
 	}
+
+	// sort to ensure consistent ordering prior to encoding
+	sort.Slice(rlpEncodable.DKGParticipants, func(i, j int) bool {
+		return rlpEncodable.DKGParticipants[i].Part.Index < rlpEncodable.DKGParticipants[j].Part.Index
+	})
+
 	return rlp.Encode(w, rlpEncodable)
 }
 
