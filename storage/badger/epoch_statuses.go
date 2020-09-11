@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -44,6 +46,7 @@ func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatus
 }
 
 func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStatus) func(tx *badger.Txn) error {
+	fmt.Println("EpochStatus.Store", blockID)
 	return es.cache.Put(blockID, status)
 }
 
@@ -53,6 +56,7 @@ func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println("EpochStatus.Retrieve", blockID)
 		return val.(*flow.EpochStatus), nil
 	}
 }
