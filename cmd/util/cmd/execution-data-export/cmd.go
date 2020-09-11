@@ -45,21 +45,25 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("malformed block hash")
 	}
 
+	log.Info().Msg("start exporting blocks")
 	err = ExportBlocks(blockID, flagDatadir, flagOutputDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export blocks")
 	}
 
+	log.Info().Msg("start exporting events")
 	err = ExportEvents(blockID, flagDatadir, flagOutputDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export events")
 	}
 
+	log.Info().Msg("start exporting transactions")
 	err = ExportExecutedTransactions(blockID, flagDatadir, flagOutputDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export transactions")
 	}
 
+	log.Info().Msg("start exporting ledger")
 	err = ExportLedger(blockID, flagDatadir, flagExecutionStateDir, flagOutputDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export ledger")
