@@ -238,7 +238,7 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 				}
 				str := string(jsonData)
 
-				_, err = txWriter.WriteString(str)
+				_, err = txWriter.WriteString(str + "\n")
 				if err != nil {
 					log.Fatal().Err(err).Msg("could not write transaction")
 					done = true
@@ -253,6 +253,8 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) {
 		// ComputationSpent uint64
 		// StartState       StateCommitment
 		// EndState         StateCommitment
+
+		// TODO fingerprints, events,  ...
 
 		evs, err := events.ByBlockID(activeBlockID)
 		if err != nil {
