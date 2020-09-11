@@ -35,7 +35,7 @@ func BenchmarkBLSBLS12381Verify(b *testing.B) {
 }
 
 func randomSK(t *testing.T, seed []byte) PrivateKey {
-	n, err := mrand.Read(seed)
+	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
@@ -315,7 +315,7 @@ func TestBatchVerify(t *testing.T) {
 	// number of signatures to aggregate
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
-	sigsNum := mrand.Intn(100) + 1
+	sigsNum := 10 //mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
@@ -332,20 +332,14 @@ func TestBatchVerify(t *testing.T) {
 		pks = append(pks, sk.PublicKey())
 		expectedValid = append(expectedValid, true)
 	}
-	// aggregated signature
-	expectedAggSig, err := AggregateSignatures(sigs)
-	require.NoError(t, err)
 
 	// Batch verify the signatures
 	// all signatures are valid
-	valid, aggSig, err := BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	valid, err := BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
 	require.NoError(t, err)
 	assert.Equal(t, valid, expectedValid,
 		fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
 			sigs, sks, input, valid))
-	assert.Equal(t, aggSig, expectedAggSig,
-		fmt.Sprintf("wrong aggregated signature %s, expected %s, signatures are %s, results are %v",
-			aggSig, expectedAggSig, sigs, valid))
 
 	// some signatures are invalid
 	invalidSigsNum := mrand.Intn(sigsNum-1) + 1 // pick a random number of invalid signatures
@@ -362,59 +356,43 @@ func TestBatchVerify(t *testing.T) {
 		expectedValid[indices[i]] = false
 	}
 
-	validSigs := make([]Signature, 0, sigsNum-invalidSigsNum) // gather the valid signatureS to compute the aggregation
-	for i := invalidSigsNum; i < sigsNum; i++ {
-		validSigs = append(validSigs, sigs[indices[i]])
-	}
-
-	expectedAggSig, err = AggregateSignatures(validSigs) // compute the aggregation
-	require.NoError(t, err)
-
-	valid, aggSig, err = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	valid, err = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
 	require.NoError(t, err)
 	assert.Equal(t, valid, expectedValid,
 		fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
 			sigs, sks, input, valid))
-	assert.Equal(t, expectedAggSig, aggSig,
-		fmt.Sprintf("wrong aggregated signature %s, expected %s, signatures are %s, valid sigs are %s, results are %v",
-			aggSig, expectedAggSig, sigs, validSigs, valid))
 
 	// all signatures are invalid
 	for i := invalidSigsNum; i < sigsNum; i++ { // alter the remaining random signatures
 		changeSignature(sigs[indices[i]])
 		expectedValid[indices[i]] = false
 	}
-	expectedAggSig, err = AggregateSignatures(validSigs[:0]) // compute the aggregation of an empty slice
-	require.NoError(t, err)
 
-	valid, aggSig, err = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	valid, err = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
 	require.NoError(t, err)
 	assert.Equal(t, valid, expectedValid,
 		fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
 			sigs, sks, input, valid))
-	assert.Equal(t, expectedAggSig, aggSig,
-		fmt.Sprintf("wrong aggregated signature %s, expected %s, signatures are %s, valid sigs are %s, results are %v",
-			aggSig, expectedAggSig, sigs, validSigs, valid))
 
 	// test the empty list case
-	valid, aggSig, err = BatchVerifySignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
+	valid, err = BatchVerifySignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
 	require.Error(t, err)
-	require.Nil(t, aggSig)
+	//require.Nil(t, aggSig)
 	assert.Equal(t, valid, []bool{},
 		fmt.Sprintf("verification should fail with empty list key, got %v", valid))
 	// test incorrect inputs
-	valid, aggSig, err = BatchVerifySignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
+	valid, err = BatchVerifySignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
 	require.Error(t, err)
-	require.Nil(t, aggSig)
+	//require.Nil(t, aggSig)
 	assert.Equal(t, valid, []bool{},
 		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
 	// test wrong hasher
 	for i := 0; i < sigsNum; i++ {
 		expectedValid[i] = false
 	}
-	valid, aggSig, err = BatchVerifySignaturesOneMessage(pks, sigs, input, nil)
+	valid, err = BatchVerifySignaturesOneMessage(pks, sigs, input, nil)
 	require.Error(t, err)
-	require.Nil(t, aggSig)
+	//require.Nil(t, aggSig)
 	assert.Equal(t, valid, expectedValid,
 		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
 }
@@ -425,4 +403,66 @@ func changeSignature(s Signature) {
 	// OR to be a non-point in G1 (either on curve or not)
 	// which tests multiple error cases.
 	s[10] ^= 1
+}
+
+// Batch verify bench when all signatures are valid
+// (2) pairing compared to (2*n) pairings for the batch verification.
+func BenchmarkBatchVerifyHappyPath(b *testing.B) {
+	// random message
+	input := make([]byte, 100)
+	_, _ = mrand.Read(input)
+	// hasher
+	kmac := NewBLSKMAC("bench tag")
+	sigsNum := 100
+	sigs := make([]Signature, 0, sigsNum)
+	pks := make([]PublicKey, 0, sigsNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+
+	// create the signatures
+	for i := 0; i < sigsNum; i++ {
+		_, _ = mrand.Read(seed)
+		sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
+		s, _ := sk.Sign(input, kmac)
+		sigs = append(sigs, s)
+		pks = append(pks, sk.PublicKey())
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// all signatures are valid
+		_, _ = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	}
+	b.StopTimer()
+}
+
+// Batch verify bench when some signatures are invalid
+// - if only one signaure is invalid (a valid point in G1):
+// less than (2*2*log(n)) pairings compared to (2*n) pairings for the simple verification.
+// - if all signatures are invalid (valid points in G1):
+// (2*2*(n-1)) pairings compared to (2*n) pairings for the simple verification.
+func BenchmarkBatchVerifyUnHappyPath(b *testing.B) {
+	input := make([]byte, 100)
+	_, _ = mrand.Read(input)
+	kmac := NewBLSKMAC("bench tag")
+	sigsNum := 100
+	sigs := make([]Signature, 0, sigsNum)
+	pks := make([]PublicKey, 0, sigsNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+
+	// create the signatures
+	for i := 0; i < sigsNum; i++ {
+		_, _ = mrand.Read(seed)
+		sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
+		s, _ := sk.Sign(input, kmac)
+		sigs = append(sigs, s)
+		pks = append(pks, sk.PublicKey())
+	}
+
+	// only one invalid signature
+	changeSignature(sigs[sigsNum/2])
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// all signatures are valid
+		_, _ = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
+	}
+	b.StopTimer()
 }

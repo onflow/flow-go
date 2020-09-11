@@ -238,21 +238,32 @@ static void bls_batchVerify_tree(const node* root, const int len, byte* results,
 
 // Batch verifies the validity of a multiple BLS signatures of the 
 // same message under multiple public keys.
-void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
-     const byte* sigs_bytes, const byte* data, const int data_len, byte* agg_sig) {  
-         //TODO: update to return the aggregation of all valid signatures
+void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
+     const byte* sigs_bytes, const byte* data, const int data_len) {  
 
     // initialize results to undefined
     memset(results, UNDEFINED, sigs_len);
 
-    // convert the signature points
+    // build the arrays of G1 and G2 elements
+    ep2_st* pks = (ep2_st*) malloc(sigs_len * sizeof(ep2_st));
     ep_st* sigs = (ep_st*) malloc(sigs_len * sizeof(ep_st));
     for (int i=0; i < sigs_len; i++) {
         ep_new(sigs[i]);
+        ep2_new(pks[i]);
+        // convert the signature points
         if (ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK) {
             // set signature as infinity and set result as invald
             ep_set_infty(&sigs[i]);
+            ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
             results[i] = INVALID;
+        // multiply signatures and public keys by random coefficients
+        } else {
+            // random coefficient of 128 bits
+            bn_t r;
+            bn_rand(r, RLC_POS, SEC_BITS);
+            ep_mul_lwnaf(&sigs[i], &sigs[i], r);
+            ep2_mul_lwnaf(&pks[i], (ep2_st*) &pks_input[i], r);  
+            bn_free(r);       
         }
     }
 
@@ -262,18 +273,11 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks,
     // verify the binary tree and fill the results using batch verification
     bls_batchVerify_tree(root, sigs_len, results, data, data_len);
 
-    // return the aggregation of the valid signatures,
-    // assuming there are more valid signatures than invalid ones. 
-    ep_t invalid_sigs;
-    ep_new(invalid_sigs);
-    ep_set_infty(invalid_sigs);
-    for (int i=0; i < sigs_len; i++) {
-        if (results[i] == INVALID ) {
-            ep_add_projc(invalid_sigs, invalid_sigs, &sigs[i]);
-        }
-    }  
-    ep_neg(invalid_sigs, invalid_sigs);
-    ep_add_projc(invalid_sigs, root->sig, invalid_sigs);
-    ep_write_bin_compact(agg_sig, invalid_sigs, SIGNATURE_LEN);
-    ep_free(invalid_sigs);
+    // free the allocated memory
+    for (int i=0; i < sigs_len; i++) { 
+        ep_free(sigs[i]);
+        ep2_free(pks[i]);
+    }
+    free(sigs); 
+    free(pks);
 }

@@ -199,37 +199,38 @@ func VerifySignatureOneMessage(pks []PublicKey, s Signature,
 //
 // Each signature at index (i) of the input signature slice is verified against
 // the public key of the same index (i) in the input key slice.
-// The hasher is the same used to generate all signatures.
-// The returned boolean slice is the set so that the value at index (i) is true
-// if signature (i) verifies against public key (i) and false otherwise.
-// Membership check is performed on the input signatures but not on the input public
+// The input hasher is the same used to generate all signatures.
+// The returned boolean slice is a slice so that the value at index (i) is true
+// if signature (i) verifies against public key (i), and false otherwise.
+//
+// Membership checks are performed on the input signatures but not on the input public
 // keys (which is supposed to have happened outside this function using the library
 // key generation or bytes decode function).
 // An error is returned if the key slice is empty.
 func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
-	message []byte, kmac hash.Hasher) ([]bool, Signature, error) {
+	message []byte, kmac hash.Hasher) ([]bool, error) {
 	_ = newBLSBLS12381()
 
 	// public keys check
 	if len(pks) == 0 || len(pks) != len(sigs) {
-		return []bool{}, nil, fmt.Errorf("key list length is not valid")
+		return []bool{}, fmt.Errorf("key list length is not valid")
 	}
 
 	verifBool := make([]bool, len(sigs))
 	// hasher check
 	if kmac == nil {
-		return verifBool, nil, errors.New("VerifyBytes requires a Hasher")
+		return verifBool, errors.New("VerifyBytes requires a Hasher")
 	}
 
 	if kmac.Size() < opSwUInputLenBLSBLS12381 {
-		return verifBool, nil, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+		return verifBool, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
 			opSwUInputLenBLSBLS12381, kmac.Size())
 	}
 
 	pkPoints := make([]pointG2, 0, len(pks))
 	for _, pk := range pks {
 		if pk.Algorithm() != BLSBLS12381 {
-			return verifBool, nil, fmt.Errorf("all keys must be BLS keys")
+			return verifBool, fmt.Errorf("all keys must be BLS keys")
 		}
 		// assertion is guaranteed to be correct after the algorithm check
 		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
@@ -245,7 +246,6 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(message)
 	verifInt := make([]byte, len(verifBool))
-	aggSig := make([]byte, signatureLengthBLSBLS12381)
 
 	C.bls_batchVerify(
 		(C.int)(len(verifInt)),
@@ -254,11 +254,11 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 		(*C.uchar)(&flatSigs[0]),
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)),
-		(*C.uchar)(&aggSig[0]),
 	)
 
 	for i, v := range verifInt {
 		verifBool[i] = ((C.int)(v) == valid)
 	}
-	return verifBool, aggSig, nil
+
+	return verifBool, nil
 }
