@@ -1,6 +1,7 @@
 package libp2p
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -16,6 +17,7 @@ import (
 	libp2perrors "github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 )
 
 // Network represents the overlay network of our peer-to-peer network, including
@@ -31,6 +33,8 @@ type Network struct {
 	metrics module.NetworkMetrics
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
+	queue   queue.MessageQueue
+	cancel  context.CancelFunc
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -66,6 +70,16 @@ func NewNetwork(
 
 	o.SetIDs(ids)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	o.cancel = cancel
+
+	// setup the message queue
+	// create priority queue
+	o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority)
+
+	// create workers to read from the queue and call queueSubmitFunc
+	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+
 	return o, nil
 }
 
@@ -86,6 +100,7 @@ func (n *Network) Ready() <-chan struct{} {
 func (n *Network) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
+		n.cancel()
 		n.mw.Stop()
 		close(done)
 	}()
@@ -179,12 +194,8 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		return nil
 	}
 
-	// Extract channel id and find the registered engine
+	// extract channel id
 	channelID := uint8(message.ChannelID)
-	en, found := n.engines[channelID]
-	if !found {
-		return libp2perrors.NewInvalidEngineError(channelID, senderID.String())
-	}
 
 	// Convert message payload to a known message type
 	decodedMessage, err := n.codec.Decode(message.Payload)
@@ -192,8 +203,19 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		return fmt.Errorf("could not decode event: %w", err)
 	}
 
-	// call the engine asynchronously with the message payload
-	en.Submit(senderID, decodedMessage)
+	// create queue message
+	qm := queue.QueueMessage{
+		Payload:   decodedMessage,
+		Size:      message.Size(),
+		ChannelID: channelID,
+		SenderID:  senderID,
+	}
+
+	// insert the message in the queue
+	err = n.queue.Insert(qm)
+	if err != nil {
+		return fmt.Errorf("failed to insert message in queue: %w", err)
+	}
 
 	return nil
 }
@@ -352,4 +374,25 @@ func (n *Network) multicast(channelID uint8, message interface{}, num uint, sele
 		Msg("message successfully multicasted")
 
 	return nil
+}
+
+func (n *Network) queueSubmitFunc(message interface{}) {
+	qm := message.(queue.QueueMessage)
+	en, found := n.engines[qm.ChannelID]
+	if !found {
+		n.logger.Error().
+			Err(libp2perrors.NewInvalidEngineError(qm.ChannelID, qm.SenderID.String())).
+			Msg("failed to submit message")
+		return
+	}
+
+	// submit the message to the engine synchronously
+	err := en.Process(qm.SenderID, qm.Payload)
+	if err != nil {
+		n.logger.Error().
+			Uint8("channel_ID", qm.ChannelID).
+			Str("sender_id", qm.SenderID.String()).
+			Err(err).
+			Msg("failed to process message")
+	}
 }
