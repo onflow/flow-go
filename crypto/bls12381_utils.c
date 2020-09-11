@@ -18,10 +18,6 @@ int get_invalid() {
     return INVALID;
 }
 
-int get_checkG1() {
-    return MEMBERSHIP_CHECK_G1;
-}
-
 // global variable of the pre-computed data
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
@@ -375,7 +371,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 // len is the size of the input buffer
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // look at the comments of ep_write_bin_compact for a detailed description
-// The code is a modified version of Relic ep_write_bin
+// The code is a modified version of Relic ep_read_bin
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     const int G1size = (G1_BYTES/(SERIALIZATION+1));
     if (len!=G1size) {
@@ -419,15 +415,18 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 	fp_read_bin(a->x, temp, Fp_BYTES);
     free(temp);
 
+    int result;
     if (SERIALIZATION == UNCOMPRESSED) {
         fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
+        result = RLC_OK;
     }
     else {
         fp_zero(a->y);
         fp_set_bit(a->y, 0, y_is_odd);
-        ep_upk_generic(a, a);
+        if (ep_upk_generic(a, a) == 1) result = RLC_OK;
+        else result = RLC_ERR;
     }
-    return RLC_OK;
+    return result;
 }
 
 // uncompress a G2 point p into r taking into account the coordinate x
@@ -522,7 +521,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// The code is a modified version of Relic ep_write_bin
+// The code is a modified version of Relic ep_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
@@ -566,17 +565,19 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     fp2_read_bin(a->x, temp, 2*Fp_BYTES);
     free(temp);
 
-
+    int result;
     if (SERIALIZATION == UNCOMPRESSED) {
         fp2_read_bin(a->y, bin + 2*Fp_BYTES, 2*Fp_BYTES);
+        result = RLC_OK;
     }
     else {
         fp2_zero(a->y);
         fp_set_bit(a->y[0], 0, y_is_odd);
-		fp_zero(a->y[1]);
-        ep2_upk_generic(a, a);
+        fp_zero(a->y[1]);
+        if (ep2_upk_generic(a, a) == 1) result = RLC_OK;
+        else result = RLC_ERR;
     }
-    return RLC_OK;
+    return result;
 }
 
 // computes the sum of the array elements x and writes the sum in jointx
@@ -734,13 +735,17 @@ void ep_rand_G1(ep_t p) {
 // generates a random point in E1\G1 and stores it in p
 void ep_rand_G1complement(ep_t p) {
     // generate a random point in E1
-    fp_rand(p->x); // set x to a random field element
-    byte r;
-    rand_bytes(&r, 1);
-    fp_zero(p->y);
-    fp_set_bit(p->y, 0, r&1); // set y randomly to 0 or 1
-    fp_set_dig(p->z, 1);
     p->norm = 1;
+    fp_set_dig(p->z, 1);
+    do {
+        fp_rand(p->x); // set x to a random field element
+        byte r;
+        rand_bytes(&r, 1);
+        fp_zero(p->y);
+        fp_set_bit(p->y, 0, r&1); // set y randomly to 0 or 1
+    }
+    while (ep_upk_generic(p, p) == 0); // make sure p is in E1
+
     // map the point to E1\G1 by clearing G1 order
     bn_t order;
     bn_new(order); 
@@ -753,6 +758,11 @@ int subgroup_check_G1_test(int inG1, int method) {
     ep_t p;
 	if (inG1) ep_rand_G1(p); // p in G1
 	else ep_rand_G1complement(p); // p in E1\G1
+
+    if (!ep_is_valid(p)) { // sanity check to make sure p is in E1
+        return UNDEFINED; // this should not happen
+    }
+        
     switch (method) {
     case EXP_ORDER: 
         return simple_subgroup_check_G1(p);

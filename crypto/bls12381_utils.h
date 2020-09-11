@@ -13,6 +13,7 @@ typedef uint8_t byte;
 
 #define VALID   RLC_OK
 #define INVALID RLC_ERR
+#define UNDEFINED (VALID^1 | INVALID^2)
 
 #define BITS_TO_BYTES(x) ((x+7)>>3)
 #define BITS_TO_DIGITS(x) ((x+63)>>6)
@@ -71,7 +72,6 @@ typedef struct prec_ {
 // Utility functions
 int      get_valid();
 int      get_invalid();
-int      get_checkG1();
 
 ctx_t*   relic_init_BLS12_381();
 prec_st* init_precomputed_data_BLS12_381();
