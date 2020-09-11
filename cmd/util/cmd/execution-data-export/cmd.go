@@ -1,4 +1,4 @@
-package export
+package exporter
 
 import (
 	"github.com/rs/zerolog/log"
@@ -53,7 +53,9 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("malformed block hash")
 	}
 
-	ExportEvents(blockID, flagDatadir, flagOutputDir)
+	ExportExecutedTransactions(blockID, flagDatadir, flagOutputDir)
+
+	// ExportEvents(blockID, flagDatadir, flagOutputDir)
 
 	// db := common.InitStorage(flagDatadir)
 	// defer db.Close()
