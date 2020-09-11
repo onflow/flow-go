@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -123,7 +122,7 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 	// Register the middleware for the channelID topic
 	err := n.mw.Subscribe(channelID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to subscribe to channel %d: %w", channelID, err)
+		return nil, fmt.Errorf("failed to subscribe to channel %s: %w", channelID, err)
 	}
 
 	// create the conduit
@@ -184,13 +183,13 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 			Hex("event_id", message.EventID).
 			Logger()
 
-		channelName := message.ChannelID)
-
 		// drops duplicate message
 		log.Debug().
-			Str("channel", channelName).
+			Str("channel", message.ChannelID).
 			Msg("dropping message due to duplication")
-		n.metrics.NetworkDuplicateMessagesDropped(channelName)
+
+		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID)
+
 		return nil
 	}
 
@@ -227,7 +226,7 @@ func (n *Network) genNetworkMessage(channelID string, event interface{}, targetI
 
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
-	_, err = h.Write([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
+	_, err = h.Write([]byte("libp2ppacking" + channelID))
 	if err != nil {
 		return nil, fmt.Errorf("could not hash channel ID as salt: %w", err)
 	}
@@ -291,7 +290,7 @@ func (n *Network) submit(channelID string, event interface{}, targetIDs ...flow.
 // In this context, unreliable means that the message is published over a libp2p pub-sub
 // channel and can be read by any node subscribed to that channel.
 // The selector could be used to optimize or restrict delivery.
-func (n *Network) publish(channelID uint8, message interface{}, selector flow.IdentityFilter) error {
+func (n *Network) publish(channelID string, message interface{}, selector flow.IdentityFilter) error {
 	// excludes this instance of network from list of targeted ids (if any)
 	// to avoid self loop on delivering this message.
 	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
@@ -321,7 +320,7 @@ func (n *Network) publish(channelID uint8, message interface{}, selector flow.Id
 // unicast sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
-func (n *Network) unicast(channelID uint8, message interface{}, targetID flow.Identifier) error {
+func (n *Network) unicast(channelID string, message interface{}, targetID flow.Identifier) error {
 	if targetID == n.me.NodeID() {
 		n.logger.Debug().Msg("network skips self unicasting")
 		return nil
@@ -347,7 +346,7 @@ func (n *Network) unicast(channelID uint8, message interface{}, targetID flow.Id
 // multicast unreliably sends the specified event over the channelID to the specified number of recipients selected from
 // the specified subset.
 // The recipients are selected randomly from the set of identities defined by selectors.
-func (n *Network) multicast(channelID uint8, message interface{}, num uint, selector flow.IdentityFilter) error {
+func (n *Network) multicast(channelID string, message interface{}, num uint, selector flow.IdentityFilter) error {
 	// excludes this instance of network from list of targeted ids (if any)
 	// to avoid self loop on delivering this message.
 	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
@@ -389,7 +388,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	err := en.Process(qm.SenderID, qm.Payload)
 	if err != nil {
 		n.logger.Error().
-			Uint8("channel_ID", qm.ChannelID).
+			Str("channel_ID", qm.ChannelID).
 			Str("sender_id", qm.SenderID.String()).
 			Err(err).
 			Msg("failed to process message")

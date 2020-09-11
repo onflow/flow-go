@@ -21,7 +21,7 @@ type MeshEngine struct {
 	received chan struct{}    // used as an indicator on reception of messages for testing
 }
 
-func NewMeshEngine(t *testing.T, net module.Network, cap int, engineID uint8) *MeshEngine {
+func NewMeshEngine(t *testing.T, net module.Network, cap int, engineID string) *MeshEngine {
 	te := &MeshEngine{
 		t:        t,
 		event:    make(chan interface{}, cap),

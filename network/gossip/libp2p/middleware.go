@@ -435,7 +435,7 @@ func (m *Middleware) Subscribe(channelID string) error {
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe for channel %d: %w", channelID, err)
+		return fmt.Errorf("failed to subscribe for channel %s: %w", channelID, err)
 	}
 	rs := NewReadSubscription(m.log, s)
 	go rs.ReceiveLoop()
