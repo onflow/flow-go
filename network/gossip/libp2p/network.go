@@ -31,7 +31,7 @@ type Network struct {
 	mw      middleware.Middleware
 	top     middleware.Topology
 	metrics module.NetworkMetrics
-	engines map[uint8]network.Engine
+	engines map[string]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
 	queue   queue.MessageQueue
 	cancel  context.CancelFunc
@@ -62,7 +62,7 @@ func NewNetwork(
 		codec:   codec,
 		me:      me,
 		mw:      mw,
-		engines: make(map[uint8]network.Engine),
+		engines: make(map[string]network.Engine),
 		rcache:  rcache,
 		top:     top,
 		metrics: metrics,
@@ -110,7 +110,7 @@ func (n *Network) Done() <-chan struct{} {
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -184,7 +184,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 			Hex("event_id", message.EventID).
 			Logger()
 
-		channelName := engine.ChannelName(uint8(message.ChannelID))
+		channelName := message.ChannelID)
 
 		// drops duplicate message
 		log.Debug().
@@ -193,9 +193,6 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		n.metrics.NetworkDuplicateMessagesDropped(channelName)
 		return nil
 	}
-
-	// extract channel id
-	channelID := uint8(message.ChannelID)
 
 	// Convert message payload to a known message type
 	decodedMessage, err := n.codec.Decode(message.Payload)
@@ -207,7 +204,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	qm := queue.QueueMessage{
 		Payload:   decodedMessage,
 		Size:      message.Size(),
-		ChannelID: channelID,
+		ChannelID: message.ChannelID,
 		SenderID:  senderID,
 	}
 
@@ -221,7 +218,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 }
 
 // genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
+func (n *Network) genNetworkMessage(channelID string, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
 	// encode the payload using the configured codec
 	payload, err := n.codec.Encode(event)
 	if err != nil {
@@ -254,7 +251,7 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 
 	// cast event to a libp2p.Message
 	msg := &message.Message{
-		ChannelID: uint32(channelID),
+		ChannelID: channelID,
 		EventID:   payloadHash,
 		OriginID:  originID,
 		TargetIDs: emTargets,
@@ -266,7 +263,7 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 
 // submit method submits the given event for the given channel to the overlay layer
 // for processing; it is used by engines through conduits.
-func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
 
 	// genNetworkMessage the event to get payload and event ID
 	msg, err := n.genNetworkMessage(channelID, event, targetIDs...)
