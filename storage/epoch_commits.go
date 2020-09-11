@@ -14,5 +14,5 @@ type EpochCommits interface {
 	StoreTx(commit *flow.EpochCommit) func(*badger.Txn) error
 
 	// ByCommitID will return the EpochCommit event by its ID.
-	ByCommitID(flow.Identifier) (*flow.EpochCommit, error)
+	ByID(flow.Identifier) (*flow.EpochCommit, error)
 }

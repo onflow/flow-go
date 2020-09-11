@@ -62,7 +62,7 @@ func (es *EpochSetups) Store(setup *flow.EpochSetup) error {
 	return operation.RetryOnConflict(es.db.Update, es.StoreTx(setup))
 }
 
-func (es *EpochSetups) BySetupID(setupID flow.Identifier) (*flow.EpochSetup, error) {
+func (es *EpochSetups) ByID(setupID flow.Identifier) (*flow.EpochSetup, error) {
 	tx := es.db.NewTransaction(false)
 	defer tx.Discard()
 	return es.retrieveTx(setupID)(tx)

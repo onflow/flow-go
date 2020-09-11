@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"encoding/binary"
 	"encoding/json"
 
 	"github.com/vmihailenco/msgpack"
@@ -51,13 +50,9 @@ func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 	}
 }
 
-// ID returns a unique ID for the epoch, based on the counter. This
-// is used as a work-around for the current caching layer, which only
-// supports flow entities keyed by ID for now.
+// ID returns the hash of the event contents.
 func (setup *EpochSetup) ID() Identifier {
-	var commitID Identifier
-	binary.LittleEndian.PutUint64(commitID[:], setup.Counter)
-	return commitID
+	return MakeID(setup)
 }
 
 // EpochCommit is a service event emitted when epoch setup has been completed.
@@ -131,13 +126,9 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 	return nil
 }
 
-// ID returns a unique ID for the epoch, based on the counter. This
-// is used as a work-around for the current caching layer, which only
-// suports flow entities keyed by ID for now.
+// ID returns the hash of the event contents.
 func (commit *EpochCommit) ID() Identifier {
-	var commitID Identifier
-	binary.LittleEndian.PutUint64(commitID[:], commit.Counter)
-	return commitID
+	return MakeID(commit)
 }
 
 type DKGParticipant struct {

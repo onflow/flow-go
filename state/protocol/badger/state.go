@@ -96,11 +96,11 @@ func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	if err != nil {
 		return NewInvalidSnapshot(fmt.Errorf("failed to retrieve epoch state: %w", err))
 	}
-	setupEvent, err := s.setups.BySetupID(epochStatus.CurrentEpoch.Setup)
+	setupEvent, err := s.setups.ByID(epochStatus.CurrentEpoch.Setup)
 	if err != nil {
 		return NewInvalidSnapshot(fmt.Errorf("failed to retrieve setup event for epoch: %w", err))
 	}
-	commitEvent, err := s.commits.ByCommitID(epochStatus.CurrentEpoch.Commit)
+	commitEvent, err := s.commits.ByID(epochStatus.CurrentEpoch.Commit)
 	if err != nil {
 		return NewInvalidSnapshot(fmt.Errorf("failed to retrieve commit event for epoch: %w", err))
 	}

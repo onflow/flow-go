@@ -419,7 +419,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("determining epoch status failed: %w", err)
 	}
-	activeSetup, err := m.state.setups.BySetupID(epochStatus.CurrentEpoch.Setup)
+	activeSetup, err := m.state.setups.ByID(epochStatus.CurrentEpoch.Setup)
 	if err != nil {
 		return fmt.Errorf("could not retrieve EpochSetup event for block: %w", err)
 	}
@@ -488,7 +488,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				}
 
 				// Finally, the commit should commit all the necessary information.
-				setup, err := m.state.setups.BySetupID(epochStatus.NextEpoch.Setup)
+				setup, err := m.state.setups.ByID(epochStatus.NextEpoch.Setup)
 				if err != nil {
 					return fmt.Errorf("could not retrieve next epoch setup: %w", err)
 				}
@@ -613,7 +613,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
-	setup, err := m.state.setups.BySetupID(epochState.CurrentEpoch.Setup)
+	setup, err := m.state.setups.ByID(epochState.CurrentEpoch.Setup)
 	if err != nil {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
@@ -703,7 +703,7 @@ func (m *Mutator) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 	}
 
 	// Retrieve EpochSetup and EpochCommit event for parent block's Epoch
-	parentSetup, err := m.state.setups.BySetupID(parentStatus.CurrentEpoch.Setup)
+	parentSetup, err := m.state.setups.ByID(parentStatus.CurrentEpoch.Setup)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
 	}

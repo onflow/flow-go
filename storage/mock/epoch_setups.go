@@ -15,7 +15,7 @@ type EpochSetups struct {
 }
 
 // BySetupID provides a mock function with given fields: _a0
-func (_m *EpochSetups) BySetupID(_a0 flow.Identifier) (*flow.EpochSetup, error) {
+func (_m *EpochSetups) ByID(_a0 flow.Identifier) (*flow.EpochSetup, error) {
 	ret := _m.Called(_a0)
 
 	var r0 *flow.EpochSetup

@@ -62,7 +62,7 @@ func (ec *EpochCommits) Store(commit *flow.EpochCommit) error {
 	return operation.RetryOnConflict(ec.db.Update, ec.StoreTx(commit))
 }
 
-func (ec *EpochCommits) ByCommitID(commitID flow.Identifier) (*flow.EpochCommit, error) {
+func (ec *EpochCommits) ByID(commitID flow.Identifier) (*flow.EpochCommit, error) {
 	tx := ec.db.NewTransaction(false)
 	defer tx.Discard()
 	return ec.retrieveTx(commitID)(tx)
