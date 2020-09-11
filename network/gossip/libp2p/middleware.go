@@ -465,7 +465,7 @@ SubscriptionLoop:
 			}
 
 			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, rs.sub.Topic())
+			m.reportInboundMsgSize(msgSize, engine.ChannelName(uint8(msg.ChannelID)))
 
 			m.processMessage(msg)
 
