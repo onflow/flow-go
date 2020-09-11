@@ -415,18 +415,16 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 	fp_read_bin(a->x, temp, Fp_BYTES);
     free(temp);
 
-    int result;
     if (SERIALIZATION == UNCOMPRESSED) {
         fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
-        result = RLC_OK;
+        return RLC_OK;
     }
-    else {
-        fp_zero(a->y);
-        fp_set_bit(a->y, 0, y_is_odd);
-        if (ep_upk_generic(a, a) == 1) result = RLC_OK;
-        else result = RLC_ERR;
+    fp_zero(a->y);
+    fp_set_bit(a->y, 0, y_is_odd);
+    if (ep_upk_generic(a, a) == 1) {
+        return RLC_OK;
     }
-    return result;
+    return RLC_ERR;
 }
 
 // uncompress a G2 point p into r taking into account the coordinate x
@@ -565,19 +563,19 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     fp2_read_bin(a->x, temp, 2*Fp_BYTES);
     free(temp);
 
-    int result;
+    
     if (SERIALIZATION == UNCOMPRESSED) {
         fp2_read_bin(a->y, bin + 2*Fp_BYTES, 2*Fp_BYTES);
-        result = RLC_OK;
+        return RLC_OK;
     }
-    else {
-        fp2_zero(a->y);
-        fp_set_bit(a->y[0], 0, y_is_odd);
-        fp_zero(a->y[1]);
-        if (ep2_upk_generic(a, a) == 1) result = RLC_OK;
-        else result = RLC_ERR;
+    
+    fp2_zero(a->y);
+    fp_set_bit(a->y[0], 0, y_is_odd);
+    fp_zero(a->y[1]);
+    if (ep2_upk_generic(a, a) == 1) {
+        return RLC_OK;
     }
-    return result;
+    return RLC_ERR;
 }
 
 // computes the sum of the array elements x and writes the sum in jointx
