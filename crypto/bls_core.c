@@ -197,15 +197,28 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
     ep_new(t->sig);
     ep_new(t->pk);
     // build the tree in a top-down way
-    t->left = build_tree(left_len, pks, sigs);
-    t->right = build_tree(right_len, pks + left_len, sigs + left_len);
+    t->left = build_tree(left_len, &pks[0], &sigs[0]);
+    t->right = build_tree(right_len, &pks[left_len], &sigs[left_len]);
     // sum the children
     ep_add_projc(t->sig, t->left->sig, t->right->sig);
     ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
     return t;
 }
 
-//static free_tree
+static void free_tree(node* root) {
+    // relic free
+    ep_free(root->sig);
+    ep2_free(root->pk);
+    if (root->left) {
+        // only free non-leaves, leaves are allocated as an entire array
+        free(root->sig);
+        free(root->pk);
+        // free the children
+        free_tree(root->left);
+        free_tree(root->right);
+    }
+    free(root);
+}
 
 // verify the binary tree and fill the results using recursive batch verification.
 static void bls_batchVerify_tree(const node* root, const int len, byte* results, 
@@ -232,21 +245,22 @@ static void bls_batchVerify_tree(const node* root, const int len, byte* results,
     // use the binary tree structure to find the invalid signatures. 
     int right_len = len/2;
     int left_len = len - right_len;
-    bls_batchVerify_tree(root->left, left_len, results, data, data_len);
-    bls_batchVerify_tree(root->right, right_len, results + left_len, data, data_len);
+    bls_batchVerify_tree(root->left, left_len, &results[0], data, data_len);
+    bls_batchVerify_tree(root->right, right_len, &results[left_len], data, data_len);
 }
 
 // Batch verifies the validity of a multiple BLS signatures of the 
 // same message under multiple public keys.
 void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
      const byte* sigs_bytes, const byte* data, const int data_len) {  
-
     // initialize results to undefined
     memset(results, UNDEFINED, sigs_len);
+    
 
-    // build the arrays of G1 and G2 elements
+    // build the arrays of G1 and G2 elements to verify
     ep2_st* pks = (ep2_st*) malloc(sigs_len * sizeof(ep2_st));
     ep_st* sigs = (ep_st*) malloc(sigs_len * sizeof(ep_st));
+    bn_t r;
     for (int i=0; i < sigs_len; i++) {
         ep_new(sigs[i]);
         ep2_new(pks[i]);
@@ -256,28 +270,24 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
             ep_set_infty(&sigs[i]);
             ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
             results[i] = INVALID;
-        // multiply signatures and public keys by random coefficients
+        // multiply signatures and public keys at the same index by random coefficients
         } else {
             // random coefficient of 128 bits
-            bn_t r;
             bn_rand(r, RLC_POS, SEC_BITS);
             ep_mul_lwnaf(&sigs[i], &sigs[i], r);
-            ep2_mul_lwnaf(&pks[i], (ep2_st*) &pks_input[i], r);  
-            bn_free(r);       
+            ep2_mul_lwnaf(&pks[i], (ep2_st*) &pks_input[i], r);      
         }
     }
 
     // build a binary tree of aggreagtions
-    node* root = build_tree(sigs_len, pks, sigs);
+    node* root = build_tree(sigs_len, &pks[0], &sigs[0]);
 
     // verify the binary tree and fill the results using batch verification
-    bls_batchVerify_tree(root, sigs_len, results, data, data_len);
+    bls_batchVerify_tree(root, sigs_len, &results[0], data, data_len);
 
-    // free the allocated memory
-    for (int i=0; i < sigs_len; i++) { 
-        ep_free(sigs[i]);
-        ep2_free(pks[i]);
-    }
+    // free the allocated memory 
+    free_tree(root); // (relic free is called in free_tree)
     free(sigs); 
     free(pks);
+    bn_free(r);   
 }

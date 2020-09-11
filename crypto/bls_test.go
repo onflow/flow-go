@@ -315,7 +315,7 @@ func TestBatchVerify(t *testing.T) {
 	// number of signatures to aggregate
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
-	sigsNum := 10 //mrand.Intn(100) + 1
+	sigsNum := mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
