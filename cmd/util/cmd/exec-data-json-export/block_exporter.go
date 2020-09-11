@@ -69,11 +69,6 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) err
 			return nil
 		}
 
-		parentVoterIDs := make([]string, 0)
-		for _, v := range header.ParentVoterIDs {
-			parentVoterIDs = append(parentVoterIDs, hex.EncodeToString(v[:]))
-		}
-
 		cols := make([]string, 0)
 		for _, g := range block.Payload.Guarantees {
 			cols = append(cols, hex.EncodeToString(g.CollectionID[:]))

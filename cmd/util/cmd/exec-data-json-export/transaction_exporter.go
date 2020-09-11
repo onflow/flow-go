@@ -159,12 +159,10 @@ func computeEnvelopeSize(tx *flow.TransactionBody) int {
 	for _, arg := range tx.Arguments {
 		envelopeSize += len(arg) // arg size
 	}
-	envelopeSize += 8                          // GasLimit
-	envelopeSize += flow.AddressLength + 8 + 8 // ProposalKey
-	envelopeSize += flow.AddressLength         // Payer
-	for _ = range tx.Authorizers {
-		envelopeSize += flow.AddressLength // per authorizer
-	}
+	envelopeSize += 8                                        // GasLimit
+	envelopeSize += flow.AddressLength + 8 + 8               // ProposalKey
+	envelopeSize += flow.AddressLength                       // Payer
+	envelopeSize += flow.AddressLength * len(tx.Authorizers) // per authorizer
 	for _, sig := range tx.PayloadSignatures {
 		envelopeSize += flow.AddressLength + 8 + 8 + len(sig.Signature) // per payload sig
 	}

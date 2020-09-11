@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -17,7 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
-	"github.com/rs/zerolog/log"
 )
 
 // ExportLedger exports ledger key value pairs at the given blockID
@@ -109,6 +110,5 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished seeking")
 	log.Info().Msg("writing root checkpoint")
 
-	mForest.DumpTrieAsJSON(targetHash, filepath.Join(outputPath, hex.EncodeToString(targetHash)+".trie.jsonl"))
-	return nil
+	return mForest.DumpTrieAsJSON(targetHash, filepath.Join(outputPath, hex.EncodeToString(targetHash)+".trie.jsonl"))
 }
