@@ -272,8 +272,9 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
             results[i] = INVALID;
         // multiply signatures and public keys at the same index by random coefficients
         } else {
-            // random coefficient of 128 bits
+            // random non-zero coefficient of a least 128 bits
             bn_rand(r, RLC_POS, SEC_BITS);
+            bn_add_dig(r, r, 1); 
             ep_mul_lwnaf(&sigs[i], &sigs[i], r);
             ep2_mul_lwnaf(&pks[i], (ep2_st*) &pks_input[i], r);      
         }
