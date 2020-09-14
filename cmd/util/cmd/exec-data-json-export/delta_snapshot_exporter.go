@@ -16,10 +16,18 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
+type dMapping struct {
+	Hash       string `json:"hash"`
+	Owner      string `json:"owner"`
+	Key        string `json:"key"`
+	Controller string `json:"controller"`
+}
+
 type dSnapshot struct {
-	DeltaJSONStr string   `json:"delta_json_str"`
-	Reads        []string `json:"reads"`
-	SpockSecret  string   `json:"spock_secret_data"`
+	DeltaJSONStr string     `json:"delta_json_str"`
+	DeltaMapping []dMapping `json:"delta_mapping"`
+	Reads        []string   `json:"reads"`
+	SpockSecret  string     `json:"spock_secret_data"`
 }
 
 // ExportDeltaSnapshots exports all the delta snapshots
@@ -66,6 +74,20 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 			return fmt.Errorf("could not load delta snapshot: %w", err)
 		}
 
+		dm := make([]dMapping, 0)
+		for k, v := range snap[0].Delta.ReadMappings {
+			dm = append(dm, dMapping{Hash: hex.EncodeToString([]byte(k)),
+				Owner:      hex.EncodeToString([]byte(v.Owner)),
+				Key:        hex.EncodeToString([]byte(v.Key)),
+				Controller: hex.EncodeToString([]byte(v.Controller))})
+		}
+		for k, v := range snap[0].Delta.WriteMappings {
+			dm = append(dm, dMapping{Hash: hex.EncodeToString([]byte(k)),
+				Owner:      hex.EncodeToString([]byte(v.Owner)),
+				Key:        hex.EncodeToString([]byte(v.Key)),
+				Controller: hex.EncodeToString([]byte(v.Controller))})
+		}
+
 		reads := make([]string, 0)
 		for _, r := range snap[0].Reads {
 			reads = append(reads, hex.EncodeToString(r[:]))
@@ -73,6 +95,7 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 
 		data := dSnapshot{
 			DeltaJSONStr: string(m),
+			DeltaMapping: dm,
 			Reads:        reads,
 			SpockSecret:  hex.EncodeToString(snap[0].SpockSecret),
 		}
