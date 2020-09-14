@@ -36,6 +36,8 @@ type Suite struct {
 	clusters   flow.ClusterList
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
+	epochQuery *protocol.EpochQuery
+	epoch      *protocol.Epoch
 	root       *flow.Block
 
 	// backend for mocks
@@ -100,7 +102,6 @@ func (suite *Suite) SetupTest() {
 		func() *flow.Header { return suite.final.Header },
 		func() error { return nil },
 	)
-	suite.snapshot.On("Clusters").Return(suite.clusters, nil)
 	suite.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realprotocol.Snapshot {
 			snap := new(protocol.Snapshot)
@@ -112,6 +113,12 @@ func (suite *Suite) SetupTest() {
 			}
 			return snap
 		})
+
+	suite.epochQuery = new(protocol.EpochQuery)
+	suite.epoch = new(protocol.Epoch)
+	suite.snapshot.On("Epochs").Return(suite.epochQuery)
+	suite.epochQuery.On("Current").Return(suite.epoch)
+	suite.epoch.On("Clustering").Return(suite.clusters, nil)
 
 	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pool, DefaultConfig())
 	suite.Require().Nil(err)

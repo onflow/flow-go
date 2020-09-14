@@ -18,6 +18,7 @@ import (
 // the reconstructed threshold signature.
 type CombinedVerifier struct {
 	committee hotstuff.Committee
+	dkg       hotstuff.DKG
 	staking   module.AggregatingVerifier
 	beacon    module.ThresholdVerifier
 	merger    module.Merger
@@ -72,8 +73,13 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	stakingSig := splitSigs[0]
 	beaconShare := splitSigs[1]
 
+	dkg, err := c.committee.DKG(block.BlockID)
+	if err != nil {
+		return false, fmt.Errorf("could not get dkg: %w", err)
+	}
+
 	// get the signer dkg key share
-	beaconPubKey, err := c.committee.DKGKeyShare(block.BlockID, voterID)
+	beaconPubKey, err := dkg.KeyShare(voterID)
 	if err != nil {
 		return false, fmt.Errorf("could not get random beacon key share for %x: %w", voterID, err)
 	}
@@ -104,10 +110,9 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 	}
 	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 
-	// get the DKG group key from the DKG state
-	dkgKey, err := c.committee.DKGGroupKey(block.BlockID)
+	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
-		return false, fmt.Errorf("could not get dkg group key: %w", err)
+		return false, fmt.Errorf("could not get dkg: %w", err)
 	}
 
 	// split the aggregated staking & beacon signatures
@@ -131,7 +136,7 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 	if err != nil {
 		return false, fmt.Errorf("could not verify staking signature: %w", err)
 	}
-	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkgKey)
+	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkg.GroupKey())
 	if err != nil {
 		return false, fmt.Errorf("could not verify beacon signature: %w", err)
 	}

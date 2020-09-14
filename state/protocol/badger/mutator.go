@@ -4,14 +4,12 @@ package badger
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -162,13 +160,17 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not insert epoch height: %w", err)
 		}
-		err = operation.InsertEpochSetup(setup.Counter, setup)(tx)
+		err = m.state.setups.StoreTx(setup)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert epoch seed: %w", err)
+			return fmt.Errorf("could not insert EpochSetup event: %w", err)
 		}
-		err = operation.InsertEpochCommit(commit.Counter, commit)(tx)
+		err = m.state.commits.StoreTx(commit)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert eoch end: %w", err)
+			return fmt.Errorf("could not insert EpochCommit event: %w", err)
+		}
+		err = m.state.epochStatuses.StoreTx(root.ID(), flow.NewEpochStatus(setup.ID(), commit.ID(), flow.ZeroID, flow.ZeroID))(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert EpochStatus: %w", err)
 		}
 
 		m.state.metrics.FinalizedHeight(root.Header.Height)
@@ -400,98 +402,17 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
 	}
 
-	// SIXTH: In case any of the payload seals includes system events, we need to
-	// check if they are valid and must apply them to the protocol state as needed.
-
-	// Retrieve the current epoch counter and the current epoch's service events.
-	var counter uint64
-	err = m.state.db.View(operation.RetrieveEpochCounter(&counter))
+	// SIXTH: epoch transitions and service events
+	//    (i) Determine protocol state for block's _current_ Epoch.
+	//        As we don't have slashing yet, the protocol state is fully
+	//        determined by the Epoch Preparation events.
+	//   (ii) Determine protocol state for block's _next_ Epoch.
+	//        In case any of the payload seals includes system events,
+	//        we need to check if they are valid and must apply them
+	//        to the protocol state as needed.
+	ops, err := m.handleServiceEvents(candidate)
 	if err != nil {
-		return fmt.Errorf("could not retrieve epoch counter: %w", err)
-	}
-	activeSetup, err := m.state.setups.ByCounter(counter)
-	if err != nil {
-		return fmt.Errorf("could not retrieve current epoch setup: %w", err)
-	}
-
-	// Let's first establish the status quo of the current epoch. This function
-	// checks if we already had an epoch setup or commit event in the history of
-	// the blockchain, both the finalized and the pending part.
-	didSetup, didCommit, err := m.epochStatus(counter+1, header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not check epoch status: %w", err)
-	}
-
-	// For each service event included in the payload, check whether it
-	// is compliant with the protocol rules.
-	// NOTE: We could check that we have at most two service eventshere,
-	// but using more granular checks that catch invalid events one by one
-	// makes the code more extensible in the future.
-	for _, seal := range payload.Seals {
-		for _, event := range seal.ServiceEvents {
-
-			switch ev := event.Event.(type) {
-			case *flow.EpochSetup:
-
-				// We should only have a single epoch setup event per epoch.
-				if didSetup {
-					return fmt.Errorf("duplicate epoch setup service event")
-				}
-
-				// The setup event should have the counter increased by one.
-				if ev.Counter != counter+1 {
-					return fmt.Errorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
-				}
-
-				// The final view needs to be after the current epoch final view.
-				// NOTE: This kind of operates as an overflow check for the other checks.
-				if ev.FinalView <= activeSetup.FinalView {
-					return fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
-				}
-
-				// Finally, the epoch setup event must contain all necessary information.
-				err = validSetup(ev)
-				if err != nil {
-					return fmt.Errorf("invalid epoch setup: %w", err)
-				}
-
-				// Make sure to disallow multiple commit events per payload.
-				didSetup = true
-
-			case *flow.EpochCommit:
-
-				// We should only have a single epoch commit event per epoch.
-				if didCommit {
-					return fmt.Errorf("duplicate epoch commit service event")
-				}
-
-				// The epoch setup event needs to happen before the commit.
-				if !didSetup {
-					return fmt.Errorf("missing epoch setup for epoch commit")
-				}
-
-				// The commit event should have the counter increased by one.
-				if ev.Counter != counter+1 {
-					return fmt.Errorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
-				}
-
-				// Finally, the commit should commit all the necessary information.
-				setup, err := m.state.setups.ByCounter(ev.Counter)
-				if err != nil {
-					return fmt.Errorf("could not retrieve next epoch setup: %w", err)
-				}
-				err = validCommit(ev, setup)
-				if err != nil {
-					return fmt.Errorf("invalid epoch commit: %w", err)
-				}
-
-				// Make sure to disallow multiple commit events per payload.
-				didCommit = true
-
-			default:
-				return fmt.Errorf("invalid service event type: %s", event.Type)
-			}
-		}
+		return fmt.Errorf("could not handle service events: %w", err)
 	}
 
 	// FINALLY: Both the header itself and its payload are in compliance with the
@@ -504,7 +425,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
-		// index the block seal for this block
+
+		// index the latest sealed block in this fork
 		blockID := candidate.ID()
 		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
@@ -516,6 +438,15 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
+
+		// apply any optional DB operations from service events
+		for _, apply := range ops {
+			err := apply(tx)
+			if err != nil {
+				return fmt.Errorf("could not apply operation: %w", err)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -562,61 +493,32 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve sealed header: %w", err)
 	}
 
-	// THIRD: If we have system events in any of the seals, we should insert
-	// them into the protocol state accordingly on finalization. We create a
-	// list of operations to be applied on top of the rest.
+	// EPOCH: A block inserted into the protocol state is already a valid
+	// extension;
 
-	payload := block.Payload
-	var ops []func(*badger.Txn) error
-	for _, seal := range payload.Seals {
-		for _, event := range seal.ServiceEvents {
-			switch ev := event.Event.(type) {
-			case *flow.EpochSetup:
-				fmt.Println("inserting setup", ev.Counter)
-				ops = append(ops, m.state.setups.StoreTx(ev))
-			case *flow.EpochCommit:
-				fmt.Println("inserting commit", ev.Counter)
-				ops = append(ops, m.state.commits.StoreTx(ev))
-			default:
-				return fmt.Errorf("invalid service event type in payload (%T)", event)
-			}
-		}
-	}
-
-	// EPOCH: We need to validate whether all information is available in the
-	// protocol state to go to the next epoch when needed. In cases where there
-	// is a bug in the smart contract, it could be that this happens too late
-	// and the chain finalization should halt.
 	// We also map the epoch to the height of its last finalized block; this is
 	// important in order to efficiently be able to look up epoch snapshots.
 
-	var counter uint64
-	err = m.state.db.View(operation.RetrieveEpochCounter(&counter))
+	epochState, err := m.state.epochStatuses.ByBlockID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve epoch counter: %w", err)
+		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
-	setup, err := m.state.setups.ByCounter(counter)
+	setup, err := m.state.setups.ByID(epochState.CurrentEpoch.SetupID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve epoch setup: %w", err)
-	}
-	if header.View > setup.FinalView {
-		didSetup, didCommit, err := m.epochStatus(counter+1, finalID)
-		if err != nil {
-			return fmt.Errorf("could not check epoch status: %w", err)
-		}
-		if !didSetup || !didCommit {
-			return fmt.Errorf("missing epoch transition event(s)!")
-		}
-		counter = counter + 1
-		ops = append(ops, operation.UpdateEpochCounter(counter))
-		ops = append(ops, operation.IndexEpochStart(counter, header.View))
-		ops = append(ops, operation.InsertEpochHeight(counter, header.Height))
-	} else {
-		ops = append(ops, operation.UpdateEpochHeight(counter, header.Height))
+		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
 
-	// FINALLY: A block inserted into the protocol state is already a valid
-	// extension; in order to make it final, we need to do just three things:
+	var ops []func(*badger.Txn) error
+	if header.View > setup.FinalView { // first block of next Epoch in this fork
+		ops = append(ops, operation.UpdateEpochCounter(setup.Counter))
+		ops = append(ops, operation.IndexEpochStart(setup.Counter, header.View))
+		ops = append(ops, operation.InsertEpochHeight(setup.Counter, header.Height))
+	} else {
+		ops = append(ops, operation.UpdateEpochHeight(setup.Counter, header.Height))
+	}
+
+	// FINALLY: any block that is finalized is already a valid extension;
+	// in order to make it final, we need to do just three things:
 	// 1) Map its height to its index; there can no longer be other blocks at
 	// this height, as it becomes immutable.
 	// 2) Forward the last finalized height to its height as well. We now have
@@ -671,105 +573,167 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	return nil
 }
 
-// epochStatus returns booleans indicating the status of the epoch with the given
-// counter, with respect to the given ancestor block. Each boolean return value
-// indicates whether the given service event type has been included, either in a
-// finalized block or in a pending ancestor block.
-func (m *Mutator) epochStatus(counter uint64, ancestorID flow.Identifier) (isSetup bool, isCommitted bool, err error) {
+// epochStatus computes the EpochStatus for the given block
+// BEFORE applying the block payload itself
+// Specifically, we must determine whether block is the first block of a new
+// epoch in its respective fork. We do this by comparing the block's view to
+// the Epoch data from its parent. If the block's view is _larger_ than the
+// final View of the parent's epoch, the block starts a new Epoch.
+// case (a): block is in same Epoch as parent.
+//           the parent's EpochStatus.CurrentEpoch also applies for the current block
+// case (b): block starts new Epoch in its respective fork.
+//           the parent's EpochStatus.NextEpoch is the current block's EpochStatus.CurrentEpoch
+// As the parent was a valid extension of the chain, by induction, the parent satisfies all
+// consistency requirements of the protocol.
+func (m *Mutator) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 
-	// First, we check if both epoch events have already been finalized; if they have, we don't
-	// need to check anything else.
-	setupFinalized, err := m.setupFinalized(counter)
+	parentStatus, err := m.state.epochStatuses.ByBlockID(block.ParentID)
 	if err != nil {
-		return false, false, fmt.Errorf("could not check epoch setup finalization: %w", err)
-	}
-	commitFinalized, err := m.commitFinalized(counter)
-	if err != nil {
-		return false, false, fmt.Errorf("could not check next epoch commit finalization: %w", err)
-	}
-	if setupFinalized && commitFinalized {
-		return true, true, nil
-	}
-
-	// This code is only to prepare the below loop. We could inject them as parameters, but it
-	// is a little less elegant, and the values should be in the badger cache anyway. This keeps
-	// the function signature a bit simpler.
-	var finalized uint64
-	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalized))
-	if err != nil {
-		return false, false, fmt.Errorf("could not retrieve finalized height: %w", err)
-	}
-	var finalID flow.Identifier
-	err = m.state.db.View(operation.LookupBlockHeight(finalized, &finalID))
-	if err != nil {
-		return false, false, fmt.Errorf("could not lookup finalized block: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
 	}
 
-	// Next, we want to check if we find the events in one of the pending blocks. We shouldn't
-	// have to check the order of events here; if they were committed in the wrong order, we
-	// already have an invalid protocol state that could be finalized and everything is broken.
-	// This allows us to ignore the finalized status of the setup event.
-	setupPending := false
-	commitPending := false
-	for ancestorID != finalID {
+	// Retrieve EpochSetup and EpochCommit event for parent block's Epoch
+	parentSetup, err := m.state.setups.ByID(parentStatus.CurrentEpoch.SetupID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
+	}
 
-		// we need to get the ancestor to check its height for validity; it could be that the
-		// block is connected to an obsolete branch of the blockchain that can no longer be
-		// finalized, in which case we will never reach the finalID
-		ancestor, err := m.state.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return false, false, fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
+	if parentSetup.FinalView < block.View { // first block of a new epoch
+		// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
+		if parentStatus.NextEpoch.SetupID == flow.ZeroID {
+			return nil, fmt.Errorf("missing setup event for starting next epoch")
 		}
-		if ancestor.Height < finalized {
-			return false, false, state.NewOutdatedExtensionErrorf("candidate block conflicts with finalized state (ancestor: %d final: %d)", ancestor.Height, finalized)
+		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
+			return nil, fmt.Errorf("missing commit event for starting next epoch")
 		}
+		p := flow.NewEpochStatus(
+			parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
+			flow.ZeroID, flow.ZeroID,
+		)
+		return p, nil
+	}
 
-		// next, we retrieve the payload to look at the service events for all block seals included
-		// on the pending part of the blockchain; if both events were found, it means we can stop
-		// looking as we should only have one of each for the compliant part of the chain
-		payload, err := m.state.payloads.ByBlockID(ancestorID)
-		if err != nil {
-			return false, false, fmt.Errorf("could not retrieve payload (%x): %w", ancestorID, err)
-		}
-		for _, seal := range payload.Seals {
-			for _, event := range seal.ServiceEvents {
-				if setupPending && commitPending {
-					break
+	// Block is in the same epoch as its parent, re-use the same epoch status
+	// IMPORTANT: copy the status to avoid modifying the parent status in the cache
+	blockStatus := flow.NewEpochStatus(
+		parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
+		parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
+	)
+	return blockStatus, nil
+}
+
+// handleServiceEvents checks the service events within the seals of a block.
+// It returns an error if there are any invalid, malformed, or duplicate events,
+// in which case this block should be rejected.
+//
+// If the service events are valid, or there are no service events, it returns
+// a slice of Badger operations to apply while storing the block. This includes
+// an operation to index the epoch status for every block, and operations to
+// insert service events for blocks that include them.
+func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) error, error) {
+
+	// Determine epoch status for block's CURRENT epoch.
+	//
+	// This yields the tentative protocol state BEFORE applying the block payload.
+	// As we don't have slashing yet, there is nothing in the payload which could
+	// modify the protocol state for the current epoch.
+	epochStatus, err := m.epochStatus(block.Header)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine epoch status: %w", err)
+	}
+
+	activeSetup, err := m.state.setups.ByID(epochStatus.CurrentEpoch.SetupID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
+	}
+	counter := activeSetup.Counter
+
+	// keep track of DB operations to apply when inserting this block
+	var ops []func(*badger.Txn) error
+
+	// The payload might contain epoch preparation service events for the next
+	// epoch. In this case, we need to update the tentative protocol state.
+	// We need to validate whether all information is available in the protocol
+	// state to go to the next epoch when needed. In cases where there is a bug
+	// in the smart contract, it could be that this happens too late and the
+	// chain finalization should halt.
+	for _, seal := range block.Payload.Seals {
+		for _, event := range seal.ServiceEvents {
+
+			switch ev := event.Event.(type) {
+			case *flow.EpochSetup:
+
+				// We should only have a single epoch setup event per epoch.
+				if epochStatus.NextEpoch.SetupID != flow.ZeroID {
+					// true iff EpochSetup event for NEXT epoch was already included before
+					return nil, fmt.Errorf("duplicate epoch setup service event")
 				}
-				if _, ok := event.Event.(*flow.EpochSetup); ok {
-					setupPending = true
-					continue
+
+				// The setup event should have the counter increased by one.
+				if ev.Counter != counter+1 {
+					return nil, fmt.Errorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
 				}
-				if _, ok := event.Event.(*flow.EpochCommit); ok {
-					commitPending = true
-					continue
+
+				// The final view needs to be after the current epoch final view.
+				// NOTE: This kind of operates as an overflow check for the other checks.
+				if ev.FinalView <= activeSetup.FinalView {
+					return nil, fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
 				}
+
+				// Finally, the epoch setup event must contain all necessary information.
+				err = validSetup(ev)
+				if err != nil {
+					return nil, fmt.Errorf("invalid epoch setup: %w", err)
+				}
+
+				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
+				epochStatus.NextEpoch.SetupID = ev.ID()
+
+				// we'll insert the setup event when we insert the block
+				ops = append(ops, m.state.setups.StoreTx(ev))
+
+			case *flow.EpochCommit:
+
+				// We should only have a single epoch commit event per epoch.
+				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
+					// true iff EpochEpochCommitSetup event for NEXT epoch was already included before
+					return nil, fmt.Errorf("duplicate epoch commit service event")
+				}
+
+				// The epoch setup event needs to happen before the commit.
+				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
+					return nil, fmt.Errorf("missing epoch setup for epoch commit")
+				}
+
+				// The commit event should have the counter increased by one.
+				if ev.Counter != counter+1 {
+					return nil, fmt.Errorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
+				}
+
+				// Finally, the commit should commit all the necessary information.
+				setup, err := m.state.setups.ByID(epochStatus.NextEpoch.SetupID)
+				if err != nil {
+					return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
+				}
+				err = validCommit(ev, setup)
+				if err != nil {
+					return nil, fmt.Errorf("invalid epoch commit: %w", err)
+				}
+
+				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
+				epochStatus.NextEpoch.CommitID = ev.ID()
+
+				// we'll insert the commit event when we insert the block
+				ops = append(ops, m.state.commits.StoreTx(ev))
+
+			default:
+				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
 			}
 		}
-		ancestorID = ancestor.ParentID
 	}
 
-	return setupPending || setupFinalized, commitPending || commitFinalized, nil
-}
+	// we always index the epoch status, even when there are no service events
+	ops = append(ops, m.state.epochStatuses.StoreTx(block.ID(), epochStatus))
 
-func (m *Mutator) setupFinalized(counter uint64) (bool, error) {
-	_, err := m.state.setups.ByCounter(counter)
-	if err == nil {
-		return true, nil
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, nil
-	}
-	return false, err
-}
-
-func (m *Mutator) commitFinalized(counter uint64) (bool, error) {
-	_, err := m.state.commits.ByCounter(counter)
-	if err == nil {
-		return true, nil
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, nil
-	}
-	return false, err
+	return ops, nil
 }

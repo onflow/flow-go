@@ -3,7 +3,9 @@ package encodable
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -158,6 +160,10 @@ func (pub *RandomBeaconPubKey) UnmarshalMsgpack(b []byte) error {
 	var err error
 	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, bz)
 	return err
+}
+
+func (pub *RandomBeaconPubKey) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, pub.PublicKey.Encode())
 }
 
 // RandomBeaconPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in

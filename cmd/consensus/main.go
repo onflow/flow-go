@@ -242,10 +242,10 @@ func main() {
 			build = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
+				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
-				node.Storage.Blocks,
 				guarantees,
 				seals,
 				builder.WithMinInterval(minInterval),

@@ -67,7 +67,7 @@ func New(
 
 	// find my cluster for the current epoch
 	// TODO this should flow from cluster state as source of truth
-	clusters, err := protoState.Final().Clusters()
+	clusters, err := protoState.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters: %w", err)
 	}

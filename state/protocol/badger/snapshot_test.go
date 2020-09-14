@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/state/protocol/util"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -26,22 +25,12 @@ func init() {
 func TestHead(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		// setup
-		header := unittest.BlockHeaderFixture()
-		header.Height = 42
-
-		err := db.Update(operation.InsertHeader(header.ID(), &header))
+		identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+		root, result, seal := unittest.BootstrapFixture(identities)
+		err := state.Mutate().Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
-		err = db.Update(operation.IndexBlockHeight(header.Height, header.ID()))
-		require.NoError(t, err)
-
-		// add a second, outdated boundary to ensure the latest is taken
-		err = db.Update(operation.InsertFinalizedHeight(header.Height - 1))
-		require.NoError(t, err)
-
-		err = db.Update(operation.UpdateFinalizedHeight(header.Height))
-		require.NoError(t, err)
+		header := root.Header
 
 		t.Run("works with block number", func(t *testing.T) {
 			retrieved, err := state.AtHeight(header.Height).Head()
@@ -99,7 +88,7 @@ func TestClusters(t *testing.T) {
 
 		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
 		require.NoError(t, err)
-		actualClusters, err := state.Final().Clusters()
+		actualClusters, err := state.Final().Epochs().Current().Clustering()
 		require.NoError(t, err)
 
 		require.Equal(t, nClusters, len(expectedClusters))
@@ -126,7 +115,7 @@ func TestSeed(t *testing.T) {
 			err := state.Mutate().Bootstrap(root, result, seal)
 			require.NoError(t, err)
 
-			_, err = state.Final().(*protocol.BlockSnapshot).Seed(1, 2, 3, 4)
+			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
 			assert.Error(t, err)
 		})
@@ -150,7 +139,7 @@ func TestSeed(t *testing.T) {
 			err = state.Mutate().Extend(&unvalidatedChild)
 			assert.Nil(t, err)
 
-			_, err = state.Final().(*protocol.BlockSnapshot).Seed(1, 2, 3, 4)
+			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
 			assert.Error(t, err)
 		})

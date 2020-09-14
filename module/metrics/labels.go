@@ -59,6 +59,7 @@ const (
 	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
+	ResourceEpochStatus              = "epoch_status"
 )
 
 const (

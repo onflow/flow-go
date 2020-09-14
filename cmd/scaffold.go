@@ -77,6 +77,7 @@ type Storage struct {
 	Collections  storage.Collections
 	Setups       storage.EpochSetups
 	Commits      storage.EpochCommits
+	Statuses     storage.EpochStatuses
 }
 
 type namedModuleFunc struct {
@@ -352,6 +353,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
+	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:      headers,
@@ -364,6 +366,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Collections:  collections,
 		Setups:       setups,
 		Commits:      commits,
+		Statuses:     statuses,
 	}
 }
 
@@ -379,6 +382,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Blocks,
 		fnb.Storage.Setups,
 		fnb.Storage.Commits,
+		fnb.Storage.Statuses,
 	)
 
 	fnb.MustNot(err).Msg("could not initialize flow state")

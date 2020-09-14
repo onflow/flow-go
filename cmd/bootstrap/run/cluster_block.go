@@ -5,7 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	clusterstate "github.com/dapperlabs/flow-go/state/cluster"
 )
 
 func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*cluster.Block {
@@ -16,7 +16,7 @@ func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*clust
 			panic(fmt.Sprintf("failed to get cluster by index: %v", i))
 		}
 
-		clusterBlocks[i] = protocol.CanonicalClusterRootBlock(epoch, cluster)
+		clusterBlocks[i] = clusterstate.CanonicalRootBlock(epoch, cluster)
 	}
 	return clusterBlocks
 }

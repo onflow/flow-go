@@ -41,7 +41,6 @@ const (
 	codeBlockToSeal         = 41 // index mapping a block its last payload seal
 	codeCollectionReference = 42 // index reference block ID for collection
 	codeBlockValidity       = 43 // validity of block per HotStuff
-	codeEpochHeight         = 44 // index mapping epoch to latest finalized block
 
 	// codes for indexing multiple identifiers by identifier
 	// 51 was used for identity indexes before epochs
@@ -50,12 +49,14 @@ const (
 	codePayloadSeals          = 53 // index mapping block ID to payload seals
 	codeCollectionBlock       = 54 // index mapping collection ID to block ID
 	codeBlockExecutionReceipt = 55 // index mapping block ID to execution receipt ID
+	codeBlockEpochStatus      = 56 // index mapping block ID to epoch status
 
 	// codes related to epoch information
-	codeEpochCounter = 60 // current epoch counter
-	codeEpochStart   = 61 // index for start views of epochs
-	codeEpochSetup   = 62 // setup events by epoch counter
-	codeEpochCommit  = 63 // commit events by epoch counter
+	codeEpochCounter = 60 // epoch counter of latest finalized block
+	codeEpochStart   = 61 // view of first finalized block in epoch
+	codeEpochHeight  = 62 // height of highest finalized block in epoch
+	codeEpochSetup   = 63 // index mapping EpochSetup event ID to full event
+	codeEpochCommit  = 64 // index mapping EpochCommit event ID to full event
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

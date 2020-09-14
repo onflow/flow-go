@@ -90,12 +90,14 @@ func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beac
 			signature.RandomBeaconThreshold(len(identities)), seed)
 		require.NoError(t, err)
 
-		committee.On("DKGSize", mock.Anything).Return(uint(len(identities)), nil)
-		committee.On("DKGGroupKey", mock.Anything).Return(beaconGroupPK, nil)
+		dkg := &mocks.DKG{}
+		committee.On("DKG", mock.Anything).Return(dkg, nil)
+		dkg.On("Size").Return(uint(len(identities)))
+		dkg.On("GroupKey").Return(beaconGroupPK)
 		for i, node := range identities {
 			share := beaconPKs[i]
-			committee.On("DKGKeyShare", mock.Anything, node.NodeID).Return(share, nil)
-			committee.On("DKGIndex", mock.Anything, node.NodeID).Return(uint(i), nil)
+			dkg.On("KeyShare", node.NodeID).Return(share, nil)
+			dkg.On("Index", node.NodeID).Return(uint(i), nil)
 		}
 	}
 
