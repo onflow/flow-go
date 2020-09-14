@@ -183,15 +183,16 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	// add a network for this node to the hub
 	net := hub.AddNetwork(localID, node)
 
-	guaranteeLimit, sealLimit, receiptLimit := uint(1000), uint(1000), uint(1000)
+	guaranteeLimit, sealLimit, receiptLimit, resultLimit := uint(1000), uint(1000), uint(1000), uint(1000)
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
-	seals, err := stdmap.NewSeals(sealLimit)
-	require.NoError(t, err)
+
+	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
+
 	receipts, err := stdmap.NewReceipts(receiptLimit)
 	require.NoError(t, err)
-	results, err := stdmap.NewResults(receiptLimit)
-	require.NoError(t, err)
+
+	results := stdmap.NewIncorporatedResults(resultLimit)
 
 	// initialize the block builder
 	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, indexDB, blocksDB, guarantees, seals, receipts, results)

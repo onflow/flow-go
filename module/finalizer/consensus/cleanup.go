@@ -20,7 +20,7 @@ func CleanupNothing() CleanupFunc {
 	}
 }
 
-func CleanupMempools(collector module.MempoolMetrics, spans module.ConsensusMetrics, payloads storage.Payloads, guarantees mempool.Guarantees, seals mempool.Seals) CleanupFunc {
+func CleanupMempools(collector module.MempoolMetrics, spans module.ConsensusMetrics, payloads storage.Payloads, guarantees mempool.Guarantees, seals mempool.IncorporatedResultSeals) CleanupFunc {
 	return func(blockID flow.Identifier) error {
 
 		payload, err := payloads.ByBlockID(blockID)

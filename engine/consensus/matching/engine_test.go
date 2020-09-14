@@ -33,25 +33,24 @@ import (
 //     2. it should ignore it when:
 //         1. the origin is invalid
 //         2. the role is invalid
-//         3. the result (a receipt has one result, multiple receipts might have the same result) has been sealed already
-//         4. the receipt has been received before
-//         5. the result has been received before
+//         3. the receipt has been received before
+// 		   4. the corresponding block has been sealed
 // 2. Matching engine should validate the incoming approval (aka ResultApproval):
 //     1. it should store it to the mempool if valid
 //     2. it should ignore it when:
 //         1. the origin is invalid
 //         2. the role is invalid
-//         3. the result has been sealed already
+//         3. the corresponding block has been sealed
 // 3. Matching engine should be able to find matched results:
 //     1. It should find no matched result if there is no result and no approval
 //     2. it should find 1 matched result if we received a receipt, and the block has no payload (impossible now, system every block will have at least one chunk to verify)
-//     3. It should find no matched result if there is only result, but no approval (skip for now, because we seal results without approvals)
+//     3. It should find no matched result if there is only result, but no approval
 // 4. Matching engine should be able to seal a matched result:
 //     1. It should not seal a matched result if:
 //         1. the block is missing (consensus hasn’t received this executed block yet)
-//         2. the approvals for a certain chunk are insufficient (skip for now, because we seal results without approvals)
+//         2. the approvals for a certain chunk are insufficient
 //         3. there is some chunk didn’t receive enough approvals
-//         4. there is no seal for its parent result
+//         4. the previous result is not known
 //     2. It should seal a matched result if the approvals are sufficient
 // 5. Matching engine should request results from execution nodes:
 //     1. If there are unsealed and finalized blocks, it should request the execution receipts from the execution nodes.
@@ -77,19 +76,22 @@ type MatchingSuite struct {
 
 	sealedResults map[flow.Identifier]*flow.ExecutionResult
 	blocks        map[flow.Identifier]*flow.Block
+	seals         map[flow.Identifier]*flow.Seal // indexed by block id
 
-	sealedResultsDB *storage.ExecutionResults
-	headersDB       *storage.Headers
-	indexDB         *storage.Index
+	resultsDB *storage.ExecutionResults
+	headersDB *storage.Headers
+	indexDB   *storage.Index
+	sealsDB   *storage.Seals
 
-	pendingResults  map[flow.Identifier]*flow.ExecutionResult
-	pendingReceipts map[flow.Identifier]*flow.ExecutionReceipt
-	pendingSeals    map[flow.Identifier]*flow.Seal
+	pendingResults   map[flow.Identifier]*flow.IncorporatedResult
+	pendingReceipts  map[flow.Identifier]*flow.ExecutionReceipt
+	pendingApprovals map[flow.Identifier]*flow.ResultApproval
+	pendingSeals     map[flow.Identifier]*flow.IncorporatedResultSeal
 
-	resultsPL   *mempool.Results
+	resultsPL   *mempool.IncorporatedResults
 	receiptsPL  *mempool.Receipts
 	approvalsPL *mempool.Approvals
-	sealsPL     *mempool.Seals
+	sealsPL     *mempool.IncorporatedResultSeals
 
 	requester *module.Requester
 
@@ -160,9 +162,10 @@ func (ms *MatchingSuite) SetupTest() {
 
 	ms.sealedResults = make(map[flow.Identifier]*flow.ExecutionResult)
 	ms.blocks = make(map[flow.Identifier]*flow.Block)
+	ms.seals = make(map[flow.Identifier]*flow.Seal)
 
-	ms.sealedResultsDB = &storage.ExecutionResults{}
-	ms.sealedResultsDB.On("ByID", mock.Anything).Return(
+	ms.resultsDB = &storage.ExecutionResults{}
+	ms.resultsDB.On("ByID", mock.Anything).Return(
 		func(resultID flow.Identifier) *flow.ExecutionResult {
 			return ms.sealedResults[resultID]
 		},
@@ -174,7 +177,7 @@ func (ms *MatchingSuite) SetupTest() {
 			return nil
 		},
 	)
-	ms.sealedResultsDB.On("Index", mock.Anything, mock.Anything).Return(
+	ms.resultsDB.On("Index", mock.Anything, mock.Anything).Return(
 		func(blockID, resultID flow.Identifier) error {
 			return nil
 		},
@@ -234,24 +237,47 @@ func (ms *MatchingSuite) SetupTest() {
 		},
 	)
 
-	ms.pendingResults = make(map[flow.Identifier]*flow.ExecutionResult)
-	ms.pendingReceipts = make(map[flow.Identifier]*flow.ExecutionReceipt)
-	ms.pendingSeals = make(map[flow.Identifier]*flow.Seal)
-
-	ms.resultsPL = &mempool.Results{}
-	ms.resultsPL.On("Size").Return(uint(0)) // only for metrics
-	ms.resultsPL.On("ByID", mock.Anything).Return(
-		func(resultID flow.Identifier) *flow.ExecutionResult {
-			return ms.pendingResults[resultID]
+	ms.sealsDB = &storage.Seals{}
+	ms.sealsDB.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.Seal {
+			seal, found := ms.seals[blockID]
+			if !found {
+				return nil
+			}
+			return seal
 		},
-		func(resultID flow.Identifier) bool {
-			_, found := ms.pendingResults[resultID]
+		func(blockID flow.Identifier) error {
+			_, found := ms.seals[blockID]
+			if !found {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
+	ms.pendingResults = make(map[flow.Identifier]*flow.IncorporatedResult)
+	ms.pendingReceipts = make(map[flow.Identifier]*flow.ExecutionReceipt)
+	ms.pendingApprovals = make(map[flow.Identifier]*flow.ResultApproval)
+	ms.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+
+	ms.resultsPL = &mempool.IncorporatedResults{}
+	ms.resultsPL.On("Size").Return(uint(0)) // only for metrics
+	ms.resultsPL.On("ByIncorporatedBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) []*flow.IncorporatedResult {
+			res := []*flow.IncorporatedResult{}
+			if ir, ok := ms.pendingResults[blockID]; ok {
+				res = append(res, ir)
+			}
+			return res
+		},
+		func(blockID flow.Identifier) bool {
+			_, found := ms.pendingResults[blockID]
 			return found
 		},
 	)
 	ms.resultsPL.On("All").Return(
-		func() []*flow.ExecutionResult {
-			results := make([]*flow.ExecutionResult, 0, len(ms.pendingResults))
+		func() []*flow.IncorporatedResult {
+			results := make([]*flow.IncorporatedResult, 0, len(ms.pendingResults))
 			for _, result := range ms.pendingResults {
 				results = append(results, result)
 			}
@@ -274,17 +300,8 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.approvalsPL = &mempool.Approvals{}
 	ms.approvalsPL.On("Size").Return(uint(0)) // only for metrics
 
-	ms.sealsPL = &mempool.Seals{}
+	ms.sealsPL = &mempool.IncorporatedResultSeals{}
 	ms.sealsPL.On("Size").Return(uint(0)) // only for metrics
-	ms.sealsPL.On("ByID", mock.Anything).Return(
-		func(sealID flow.Identifier) *flow.Seal {
-			return ms.pendingSeals[sealID]
-		},
-		func(sealID flow.Identifier) bool {
-			_, found := ms.pendingSeals[sealID]
-			return found
-		},
-	)
 
 	ms.requester = new(module.Requester)
 	ms.assigner = &module.ChunkAssigner{}
@@ -296,10 +313,11 @@ func (ms *MatchingSuite) SetupTest() {
 		mempool:                 metrics,
 		state:                   ms.state,
 		requester:               ms.requester,
-		sealedResultsDB:         ms.sealedResultsDB,
+		resultsDB:               ms.resultsDB,
 		headersDB:               ms.headersDB,
 		indexDB:                 ms.indexDB,
-		results:                 ms.resultsPL,
+		sealsDB:                 ms.sealsDB,
+		incorporatedResults:     ms.resultsPL,
 		receipts:                ms.receiptsPL,
 		approvals:               ms.approvalsPL,
 		seals:                   ms.sealsPL,
@@ -355,16 +373,16 @@ func (ms *MatchingSuite) TestOnReceiptUnstakedExecutor() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestOnReceiptSealedResult() {
+func (ms *MatchingSuite) TestOnReceiptSealedBlock() {
 
 	// try to submit a receipt for a sealed result
 	originID := ms.exeID
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
-	ms.sealedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+	ms.seals[receipt.ExecutionResult.BlockID] = &flow.Seal{}
 
 	err := ms.matching.onReceipt(originID, receipt)
-	ms.Require().NoError(err, "should ignore receipt for sealed result")
+	ms.Require().NoError(err, "should ignore receipt for sealed block")
 
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -457,16 +475,16 @@ func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestOnApprovalSealedResult() {
+func (ms *MatchingSuite) TestOnApprovalSealedBlock() {
 
-	// try to submit an approval for a sealed result
+	// try to submit an approval for a sealed block
 	originID := ms.verID
 	approval := unittest.ResultApprovalFixture()
 	approval.Body.ApproverID = originID
-	ms.sealedResults[approval.Body.ExecutionResultID] = unittest.ExecutionResultFixture()
+	ms.seals[approval.Body.BlockID] = &flow.Seal{}
 
 	err := ms.matching.onApproval(originID, approval)
-	ms.Require().NoError(err, "should ignore approval for sealed result")
+	ms.Require().NoError(err, "should ignore approval for sealed block")
 
 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -531,18 +549,23 @@ func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 	block.Payload.Guarantees = nil
 	ms.blocks[block.Header.ID()] = &block
 
-	// add a result for this block to the DB
+	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
-	ms.pendingResults[result.ID()] = result
+	incorporationBlockID := unittest.IdentifierFixture()
+	incorporatedResult := &flow.IncorporatedResult{
+		IncorporatedBlockID: incorporationBlockID,
+		Result:              result,
+	}
+	ms.pendingResults[incorporationBlockID] = incorporatedResult
 
 	assignment := chunks.NewAssignment()
-	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+	ms.assigner.On("Assign", result, incorporationBlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
 	if ms.Assert().Len(results, 1, "should select result for empty block") {
 		sealable := results[0]
-		ms.Assert().Equal(result, sealable)
+		ms.Assert().Equal(incorporatedResult, sealable)
 	}
 }
 
@@ -554,7 +577,12 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 
 	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
-	ms.pendingResults[result.ID()] = result
+	incorporationBlockID := unittest.IdentifierFixture()
+	incorporatedResult := &flow.IncorporatedResult{
+		IncorporatedBlockID: incorporationBlockID,
+		Result:              result,
+	}
+	ms.pendingResults[incorporationBlockID] = incorporatedResult
 
 	// check calls have the correct parameters, and return 0 approvals
 	ms.approvalsPL.On("ByChunk", mock.Anything, mock.Anything).Run(
@@ -564,12 +592,14 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 		},
 	).Return(nil, false)
 
+	// only include 3/4 approvals
 	assignment := chunks.NewAssignment()
 	approvers := ms.approvers[:3]
 	for _, chunk := range result.Chunks {
 		assignment.Add(chunk, approvers.NodeIDs())
 	}
-	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+
+	ms.assigner.On("Assign", result, incorporationBlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -584,14 +614,19 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 
 	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
-	ms.pendingResults[result.ID()] = result
+	incorporationBlockID := unittest.IdentifierFixture()
+	incorporatedResult := &flow.IncorporatedResult{
+		IncorporatedBlockID: incorporationBlockID,
+		Result:              result,
+	}
+	ms.pendingResults[incorporationBlockID] = incorporatedResult
 
 	assignment := chunks.NewAssignment()
 	approvers := ms.approvers[:3]
 	for _, chunk := range result.Chunks {
 		assignment.Add(chunk, approvers.NodeIDs())
 	}
-	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+	ms.assigner.On("Assign", result, incorporationBlockID).Return(assignment, nil)
 
 	realApprovalPool, err := stdmap.NewApprovals(1000)
 	ms.Require().NoError(err)
@@ -614,7 +649,7 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	ms.Require().NoError(err)
 	if ms.Assert().Len(results, 1, "should select result with sufficient approvals") {
 		sealable := results[0]
-		ms.Assert().Equal(result, sealable)
+		ms.Assert().Equal(incorporatedResult, sealable)
 	}
 }
 
@@ -622,9 +657,16 @@ func (ms *MatchingSuite) TestMatchedResultsUnassignedVerifiers() {
 
 	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
 
 	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
+	incorporationBlockID := unittest.IdentifierFixture()
+	incorporatedResult := &flow.IncorporatedResult{
+		IncorporatedBlockID: incorporationBlockID,
+		Result:              result,
+	}
+	ms.pendingResults[incorporationBlockID] = incorporatedResult
 
 	// list of 3 approvers
 	assignedApprovers := ms.approvers[:3]
@@ -652,7 +694,7 @@ func (ms *MatchingSuite) TestMatchedResultsUnassignedVerifiers() {
 	}
 
 	// mock assigner
-	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+	ms.assigner.On("Assign", result, incorporationBlockID).Return(assignment, nil)
 
 	results, err := ms.matching.matchedResults()
 	ms.Require().NoError(err)
@@ -662,12 +704,12 @@ func (ms *MatchingSuite) TestMatchedResultsUnassignedVerifiers() {
 func (ms *MatchingSuite) TestSealResultMissingBlock() {
 
 	// try to seal a result for which we don't have the index payload
-	result := unittest.ExecutionResultFixture()
+	incorporatedResult := unittest.IncorporatedResultFixture()
 
-	err := ms.matching.sealResult(result)
+	err := ms.matching.sealResult(incorporatedResult)
 	ms.Require().Equal(errUnknownBlock, err, "should get unknown block error on missing block")
 
-	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -680,25 +722,30 @@ func (ms *MatchingSuite) TestSealResultInvalidChunks() {
 	chunk := unittest.ChunkFixture()
 	chunk.Index = uint64(len(block.Payload.Guarantees))
 	result.Chunks = append(result.Chunks, chunk)
+	incorporationBlockID := unittest.IdentifierFixture()
+	incorporatedResult := &flow.IncorporatedResult{
+		IncorporatedBlockID: incorporationBlockID,
+		Result:              result,
+	}
 
-	err := ms.matching.sealResult(result)
+	err := ms.matching.sealResult(incorporatedResult)
 	ms.Require().Equal(errInvalidChunks, err, "should get invalid chunks error on wrong chunk count")
 
-	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestSealResultUnsealedPrevious() {
+func (ms *MatchingSuite) TestSealResultUnknownPrevious() {
 
 	// try to seal a result with a missing previous result
 	block := unittest.BlockFixture()
 	ms.blocks[block.Header.ID()] = &block
-	result := unittest.ResultForBlockFixture(&block)
+	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
 
-	err := ms.matching.sealResult(result)
-	ms.Require().Equal(errUnsealedPrevious, err, "should get unsealed previous error on missing previous result")
+	err := ms.matching.sealResult(incorporatedResult)
+	ms.Require().Equal(errUnknownPrevious, err, "should get unknown previous error")
 
-	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -711,26 +758,32 @@ func (ms *MatchingSuite) TestSealResultValid() {
 	previous := unittest.ExecutionResultFixture()
 	result.PreviousResultID = previous.ID()
 	ms.sealedResults[previous.ID()] = previous
+	incorporationBlockID := unittest.IdentifierFixture()
+	incorporatedResult := &flow.IncorporatedResult{
+		IncorporatedBlockID: incorporationBlockID,
+		Result:              result,
+	}
 
 	// check match when we are storing entities
-	ms.sealedResultsDB.On("Store", mock.Anything).Run(
+	ms.resultsDB.On("Store", mock.Anything).Run(
 		func(args mock.Arguments) {
 			stored := args.Get(0).(*flow.ExecutionResult)
 			ms.Assert().Equal(result, stored)
 		},
 	).Return(nil)
+
 	ms.sealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
-			seal := args.Get(0).(*flow.Seal)
-			ms.Assert().Equal(result.ID(), seal.ResultID)
-			ms.Assert().Equal(result.BlockID, seal.BlockID)
+			seal := args.Get(0).(*flow.IncorporatedResultSeal)
+			ms.Assert().Equal(incorporatedResult.ID(), seal.IncorporatedResult.ID())
+			ms.Assert().Equal(result.BlockID, seal.Seal.BlockID)
 		},
 	).Return(true)
 
-	err := ms.matching.sealResult(result)
+	err := ms.matching.sealResult(incorporatedResult)
 	ms.Require().NoError(err, "should generate seal on persisted previous result")
 
-	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 }
 
@@ -801,5 +854,5 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 	ms.Require().NoError(err, "should request results for pending blocks")
 
 	// should request n-1 blocks if n > requestReceiptThreshold
-	ms.Assert().Equal(len(requestedBlocks), n-1)
+	ms.Assert().Equal(n-1, len(requestedBlocks))
 }

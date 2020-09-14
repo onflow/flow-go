@@ -32,18 +32,26 @@ type BuilderSuite struct {
 	parentID          flow.Identifier   // parent block we build on
 	finalizedBlockIDs []flow.Identifier // blocks between first and final
 	pendingBlockIDs   []flow.Identifier // blocks between final and parent
-	chain             []*flow.Seal      // chain of seals starting first
 
-	// stored data
-	pendingGuarantees   []*flow.CollectionGuarantee
-	pendingSeals        []*flow.Seal
-	pendingReceipts     []*flow.ExecutionReceipt
-	incorporatedResults []*flow.ExecutionResult
+	// used to populate and test the seal mempool
+	chain   []*flow.Seal                                     // chain of seals starting first
+	irsList []*flow.IncorporatedResultSeal                   // chain of IncorporatedResultSeals
+	irsMap  map[flow.Identifier]*flow.IncorporatedResultSeal // index for irsList
 
+	// mempools consumed by builder
+	pendingGuarantees []*flow.CollectionGuarantee
+	pendingReceipts   []*flow.ExecutionReceipt
+	pendingSeals      map[flow.Identifier]*flow.IncorporatedResultSeal // storage for the seal mempool
+
+	// mempool written to by builder
+	incorporatedResults []*flow.IncorporatedResult
+
+	// storage for dbs
 	seals   map[flow.Identifier]*flow.Seal
 	headers map[flow.Identifier]*flow.Header
 	heights map[uint64]*flow.Header
 	index   map[flow.Identifier]*flow.Index
+	blocks  map[flow.Identifier]*flow.Block
 
 	lastSeal *flow.Seal
 
@@ -60,33 +68,95 @@ type BuilderSuite struct {
 	blockDB  *storage.Blocks
 
 	guarPool *mempool.Guarantees
-	sealPool *mempool.Seals
+	sealPool *mempool.IncorporatedResultSeals
 	recPool  *mempool.Receipts
-	resPool  *mempool.Results
+	resPool  *mempool.IncorporatedResults
 
 	// tracking behaviour
 	assembled  *flow.Payload     // built payload
 	remCollIDs []flow.Identifier // guarantees removed from mempool
-	remSealIDs []flow.Identifier // seals removed from mempool
 	remRecIDs  []flow.Identifier // receipts removed from mempool
 
 	// component under test
 	build *Builder
 }
 
-func (bs *BuilderSuite) chainSeal(blockID flow.Identifier) {
+// createAndRecordBlock creates a new block chained to the previous block (if it
+// is not nil). The new block contains a receipt for a result of the previous
+// block, which is also used to create a seal for the previous block. The seal
+// and the result are combined in an IncorporatedResultSeal which is a candidate
+// for the seals mempool.
+func (bs *BuilderSuite) createAndRecordBlock(previous *flow.Block) *flow.Block {
+	var header flow.Header
+	if previous == nil {
+		header = unittest.BlockHeaderFixture()
+	} else {
+		header = unittest.BlockHeaderWithParentFixture(previous.Header)
+	}
+
+	block := &flow.Block{
+		Header:  &header,
+		Payload: unittest.PayloadFixture(),
+	}
+
+	// if previous is not nil, create a receipt for a result of the previous
+	// block, and add it to the payload. The corresponding IncorporatedResult
+	// will be use to seal the previous block, and to create an
+	// IncorporatedResultSeal for the seal mempool.
+	var incorporatedResult *flow.IncorporatedResult
+
+	if previous != nil {
+		previousResult := unittest.ResultForBlockFixture(previous)
+		receipt := unittest.ExecutionReceiptFixture()
+		receipt.ExecutionResult = *previousResult
+		block.Payload.Receipts = append(block.Payload.Receipts, receipt)
+
+		// include a result of the previous block
+		incorporatedResult = &flow.IncorporatedResult{
+			IncorporatedBlockID: block.ID(),
+			Result:              previousResult,
+		}
+	}
+
+	// record block in dbs
+	bs.headers[block.ID()] = block.Header
+	bs.heights[block.Header.Height] = block.Header
+	bs.blocks[block.ID()] = block
+	bs.index[block.ID()] = block.Payload.Index()
+
+	// seal the previous block with the result included in this block. Do not
+	// seal the first block because it is assumed that it is already sealed.
+	if previous != nil && previous.ID() != bs.firstID {
+		bs.chainSeal(incorporatedResult)
+	}
+
+	return block
+}
+
+// Create a seal for the result's block, and link it to the previous seal's
+// final state, thereby creating a valid chain. The corresponding
+// IncorporatedResultSeal, which ties the seal to the incorporated result it
+// seals, is also recorded for future access.
+func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 	initial := bs.lastSeal.FinalState
 	final := unittest.StateCommitmentFixture()
 	if len(bs.chain) > 0 {
 		initial = bs.chain[len(bs.chain)-1].FinalState
 	}
 	seal := &flow.Seal{
-		BlockID:      blockID,
-		ResultID:     flow.ZeroID, // we don't care
+		BlockID:      incorporatedResult.Result.BlockID,
+		ResultID:     incorporatedResult.Result.ID(),
 		InitialState: initial,
 		FinalState:   final,
 	}
 	bs.chain = append(bs.chain, seal)
+
+	incorporatedResultSeal := &flow.IncorporatedResultSeal{
+		IncorporatedResult: incorporatedResult,
+		Seal:               seal,
+	}
+	bs.irsMap[incorporatedResultSeal.ID()] = incorporatedResultSeal
+	bs.irsList = append(bs.irsList, incorporatedResultSeal)
 }
 
 /*
@@ -110,7 +180,10 @@ func (bs *BuilderSuite) SetupTest() {
 	// reset test helpers
 	bs.pendingBlockIDs = nil
 	bs.finalizedBlockIDs = nil
+
 	bs.chain = nil
+	bs.irsMap = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	bs.irsList = nil
 
 	// initialize the pools
 	bs.pendingGuarantees = nil
@@ -124,19 +197,16 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.headers = make(map[flow.Identifier]*flow.Header)
 	bs.heights = make(map[uint64]*flow.Header)
 	bs.index = make(map[flow.Identifier]*flow.Index)
+	bs.blocks = make(map[flow.Identifier]*flow.Block)
 
 	// initialize behaviour tracking
 	bs.assembled = nil
 	bs.remCollIDs = nil
-	bs.remSealIDs = nil
 	bs.remRecIDs = nil
 
 	// insert the first block in our range
-	first := unittest.BlockHeaderFixture()
+	first := bs.createAndRecordBlock(nil)
 	bs.firstID = first.ID()
-	bs.headers[first.ID()] = &first
-	bs.heights[first.Height] = &first
-	bs.index[first.ID()] = &flow.Index{}
 	bs.lastSeal = &flow.Seal{
 		BlockID:      first.ID(),
 		ResultID:     flow.ZeroID,
@@ -146,57 +216,43 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.seals[first.ID()] = bs.lastSeal
 
 	// insert the finalized blocks between first and final
-	previous := &first
+	previous := first
 	for n := 0; n < numFinalizedBlocks; n++ {
-		finalized := unittest.BlockHeaderWithParentFixture(previous)
+		finalized := bs.createAndRecordBlock(previous)
 		bs.finalizedBlockIDs = append(bs.finalizedBlockIDs, finalized.ID())
-		bs.headers[finalized.ID()] = &finalized
-		bs.heights[finalized.Height] = &finalized
-		bs.index[finalized.ID()] = &flow.Index{}
-		bs.chainSeal(finalized.ID())
-		previous = &finalized
+		previous = finalized
 	}
 
 	// insert the finalized block with an empty payload
-	final := unittest.BlockHeaderWithParentFixture(previous)
+	final := bs.createAndRecordBlock(previous)
 	bs.finalID = final.ID()
-	bs.headers[final.ID()] = &final
-	bs.heights[final.Height] = &final
-	bs.index[final.ID()] = &flow.Index{}
-	bs.chainSeal(final.ID())
 
 	// insert the pending ancestors with empty payload
-	previous = &final
+	previous = final
 	for n := 0; n < numPendingBlocks; n++ {
-		pending := unittest.BlockHeaderWithParentFixture(previous)
+		pending := bs.createAndRecordBlock(previous)
 		bs.pendingBlockIDs = append(bs.pendingBlockIDs, pending.ID())
-		bs.headers[pending.ID()] = &pending
-		bs.index[pending.ID()] = &flow.Index{}
-		bs.chainSeal(pending.ID())
-		previous = &pending
+		previous = pending
 	}
 
 	// insert the parent block with an empty payload
-	parent := unittest.BlockHeaderWithParentFixture(previous)
+	parent := bs.createAndRecordBlock(previous)
 	bs.parentID = parent.ID()
-	bs.headers[parent.ID()] = &parent
-	bs.index[parent.ID()] = &flow.Index{}
-	bs.chainSeal(parent.ID())
 
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
 
-	err := bs.db.Update(operation.InsertFinalizedHeight(final.Height))
+	err := bs.db.Update(operation.InsertFinalizedHeight(final.Header.Height))
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(final.Height, bs.finalID))
+	err = bs.db.Update(operation.IndexBlockHeight(final.Header.Height, bs.finalID))
 	bs.Require().NoError(err)
 
 	err = bs.db.Update(operation.InsertRootHeight(13))
 	bs.Require().NoError(err)
 
-	err = bs.db.Update(operation.InsertSealedHeight(first.Height))
+	err = bs.db.Update(operation.InsertSealedHeight(first.Header.Height))
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(first.Height, first.ID()))
+	err = bs.db.Update(operation.IndexBlockHeight(first.Header.Height, first.ID()))
 	bs.Require().NoError(err)
 
 	bs.sentinel = 1337
@@ -262,6 +318,18 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	bs.blockDB = &storage.Blocks{}
+	bs.blockDB.On("ByID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.Block {
+			return bs.blocks[blockID]
+		},
+		func(blockID flow.Identifier) error {
+			_, exists := bs.blocks[blockID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
 	bs.blockDB.On("Store", mock.Anything).Run(func(args mock.Arguments) {
 		block := args.Get(0).(*flow.Block)
 		bs.Assert().Equal(bs.sentinel, block.Header.View)
@@ -281,17 +349,26 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.remCollIDs = append(bs.remCollIDs, collID)
 	}).Return(true)
 
-	bs.sealPool = &mempool.Seals{}
+	bs.sealPool = &mempool.IncorporatedResultSeals{}
 	bs.sealPool.On("Size").Return(uint(0)) // only used by metrics
 	bs.sealPool.On("All").Return(
-		func() []*flow.Seal {
-			return bs.pendingSeals
+		func() []*flow.IncorporatedResultSeal {
+			res := make([]*flow.IncorporatedResultSeal, 0, len(bs.pendingSeals))
+			for _, ps := range bs.pendingSeals {
+				res = append(res, ps)
+			}
+			return res
 		},
 	)
-	bs.sealPool.On("Rem", mock.Anything).Run(func(args mock.Arguments) {
-		sealID := args.Get(0).(flow.Identifier)
-		bs.remSealIDs = append(bs.remSealIDs, sealID)
-	}).Return(true)
+	bs.sealPool.On("ByID", mock.Anything).Return(
+		func(id flow.Identifier) *flow.IncorporatedResultSeal {
+			return bs.pendingSeals[id]
+		},
+		func(id flow.Identifier) bool {
+			_, exists := bs.pendingSeals[id]
+			return exists
+		},
+	)
 
 	bs.recPool = &mempool.Receipts{}
 	bs.recPool.On("Size").Return(uint(0))
@@ -305,11 +382,11 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.remRecIDs = append(bs.remRecIDs, recID)
 	}).Return(true)
 
-	bs.resPool = &mempool.Results{}
+	bs.resPool = &mempool.IncorporatedResults{}
 	bs.resPool.On("Size").Return(uint(0))
 	bs.resPool.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*flow.ExecutionResult)
+			res := args.Get(0).(*flow.IncorporatedResult)
 			bs.incorporatedResults = append(bs.incorporatedResults, res)
 		},
 	).Return(true)
@@ -329,7 +406,6 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	bs.build.cfg.expiry = 11
-
 }
 
 func (bs *BuilderSuite) TearDownTest() {
@@ -445,53 +521,62 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 func (bs *BuilderSuite) TestPayloadSealAllValid() {
 
 	// use valid chain of seals in mempool
-	bs.pendingSeals = bs.chain
+	bs.pendingSeals = bs.irsMap
+
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().ElementsMatch(bs.pendingSeals, bs.assembled.Seals, "should have included valid chain of seals")
-	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
+	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
 func (bs *BuilderSuite) TestPayloadSealSomeValid() {
 
-	// generate invalid seals
-	invalid := unittest.BlockSealsFixture(8)
+	bs.pendingSeals = bs.irsMap
 
-	// use both valid and non-valid seals for chain
-	bs.pendingSeals = append(bs.chain, invalid...)
+	// add some invalid seals to the mempool
+	for i := 0; i < 8; i++ {
+		invalid := &flow.IncorporatedResultSeal{
+			IncorporatedResult: unittest.IncorporatedResultFixture(),
+			Seal:               unittest.BlockSealFixture(),
+		}
+		bs.pendingSeals[invalid.ID()] = invalid
+	}
+
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
-	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
 }
 
 func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 
 	// remove the seal at the start
-	bs.pendingSeals = bs.chain[1:]
+	cutoff := bs.irsMap
+	first := bs.irsList[0]
+	delete(cutoff, first.ID())
 
-	// use both valid and non-valid seals for chain
+	bs.pendingSeals = cutoff
+
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().Empty(bs.assembled.Seals, "should have not included any chains from cutoff chain")
-	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
+	bs.Assert().Empty(bs.assembled.Seals, "should have not included any seals from cutoff chain")
 }
 
 func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
 
-	// remove the seal at the start
-	bs.pendingSeals = bs.chain[:3]
-	bs.pendingSeals = append(bs.pendingSeals, bs.chain[4:]...)
+	// remove the 4th seal
+	brokenChain := bs.irsMap
+	fourth := bs.irsList[3]
+	delete(brokenChain, fourth.ID())
+
+	bs.pendingSeals = brokenChain
 
 	// use both valid and non-valid seals for chain
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().ElementsMatch(bs.chain[:3], bs.assembled.Seals, "should have included only beginning of broken chain")
-	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
 }
 
 // Receipts for unknown blocks should not be inserted, and should be removed
@@ -578,7 +663,6 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 
 	// create valid receipts for known, unsealed blocks
 	receipts := []*flow.ExecutionReceipt{}
-	results := []*flow.ExecutionResult{}
 	var i uint64
 	for i = 0; i < 5; i++ {
 		pendingReceipt := unittest.ExecutionReceiptFixture()
@@ -586,7 +670,7 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 			Height: i,
 		}
 		receipts = append(receipts, pendingReceipt)
-		results = append(results, &pendingReceipt.ExecutionResult)
+
 	}
 
 	// shuffle receipts
@@ -597,11 +681,21 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 
 	bs.pendingReceipts = sr
 
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	header, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain receipts ordered by block height")
 	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
-	bs.Assert().ElementsMatch(bs.incorporatedResults, results, "should insert incorporated results in mempool")
+
+	expectedIncorporatedResults := []*flow.IncorporatedResult{}
+	for i := 0; i < 5; i++ {
+		expectedIncorporatedResults = append(expectedIncorporatedResults,
+			&flow.IncorporatedResult{
+				IncorporatedBlockID: header.ID(),
+				Result:              &receipts[i].ExecutionResult,
+			})
+	}
+
+	bs.Assert().ElementsMatch(bs.incorporatedResults, expectedIncorporatedResults, "should insert incorporated results in mempool")
 }
 
 // Payloads can contain multiple receipts for a given block.

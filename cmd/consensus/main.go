@@ -66,10 +66,10 @@ func main() {
 		err            error
 		privateDKGData *bootstrap.DKGParticipantPriv
 		guarantees     mempool.Guarantees
-		results        mempool.Results
+		results        mempool.IncorporatedResults
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
-		seals          mempool.Seals
+		seals          mempool.IncorporatedResultSeals
 		prov           *provider.Engine
 		requesterEng   *requester.Engine
 		syncCore       *synchronization.Core
@@ -103,8 +103,8 @@ func main() {
 			return err
 		}).
 		Module("execution results mempool", func(node *cmd.FlowNodeBuilder) error {
-			results, err = stdmap.NewResults(resultLimit)
-			return err
+			results = stdmap.NewIncorporatedResults(resultLimit)
+			return nil
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			receipts, err = stdmap.NewReceipts(receiptLimit)
@@ -127,9 +127,9 @@ func main() {
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
-			ejector := ejectors.NewLatestSeal(node.Storage.Headers)
-			seals, err = stdmap.NewSeals(sealLimit, stdmap.WithEject(ejector.Eject))
-			return err
+			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
+			seals = stdmap.NewIncorporatedResultSeals(sealLimit, stdmap.WithEject(ejector.Eject))
+			return nil
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer)
@@ -144,7 +144,8 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			sealedResultsDB := bstorage.NewExecutionResults(node.DB)
+			resultsDB := bstorage.NewExecutionResults(node.DB)
+
 			requesterEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -174,9 +175,10 @@ func main() {
 				node.State,
 				node.Me,
 				requesterEng,
-				sealedResultsDB,
 				node.Storage.Headers,
 				node.Storage.Index,
+				node.Storage.Seals,
+				resultsDB,
 				results,
 				receipts,
 				approvals,
