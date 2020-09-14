@@ -1,25 +1,30 @@
-package bootstrap
+package encodable
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
+
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
-// EncodableNetworkPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the
+// NetworkPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types.
-type EncodableNetworkPubKey struct {
+type NetworkPubKey struct {
 	crypto.PublicKey
 }
 
-func (pub EncodableNetworkPubKey) MarshalJSON() ([]byte, error) {
+func (pub NetworkPubKey) MarshalJSON() ([]byte, error) {
 	if pub.PublicKey == nil {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(pub.Encode())
 }
 
-func (pub *EncodableNetworkPubKey) UnmarshalJSON(b []byte) error {
+func (pub *NetworkPubKey) UnmarshalJSON(b []byte) error {
 	var bz []byte
 	if err := json.Unmarshal(b, &bz); err != nil {
 		return err
@@ -32,22 +37,22 @@ func (pub *EncodableNetworkPubKey) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// EncodableNetworkPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in the
+// NetworkPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types. More importantly, private
 // keys should not be automatically encodable/serializable to prevent accidental secret sharing. The bootstrapping
 // package is an exception, since it generates private keys that need to be serialized.
-type EncodableNetworkPrivKey struct {
+type NetworkPrivKey struct {
 	crypto.PrivateKey
 }
 
-func (priv EncodableNetworkPrivKey) MarshalJSON() ([]byte, error) {
+func (priv NetworkPrivKey) MarshalJSON() ([]byte, error) {
 	if priv.PrivateKey == nil {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(priv.Encode())
 }
 
-func (priv *EncodableNetworkPrivKey) UnmarshalJSON(b []byte) error {
+func (priv *NetworkPrivKey) UnmarshalJSON(b []byte) error {
 	var bz []byte
 	if err := json.Unmarshal(b, &bz); err != nil {
 		return err
@@ -60,20 +65,20 @@ func (priv *EncodableNetworkPrivKey) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// EncodableStakingPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the
+// StakingPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types.
-type EncodableStakingPubKey struct {
+type StakingPubKey struct {
 	crypto.PublicKey
 }
 
-func (pub EncodableStakingPubKey) MarshalJSON() ([]byte, error) {
+func (pub StakingPubKey) MarshalJSON() ([]byte, error) {
 	if pub.PublicKey == nil {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(pub.Encode())
 }
 
-func (pub *EncodableStakingPubKey) UnmarshalJSON(b []byte) error {
+func (pub *StakingPubKey) UnmarshalJSON(b []byte) error {
 	var bz []byte
 	if err := json.Unmarshal(b, &bz); err != nil {
 		return err
@@ -86,22 +91,22 @@ func (pub *EncodableStakingPubKey) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// EncodableStakingPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in the
+// StakingPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types. More importantly, private
 // keys should not be automatically encodable/serializable to prevent accidental secret sharing. The bootstrapping
 // package is an exception, since it generates private keys that need to be serialized.
-type EncodableStakingPrivKey struct {
+type StakingPrivKey struct {
 	crypto.PrivateKey
 }
 
-func (priv EncodableStakingPrivKey) MarshalJSON() ([]byte, error) {
+func (priv StakingPrivKey) MarshalJSON() ([]byte, error) {
 	if priv.PrivateKey == nil {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(priv.Encode())
 }
 
-func (priv *EncodableStakingPrivKey) UnmarshalJSON(b []byte) error {
+func (priv *StakingPrivKey) UnmarshalJSON(b []byte) error {
 	var bz []byte
 	if err := json.Unmarshal(b, &bz); err != nil {
 		return err
@@ -114,20 +119,20 @@ func (priv *EncodableStakingPrivKey) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// EncodableRandomBeaconPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the
+// RandomBeaconPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types.
-type EncodableRandomBeaconPubKey struct {
+type RandomBeaconPubKey struct {
 	crypto.PublicKey
 }
 
-func (pub EncodableRandomBeaconPubKey) MarshalJSON() ([]byte, error) {
+func (pub RandomBeaconPubKey) MarshalJSON() ([]byte, error) {
 	if pub.PublicKey == nil {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(pub.Encode())
 }
 
-func (pub *EncodableRandomBeaconPubKey) UnmarshalJSON(b []byte) error {
+func (pub *RandomBeaconPubKey) UnmarshalJSON(b []byte) error {
 	var bz []byte
 	if err := json.Unmarshal(b, &bz); err != nil {
 		return err
@@ -140,22 +145,43 @@ func (pub *EncodableRandomBeaconPubKey) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// EncodableRandomBeaconPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in
+func (pub RandomBeaconPubKey) MarshalMsgpack() ([]byte, error) {
+	if pub.PublicKey == nil {
+		return nil, fmt.Errorf("empty public key")
+	}
+	return msgpack.Marshal(pub.PublicKey.Encode())
+}
+
+func (pub *RandomBeaconPubKey) UnmarshalMsgpack(b []byte) error {
+	var bz []byte
+	if err := msgpack.Unmarshal(b, &bz); err != nil {
+		return err
+	}
+	var err error
+	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, bz)
+	return err
+}
+
+func (pub *RandomBeaconPubKey) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, pub.PublicKey.Encode())
+}
+
+// RandomBeaconPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in
 // the crypto package since the crypto package should not know about the different key types. More importantly, private
 // keys should not be automatically encodable/serializable to prevent accidental secret sharing. The bootstrapping
 // package is an exception, since it generates private keys that need to be serialized.
-type EncodableRandomBeaconPrivKey struct {
+type RandomBeaconPrivKey struct {
 	crypto.PrivateKey
 }
 
-func (priv EncodableRandomBeaconPrivKey) MarshalJSON() ([]byte, error) {
+func (priv RandomBeaconPrivKey) MarshalJSON() ([]byte, error) {
 	if priv.PrivateKey == nil {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(priv.Encode())
 }
 
-func (priv *EncodableRandomBeaconPrivKey) UnmarshalJSON(b []byte) error {
+func (priv *RandomBeaconPrivKey) UnmarshalJSON(b []byte) error {
 	var bz []byte
 	if err := json.Unmarshal(b, &bz); err != nil {
 		return err

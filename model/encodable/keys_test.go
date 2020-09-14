@@ -1,4 +1,4 @@
-package bootstrap
+package encodable
 
 import (
 	"crypto/rand"
@@ -13,26 +13,26 @@ import (
 func TestEncodableNetworkPubKey(t *testing.T) {
 	netw, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, generateRandomSeed(t))
 	require.NoError(t, err)
-	key := EncodableNetworkPubKey{netw.PublicKey()}
+	key := NetworkPubKey{netw.PublicKey()}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.NotEmpty(t, enc)
 
-	var dec EncodableNetworkPubKey
+	var dec NetworkPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.True(t, key.Equals(dec.PublicKey))
 }
 
 func TestEncodableNetworkPubKeyNil(t *testing.T) {
-	key := EncodableNetworkPubKey{}
+	key := NetworkPubKey{}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.Equal(t, "null", string(enc))
 
-	var dec EncodableNetworkPubKey
+	var dec NetworkPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.Equal(t, key, dec)
@@ -41,26 +41,26 @@ func TestEncodableNetworkPubKeyNil(t *testing.T) {
 func TestEncodableNetworkPrivKey(t *testing.T) {
 	netw, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, generateRandomSeed(t))
 	require.NoError(t, err)
-	key := EncodableNetworkPrivKey{netw}
+	key := NetworkPrivKey{netw}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.NotEmpty(t, enc)
 
-	var dec EncodableNetworkPrivKey
+	var dec NetworkPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.True(t, key.Equals(dec.PrivateKey))
 }
 
 func TestEncodableNetworkPrivKeyNil(t *testing.T) {
-	key := EncodableNetworkPrivKey{}
+	key := NetworkPrivKey{}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.Equal(t, "null", string(enc))
 
-	var dec EncodableNetworkPrivKey
+	var dec NetworkPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.Equal(t, key, dec)
@@ -69,26 +69,26 @@ func TestEncodableNetworkPrivKeyNil(t *testing.T) {
 func TestEncodableStakingPubKey(t *testing.T) {
 	stak, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, generateRandomSeed(t))
 	require.NoError(t, err)
-	key := EncodableStakingPubKey{stak.PublicKey()}
+	key := StakingPubKey{stak.PublicKey()}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.NotEmpty(t, enc)
 
-	var dec EncodableStakingPubKey
+	var dec StakingPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.True(t, key.Equals(dec.PublicKey))
 }
 
 func TestEncodableStakingPubKeyNil(t *testing.T) {
-	key := EncodableStakingPubKey{}
+	key := StakingPubKey{}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.Equal(t, "null", string(enc))
 
-	var dec EncodableStakingPubKey
+	var dec StakingPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.Equal(t, key, dec)
@@ -97,13 +97,13 @@ func TestEncodableStakingPubKeyNil(t *testing.T) {
 func TestEncodableStakingPrivKey(t *testing.T) {
 	stak, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, generateRandomSeed(t))
 	require.NoError(t, err)
-	key := EncodableStakingPrivKey{stak}
+	key := StakingPrivKey{stak}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.NotEmpty(t, enc)
 
-	var dec EncodableStakingPrivKey
+	var dec StakingPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 
@@ -111,13 +111,13 @@ func TestEncodableStakingPrivKey(t *testing.T) {
 }
 
 func TestEncodableStakingPrivKeyNil(t *testing.T) {
-	key := EncodableStakingPrivKey{}
+	key := StakingPrivKey{}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.Equal(t, "null", string(enc))
 
-	var dec EncodableStakingPrivKey
+	var dec StakingPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.Equal(t, key, dec)
@@ -126,26 +126,26 @@ func TestEncodableStakingPrivKeyNil(t *testing.T) {
 func TestEncodableRandomBeaconPubKey(t *testing.T) {
 	randbeac, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, generateRandomSeed(t))
 	require.NoError(t, err)
-	key := EncodableRandomBeaconPubKey{randbeac.PublicKey()}
+	key := RandomBeaconPubKey{randbeac.PublicKey()}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.NotEmpty(t, enc)
 
-	var dec EncodableRandomBeaconPubKey
+	var dec RandomBeaconPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.True(t, key.Equals(dec.PublicKey))
 }
 
 func TestEncodableRandomBeaconPubKeyNil(t *testing.T) {
-	key := EncodableRandomBeaconPubKey{}
+	key := RandomBeaconPubKey{}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.Equal(t, "null", string(enc))
 
-	var dec EncodableRandomBeaconPubKey
+	var dec RandomBeaconPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.Equal(t, key, dec)
@@ -154,13 +154,13 @@ func TestEncodableRandomBeaconPubKeyNil(t *testing.T) {
 func TestEncodableRandomBeaconPrivKey(t *testing.T) {
 	randbeac, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, generateRandomSeed(t))
 	require.NoError(t, err)
-	key := EncodableRandomBeaconPrivKey{randbeac}
+	key := RandomBeaconPrivKey{randbeac}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.NotEmpty(t, enc)
 
-	var dec EncodableRandomBeaconPrivKey
+	var dec RandomBeaconPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 
@@ -168,13 +168,13 @@ func TestEncodableRandomBeaconPrivKey(t *testing.T) {
 }
 
 func TestEncodableRandomBeaconPrivKeyNil(t *testing.T) {
-	key := EncodableRandomBeaconPrivKey{}
+	key := RandomBeaconPrivKey{}
 
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.Equal(t, "null", string(enc))
 
-	var dec EncodableRandomBeaconPrivKey
+	var dec RandomBeaconPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.Equal(t, key, dec)

@@ -26,7 +26,7 @@ func NewMetricsWrapper(validator hotstuff.Validator, metrics module.HotstuffMetr
 	}
 }
 
-func (w ValidatorMetricsWrapper) ValidateQC(qc *model.QuorumCertificate, block *model.Block) error {
+func (w ValidatorMetricsWrapper) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
 	processStart := time.Now()
 	err := w.validator.ValidateQC(qc, block)
 	w.metrics.ValidatorProcessingDuration(time.Since(processStart))

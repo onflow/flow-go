@@ -9,8 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func MakeQC(t *testing.T, options ...func(*model.QuorumCertificate)) *model.QuorumCertificate {
-	qc := model.QuorumCertificate{
+func MakeQC(t *testing.T, options ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
+	qc := flow.QuorumCertificate{
 		View:      rand.Uint64(),
 		BlockID:   unittest.IdentifierFixture(),
 		SignerIDs: unittest.IdentityListFixture(7).NodeIDs(),
@@ -22,21 +22,21 @@ func MakeQC(t *testing.T, options ...func(*model.QuorumCertificate)) *model.Quor
 	return &qc
 }
 
-func WithQCBlock(block *model.Block) func(*model.QuorumCertificate) {
-	return func(qc *model.QuorumCertificate) {
+func WithQCBlock(block *model.Block) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
 		qc.View = block.View
 		qc.BlockID = block.BlockID
 	}
 }
 
-func WithQCSigners(signerIDs []flow.Identifier) func(*model.QuorumCertificate) {
-	return func(qc *model.QuorumCertificate) {
+func WithQCSigners(signerIDs []flow.Identifier) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
 		qc.SignerIDs = signerIDs
 	}
 }
 
-func WithQCView(view uint64) func(*model.QuorumCertificate) {
-	return func(qc *model.QuorumCertificate) {
+func WithQCView(view uint64) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
 		qc.View = view
 	}
 }

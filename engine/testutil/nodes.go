@@ -30,7 +30,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -65,21 +64,21 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 
 	metrics := metrics.NewNoopCollector()
 
-	identities := storage.NewIdentities(metrics, db)
 	guarantees := storage.NewGuarantees(metrics, db)
 	seals := storage.NewSeals(metrics, db)
 	headers := storage.NewHeaders(metrics, db)
 	index := storage.NewIndex(metrics, db)
-	payloads := storage.NewPayloads(db, index, identities, guarantees, seals)
+	payloads := storage.NewPayloads(db, index, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
+	setups := storage.NewEpochSetups(metrics, db)
+	commits := storage.NewEpochCommits(metrics, db)
+	statuses := storage.NewEpochStatuses(metrics, db)
 
-	state, err := protocol.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
+	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses)
 	require.NoError(t, err)
 
-	genesis := flow.Genesis(participants, chainID)
-	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
-	err = state.Mutate().Bootstrap(genesis, result, seal)
+	root, result, seal := unittest.BootstrapFixture(participants)
+	err = state.Mutate().Bootstrap(root, result, seal)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -113,7 +112,6 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Tracer:     tracer,
 		DB:         db,
 		Headers:    headers,
-		Identities: identities,
 		Guarantees: guarantees,
 		Seals:      seals,
 		Payloads:   payloads,

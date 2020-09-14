@@ -200,12 +200,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		nil,
 	)
 	in.signer.On("CreateQC", mock.Anything).Return(
-		func(votes []*model.Vote) *model.QuorumCertificate {
+		func(votes []*model.Vote) *flow.QuorumCertificate {
 			voterIDs := make([]flow.Identifier, 0, len(votes))
 			for _, vote := range votes {
 				voterIDs = append(voterIDs, vote.SignerID)
 			}
-			qc := &model.QuorumCertificate{
+			qc := &flow.QuorumCertificate{
 				View:      votes[0].View,
 				BlockID:   votes[0].BlockID,
 				SignerIDs: voterIDs,
@@ -296,7 +296,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
-	rootQC := &model.QuorumCertificate{
+	rootQC := &flow.QuorumCertificate{
 		View:      rootBlock.View,
 		BlockID:   rootBlock.BlockID,
 		SignerIDs: in.participants.NodeIDs(),

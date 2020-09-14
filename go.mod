@@ -15,6 +15,7 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.4.0
+	github.com/google/go-cmp v0.4.0
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4
@@ -50,7 +51,9 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
+	google.golang.org/protobuf v1.23.0 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gotest.tools v2.2.0+incompatible
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

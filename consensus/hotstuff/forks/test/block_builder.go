@@ -68,7 +68,7 @@ func (f *BlockBuilder) Blocks() ([]*model.Block, error) {
 		QCView: genesisBQ.QC.View,
 	}
 
-	qcs := make(map[string]*model.QuorumCertificate)
+	qcs := make(map[string]*flow.QuorumCertificate)
 	qcs[genesisBV.QCIndex()] = genesisBQ.QC
 
 	for _, bv := range f.blockViews {
@@ -87,7 +87,7 @@ func (f *BlockBuilder) Blocks() ([]*model.Block, error) {
 		blocks = append(blocks, block)
 
 		// generate QC for the new block
-		qcs[bv.BlockIndex()] = &model.QuorumCertificate{
+		qcs[bv.BlockIndex()] = &flow.QuorumCertificate{
 			View:      block.View,
 			BlockID:   block.BlockID,
 			SignerIDs: nil,
@@ -98,10 +98,10 @@ func (f *BlockBuilder) Blocks() ([]*model.Block, error) {
 	return blocks, nil
 }
 
-func makePayloadHash(view uint64, qc *model.QuorumCertificate, blockVersion int) flow.Identifier {
+func makePayloadHash(view uint64, qc *flow.QuorumCertificate, blockVersion int) flow.Identifier {
 	return flow.MakeID(struct {
 		View         uint64
-		QC           *model.QuorumCertificate
+		QC           *flow.QuorumCertificate
 		BlockVersion uint64
 	}{
 		View:         view,
@@ -113,7 +113,7 @@ func makePayloadHash(view uint64, qc *model.QuorumCertificate, blockVersion int)
 func makeBlockID(block *model.Block) flow.Identifier {
 	return flow.MakeID(struct {
 		View        uint64
-		QC          *model.QuorumCertificate
+		QC          *flow.QuorumCertificate
 		PayloadHash flow.Identifier
 	}{
 		View:        block.View,
@@ -128,7 +128,7 @@ func makeGenesis() *forks.BlockQC {
 	}
 	genesis.BlockID = makeBlockID(genesis)
 
-	genesisQC := &model.QuorumCertificate{
+	genesisQC := &flow.QuorumCertificate{
 		View:    1,
 		BlockID: genesis.BlockID,
 	}

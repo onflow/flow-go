@@ -35,6 +35,7 @@ type Suite struct {
 	proto struct {
 		state    *protocol.State
 		snapshot *protocol.Snapshot
+		params   *protocol.Params
 		mutator  *protocol.Mutator
 	}
 
@@ -61,8 +62,10 @@ func (suite *Suite) SetupTest() {
 	// mock out protocol state
 	suite.proto.state = new(protocol.State)
 	suite.proto.snapshot = new(protocol.Snapshot)
+	suite.proto.params = new(protocol.Params)
 	suite.proto.state.On("Identity").Return(obsIdentity, nil)
 	suite.proto.state.On("Final").Return(suite.proto.snapshot, nil)
+	suite.proto.state.On("Params").Return(suite.proto.params)
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
@@ -435,7 +438,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		// simulate the absence of the full block height index
 		lastFullBlockHeight = 0
 		rtnErr = storerr.ErrNotFound
-		suite.proto.state.On("Root").Return(rootBlk.Header, nil)
+		suite.proto.params.On("Root").Return(rootBlk.Header, nil)
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
 		suite.eng.updateLastFullBlockReceivedIndex()
