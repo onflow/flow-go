@@ -76,8 +76,8 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 ) ([]byte, error) {
 
 	execReq := execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId: blockID[:],
-		Script:  script,
+		BlockId:   blockID[:],
+		Script:    script,
 		Arguments: arguments,
 	}
 
