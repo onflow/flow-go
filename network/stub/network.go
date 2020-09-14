@@ -21,12 +21,12 @@ import (
 // all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
 	sync.Mutex
-	state        protocol.State           // used to represent full protocol state of the attached node.
-	me           module.Local             // used to represent information of the attached node.
-	hub          *Hub                     // used to attach Network layers of nodes together.
-	engines      map[uint8]network.Engine // used to keep track of attached engines of the node.
-	seenEventIDs sync.Map                 // used to keep track of event IDs seen by attached engines.
-	qCD          chan struct{}            // used to stop continuous delivery mode of the Network.
+	state        protocol.State            // used to represent full protocol state of the attached node.
+	me           module.Local              // used to represent information of the attached node.
+	hub          *Hub                      // used to attach Network layers of nodes together.
+	engines      map[string]network.Engine // used to keep track of attached engines of the node.
+	seenEventIDs sync.Map                  // used to keep track of event IDs seen by attached engines.
+	qCD          chan struct{}             // used to stop continuous delivery mode of the Network.
 }
 
 // NewNetwork create a mocked Network.
@@ -37,7 +37,7 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 		state:   state,
 		me:      me,
 		hub:     hub,
-		engines: make(map[uint8]network.Engine),
+		engines: make(map[string]network.Engine),
 		qCD:     make(chan struct{}),
 	}
 	// AddNetwork the Network to a hub so that Networks can find each other.
@@ -52,10 +52,10 @@ func (n *Network) GetID() flow.Identifier {
 
 // Register registers an Engine of the attached node to the channel ID via a Conduit, and returns the
 // Conduit instance.
-func (n *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
 	_, ok := n.engines[channelID]
 	if ok {
-		return nil, errors.Errorf("engine code already taken (%d)", channelID)
+		return nil, errors.Errorf("engine code already taken (%s)", channelID)
 	}
 	conduit := &Conduit{
 		channelID: channelID,
@@ -70,7 +70,7 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 
 // submit is called when the attached Engine to the channel ID is sending an event to an
 // Engine attached to the same channel ID on another node or nodes.
-func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
 	m := &PendingMessage{
 		From:      n.GetID(),
 		ChannelID: channelID,
@@ -85,7 +85,7 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 
 // unicast is called when the attached Engine to the channel ID is sending an event to a single target
 // Engine attached to the same channel ID on another node.
-func (n *Network) unicast(channelID uint8, event interface{}, targetID flow.Identifier) error {
+func (n *Network) unicast(channelID string, event interface{}, targetID flow.Identifier) error {
 	m := &PendingMessage{
 		From:      n.GetID(),
 		ChannelID: channelID,
@@ -100,7 +100,7 @@ func (n *Network) unicast(channelID uint8, event interface{}, targetID flow.Iden
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel ID on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(channelID uint8, event interface{}, selector flow.IdentityFilter) error {
+func (n *Network) publish(channelID string, event interface{}, selector flow.IdentityFilter) error {
 	// excludes this instance of Network from list of targeted ids (if any)
 	// to avoid self loop on delivering this message.
 	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
@@ -122,7 +122,7 @@ func (n *Network) publish(channelID uint8, event interface{}, selector flow.Iden
 // multicast is called when an engine attached to the channel ID is sending an event to a number of randomly chosen
 // Engines attached to the same channel ID on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(channelID uint8, event interface{}, num uint, selector flow.IdentityFilter) error {
+func (n *Network) multicast(channelID string, event interface{}, num uint, selector flow.IdentityFilter) error {
 	// excludes this instance of Network from list of targeted ids (if any)
 	// to avoid self loop on delivering this message.
 	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))

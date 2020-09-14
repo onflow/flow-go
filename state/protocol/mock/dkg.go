@@ -15,7 +15,7 @@ type DKG struct {
 }
 
 // GroupKey provides a mock function with given fields:
-func (_m *DKG) GroupKey() (crypto.PublicKey, error) {
+func (_m *DKG) GroupKey() crypto.PublicKey {
 	ret := _m.Called()
 
 	var r0 crypto.PublicKey
@@ -27,14 +27,7 @@ func (_m *DKG) GroupKey() (crypto.PublicKey, error) {
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // Index provides a mock function with given fields: nodeID
@@ -82,7 +75,7 @@ func (_m *DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 }
 
 // Size provides a mock function with given fields:
-func (_m *DKG) Size() (uint, error) {
+func (_m *DKG) Size() uint {
 	ret := _m.Called()
 
 	var r0 uint
@@ -92,12 +85,5 @@ func (_m *DKG) Size() (uint, error) {
 		r0 = ret.Get(0).(uint)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }

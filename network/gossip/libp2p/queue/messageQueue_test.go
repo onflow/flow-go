@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 )
 
@@ -48,7 +49,7 @@ func TestConcurrentQueueAccess(t *testing.T) {
 	close(msgChan)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	mq := queue.NewMessageQueue(ctx, priorityFunc)
+	mq := queue.NewMessageQueue(ctx, priorityFunc, metrics.NewNoopCollector())
 
 	writeWg := sync.WaitGroup{}
 	write := func() {
@@ -95,7 +96,7 @@ func TestConcurrentQueueAccess(t *testing.T) {
 // TestQueueShutdown tests that Remove unblocks when the context is shutdown
 func TestQueueShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	mq := queue.NewMessageQueue(ctx, fixedPriority)
+	mq := queue.NewMessageQueue(ctx, fixedPriority, metrics.NewNoopCollector())
 	ch := make(chan struct{})
 
 	go func() {
@@ -130,7 +131,7 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// create the queue
-	mq := queue.NewMessageQueue(ctx, priorityFunc)
+	mq := queue.NewMessageQueue(ctx, priorityFunc, metrics.NewNoopCollector())
 
 	// insert all elements in the queue
 	for msg, p := range messages {
@@ -140,9 +141,6 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 		// remember insertion order to check later
 		queues[p] = append(queues[p], msg)
-
-		// sleep to make sure two consecutive elements don't get the same timestamp
-		time.Sleep(1 * time.Millisecond)
 	}
 
 	// create a slice of the expected messages in the order in which they are expected
@@ -169,7 +167,7 @@ func BenchmarkPush(b *testing.B) {
 	b.StopTimer()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var mq = queue.NewMessageQueue(ctx, randomPriority)
+	var mq = queue.NewMessageQueue(ctx, randomPriority, metrics.NewNoopCollector())
 	for i := 0; i < b.N; i++ {
 		err := mq.Insert("test")
 		if err != nil {
@@ -189,7 +187,7 @@ func BenchmarkPop(b *testing.B) {
 	b.StopTimer()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var mq = queue.NewMessageQueue(ctx, randomPriority)
+	var mq = queue.NewMessageQueue(ctx, randomPriority, metrics.NewNoopCollector())
 	for i := 0; i < b.N; i++ {
 		err := mq.Insert("test")
 		if err != nil {

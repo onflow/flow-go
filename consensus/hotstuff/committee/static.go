@@ -3,6 +3,7 @@ package committee
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -10,10 +11,12 @@ import (
 // NewStaticCommittee returns a new committee with a static participant set.
 func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dkgParticipants map[flow.Identifier]flow.DKGParticipant, dkgGroupKey crypto.PublicKey) (*Static, error) {
 	static := &Static{
-		participants:    participants,
-		myID:            myID,
-		dkgParticipants: dkgParticipants,
-		dkgGroupKey:     dkgGroupKey,
+		participants: participants,
+		myID:         myID,
+		dkg: staticDKG{
+			dkgParticipants: dkgParticipants,
+			dkgGroupKey:     dkgGroupKey,
+		},
 	}
 	return static, nil
 }
@@ -21,10 +24,9 @@ func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dk
 // Static represents a committee with a static participant set. It is used for
 // bootstrapping purposes.
 type Static struct {
-	participants    flow.IdentityList
-	myID            flow.Identifier
-	dkgParticipants map[flow.Identifier]flow.DKGParticipant
-	dkgGroupKey     crypto.PublicKey
+	participants flow.IdentityList
+	myID         flow.Identifier
+	dkg          staticDKG
 }
 
 func (s Static) Identities(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
@@ -47,15 +49,24 @@ func (s Static) Self() flow.Identifier {
 	return s.myID
 }
 
-func (s Static) DKGSize(_ flow.Identifier) (uint, error) {
-	return uint(len(s.dkgParticipants)), nil
+func (s Static) DKG(_ flow.Identifier) (hotstuff.DKG, error) {
+	return s.dkg, nil
 }
 
-func (s Static) DKGGroupKey(_ flow.Identifier) (crypto.PublicKey, error) {
-	return s.dkgGroupKey, nil
+type staticDKG struct {
+	dkgParticipants map[flow.Identifier]flow.DKGParticipant
+	dkgGroupKey     crypto.PublicKey
 }
 
-func (s Static) DKGIndex(_ flow.Identifier, nodeID flow.Identifier) (uint, error) {
+func (s staticDKG) Size() uint {
+	return uint(len(s.dkgParticipants))
+}
+
+func (s staticDKG) GroupKey() crypto.PublicKey {
+	return s.dkgGroupKey
+}
+
+func (s staticDKG) Index(nodeID flow.Identifier) (uint, error) {
 	participant, ok := s.dkgParticipants[nodeID]
 	if !ok {
 		return 0, fmt.Errorf("could not get participant")
@@ -63,7 +74,7 @@ func (s Static) DKGIndex(_ flow.Identifier, nodeID flow.Identifier) (uint, error
 	return participant.Index, nil
 }
 
-func (s Static) DKGKeyShare(_ flow.Identifier, nodeID flow.Identifier) (crypto.PublicKey, error) {
+func (s staticDKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	participant, ok := s.dkgParticipants[nodeID]
 	if !ok {
 		return nil, fmt.Errorf("could not get participant")

@@ -72,8 +72,9 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	blocks := storage.NewBlocks(db, headers, payloads)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
+	statuses := storage.NewEpochStatuses(metrics, db)
 
-	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits)
+	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses)
 	require.NoError(t, err)
 
 	root, result, seal := unittest.BootstrapFixture(participants)

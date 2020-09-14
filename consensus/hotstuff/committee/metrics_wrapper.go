@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
@@ -55,30 +54,9 @@ func (w CommitteeMetricsWrapper) Self() flow.Identifier {
 	return id
 }
 
-func (w CommitteeMetricsWrapper) DKGSize(blockID flow.Identifier) (uint, error) {
+func (w CommitteeMetricsWrapper) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
 	processStart := time.Now()
-	size, err := w.committee.DKGSize(blockID)
+	dkg, err := w.committee.DKG(blockID)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
-	return size, err
-}
-
-func (w CommitteeMetricsWrapper) DKGGroupKey(blockID flow.Identifier) (crypto.PublicKey, error) {
-	processStart := time.Now()
-	groupKey, err := w.committee.DKGGroupKey(blockID)
-	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
-	return groupKey, err
-}
-
-func (w CommitteeMetricsWrapper) DKGIndex(blockID flow.Identifier, nodeID flow.Identifier) (uint, error) {
-	processStart := time.Now()
-	index, err := w.committee.DKGIndex(blockID, nodeID)
-	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
-	return index, err
-}
-
-func (w CommitteeMetricsWrapper) DKGKeyShare(blockID flow.Identifier, nodeID flow.Identifier) (crypto.PublicKey, error) {
-	processStart := time.Now()
-	groupKey, err := w.committee.DKGKeyShare(blockID, nodeID)
-	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
-	return groupKey, err
+	return dkg, err
 }

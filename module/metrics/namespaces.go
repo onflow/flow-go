@@ -17,6 +17,7 @@ const (
 	// subsystemLibp2p = "libp2p"
 	subsystemGossip = "gossip"
 	subsystemEngine = "engine"
+	subsystemQueue  = "queue"
 )
 
 // Storage subsystems represent the various components of the storage layer.

@@ -8,8 +8,8 @@ var (
 )
 
 // ProtocolCollectorClusterLeaderSelection returns the indices for the leader selection for the i-th collector cluster
-func ProtocolCollectorClusterLeaderSelection(clusterIndex uint32) []uint32 {
-	return append([]uint32{0, 0}, clusterIndex)
+func ProtocolCollectorClusterLeaderSelection(clusterIndex uint) []uint32 {
+	return append([]uint32{0, 0}, uint32(clusterIndex))
 }
 
 // ExecutionChunk returns the indices for i-th chunk

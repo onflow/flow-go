@@ -850,7 +850,7 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 		FinalView:    uint64(rand.Uint32() + 1000),
 		Participants: participants,
 		Assignments:  assignments,
-		Seed:         SeedFixture(32),
+		RandomSource: SeedFixture(32),
 	}
 	for _, apply := range opts {
 		apply(setup)

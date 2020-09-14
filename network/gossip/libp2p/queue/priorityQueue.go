@@ -1,15 +1,13 @@
 package queue
 
-import (
-	"time"
-)
+import "time"
 
 type item struct {
 	message  interface{}
 	priority int // The priority of the item in the queue.
 	// The index is needed by update and is maintained by the heap.Interface methods.
-	index     int   // The index of the item in the heap.
-	timestamp int64 // timestamp to maintain insertions order for items with the same priority and for telemetry
+	index     int       // The index of the item in the heap.
+	timestamp time.Time // timestamp to maintain insertions order for items with the same priority and for telemetry
 
 }
 
@@ -27,7 +25,7 @@ func (pq priorityQueue) Less(i, j int) bool {
 		return false
 	}
 	// if both items have the same priority, then pop the oldest
-	return pq[i].timestamp < pq[j].timestamp
+	return pq[i].timestamp.Before(pq[j].timestamp)
 }
 
 func (pq priorityQueue) Swap(i, j int) {
@@ -43,7 +41,6 @@ func (pq *priorityQueue) Push(x interface{}) {
 		return
 	}
 	item.index = n
-	item.timestamp = time.Now().UnixNano()
 	*pq = append(*pq, item)
 }
 

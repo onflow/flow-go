@@ -2,6 +2,10 @@ package test
 
 import (
 	"fmt"
+	"reflect"
+	"runtime"
+	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -183,4 +187,12 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
+}
+
+// OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
+func optionalSleep(send ConduitSendWrapperFunc) {
+	sendFuncName := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
+	if strings.Contains(sendFuncName, "Multicast") || strings.Contains(sendFuncName, "Publish") {
+		time.Sleep(2 * time.Second)
+	}
 }

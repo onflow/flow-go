@@ -17,7 +17,7 @@ type BuilderFactory struct {
 	trace            module.Tracer
 	opts             []builder.Opt
 	metrics          module.CollectionMetrics
-	pusher           network.Engine
+	pusher           network.Engine // engine for pushing finalized collection to consensus committee
 }
 
 func NewBuilderFactory(
@@ -25,6 +25,7 @@ func NewBuilderFactory(
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,
 	metrics module.CollectionMetrics,
+	pusher network.Engine,
 	opts ...builder.Opt,
 ) (*BuilderFactory, error) {
 
@@ -33,6 +34,7 @@ func NewBuilderFactory(
 		mainChainHeaders: mainChainHeaders,
 		trace:            trace,
 		metrics:          metrics,
+		pusher:           pusher,
 		opts:             opts,
 	}
 	return factory, nil

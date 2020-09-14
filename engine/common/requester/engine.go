@@ -39,7 +39,7 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	channel  uint8
+	channel  string
 	selector flow.IdentityFilter
 	create   CreateFunc
 	handle   HandleFunc
@@ -51,7 +51,7 @@ type Engine struct {
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
-	channel uint8, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
+	channel string, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
 
 	// initialize the default config
 	cfg := Config{
@@ -348,7 +348,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		delete(e.requests, req.Nonce)
 	}()
 
-	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageEntityRequest)
+	e.metrics.MessageSent(e.channel, metrics.MessageEntityRequest)
 
 	return true, nil
 }
@@ -356,8 +356,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-	e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageEntityResponse)
-	defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageEntityResponse)
+	e.metrics.MessageReceived(e.channel, metrics.MessageEntityResponse)
+	defer e.metrics.MessageHandled(e.channel, metrics.MessageEntityResponse)
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
