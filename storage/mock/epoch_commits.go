@@ -14,7 +14,7 @@ type EpochCommits struct {
 	mock.Mock
 }
 
-// ByCommitID provides a mock function with given fields: _a0
+// ByID provides a mock function with given fields: _a0
 func (_m *EpochCommits) ByID(_a0 flow.Identifier) (*flow.EpochCommit, error) {
 	ret := _m.Called(_a0)
 

@@ -148,7 +148,7 @@ func (_m *Epoch) InitialIdentities() (flow.IdentityList, error) {
 	return r0, r1
 }
 
-// LeaderSelectionSeed provides a mock function with given fields: indices
+// Seed provides a mock function with given fields: indices
 func (_m *Epoch) Seed(indices ...uint32) ([]byte, error) {
 	_va := make([]interface{}, len(indices))
 	for _i := range indices {
