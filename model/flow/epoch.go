@@ -17,6 +17,8 @@ import (
 // An epoch begins in the staking phase, then transitions to the setup phase in
 // the block containing the EpochSetup service event, then to the committed
 // phase in the block containing the EpochCommit service event.
+// |<--  EpochPhaseStaking -->|<-- EpochPhaseSetup -->|<-- EpochCommittedPhase -->|<-- EpochPhaseStaking -->...
+// |<------------------------------- Epoch N ------------------------------------>|<-- Epoch N + 1 --...
 type EpochPhase int
 
 const (
