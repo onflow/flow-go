@@ -17,16 +17,16 @@ type EpochCommits struct {
 func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits {
 
 	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
-		counter := key.(uint64)
+		id := key.(flow.Identifier)
 		commit := val.(*flow.EpochCommit)
-		return operation.InsertEpochCommit(counter, commit)
+		return operation.InsertEpochCommit(id, commit)
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		counter := key.(uint64)
+		id := key.(flow.Identifier)
 		var commit flow.EpochCommit
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := operation.RetrieveEpochCommit(counter, &commit)(tx)
+			err := operation.RetrieveEpochCommit(id, &commit)(tx)
 			return &commit, err
 		}
 	}
@@ -34,22 +34,22 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 	ec := &EpochCommits{
 		db: db,
 		cache: newCache(collector,
-			withLimit(16),
+			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve),
-			withResource(metrics.ResourceSeal)),
+			withResource(metrics.ResourceEpochCommit)),
 	}
 
 	return ec
 }
 
 func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(tx *badger.Txn) error {
-	return ec.cache.Put(commit.Counter, commit)
+	return ec.cache.Put(commit.ID(), commit)
 }
 
-func (ec *EpochCommits) retrieveTx(counter uint64) func(tx *badger.Txn) (*flow.EpochCommit, error) {
+func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn) (*flow.EpochCommit, error) {
 	return func(tx *badger.Txn) (*flow.EpochCommit, error) {
-		val, err := ec.cache.Get(counter)(tx)
+		val, err := ec.cache.Get(commitID)(tx)
 		if err != nil {
 			return nil, err
 		}
@@ -57,12 +57,13 @@ func (ec *EpochCommits) retrieveTx(counter uint64) func(tx *badger.Txn) (*flow.E
 	}
 }
 
-func (ec *EpochCommits) Store(counter uint64, commit *flow.EpochCommit) error {
+// TODO: can we remove this method? Its not contained in the interface.
+func (ec *EpochCommits) Store(commit *flow.EpochCommit) error {
 	return operation.RetryOnConflict(ec.db.Update, ec.StoreTx(commit))
 }
 
-func (ec *EpochCommits) ByCounter(counter uint64) (*flow.EpochCommit, error) {
+func (ec *EpochCommits) ByID(commitID flow.Identifier) (*flow.EpochCommit, error) {
 	tx := ec.db.NewTransaction(false)
 	defer tx.Discard()
-	return ec.retrieveTx(counter)(tx)
+	return ec.retrieveTx(commitID)(tx)
 }

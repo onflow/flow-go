@@ -14,13 +14,13 @@ type EpochSetups struct {
 	mock.Mock
 }
 
-// ByCounter provides a mock function with given fields: counter
-func (_m *EpochSetups) ByCounter(counter uint64) (*flow.EpochSetup, error) {
-	ret := _m.Called(counter)
+// ByID provides a mock function with given fields: _a0
+func (_m *EpochSetups) ByID(_a0 flow.Identifier) (*flow.EpochSetup, error) {
+	ret := _m.Called(_a0)
 
 	var r0 *flow.EpochSetup
-	if rf, ok := ret.Get(0).(func(uint64) *flow.EpochSetup); ok {
-		r0 = rf(counter)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.EpochSetup); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.EpochSetup)
@@ -28,8 +28,8 @@ func (_m *EpochSetups) ByCounter(counter uint64) (*flow.EpochSetup, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint64) error); ok {
-		r1 = rf(counter)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -37,13 +37,13 @@ func (_m *EpochSetups) ByCounter(counter uint64) (*flow.EpochSetup, error) {
 	return r0, r1
 }
 
-// StoreTx provides a mock function with given fields: setup
-func (_m *EpochSetups) StoreTx(setup *flow.EpochSetup) func(*badger.Txn) error {
-	ret := _m.Called(setup)
+// StoreTx provides a mock function with given fields: _a0
+func (_m *EpochSetups) StoreTx(_a0 *flow.EpochSetup) func(*badger.Txn) error {
+	ret := _m.Called(_a0)
 
 	var r0 func(*badger.Txn) error
 	if rf, ok := ret.Get(0).(func(*flow.EpochSetup) func(*badger.Txn) error); ok {
-		r0 = rf(setup)
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(func(*badger.Txn) error)

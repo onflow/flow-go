@@ -1,40 +1,31 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// CanonicalClusterID returns the canonical chain ID for the given cluster in
-// the given epoch.
-func CanonicalClusterID(epoch uint64, participants flow.IdentityList) flow.ChainID {
-	return flow.ChainID(fmt.Sprintf("cluster-%d-%s", epoch, participants.Fingerprint()))
-}
+// Cluster represents the detailed information for a particular cluster,
+// for a given epoch. This information represents the INITIAL state of the
+// cluster, as defined by the Epoch Preparation Protocol. It DOES NOT take
+// into account state changes over the course of the epoch (ie. slashing).
+type Cluster interface {
 
-// CanonicalClusterRootBlock returns the canonical root block for the given
-// cluster in the given epoch. It contains an empty collection referencing
-func CanonicalClusterRootBlock(epoch uint64, participants flow.IdentityList) *cluster.Block {
+	// Index returns the index for this cluster.
+	Index() uint
 
-	chainID := CanonicalClusterID(epoch, participants)
-	payload := cluster.EmptyPayload(flow.ZeroID)
-	payload.ReferenceEpoch = epoch
-	header := &flow.Header{
-		ChainID:        chainID,
-		ParentID:       flow.ZeroID,
-		Height:         0,
-		PayloadHash:    payload.Hash(),
-		Timestamp:      flow.GenesisTime,
-		View:           0,
-		ParentVoterIDs: nil,
-		ParentVoterSig: nil,
-		ProposerID:     flow.ZeroID,
-		ProposerSig:    nil,
-	}
+	// ChainID returns chain ID for the cluster's chain.
+	ChainID() flow.ChainID
 
-	return &cluster.Block{
-		Header:  header,
-		Payload: &payload,
-	}
+	// EpochCounter returns the epoch counter for this cluster.
+	EpochCounter() uint64
+
+	// Members returns the initial set of collector nodes in this cluster.
+	Members() flow.IdentityList
+
+	// RootBlock returns the root block for this cluster.
+	RootBlock() *cluster.Block
+
+	// RootQC returns the quorum certificate for this cluster.
+	RootQC() *flow.QuorumCertificate
 }

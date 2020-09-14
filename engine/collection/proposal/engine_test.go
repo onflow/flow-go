@@ -31,6 +31,8 @@ type Suite struct {
 	proto struct {
 		state    *protocol.State
 		snapshot *protocol.Snapshot
+		query    *protocol.EpochQuery
+		epoch    *protocol.Epoch
 		mutator  *protocol.Mutator
 	}
 	// cluster state
@@ -68,11 +70,15 @@ func (suite *Suite) SetupTest() {
 	// mock out protocol state
 	suite.proto.state = new(protocol.State)
 	suite.proto.snapshot = new(protocol.Snapshot)
+	suite.proto.query = new(protocol.EpochQuery)
+	suite.proto.epoch = new(protocol.Epoch)
 	suite.proto.mutator = new(protocol.Mutator)
 	suite.proto.state.On("Final").Return(suite.proto.snapshot)
 	suite.proto.state.On("Mutate").Return(suite.proto.mutator)
 	suite.proto.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
+	suite.proto.snapshot.On("Epochs").Return(suite.proto.query)
+	suite.proto.query.On("Current").Return(suite.proto.epoch)
 
 	// mock out cluster state
 	suite.cluster.state = new(clusterstate.State)
@@ -84,7 +90,7 @@ func (suite *Suite) SetupTest() {
 
 	// create a fake cluster
 	clusters := flow.ClusterList{flow.IdentityList{me}}
-	suite.proto.snapshot.On("Clusters").Return(clusters, nil)
+	suite.proto.epoch.On("Clustering").Return(clusters, nil)
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)

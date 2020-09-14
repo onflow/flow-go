@@ -31,7 +31,7 @@ func constructRootResultAndSeal(
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
 		Assignments:  assignments,
-		Seed:         blockID[:],
+		RandomSource: blockID[:],
 	}
 
 	dkgLookup := model.ToDKGLookup(dkgData, participants)

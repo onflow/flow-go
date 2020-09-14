@@ -39,7 +39,7 @@ func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 	net := &Network{
 		hub:      h,
 		originID: originID,
-		conduits: make(map[uint8]*Conduit),
+		conduits: make(map[string]*Conduit),
 		node:     node,
 	}
 	h.networks[originID] = net
@@ -57,12 +57,12 @@ type Network struct {
 	hub      *Hub
 	node     *Node
 	originID flow.Identifier
-	conduits map[uint8]*Conduit
+	conduits map[string]*Conduit
 }
 
 // Register registers an Engine of the attached node to the channel ID via a Conduit, and returns the
 // Conduit instance.
-func (n *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
 	con := &Conduit{
 		net:       n,
 		channelID: channelID,
@@ -80,7 +80,7 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 // submit is called when the attached Engine to the channel ID is sending an event to an
 // Engine attached to the same channel ID on another node or nodes.
 // This implementation uses unicast under the hood.
-func (n *Network) submit(event interface{}, channelID uint8, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(event interface{}, channelID string, targetIDs ...flow.Identifier) error {
 	for _, targetID := range targetIDs {
 		if err := n.unicast(event, channelID, targetID); err != nil {
 			return fmt.Errorf("could not unicast the event: %w", err)
@@ -91,7 +91,7 @@ func (n *Network) submit(event interface{}, channelID uint8, targetIDs ...flow.I
 
 // unicast is called when the attached Engine to the channel ID is sending an event to a single target
 // Engine attached to the same channel ID on another node.
-func (n *Network) unicast(event interface{}, channelID uint8, targetID flow.Identifier) error {
+func (n *Network) unicast(event interface{}, channelID string, targetID flow.Identifier) error {
 	net, found := n.hub.networks[targetID]
 	if !found {
 		return fmt.Errorf("could not find target network on hub: %x", targetID)
@@ -127,7 +127,7 @@ func (n *Network) unicast(event interface{}, channelID uint8, targetID flow.Iden
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel ID on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(event interface{}, channelID uint8, selector flow.IdentityFilter) error {
+func (n *Network) publish(event interface{}, channelID string, selector flow.IdentityFilter) error {
 	// excludes this instance of network from list of targeted ids (if any)
 	// to avoid self loop on delivering this message.
 	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.originID)))
@@ -145,7 +145,7 @@ func (n *Network) publish(event interface{}, channelID uint8, selector flow.Iden
 // multicast is called when an Engine attached to the channel ID is sending an event to a number of randomly chosen
 // Engines attached to the same channel ID on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(event interface{}, channelID uint8, num uint, selector flow.IdentityFilter) error {
+func (n *Network) multicast(event interface{}, channelID string, num uint, selector flow.IdentityFilter) error {
 	// excludes this instance of network from list of targeted ids (if any)
 	// to avoid self loop on delivering this message.
 	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.originID)))
@@ -165,7 +165,7 @@ func (n *Network) multicast(event interface{}, channelID uint8, num uint, select
 
 type Conduit struct {
 	net       *Network
-	channelID uint8
+	channelID string
 	queue     chan message
 }
 

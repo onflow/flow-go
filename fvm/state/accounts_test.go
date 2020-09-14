@@ -36,13 +36,10 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	address, err := accounts.Create(nil)
 	require.NoError(t, err)
 
-	countRegister := state.RegisterID(
+	ledger.Delete(
 		string(address.Bytes()),
 		string(address.Bytes()),
-		"public_key_count",
-	)
-
-	ledger.Delete(countRegister)
+		"public_key_count")
 
 	require.NotPanics(t, func() {
 		_, _ = accounts.Get(address)

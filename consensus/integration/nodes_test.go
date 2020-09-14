@@ -134,9 +134,10 @@ func createNode(
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)
+	statusesDB := storage.NewEpochStatuses(metrics, db)
 	consumer := events.NewNoop()
 
-	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, consumer)
+	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(root, result, seal)
@@ -188,7 +189,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, indexDB, blocksDB, guarantees, seals)
+	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals)
 
 	signer := &Signer{identity.ID()}
 

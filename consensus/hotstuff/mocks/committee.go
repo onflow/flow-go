@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	crypto "github.com/dapperlabs/flow-go/crypto"
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff"
 	flow "github.com/dapperlabs/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
@@ -14,82 +14,17 @@ type Committee struct {
 	mock.Mock
 }
 
-// DKGGroupKey provides a mock function with given fields: blockID
-func (_m *Committee) DKGGroupKey(blockID flow.Identifier) (crypto.PublicKey, error) {
+// DKG provides a mock function with given fields: blockID
+func (_m *Committee) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
 	ret := _m.Called(blockID)
 
-	var r0 crypto.PublicKey
-	if rf, ok := ret.Get(0).(func(flow.Identifier) crypto.PublicKey); ok {
+	var r0 hotstuff.DKG
+	if rf, ok := ret.Get(0).(func(flow.Identifier) hotstuff.DKG); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(crypto.PublicKey)
+			r0 = ret.Get(0).(hotstuff.DKG)
 		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(blockID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// DKGIndex provides a mock function with given fields: blockID, nodeID
-func (_m *Committee) DKGIndex(blockID flow.Identifier, nodeID flow.Identifier) (uint, error) {
-	ret := _m.Called(blockID, nodeID)
-
-	var r0 uint
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) uint); ok {
-		r0 = rf(blockID, nodeID)
-	} else {
-		r0 = ret.Get(0).(uint)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, flow.Identifier) error); ok {
-		r1 = rf(blockID, nodeID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// DKGKeyShare provides a mock function with given fields: blockID, nodeID
-func (_m *Committee) DKGKeyShare(blockID flow.Identifier, nodeID flow.Identifier) (crypto.PublicKey, error) {
-	ret := _m.Called(blockID, nodeID)
-
-	var r0 crypto.PublicKey
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) crypto.PublicKey); ok {
-		r0 = rf(blockID, nodeID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(crypto.PublicKey)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, flow.Identifier) error); ok {
-		r1 = rf(blockID, nodeID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// DKGSize provides a mock function with given fields: blockID
-func (_m *Committee) DKGSize(blockID flow.Identifier) (uint, error) {
-	ret := _m.Called(blockID)
-
-	var r0 uint
-	if rf, ok := ret.Get(0).(func(flow.Identifier) uint); ok {
-		r0 = rf(blockID)
-	} else {
-		r0 = ret.Get(0).(uint)
 	}
 
 	var r1 error
