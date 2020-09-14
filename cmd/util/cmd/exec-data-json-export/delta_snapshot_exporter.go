@@ -17,8 +17,9 @@ import (
 )
 
 type dSnapshot struct {
-	DeltaJSONStr string `json:"delta_json_str"`
-	SpockSecret  string `json:"spock_secret_data"`
+	DeltaJSONStr string   `json:"delta_json_str"`
+	Reads        []string `json:"reads"`
+	SpockSecret  string   `json:"spock_secret_data"`
 }
 
 // ExportDeltaSnapshots exports all the delta snapshots
@@ -65,8 +66,14 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 			return fmt.Errorf("could not load delta snapshot: %w", err)
 		}
 
+		reads := make([]string, 0)
+		for _, r := range snap[0].Reads {
+			reads = append(reads, hex.EncodeToString(r[:]))
+		}
+
 		data := dSnapshot{
 			DeltaJSONStr: string(m),
+			Reads:        reads,
 			SpockSecret:  hex.EncodeToString(snap[0].SpockSecret),
 		}
 
