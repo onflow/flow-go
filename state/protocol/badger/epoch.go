@@ -57,7 +57,7 @@ func (es *SetupEpoch) DKG() (protocol.DKG, error) {
 	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
 }
 
-func (es *SetupEpoch) LeaderSelectionSeed(indices ...uint32) ([]byte, error) {
+func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
 	return protocol.SeedFromRandomSource(indices, es.setupEvent.RandomSource)
 }
 
@@ -153,7 +153,7 @@ func (u *InvalidEpoch) DKG() (protocol.DKG, error) {
 	return nil, u.err
 }
 
-func (u *InvalidEpoch) LeaderSelectionSeed(...uint32) ([]byte, error) {
+func (u *InvalidEpoch) Seed(...uint32) ([]byte, error) {
 	return nil, u.err
 }
 

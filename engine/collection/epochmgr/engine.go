@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	chainsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
+	"github.com/dapperlabs/flow-go/model/indices"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/state/cluster"
@@ -140,10 +141,10 @@ func (e *Engine) setupEpoch(epochCounter uint64) (*epochreqs, error) {
 		return nil, fmt.Errorf("could not create builder/finalizer: %w", err)
 	}
 
-	// TODO need a protocol state method for this - for now fake it with root ID
-	//seed, err := e.state.AtEpoch(epoch).LeaderSelectionSeed()
-	rootID := cluster.RootBlock().ID()
-	seed := rootID[:]
+	seed, err := epoch.Seed(indices.ProtocolCollectorClusterLeaderSelection(clusterIndex)...)
+	if err != nil {
+		return nil, fmt.Errorf("could not get leader selection seed: %w", err)
+	}
 
 	proposalEngine, err := e.proposalFactory.Create(clusterState, headers, payloads)
 	if err != nil {

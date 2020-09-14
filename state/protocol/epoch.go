@@ -38,12 +38,12 @@ type Epoch interface {
 	// Counter returns the Epoch's counter.
 	Counter() (uint64, error)
 
-	// FinalView returns the largest view number which still belongs to this Epoch.
+	// FinalView returns the largest view number which still belongs to this epoch.
 	FinalView() (uint64, error)
 
-	// LeaderSelectionSeed returns the seed for leader selection for this epoch
-	// using the source of randomness specified in the EpochSetup service event.
-	LeaderSelectionSeed(indices ...uint32) ([]byte, error)
+	// Seed generates a random seed using the source of randomness for this
+	// epoch, specified in the EpochSetup service event.
+	Seed(indices ...uint32) ([]byte, error)
 
 	// InitialIdentities returns the identities for this epoch as they were
 	// specified in the EpochSetup service event.
