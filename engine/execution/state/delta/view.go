@@ -22,8 +22,8 @@ type View struct {
 	// SpocksSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing SpocksSecret
 	// for views other than collection views to improve performance
-	spockSecret []byte
-	readFunc    GetRegisterFunc
+	spockSecretHasher hash.Hasher
+	readFunc          GetRegisterFunc
 }
 
 // Snapshot is set of interactions with the register
@@ -36,10 +36,10 @@ type Snapshot struct {
 // NewView instantiates a new ledger view with the provided read function.
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
-		delta:       NewDelta(),
-		regTouchSet: make(map[string]bool),
-		spockSecret: make([]byte, 0),
-		readFunc:    readFunc,
+		delta:             NewDelta(),
+		regTouchSet:       make(map[string]bool),
+		readFunc:          readFunc,
+		spockSecretHasher: hash.NewSHA3_256(),
 	}
 }
 
@@ -52,7 +52,6 @@ func (r *View) Interactions() *Snapshot {
 		ReadMappings:  make(map[string]Mapping),
 	}
 	var reads = make([]flow.RegisterID, 0, len(r.regTouchSet))
-	var spockSecret = make([]byte, len(r.spockSecret))
 
 	//copy data
 	for s, value := range r.delta.Data {
@@ -69,7 +68,9 @@ func (r *View) Interactions() *Snapshot {
 		reads = append(reads, []byte(key))
 	}
 
-	copy(spockSecret, r.spockSecret)
+	spockSecHashSum := r.spockSecretHasher.SumHash()
+	var spockSecret = make([]byte, len(spockSecHashSum))
+	copy(spockSecret, spockSecHashSum)
 
 	return &Snapshot{
 		Delta:       delta,
@@ -145,16 +146,10 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
 }
 
 func (v *View) updateSpock(value []byte) error {
-	hasher := hash.NewSHA3_256()
-	_, err := hasher.Write(v.spockSecret)
+	_, err := v.spockSecretHasher.Write(value)
 	if err != nil {
-		return fmt.Errorf("error updating spock secret data (step1): %w", err)
+		return fmt.Errorf("error updating spock secret data: %w", err)
 	}
-	_, err = hasher.Write(value)
-	if err != nil {
-		return fmt.Errorf("error updating spock secret data (step2): %w", err)
-	}
-	v.spockSecret = hasher.SumHash()
 	return nil
 }
 
@@ -188,7 +183,7 @@ func (v *View) MergeView(child *View) {
 	}
 	// SpockSecret is order aware
 	// TODO return the error and handle it properly on other places
-	err := v.updateSpock(child.spockSecret)
+	err := v.updateSpock(child.SpockSecret())
 	if err != nil {
 		panic(err)
 	}
@@ -209,5 +204,5 @@ func (r *View) ReadsCount() uint64 {
 
 // SpockSecret returns the secret value for SPoCK
 func (v *View) SpockSecret() []byte {
-	return v.spockSecret
+	return v.spockSecretHasher.SumHash()
 }
