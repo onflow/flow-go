@@ -63,6 +63,12 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("cannot get export transactions")
 	}
 
+	log.Info().Msg("start exporting delta snapshots")
+	err = ExportDeltaSnapshots(blockID, flagDatadir, flagOutputDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot get export delta snapshots")
+	}
+
 	log.Info().Msg("start exporting ledger")
 	err = ExportLedger(blockID, flagDatadir, flagExecutionStateDir, flagOutputDir)
 	if err != nil {
