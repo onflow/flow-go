@@ -539,6 +539,51 @@ func Load(path string) (*MTrie, error) {
 	return trie, nil
 }
 
+// DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
+func (mt *MTrie) DumpAsJSON(path string) error {
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	err = mt.dumpAsJSON(mt.root, writer)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (mt *MTrie) dumpAsJSON(n *node.Node, writer *bufio.Writer) error {
+	if key := n.Key(); key != nil {
+		str := "{\"key\": \"" + hex.EncodeToString(key) +
+			"\", \"value\": \"" + hex.EncodeToString(n.Value()) + "\"}\n"
+		_, err := writer.WriteString(str)
+		if err != nil {
+			return err
+		}
+		writer.Flush()
+	}
+
+	if lChild := n.LeftChild(); lChild != nil {
+		err := mt.dumpAsJSON(lChild, writer)
+		if err != nil {
+			return err
+		}
+	}
+
+	if rChild := n.RigthChild(); rChild != nil {
+		err := mt.dumpAsJSON(rChild, writer)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // constructTrieFromKeyValuePairs constructs a trie from the given key-value pairs.
 // UNSAFE: function requires the following conditions to be satisfied, but does not explicitly check them:
 //   * keys must have the same keyLength

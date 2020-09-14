@@ -397,6 +397,15 @@ func (f *MForest) StoreTrie(rootHash []byte, path string) error {
 	return trie.Store(path)
 }
 
+// DumpTrieAsJSON dumps a trie into a json file
+func (f *MForest) DumpTrieAsJSON(rootHash []byte, path string) error {
+	trie, err := f.GetTrie(rootHash)
+	if err != nil {
+		return err
+	}
+	return trie.DumpAsJSON(path)
+}
+
 // LoadTrie loads a trie from the disk
 func (f *MForest) LoadTrie(path string) (*trie.MTrie, error) {
 	newTrie, err := trie.Load(path)
