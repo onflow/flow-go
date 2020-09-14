@@ -264,22 +264,30 @@ func NewEpochStatus(currentSetup, currentCommit, nextSetup, nextCommit Identifie
 	}
 }
 
+// Valid returns true if the status is well-formed.
+func (es *EpochStatus) Valid() bool {
+
+	if es == nil {
+		return false
+	}
+	// must reference event IDs for current epoch
+	if es.CurrentEpoch.SetupID == ZeroID || es.CurrentEpoch.CommitID == ZeroID {
+		return false
+	}
+	// must not reference a commit without a setup
+	if es.NextEpoch.SetupID == ZeroID && es.NextEpoch.CommitID != ZeroID {
+		return false
+	}
+	return true
+}
+
 // Phase returns the phase for the CURRENT epoch, given this epoch status.
 func (es *EpochStatus) Phase() EpochPhase {
 
-	if es == nil {
+	if !es.Valid() {
 		return EpochPhaseUnknown
 	}
-	// invalid for any current epoch events to be empty
-	if es.CurrentEpoch.SetupID == ZeroID || es.CurrentEpoch.CommitID == ZeroID {
-		return EpochPhaseUnknown
-	}
-
 	if es.NextEpoch.SetupID == ZeroID {
-		// invalid for commit to have been emitted before setup
-		if es.NextEpoch.CommitID != ZeroID {
-			return EpochPhaseUnknown
-		}
 		return EpochPhaseStaking
 	}
 
