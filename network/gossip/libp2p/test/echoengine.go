@@ -31,7 +31,7 @@ type EchoEngine struct {
 	send     ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
 }
 
-func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
+func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID string, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
 	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",

@@ -69,7 +69,7 @@ func (suite *Suite) SetupTest() {
 
 	net := new(module.Network)
 	conduit := new(network.Conduit)
-	net.On("Register", uint8(engine.ReceiveReceipts), mock.Anything).
+	net.On("Register", engine.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
 	suite.request = new(module.Requester)

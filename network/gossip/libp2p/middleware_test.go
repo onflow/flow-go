@@ -313,7 +313,7 @@ func (m *MiddlewareTestSuit) TestMaxMessageSize_Publish() {
 	msg.Payload = encodedEvent
 
 	// sends a direct message from first node to the last node
-	err = m.mws[firstNode].Publish(msg, 0)
+	err = m.mws[firstNode].Publish(msg, "0")
 	require.Error(m.Suite.T(), err)
 }
 
@@ -369,7 +369,7 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 	}
 
 	return &message.Message{
-		ChannelID: 1,
+		ChannelID: "1",
 		EventID:   []byte("1"),
 		OriginID:  originID[:],
 		TargetIDs: [][]byte{targetID[:]},

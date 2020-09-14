@@ -57,7 +57,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.metrics = &mockmodule.VerificationMetrics{}
 	suite.chain = flow.Testnet.Chain()
 
-	suite.net.On("Register", uint8(engine.PushApprovals), testifymock.Anything).
+	suite.net.On("Register", engine.PushApprovals, testifymock.Anything).
 		Return(suite.con, nil).
 		Once()
 
