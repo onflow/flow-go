@@ -155,7 +155,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	// Block setup
 	payload := flow.Payload{
-		Identities: unittest.IdentityListFixture(32),
 		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
 	header := unittest.BlockHeaderFixture()

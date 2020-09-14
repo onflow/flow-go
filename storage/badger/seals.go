@@ -20,12 +20,14 @@ type Seals struct {
 
 func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
-	store := func(sealID flow.Identifier, v interface{}) func(*badger.Txn) error {
-		seal := v.(*flow.Seal)
+	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+		sealID := key.(flow.Identifier)
+		seal := val.(*flow.Seal)
 		return operation.SkipDuplicates(operation.InsertSeal(sealID, seal))
 	}
 
-	retrieve := func(sealID flow.Identifier) func(*badger.Txn) (interface{}, error) {
+	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
+		sealID := key.(flow.Identifier)
 		var seal flow.Seal
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := operation.RetrieveSeal(sealID, &seal)(tx)
@@ -51,11 +53,11 @@ func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
 
 func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal, error) {
 	return func(tx *badger.Txn) (*flow.Seal, error) {
-		v, err := s.cache.Get(sealID)(tx)
+		val, err := s.cache.Get(sealID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return v.(*flow.Seal), err
+		return val.(*flow.Seal), err
 	}
 }
 

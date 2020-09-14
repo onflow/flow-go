@@ -26,11 +26,11 @@ func (c *MetricsConsumer) OnEnteringView(view uint64, leader flow.Identifier) {
 	c.metrics.SetCurView(view)
 }
 
-func (c *MetricsConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
+func (c *MetricsConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	c.metrics.SetQCView(qc.View)
 }
 
-func (c *MetricsConsumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
+func (c *MetricsConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	c.metrics.CountSkipped()
 }
 

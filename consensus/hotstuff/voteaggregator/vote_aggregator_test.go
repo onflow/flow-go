@@ -81,7 +81,7 @@ func (as *AggregatorSuite) SetupTest() {
 	combined, err := c.Join(sig1, sig2)
 	require.NoError(as.T(), err)
 
-	rootQC := &model.QuorumCertificate{
+	rootQC := &flow.QuorumCertificate{
 		View:      rootHeader.View,
 		BlockID:   rootHeader.ID(),
 		SignerIDs: nil,
@@ -102,11 +102,11 @@ func (as *AggregatorSuite) SetupTest() {
 	as.signer.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("CreateQC", mock.AnythingOfType("[]*model.Vote")).Return(
-		func(votes []*model.Vote) *model.QuorumCertificate {
+		func(votes []*model.Vote) *flow.QuorumCertificate {
 			if len(votes) < 1 {
 				return nil
 			}
-			qc := &model.QuorumCertificate{
+			qc := &flow.QuorumCertificate{
 				View:    votes[0].View,
 				BlockID: votes[0].BlockID,
 				SigData: []byte{},
@@ -219,7 +219,7 @@ func (as *AggregatorSuite) TestReceiveVoteAfterQCBuilt() {
 	expectedVoters.AddVote(proposerVote)
 	_ = as.aggregator.StoreProposerVote(proposerVote)
 	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	var qc *model.QuorumCertificate
+	var qc *flow.QuorumCertificate
 	for i := 0; i < 4; i++ {
 		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		expectedVoters.AddVote(vote)
@@ -911,7 +911,7 @@ func getStateLength(aggregator *VoteAggregator) (uint64, int, int, int, int) {
 
 func (as *AggregatorSuite) qcForBlock(proposal *model.Proposal, expectedQcContributors *expectedQcContributors) interface{} {
 	return mock.MatchedBy(
-		func(qc *model.QuorumCertificate) bool {
+		func(qc *flow.QuorumCertificate) bool {
 			return (qc.View == proposal.Block.View) && (qc.BlockID == proposal.Block.BlockID) && expectedQcContributors.HasExpectedVoters(qc)
 		},
 	)
@@ -936,7 +936,7 @@ func (c *expectedQcContributors) AddVote(vote *model.Vote) {
 	voters[vote.SignerID] = struct{}{}
 }
 
-func (c *expectedQcContributors) HasExpectedVoters(qc *model.QuorumCertificate) bool {
+func (c *expectedQcContributors) HasExpectedVoters(qc *flow.QuorumCertificate) bool {
 	voters, ok := c.blockVotes[qc.BlockID]
 	if !ok {
 		return false

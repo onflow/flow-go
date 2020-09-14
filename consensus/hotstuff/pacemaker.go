@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // PaceMaker for HotStuff. The component is passive in that it only reacts to method calls.
@@ -41,7 +42,7 @@ type PaceMaker interface {
 
 	// UpdateCurViewWithQC will check if the given QC will allow PaceMaker to fast
 	// forward to QC.view+1. If PaceMaker incremented the current View, a NewViewEvent will be returned.
-	UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool)
+	UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool)
 
 	// UpdateCurViewWithBlock will check if the given block will allow PaceMaker to fast forward
 	// to the BlockProposal's view. If yes, the PaceMaker will update it's internal value for

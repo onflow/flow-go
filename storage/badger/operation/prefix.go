@@ -27,8 +27,8 @@ const (
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 
 	// codes for single entity storage
+	// 31 was used for identities before epochs
 	codeHeader               = 30
-	codeIdentity             = 31
 	codeGuarantee            = 32
 	codeSeal                 = 33
 	codeTransaction          = 34
@@ -43,12 +43,20 @@ const (
 	codeBlockValidity       = 43 // validity of block per HotStuff
 
 	// codes for indexing multiple identifiers by identifier
+	// 51 was used for identity indexes before epochs
 	codeBlockChildren         = 50 // index mapping block ID to children blocks
-	codePayloadIdentities     = 51 // index mapping block ID to payload identities
 	codePayloadGuarantees     = 52 // index mapping block ID to payload guarantees
 	codePayloadSeals          = 53 // index mapping block ID to payload seals
 	codeCollectionBlock       = 54 // index mapping collection ID to block ID
 	codeBlockExecutionReceipt = 55 // index mapping block ID to execution receipt ID
+	codeBlockEpochStatus      = 56 // index mapping block ID to epoch status
+
+	// codes related to epoch information
+	codeEpochCounter = 60 // epoch counter of latest finalized block
+	codeEpochStart   = 61 // view of first finalized block in epoch
+	codeEpochHeight  = 62 // height of highest finalized block in epoch
+	codeEpochSetup   = 63 // index mapping EpochSetup event ID to full event
+	codeEpochCommit  = 64 // index mapping EpochCommit event ID to full event
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100
