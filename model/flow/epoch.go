@@ -244,22 +244,22 @@ type EpochStatus struct {
 }
 
 type EventIDs struct {
-	// SetupEventID is the ID of the EpochSetup event for the respective Epoch
-	Setup Identifier
+	// SetupID is the ID of the EpochSetup event for the respective Epoch
+	SetupID Identifier
 
-	// CommitEventID is the ID of the EpochCommit event for the respective Epoch
-	Commit Identifier
+	// CommitID is the ID of the EpochCommit event for the respective Epoch
+	CommitID Identifier
 }
 
 func NewEpochStatus(currentSetup, currentCommit, nextSetup, nextCommit Identifier) *EpochStatus {
 	return &EpochStatus{
 		CurrentEpoch: EventIDs{
-			Setup:  currentSetup,
-			Commit: currentCommit,
+			SetupID:  currentSetup,
+			CommitID: currentCommit,
 		},
 		NextEpoch: EventIDs{
-			Setup:  nextSetup,
-			Commit: nextCommit,
+			SetupID:  nextSetup,
+			CommitID: nextCommit,
 		},
 	}
 }
@@ -271,19 +271,19 @@ func (es *EpochStatus) Phase() EpochPhase {
 		return EpochPhaseUnknown
 	}
 	// invalid for any current epoch events to be empty
-	if es.CurrentEpoch.Setup == ZeroID || es.CurrentEpoch.Commit == ZeroID {
+	if es.CurrentEpoch.SetupID == ZeroID || es.CurrentEpoch.CommitID == ZeroID {
 		return EpochPhaseUnknown
 	}
 
-	if es.NextEpoch.Setup == ZeroID {
+	if es.NextEpoch.SetupID == ZeroID {
 		// invalid for commit to have been emitted before setup
-		if es.NextEpoch.Commit != ZeroID {
+		if es.NextEpoch.CommitID != ZeroID {
 			return EpochPhaseUnknown
 		}
 		return EpochPhaseStaking
 	}
 
-	if es.NextEpoch.Commit == ZeroID {
+	if es.NextEpoch.CommitID == ZeroID {
 		return EpochPhaseSetup
 	}
 	return EpochPhaseCommitted

@@ -52,7 +52,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	setup, err := s.state.setups.ByID(status.CurrentEpoch.Setup)
+	setup, err := s.state.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, err
 	}
@@ -184,11 +184,11 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	setup, err := q.snap.state.setups.ByID(status.CurrentEpoch.Setup)
+	setup, err := q.snap.state.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	commit, err := q.snap.state.commits.ByID(status.CurrentEpoch.Commit)
+	commit, err := q.snap.state.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
@@ -201,7 +201,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	setup, err := q.snap.state.setups.ByID(status.CurrentEpoch.Setup)
+	setup, err := q.snap.state.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
@@ -216,11 +216,11 @@ func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	currentSetup, err := q.snap.state.setups.ByID(status.CurrentEpoch.Setup)
+	currentSetup, err := q.snap.state.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	currentCommit, err := q.snap.state.commits.ByID(status.CurrentEpoch.Commit)
+	currentCommit, err := q.snap.state.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
@@ -232,18 +232,18 @@ func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 	case counter == currentSetup.Counter:
 		return NewCommittedEpoch(currentSetup, currentCommit)
 	case counter == currentSetup.Counter+1:
-		if status.NextEpoch.Setup == flow.ZeroID {
+		if status.NextEpoch.SetupID == flow.ZeroID {
 			return NewInvalidEpoch(fmt.Errorf("epoch still undefined"))
 		}
-		nextSetup, err := q.snap.state.setups.ByID(status.NextEpoch.Setup)
+		nextSetup, err := q.snap.state.setups.ByID(status.NextEpoch.SetupID)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
 		}
 
-		if status.NextEpoch.Commit == flow.ZeroID {
+		if status.NextEpoch.CommitID == flow.ZeroID {
 			return NewSetupEpoch(nextSetup)
 		}
-		nextCommit, err := q.snap.state.commits.ByID(status.NextEpoch.Commit)
+		nextCommit, err := q.snap.state.commits.ByID(status.NextEpoch.CommitID)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
 		}

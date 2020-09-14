@@ -503,7 +503,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
-	setup, err := m.state.setups.ByID(epochState.CurrentEpoch.Setup)
+	setup, err := m.state.setups.ByID(epochState.CurrentEpoch.SetupID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
@@ -593,21 +593,21 @@ func (m *Mutator) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 	}
 
 	// Retrieve EpochSetup and EpochCommit event for parent block's Epoch
-	parentSetup, err := m.state.setups.ByID(parentStatus.CurrentEpoch.Setup)
+	parentSetup, err := m.state.setups.ByID(parentStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
 	}
 
 	if parentSetup.FinalView < block.View { // first block of a new epoch
 		// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
-		if parentStatus.NextEpoch.Setup == flow.ZeroID {
+		if parentStatus.NextEpoch.SetupID == flow.ZeroID {
 			return nil, fmt.Errorf("missing setup event for starting next epoch")
 		}
-		if parentStatus.NextEpoch.Commit == flow.ZeroID {
+		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
 			return nil, fmt.Errorf("missing commit event for starting next epoch")
 		}
 		p := flow.NewEpochStatus(
-			parentStatus.NextEpoch.Setup, parentStatus.NextEpoch.Commit,
+			parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
 			flow.ZeroID, flow.ZeroID,
 		)
 		return p, nil
@@ -616,8 +616,8 @@ func (m *Mutator) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 	// Block is in the same epoch as its parent, re-use the same epoch status
 	// IMPORTANT: copy the status to avoid modifying the parent status in the cache
 	blockStatus := flow.NewEpochStatus(
-		parentStatus.CurrentEpoch.Setup, parentStatus.CurrentEpoch.Commit,
-		parentStatus.NextEpoch.Setup, parentStatus.NextEpoch.Commit,
+		parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
+		parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
 	)
 	return blockStatus, nil
 }
@@ -642,7 +642,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
 	}
 
-	activeSetup, err := m.state.setups.ByID(epochStatus.CurrentEpoch.Setup)
+	activeSetup, err := m.state.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
 	}
@@ -664,7 +664,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 			case *flow.EpochSetup:
 
 				// We should only have a single epoch setup event per epoch.
-				if epochStatus.NextEpoch.Setup != flow.ZeroID {
+				if epochStatus.NextEpoch.SetupID != flow.ZeroID {
 					// true iff EpochSetup event for NEXT epoch was already included before
 					return nil, fmt.Errorf("duplicate epoch setup service event")
 				}
@@ -687,7 +687,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
-				epochStatus.NextEpoch.Setup = ev.ID()
+				epochStatus.NextEpoch.SetupID = ev.ID()
 
 				// we'll insert the setup event when we insert the block
 				ops = append(ops, m.state.setups.StoreTx(ev))
@@ -695,13 +695,13 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 			case *flow.EpochCommit:
 
 				// We should only have a single epoch commit event per epoch.
-				if epochStatus.NextEpoch.Commit != flow.ZeroID {
+				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
 					// true iff EpochEpochCommitSetup event for NEXT epoch was already included before
 					return nil, fmt.Errorf("duplicate epoch commit service event")
 				}
 
 				// The epoch setup event needs to happen before the commit.
-				if epochStatus.NextEpoch.Setup == flow.ZeroID {
+				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
 					return nil, fmt.Errorf("missing epoch setup for epoch commit")
 				}
 
@@ -711,7 +711,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				}
 
 				// Finally, the commit should commit all the necessary information.
-				setup, err := m.state.setups.ByID(epochStatus.NextEpoch.Setup)
+				setup, err := m.state.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
 				}
@@ -721,7 +721,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
-				epochStatus.NextEpoch.Commit = ev.ID()
+				epochStatus.NextEpoch.CommitID = ev.ID()
 
 				// we'll insert the commit event when we insert the block
 				ops = append(ops, m.state.commits.StoreTx(ev))
