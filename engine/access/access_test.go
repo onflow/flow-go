@@ -364,7 +364,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// setup mocks
 		originID := unittest.IdentifierFixture()
 		conduit := new(network.Conduit)
-		suite.net.On("Register", uint8(engine.ReceiveReceipts), mock.Anything).Return(conduit, nil).
+		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))

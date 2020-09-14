@@ -19,7 +19,7 @@ const (
 type QueueMessage struct {
 	Payload   interface{}     // the decoded message
 	Size      int             // the size of the message in bytes
-	ChannelID uint8           // the channel id to use to lookup the engine
+	ChannelID string          // the channel id to use to lookup the engine
 	SenderID  flow.Identifier // senderID for logging
 }
 
