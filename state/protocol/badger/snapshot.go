@@ -43,10 +43,10 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
 	if err != nil {
-		return flow.EpochPhaseUnknown, fmt.Errorf("could not retrieve epoch status: %w", err)
+		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve epoch status: %w", err)
 	}
 	if !status.Valid() {
-		return flow.EpochPhaseUnknown, fmt.Errorf("invalid epoch status")
+		return flow.EpochPhaseUndefined, fmt.Errorf("invalid epoch status")
 	}
 	return status.Phase(), nil
 }
