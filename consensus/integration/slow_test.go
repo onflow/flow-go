@@ -75,7 +75,7 @@ func TestDelay(t *testing.T) {
 func TestOneNodeBehind(t *testing.T) {
 	nodes, stopper, hub := createNodes(t, 5, 1500)
 
-	hub.WithFilter(func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	hub.WithFilter(func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		if receiver == nodes[0] {
 			return false, hotstuffTimeout + time.Millisecond
 		}

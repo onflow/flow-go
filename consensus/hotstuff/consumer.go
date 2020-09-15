@@ -81,7 +81,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64)
+	OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64)
 
 	// OnProposingBlock notifications are produced by the EventHandler when the replica, as
 	// leader for the respective view, proposing a block.
@@ -101,7 +101,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcConstructedFromVotes(*model.QuorumCertificate)
+	OnQcConstructedFromVotes(*flow.QuorumCertificate)
 
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.
@@ -123,7 +123,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcIncorporated(*model.QuorumCertificate)
+	OnQcIncorporated(*flow.QuorumCertificate)
 
 	// OnForkChoiceGenerated notifications are produced by ForkChoice whenever a fork choice is generated.
 	// The arguments specify the view (first argument) of the block which is to be built and the
@@ -131,7 +131,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnForkChoiceGenerated(uint64, *model.QuorumCertificate)
+	OnForkChoiceGenerated(uint64, *flow.QuorumCertificate)
 
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.

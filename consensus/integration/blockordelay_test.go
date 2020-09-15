@@ -23,7 +23,7 @@ func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
 
 	sent, received := 0, 0
 
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
 
 		switch m := event.(type) {
@@ -61,7 +61,7 @@ func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
 
 func blockReceiverMessagesByPercentage(percent int) BlockOrDelayFunc {
 	rand.Seed(time.Now().UnixNano())
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block := rand.Intn(100) <= percent
 		return block, 0
 	}
@@ -69,7 +69,7 @@ func blockReceiverMessagesByPercentage(percent int) BlockOrDelayFunc {
 
 func delayReceiverMessagesByRange(low time.Duration, high time.Duration) BlockOrDelayFunc {
 	rand.Seed(time.Now().UnixNano())
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		rng := high - low
 		delay := int64(low) + rand.Int63n(int64(rng))
 		return false, time.Duration(delay)

@@ -42,6 +42,7 @@ type Suite struct {
 	suite.Suite
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
+	epochQuery *protocol.EpochQuery
 	log        zerolog.Logger
 	net        *module.Network
 	request    *module.Requester
@@ -62,8 +63,10 @@ func (suite *Suite) SetupTest() {
 	suite.net = new(module.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 	suite.request = new(module.Requester)
@@ -160,21 +163,23 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		// create collection node cluster
 		count := 2
 		collNodes := unittest.IdentityListFixture(count, unittest.WithRole(flow.RoleCollection))
-		clusters := flow.NewClusterList(uint(count))
-		collNode1 := collNodes[0]
-		collNode2 := collNodes[1]
-		clusters.Add(0, collNode1)
-		clusters.Add(1, collNode2)
-		suite.snapshot.On("Clusters").Return(clusters, nil).Twice()
+		assignments := unittest.ClusterAssignment(uint(count), collNodes)
+		clusters, err := flow.NewClusterList(assignments, collNodes)
+		suite.Require().Nil(err)
+		collNode1 := clusters[0][0]
+		collNode2 := clusters[1][0]
+		epoch := new(protocol.Epoch)
+		suite.epochQuery.On("Current").Return(epoch)
+		epoch.On("Clustering").Return(clusters, nil)
 
 		// create two transactions bound for each of the cluster
-		cluster1, _ := clusters.ByIndex(0)
+		cluster1 := clusters[0]
 		cluster1tx := unittest.AlterTransactionForCluster(transaction.TransactionBody, clusters, cluster1, func(transaction *flow.TransactionBody) {})
 		tx1 := convert.TransactionToMessage(cluster1tx)
 		sendReq1 := &accessproto.SendTransactionRequest{
 			Transaction: tx1,
 		}
-		cluster2, _ := clusters.ByIndex(1)
+		cluster2 := clusters[1]
 		cluster2tx := unittest.AlterTransactionForCluster(transaction.TransactionBody, clusters, cluster2, func(transaction *flow.TransactionBody) {})
 		tx2 := convert.TransactionToMessage(cluster2tx)
 		sendReq2 := &accessproto.SendTransactionRequest{
@@ -228,7 +233,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		// verify that a collection node in the correct cluster was contacted exactly once
 		col1ApiClient.AssertExpectations(suite.T())
 		col2ApiClient.AssertExpectations(suite.T())
-		suite.snapshot.AssertNumberOfCalls(suite.T(), "Clusters", 2)
+		epoch.AssertNumberOfCalls(suite.T(), "Clustering", 2)
 
 		// additionally do a GetTransaction request for the two transactions
 		getTx := func(tx flow.TransactionBody) {
@@ -251,8 +256,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities,
-		_ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Guarantees, _ *storage.Seals,
+		_ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks, _ *storage.EpochSetups, _ *storage.EpochCommits, _ *storage.EpochStatuses) {
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
 		// test block2 get by height
@@ -352,14 +357,14 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed blocked
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks, _ *storage.EpochSetups, _ *storage.EpochCommits, _ *storage.EpochStatuses) {
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
 		conduit := new(network.Conduit)
-		suite.net.On("Register", uint8(engine.ReceiveReceipts), mock.Anything).Return(conduit, nil).
+		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
@@ -443,7 +448,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks, _ *storage.EpochSetups, _ *storage.EpochCommits, _ *storage.EpochStatuses) {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()

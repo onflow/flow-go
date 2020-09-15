@@ -2,11 +2,10 @@
 
 package flow
 
-func Genesis(identities IdentityList, chainID ChainID) *Block {
+func Genesis(chainID ChainID) *Block {
 
 	// create the raw content for the genesis block
 	payload := Payload{
-		Identities: identities,
 		Guarantees: nil,
 		Seals:      nil,
 	}
@@ -17,7 +16,7 @@ func Genesis(identities IdentityList, chainID ChainID) *Block {
 		ParentID:    ZeroID,
 		Height:      0,
 		PayloadHash: payload.Hash(),
-		Timestamp:   GenesisTime(),
+		Timestamp:   GenesisTime,
 		View:        0,
 	}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // NitroPaceMaker implements the hotstuff.PaceMaker
@@ -72,7 +73,7 @@ func (p *NitroPaceMaker) TimeoutChannel() <-chan time.Time {
 
 // UpdateCurViewWithQC notifies the pacemaker with a new QC, which might allow pacemaker to
 // fast forward its view.
-func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool) {
+func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	if qc.View < p.currentView {
 		return nil, false
 	}

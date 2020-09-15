@@ -26,7 +26,7 @@ type Middleware interface {
 	// Deprecated: Send exists for historical compatibility, and should not be used on new
 	// developments. It is planned to be cleaned up in near future. Proper utilization of Dispatch or
 	// Publish are recommended instead.
-	Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error
+	Send(channelID string, msg *message.Message, targetIDs ...flow.Identifier) error
 
 	// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
@@ -39,10 +39,10 @@ type Middleware interface {
 	// Publish publishes msg on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel ID. It does not guarantee the delivery though, and operates on a best
 	// effort.
-	Publish(msg *message.Message, channelID uint8) error
+	Publish(msg *message.Message, channelID string) error
 
 	// Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
-	Subscribe(channelID uint8) error
+	Subscribe(channelID string) error
 
 	// Ping pings the target node and returns the ping RTT or an error
 	Ping(targetID flow.Identifier) (time.Duration, error)

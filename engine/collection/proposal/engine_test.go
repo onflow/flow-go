@@ -31,6 +31,8 @@ type Suite struct {
 	proto struct {
 		state    *protocol.State
 		snapshot *protocol.Snapshot
+		query    *protocol.EpochQuery
+		epoch    *protocol.Epoch
 		mutator  *protocol.Mutator
 	}
 	// cluster state
@@ -68,11 +70,15 @@ func (suite *Suite) SetupTest() {
 	// mock out protocol state
 	suite.proto.state = new(protocol.State)
 	suite.proto.snapshot = new(protocol.Snapshot)
+	suite.proto.query = new(protocol.EpochQuery)
+	suite.proto.epoch = new(protocol.Epoch)
 	suite.proto.mutator = new(protocol.Mutator)
 	suite.proto.state.On("Final").Return(suite.proto.snapshot)
 	suite.proto.state.On("Mutate").Return(suite.proto.mutator)
 	suite.proto.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
+	suite.proto.snapshot.On("Epochs").Return(suite.proto.query)
+	suite.proto.query.On("Current").Return(suite.proto.epoch)
 
 	// mock out cluster state
 	suite.cluster.state = new(clusterstate.State)
@@ -83,9 +89,8 @@ func (suite *Suite) SetupTest() {
 	suite.cluster.snapshot.On("Head").Return(&flow.Header{}, nil)
 
 	// create a fake cluster
-	clusters := flow.NewClusterList(1)
-	clusters.Add(0, me)
-	suite.proto.snapshot.On("Clusters").Return(clusters, nil)
+	clusters := flow.ClusterList{flow.IdentityList{me}}
+	suite.proto.epoch.On("Clustering").Return(clusters, nil)
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)
@@ -107,9 +112,23 @@ func (suite *Suite) SetupTest() {
 	suite.sync = new(module.BlockRequester)
 	suite.hotstuff = new(module.HotStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, metrics, suite.proto.state, suite.cluster.state, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending, suite.sync)
+	eng, err := proposal.New(
+		log,
+		suite.net,
+		suite.me,
+		metrics,
+		metrics,
+		metrics,
+		suite.proto.state,
+		suite.cluster.state,
+		suite.pool,
+		suite.transactions,
+		suite.headers,
+		suite.payloads,
+		suite.pending,
+	)
 	require.NoError(suite.T(), err)
-	suite.eng = eng.WithConsensus(suite.hotstuff)
+	suite.eng = eng.WithHotStuff(suite.hotstuff).WithSync(suite.sync)
 }
 
 func (suite *Suite) TestHandleProposal() {

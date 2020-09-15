@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/bootstrap"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
@@ -71,7 +70,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
-	headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+	headers, _, _, _, _, blocks, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
 	suite.headers = headers
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
@@ -102,10 +101,11 @@ func (suite *BuilderSuite) TearDownTest() {
 func (suite *BuilderSuite) Bootstrap() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
-	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
-	err := suite.protoState.Mutate().Bootstrap(genesis, result, seal)
+	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	root, result, seal := unittest.BootstrapFixture(identities)
+	// ensure we don't enter a new epoch for tests that build many blocks
+	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+	err := suite.protoState.Mutate().Bootstrap(root, result, seal)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain
@@ -115,7 +115,7 @@ func (suite *BuilderSuite) Bootstrap() {
 	// add some transactions to transaction pool
 	for i := 0; i < 3; i++ {
 		transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
-			tx.ReferenceBlockID = genesis.ID()
+			tx.ReferenceBlockID = root.ID()
 			tx.ProposalKey.SequenceNumber = uint64(i)
 		})
 		added := suite.pool.Add(&transaction)
@@ -582,7 +582,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}()
 
 		metrics := metrics.NewNoopCollector()
-		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+		headers, _, _, _, _, blocks, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
 		suite.headers = headers
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)

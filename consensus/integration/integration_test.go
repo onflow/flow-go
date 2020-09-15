@@ -116,10 +116,10 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 	return low2high
 }
 
-type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
+type BlockOrDelayFunc func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration)
 
 // block nothing
-func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+func blockNothing(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 	return false, 0
 }
 
@@ -129,7 +129,7 @@ func blockNodes(denyList ...*Node) BlockOrDelayFunc {
 	for _, n := range denyList {
 		blackList[n.id.ID()] = n
 	}
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
 		if _, ok := blackList[sender.id.ID()]; ok {
 			return block, 0

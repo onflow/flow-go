@@ -166,7 +166,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// retrieve the set of collector clusters
-	clusters, err := e.state.Final().Clusters()
+	// TODO needs to be per-epoch
+	clusters, err := e.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
@@ -286,6 +287,7 @@ func (e *Engine) checkTransactionExpiry(tx *flow.TransactionBody) error {
 	if ref.Height > final.Height {
 		diff = 0
 	}
+
 	// discard transactions that are expired, or that will expire sooner than
 	// our configured buffer allows
 	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {

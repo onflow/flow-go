@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 const (
@@ -59,8 +60,8 @@ func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mocks.Consum
 	return pm, notifier
 }
 
-func QC(view uint64) *model.QuorumCertificate {
-	return &model.QuorumCertificate{View: view}
+func QC(view uint64) *flow.QuorumCertificate {
+	return &flow.QuorumCertificate{View: view}
 }
 
 func makeBlock(qcView, blockView uint64) *model.Block {

@@ -1,0 +1,48 @@
+package protocol
+
+import (
+	"encoding/binary"
+	"fmt"
+
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/module/signature"
+)
+
+// SeedFromParentSignature reads the raw random seed from a combined signature.
+// the combinedSig must be from a QuorumCertificate. The indices can be used to
+// generate task-specific seeds from the same signature.
+func SeedFromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
+	// split the parent voter sig into staking & beacon parts
+	combiner := signature.NewCombiner()
+	sigs, err := combiner.Split(combinedSig)
+	if err != nil {
+		return nil, fmt.Errorf("could not split block signature: %w", err)
+	}
+	if len(sigs) != 2 {
+		return nil, fmt.Errorf("invalid block signature split")
+	}
+
+	return SeedFromRandomSource(indices, sigs[1])
+}
+
+// SeedFromRandomSource generates a task-specific seed (task is determined by indices).
+func SeedFromRandomSource(indices []uint32, sor []byte) ([]byte, error) {
+	if len(indices)*4 > hash.KmacMaxParamsLen {
+		return nil, fmt.Errorf("unsupported number of indices")
+	}
+
+	// create the key used for the KMAC by concatenating all indices
+	key := make([]byte, 4*len(indices))
+	for i, index := range indices {
+		binary.LittleEndian.PutUint32(key[4*i:4*i+4], index)
+	}
+
+	// create a KMAC instance with our key and 32 bytes output size
+	kmac, err := hash.NewKMAC_128(key, nil, 32)
+	if err != nil {
+		return nil, fmt.Errorf("could not create kmac: %w", err)
+	}
+
+	return kmac.ComputeHash(sor), nil
+}
