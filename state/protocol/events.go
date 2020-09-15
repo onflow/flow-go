@@ -44,7 +44,7 @@ type Consumer interface {
 	// for the current epoch. This is equivalent to the end of the epoch setup
 	// phase for the current epoch.
 	//
-	// The block parameter is the first block of the epoch setup phase.
+	// The block parameter is the first block of the epoch committed phase.
 	// Referencing the diagram below, the event is emitted when block e is
 	// finalized, and `first` is block e.
 	//
