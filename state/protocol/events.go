@@ -29,6 +29,8 @@ type Consumer interface {
 	// phase for the current epoch.
 	//
 	// The block parameter is the first block of the epoch setup phase.
+	// Specifically, it is the block containing the seal for the block in which
+	// the EpochSetup event was emitted.
 	//
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochSetupPhaseStarted(epoch uint64, first *flow.Header)
@@ -38,6 +40,8 @@ type Consumer interface {
 	// phase for the current epoch.
 	//
 	// The block parameter is the first block of the epoch setup phase.
+	// Specifically, it is the block containing the seal for the block in which
+	// the EpochCommitted event was emitted.
 	//
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochCommittedPhaseStarted(epoch uint64, first *flow.Header)
