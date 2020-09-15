@@ -9,7 +9,6 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -38,27 +37,26 @@ var (
 // from verification nodes), and saves the seals into seals mempool for adding
 // into a new block.
 type Engine struct {
-	unit                    *engine.Unit                               // used to control startup/shutdown
-	log                     zerolog.Logger                             // used to log relevant actions with context
-	metrics                 module.EngineMetrics                       // used to track sent and received messages
-	tracer                  module.Tracer                              // used to trace execution
-	mempool                 module.MempoolMetrics                      // used to track mempool size
-	state                   protocol.State                             // used to access the  protocol state
-	me                      module.Local                               // used to access local node information
-	requester               module.Requester                           // used to request missing execution receipts by block ID
-	sealedResultsDB         storage.ExecutionResults                   // used to permanently store sealed results
-	headersDB               storage.Headers                            // used to check sealed headers
-	indexDB                 storage.Index                              // used to check payloads for results
-	results                 mempool.Results                            // holds execution results in memory
-	receipts                mempool.Receipts                           // holds execution receipts in memory
-	approvals               mempool.Approvals                          // holds result approvals in memory
-	seals                   mempool.Seals                              // holds block seals in memory
-	missing                 map[flow.Identifier]uint                   // track how often a block was missing
-	approvalsByResult       map[flow.Identifier][]*flow.ResultApproval // track approvals by execution result
-	assigner                module.ChunkAssigner                       // chunk assignment object
-	checkingSealing         *atomic.Bool                               // used to rate limit the checksealing call
-	requestReceiptThreshold uint                                       // how many blocks between sealed/finalized before we request execution receipts
-	maxUnsealedResults      int                                        // how many unsealed results to check when check sealing
+	unit                    *engine.Unit             // used to control startup/shutdown
+	log                     zerolog.Logger           // used to log relevant actions with context
+	metrics                 module.EngineMetrics     // used to track sent and received messages
+	tracer                  module.Tracer            // used to trace execution
+	mempool                 module.MempoolMetrics    // used to track mempool size
+	state                   protocol.State           // used to access the  protocol state
+	me                      module.Local             // used to access local node information
+	requester               module.Requester         // used to request missing execution receipts by block ID
+	sealedResultsDB         storage.ExecutionResults // used to permanently store sealed results
+	headersDB               storage.Headers          // used to check sealed headers
+	indexDB                 storage.Index            // used to check payloads for results
+	results                 mempool.Results          // holds execution results in memory
+	receipts                mempool.Receipts         // holds execution receipts in memory
+	approvals               mempool.Approvals        // holds result approvals in memory
+	seals                   mempool.Seals            // holds block seals in memory
+	missing                 map[flow.Identifier]uint // track how often a block was missing
+	assigner                module.ChunkAssigner     // chunk assignment object
+	checkingSealing         *atomic.Bool             // used to rate limit the checksealing call
+	requestReceiptThreshold uint                     // how many blocks between sealed/finalized before we request execution receipts
+	maxUnsealedResults      int                      // how many unsealed results to check when check sealing
 }
 
 // New creates a new collection propagation engine.
@@ -99,7 +97,6 @@ func New(
 		approvals:               approvals,
 		seals:                   seals,
 		missing:                 make(map[flow.Identifier]uint),
-		approvalsByResult:       make(map[flow.Identifier]([]*flow.ResultApproval)),
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxUnsealedResults:      200,
@@ -332,46 +329,23 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return fmt.Errorf("could not check result: %w", err)
 	}
 
-	// store in the memory pool
-	e.addPendingApproval(approval)
+	// store in the memory pool (it won't be added if it is already in there).
+	added, err := e.approvals.Add(approval)
+	if err != nil {
+		return err
+	}
+
+	if !added {
+		e.log.Debug().Msg("skipping approval already in mempool")
+		return nil
+	}
+
+	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
 	// kick off a check for potential seal formation
 	go e.checkSealing()
 
 	return nil
-}
-
-// addPendingApproval adds the approval to the mempool and to the
-// approvalsByResult map.
-func (e *Engine) addPendingApproval(approval *flow.ResultApproval) {
-	// store in the memory pool
-	added := e.approvals.Add(approval)
-	if !added {
-		log.Debug().Msg("skipping approval already in mempool")
-		return
-	}
-
-	// store in the mapping by result
-	e.approvalsByResult[approval.Body.ExecutionResultID] = append(
-		e.approvalsByResult[approval.Body.ExecutionResultID],
-		approval)
-
-	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
-
-	log.Info().Msg("result approval added to mempool")
-}
-
-// removePendingApproval removes the approval from the mempool and from the
-// approvalsByResult map.
-// TODO: There is an edge case whereby approvals can remain in approvalsByResult
-// forever. Indeed, e.approvals is a mempool, which will automatically eject
-// approvals when it's full, and when the ejection happens, it won't notify
-// e.approvalsByResult to remove the same approval. And since e.approvals no
-// longer has that approval, the approval will stay in e.approvalsByResult
-// forever.
-func (e *Engine) removePendingApproval(approval *flow.ResultApproval) {
-	_ = e.approvals.Rem(approval.ID())
-	delete(e.approvalsByResult, approval.Body.ExecutionResultID)
 }
 
 // checkSealing checks if there is anything worth sealing at the moment.
@@ -511,35 +485,36 @@ func (e *Engine) matchedResults() ([]*flow.ExecutionResult, error) {
 	var results []*flow.ExecutionResult
 
 	// go through the results mempool and check which ones we have collected
-	// enough approvals
-ResultLoop:
+	// enough approvals for
 	for _, result := range e.results.All() {
-		resultID := result.ID()
 
-		// get the approvals for this result
-		approvals := e.approvalsByResult[resultID]
+		// check that each chunk collected enough approvals
+		allChunksMatched := true
 
-		// TODO: As a temporary shortcut, we can just use the block the Execution receipt is for, i.e. blockID = result.BlockID
-		// However, in the full protocol, blockID is the first block in its fork, which references an
-		// Execution Receipt with an Execution Result identical to result. (were blockID != result.BlockID)
+		// TODO: As a temporary shortcut, we can just use the block the
+		// Execution receipt is for, i.e. blockID = result.BlockID. However, in
+		// the full protocol, blockID is the first block in its fork, which
+		// references an Execution Receipt with an Execution Result identical to
+		// result. (were blockID != result.BlockID)
 		assignment, err := e.assigner.Assign(result, result.BlockID)
 		if err != nil {
 			return nil, fmt.Errorf("could assign verifiers: %w", err)
 		}
 
-		// go through all the chunks of this result and check that each of them
-		// have a qualified majority of verifier stake approving
+		// check that each chunk collects enough approvals
 		for _, chunk := range result.Chunks {
-			matched := e.matchChunk(approvals, chunk, assignment)
+			matched := e.matchChunk(result.ID(), chunk, assignment)
 			if !matched {
-				continue ResultLoop
+				allChunksMatched = false
+				break
 			}
 		}
 
-		e.log.Info().Msg("adding result with sufficient verification")
-
 		// add the result to the results that should be sealed
-		results = append(results, result)
+		if allChunksMatched {
+			e.log.Info().Msg("adding result with sufficient verification")
+			results = append(results, result)
+		}
 	}
 
 	return results, nil
@@ -547,50 +522,27 @@ ResultLoop:
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
-func (e *Engine) matchChunk(approvals []*flow.ResultApproval, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
-	// get valid approver IDs per chunk
-	validApprovers := e.validateApprovers(assignment, approvals, chunk)
+func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
 
-	// check if there are atleast 1 approval
-	return validApprovers.Len() >= 1
-}
+	// get all the chunk approvals from mempool
+	approvals, ok := e.approvals.ByChunk(resultID, chunk.Index)
+	if !ok {
+		return false
+	}
 
-// validateApprovers checks all approvals for a chunk and returns a list of all valid approverIds
-// also drops any duplicate approvals in the mempool
-func (e *Engine) validateApprovers(assignment *chunks.Assignment, approvals []*flow.ResultApproval, chunk *flow.Chunk) flow.IdentifierList {
-	// TODO: Need to remove this dupCheck and move into e.addPendingApproval
-	dupCheck := make(map[flow.Identifier]bool)
-
+	// only keep approvals from assigned verifiers
 	var validApprovers flow.IdentifierList
-	for _, approval := range approvals {
-		if approval.Body.ChunkIndex == chunk.Index {
-			approverID := approval.Body.ApproverID
-
-			// check if already in dupCheck map
-			if dupCheck[approverID] {
-				e.log.Warn().
-					Hex("approver", approverID[:]).
-					Msg("dropping duplicate approval")
-				continue
-			}
-
-			dupCheck[approverID] = true
-
-			ok := chmodule.IsValidVerifer(assignment, chunk, approverID)
-			if ok {
-				validApprovers = append(validApprovers, approverID)
-				continue
-			}
-
-			e.log.Warn().
-				Hex("approver", approverID[:]).
-				Hex("block", approval.Body.BlockID[:]).
-				Uint64("chunk_index", chunk.Index).
-				Msg("skipping invalid approver")
+	for approverID := range approvals {
+		ok := chmodule.IsValidVerifer(assignment, chunk, approverID)
+		if ok {
+			validApprovers = append(validApprovers, approverID)
 		}
 	}
 
-	return validApprovers
+	// TODO:
+	//  * This is the happy path (requires just one approval per chunk). Should
+	//    be +2/3 of all currently staked verifiers.
+	return len(validApprovers) > 0
 }
 
 // sealResult records a matched result in the result database, creates a seal
@@ -700,7 +652,8 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	}
 	for _, approval := range e.approvals.All() {
 		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
-			e.removePendingApproval(approval)
+			// delete all the approvals for the corresponding chunk
+			e.approvals.Rem(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 		}
 	}
 	for _, seal := range e.seals.All() {
