@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -202,6 +203,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 		log.Debug().Msg("propagating transaction to cluster")
 
+		txCluster = txCluster.Filter(filter.Not(filter.HasNodeID(e.me.NodeID())))
 		err = e.conduit.Multicast(tx, math.MinUint(e.config.PropagationRedundancy+1, txCluster.Count()), txCluster.Selector())
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
