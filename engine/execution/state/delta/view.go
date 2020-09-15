@@ -1,6 +1,9 @@
 package delta
 
 import (
+	"fmt"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -19,8 +22,8 @@ type View struct {
 	// SpocksSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing SpocksSecret
 	// for views other than collection views to improve performance
-	spockSecret []byte
-	readFunc    GetRegisterFunc
+	spockSecretHasher hash.Hasher
+	readFunc          GetRegisterFunc
 }
 
 // Snapshot is set of interactions with the register
@@ -33,10 +36,10 @@ type Snapshot struct {
 // NewView instantiates a new ledger view with the provided read function.
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
-		delta:       NewDelta(),
-		regTouchSet: make(map[string]bool),
-		spockSecret: make([]byte, 0),
-		readFunc:    readFunc,
+		delta:             NewDelta(),
+		regTouchSet:       make(map[string]bool),
+		readFunc:          readFunc,
+		spockSecretHasher: hash.NewSHA3_256(),
 	}
 }
 
@@ -49,7 +52,6 @@ func (r *View) Interactions() *Snapshot {
 		ReadMappings:  make(map[string]Mapping),
 	}
 	var reads = make([]flow.RegisterID, 0, len(r.regTouchSet))
-	var spockSecret = make([]byte, len(r.spockSecret))
 
 	//copy data
 	for s, value := range r.delta.Data {
@@ -66,7 +68,9 @@ func (r *View) Interactions() *Snapshot {
 		reads = append(reads, []byte(key))
 	}
 
-	copy(spockSecret, r.spockSecret)
+	spockSecHashSum := r.spockSecretHasher.SumHash()
+	var spockSecret = make([]byte, len(spockSecHashSum))
+	copy(spockSecret, spockSecHashSum)
 
 	return &Snapshot{
 		Delta:       delta,
@@ -103,10 +107,9 @@ func (v *View) NewChild() *View {
 func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	value, exists := v.delta.Get(owner, controller, key)
 	if exists {
-		// every time we read a value (order preserving)
-		// we append the value to the end of the SpocksSecret byte slice
-		v.spockSecret = append(v.spockSecret, value...)
-		return value, nil
+		// every time we read a value (order preserving) we update spock
+		err := v.updateSpock(value)
+		return value, err
 	}
 
 	value, err := v.readFunc(owner, controller, key)
@@ -120,24 +123,34 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	// increase reads
 	v.readsCount++
 
-	// every time we read a value (order preserving)
-	// we append the value to the end of the SpocksSecret byte slice
-	v.spockSecret = append(v.spockSecret, value...)
-	return value, nil
+	// every time we read a value (order preserving) we update spock
+	err = v.updateSpock(value)
+	return value, err
 }
 
 // Set sets a register value in this view.
 func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
-	// every time we write something to delta (order preserving)
-	// we append the value to the end of the SpocksSecret byte slice
-	v.spockSecret = append(v.spockSecret, value...)
-	// capture register touch
+	// every time we write something to delta (order preserving) we update spock
+	// TODO return the error and handle it properly on other places
+	err := v.updateSpock(value)
+	if err != nil {
+		panic(err)
+	}
 
+	// capture register touch
 	k := state.RegisterID(owner, controller, key)
 
 	v.regTouchSet[string(k)] = true
 	// add key value to delta
 	v.delta.Set(owner, controller, key, value)
+}
+
+func (v *View) updateSpock(value []byte) error {
+	_, err := v.spockSecretHasher.Write(value)
+	if err != nil {
+		return fmt.Errorf("error updating spock secret data: %w", err)
+	}
+	return nil
 }
 
 // Touch explicitly adds a register to the touched registers set.
@@ -153,7 +166,6 @@ func (v *View) Touch(owner, controller, key string) {
 
 // Delete removes a register in this view.
 func (v *View) Delete(owner, controller, key string) {
-
 	v.delta.Delete(owner, controller, key)
 }
 
@@ -170,7 +182,11 @@ func (v *View) MergeView(child *View) {
 		v.regTouchSet[string(k)] = true
 	}
 	// SpockSecret is order aware
-	v.spockSecret = append(v.spockSecret, child.spockSecret...)
+	// TODO return the error and handle it properly on other places
+	err := v.updateSpock(child.SpockSecret())
+	if err != nil {
+		panic(err)
+	}
 	v.delta.MergeWith(child.delta)
 }
 
@@ -188,5 +204,5 @@ func (r *View) ReadsCount() uint64 {
 
 // SpockSecret returns the secret value for SPoCK
 func (v *View) SpockSecret() []byte {
-	return v.spockSecret
+	return v.spockSecretHasher.SumHash()
 }
