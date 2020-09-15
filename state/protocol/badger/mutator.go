@@ -377,17 +377,6 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
 
-	var finalizedHeight uint64
-	err := m.state.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
-	}
-	var finalID flow.Identifier
-	err = m.state.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
-	if err != nil {
-		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
-	}
-
 	// map each seal to the block it is sealing for easy lookup; we will need to
 	// successfully connect _all_ of these seals to the last sealed block for
 	// the payload to be valid
@@ -395,7 +384,7 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	for _, seal := range payload.Seals {
 		byBlock[seal.BlockID] = seal
 	}
-	if len(payload.Seals) > len(byBlock) {
+	if len(payload.Seals) != len(byBlock) {
 		return nil, state.NewInvalidExtensionErrorf("multiple seals for the same block")
 	}
 
@@ -407,6 +396,12 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
 
+	// if there is no seal in the block payload, use the last sealed block of the parent
+	// block as the last sealed block of the given block.
+	if len(payload.Seals) == 0 {
+		return last, nil
+	}
+
 	// get the last sealed block; we use its height to iterate forwards through
 	// the finalized blocks which still need sealing
 	sealed, err := m.state.headers.ByBlockID(last.BlockID)
@@ -414,12 +409,26 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
 	}
 
+	var finalizedHeight uint64
+	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
+	}
+	var finalID flow.Identifier
+	err = m.state.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
+	}
+
 	// we now go from last sealed height plus one to finalized height and check
 	// if we have the seal for each of them step by step; often we will not even
 	// enter this loop, because last sealed height is higher than finalized
 	for height := sealed.Height + 1; height <= finalizedHeight; height++ {
+		// as we are iterating the finalized blocks, if there is all the seals
+		// have been used to seal the finalized blocks, and there is no more seal left,
+		// we could exit earlier with the last seal
 		if len(byBlock) == 0 {
-			break
+			return last, nil
 		}
 		header, err := m.state.headers.ByHeight(height)
 		if err != nil {
@@ -436,10 +445,6 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		delete(byBlock, blockID)
 		last = next
 	}
-
-	// NOTE: We could skip the remaining part in case no seals are left; it is,
-	// however, cheap, and it's what we will always do during normal operation,
-	// where we only seal the last 1-3 blocks, which are not yet finalized.
 
 	// Once we have filled in seals for all finalized blocks we need to check
 	// the non-finalized blocks backwards; collect all of them, from direct
@@ -458,8 +463,10 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	}
 
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
+		// as we are iterating the pendings blocks, if there is no more seal left,
+		// we could exit earlier with the last seal
 		if len(byBlock) == 0 {
-			break
+			return last, nil
 		}
 		pendingID := pendingIDs[i]
 		next, found := byBlock[pendingID]
@@ -476,8 +483,8 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	// This is just a sanity check; at this point, no seals should be left.
 	if len(byBlock) > 0 {
 		return nil, fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
-
 	}
+
 	return last, nil
 }
 
