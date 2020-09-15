@@ -31,8 +31,8 @@ const (
 func (p EpochPhase) String() string {
 	return [...]string{
 		"EpochPhaseUndefined",
-		"EpochStakingPhase",
-		"EpochSetupPhase",
+		"EpochPhaseStaking",
+		"EpochPhaseSetup",
 		"EpochPhaseCommitted",
 	}[p]
 }
