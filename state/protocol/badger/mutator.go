@@ -233,7 +233,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	return nil
 }
 
-// header compliance check returns
+// header compliance check to verify if the given block connects to the
+// last finalized block.
 func (m *Mutator) headerExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
@@ -292,14 +293,13 @@ func (m *Mutator) headerExtend(candidate *flow.Block) error {
 	return nil
 }
 
+// The guarantee part of the payload compliance check.
+// None of the blocks should have included a
+// guarantee that was expired at the block height, nor should it have been
+// included in any previous payload.
 func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
 	header := candidate.Header
 	payload := candidate.Payload
-
-	// FOURTH: The header is now fully validated. Next is the guarantee part of
-	// the payload compliance check. None of the blocks should have included a
-	// guarantee that was expired at the block height, nor should it have been
-	// included in any previous payload.
 
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
@@ -366,6 +366,13 @@ func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
 	return nil
 }
 
+// The compliance of the seal payload.
+// we need them to create a valid chain of seals on our branch of the chain,
+// starting at the block directly after the last sealed block all the way to
+// at most the parent.
+// We use deterministic lookup by height for the finalized part of the chain and
+// then make a list of unfinalized blocks for the remainder, if any seals
+// remain.
 func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
@@ -380,13 +387,6 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
-
-	// FIFTH: For compliance of the seal payload, we need them to create a valid
-	// chain of seals on our branch of the chain, starting at the block directly
-	// after the last sealed block all the way to at most the parent. We use
-	// deterministic lookup by height for the finalized part of the chain and
-	// then make a list of unfinalized blocks for the remainder, if any seals
-	// remain.
 
 	// map each seal to the block it is sealing for easy lookup; we will need to
 	// successfully connect _all_ of these seals to the last sealed block for
