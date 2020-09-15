@@ -88,10 +88,8 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 
-	recipient := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0]
-
 	// should submit the collection to consensus nodes
-	suite.con.On("Submit", guarantee, recipient.NodeID).Return(nil)
+	suite.con.On("Multicast", guarantee, uint(3), mock.Anything).Return(nil)
 
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
@@ -109,7 +107,6 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 
 	// send from a non-allowed role
 	sender := suite.identities.Filter(filter.HasRole(flow.RoleVerification))[0]
-	recipient := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0]
 
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
@@ -117,5 +114,5 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	err := suite.engine.Process(sender.NodeID, msg)
 	suite.Require().Error(err)
 
-	suite.con.AssertNotCalled(suite.T(), "Submit", guarantee, recipient.NodeID)
+	suite.con.AssertNotCalled(suite.T(), "Multicast", guarantee, uint(3), mock.Anything)
 }
