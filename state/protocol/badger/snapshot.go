@@ -42,7 +42,13 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 	status, err := s.state.epochStatuses.ByBlockID(s.blockID)
-	return status.Phase(), err
+	if err != nil {
+		return flow.EpochPhaseUnknown, fmt.Errorf("could not retrieve epoch status: %w", err)
+	}
+	if !status.Valid() {
+		return flow.EpochPhaseUnknown, fmt.Errorf("invalid epoch status")
+	}
+	return status.Phase(), nil
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {

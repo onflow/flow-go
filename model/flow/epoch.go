@@ -290,7 +290,6 @@ func (es *EpochStatus) Phase() EpochPhase {
 	if es.NextEpoch.SetupID == ZeroID {
 		return EpochPhaseStaking
 	}
-
 	if es.NextEpoch.CommitID == ZeroID {
 		return EpochPhaseSetup
 	}
