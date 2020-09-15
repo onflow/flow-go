@@ -148,15 +148,15 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 
 		// 5) initialize values related to the epoch logic
-		err = m.state.setups.StoreTx(setup)(tx)
+		err = m.state.epoch.setups.StoreTx(setup)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochSetup event: %w", err)
 		}
-		err = m.state.commits.StoreTx(commit)(tx)
+		err = m.state.epoch.commits.StoreTx(commit)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochCommit event: %w", err)
 		}
-		err = m.state.epochStatuses.StoreTx(root.ID(), flow.NewEpochStatus(setup.ID(), commit.ID(), flow.ZeroID, flow.ZeroID))(tx)
+		err = m.state.epoch.statuses.StoreTx(root.ID(), flow.NewEpochStatus(setup.ID(), commit.ID(), flow.ZeroID, flow.ZeroID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochStatus: %w", err)
 		}
@@ -483,11 +483,11 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 
 	// EPOCH: A block inserted into the protocol state is already a valid extension
 
-	epochStatus, err := m.state.epochStatuses.ByBlockID(blockID)
+	epochStatus, err := m.state.epoch.statuses.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
-	setup, err := m.state.setups.ByID(epochStatus.CurrentEpoch.SetupID)
+	setup, err := m.state.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
@@ -588,13 +588,13 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 // consistency requirements of the protocol.
 func (m *Mutator) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 
-	parentStatus, err := m.state.epochStatuses.ByBlockID(block.ParentID)
+	parentStatus, err := m.state.epoch.statuses.ByBlockID(block.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
 	}
 
 	// Retrieve EpochSetup and EpochCommit event for parent block's Epoch
-	parentSetup, err := m.state.setups.ByID(parentStatus.CurrentEpoch.SetupID)
+	parentSetup, err := m.state.epoch.setups.ByID(parentStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
 	}
@@ -643,7 +643,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
 	}
 
-	activeSetup, err := m.state.setups.ByID(epochStatus.CurrentEpoch.SetupID)
+	activeSetup, err := m.state.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
 	}
@@ -691,7 +691,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				epochStatus.NextEpoch.SetupID = ev.ID()
 
 				// we'll insert the setup event when we insert the block
-				ops = append(ops, m.state.setups.StoreTx(ev))
+				ops = append(ops, m.state.epoch.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
 
@@ -712,7 +712,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				}
 
 				// Finally, the commit should commit all the necessary information.
-				setup, err := m.state.setups.ByID(epochStatus.NextEpoch.SetupID)
+				setup, err := m.state.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
 				}
@@ -725,7 +725,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				epochStatus.NextEpoch.CommitID = ev.ID()
 
 				// we'll insert the commit event when we insert the block
-				ops = append(ops, m.state.commits.StoreTx(ev))
+				ops = append(ops, m.state.epoch.commits.StoreTx(ev))
 
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
@@ -734,7 +734,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 	}
 
 	// we always index the epoch status, even when there are no service events
-	ops = append(ops, m.state.epochStatuses.StoreTx(block.ID(), epochStatus))
+	ops = append(ops, m.state.epoch.statuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
 }
