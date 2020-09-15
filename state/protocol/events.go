@@ -33,7 +33,7 @@ type Consumer interface {
 	// finalized, and first is block b.
 	//
 	// |<-- Epoch N ------------------------------------------------->|
-	// |<-- StakingPhase -->|<-- SetupPhase -->|
+	// |<-- StakingPhase -->|<-- SetupPhase --><-- CommittedPhase -->||
 	//                      ^--- block A - this block's execution result contains an EpochSetup event
 	//                        ^--- block b - contains seal for block A
 	//
@@ -49,9 +49,9 @@ type Consumer interface {
 	// finalized, and `first` is block e.
 	//
 	// |<-- Epoch N ------------------------------------------------->|
-	// |<-- SetupPhase -->|<-- CommittedPhase -->|
-	//                      ^--- block D - this block's execution result contains an EpochCommit event
-	//                        ^--- block e - contains seal for block D
+	// |<-- StakingPhase -->|<-- SetupPhase -->|<-- CommittedPhase -->|
+	//                                         ^--- block D - this block's execution result contains an EpochCommit event
+	//                                           ^--- block e - contains seal for block D
 	///
 	//
 	// NOTE: Only called once the phase transition has been finalized.
