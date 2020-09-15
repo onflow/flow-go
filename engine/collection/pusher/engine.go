@@ -28,7 +28,7 @@ type Engine struct {
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
 	colMetrics   module.CollectionMetrics
-	push         network.Conduit
+	conduit      network.Conduit
 	me           module.Local
 	state        protocol.State
 	pool         mempool.Transactions
@@ -49,11 +49,11 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, engMetric
 		transactions: transactions,
 	}
 
-	push, err := net.Register(engine.PushGuarantees, e)
+	conduit, err := net.Register(engine.PushGuarantees, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for push protocol: %w", err)
 	}
-	e.push = push
+	e.conduit = conduit
 
 	return e, nil
 }
@@ -135,7 +135,7 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 	// network usage significantly by implementing a simple retry mechanism here and
 	// only sending to a single consensus node.
 	// => https://github.com/dapperlabs/flow-go/issues/4358
-	err = e.push.Multicast(guarantee, 3, consensusNodes.Selector())
+	err = e.conduit.Multicast(guarantee, 3, consensusNodes.Selector())
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}

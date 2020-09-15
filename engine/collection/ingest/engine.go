@@ -28,7 +28,7 @@ type Engine struct {
 	log        zerolog.Logger
 	engMetrics module.EngineMetrics
 	colMetrics module.CollectionMetrics
-	con        network.Conduit
+	conduit    network.Conduit
 	me         module.Local
 	state      protocol.State
 	pool       mempool.Transactions
@@ -61,12 +61,12 @@ func New(
 		config:     config,
 	}
 
-	con, err := net.Register(engine.PushTransactions, e)
+	conduit, err := net.Register(engine.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
-	e.con = con
+	e.conduit = conduit
 
 	return e, nil
 }
@@ -201,7 +201,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 		log.Debug().Msg("propagating transaction to cluster")
 
-		err = e.con.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.Selector())
+		err = e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.Selector())
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
 		}

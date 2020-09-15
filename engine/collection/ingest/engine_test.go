@@ -27,9 +27,9 @@ type Suite struct {
 	N_COLLECTORS int
 	N_CLUSTERS   uint
 
-	con  *network.Conduit
-	me   *module.Local
-	conf Config
+	conduit *network.Conduit
+	me      *module.Local
+	conf    Config
 
 	pool *mempool.Transactions
 
@@ -63,8 +63,8 @@ func (suite *Suite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	net := new(module.Network)
-	suite.con = new(network.Conduit)
-	net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil).Once()
+	suite.conduit = new(network.Conduit)
+	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil).Once()
 
 	collectors := unittest.IdentityListFixture(suite.N_COLLECTORS, unittest.WithRole(flow.RoleCollection))
 	me := collectors[0]
@@ -199,7 +199,7 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
 	// should route to other node in local cluster
-	suite.con.
+	suite.conduit.
 		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, mock.Anything).
 		Return(nil)
 
@@ -210,7 +210,7 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	stored, ok := suite.transactions[tx.ID()]
 	suite.Assert().True(ok)
 	suite.Assert().Equal(tx.ID(), stored.ID())
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // should not store transactions for a different cluster and should propagate
@@ -229,7 +229,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, remote, func(transaction *flow.TransactionBody) {})
 
 	// should route to both nodes in remote cluster
-	suite.con.
+	suite.conduit.
 		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, mock.Anything).Run(
 		func(args mock.Arguments) {
 			selector := args.Get(2).(flow.IdentityFilter)
@@ -243,7 +243,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	// should not be added to local mempool
 	_, ok = suite.transactions[tx.ID()]
 	suite.Assert().False(ok)
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // should not propagate transactions received from another node (that node is
@@ -262,7 +262,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
 	// should not route to any node
-	suite.con.AssertNotCalled(suite.T(), "Multicast", &tx, suite.conf.PropagationRedundancy+1, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", &tx, suite.conf.PropagationRedundancy+1, mock.Anything)
 
 	err := suite.engine.Process(sender.NodeID, &tx)
 	suite.Assert().Nil(err)
@@ -271,7 +271,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	stored, ok := suite.transactions[tx.ID()]
 	suite.Assert().True(ok)
 	suite.Assert().Equal(tx.ID(), stored.ID())
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // should not route or store invalid transactions
@@ -291,12 +291,12 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 		})
 
 	// should not route to any node
-	suite.con.AssertNotCalled(suite.T(), "Multicast", tx, suite.conf.PropagationRedundancy+1, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", tx, suite.conf.PropagationRedundancy+1, mock.Anything)
 
 	_ = suite.engine.ProcessLocal(&tx)
 
 	// should not be added to local mempool
 	_, ok = suite.transactions[tx.ID()]
 	suite.Assert().False(ok)
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
