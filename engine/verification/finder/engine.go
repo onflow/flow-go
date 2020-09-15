@@ -230,7 +230,10 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 
 // processResult submits the result to the match engine.
 // originID is the identifier of the node that initially sends a receipt containing this result.
-func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, result *flow.ExecutionResult) error {
+// It returns true and nil if the result is submitted successfully to the match engine.
+// Otherwise, it returns false, and error if the result is not going successfully to the match engine. It returns false,
+// and nil, if the result has already been processed.
+func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, result *flow.ExecutionResult) (bool, error) {
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindProcessResult)
 	defer span.Finish()
 
@@ -239,11 +242,11 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 		e.log.Debug().
 			Hex("result_id", logging.ID(resultID)).
 			Msg("result already processed")
-		return nil
+		return false, nil
 	}
 	err := e.match.Process(originID, result)
 	if err != nil {
-		return fmt.Errorf("submission error to match engine: %w", err)
+		return false, fmt.Errorf("submission error to match engine: %w", err)
 	}
 
 	e.log.Info().
@@ -253,7 +256,7 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 	// monitoring: increases number of execution results sent
 	e.metrics.OnExecutionResultSent()
 
-	return nil
+	return true, nil
 }
 
 // onResultProcessed is called whenever a result is processed completely and
@@ -455,13 +458,18 @@ func (e *Engine) checkReadyReceipts() {
 			receiptID := rdp.Receipt.ID()
 			resultID := rdp.Receipt.ExecutionResult.ID()
 
-			err := e.processResult(ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
+			ok, err := e.processResult(ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
 					Hex("receipt_id", logging.ID(receiptID)).
 					Hex("result_id", logging.ID(resultID)).
 					Msg("could not process result")
+				return
+			}
+
+			if !ok {
+				// result has already been processed, no cleanup is needed
 				return
 			}
 

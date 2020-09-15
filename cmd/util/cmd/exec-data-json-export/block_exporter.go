@@ -38,10 +38,9 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) err
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := badger.NewHeaders(cacheMetrics, db)
 	index := badger.NewIndex(cacheMetrics, db)
-	identities := badger.NewIdentities(cacheMetrics, db)
 	guarantees := badger.NewGuarantees(cacheMetrics, db)
 	seals := badger.NewSeals(cacheMetrics, db)
-	payloads := badger.NewPayloads(db, index, identities, guarantees, seals)
+	payloads := badger.NewPayloads(db, index, guarantees, seals)
 	blocks := badger.NewBlocks(db, headers, payloads)
 
 	activeBlockID := blockID
