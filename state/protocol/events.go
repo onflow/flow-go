@@ -28,14 +28,15 @@ type Consumer interface {
 	// the current epoch. This is equivalent to the end of the epoch staking
 	// phase for the current epoch.
 	//
-	// The block parameter is the first block of the epoch setup phase (b).
-	// Referencing the diagram below, the event is emitted when block b is
-	// finalized.
+	// Referencing the diagram below, the event is emitted when block c is received.
+	// The block parameter is the first block of the epoch setup phase (block b).
+
 	//
 	// |<-- Epoch N ------------------------------------------------->|
-	// |<-- StakingPhase -->|<-- SetupPhase --><-- CommittedPhase -->||
+	// |<-- StakingPhase -->|<-- SetupPhase -->|<-- CommittedPhase -->|
 	//                      ^--- block A - this block's execution result contains an EpochSetup event
 	//                        ^--- block b - contains seal for block A, first block of Setup phase
+	//                           ^--- block c - finalizes block b. Receiving this block will trigger `EpochSetupPhaseStarted`
 	//
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochSetupPhaseStarted(epoch uint64, first *flow.Header)
@@ -44,14 +45,14 @@ type Consumer interface {
 	// for the current epoch. This is equivalent to the end of the epoch setup
 	// phase for the current epoch.
 	//
-	// The block parameter is the first block of the epoch committed phase (e).
-	// Referencing the diagram below, the event is emitted when block e is
-	// finalized.
+	// Referencing the diagram below, the event is emitted when block f is received.
+	// The block parameter is the first block of the epoch committed phase (block e).
 	//
 	// |<-- Epoch N ------------------------------------------------->|
 	// |<-- StakingPhase -->|<-- SetupPhase -->|<-- CommittedPhase -->|
 	//                                         ^--- block D - this block's execution result contains an EpochCommit event
 	//                                           ^--- block e - contains seal for block D, first block of Committed phase
+	//                                              ^--- block f - this block finalizes block e, and triggers `EpochSetupPhaseStarted`
 	///
 	//
 	// NOTE: Only called once the phase transition has been finalized.
