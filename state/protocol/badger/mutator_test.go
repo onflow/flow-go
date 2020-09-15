@@ -338,12 +338,8 @@ func TestExtendValid(t *testing.T) {
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
-		extend := unittest.BlockFixture()
+		extend := unittest.BlockWithParentFixture(block.Header)
 		extend.Payload.Guarantees = nil
-		extend.Payload.Seals = nil
-		extend.Header.Height = 1
-		extend.Header.View = 1
-		extend.Header.ParentID = block.ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
 		err = state.Mutate().Extend(&extend)
@@ -596,6 +592,76 @@ func TestExtendInvalidChainID(t *testing.T) {
 
 		err := state.Mutate().Extend(&block)
 		require.Error(t, err)
+	})
+}
+
+func TestExtendHighestSeal(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		// bootstrap the root block
+		block1, result, seal := unittest.BootstrapFixture(participants)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+		err := state.Mutate().Bootstrap(block1, result, seal)
+		require.NoError(t, err)
+
+		// create block2 and block3
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Payload.Guarantees = nil
+		block2.Header.PayloadHash = block2.Payload.Hash()
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Payload.Guarantees = nil
+		block3.Header.PayloadHash = block3.Payload.Hash()
+		err = state.Mutate().Extend(&block3)
+		require.Nil(t, err)
+
+		// create seals for block2 and block3
+		seal2 := unittest.SealFixture(
+			unittest.SealWithBlockID(block2.ID()),
+			unittest.WithInitalState(seal.FinalState),
+		)
+		seal3 := unittest.SealFixture(
+			unittest.SealWithBlockID(block3.ID()),
+			unittest.WithInitalState(seal2.FinalState),
+		)
+
+		// include the seals in block4
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.Payload.Guarantees = nil
+		block4.SetPayload(flow.Payload{
+			// placing seals in the reversed order to test
+			// Extend will pick the highest sealed block
+			Seals: []*flow.Seal{seal3, seal2},
+		})
+		block4.Header.PayloadHash = block4.Payload.Hash()
+		err = state.Mutate().Extend(&block4)
+		require.Nil(t, err)
+
+		// create a seal for block4, and included in block5,
+		// which built on top of block4
+		// verify that the block 5 should seal up to block4,
+		seal4 := unittest.SealFixture(
+			unittest.SealWithBlockID(block4.ID()),
+			unittest.WithInitalState(seal3.FinalState),
+		)
+
+		block5 := unittest.BlockWithParentFixture(block4.Header)
+		block5.Payload.Guarantees = nil
+		block5.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal4},
+		})
+		block5.Header.PayloadHash = block5.Payload.Hash()
+
+		// when extending block5, the seals in the block,
+		// which is seal4 that sealing block4, is the last seal
+		err = state.Mutate().Extend(&block5)
+		require.Nil(t, err)
+
+		finalCommit, err := state.AtBlockID(block5.ID()).Commit()
+		assert.NoError(t, err)
+		assert.Equal(t, seal4.FinalState, finalCommit)
 	})
 }
 
@@ -1107,12 +1173,8 @@ func TestHeaderExtendValid(t *testing.T) {
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
-		extend := unittest.BlockFixture()
+		extend := unittest.BlockWithParentFixture(block.Header)
 		extend.Payload.Guarantees = nil
-		extend.Payload.Seals = nil
-		extend.Header.Height = 1
-		extend.Header.View = 1
-		extend.Header.ParentID = block.ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
 		err = state.Mutate().HeaderExtend(&extend)
@@ -1241,15 +1303,21 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 		// bootstrap the root block
 		block1, result, seal := unittest.BootstrapFixture(participants)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
 		err := state.Mutate().Bootstrap(block1, result, seal)
 		require.NoError(t, err)
 
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Payload.Guarantees = nil
+		block2.Header.PayloadHash = block2.Payload.Hash()
 		err = state.Mutate().HeaderExtend(&block2)
 		require.Nil(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Payload.Guarantees = nil
+		block3.Header.PayloadHash = block3.Payload.Hash()
 		err = state.Mutate().HeaderExtend(&block3)
 		require.Nil(t, err)
 
@@ -1265,24 +1333,38 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 
 		// include the seals in block4
 		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.Payload.Guarantees = nil
 		block4.SetPayload(flow.Payload{
 			// placing seals in the reversed order to test
-			// HeaderExtend will pick the highest sealed block
+			// Extend will pick the highest sealed block
 			Seals: []*flow.Seal{seal3, seal2},
 		})
+		block4.Header.PayloadHash = block4.Payload.Hash()
 		err = state.Mutate().HeaderExtend(&block4)
 		require.Nil(t, err)
 
-		// create block5 on top of block4
-		block5 := unittest.BlockWithParentFixture(block4.Header)
+		// create a seal for block4, and included in block5,
+		// which built on top of block4
+		// verify that the block 5 should seal up to block4,
+		seal4 := unittest.SealFixture(
+			unittest.SealWithBlockID(block4.ID()),
+			unittest.WithInitalState(seal3.FinalState),
+		)
 
-		// when extending block5, the seals in the parent block,
-		// which is block4 is the last seal
+		block5 := unittest.BlockWithParentFixture(block4.Header)
+		block5.Payload.Guarantees = nil
+		block5.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal4},
+		})
+		block5.Header.PayloadHash = block5.Payload.Hash()
+
+		// when extending block5, the seals in the block,
+		// which is seal4 that sealing block4, is the last seal
 		err = state.Mutate().HeaderExtend(&block5)
 		require.Nil(t, err)
 
 		finalCommit, err := state.AtBlockID(block5.ID()).Commit()
 		assert.NoError(t, err)
-		assert.Equal(t, seal3.FinalState, finalCommit)
+		assert.Equal(t, seal4.FinalState, finalCommit)
 	})
 }

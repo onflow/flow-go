@@ -191,7 +191,7 @@ func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 	}
 
 	// find the last seal at the parent block
-	last, err := m.lastSeal(candidate)
+	last, err := m.lastSealed(candidate)
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
@@ -481,25 +481,27 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	return last, nil
 }
 
-func (m *Mutator) lastSeal(candidate *flow.Block) (*flow.Seal, error) {
+// finding the last sealed block on the chain of which the given block is extending
+// for instance, here is the chain state: block 100 is the head, block 97 is finalized,
+// and 95 is the last sealed block at the state of block 100.
+// 95 (sealed) <- 96 <- 97 (finalized) <- 98 <- 99 <- 100
+// Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
+// be the last sealed for block 101.
+func (m *Mutator) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
+	payload := candidate.Payload
 
-	// getting the last seal for the parent block
+	// getting the last sealed block
 	last, err := m.state.seals.ByBlockID(header.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
 
-	parentPayload, err := m.state.payloads.ByBlockID(header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent payload (%x): %w", header.ParentID, err)
-	}
-
-	// if the payload of the parent block has seals, then the last seal is the seal for the highest
+	// if the payload of the block has seals, then the last seal is the seal for the highest
 	// block
-	if len(parentPayload.Seals) > 0 {
+	if len(payload.Seals) > 0 {
 		var highestHeader *flow.Header
-		for i, seal := range parentPayload.Seals {
+		for i, seal := range payload.Seals {
 			header, err := m.state.headers.ByBlockID(seal.BlockID)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve the header %v for seal: %w", seal.BlockID, err)
