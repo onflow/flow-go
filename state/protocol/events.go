@@ -6,7 +6,7 @@ import (
 
 // Consumer defines a set of events that occur within the protocol state, that
 // can be propagated to other components via an implementation of this interface.
-// Consumer methods are invoked in goroutines.
+// Consumer implementations must be non-blocking.
 //
 // NOTE: These methods are only called once the fork containing the relevant
 // event has been finalized.

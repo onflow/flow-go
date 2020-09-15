@@ -555,9 +555,9 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	m.state.metrics.SealedHeight(sealed.Height)
 	m.state.metrics.BlockFinalized(block)
 
-	go m.state.consumer.BlockFinalized(header)
+	m.state.consumer.BlockFinalized(header)
 	for _, emit := range events {
-		go emit()
+		emit()
 	}
 
 	for _, seal := range block.Payload.Seals {
