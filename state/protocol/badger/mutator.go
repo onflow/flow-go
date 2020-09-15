@@ -148,18 +148,6 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 
 		// 5) initialize values related to the epoch logic
-		err = operation.InsertEpochCounter(setup.Counter)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch counter: %w", err)
-		}
-		err = operation.IndexEpochStart(setup.Counter, root.Header.View)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index epoch start: %w", err)
-		}
-		err = operation.InsertEpochHeight(setup.Counter, root.Header.Height)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch height: %w", err)
-		}
 		err = m.state.setups.StoreTx(setup)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochSetup event: %w", err)
@@ -493,8 +481,16 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve sealed header: %w", err)
 	}
 
-	// EPOCH: A block inserted into the protocol state is already a valid
-	// extension;
+	// EPOCH: A block inserted into the protocol state is already a valid extension
+
+	epochStatus, err := m.state.epochStatuses.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve epoch state: %w", err)
+	}
+	setup, err := m.state.setups.ByID(epochStatus.CurrentEpoch.SetupID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
+	}
 
 	payload := block.Payload
 	// track protocol events that should be emitted
@@ -512,32 +508,16 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		}
 	}
 
-	// EPOCH: We need to validate whether all information is available in the
-	// protocol state to go to the next epoch when needed. In cases where there
-	// is a bug in the smart contract, it could be that this happens too late
-	// and the chain finalization should halt.
-
-	// We also map the epoch to the height of its last finalized block; this is
-	// important in order to efficiently be able to look up epoch snapshots.
-
-	epochState, err := m.state.epochStatuses.ByBlockID(blockID)
+	// retrieve the final view of the current epoch w.r.t. the parent block
+	finalView, err := m.state.AtBlockID(header.ParentID).Epochs().Current().FinalView()
 	if err != nil {
-		return fmt.Errorf("could not retrieve epoch state: %w", err)
-	}
-	setup, err := m.state.setups.ByID(epochState.CurrentEpoch.SetupID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
+		return fmt.Errorf("could not get parent epoch final view: %w", err)
 	}
 
-	// track DB operations we need to apply while finalizing the block
-	var ops []func(*badger.Txn) error
-	if header.View > setup.FinalView { // first block of next epoch in this fork
-		ops = append(ops, operation.UpdateEpochCounter(setup.Counter))
-		ops = append(ops, operation.IndexEpochStart(setup.Counter, header.View))
-		ops = append(ops, operation.InsertEpochHeight(setup.Counter, header.Height))
+	// if this block's view exceeds the final view of its parent's current epoch,
+	// this block begins the next epoch
+	if header.View > finalView {
 		events = append(events, func() { m.state.consumer.EpochTransition(setup.Counter, header) })
-	} else {
-		ops = append(ops, operation.UpdateEpochHeight(setup.Counter, header.Height))
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;
@@ -562,12 +542,6 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		err = operation.UpdateSealedHeight(sealed.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
-		}
-		for _, op := range ops {
-			err = op(tx)
-			if err != nil {
-				return fmt.Errorf("could not apply additional operation: %w", err)
-			}
 		}
 		return nil
 	})
