@@ -41,7 +41,7 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
-	status, err := s.state.epochStatuses.ByBlockID(s.blockID)
+	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
 	if err != nil {
 		return flow.EpochPhaseUnknown, fmt.Errorf("could not retrieve epoch status: %w", err)
 	}
@@ -53,12 +53,12 @@ func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 
-	status, err := s.state.epochStatuses.ByBlockID(s.blockID)
+	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
 	if err != nil {
 		return nil, err
 	}
 
-	setup, err := s.state.setups.ByID(status.CurrentEpoch.SetupID)
+	setup, err := s.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,15 +186,15 @@ type EpochQuery struct {
 
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
-	status, err := q.snap.state.epochStatuses.ByBlockID(q.snap.blockID)
+	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	setup, err := q.snap.state.setups.ByID(status.CurrentEpoch.SetupID)
+	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	commit, err := q.snap.state.commits.ByID(status.CurrentEpoch.CommitID)
+	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
@@ -203,11 +203,11 @@ func (q *EpochQuery) Current() protocol.Epoch {
 
 // Next returns the next epoch.
 func (q *EpochQuery) Next() protocol.Epoch {
-	status, err := q.snap.state.epochStatuses.ByBlockID(q.snap.blockID)
+	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	setup, err := q.snap.state.setups.ByID(status.CurrentEpoch.SetupID)
+	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
@@ -218,15 +218,15 @@ func (q *EpochQuery) Next() protocol.Epoch {
 func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 
 	// get the current setup/commit events
-	status, err := q.snap.state.epochStatuses.ByBlockID(q.snap.blockID)
+	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	currentSetup, err := q.snap.state.setups.ByID(status.CurrentEpoch.SetupID)
+	currentSetup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	currentCommit, err := q.snap.state.commits.ByID(status.CurrentEpoch.CommitID)
+	currentCommit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
@@ -241,7 +241,7 @@ func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 		if status.NextEpoch.SetupID == flow.ZeroID {
 			return NewInvalidEpoch(fmt.Errorf("epoch still undefined"))
 		}
-		nextSetup, err := q.snap.state.setups.ByID(status.NextEpoch.SetupID)
+		nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
 		}
@@ -249,7 +249,7 @@ func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 		if status.NextEpoch.CommitID == flow.ZeroID {
 			return NewSetupEpoch(nextSetup)
 		}
-		nextCommit, err := q.snap.state.commits.ByID(status.NextEpoch.CommitID)
+		nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
 		}
@@ -278,11 +278,11 @@ func (u *InvalidSnapshot) Phase() (flow.EpochPhase, error) {
 	return 0, u.err
 }
 
-func (u *InvalidSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (u *InvalidSnapshot) Identities(_ flow.IdentityFilter) (flow.IdentityList, error) {
 	return nil, u.err
 }
 
-func (u *InvalidSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+func (u *InvalidSnapshot) Identity(_ flow.Identifier) (*flow.Identity, error) {
 	return nil, u.err
 }
 
@@ -294,7 +294,7 @@ func (u *InvalidSnapshot) Pending() ([]flow.Identifier, error) {
 	return nil, u.err
 }
 
-func (u *InvalidSnapshot) Seed(indices ...uint32) ([]byte, error) {
+func (u *InvalidSnapshot) Seed(_ ...uint32) ([]byte, error) {
 	return nil, u.err
 }
 
