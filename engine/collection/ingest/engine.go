@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/dapperlabs/flow-go/utils/math"
 )
 
 // Engine is the transaction ingestion engine, which ensures that new
@@ -201,7 +202,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 		log.Debug().Msg("propagating transaction to cluster")
 
-		err = e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.Selector())
+		err = e.conduit.Multicast(tx, math.MinUint(e.config.PropagationRedundancy+1, txCluster.Count()), txCluster.Selector())
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
 		}

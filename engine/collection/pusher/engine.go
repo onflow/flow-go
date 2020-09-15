@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/dapperlabs/flow-go/utils/math"
 )
 
 // Engine is the collection pusher engine, which provides access to resources
@@ -135,7 +136,7 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 	// network usage significantly by implementing a simple retry mechanism here and
 	// only sending to a single consensus node.
 	// => https://github.com/dapperlabs/flow-go/issues/4358
-	err = e.conduit.Multicast(guarantee, 3, consensusNodes.Selector())
+	err = e.conduit.Multicast(guarantee, math.MinUint(consensusNodes.Count(), 3), consensusNodes.Selector())
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
