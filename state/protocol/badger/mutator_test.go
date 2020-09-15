@@ -639,29 +639,9 @@ func TestExtendHighestSeal(t *testing.T) {
 		err = state.Mutate().Extend(&block4)
 		require.Nil(t, err)
 
-		// create a seal for block4, and included in block5,
-		// which built on top of block4
-		// verify that the block 5 should seal up to block4,
-		seal4 := unittest.SealFixture(
-			unittest.SealWithBlockID(block4.ID()),
-			unittest.WithInitalState(seal3.FinalState),
-		)
-
-		block5 := unittest.BlockWithParentFixture(block4.Header)
-		block5.Payload.Guarantees = nil
-		block5.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal4},
-		})
-		block5.Header.PayloadHash = block5.Payload.Hash()
-
-		// when extending block5, the seals in the block,
-		// which is seal4 that sealing block4, is the last seal
-		err = state.Mutate().Extend(&block5)
-		require.Nil(t, err)
-
-		finalCommit, err := state.AtBlockID(block5.ID()).Commit()
+		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
 		assert.NoError(t, err)
-		assert.Equal(t, seal4.FinalState, finalCommit)
+		assert.Equal(t, seal3.FinalState, finalCommit)
 	})
 }
 
@@ -1343,28 +1323,8 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		err = state.Mutate().HeaderExtend(&block4)
 		require.Nil(t, err)
 
-		// create a seal for block4, and included in block5,
-		// which built on top of block4
-		// verify that the block 5 should seal up to block4,
-		seal4 := unittest.SealFixture(
-			unittest.SealWithBlockID(block4.ID()),
-			unittest.WithInitalState(seal3.FinalState),
-		)
-
-		block5 := unittest.BlockWithParentFixture(block4.Header)
-		block5.Payload.Guarantees = nil
-		block5.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal4},
-		})
-		block5.Header.PayloadHash = block5.Payload.Hash()
-
-		// when extending block5, the seals in the block,
-		// which is seal4 that sealing block4, is the last seal
-		err = state.Mutate().HeaderExtend(&block5)
-		require.Nil(t, err)
-
-		finalCommit, err := state.AtBlockID(block5.ID()).Commit()
+		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
 		assert.NoError(t, err)
-		assert.Equal(t, seal4.FinalState, finalCommit)
+		assert.Equal(t, seal3.FinalState, finalCommit)
 	})
 }
