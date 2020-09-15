@@ -1098,3 +1098,98 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestHeaderExtendValid(t *testing.T) {
+
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		block := unittest.GenesisFixture(participants)
+
+		result := unittest.ExecutionResultFixture()
+		result.BlockID = block.ID()
+
+		seal := unittest.SealFixture()
+		seal.BlockID = block.ID()
+		seal.ResultID = result.ID()
+		seal.FinalState = result.FinalStateCommit
+
+		err := state.Mutate().Bootstrap(block, result, seal)
+		require.NoError(t, err)
+
+		extend := unittest.BlockFixture()
+		extend.Payload.Guarantees = nil
+		extend.Payload.Seals = nil
+		extend.Header.Height = 1
+		extend.Header.View = 1
+		extend.Header.ParentID = block.ID()
+		extend.Header.PayloadHash = extend.Payload.Hash()
+
+		err = state.Mutate().HeaderExtend(&extend)
+		require.NoError(t, err)
+
+		finalCommit, err := state.Final().Commit()
+		assert.NoError(t, err)
+		assert.Equal(t, seal.FinalState, finalCommit)
+	})
+}
+
+func TestHeaderExtendHeightTooLarge(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		root := unittest.GenesisFixture(participants)
+
+		block := unittest.BlockWithParentFixture(root.Header)
+		block.SetPayload(flow.Payload{})
+		// set an invalid height
+		block.Header.Height = root.Header.Height + 2
+
+		err := state.Mutate().HeaderExtend(&block)
+		require.Error(t, err)
+	})
+}
+
+func TestHeaderExtendBlockNotConnected(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		block := unittest.GenesisFixture(participants)
+
+		result := unittest.ExecutionResultFixture()
+		result.BlockID = block.ID()
+
+		seal := unittest.SealFixture()
+		seal.BlockID = block.ID()
+		seal.ResultID = result.ID()
+		seal.FinalState = result.FinalStateCommit
+
+		err := state.Mutate().Bootstrap(block, result, seal)
+		require.NoError(t, err)
+
+		// add 2 blocks, the second finalizing/sealing the state of the first
+		extend := unittest.BlockFixture()
+		extend.Payload.Guarantees = nil
+		extend.Payload.Seals = nil
+		extend.Header.Height = 1
+		extend.Header.View = 1
+		extend.Header.ParentID = block.Header.ID()
+		extend.Header.PayloadHash = extend.Payload.Hash()
+
+		err = state.Mutate().HeaderExtend(&extend)
+		require.NoError(t, err)
+
+		err = state.Mutate().Finalize(extend.ID())
+		require.NoError(t, err)
+
+		// create a fork at view/height 1 and try to connect it to root
+		extend.Header.Timestamp = extend.Header.Timestamp.Add(time.Second)
+		extend.Header.ParentID = block.Header.ID()
+
+		err = state.Mutate().HeaderExtend(&extend)
+		require.Error(t, err)
+
+		// verify seal not indexed
+		var sealID flow.Identifier
+		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+	})
+}

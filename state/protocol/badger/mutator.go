@@ -186,6 +186,54 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
+	err := m.headerExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("header does not compliance the chain state: %w", err)
+	}
+
+	last, err := m.sealExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+	}
+
+	err = m.insert(candidate, last)
+	if err != nil {
+		return fmt.Errorf("failed to insert the block: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Mutator) Extend(candidate *flow.Block) error {
+	// check if the block header is a valid extension of the finalized state
+	err := m.headerExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("header does not compliance the chain state: %w", err)
+	}
+
+	// check if the block payload is a valid extension of the finalized state
+	err = m.guaranteeExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
+	}
+
+	last, err := m.sealExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+	}
+
+	err = m.insert(candidate, last)
+	if err != nil {
+		return fmt.Errorf("failed to insert the block: %w", err)
+	}
+	return nil
+}
+
+// header compliance check returns
+func (m *Mutator) headerExtend(candidate *flow.Block) error {
+	// FIRST: We do some initial cheap sanity checks. Currently, only the
+	// root block can contain identities. We also want to make sure that the
+	// payload hash has been set correctly.
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -214,13 +262,13 @@ func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 	// valid in the context of the entire state. For this, the block needs to
 	// directly connect, through its ancestors, to the last finalized block.
 
-	var finalized uint64
-	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	var finalizedHeight uint64
+	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 	var finalID flow.Identifier
-	err = m.state.db.View(operation.LookupBlockHeight(finalized, &finalID))
+	err = m.state.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized block: %w", err)
 	}
@@ -231,9 +279,9 @@ func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
-		if ancestor.Height < finalized {
+		if ancestor.Height < finalizedHeight {
 			return state.NewOutdatedExtensionErrorf("candidate block conflicts with finalized state (ancestor: %d final: %d)",
-				ancestor.Height, finalized)
+				ancestor.Height, finalizedHeight)
 		}
 		ancestorID = ancestor.ParentID
 	}
@@ -241,20 +289,9 @@ func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 	return nil
 }
 
-func (m *Mutator) payloadExtend(candidate *flow.Block) error {
+func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
 	header := candidate.Header
 	payload := candidate.Payload
-
-	var finalized uint64
-	err := m.state.db.View(operation.RetrieveFinalizedHeight(&finalized))
-	if err != nil {
-		return fmt.Errorf("could not retrieve finalized height: %w", err)
-	}
-	var finalID flow.Identifier
-	err = m.state.db.View(operation.LookupBlockHeight(finalized, &finalID))
-	if err != nil {
-		return fmt.Errorf("could not lookup finalized block: %w", err)
-	}
 
 	// FOURTH: The header is now fully validated. Next is the guarantee part of
 	// the payload compliance check. None of the blocks should have included a
@@ -272,7 +309,7 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 	// look up the root height so we don't look too far back
 	// initially this is the genesis block height (aka 0).
 	var rootHeight uint64
-	err = m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	err := m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve root block height: %w", err)
 	}
@@ -323,6 +360,24 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 		}
 	}
 
+	return nil
+}
+
+func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
+	header := candidate.Header
+	payload := candidate.Payload
+
+	var finalizedHeight uint64
+	err := m.state.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
+	}
+	var finalID flow.Identifier
+	err = m.state.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
+	}
+
 	// FIFTH: For compliance of the seal payload, we need them to create a valid
 	// chain of seals on our branch of the chain, starting at the block directly
 	// after the last sealed block all the way to at most the parent. We use
@@ -338,7 +393,7 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 		byBlock[seal.BlockID] = seal
 	}
 	if len(payload.Seals) > len(byBlock) {
-		return state.NewInvalidExtensionErrorf("multiple seals for the same block")
+		return nil, state.NewInvalidExtensionErrorf("multiple seals for the same block")
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -346,34 +401,34 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 	// for the candidate block, which remains at the same sealed state
 	last, err := m.state.seals.ByBlockID(header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
+		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
 
 	// get the last sealed block; we use its height to iterate forwards through
 	// the finalized blocks which still need sealing
 	sealed, err := m.state.headers.ByBlockID(last.BlockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
 	}
 
 	// we now go from last sealed height plus one to finalized height and check
 	// if we have the seal for each of them step by step; often we will not even
 	// enter this loop, because last sealed height is higher than finalized
-	for height := sealed.Height + 1; height <= finalized; height++ {
+	for height := sealed.Height + 1; height <= finalizedHeight; height++ {
 		if len(byBlock) == 0 {
 			break
 		}
 		header, err := m.state.headers.ByHeight(height)
 		if err != nil {
-			return fmt.Errorf("could not get block for sealed height (%d): %w", height, err)
+			return nil, fmt.Errorf("could not get block for sealed height (%d): %w", height, err)
 		}
 		blockID := header.ID()
 		next, found := byBlock[blockID]
 		if !found {
-			return state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
+			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
 		}
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return state.NewInvalidExtensionError("seal execution states do not connect in finalized")
+			return nil, state.NewInvalidExtensionError("seal execution states do not connect in finalized")
 		}
 		delete(byBlock, blockID)
 		last = next
@@ -388,16 +443,17 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 	// parent to just before finalized, and see if we can use up the rest of the
 	// seals. We need to stop collecting ancestors either when reaching the
 	// finalized state, or when reaching the last sealed block.
-	ancestorID = header.ParentID
+	ancestorID := header.ParentID
 	var pendingIDs []flow.Identifier
 	for ancestorID != finalID && ancestorID != last.BlockID {
 		pendingIDs = append(pendingIDs, ancestorID)
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
+			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
 		ancestorID = ancestor.ParentID
 	}
+
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
 		if len(byBlock) == 0 {
 			break
@@ -405,10 +461,10 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 		pendingID := pendingIDs[i]
 		next, found := byBlock[pendingID]
 		if !found {
-			return state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
+			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
 		}
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return state.NewInvalidExtensionErrorf("seal execution states do not connect in pending")
+			return nil, state.NewInvalidExtensionErrorf("seal execution states do not connect in pending")
 		}
 		delete(byBlock, pendingID)
 		last = next
@@ -416,8 +472,13 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 
 	// This is just a sanity check; at this point, no seals should be left.
 	if len(byBlock) > 0 {
-		return fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
+		return nil, fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
+
 	}
+	return last, nil
+}
+
+func (m *Mutator) insert(candidate *flow.Block, last *flow.Seal) error {
 
 	// SIXTH: epoch transitions and service events
 	//    (i) Determine protocol state for block's _current_ Epoch.
@@ -436,6 +497,11 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
+	err = m.state.blocks.Store(candidate)
+	if err != nil {
+		return fmt.Errorf("could not store candidate block: %w", err)
+	}
+	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 		// insert the block into the database AND cache
 		err := m.state.blocks.StoreTx(candidate)(tx)
@@ -444,7 +510,6 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 		}
 
 		// index the latest sealed block in this fork
-		blockID := candidate.ID()
 		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
@@ -466,25 +531,11 @@ func (m *Mutator) payloadExtend(candidate *flow.Block) error {
 
 		return nil
 	})
+
 	if err != nil {
 		return fmt.Errorf("could not execute state extension: %w", err)
 	}
 
-	return nil
-}
-
-func (m *Mutator) Extend(candidate *flow.Block) error {
-	// check if the block header is a valid extension of the finalized state
-	err := m.HeaderExtend(candidate)
-	if err != nil {
-		return err
-	}
-
-	// check if the block payload is a valid extension of the finalized state
-	err = m.payloadExtend(candidate)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
