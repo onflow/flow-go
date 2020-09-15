@@ -445,7 +445,10 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		delete(byBlock, blockID)
 		last = next
 	}
-
+	// In case no seals are left, we skip the remaining part: 
+	if len(byBlock) == 0 {
+		return last, nil
+	}
 	// Once we have filled in seals for all finalized blocks we need to check
 	// the non-finalized blocks backwards; collect all of them, from direct
 	// parent to just before finalized, and see if we can use up the rest of the
