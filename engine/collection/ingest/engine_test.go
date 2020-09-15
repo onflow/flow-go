@@ -27,8 +27,9 @@ type Suite struct {
 	N_COLLECTORS int
 	N_CLUSTERS   uint
 
-	con *network.Conduit
-	me  *module.Local
+	con  *network.Conduit
+	me   *module.Local
+	conf Config
 
 	pool *mempool.Transactions
 
@@ -120,7 +121,8 @@ func (suite *Suite) SetupTest() {
 	suite.epochQuery.On("Current").Return(suite.epoch)
 	suite.epoch.On("Clustering").Return(suite.clusters, nil)
 
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pool, DefaultConfig())
+	suite.conf = DefaultConfig()
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pool, suite.conf)
 	suite.Require().Nil(err)
 }
 
@@ -196,11 +198,9 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
-	recipient := local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))[0]
-
 	// should route to other node in local cluster
 	suite.con.
-		On("Submit", &tx, recipient.NodeID).
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, mock.Anything).
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
@@ -230,16 +230,10 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 
 	// should route to both nodes in remote cluster
 	suite.con.
-		On("Submit", &tx, mock.Anything, mock.Anything).Run(
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, mock.Anything).Run(
 		func(args mock.Arguments) {
-			lookup := make(map[flow.Identifier]bool)
-			for _, arg := range args[1:] {
-				lookup[arg.(flow.Identifier)] = true
-			}
-			for _, recipientID := range remote.NodeIDs() {
-				suite.Assert().True(lookup[recipientID])
-			}
-			suite.Assert().Equal(len(lookup), len(remote.NodeIDs()))
+			selector := args.Get(2).(flow.IdentityFilter)
+			suite.Assert().Equal(len(remote), len(remote.Filter(selector)))
 		}).
 		Return(nil)
 
@@ -268,8 +262,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
 	// should not route to any node
-	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything)
-	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything, mock.Anything)
+	suite.con.AssertNotCalled(suite.T(), "Multicast", &tx, suite.conf.PropagationRedundancy+1, mock.Anything)
 
 	err := suite.engine.Process(sender.NodeID, &tx)
 	suite.Assert().Nil(err)
@@ -298,8 +291,7 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 		})
 
 	// should not route to any node
-	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything)
-	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything, mock.Anything)
+	suite.con.AssertNotCalled(suite.T(), "Multicast", tx, suite.conf.PropagationRedundancy+1, mock.Anything)
 
 	_ = suite.engine.ProcessLocal(&tx)
 

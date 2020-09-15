@@ -11,7 +11,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -200,17 +199,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// propagate it to all members of the responsible cluster
 	if originID == localID {
 
-		// always send the transaction to one node in the responsible cluster
-		// send to additional nodes based on configuration
-		targetIDs := txCluster.
-			Filter(filter.Not(filter.HasNodeID(localID))).
-			Sample(e.config.PropagationRedundancy + 1)
+		log.Debug().Msg("propagating transaction to cluster")
 
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
-			Msg("propagating transaction to cluster")
-
-		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
+		err = e.con.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.Selector())
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
 		}
