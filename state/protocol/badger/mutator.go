@@ -191,7 +191,7 @@ func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 	}
 
 	// find the last seal at the parent block
-	last, err := m.sealExtend(candidate)
+	last, err := m.lastSeal(candidate)
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
