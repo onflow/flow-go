@@ -515,7 +515,7 @@ func (e *EventHandler) processVote(vote *model.Vote) error {
 
 // processQC stores the QC and check whether the QC will trigger view change.
 // If triggered, then go to the new view.
-func (e *EventHandler) processQC(qc *model.QuorumCertificate) error {
+func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
 
 	log := e.log.With().
 		Uint64("block_view", qc.View).

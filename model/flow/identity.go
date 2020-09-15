@@ -82,7 +82,7 @@ type encodableIdentity struct {
 	NetworkPubKey []byte
 }
 
-func toEncodable(iy Identity) (encodableIdentity, error) {
+func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
 	if iy.StakingPubKey != nil {
 		ie.StakingPubKey = iy.StakingPubKey.Encode()
@@ -94,7 +94,7 @@ func toEncodable(iy Identity) (encodableIdentity, error) {
 }
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
-	encodable, err := toEncodable(iy)
+	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert to encodable: %w", err)
 	}
@@ -106,7 +106,7 @@ func (iy Identity) MarshalJSON() ([]byte, error) {
 }
 
 func (iy Identity) MarshalMsgpack() ([]byte, error) {
-	encodable, err := toEncodable(iy)
+	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert to encodable: %w", err)
 	}
@@ -117,7 +117,7 @@ func (iy Identity) MarshalMsgpack() ([]byte, error) {
 	return data, nil
 }
 
-func fromEncodable(ie encodableIdentity, identity *Identity) error {
+func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
 	identity.Role = ie.Role
@@ -142,7 +142,7 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("could not decode json: %w", err)
 	}
-	err = fromEncodable(encodable, iy)
+	err = identityFromEncodable(encodable, iy)
 	if err != nil {
 		return fmt.Errorf("could not convert from encodable: %w", err)
 	}
@@ -155,7 +155,7 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("could not decode json: %w", err)
 	}
-	err = fromEncodable(encodable, iy)
+	err = identityFromEncodable(encodable, iy)
 	if err != nil {
 		return fmt.Errorf("could not convert from encodable: %w", err)
 	}

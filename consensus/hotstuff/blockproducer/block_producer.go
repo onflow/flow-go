@@ -28,7 +28,7 @@ func New(signer hotstuff.Signer, committee hotstuff.Committee, builder module.Bu
 }
 
 // MakeBlockProposal will build a proposal for the given view with the given QC
-func (bp *BlockProducer) MakeBlockProposal(qc *model.QuorumCertificate, view uint64) (*model.Proposal, error) {
+func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64) (*model.Proposal, error) {
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
 	setHotstuffFields := func(header *flow.Header) error {

@@ -20,12 +20,14 @@ type Index struct {
 
 func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 
-	store := func(blockID flow.Identifier, v interface{}) func(tx *badger.Txn) error {
-		index := v.(*flow.Index)
+	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		blockID := key.(flow.Identifier)
+		index := val.(*flow.Index)
 		return procedure.InsertIndex(blockID, index)
 	}
 
-	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		blockID := key.(flow.Identifier)
 		var index flow.Index
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := procedure.RetrieveIndex(blockID, &index)(tx)
@@ -51,11 +53,11 @@ func (i *Index) storeTx(blockID flow.Identifier, index *flow.Index) func(*badger
 
 func (i *Index) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Index, error) {
 	return func(tx *badger.Txn) (*flow.Index, error) {
-		v, err := i.cache.Get(blockID)(tx)
+		val, err := i.cache.Get(blockID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return v.(*flow.Index), nil
+		return val.(*flow.Index), nil
 	}
 }
 

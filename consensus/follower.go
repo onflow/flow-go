@@ -7,7 +7,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/recovery"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -19,7 +18,7 @@ import (
 
 func NewFollower(log zerolog.Logger, committee hotstuff.Committee, headers storage.Headers, updater module.Finalizer,
 	verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header,
-	rootQC *model.QuorumCertificate, finalized *flow.Header, pending []*flow.Header) (*hotstuff.FollowerLoop, error) {
+	rootQC *flow.QuorumCertificate, finalized *flow.Header, pending []*flow.Header) (*hotstuff.FollowerLoop, error) {
 
 	finalizer, err := initFinalizer(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {

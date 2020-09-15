@@ -24,7 +24,7 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 // Message models a single message that is supposed to get exchanged by the gossip network
 type Message struct {
-	ChannelID            uint32   `protobuf:"varint,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
+	ChannelID            string   `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
 	EventID              []byte   `protobuf:"bytes,2,opt,name=EventID,proto3" json:"EventID,omitempty"`
 	OriginID             []byte   `protobuf:"bytes,3,opt,name=OriginID,proto3" json:"OriginID,omitempty"`
 	TargetIDs            [][]byte `protobuf:"bytes,4,rep,name=TargetIDs,proto3" json:"TargetIDs,omitempty"`
@@ -67,11 +67,11 @@ func (m *Message) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Message proto.InternalMessageInfo
 
-func (m *Message) GetChannelID() uint32 {
+func (m *Message) GetChannelID() string {
 	if m != nil {
 		return m.ChannelID
 	}
-	return 0
+	return ""
 }
 
 func (m *Message) GetEventID() []byte {
@@ -113,14 +113,14 @@ var fileDescriptor_33c57e4bae7b9afd = []byte{
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0xcd, 0x4d, 0x2d, 0x2e,
 	0x4e, 0x4c, 0x4f, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x87, 0x72, 0x95, 0xa6, 0x32,
 	0x72, 0xb1, 0xfb, 0x42, 0xd8, 0x42, 0x32, 0x5c, 0x9c, 0xce, 0x19, 0x89, 0x79, 0x79, 0xa9, 0x39,
-	0x9e, 0x2e, 0x12, 0x8c, 0x0a, 0x8c, 0x1a, 0xbc, 0x41, 0x08, 0x01, 0x21, 0x09, 0x2e, 0x76, 0xd7,
+	0x9e, 0x2e, 0x12, 0x8c, 0x0a, 0x8c, 0x1a, 0x9c, 0x41, 0x08, 0x01, 0x21, 0x09, 0x2e, 0x76, 0xd7,
 	0xb2, 0xd4, 0xbc, 0x12, 0x4f, 0x17, 0x09, 0x26, 0x05, 0x46, 0x0d, 0x9e, 0x20, 0x18, 0x57, 0x48,
 	0x8a, 0x8b, 0xc3, 0xbf, 0x28, 0x33, 0x3d, 0x33, 0xcf, 0xd3, 0x45, 0x82, 0x19, 0x2c, 0x05, 0xe7,
 	0x83, 0xcc, 0x0c, 0x49, 0x2c, 0x4a, 0x4f, 0x2d, 0xf1, 0x74, 0x29, 0x96, 0x60, 0x51, 0x60, 0xd6,
 	0xe0, 0x09, 0x42, 0x08, 0x80, 0xcc, 0x0c, 0x48, 0xac, 0xcc, 0xc9, 0x4f, 0x4c, 0x91, 0x60, 0x85,
 	0x98, 0x09, 0xe5, 0x3a, 0x09, 0x9c, 0x78, 0x24, 0xc7, 0x78, 0xe1, 0x91, 0x1c, 0xe3, 0x83, 0x47,
 	0x72, 0x8c, 0x33, 0x1e, 0xcb, 0x31, 0x24, 0xb1, 0x81, 0x5d, 0x6e, 0x0c, 0x08, 0x00, 0x00, 0xff,
-	0xff, 0xdb, 0xbd, 0xf4, 0x36, 0xca, 0x00, 0x00, 0x00,
+	0xff, 0xf2, 0x29, 0xcc, 0x26, 0xca, 0x00, 0x00, 0x00,
 }
 
 func (m *Message) Marshal() (dAtA []byte, err error) {
@@ -177,10 +177,12 @@ func (m *Message) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x12
 	}
-	if m.ChannelID != 0 {
-		i = encodeVarintMessage(dAtA, i, uint64(m.ChannelID))
+	if len(m.ChannelID) > 0 {
+		i -= len(m.ChannelID)
+		copy(dAtA[i:], m.ChannelID)
+		i = encodeVarintMessage(dAtA, i, uint64(len(m.ChannelID)))
 		i--
-		dAtA[i] = 0x8
+		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -202,8 +204,9 @@ func (m *Message) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.ChannelID != 0 {
-		n += 1 + sovMessage(uint64(m.ChannelID))
+	l = len(m.ChannelID)
+	if l > 0 {
+		n += 1 + l + sovMessage(uint64(l))
 	}
 	l = len(m.EventID)
 	if l > 0 {
@@ -265,10 +268,10 @@ func (m *Message) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 0 {
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ChannelID", wireType)
 			}
-			m.ChannelID = 0
+			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMessage
@@ -278,11 +281,24 @@ func (m *Message) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ChannelID |= uint32(b&0x7F) << shift
+				stringLen |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessage
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMessage
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChannelID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field EventID", wireType)

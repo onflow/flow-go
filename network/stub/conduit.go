@@ -6,7 +6,7 @@ import (
 )
 
 type Conduit struct {
-	channelID uint8
+	channelID string
 	submit    libp2p.SubmitFunc
 	publish   libp2p.PublishFunc
 	unicast   libp2p.UnicastFunc

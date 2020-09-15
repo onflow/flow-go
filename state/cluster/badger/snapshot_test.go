@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/bootstrap"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -53,7 +52,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 
-	headers, identities, _, seals, index, conPayloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
@@ -61,11 +60,10 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.mutator = suite.state.Mutate()
 
 	// just bootstrap with a genesis block, we'll use this as reference
-	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, index, conPayloads, blocks)
+	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses)
 	suite.Assert().Nil(err)
-	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	genesis, result, seal := unittest.BootstrapFixture(participants)
 	err = suite.protoState.Mutate().Bootstrap(genesis, result, seal)
 	suite.Require().Nil(err)
 

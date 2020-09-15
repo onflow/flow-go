@@ -114,7 +114,7 @@ func (t *TelemetryConsumer) OnFinalizedBlock(block *model.Block) {
 		Msg("OnFinalizedBlock")
 }
 
-func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *model.QuorumCertificate, newView uint64) {
+func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
 	t.pathHandler.NextStep().
 		Uint64("qc_block_view", qc.View).
 		Uint64("next_view", newView).
@@ -146,7 +146,7 @@ func (t *TelemetryConsumer) OnVoting(vote *model.Vote) {
 		Msg("OnVoting")
 }
 
-func (t *TelemetryConsumer) OnForkChoiceGenerated(current_view uint64, qc *model.QuorumCertificate) {
+func (t *TelemetryConsumer) OnForkChoiceGenerated(current_view uint64, qc *flow.QuorumCertificate) {
 	t.pathHandler.NextStep().
 		Uint64("block_view", current_view).
 		Msg("OnForkChoiceGenerated")
@@ -154,14 +154,14 @@ func (t *TelemetryConsumer) OnForkChoiceGenerated(current_view uint64, qc *model
 	// proposed block, whose details (including the qc) are captured by telemetry
 }
 
-func (t *TelemetryConsumer) OnQcConstructedFromVotes(qc *model.QuorumCertificate) {
+func (t *TelemetryConsumer) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
 	t.pathHandler.NextStep().
 		Uint64("qc_block_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcIncorporated")
 }
 
-func (t *TelemetryConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
+func (t *TelemetryConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	t.pathHandler.NextStep().
 		Uint64("qc_block_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).

@@ -7,25 +7,25 @@ import (
 // SubmitFunc is a function that submits the given event for the given engine to
 // the overlay network, which should take care of delivering it to the given
 // recipients.
-type SubmitFunc func(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error
+type SubmitFunc func(channelID string, event interface{}, targetIDs ...flow.Identifier) error
 
 // PublishFunc is a function that broadcasts the specified event
 // to all participants on the given channel.
-type PublishFunc func(channelID uint8, event interface{}, selector flow.IdentityFilter) error
+type PublishFunc func(channelID string, event interface{}, selector flow.IdentityFilter) error
 
 // UnicastFunc is a function that reliably sends the event via reliable 1-1 direct
 // connection in  the underlying network to the target ID.
-type UnicastFunc func(channelID uint8, event interface{}, targetID flow.Identifier) error
+type UnicastFunc func(channelID string, event interface{}, targetID flow.Identifier) error
 
 // MulticastFunc is a function that unreliably sends the event in the underlying
 // network to randomly chosen subset of nodes specified by the selector.
-type MulticastFunc func(channelID uint8, event interface{}, num uint, selector flow.IdentityFilter) error
+type MulticastFunc func(channelID string, event interface{}, num uint, selector flow.IdentityFilter) error
 
 // Conduit is a helper of the overlay layer which functions as an accessor for
 // sending messages within a single engine process. It sends all messages to
 // what can be considered a bus reserved for that specific engine.
 type Conduit struct {
-	channelID uint8
+	channelID string
 	submit    SubmitFunc
 	publish   PublishFunc
 	unicast   UnicastFunc

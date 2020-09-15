@@ -52,7 +52,7 @@ type HotStuffFollowerSuite struct {
 	verifier   *mockhotstuff.Verifier
 	notifier   *mockhotstuff.FinalizationConsumer
 	rootHeader *flow.Header
-	rootQC     *model.QuorumCertificate
+	rootQC     *flow.QuorumCertificate
 	finalized  *flow.Header
 	pending    []*flow.Header
 	follower   *hotstuff.FollowerLoop
@@ -105,7 +105,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 		Height:    21053,
 		View:      52078,
 	}
-	s.rootQC = &model.QuorumCertificate{
+	s.rootQC = &flow.QuorumCertificate{
 		View:      s.rootHeader.View,
 		BlockID:   s.rootHeader.ID(),
 		SignerIDs: identities.NodeIDs()[:3],
