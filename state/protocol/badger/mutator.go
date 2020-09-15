@@ -184,18 +184,19 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 }
 
 func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
-	// FIRST: We do some initial cheap sanity checks, like checking the payload
-	// hash is consistent
+	// check if he block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("header does not compliance the chain state: %w", err)
 	}
 
+	// find the last seal at the parent block
 	last, err := m.sealExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
 
+	// insert the block and index the last seal for the block
 	err = m.insert(candidate, last)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
@@ -211,17 +212,20 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("header does not compliance the chain state: %w", err)
 	}
 
-	// check if the block payload is a valid extension of the finalized state
+	// check if the guarantees in the payload is a valid extension of the finalized state
 	err = m.guaranteeExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
 	}
 
+	// check if the seals in the payload is a valid extension of the finalized state
+	// return the last seal at the parent block
 	last, err := m.sealExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
 
+	// insert the block and index the last seal for the block
 	err = m.insert(candidate, last)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
@@ -231,9 +235,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 // header compliance check returns
 func (m *Mutator) headerExtend(candidate *flow.Block) error {
-	// FIRST: We do some initial cheap sanity checks. Currently, only the
-	// root block can contain identities. We also want to make sure that the
-	// payload hash has been set correctly.
+	// FIRST: We do some initial cheap sanity checks, like checking the payload
+	// hash is consistent
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -478,6 +481,40 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	return last, nil
 }
 
+func (m *Mutator) lastSeal(candidate *flow.Block) (*flow.Seal, error) {
+	header := candidate.Header
+
+	// getting the last seal for the parent block
+	last, err := m.state.seals.ByBlockID(header.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
+	}
+
+	parentPayload, err := m.state.payloads.ByBlockID(header.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent payload (%x): %w", header.ParentID, err)
+	}
+
+	// if the payload of the parent block has seals, then the last seal is the seal for the highest
+	// block
+	if len(parentPayload.Seals) > 0 {
+		var highestHeader *flow.Header
+		for i, seal := range parentPayload.Seals {
+			header, err := m.state.headers.ByBlockID(seal.BlockID)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve the header %v for seal: %w", seal.BlockID, err)
+			}
+
+			if i == 0 || header.Height > highestHeader.Height {
+				highestHeader = header
+				last = seal
+			}
+		}
+	}
+
+	return last, nil
+}
+
 func (m *Mutator) insert(candidate *flow.Block, last *flow.Seal) error {
 
 	// SIXTH: epoch transitions and service events
@@ -497,10 +534,6 @@ func (m *Mutator) insert(candidate *flow.Block, last *flow.Seal) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
-	err = m.state.blocks.Store(candidate)
-	if err != nil {
-		return fmt.Errorf("could not store candidate block: %w", err)
-	}
 	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 		// insert the block into the database AND cache

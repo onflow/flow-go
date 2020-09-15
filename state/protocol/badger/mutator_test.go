@@ -1103,16 +1103,7 @@ func TestHeaderExtendValid(t *testing.T) {
 
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.SealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
@@ -1130,6 +1121,67 @@ func TestHeaderExtendValid(t *testing.T) {
 		finalCommit, err := state.Final().Commit()
 		assert.NoError(t, err)
 		assert.Equal(t, seal.FinalState, finalCommit)
+	})
+}
+
+func TestHeaderExtendMissingParent(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		block, result, seal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(block, result, seal)
+		require.NoError(t, err)
+
+		extend := unittest.BlockFixture()
+		extend.Payload.Guarantees = nil
+		extend.Payload.Seals = nil
+		extend.Header.Height = 2
+		extend.Header.View = 2
+		extend.Header.ParentID = unittest.BlockFixture().ID()
+		extend.Header.PayloadHash = extend.Payload.Hash()
+
+		err = state.Mutate().HeaderExtend(&extend)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+
+		// verify seal not indexed
+		var sealID flow.Identifier
+		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+	})
+}
+
+func TestHeaderExtendHeightTooSmall(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		block, result, seal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(block, result, seal)
+		require.NoError(t, err)
+
+		extend := unittest.BlockFixture()
+		extend.Payload.Guarantees = nil
+		extend.Payload.Seals = nil
+		extend.Header.Height = 1
+		extend.Header.View = 1
+		extend.Header.ParentID = block.Header.ID()
+		extend.Header.PayloadHash = extend.Payload.Hash()
+
+		err = state.Mutate().HeaderExtend(&extend)
+		require.NoError(t, err)
+
+		// create another block with the same height and view, that is coming after
+		extend.Header.ParentID = extend.Header.ID()
+		extend.Header.Height = 1
+		extend.Header.View = 2
+
+		err = state.Mutate().Extend(&extend)
+		require.Error(t, err)
+
+		// verify seal not indexed
+		var sealID flow.Identifier
+		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
 	})
 }
 
@@ -1151,16 +1203,7 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 func TestHeaderExtendBlockNotConnected(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		block := unittest.GenesisFixture(participants)
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.SealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
+		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
@@ -1173,7 +1216,7 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		extend.Header.ParentID = block.Header.ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.Mutate().HeaderExtend(&extend)
+		err = state.Mutate().Extend(&extend)
 		require.NoError(t, err)
 
 		err = state.Mutate().Finalize(extend.ID())
@@ -1184,12 +1227,12 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		extend.Header.ParentID = block.Header.ID()
 
 		err = state.Mutate().HeaderExtend(&extend)
-		require.Error(t, err)
+		assert.Error(t, err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
-		require.Error(t, err)
+		assert.Error(t, err)
 		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
 	})
 }
