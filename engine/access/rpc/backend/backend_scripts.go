@@ -76,8 +76,9 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 ) ([]byte, error) {
 
 	execReq := execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId: blockID[:],
-		Script:  script,
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments,
 	}
 
 	execResp, err := b.executionRPC.ExecuteScriptAtBlockID(ctx, &execReq)
