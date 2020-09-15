@@ -467,7 +467,7 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
 		// as we are iterating the pendings blocks, if there is no more seal left,
-		// we could exit earlier with the last seal
+		// we exit earlier with the last seal
 		if len(byBlock) == 0 {
 			return last, nil
 		}
