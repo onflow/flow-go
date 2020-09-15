@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -104,11 +105,24 @@ func TestView_Set(t *testing.T) {
 
 		// this part checks that spocks ordering be based
 		// on update orders and not registerIDs
+		expSpock := hash.NewSHA3_256()
 		v.Set(registerID2, "", "", flow.RegisterValue("1"))
+		err = hashIt(expSpock, []byte("1"))
+		assert.NoError(t, err)
+
 		v.Set(registerID3, "", "", flow.RegisterValue("2"))
+		err = hashIt(expSpock, []byte("2"))
+		assert.NoError(t, err)
+
 		v.Set(registerID1, "", "", flow.RegisterValue("3"))
+		err = hashIt(expSpock, []byte("3"))
+		assert.NoError(t, err)
+
 		b, err := v.Get(registerID1, "", "")
 		assert.NoError(t, err)
+		err = hashIt(expSpock, []byte("3"))
+		assert.NoError(t, err)
+
 		assert.Equal(t, b, flow.RegisterValue("3"))
 		// this part checks that delete functionality
 		// doesn't impact secret
@@ -116,11 +130,19 @@ func TestView_Set(t *testing.T) {
 		// this part checks that it always update the
 		// intermediate values and not just the final values
 		v.Set(registerID1, "", "", flow.RegisterValue("4"))
+		err = hashIt(expSpock, []byte("4"))
+		assert.NoError(t, err)
+
 		v.Set(registerID1, "", "", flow.RegisterValue("5"))
+		err = hashIt(expSpock, []byte("5"))
+		assert.NoError(t, err)
+
 		v.Set(registerID3, "", "", flow.RegisterValue("6"))
+		err = hashIt(expSpock, []byte("6"))
+		assert.NoError(t, err)
 
 		s := v.SpockSecret()
-		assert.Equal(t, s, []byte("1233456"))
+		assert.Equal(t, s, []uint8(expSpock.SumHash()))
 
 		t.Run("reflects in the snapshot", func(t *testing.T) {
 			assert.Equal(t, v.SpockSecret(), v.Interactions().SpockSecret)
@@ -289,6 +311,31 @@ func TestView_MergeView(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, b)
 	})
+	t.Run("SpockDataMerge", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		expSpock1 := hash.NewSHA3_256()
+		v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err := hashIt(expSpock1, []byte("apple"))
+		assert.NoError(t, err)
+		assert.Equal(t, v.SpockSecret(), []uint8(expSpock1.SumHash()))
+
+		expSpock2 := hash.NewSHA3_256()
+		chView := v.NewChild()
+		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = hashIt(expSpock2, []byte("carrot"))
+		assert.NoError(t, err)
+		assert.Equal(t, chView.SpockSecret(), []uint8(expSpock2.SumHash()))
+
+		v.MergeView(chView)
+		err = hashIt(expSpock1, expSpock2.SumHash())
+		assert.NoError(t, err)
+
+		s := v.SpockSecret()
+		assert.Equal(t, s, []uint8(expSpock1.SumHash()))
+	})
 }
 
 func TestView_RegisterTouches(t *testing.T) {
@@ -325,4 +372,9 @@ func TestView_RegisterTouches(t *testing.T) {
 		touches := v.Interactions().RegisterTouches()
 		assert.Len(t, touches, 2)
 	})
+}
+
+func hashIt(spock hash.Hasher, value []byte) error {
+	_, err := spock.Write(value)
+	return err
 }
