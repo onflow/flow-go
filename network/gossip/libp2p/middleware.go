@@ -437,41 +437,15 @@ func (m *Middleware) Subscribe(channelID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channelID, err)
 	}
-	rs := NewReadSubscription(m.log, s)
-	go rs.ReceiveLoop()
 
-	// add to waitgroup to wait for the inbound subscription go routine during stop
+	// create a new readSubscription with context of the middleware
+	rs := newReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
 	m.wg.Add(1)
-	go m.handleInboundSubscription(rs)
+
+	// kick off the recieve loop to continuously receive messages
+	go rs.receiveLoop(m.wg)
+
 	return nil
-}
-
-// handleInboundSubscription reads the messages from the channel written to by readsSubscription and processes them
-func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
-	defer m.wg.Done()
-	defer rs.stop()
-	// process incoming messages for as long as the peer is running
-SubscriptionLoop:
-	for {
-		select {
-		case <-m.stop:
-			// middleware stops
-			m.log.Info().Msg("exiting subscription loop: middleware stops")
-			break SubscriptionLoop
-		case msg, ok := <-rs.inbound:
-			if !ok {
-				m.log.Info().Msg("exiting subscription loop: connection stops")
-				break SubscriptionLoop
-			}
-
-			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, msg.ChannelID)
-
-			m.processMessage(msg)
-
-			continue SubscriptionLoop
-		}
-	}
 }
 
 // processMessage processes a message and eventually passes it to the overlay
