@@ -50,6 +50,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/protocol/events"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -80,9 +81,10 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	blocks := storage.NewBlocks(db, headers, payloads)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
+	consumer := events.NewNoop()
 	statuses := storage.NewEpochStatuses(metrics, db)
 
-	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses)
+	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
 	require.NoError(t, err)
 
 	root, result, seal := unittest.BootstrapFixture(participants)
