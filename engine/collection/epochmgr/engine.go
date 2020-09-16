@@ -27,9 +27,9 @@ type epochreqs struct {
 }
 
 // Engine is the epoch manager, which coordinates the lifecycle of other modules
-// that are epoch-dependent. The manager is responsible for spinning up engines
-// when a new epoch is about to start and spinning down engines for an epoch that
-// has ended.
+// and processes that are epoch-dependent. The manager is responsible for
+// spinning up engines when a new epoch is about to start and spinning down
+// engines for an epoch that has ended.
 type Engine struct {
 	unit  *engine.Unit
 	epoch *epochreqs // requirements for the current epoch
