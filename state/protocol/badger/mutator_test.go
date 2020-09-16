@@ -10,16 +10,21 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/protocol/events"
+	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/state/protocol/util"
 	stoerr "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	storeutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -332,10 +337,21 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 }
 
 func TestExtendValid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		metrics := metrics.NewNoopCollector()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
+
+		// create a event consumer to test epoch transition events
+		distributor := events.NewDistributor()
+		consumer := new(mockprotocol.Consumer)
+		distributor.AddConsumer(consumer)
+
+		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		require.Nil(t, err)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Mutate().Bootstrap(block, result, seal)
+		err = state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
 		extend := unittest.BlockFixture()
@@ -352,6 +368,11 @@ func TestExtendValid(t *testing.T) {
 		finalCommit, err := state.Final().Commit()
 		assert.NoError(t, err)
 		assert.Equal(t, seal.FinalState, finalCommit)
+
+		consumer.On("BlockFinalized", extend.Header).Once()
+		err = state.Mutate().Finalize(extend.ID())
+		require.Nil(t, err)
+		consumer.AssertExpectations(t)
 	})
 }
 
@@ -599,14 +620,27 @@ func TestExtendInvalidChainID(t *testing.T) {
 	})
 }
 
-// tests the full flow of transitioning between epochs by finalizing a setup
-// event, then a commit event, then finalizing the first block of the next epoch
+// Tests the full flow of transitioning between epochs by finalizing a setup
+// event, then a commit event, then finalizing the first block of the next epoch.
+// Also tests that appropriate epoch transition events are fired.
 func TestExtendEpochTransitionValid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		metrics := metrics.NewNoopCollector()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
+
+		// create a event consumer to test epoch transition events
+		distributor := events.NewDistributor()
+		consumer := new(mockprotocol.Consumer)
+		consumer.On("BlockFinalized", mock.Anything)
+		distributor.AddConsumer(consumer)
+
+		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		require.Nil(t, err)
 
 		// first bootstrap with the initial epoch
 		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
-		err := state.Mutate().Bootstrap(root, rootResult, rootSeal)
+		err = state.Mutate().Bootstrap(root, rootResult, rootSeal)
 		require.Nil(t, err)
 
 		// we should begin the epoch in the staking phase
@@ -618,6 +652,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block1 := unittest.BlockWithParentFixture(root.Header)
 		block1.SetPayload(flow.Payload{})
 		err = state.Mutate().Extend(&block1)
+		require.Nil(t, err)
+		err = state.Mutate().Finalize(block1.ID())
 		require.Nil(t, err)
 
 		epoch1Setup := rootSeal.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -672,6 +708,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
 		assert.Error(t, err)
 
+		// ensure an epoch phase transition when we finalize the event
+		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block2.Header).Once()
+		err = state.Mutate().Finalize(block2.ID())
+		require.Nil(t, err)
+		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block2.Header)
+
 		epoch2Commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(epoch2Setup.Counter),
 			unittest.WithDKGFromParticipants(epoch2Participants),
@@ -708,6 +750,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		phase, err = state.AtBlockID(block3.ID()).Phase()
 		assert.Nil(t, err)
 		assert.Equal(t, flow.EpochPhaseCommitted, phase)
+
+		// expect epoch phase transition once we finalize block 3
+		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block3.Header)
+		err = state.Mutate().Finalize(block3.ID())
+		require.Nil(t, err)
+		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block3.Header)
 
 		// we should still be in epoch 1
 		epochCounter, err := state.AtBlockID(block3.ID()).Epochs().Current().Counter()
@@ -746,6 +794,14 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		phase, err = state.AtBlockID(block5.ID()).Phase()
 		assert.Nil(t, err)
 		assert.Equal(t, flow.EpochPhaseStaking, phase)
+
+		// expect epoch transition once we finalize block 5
+		consumer.On("EpochTransition", epoch2Setup.Counter, block5.Header).Once()
+		err = state.Mutate().Finalize(block4.ID())
+		require.Nil(t, err)
+		err = state.Mutate().Finalize(block5.ID())
+		require.Nil(t, err)
+		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block5.Header)
 	})
 }
 
@@ -769,6 +825,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		block1.SetPayload(flow.Payload{})
 		err = state.Mutate().Extend(&block1)
 		require.Nil(t, err)
+
 		block2 := unittest.BlockWithParentFixture(root.Header)
 		block2.SetPayload(flow.Payload{})
 		err = state.Mutate().Extend(&block2)
