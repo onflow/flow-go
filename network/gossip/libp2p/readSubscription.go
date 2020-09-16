@@ -49,6 +49,7 @@ func newReadSubscription(ctx context.Context,
 func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 
 	defer wg.Done()
+	defer r.log.Debug().Msg("exiting receive routine")
 
 	for {
 

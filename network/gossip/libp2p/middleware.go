@@ -216,7 +216,7 @@ func (m *Middleware) Stop() {
 	// cancel the context (this also signals any lingering libp2p go routines to exit)
 	m.cancel()
 
-	// wait for the go routines spawned by middleware to stop
+	// wait for the readConnection and readSubscription routines to stop
 	m.wg.Wait()
 }
 
@@ -325,7 +325,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	go helpers.FullClose(stream)
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	go m.reportOutboundMsgSize(byteCount, metrics.ChannelOneToOne)
+	m.metrics.NetworkMessageSent(byteCount, metrics.ChannelOneToOne)
 
 	return nil
 }
@@ -386,46 +386,21 @@ func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress
 // this is a blocking call, so that the deferred resource cleanup happens after
 // we are done handling the connection
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
-	m.wg.Add(1)
-	defer m.wg.Done()
 
+	// qualify the logger with local and remote address
 	log := m.log.With().
 		Str("local_addr", s.Conn().LocalMultiaddr().String()).
 		Str("remote_addr", s.Conn().RemoteMultiaddr().String()).
 		Logger()
 
-	// initialize the encoder/decoder and create the connection handler
-	conn := NewReadConnection(log, s, m.maxUnicastMsgSize)
-
-	// make sure we close the connection when we are done handling the peer
-	defer conn.stop()
-
 	log.Info().Msg("incoming connection established")
 
-	// start processing messages in the background
-	go conn.ReceiveLoop()
+	//create a new readConnection with the context of the middleware
+	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
 
-	// process incoming messages for as long as the peer is running
-ProcessLoop:
-	for {
-		select {
-		case <-m.stop:
-			m.log.Info().Msg("exiting process loop: middleware stops")
-			break ProcessLoop
-		case msg, ok := <-conn.inbound:
-			if !ok {
-				m.log.Info().Msg("exiting process loop: read connection closed")
-				break ProcessLoop
-			}
-
-			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, metrics.ChannelOneToOne)
-			m.processMessage(msg)
-			continue ProcessLoop
-		}
-	}
-
-	log.Info().Msg("middleware closed the connection")
+	// kick off the receive loop to continuously receive messages
+	m.wg.Add(1)
+	go conn.receiveLoop(m.wg)
 }
 
 // Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
@@ -438,11 +413,11 @@ func (m *Middleware) Subscribe(channelID string) error {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channelID, err)
 	}
 
-	// create a new readSubscription with context of the middleware
+	// create a new readSubscription with the context of the middleware
 	rs := newReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
 	m.wg.Add(1)
 
-	// kick off the recieve loop to continuously receive messages
+	// kick off the receive loop to continuously receive messages
 	go rs.receiveLoop(m.wg)
 
 	return nil
@@ -492,17 +467,9 @@ func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	m.reportOutboundMsgSize(len(data), channelID) // use the shorter channel name to report metrics
+	m.metrics.NetworkMessageSent(len(data), channelID)
 
 	return nil
-}
-
-func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
-	m.metrics.NetworkMessageSent(size, channel)
-}
-
-func (m *Middleware) reportInboundMsgSize(size int, channel string) {
-	m.metrics.NetworkMessageReceived(size, channel)
 }
 
 // Ping pings the target node and returns the ping RTT or an error
