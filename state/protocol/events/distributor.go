@@ -39,3 +39,27 @@ func (d *Distributor) BlockReadyForProcessing(block *flow.Header) {
 		sub.BlockReadyForProcessing(block)
 	}
 }
+
+func (d *Distributor) EpochTransition(newEpoch uint64, first *flow.Header) {
+	d.mu.RLock()
+	defer d.mu.RLock()
+	for _, sub := range d.subscribers {
+		sub.EpochTransition(newEpoch, first)
+	}
+}
+
+func (d *Distributor) EpochSetupPhaseStarted(epoch uint64, first *flow.Header) {
+	d.mu.RLock()
+	defer d.mu.RLock()
+	for _, sub := range d.subscribers {
+		sub.EpochSetupPhaseStarted(epoch, first)
+	}
+}
+
+func (d *Distributor) EpochCommittedPhaseStarted(epoch uint64, first *flow.Header) {
+	d.mu.RLock()
+	defer d.mu.RLock()
+	for _, sub := range d.subscribers {
+		sub.EpochCommittedPhaseStarted(epoch, first)
+	}
+}
