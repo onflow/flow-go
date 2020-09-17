@@ -28,6 +28,15 @@ func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *
 	return nil
 }
 
+// BatchStore will store the transaction results for the given block ID
+func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []*flow.TransactionResult) error {
+	err := operation.RetryOnConflict(tr.db.Update, operation.BatchInsertTransactionResults(blockID, transactionResults))
+	if err != nil {
+		return fmt.Errorf("could not batch insert transaction results: %w", err)
+	}
+	return nil
+}
+
 // ByBlockIDTransactionID returns the runtime transaction result for the given block ID and transaction ID
 func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.TransactionResult, error) {
 

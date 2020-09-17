@@ -49,7 +49,45 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err != nil {
 			return fmt.Errorf("could not store data: %w", err)
 		}
+		return nil
+	}
+}
 
+// batchInsert will encode the given entities using JSON and will insert the resulting
+// binary data in the badger DB under the provided keys. It will error if any of the
+// keys already exists.
+func batchInsert(keys [][]byte, entities []interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		// iterate over the keys
+		for i, key := range keys {
+			// TODO (do we really need this?)
+			// update the maximum key size if the inserted key is bigger
+			if uint32(len(key)) > max {
+				max = uint32(len(key))
+				err := SetMax(tx)
+				if err != nil {
+					return fmt.Errorf("could not update max tracker: %w", err)
+				}
+			}
+			// check if the key already exists in the db
+			_, err := tx.Get(key)
+			if err == nil {
+				return storage.ErrAlreadyExists
+			}
+			if err != badger.ErrKeyNotFound {
+				return fmt.Errorf("could not check key: %w", err)
+			}
+			// serialize the entity data
+			val, err := msgpack.Marshal(entities[i])
+			if err != nil {
+				return fmt.Errorf("could not encode entity: %w", err)
+			}
+			// persist the entity data into the DB
+			err = tx.Set(key, val)
+			if err != nil {
+				return fmt.Errorf("could not store data: %w", err)
+			}
+		}
 		return nil
 	}
 }

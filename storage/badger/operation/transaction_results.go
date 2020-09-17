@@ -12,6 +12,17 @@ func InsertTransactionResult(blockID flow.Identifier, transactionResult *flow.Tr
 	return insert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
+func BatchInsertTransactionResults(blockID flow.Identifier, transactionResults []*flow.TransactionResult) func(*badger.Txn) error {
+	prefixes := make([][]byte, 0)
+	values := make([]interface{}, len(transactionResults))
+	for i, tx := range transactionResults {
+		prefix := makePrefix(codeTransactionResult, blockID, tx.TransactionID)
+		prefixes = append(prefixes, prefix)
+		values[i] = tx
+	}
+	return batchInsert(prefixes, values)
+}
+
 func RetrieveTransactionResult(blockID flow.Identifier, transactionID flow.Identifier, transactionResult *flow.TransactionResult) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeTransactionResult, blockID, transactionID), transactionResult)
 }
