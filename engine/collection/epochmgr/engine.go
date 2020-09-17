@@ -111,6 +111,14 @@ func (e *Engine) Done() <-chan struct{} {
 	})
 }
 
+// onEpochSetupPhaseStarted is called either when we transition into the epoch
+// setup phase, or when the node is restarted during the epoch setup phase. It
+// kicks off setup tasks for the phase, in particular submitting a vote for the
+// next epoch's root cluster QC.
+func (e *Engine) onEpochSetupPhaseStarted() {
+
+}
+
 // setupEpoch sets up cluster state and HotStuff for a new chain for the given
 // epoch. This can be used for in-progress chains (for example, when restarting
 // mid-epoch) or to bootstrap the chain for a new epoch.

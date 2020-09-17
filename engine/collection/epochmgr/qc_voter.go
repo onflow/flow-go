@@ -22,21 +22,43 @@ type RootQCVoter struct {
 	signer hotstuff.Signer
 	state  protocol.State
 	client module.QCContractClient // client to the QC aggregator smart contract
-	epoch  protocol.Epoch          // the epoch for which we are generating root QC
+}
+
+// NewRootQCVoter returns a new root QC voter, configured for a particular epoch.
+func NewRootQCVoter(
+	log zerolog.Logger,
+	me module.Local,
+	signer hotstuff.Signer,
+	state protocol.State,
+	client module.QCContractClient,
+) *RootQCVoter {
+
+	voter := &RootQCVoter{
+		log:    log,
+		me:     me,
+		signer: signer,
+		state:  state,
+		client: client,
+	}
+	return voter
 }
 
 // Vote handles the full procedure of generating a vote, submitting it to the
 // epoch smart contract, and verifying submission. Returns an error only if
 // there is a critical error that would make it impossible for the vote to be
 // submitted. Otherwise, exits when the vote has been successfully submitted.
-// It is safe to run multiple times per epoch.
+//
+// It is safe to run multiple times within a single setup phase.
 func (voter *RootQCVoter) Vote(ctx context.Context) error {
 
-	counter, err := voter.epoch.Counter()
+	// retrieve the next epoch
+	epoch := voter.state.Final().Epochs().Next()
+
+	counter, err := epoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get epoch counter: %w", err)
 	}
-	clusters, err := voter.epoch.Clustering()
+	clusters, err := epoch.Clustering()
 	if err != nil {
 		return fmt.Errorf("could not get clustering: %w", err)
 	}
@@ -74,7 +96,16 @@ func (voter *RootQCVoter) Vote(ctx context.Context) error {
 		default:
 		}
 
-		// check whether we've already voted
+		// check that we're still in the setup phase, if we're not we can't
+		// submit a vote anyway and must exit this process
+		phase, err := voter.state.Final().Phase()
+		if err != nil {
+			log.Error().Err(err).Msg("could not get current phase")
+		} else if phase != flow.EpochPhaseSetup {
+			return fmt.Errorf("could not submit vote - no longer in setup phase")
+		}
+
+		// check whether we've already voted, if we have we can exit early
 		voted, err := voter.client.Voted(ctx)
 		if err != nil {
 			log.Error().Err(err).Msg("could not check vote status")
@@ -83,22 +114,12 @@ func (voter *RootQCVoter) Vote(ctx context.Context) error {
 			return nil
 		}
 
-		// submit the vote, this call will block until the transaction has
+		// submit the vote - this call will block until the transaction has
 		// either succeeded or we are able to retry
 		log.Info().Msg("submitting vote...")
 		err = voter.client.SubmitVote(ctx, vote)
 		if err != nil {
 			log.Error().Err(err).Msg("could not submit vote")
-		}
-
-		// check that we're still in the setup phase, if we're not we can't
-		// submit a vote anyway and must exit this process
-		phase, err := voter.state.Final().Phase()
-		if err != nil {
-			log.Error().Err(err).Msg("could not get current phase")
-			continue
-		} else if phase != flow.EpochPhaseSetup {
-			return fmt.Errorf("could not submit vote - no longer in setup phase")
 		}
 	}
 }
