@@ -117,10 +117,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 // MakeValid marks a block as having passed HotStuff validation.
 func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
-	return operation.RetryOnConflict(
-		f.db.Update,
-		operation.SkipDuplicates(
-			operation.InsertBlockValidity(blockID, true),
-		),
-	)
+	err := f.state.Mutate().MarkValid(blockID)
+	if err != nil {
+		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
+	}
+	return nil
 }

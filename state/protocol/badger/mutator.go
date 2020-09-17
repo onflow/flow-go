@@ -94,6 +94,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not insert root block: %w", err)
 		}
+		err = operation.InsertBlockValidity(root.ID(), true)(tx)
+		if err != nil {
+			return fmt.Errorf("could not mark root block as valid: %w", err)
+		}
+
 		err = operation.IndexBlockHeight(root.Header.Height, root.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index root block: %w", err)
@@ -445,7 +450,7 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		delete(byBlock, blockID)
 		last = next
 	}
-	// In case no seals are left, we skip the remaining part: 
+	// In case no seals are left, we skip the remaining part:
 	if len(byBlock) == 0 {
 		return last, nil
 	}
@@ -684,8 +689,9 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 
 	m.state.metrics.FinalizedHeight(header.Height)
 	m.state.metrics.SealedHeight(sealed.Height)
-
 	m.state.metrics.BlockFinalized(block)
+
+	m.state.consumer.BlockFinalized(header)
 
 	for _, seal := range block.Payload.Seals {
 
@@ -864,4 +870,49 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 	ops = append(ops, m.state.epochStatuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
+}
+
+func (m *Mutator) MarkValid(blockID flow.Identifier) error {
+	block, err := m.state.headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", blockID, err)
+	}
+	parentID := block.ParentID
+	var isParentValid bool
+	err = m.state.db.View(operation.RetrieveBlockValidity(parentID, &isParentValid))
+	if err != nil {
+		return fmt.Errorf("could not retrieve validity of parent block (%x): %w", parentID, err)
+	}
+	if !isParentValid {
+		return fmt.Errorf("can only mark block as valid whose parent is valid")
+	}
+
+	err = operation.RetryOnConflict(
+		m.state.db.Update,
+		operation.SkipDuplicates(
+			operation.InsertBlockValidity(blockID, true),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
+	}
+
+	// Emmit BlockReadyForProcessing Event:
+	// we want to suppress events for the root block, hence we just ignore everything with height
+	// smaller or equal to the root block
+	parent, err := m.state.headers.ByBlockID(parentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
+	}
+	var rootHeight uint64
+	err = m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root block's height: %w", err)
+	}
+	if rootHeight >= parent.Height {
+		return nil
+	}
+	m.state.consumer.BlockReadyForProcessing(parent)
+
+	return nil
 }

@@ -18,10 +18,10 @@ type Consumer interface {
 	// of this callback must handle repeated calls with the same header.
 	BlockFinalized(block *flow.Header)
 
-	// CorrectBlock is called when a correct block is encountered that is ready
-	// to be processed (i.e. it is connected to the finalized chain and its
-	// source of randomness is available).
+	// BlockReadyForProcessing is called when a correct block is encountered
+	// that is ready to be processed (i.e. it is connected to the finalized
+	// chain and its source of randomness is available).
 	// Formally, this callback is informationally idempotent. I.e. the consumer
-	// of this callback must handle repeated calls with the same header.
-	CorrectBlock(block *flow.Header)
+	// of this callback must handle repeated calls for the same block.
+	BlockReadyForProcessing(block *flow.Header)
 }
