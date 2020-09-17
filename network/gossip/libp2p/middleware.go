@@ -383,8 +383,7 @@ func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
-// this is a blocking call, so that the deferred resource cleanup happens after
-// we are done handling the connection
+// it is a callback that gets called for each incoming stream by libp2p with a new stream object
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// qualify the logger with local and remote address
