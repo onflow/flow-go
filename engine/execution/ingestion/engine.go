@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
@@ -52,6 +53,7 @@ type Engine struct {
 	extensiveLogging   bool
 	spockHasher        hash.Hasher
 	root               *flow.Header
+	syncingState       atomic.Bool // a state variable to avoid triggering state sync while state syncing is progress
 }
 
 func New(
@@ -115,6 +117,8 @@ func (e *Engine) Done() <-chan struct{} {
 	})
 }
 
+// Wait will wait until all the blocks that are currently being executing
+// finish being executed.
 func (e *Engine) Wait() {
 	e.wg.Wait() // wait for block execution
 }
@@ -155,33 +159,52 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
 
+	// acquiring the lock so that there is one process modifying the queue
 	return e.mempool.Run(
 		func(
 			blockByCollection *stdmap.BlockByCollectionBackdata,
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
-			// if block fits into execution queue, that's it
+			// check if this block is a new block by checking if the execution queue has this block already
+			// if it's not a new block, then bail
 			if _, added := tryEnqueue(executableBlock, executionQueues); added {
-				e.log.Debug().Hex("block_id", logging.Entity(executableBlock)).Msg("added block to existing execution queue")
+				e.log.Debug().
+					Hex("block_id", logging.Entity(executableBlock)).
+					Msg("added block to existing execution queue")
 				return nil
 			}
 
-			stateCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
-			// any other error while accessing storage - panic
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
+			// check if this block has been executed already
+
+			// check if we need to trigger state sync
+
+			// check if a block is executable.
+			// a block is executable if the following conditions are all true
+			// 1) the parent state commitment is ready
+			// 2) the collections for the block payload are ready
+			// 3) TODO: the child block is ready to query the randomness
+
+			// check if the block's parent has been executed. (we can't execute the block if the parent has
+			// not been executed yet)
+			if executableBlock.StartState == nil {
+				// check if there is a statecommitment for the parent block
+				parentCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
+
+				// if we found the statecommitment for the parent block, then add it to the executable block.
+				if err == nil {
+					executableBlock.StartState = parentCommitment
+				}
+
+				// if there is exception, then crash
+				if !errors.Is(err, storage.ErrNotFound) {
+					e.log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
+				}
 			}
 
-			//if block has state commitment, it has all parents blocks
-			err = e.matchOrRequestCollections(executableBlock, blockByCollection)
+			// check if we have all the collections for the block, and request them if there is missing.
+			err := e.matchOrRequestCollections(executableBlock, blockByCollection)
 			if err != nil {
 				return fmt.Errorf("cannot send collection requests: %w", err)
-			}
-
-			executableBlock.StartState = stateCommitment
-			_, added := enqueue(executableBlock, executionQueues) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
-			if !added {
-				e.log.Fatal().Err(err).Msg("could enqueue block for execution")
 			}
 
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock)).Msg("added block to execution queue")
@@ -299,53 +322,68 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 }
 
 func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
-	err := e.handleCollection(originID, entity)
+	// convert entity to strongly typed collection
+	collection, ok := entity.(*flow.Collection)
+	if !ok {
+		e.log.Error().Msgf("invalid entity type (%T)", entity)
+	}
+
+	err := e.handleCollection(originID, collection)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not handle collection")
 		return
 	}
 }
 
-func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) error {
+// a block can't be executed if its collection is missing.
+// since a collection can belong to multiple blocks, we need to
+// find all the blocks that are needing this collection, and then
+// check if any of these block becomes executable and execut it if
+// is.
+func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
 
-	// convert entity to strongly typed collection
-	collection, ok := entity.(*flow.Collection)
-	if !ok {
-		return fmt.Errorf("invalid entity type (%T)", entity)
-	}
-
-	collID := collection.ID()
-
+	// TODO: bail if have seen this collection before.
 	err := e.collections.Store(collection)
 	if err != nil {
 		return fmt.Errorf("cannot store collection: %w", err)
 	}
 
+	collID := collection.ID()
+
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
 			blockByCollectionID, exists := backdata.ByID(collID)
+
+			// if we don't find any block for this collection, then
+			// means we don't need this collection any more.
+			// or it was ejected from the mempool when it was full.
+			// either way, we will return
 			if !exists {
-				return fmt.Errorf("could not find block for collection")
+				return nil
 			}
 
-			executableBlocks := blockByCollectionID.ExecutableBlocks
-
-			for _, executableBlock := range executableBlocks {
-
+			for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
 				completeCollection, ok := executableBlock.CompleteCollections[collID]
 				if !ok {
 					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
 				}
-				// already received transactions for this collection
-				// TODO - check if data stored is the same
-				if completeCollection.Transactions != nil {
+
+				if completeCollection.IsComplete() {
+					// already received transactions for this collection
+					// this would happen if the same collection is handled twice.
 					continue
 				}
 
+				// update the transactions of the collection
+				// Note: it's guaranteed the transactions are for this collection, because
+				// the collection id matches with the CollectionID from the collection guarantee
 				completeCollection.Transactions = collection.Transactions
 
+				// check if the block becomes executable
 				e.executeBlockIfComplete(executableBlock)
 			}
+
+			// since we've received this collection, remove it from the colle
 			backdata.Rem(collID)
 
 			return nil
@@ -382,56 +420,93 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 // if yes, add the collection to the executable block
 // if no, fetch the collection.
 // if a block has 3 collection, it would be 3 reqs to fetch them.
+// mark the collection belongs to the block,
+// mark the block contains this collection.
 func (e *Engine) matchOrRequestCollections(
 	executableBlock *entity.ExecutableBlock,
-	backdata *stdmap.BlockByCollectionBackdata,
+	collectionsBackdata *stdmap.BlockByCollectionBackdata,
 ) error {
 
 	// make sure that the requests are dispatched immediately by the requester
 	defer e.request.Force()
 
+	// an optimization to check if collections have been requested already
+	// the executableBlock initially has a nil CompleteCollections, as iterating through
+	// the guarantees, we will create an entry in CompleteCollections for each collection,
+	// and request it from collection node.
+	// therefore, if the CompleteCollections has the same length as the guarantees,
+	// it means either the block has no collection or the collection must have all been requested.
+	if len(executableBlock.Block.Payload.Guarantees) == len(executableBlock.CompleteCollections) {
+		return nil
+	}
+
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
-		var transactions []*flow.TransactionBody
-		maybeBlockByCollection, exists := backdata.ByID(guarantee.ID())
+		coll := &entity.CompleteCollection{
+			Guarantee: guarantee,
+		}
+		executableBlock.CompleteCollections[guarantee.ID()] = coll
 
-		if exists {
-			if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {
-				e.log.Info().Hex("block_id", logging.Entity(executableBlock)).Msg("requesting collections for block with already pending requests. Ignoring requests.")
-			}
-			maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
-		} else {
-			collection, err := e.collections.ByID(guarantee.CollectionID)
+		// check if we have requested this collection before.
+		// blocksNeedingCollection stores all the blocks that contain this collection
 
-			if err == nil {
-				transactions = collection.Transactions
-			} else if errors.Is(err, storage.ErrNotFound) {
-				maybeBlockByCollection = &entity.BlocksByCollection{
-					CollectionID:     guarantee.ID(),
-					ExecutableBlocks: map[flow.Identifier]*entity.ExecutableBlock{executableBlock.ID(): executableBlock},
-				}
+		if blocksNeedingCollection, exists := collectionsBackdata.ByID(guarantee.ID()); exists {
+			// if we've requested this collection, it means other block might also contain this collection.
+			// in this case, add this block to the map so that when the collection is received,
+			// we could update the executable block
+			blocksNeedingCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
 
-				added := backdata.Add(maybeBlockByCollection)
-				if !added {
-					return fmt.Errorf("collection already mapped to block")
-				}
-
-				e.log.Debug().
-					Hex("block_id", logging.Entity(executableBlock)).
-					Hex("collection_id", logging.ID(guarantee.ID())).
-					Msg("requesting collection")
-
-				// queue the collection to be requested from one of the guarantors
-				e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
-
-			} else {
-				return fmt.Errorf("error while querying for collection: %w", err)
-			}
+			// since the collection is still being requested, we don't have the transactions
+			// yet, so exit
+			continue
 		}
 
-		executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: transactions,
+		// if we are not requesting this collection, then there are two cases here:
+		// 1) we have never seen this collection
+		// 2) we have seen this collection from some other block
+
+		// if we've requested this collection, we will store it in the storage,
+		// so check the storage to see whether we've seen it.
+		collection, err := e.collections.ByID(guarantee.CollectionID)
+
+		if err == nil {
+			// we found the collection, update the transactions
+			coll.Transactions = collection.Transactions
+			continue
 		}
+
+		// check if there was exception
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("error while querying for collection: %w", err)
+		}
+
+		// the storage doesn't have this collection, meaning this is our first time seeing this
+		// collection guarantee, create an entry to store in collectionsBackdata in order to
+		// update the executable blocks when the collection is received.
+		blocksNeedingCollection := &entity.BlocksByCollection{
+			CollectionID:     guarantee.ID(),
+			ExecutableBlocks: map[flow.Identifier]*entity.ExecutableBlock{executableBlock.ID(): executableBlock},
+		}
+
+		added := collectionsBackdata.Add(blocksNeedingCollection)
+		if !added {
+			return fmt.Errorf("collection already mapped to block")
+		}
+
+		e.log.Debug().
+			Hex("block_id", logging.Entity(executableBlock)).
+			Hex("collection_id", logging.ID(guarantee.ID())).
+			Msg("requesting collection")
+
+		// queue the collection to be requested from one of the guarantors
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+	}
+
+	// sandity check which ensures we are able to exit early next time
+	if len(executableBlock.Block.Payload.Guarantees) != len(executableBlock.CompleteCollections) {
+		return fmt.Errorf("sanity check failed, the number of collections (%v) does not match with"+
+			"the number of guarantees (%v)",
+			len(executableBlock.CompleteCollections),
+			len(executableBlock.CompleteCollections))
 	}
 
 	return nil
