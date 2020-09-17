@@ -774,15 +774,16 @@ func (e *Engine) saveExecutionResults(
 		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
 		defer span.Finish()
 
+		blockID := executableBlock.ID()
 		if len(events) > 0 {
-			err = e.events.Store(executableBlock.ID(), events)
+			err = e.events.Store(blockID, events)
 			if err != nil {
 				return fmt.Errorf("failed to store events: %w", err)
 			}
 		}
 
 		for _, te := range txResults {
-			err = e.transactionResults.Store(executableBlock.ID(), &te)
+			err = e.transactionResults.Store(blockID, &te)
 			if err != nil {
 				return fmt.Errorf("failed to store transaction error: %w", err)
 			}
