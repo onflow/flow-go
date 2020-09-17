@@ -564,6 +564,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.assertAllExpectations() // assert that request was not sent to execution node
 	})
 
+	suite.Run("invalid request empty event type", func() {
+		backend := New(
+			suite.state,
+			nil, nil, nil, nil, nil, nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			0,
+			nil,
+			false,
+		)
+
+		_, err := backend.GetEventsForHeightRange(ctx, "  ", maxHeight, minHeight)
+		suite.Require().Error(err)
+
+		suite.assertAllExpectations() // assert that request was not sent to execution node
+	})
+
 	suite.Run("valid request with min_height < max_height < last_sealed_block_height", func() {
 
 		headHeight = maxHeight + 1
