@@ -150,6 +150,18 @@ func (d Delta) Set(owner, controller, key string, value flow.RegisterValue) {
 // Delete records a deletion in this delta.
 func (d Delta) Delete(owner, controller, key string) {
 	k := toString(state.RegisterID(owner, controller, key))
+	d.WriteMappings[k] = Mapping{
+		Owner:      owner,
+		Controller: controller,
+		Key:        key,
+	}
+	if controller == "" {
+		d.WriteMappings[k] = Mapping{
+			Owner:      owner,
+			Controller: owner,
+			Key:        key,
+		}
+	}
 	d.Data[k] = nil
 }
 

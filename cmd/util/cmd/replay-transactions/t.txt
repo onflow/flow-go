@@ -1,0 +1,121 @@
+{"level":"info","time":"2020-09-15T14:01:50-07:00","message":"Processing blocks from  6215207 to 6265206"}
+{"level":"info","time":"2020-09-15T14:02:18-07:00","message":"Finished reading total of 49999 blocks containing 42 transactions using cached height mappings"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:02:18-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:02:19-07:00","message":"Finished loading 41 tries"}
+{"level":"warn","time":"2020-09-15T14:02:19-07:00","message":"Block height 6215207 did not collect any blocks"}
+{"level":"info","block":6265206,"time":"2020-09-15T14:02:21-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:02:25-07:00","message":"Processing blocks from  6265207 to 6315206"}
+{"level":"info","time":"2020-09-15T14:03:09-07:00","message":"Finished reading 50000 blocks containing 86 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:03:09-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:03:10-07:00","message":"Finished loading 62 tries"}
+{"level":"info","block":6315206,"time":"2020-09-15T14:03:14-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:03:18-07:00","message":"Processing blocks from  6315207 to 6365206"}
+{"level":"info","time":"2020-09-15T14:03:56-07:00","message":"Finished reading 50000 blocks containing 4 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:03:56-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:03:57-07:00","message":"Finished loading 5 tries"}
+{"level":"info","block":6365206,"time":"2020-09-15T14:03:57-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:04:01-07:00","message":"Processing blocks from  6365207 to 6415206"}
+{"level":"info","time":"2020-09-15T14:04:40-07:00","message":"Finished reading 50000 blocks containing 49 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:04:40-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:04:41-07:00","message":"Finished loading 48 tries"}
+{"level":"info","block":6415206,"time":"2020-09-15T14:04:42-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:04:46-07:00","message":"Processing blocks from  6415207 to 6465206"}
+{"level":"info","time":"2020-09-15T14:05:25-07:00","message":"Finished reading 50000 blocks containing 9 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:05:25-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:05:26-07:00","message":"Finished loading 10 tries"}
+{"level":"info","block":6465206,"time":"2020-09-15T14:05:26-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:05:30-07:00","message":"Processing blocks from  6465207 to 6515206"}
+{"level":"info","time":"2020-09-15T14:06:08-07:00","message":"Finished reading 50000 blocks containing 2 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:06:08-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:06:09-07:00","message":"Finished loading 3 tries"}
+{"level":"info","block":6515206,"time":"2020-09-15T14:06:09-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:06:13-07:00","message":"Processing blocks from  6515207 to 6565206"}
+{"level":"info","time":"2020-09-15T14:06:51-07:00","message":"Finished reading 50000 blocks containing 10 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:06:51-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:06:51-07:00","message":"Finished loading 11 tries"}
+{"level":"info","block":6565206,"time":"2020-09-15T14:06:52-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:06:56-07:00","message":"Processing blocks from  6565207 to 6615206"}
+{"level":"info","time":"2020-09-15T14:07:37-07:00","message":"Finished reading 50000 blocks containing 98 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:07:37-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:07:38-07:00","message":"Finished loading 96 tries"}
+{"level":"info","block":6615206,"time":"2020-09-15T14:07:42-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:07:45-07:00","message":"Processing blocks from  6615207 to 6665206"}
+{"level":"info","time":"2020-09-15T14:08:23-07:00","message":"Finished reading 50000 blocks containing 13 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:08:23-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:08:24-07:00","message":"Finished loading 14 tries"}
+{"level":"info","block":6665206,"time":"2020-09-15T14:08:25-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:08:29-07:00","message":"Processing blocks from  6665207 to 6715206"}
+{"level":"info","time":"2020-09-15T14:09:11-07:00","message":"Finished reading 50000 blocks containing 92 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:09:11-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:09:13-07:00","message":"Finished loading 87 tries"}
+{"level":"info","block":6715206,"time":"2020-09-15T14:09:16-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:09:20-07:00","message":"Processing blocks from  6715207 to 6765206"}
+{"level":"info","time":"2020-09-15T14:10:10-07:00","message":"Finished reading 50000 blocks containing 255 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:10:10-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:10:11-07:00","message":"Finished loading 235 tries"}
+{"level":"info","block":6765206,"time":"2020-09-15T14:10:20-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:10:24-07:00","message":"Processing blocks from  6765207 to 6815206"}
+{"level":"info","time":"2020-09-15T14:11:05-07:00","message":"Finished reading 50000 blocks containing 103 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:11:05-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:11:07-07:00","message":"Finished loading 99 tries"}
+{"level":"info","block":6815206,"time":"2020-09-15T14:11:10-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:11:14-07:00","message":"Processing blocks from  6815207 to 6865206"}
+{"level":"info","time":"2020-09-15T14:11:56-07:00","message":"Finished reading 50000 blocks containing 57 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:11:56-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:11:59-07:00","message":"Finished loading 57 tries"}
+{"level":"info","block":6865206,"time":"2020-09-15T14:12:02-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:12:06-07:00","message":"Processing blocks from  6865207 to 6915206"}
+{"level":"info","time":"2020-09-15T14:12:45-07:00","message":"Finished reading 50000 blocks containing 40 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:12:45-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:12:47-07:00","message":"Finished loading 41 tries"}
+{"level":"info","block":6915206,"time":"2020-09-15T14:12:49-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:12:53-07:00","message":"Processing blocks from  6915207 to 6965206"}
+{"level":"info","time":"2020-09-15T14:13:32-07:00","message":"Finished reading 50000 blocks containing 36 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:13:32-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:13:34-07:00","message":"Finished loading 36 tries"}
+{"level":"info","block":6965206,"time":"2020-09-15T14:13:35-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:13:39-07:00","message":"Processing blocks from  6965207 to 7015206"}
+{"level":"info","time":"2020-09-15T14:14:18-07:00","message":"Finished reading 50000 blocks containing 22 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:14:18-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:14:21-07:00","message":"Finished loading 23 tries"}
+{"level":"info","block":7015206,"time":"2020-09-15T14:14:22-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:14:26-07:00","message":"Processing blocks from  7015207 to 7065206"}
+{"level":"info","time":"2020-09-15T14:15:07-07:00","message":"Finished reading 50000 blocks containing 73 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:15:07-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:15:09-07:00","message":"Finished loading 72 tries"}
+{"level":"info","block":7065206,"time":"2020-09-15T14:15:12-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:15:16-07:00","message":"Processing blocks from  7065207 to 7115206"}
+{"level":"info","time":"2020-09-15T14:15:53-07:00","message":"Finished reading 50000 blocks containing 2 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:15:53-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:15:55-07:00","message":"Finished loading 3 tries"}
+{"level":"info","block":7115206,"time":"2020-09-15T14:15:55-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:15:59-07:00","message":"Processing blocks from  7115207 to 7165206"}
+{"level":"info","time":"2020-09-15T14:16:36-07:00","message":"Finished reading 50000 blocks containing 3 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:16:36-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:16:39-07:00","message":"Finished loading 4 tries"}
+{"level":"info","block":7165206,"time":"2020-09-15T14:16:39-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:16:43-07:00","message":"Processing blocks from  7165207 to 7215206"}
+{"level":"info","time":"2020-09-15T14:17:20-07:00","message":"Finished reading 50000 blocks containing 13 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:17:20-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:17:22-07:00","message":"Finished loading 14 tries"}
+{"level":"info","block":7215206,"time":"2020-09-15T14:17:23-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:17:27-07:00","message":"Processing blocks from  7215207 to 7265206"}
+{"level":"info","time":"2020-09-15T14:18:04-07:00","message":"Finished reading 50000 blocks containing 19 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:18:04-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:18:06-07:00","message":"Finished loading 16 tries"}
+{"level":"info","block":7265206,"time":"2020-09-15T14:18:07-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:18:11-07:00","message":"Processing blocks from  7265207 to 7315206"}
+{"level":"info","time":"2020-09-15T14:18:48-07:00","message":"Finished reading 50000 blocks containing 57 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:18:48-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:18:51-07:00","message":"Finished loading 57 tries"}
+{"level":"info","block":7315206,"time":"2020-09-15T14:18:52-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:18:56-07:00","message":"Processing blocks from  7315207 to 7365206"}
+{"level":"info","time":"2020-09-15T14:19:42-07:00","message":"Finished reading 50000 blocks containing 153 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:19:42-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:19:44-07:00","message":"Finished loading 154 tries"}
+{"level":"info","block":7365206,"time":"2020-09-15T14:19:51-07:00","message":"All mapping for trie at this height found"}
+{"level":"info","time":"2020-09-15T14:19:55-07:00","message":"Processing blocks from  7365207 to 7413889"}
+{"level":"info","time":"2020-09-15T14:20:31-07:00","message":"Finished reading 48683 blocks containing 25 transactions from protocol database"}
+{"level":"debug","filename":"/home/m4ks/devnet11-execution/execution/root.checkpoint","time":"2020-09-15T14:20:31-07:00","message":"loading checkpoint"}
+{"level":"info","time":"2020-09-15T14:20:34-07:00","message":"Finished loading 26 tries"}
+{"level":"info","block":7413889,"time":"2020-09-15T14:20:35-07:00","message":"All mapping for trie at this height found"}

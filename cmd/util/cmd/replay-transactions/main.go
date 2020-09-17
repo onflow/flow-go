@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"net/http"
 	_ "net/http/pprof"
 
 	"github.com/davecgh/go-spew/spew"
@@ -89,9 +88,11 @@ type Loader struct {
 	blockIDsDir      string
 	blocksDir        string
 	systemChunk      bool
+	chain            flow.ChainID
+	restricted       bool
 }
 
-func newLoader(protocolDir, executionDir, dataDir, blockIDsDir, blocksDir string, vm *fvm.VirtualMachine, systemChunk bool) *Loader {
+func newLoader(protocolDir, executionDir, dataDir, blockIDsDir, blocksDir string, vm *fvm.VirtualMachine, systemChunk bool, chain flow.ChainID, restricted bool) *Loader {
 	db := common.InitStorage(protocolDir)
 	// defer db.Close()
 
@@ -136,6 +137,8 @@ func newLoader(protocolDir, executionDir, dataDir, blockIDsDir, blocksDir string
 		blockIDsDir:      blockIDsDir,
 		blocksDir:        blocksDir,
 		systemChunk:      systemChunk,
+		chain:            chain,
+		restricted:       restricted,
 	}
 	return &loader
 }
@@ -144,25 +147,43 @@ var debugStateCommitments = false
 
 func main() {
 
-	go func() {
-		err := http.ListenAndServe(":4000", nil)
-		log.Fatal().Err(err).Msg("pprof server error")
-	}()
+	// go func() {
+	// 	err := http.ListenAndServe(":4000", nil)
+	// 	log.Fatal().Err(err).Msg("pprof server error")
+	// }()
 
-	//candidate1()
-	//candidate4()
-	//candidate5()
-	//candidate6()
-	candidate7()
+	totalTx := 0
+
+	totalTx += candidate1()
+	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate1")
+	totalTx += candidate4()
+	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate4")
+	totalTx += candidate5()
+	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate5")
+
+	totalTx += candidate6()
+	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate6")
+
+	totalTx += candidate7()
+	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate7")
+
+	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidates")
+
+	//devnet7()
+	//devnet8()
+	//devnet9()
+	//devnet10()
+	//devnet11()
+	//devnet12()
 
 }
 
-func candidate1() {
+func candidate1() int {
 
 	initialRT := initialRuntime.NewInterpreterRuntime()
 	vm := fvm.NewWithInitial(initialRT)
 
-	loader := newLoader("/home/m4ks/candidate1-execution/protocol/", "/home/m4ks/candidate1-execution/execution", "data1", "block-ids", "blocks", vm, false)
+	loader := newLoader("/home/m4ks/candidate1-execution/protocol/", "/home/m4ks/candidate1-execution/execution", "data1", "block-ids", "blocks", vm, false, flow.Mainnet, true)
 	defer loader.Close()
 
 	genesis, err := loader.blocks.ByHeight(0)
@@ -179,118 +200,334 @@ func candidate1() {
 	log.Info().Msgf("genesis state commitment %x empty state commitment %x", genesisState, emptyTrieRootHash)
 
 	//step := 200_000
-	step := 50_000
+	step := 250_000
 	last := 1_065_711
 	//last := 49_999
 
 	megaMapping := make(map[string]delta.Mapping, 0)
-
+	totalTx := 0
 	for i := 0; i <= last; i += step {
 		end := i + step - 1
 		if end > last {
 			end = last
 		}
-		megaMapping = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
+
 		runtime.GC()
 	}
+
+	return totalTx
 }
 
-func candidate4() {
+func candidate4() int {
 
 	initialRT := initialRuntime.NewInterpreterRuntime()
 	vm := fvm.NewWithInitial(initialRT)
 
-	loader := newLoader("/home/m4ks/candidate4-execution/protocol", "/home/m4ks/candidate4-execution/execution", "data4", "block-ids", "blocks", vm, false)
+	loader := newLoader("/home/m4ks/candidate4-execution/protocol", "/home/m4ks/candidate4-execution/execution", "data4", "block-ids", "blocks", vm, false, flow.Mainnet, true)
+	defer loader.Close()
 
-	step := 10_000
+	step := 250_000
 	first := 1_065_712
 	last := 2_033_592
 
 	megaMapping := readMegamappings("/home/m4ks/candidate4-execution/execution/root.checkpoint.mapping.json")
-
+	totalTx := 0
 	for i := first; i <= last; i += step {
 		end := i + step - 1
 		if end > last {
 			end = last
 		}
-		megaMapping = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
 		runtime.GC()
 	}
+
+	return totalTx
 }
 
-func candidate5() {
+func candidate5() int {
 
 	initialRT := initialRuntime.NewInterpreterRuntime()
 	vm := fvm.NewWithInitial(initialRT)
 
-	loader := newLoader("/home/m4ks/candidate5-execution/protocol", "/home/m4ks/candidate5-execution/execution", "data5", "block-ids", "blocks", vm, false)
+	loader := newLoader("/home/m4ks/candidate5-execution/protocol", "/home/m4ks/candidate5-execution/execution", "data5", "block-ids", "blocks", vm, false, flow.Mainnet, true)
+	defer loader.Close()
 
-	step := 50_000
+	step := 250_000
 	first := 2_033_593
 	last := 3_187_931
 
 	megaMapping := readMegamappings("/home/m4ks/candidate5-execution/execution/root.checkpoint.mapping.json")
-
+	totalTx := 0
 	for i := first; i <= last; i += step {
 		end := i + step - 1
 		if end > last {
 			end = last
 		}
-		megaMapping = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
 
 		runtime.GC()
 
 	}
+
+	return totalTx
 }
 
-func candidate6() {
+func candidate6() int {
 
 	initialRT := cadenceRuntime.NewInterpreterRuntime()
 	vm := fvm.New(initialRT)
 
-	loader := newLoader("/home/m4ks/candidate6-execution/protocol", "/home/m4ks/candidate6-execution/execution", "data6", "block-ids", "blocks", vm, false)
+	loader := newLoader("/home/m4ks/candidate6-execution/protocol", "/home/m4ks/candidate6-execution/execution", "data6", "block-ids", "blocks", vm, false, flow.Mainnet, true)
+	defer loader.Close()
 
-	step := 50_000
+	step := 250_000
 	first := 3_187_932
 	last := 4_132_133
 
 	megaMapping := readMegamappings("/home/m4ks/candidate6-execution/execution/root.checkpoint.mapping.json")
-
+	totalTx := 0
 	for i := first; i <= last; i += step {
 		end := i + step - 1
 		if end > last {
 			end = last
 		}
-		megaMapping = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
 
 		runtime.GC()
 
 	}
+
+	return totalTx
 }
 
-func candidate7() {
+func candidate7() int {
 
 	initialRT := cadenceRuntime.NewInterpreterRuntime()
 	vm := fvm.New(initialRT)
 
-	loader := newLoader("/home/m4ks/candidate7-execution/protocol", "/home/m4ks/candidate7-execution/execution", "data7", "block-ids", "blocks", vm, true)
+	loader := newLoader("/home/m4ks/candidate7-execution/protocol", "/home/m4ks/candidate7-execution/execution", "data7", "block-ids", "blocks", vm, true, flow.Mainnet, true)
+	defer loader.Close()
 
-	step := 50_000
+	step := 250_000
 	first := 4_132_134
 	last := 4_972_987
 
 	megaMapping := readMegamappings("/home/m4ks/candidate7-execution/execution/root.checkpoint.mapping.json")
+	totalTx := 0
+	for i := first; i <= last; i += step {
+		end := i + step - 1
+		if end > last {
+			end = last
+		}
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
+
+		runtime.GC()
+
+	}
+
+	return totalTx
+}
+
+func devnet7() int {
+
+	initialRT := initialRuntime.NewInterpreterRuntime()
+	vm := fvm.NewWithInitial(initialRT)
+
+	loader := newLoader("/home/m4ks/devnet7-execution/protocol", "/home/m4ks/devnet7-execution/execution", "devnet7", "devnet/block-ids", "devnet/blocks", vm, false, flow.Testnet, false)
+
+	step := 50_000
+	first := 0
+	last := 1_501_900
+	//last := 1_189_844
+
+	//megaMapping := readMegamappings("/home/m4ks/candidate7-execution/execution/root.checkpoint.mapping.json")
+
+	megaMapping := loader.BootstrapMegamapping()
+	totalTx := 0
+	for i := first; i <= last; i += step {
+		end := i + step - 1
+		if end > last {
+			end = last
+		}
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
+
+		runtime.GC()
+
+	}
+
+	return totalTx
+}
+
+func devnet8() int {
+
+	initialRT := initialRuntime.NewInterpreterRuntime()
+	vm := fvm.NewWithInitial(initialRT)
+
+	loader := newLoader("/home/m4ks/devnet8-execution/protocol", "/home/m4ks/devnet8-execution/execution", "devnet8", "devnet/block-ids", "devnet/blocks", vm, false, flow.Testnet, false)
+
+	step := 50_000
+	first := 1_501_901
+	//first := 1_189_845
+	last := 2_586_450
+
+	megaMapping := readMegamappings("/home/m4ks/devnet8-execution/execution/root.checkpoint.mapping.json")
+	totalTx := 0
+	for i := first; i <= last; i += step {
+		end := i + step - 1
+		if end > last {
+			end = last
+		}
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
+
+		runtime.GC()
+
+	}
+
+	return totalTx
+}
+
+func devnet9() int {
+
+	initialRT := initialRuntime.NewInterpreterRuntime()
+	vm := fvm.NewWithInitial(initialRT)
+
+	loader := newLoader("/home/m4ks/devnet9-execution/protocol", "/home/m4ks/devnet9-execution/execution", "devnet9", "devnet/block-ids", "devnet/blocks", vm, false, flow.Testnet, false)
+
+	step := 50_000
+	first := 2_586_451
+	last := 4_565_700
+
+	megaMapping := readMegamappings("/home/m4ks/devnet9-execution/execution/root.checkpoint.mapping.json")
+	totalTx := 0
+	for i := first; i <= last; i += step {
+		end := i + step - 1
+		if end > last {
+			end = last
+		}
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
+
+		runtime.GC()
+
+	}
+
+	return totalTx
+}
+
+func devnet10() int {
+
+	initialRT := cadenceRuntime.NewInterpreterRuntime()
+	vm := fvm.New(initialRT)
+
+	loader := newLoader("/home/m4ks/devnet10-execution/protocol", "/home/m4ks/devnet10-execution/execution", "devnet10", "devnet/block-ids", "devnet/blocks", vm, false, flow.Testnet, false)
+
+	step := 50_000
+	first := 4_565_701
+	last := 6_215_206
+
+	megaMapping := readMegamappings("/home/m4ks/devnet10-execution/execution/root.checkpoint.mapping.json")
+	totalTx := 0
+	for i := first; i <= last; i += step {
+		end := i + step - 1
+		if end > last {
+			end = last
+		}
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
+
+		runtime.GC()
+
+	}
+
+	return totalTx
+}
+
+func devnet11() int {
+
+	initialRT := cadenceRuntime.NewInterpreterRuntime()
+	vm := fvm.New(initialRT)
+
+	loader := newLoader("/home/m4ks/devnet11-execution/protocol", "/home/m4ks/devnet11-execution/execution", "devnet11", "devnet/block-ids", "devnet/blocks", vm, true, flow.Testnet, false)
+
+	step := 50_000
+	first := 6_215_207
+	last := 7_413_889
+
+	megaMapping := readMegamappings("/home/m4ks/devnet11-execution/execution/root.checkpoint.mapping.json")
+	totalTx := 0
+	for i := first; i <= last; i += step {
+		end := i + step - 1
+		if end > last {
+			end = last
+		}
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
+
+		runtime.GC()
+
+	}
+
+	return totalTx
+}
+
+func devnet12() int {
+
+	initialRT := cadenceRuntime.NewInterpreterRuntime()
+	vm := fvm.New(initialRT)
+
+	loader := newLoader("/home/m4ks/devnet12-execution/protocol", "/home/m4ks/devnet12-execution/execution", "devnet12", "devnet/block-ids", "devnet/blocks", vm, true, flow.Testnet, false)
+
+	step := 50_000
+	first := 7_413_890
+	last := 9_599_438
+
+	megaMapping := readMegamappings("/home/m4ks/devnet12-execution/execution/root.checkpoint.mapping.json")
+
+	totalTx := 0
 
 	for i := first; i <= last; i += step {
 		end := i + step - 1
 		if end > last {
 			end = last
 		}
-		megaMapping = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
 
 		runtime.GC()
 
 	}
+
+	return totalTx
 }
 
 func dumpEntity(entity interface{}) {
@@ -391,48 +628,42 @@ func (l *Loader) addToList(header *flow.Header, m map[uint64][]*ComputedBlock) i
 
 	updates := make([]Update, chunksCount)
 
-	delta, err := l.executionState.RetrieveStateDelta(context.Background(), header.ID())
-	if err != nil {
-		log.Warn().Err(err).Str("block_id", header.ID().String()).Uint64("height", header.Height).Msg("cannot load delta")
-		return 0
-	}
-
-	executionResult, err := l.executionResults.ByBlockID(header.ID())
-	if err != nil {
-		log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("cannot load execution results")
-	}
-	if executionResult.BlockID != header.ID() {
-		spew.Dump(header)
-		spew.Dump(payload)
-		log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("execution result ID different from asked")
-	}
-
-	lastIndex := len(executionResult.Chunks)
-	// if l.systemChunk {
-	// 	lastIndex -= 1
+	// delta, err := l.executionState.RetrieveStateDelta(context.Background(), header.ID())
+	// if err != nil {
+	// 	log.Warn().Err(err).Str("block_id", header.ID().String()).Uint64("height", header.Height).Msg("cannot load delta")
+	// 	return 0
 	// }
 
-	for i := 0; i < lastIndex; i++ {
-		chunk := executionResult.Chunks[i]
+	// executionResult, err := l.executionResults.ByBlockID(header.ID())
+	// if err != nil {
+	// 	log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("cannot load execution results")
+	// }
+	// if executionResult.BlockID != header.ID() {
+	// 	spew.Dump(header)
+	// 	spew.Dump(payload)
+	// 	log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("execution result ID different from asked")
+	// }
 
-		//	}
+	// lastIndex := len(executionResult.Chunks)
 
-		//	for i, chunk := range executionResult.Chunks {
-		chunkDataPack, err := l.chunkDataPacks.ByChunkID(chunk.ID())
-		if err != nil {
-			log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("cannot load chunk data pack")
-		}
-		if chunkDataPack.ID() != chunk.ID() {
-			spew.Dump(header)
-			spew.Dump(payload)
-			log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("chunk data pack ID different from asked")
-		}
+	// for i := 0; i < lastIndex; i++ {
+	// 	chunk := executionResult.Chunks[i]
 
-		updates[i] = Update{
-			StateCommitment: chunkDataPack.StartState,
-			Snapshot:        delta.StateInteractions[i],
-		}
-	}
+	// 	chunkDataPack, err := l.chunkDataPacks.ByChunkID(chunk.ID())
+	// 	if err != nil {
+	// 		log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("cannot load chunk data pack")
+	// 	}
+	// 	if chunkDataPack.ID() != chunk.ID() {
+	// 		spew.Dump(header)
+	// 		spew.Dump(payload)
+	// 		log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("chunk data pack ID different from asked")
+	// 	}
+
+	// 	updates[i] = Update{
+	// 		StateCommitment: chunkDataPack.StartState,
+	// 		Snapshot:        delta.StateInteractions[i],
+	// 	}
+	// }
 
 	computerBlock := &ComputedBlock{
 		ExecutableBlock: entity.ExecutableBlock{
@@ -443,9 +674,9 @@ func (l *Loader) addToList(header *flow.Header, m map[uint64][]*ComputedBlock) i
 			CompleteCollections: completeCollections,
 			StartState:          stateCommitment,
 		},
-		EndState: delta.EndState,
-		Updates:  updates,
-		Results:  delta.TransactionResults,
+		//EndState: delta.EndState,
+		Updates: updates,
+		//Results:  delta.TransactionResults,
 	}
 
 	m[header.Height] = append(m[header.Height], computerBlock)
@@ -614,7 +845,7 @@ func readMegamappings(filename string) map[string]delta.Mapping {
 	return readMappings
 }
 
-func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]delta.Mapping) map[string]delta.Mapping {
+func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]delta.Mapping) (map[string]delta.Mapping, int) {
 
 	var blockData map[uint64][]*ComputedBlock
 
@@ -633,14 +864,10 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 
 	if _, err := os.Stat(filename); !os.IsNotExist(err) {
 		log.Info().Msgf("Loaded mappings %d to %d from megamappings file", start, end)
-		return readMegamappings(filename)
+		return readMegamappings(filename), -1
 	}
 
-	if rangeStart == 0 {
-		megaMapping = l.BootstrapMegamapping()
-	} else {
-		megaMapping = prevMapping
-	}
+	megaMapping = prevMapping
 
 	blockIDsFilename := fmt.Sprintf("%s/height_to_ids_g_%d_%d.json", l.blockIDsDir, rangeStart, rangeStop)
 	if _, err := os.Stat(blockIDsFilename); !os.IsNotExist(err) {
@@ -706,6 +933,7 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 
 	}
 
+	return nil, totalTx
 	////save to file
 	//dataFile, err := os.Create(blocksFilename)
 	//if err != nil {
@@ -770,7 +998,8 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 		blocks, has := blockData[i]
 
 		if !has {
-			log.Fatal().Msgf("Block height %d did not collect any blocks", i)
+			log.Warn().Msgf("Block height %d did not collect any blocks", i)
+			continue
 		}
 
 		for _, computedBlock := range blocks {
@@ -915,7 +1144,7 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 		}
 	}
 
-	return megaMapping
+	return megaMapping, totalTx
 }
 
 func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*trie.MTrie) map[string]delta.Mapping {
@@ -940,8 +1169,10 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 	}
 
 	vmCtx := fvm.NewContext(
-		fvm.WithChain(flow.Mainnet.Chain()),
+		fvm.WithChain(l.chain.Chain()),
 		fvm.WithBlocks(l.blocks),
+		fvm.WithRestrictedAccountCreation(l.restricted),
+		fvm.WithRestrictedDeployment(l.restricted),
 	)
 
 	computationManager := computation.New(
@@ -1126,21 +1357,23 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 			}
 			fmt.Println("/Transaction script")
 
-			spew.Dump(originalDelta.Data)
-
-			for key, _ := range originalDelta.Data {
-
-				fmt.Printf("Original delta data key %x\n", key)
-
+			fmt.Printf("Original delta\n")
+			hexed := make(map[string]flow.RegisterValue)
+			for k, v := range originalDelta.Data {
+				fmt.Printf("Key %s => %s\n", hex.EncodeToString([]byte(k)), hex.EncodeToString(v))
+				//hexed[hex.EncodeToString([]byte(k))] = v
 			}
 
-			spew.Dump(calculatedDelta.Data)
+			//spew.Dump(hexed)
 
-			for key, _ := range calculatedDelta.Data {
-
-				fmt.Printf("Calculated delta data key %x\n", key)
-
+			fmt.Printf("Calculated delta \n")
+			hexed = make(map[string]flow.RegisterValue)
+			for k, v := range calculatedDelta.Data {
+				fmt.Printf("Key %s => %s\n", hex.EncodeToString([]byte(k)), hex.EncodeToString(v))
+				//hexed[hex.EncodeToString([]byte(k))] = v
 			}
+
+			spew.Dump(hexed)
 
 			// if mapping, has := calculatedDelta.WriteMappings[key]; !has {
 			// 	failed = true
@@ -1176,7 +1409,7 @@ func (l *Loader) BootstrapMegamapping() map[string]delta.Mapping {
 		log.Fatal().Err(err).Msgf("cannot create ufix64")
 	}
 
-	err = bootstrapper.BoostrapView(bootstrapView, privateKey.PublicKey(1000), fix64, flow.Mainnet.Chain())
+	err = bootstrapper.BoostrapView(bootstrapView, privateKey.PublicKey(1000), fix64, l.chain.Chain())
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot bootstrap")
 	}

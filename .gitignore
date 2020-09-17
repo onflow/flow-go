@@ -60,3 +60,4 @@ cmd/util/cmd/replay-transactions/data1/**
 cmd/util/cmd/replay-transactions/data5/**
 cmd/util/cmd/replay-transactions/data6/**
 cmd/util/cmd/replay-transactions/data7/**
+cmd/util/cmd/replay-transactions/devnet**

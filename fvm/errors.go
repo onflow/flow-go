@@ -87,7 +87,7 @@ type InvalidSignatureAccountError struct {
 }
 
 func (e *InvalidSignatureAccountError) Error() string {
-	return fmt.Sprintf("ISE account with address %s does not exist", e.Address)
+	return fmt.Sprintf("account with address %s does not exist", e.Address)
 }
 
 func (e *InvalidSignatureAccountError) Code() uint32 {
