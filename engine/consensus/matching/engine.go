@@ -619,7 +619,7 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
 	// ensure that previous result is known and sealed.
 	previousID := result.PreviousResultID
-	previous, err := e.sealedResultsDB.ByID(previousID)
+	_, err = e.sealedResultsDB.ByID(previousID)
 	if err != nil {
 		return errUnsealedPrevious
 	}
@@ -641,7 +641,6 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	seal := &flow.Seal{
 		BlockID:                result.BlockID,
 		ResultID:               result.ID(),
-		InitialState:           previous.FinalStateCommit,
 		FinalState:             result.FinalStateCommit,
 		AggregatedApprovalSigs: aggregatedSigs,
 	}

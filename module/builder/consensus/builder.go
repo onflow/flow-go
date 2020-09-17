@@ -3,7 +3,6 @@
 package consensus
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"sort"
@@ -428,10 +427,6 @@ func (b *Builder) getInsertableSeals(
 			break
 		}
 
-		if !bytes.Equal(next.InitialState, lastSeal.FinalState) {
-			return nil, nil, fmt.Errorf("seal execution states do not connect in finalized")
-		}
-
 		seals = append(seals, next)
 
 		sealCount++
@@ -480,10 +475,6 @@ func (b *Builder) getInsertableSeals(
 			next, found := byBlock[pendingID]
 			if !found {
 				break
-			}
-
-			if !bytes.Equal(next.InitialState, lastSeal.FinalState) {
-				return nil, nil, fmt.Errorf("seal execution states do not connect in pending")
 			}
 
 			seals = append(seals, next)

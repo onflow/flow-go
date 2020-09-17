@@ -3,7 +3,6 @@
 package badger
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -342,9 +341,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if !found {
 			return state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
 		}
-		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return state.NewInvalidExtensionError("seal execution states do not connect in finalized")
-		}
+
 		delete(byBlock, blockID)
 		last = next
 	}
@@ -377,9 +374,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if !found {
 			return state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
 		}
-		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return state.NewInvalidExtensionErrorf("seal execution states do not connect in pending")
-		}
+
 		delete(byBlock, pendingID)
 		last = next
 	}

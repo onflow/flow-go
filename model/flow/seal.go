@@ -15,22 +15,19 @@ type AggregatedSignature struct {
 type Seal struct {
 	BlockID                Identifier
 	ResultID               Identifier
-	InitialState           StateCommitment
 	FinalState             StateCommitment
 	AggregatedApprovalSigs []AggregatedSignature
 }
 
 func (s Seal) Body() interface{} {
 	return struct {
-		BlockID      Identifier
-		ResultID     Identifier
-		InitialState StateCommitment
-		FinalState   StateCommitment
+		BlockID    Identifier
+		ResultID   Identifier
+		FinalState StateCommitment
 	}{
-		BlockID:      s.BlockID,
-		ResultID:     s.ResultID,
-		InitialState: s.InitialState,
-		FinalState:   s.FinalState,
+		BlockID:    s.BlockID,
+		ResultID:   s.ResultID,
+		FinalState: s.FinalState,
 	}
 }
 

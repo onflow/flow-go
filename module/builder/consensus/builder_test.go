@@ -73,16 +73,12 @@ type BuilderSuite struct {
 }
 
 func (bs *BuilderSuite) chainSeal(blockID flow.Identifier) {
-	initial := bs.lastSeal.FinalState
 	final := unittest.StateCommitmentFixture()
-	if len(bs.chain) > 0 {
-		initial = bs.chain[len(bs.chain)-1].FinalState
-	}
+
 	seal := &flow.Seal{
-		BlockID:      blockID,
-		ResultID:     flow.ZeroID, // we don't care
-		InitialState: initial,
-		FinalState:   final,
+		BlockID:    blockID,
+		ResultID:   flow.ZeroID, // we don't care
+		FinalState: final,
 	}
 	bs.chain = append(bs.chain, seal)
 }
@@ -135,10 +131,9 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.heights[first.Height] = &first
 	bs.index[first.ID()] = &flow.Index{}
 	bs.lastSeal = &flow.Seal{
-		BlockID:      first.ID(),
-		ResultID:     flow.ZeroID,
-		InitialState: unittest.StateCommitmentFixture(),
-		FinalState:   unittest.StateCommitmentFixture(),
+		BlockID:    first.ID(),
+		ResultID:   flow.ZeroID,
+		FinalState: unittest.StateCommitmentFixture(),
 	}
 	bs.seals[first.ID()] = bs.lastSeal
 
