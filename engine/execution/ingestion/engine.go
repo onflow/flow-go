@@ -781,7 +781,17 @@ func (e *Engine) saveExecutionResults(
 				return fmt.Errorf("failed to store events: %w", err)
 			}
 		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
 
+	err = func() error {
+		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResultsEvents)
+		defer span.Finish()
+
+		blockID := executableBlock.ID()
 		for _, te := range txResults {
 			err = e.transactionResults.Store(blockID, &te)
 			if err != nil {

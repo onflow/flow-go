@@ -30,9 +30,10 @@ const (
 
 	// Execution Node
 
-	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
-	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
-	EXESaveTransactionResults SpanName = "exe.ingestion.saveTransactionResults"
+	EXEExecuteBlock                 SpanName = "exe.ingestion.executeBlock"
+	EXESaveExecutionResults         SpanName = "exe.ingestion.saveExecutionResults"
+	EXESaveTransactionResults       SpanName = "exe.ingestion.saveTransactionResults"
+	EXESaveTransactionResultsEvents SpanName = "exe.ingestion.saveTransactionResultsEvents"
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
