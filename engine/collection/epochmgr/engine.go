@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/epochs"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/state/protocol/events"
@@ -45,7 +44,7 @@ func New(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
-	voter *epochs.RootQCVoter,
+	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
 ) (*Engine, error) {
 

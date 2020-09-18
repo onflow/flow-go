@@ -8,8 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/module/epochs"
-	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
+	epochmgr "github.com/dapperlabs/flow-go/engine/collection/epochmgr/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 )
@@ -20,12 +19,12 @@ type Suite struct {
 	// engine dependencies
 	me    *module.Local
 	state *protocol.State
-	pool  *mempool.Transactions
 
 	// qc voter dependencies
-	signer *hotstuff.Signer
-	client *module.QCContractClient
-	voter  *epochs.RootQCVoter
+	signer  *hotstuff.Signer
+	client  *module.QCContractClient
+	voter   *module.ClusterRootQCVoter
+	factory *epochmgr.EpochComponentsFactory
 
 	engine *Engine
 }
@@ -35,13 +34,15 @@ func (suite *Suite) SetupTest() {
 	log := zerolog.New(ioutil.Discard)
 	suite.me = new(module.Local)
 	suite.state = new(protocol.State)
-	suite.pool = new(mempool.Transactions)
 
 	suite.signer = new(hotstuff.Signer)
 	suite.client = new(module.QCContractClient)
-	suite.voter = epochs.NewRootQCVoter(log, suite.me, suite.signer, suite.state, suite.client)
+	suite.voter = new(module.ClusterRootQCVoter)
+	suite.factory = new(epochmgr.EpochComponentsFactory)
 
-	suite.engine = New(log, suite.me, suite.state, suite.pool, suite.voter)
+	var err error
+	suite.engine, err = New(log, suite.me, suite.state, suite.voter, suite.factory)
+	suite.Require().Nil(err)
 }
 
 func TestEpochManager(t *testing.T) {
