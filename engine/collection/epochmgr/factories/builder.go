@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/dgraph-io/badger/v2"
@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type BuilderFactory struct {
+type Builder struct {
 	db               *badger.DB
 	mainChainHeaders storage.Headers
 	trace            module.Tracer
@@ -27,9 +27,9 @@ func NewBuilderFactory(
 	metrics module.CollectionMetrics,
 	pusher network.Engine,
 	opts ...builder.Opt,
-) (*BuilderFactory, error) {
+) (*Builder, error) {
 
-	factory := &BuilderFactory{
+	factory := &Builder{
 		db:               db,
 		mainChainHeaders: mainChainHeaders,
 		trace:            trace,
@@ -40,7 +40,7 @@ func NewBuilderFactory(
 	return factory, nil
 }
 
-func (f *BuilderFactory) Create(
+func (f *Builder) Create(
 	clusterHeaders storage.Headers,
 	clusterPayloads storage.ClusterPayloads,
 	pool mempool.Transactions,

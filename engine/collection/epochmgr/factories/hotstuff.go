@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/dgraph-io/badger/v2"
@@ -26,7 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type HotStuffFactory struct {
+type HotStuff struct {
 	log        zerolog.Logger
 	me         module.Local
 	db         *badger.DB
@@ -40,9 +40,9 @@ func NewHotStuffFactory(
 	db *badger.DB,
 	protoState protocol.State,
 	opts ...consensus.Option,
-) (*HotStuffFactory, error) {
+) (*HotStuff, error) {
 
-	factory := &HotStuffFactory{
+	factory := &HotStuff{
 		log:        log,
 		me:         me,
 		db:         db,
@@ -52,7 +52,7 @@ func NewHotStuffFactory(
 	return factory, nil
 }
 
-func (f *HotStuffFactory) Create(
+func (f *HotStuff) Create(
 	clusterID flow.ChainID,
 	cluster flow.IdentityList,
 	clusterState cluster.State,

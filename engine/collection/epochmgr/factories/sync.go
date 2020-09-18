@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/rs/zerolog"
@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type SyncEngineFactory struct {
+type SyncEngine struct {
 	log     zerolog.Logger
 	net     module.Network
 	me      module.Local
@@ -26,9 +26,9 @@ func NewSyncEngineFactory(
 	net module.Network,
 	me module.Local,
 	conf chainsync.Config,
-) (*SyncEngineFactory, error) {
+) (*SyncEngine, error) {
 
-	factory := &SyncEngineFactory{
+	factory := &SyncEngine{
 		log:     log,
 		me:      me,
 		net:     net,
@@ -38,7 +38,7 @@ func NewSyncEngineFactory(
 	return factory, nil
 }
 
-func (f *SyncEngineFactory) Create(
+func (f *SyncEngine) Create(
 	participants flow.IdentityList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,

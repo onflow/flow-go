@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/rs/zerolog"
@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type ProposalEngineFactory struct {
+type ProposalEngine struct {
 	log            zerolog.Logger
 	me             module.Local
 	net            module.Network
@@ -35,9 +35,9 @@ func NewProposalEngineFactory(
 	protoState protocol.State,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
-) (*ProposalEngineFactory, error) {
+) (*ProposalEngine, error) {
 
-	factory := &ProposalEngineFactory{
+	factory := &ProposalEngine{
 		log:            log,
 		me:             me,
 		net:            net,
@@ -51,7 +51,7 @@ func NewProposalEngineFactory(
 	return factory, nil
 }
 
-func (f *ProposalEngineFactory) Create(clusterState cluster.State, headers storage.Headers, payloads storage.ClusterPayloads) (*proposal.Engine, error) {
+func (f *ProposalEngine) Create(clusterState cluster.State, headers storage.Headers, payloads storage.ClusterPayloads) (*proposal.Engine, error) {
 
 	cache := buffer.NewPendingClusterBlocks()
 	engine, err := proposal.New(

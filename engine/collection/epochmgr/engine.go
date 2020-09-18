@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/collection/epochmgr/factories"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	chainsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
 	"github.com/dapperlabs/flow-go/model/indices"
@@ -42,11 +43,11 @@ type Engine struct {
 	pool mempool.Transactions
 
 	// factories for building new engines for a new epoch
-	clusterStateFactory *ClusterStateFactory
-	builderFactory      *BuilderFactory
-	proposalFactory     *ProposalEngineFactory
-	syncFactory         *SyncEngineFactory
-	hotstuffFactory     *HotStuffFactory
+	clusterStateFactory *factories.ClusterState
+	builderFactory      *factories.Builder
+	proposalFactory     *factories.ProposalEngine
+	syncFactory         *factories.SyncEngine
+	hotstuffFactory     *factories.HotStuff
 }
 
 func New(
@@ -54,11 +55,11 @@ func New(
 	me module.Local,
 	state protocol.State,
 	pool mempool.Transactions,
-	clusterStateFactory *ClusterStateFactory,
-	builderFactory *BuilderFactory,
-	proposalFactory *ProposalEngineFactory,
-	syncFactory *SyncEngineFactory,
-	hotstuffFactory *HotStuffFactory,
+	clusterStateFactory *factories.ClusterState,
+	builderFactory *factories.Builder,
+	proposalFactory *factories.ProposalEngine,
+	syncFactory *factories.SyncEngine,
+	hotstuffFactory *factories.HotStuff,
 ) (*Engine, error) {
 
 	e := &Engine{

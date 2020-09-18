@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/dgraph-io/badger/v2"
@@ -9,7 +9,7 @@ import (
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
-type ClusterStateFactory struct {
+type ClusterState struct {
 	db      *badger.DB
 	metrics module.CacheMetrics
 }
@@ -17,15 +17,15 @@ type ClusterStateFactory struct {
 func NewClusterStateFactory(
 	db *badger.DB,
 	metrics module.CacheMetrics,
-) (*ClusterStateFactory, error) {
-	factory := &ClusterStateFactory{
+) (*ClusterState, error) {
+	factory := &ClusterState{
 		db:      db,
 		metrics: metrics,
 	}
 	return factory, nil
 }
 
-func (f *ClusterStateFactory) Create(clusterID flow.ChainID) (
+func (f *ClusterState) Create(clusterID flow.ChainID) (
 	*clusterkv.State,
 	*bstorage.Headers,
 	*bstorage.ClusterPayloads,
