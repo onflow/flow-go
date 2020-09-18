@@ -135,5 +135,4 @@ func TestOpSwuHashToG1(t *testing.T) {
 		OpSwUUnitTest(output, input)
 		assert.Equal(t, hex.EncodeToString(output), expected[i], "hash to G1 is not equal to the expected value")
 	}
-	return
 }
