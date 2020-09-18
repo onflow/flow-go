@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type Builder struct {
+type BuilderFactory struct {
 	db               *badger.DB
 	mainChainHeaders storage.Headers
 	trace            module.Tracer
@@ -27,9 +27,9 @@ func NewBuilderFactory(
 	metrics module.CollectionMetrics,
 	pusher network.Engine,
 	opts ...builder.Opt,
-) (*Builder, error) {
+) (*BuilderFactory, error) {
 
-	factory := &Builder{
+	factory := &BuilderFactory{
 		db:               db,
 		mainChainHeaders: mainChainHeaders,
 		trace:            trace,
@@ -40,7 +40,7 @@ func NewBuilderFactory(
 	return factory, nil
 }
 
-func (f *Builder) Create(
+func (f *BuilderFactory) Create(
 	clusterHeaders storage.Headers,
 	clusterPayloads storage.ClusterPayloads,
 	pool mempool.Transactions,

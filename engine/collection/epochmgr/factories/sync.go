@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type SyncEngine struct {
+type SyncEngineFactory struct {
 	log     zerolog.Logger
 	net     module.Network
 	me      module.Local
@@ -26,9 +26,9 @@ func NewSyncEngineFactory(
 	net module.Network,
 	me module.Local,
 	conf chainsync.Config,
-) (*SyncEngine, error) {
+) (*SyncEngineFactory, error) {
 
-	factory := &SyncEngine{
+	factory := &SyncEngineFactory{
 		log:     log,
 		me:      me,
 		net:     net,
@@ -38,7 +38,7 @@ func NewSyncEngineFactory(
 	return factory, nil
 }
 
-func (f *SyncEngine) Create(
+func (f *SyncEngineFactory) Create(
 	participants flow.IdentityList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,

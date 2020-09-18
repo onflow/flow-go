@@ -1,4 +1,4 @@
-package epochmgr
+package epochs
 
 import (
 	"context"

@@ -4,28 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/collection/epochmgr/factories"
-	"github.com/dapperlabs/flow-go/engine/collection/proposal"
-	chainsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/indices"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/epochs"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/state/protocol/events"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
-// all requirements for participating in the cluster chain for one epoch
-type epochreqs struct {
+// EpochComponents represents all dependencies for running an epoch.
+type EpochComponents struct {
 	state    cluster.State
-	proposal *proposal.Engine
-	sync     *chainsync.Engine
+	prop     module.Engine
+	sync     module.Engine
 	hotstuff module.HotStuff
 	// TODO: ingest/txpool should also be epoch-dependent, possibly managed by this engine
 }
@@ -36,24 +31,18 @@ type epochreqs struct {
 // engines for an epoch that has ended.
 type Engine struct {
 	unit  *engine.Unit
-	epoch *epochreqs   // requirements for the current epoch
-	voter *RootQCVoter // manages process of voting for next epoch's QC
+	epoch *EpochComponents          // requirements for the current epoch
+	voter module.ClusterRootQCVoter // manages process of voting for next epoch's QC
 
-	log   zerolog.Logger
-	me    module.Local
-	state protocol.State
+	log     zerolog.Logger
+	me      module.Local
+	state   protocol.State
+	factory EpochComponentsFactory // consolidates creating components for an epoch
 
 	events.Noop // satisfy protocol events consumer interface
 
 	// TODO should be per-epoch eventually, cache here for now
 	pool mempool.Transactions
-
-	// factories for building new engines for a new epoch
-	clusterStateFactory *factories.ClusterState
-	builderFactory      *factories.Builder
-	proposalFactory     *factories.ProposalEngine
-	syncFactory         *factories.SyncEngine
-	hotstuffFactory     *factories.HotStuff
 }
 
 func New(
@@ -61,41 +50,29 @@ func New(
 	me module.Local,
 	state protocol.State,
 	pool mempool.Transactions,
-	voter *RootQCVoter,
-	clusterStateFactory *factories.ClusterState,
-	builderFactory *factories.Builder,
-	proposalFactory *factories.ProposalEngine,
-	syncFactory *factories.SyncEngine,
-	hotstuffFactory *factories.HotStuff,
+	voter *epochs.RootQCVoter,
+	factory EpochComponentsFactory,
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:                engine.NewUnit(),
-		log:                 log,
-		me:                  me,
-		state:               state,
-		pool:                pool,
-		voter:               voter,
-		clusterStateFactory: clusterStateFactory,
-		builderFactory:      builderFactory,
-		proposalFactory:     proposalFactory,
-		syncFactory:         syncFactory,
-		hotstuffFactory:     hotstuffFactory,
+		unit:    engine.NewUnit(),
+		log:     log,
+		me:      me,
+		state:   state,
+		pool:    pool,
+		voter:   voter,
+		factory: factory,
 	}
 
-	// get the current epoch
-	epoch, err := e.state.Final().Epochs().Current().Counter()
+	// set up epoch-scoped components managed by this engine for the current epoch
+	epoch := e.state.Final().Epochs().Current()
+	reqs, err := e.createEpochComponents(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not get current epoch number: %w", err)
+		return nil, fmt.Errorf("could not create epoch components for current epoch: %w", err)
 	}
-
-	reqs, err := e.setupEpoch(epoch)
-	if err != nil {
-		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
-	}
-
 	e.epoch = reqs
 	_ = e.epoch.state // TODO lint
+
 	return e, nil
 }
 
@@ -106,7 +83,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
 		// start up dependencies
 		<-e.epoch.hotstuff.Ready()
-		<-e.epoch.proposal.Ready()
+		<-e.epoch.prop.Ready()
 		<-e.epoch.sync.Ready()
 	}, func() {
 		// check the current phase on startup, in case we are in setup phase
@@ -126,9 +103,25 @@ func (e *Engine) Ready() <-chan struct{} {
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
 		<-e.epoch.hotstuff.Done()
-		<-e.epoch.proposal.Done()
+		<-e.epoch.prop.Done()
 		<-e.epoch.sync.Done()
 	})
+}
+
+func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
+
+	state, prop, sync, hot, err := e.factory.Create(epoch)
+	if err != nil {
+		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
+	}
+
+	reqs := &EpochComponents{
+		state:    state,
+		prop:     prop,
+		sync:     sync,
+		hotstuff: hot,
+	}
+	return reqs, err
 }
 
 // EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
@@ -152,119 +145,4 @@ func (e *Engine) prepareNextEpoch() {
 			e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
 		}
 	})
-}
-
-// setupEpoch sets up cluster state and HotStuff for a new chain for the given
-// epoch. This can be used for in-progress chains (for example, when restarting
-// mid-epoch) or to bootstrap the chain for a new epoch.
-func (e *Engine) setupEpoch(epochCounter uint64) (*epochreqs, error) {
-
-	clusterState, headers, payloads, blocks, err := e.createClusterState(epochCounter)
-	if err != nil {
-		return nil, fmt.Errorf("could not create cluster state: %w", err)
-	}
-
-	// determine this node's cluster for the epoch
-	epoch := e.state.Final().Epochs().ByCounter(epochCounter)
-	clusters, err := epoch.Clustering()
-	if err != nil {
-		return nil, fmt.Errorf("could not get clusters for epoch: %w", err)
-	}
-	_, clusterIndex, ok := clusters.ByNodeID(e.me.NodeID())
-	if !ok {
-		return nil, fmt.Errorf("could not find my cluster")
-	}
-	cluster, err := epoch.Cluster(clusterIndex)
-	if err != nil {
-		return nil, fmt.Errorf("could not get cluster: %w", err)
-	}
-
-	builder, finalizer, err := e.builderFactory.Create(headers, payloads, e.pool)
-	if err != nil {
-		return nil, fmt.Errorf("could not create builder/finalizer: %w", err)
-	}
-
-	seed, err := epoch.Seed(indices.ProtocolCollectorClusterLeaderSelection(clusterIndex)...)
-	if err != nil {
-		return nil, fmt.Errorf("could not get leader selection seed: %w", err)
-	}
-
-	proposalEngine, err := e.proposalFactory.Create(clusterState, headers, payloads)
-	if err != nil {
-		return nil, fmt.Errorf("could not create proposal engine: %w", err)
-	}
-	syncCore, syncEngine, err := e.syncFactory.Create(cluster.Members(), clusterState, blocks, proposalEngine)
-	if err != nil {
-		return nil, fmt.Errorf("could not create sync engine: %w", err)
-	}
-	hotstuff, err := e.hotstuffFactory.Create(
-		cluster.ChainID(),
-		cluster.Members(),
-		clusterState,
-		headers,
-		payloads,
-		seed,
-		builder,
-		finalizer,
-		proposalEngine,
-		cluster.RootBlock().Header,
-		cluster.RootQC(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not create hotstuff: %w", err)
-	}
-
-	// attach dependencies to the proposal engine
-	proposalEngine = proposalEngine.
-		WithHotStuff(hotstuff).
-		WithSync(syncCore)
-
-	engines := &epochreqs{
-		proposal: proposalEngine,
-		sync:     syncEngine,
-		hotstuff: hotstuff,
-	}
-	return engines, nil
-}
-
-func (e *Engine) createClusterState(epochCounter uint64) (cluster.State, storage.Headers, storage.ClusterPayloads, storage.ClusterBlocks, error) {
-
-	epoch := e.state.Final().Epochs().ByCounter(epochCounter)
-
-	// determine this node's cluster for the epoch
-	clusters, err := epoch.Clustering()
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not get clusters for epoch: %w", err)
-	}
-	_, clusterIndex, ok := clusters.ByNodeID(e.me.NodeID())
-	if !ok {
-		return nil, nil, nil, nil, fmt.Errorf("could not find my cluster")
-	}
-	cluster, err := epoch.Cluster(clusterIndex)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not get cluster info: %w", err)
-	}
-
-	// create the cluster state
-	clusterState, headers, payloads, blocks, err := e.clusterStateFactory.Create(cluster.ChainID())
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not create cluster state: %w", err)
-	}
-	_, err = clusterState.Final().Head()
-	// storage layer error while checking state - fail fast
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, nil, nil, nil, fmt.Errorf("could not check cluster state db: %w", err)
-	}
-	// the cluster state for this epoch has already been bootstrapped
-	if err == nil {
-		return clusterState, headers, payloads, blocks, nil
-	}
-
-	// no existing cluster state, bootstrap with root block for epoch
-	err = clusterState.Mutate().Bootstrap(cluster.RootBlock())
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not bootstrap cluster state: %w", err)
-	}
-
-	return clusterState, headers, payloads, blocks, nil
 }

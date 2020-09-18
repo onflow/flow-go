@@ -28,6 +28,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
+	"github.com/dapperlabs/flow-go/module/epochs"
 	confinalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -254,7 +255,7 @@ func main() {
 			)
 			return push, err
 		}).
-		// Epoch manager encapsulates and manages epoch-dependent engines as we
+		// EpochComponents manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -320,7 +321,7 @@ func main() {
 
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
-			rootQCVoter := epochmgr.NewRootQCVoter(
+			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
 				node.Me,
 				signer,

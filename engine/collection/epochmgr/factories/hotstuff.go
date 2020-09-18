@@ -26,7 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type HotStuff struct {
+type HotStuffFactory struct {
 	log        zerolog.Logger
 	me         module.Local
 	db         *badger.DB
@@ -40,9 +40,9 @@ func NewHotStuffFactory(
 	db *badger.DB,
 	protoState protocol.State,
 	opts ...consensus.Option,
-) (*HotStuff, error) {
+) (*HotStuffFactory, error) {
 
-	factory := &HotStuff{
+	factory := &HotStuffFactory{
 		log:        log,
 		me:         me,
 		db:         db,
@@ -52,7 +52,7 @@ func NewHotStuffFactory(
 	return factory, nil
 }
 
-func (f *HotStuff) Create(
+func (f *HotStuffFactory) Create(
 	clusterID flow.ChainID,
 	cluster flow.IdentityList,
 	clusterState cluster.State,

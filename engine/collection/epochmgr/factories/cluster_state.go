@@ -9,7 +9,7 @@ import (
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
-type ClusterState struct {
+type ClusterStateFactory struct {
 	db      *badger.DB
 	metrics module.CacheMetrics
 }
@@ -17,15 +17,15 @@ type ClusterState struct {
 func NewClusterStateFactory(
 	db *badger.DB,
 	metrics module.CacheMetrics,
-) (*ClusterState, error) {
-	factory := &ClusterState{
+) (*ClusterStateFactory, error) {
+	factory := &ClusterStateFactory{
 		db:      db,
 		metrics: metrics,
 	}
 	return factory, nil
 }
 
-func (f *ClusterState) Create(clusterID flow.ChainID) (
+func (f *ClusterStateFactory) Create(clusterID flow.ChainID) (
 	*clusterkv.State,
 	*bstorage.Headers,
 	*bstorage.ClusterPayloads,
