@@ -31,8 +31,9 @@ func (b *backendEvents) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 ) ([]flow.BlockEvents, error) {
 
-	if len(strings.TrimSpace(eventType)) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "empty eventType")
+	err := validateEventType(eventType)
+	if err != nil {
+		return nil, err
 	}
 
 	if endHeight < startHeight {
@@ -72,8 +73,9 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 ) ([]flow.BlockEvents, error) {
 
-	if len(strings.TrimSpace(eventType)) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "empty eventType")
+	err := validateEventType(eventType)
+	if err != nil {
+		return nil, err
 	}
 
 	// forward the request to the execution node
@@ -135,4 +137,11 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 	}
 
 	return results, nil
+}
+
+func validateEventType(eventType string) error {
+	if len(strings.TrimSpace(eventType)) == 0 {
+		return status.Error(codes.InvalidArgument, "empty event type")
+	}
+	return nil
 }
