@@ -340,6 +340,13 @@ func main() {
 				syncFactory,
 				hotstuffFactory,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create epoch manager: %w", err)
+			}
+
+			// register the manager for protocol events
+			node.ProtocolEvents.AddConsumer(manager)
+
 			return manager, err
 		}).
 		Run()

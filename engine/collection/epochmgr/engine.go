@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol/events"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
@@ -41,6 +42,8 @@ type Engine struct {
 	log   zerolog.Logger
 	me    module.Local
 	state protocol.State
+
+	events.Noop // satisfy protocol events consumer interface
 
 	// TODO should be per-epoch eventually, cache here for now
 	pool mempool.Transactions
@@ -114,7 +117,7 @@ func (e *Engine) Ready() <-chan struct{} {
 			return
 		}
 		if phase == flow.EpochPhaseSetup {
-			e.PrepareNextEpoch()
+			e.prepareNextEpoch()
 		}
 	})
 }
@@ -128,11 +131,16 @@ func (e *Engine) Done() <-chan struct{} {
 	})
 }
 
-// PrepareNextEpoch is called either when we transition into the epoch
+// EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
+func (e *Engine) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
+	e.prepareNextEpoch()
+}
+
+// prepareNextEpoch is called either when we transition into the epoch
 // setup phase, or when the node is restarted during the epoch setup phase. It
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
-func (e *Engine) PrepareNextEpoch() {
+func (e *Engine) prepareNextEpoch() {
 	e.unit.Launch(func() {
 
 		epoch := e.state.Final().Epochs().Next()
