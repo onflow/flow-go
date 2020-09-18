@@ -66,7 +66,7 @@ git submodule update --init --recursive
 - Install [Go](https://golang.org/doc/install) (Flow supports Go 1.13 and later)
 - Install [CMake](https://cmake.org/install/), which is used for building the crypto library [Relic](https://github.com/relic-toolkit/relic).
 
-  To build Relic run `./relic_build.sh` from the [./crypto/](/crypto) directory.
+  To build Relic run `make crypto/relic/build`
 
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running
   a local network and integration tests
