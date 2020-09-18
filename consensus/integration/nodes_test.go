@@ -33,6 +33,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/trace"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/protocol/events"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	storagemock "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -134,8 +135,9 @@ func createNode(
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)
 	statusesDB := storage.NewEpochStatuses(metrics, db)
+	consumer := events.NewNoop()
 
-	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB)
+	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(root, result, seal)
