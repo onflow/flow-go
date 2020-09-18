@@ -685,7 +685,8 @@ func (e *Engine) generateExecutionResultForBlock(
 
 	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get previous execution result ID: %w, %v", err, block.Header.ParentID)
+		return nil, fmt.Errorf("could not get execution result ID for parent block (%v): %w",
+			block.Header.ParentID, err)
 	}
 
 	er := &flow.ExecutionResult{
