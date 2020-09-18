@@ -54,6 +54,7 @@ type Engine struct {
 	spockHasher        hash.Hasher
 	root               *flow.Header
 	syncingState       atomic.Bool // a state variable to avoid triggering state sync while state syncing is progress
+	syncThreshold      int
 }
 
 func New(
@@ -144,8 +145,8 @@ func (e *Engine) OnBlockIncorporated(b *model.Block) {
 	}
 }
 
-func (e *Engine) OnFinalizedBlock(block *model.Block) {}
-
+// required to provide implementation as a consensus follwer engine
+func (e *Engine) OnFinalizedBlock(block *model.Block)                {}
 func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 // Main handling
@@ -166,13 +167,17 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
 			// check if this block is a new block by checking if the execution queue has this block already
+			queue, added := tryEnqueue(executableBlock, executionQueues)
+
 			// if it's not a new block, then bail
-			if _, added := tryEnqueue(executableBlock, executionQueues); added {
+			if !added {
 				e.log.Debug().
 					Hex("block_id", logging.Entity(executableBlock)).
 					Msg("added block to existing execution queue")
 				return nil
 			}
+
+			e.checkStateSync(queue, executableBlock)
 
 			// check if this block has been executed already
 
@@ -186,17 +191,15 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 
 			// check if the block's parent has been executed. (we can't execute the block if the parent has
 			// not been executed yet)
-			if executableBlock.StartState == nil {
+			if executableBlock.HasStartState() {
 				// check if there is a statecommitment for the parent block
 				parentCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
 
 				// if we found the statecommitment for the parent block, then add it to the executable block.
 				if err == nil {
 					executableBlock.StartState = parentCommitment
-				}
-
-				// if there is exception, then crash
-				if !errors.Is(err, storage.ErrNotFound) {
+				} else if !errors.Is(err, storage.ErrNotFound) {
+					// if there is exception, then crash
 					e.log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
 				}
 			}
@@ -207,8 +210,6 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 				return fmt.Errorf("cannot send collection requests: %w", err)
 			}
 
-			e.log.Debug().Hex("block_id", logging.Entity(executableBlock)).Msg("added block to execution queue")
-
 			// If the block was empty
 			e.executeBlockIfComplete(executableBlock)
 
@@ -217,6 +218,8 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	)
 }
 
+// executeBlock will execute the block.
+// When finish executing, it will check if the children becomes executable and execute them if yes.
 func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.ExecutableBlock) {
 	defer e.wg.Done()
 
@@ -256,35 +259,52 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionStateStorageDiskTotal(diskTotal)
 	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
 
+	// we've executed the block, now we need to check if its children can be executed
+	// the executionQueues stores blocks as a tree:
+	// 10 <- 11 <- 12
+	// 	 ^-- 13
+	// 14 <- 15 <- 16
+	// if block 10 is the one just executed, then we will remove it from the queue, and add
+	// its children back, meaning the tree will become:
+	// 11 <- 12
+	// 13
+	// 14 <- 15 <- 16
 	err = e.mempool.Run(
 		func(
 			blockByCollection *stdmap.BlockByCollectionBackdata,
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
+			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executableBlock.ID())
 			if !exists {
 				return fmt.Errorf("fatal error - executed block not present in execution queue")
 			}
 
+			// dismount the executed block and all its children
 			_, newQueues := executionQueue.Dismount()
 
+			// go through each children, add them back to the queue, and check
+			// if the children is executable
 			for _, queue := range newQueues {
-				newExecutableBlock := queue.Head.Item.(*entity.ExecutableBlock)
-				newExecutableBlock.StartState = finalState
-
-				err := e.matchOrRequestCollections(newExecutableBlock, blockByCollection)
-				if err != nil {
-					return fmt.Errorf("cannot send collection requests: %w", err)
-				}
-
 				added := executionQueues.Add(queue)
 				if !added {
 					return fmt.Errorf("fatal error - child block already in execution queue")
 				}
 
-				e.executeBlockIfComplete(newExecutableBlock)
+				// the parent block has been executed, update the StartState of
+				// each child block.
+				childBlock := queue.Head.Item.(*entity.ExecutableBlock)
+				childBlock.StartState = finalState
+
+				err := e.matchOrRequestCollections(childBlock, blockByCollection)
+				if err != nil {
+					return fmt.Errorf("cannot send collection requests: %w", err)
+				}
+
+				e.executeBlockIfComplete(childBlock)
 			}
 
+			// remove the executed block
 			executionQueues.Rem(executableBlock.ID())
 
 			return nil
@@ -304,6 +324,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionLastExecutedBlockHeight(executableBlock.Block.Header.Height)
 }
 
+// executeBlockIfComplete checks whether the block is ready to be executed.
+// if yes, execute the block
 func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	if eb.IsComplete() {
 		e.log.Debug().
@@ -368,9 +390,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
 				}
 
-				if completeCollection.IsComplete() {
+				if completeCollection.IsCompleted() {
 					// already received transactions for this collection
-					// this would happen if the same collection is handled twice.
 					continue
 				}
 
@@ -430,16 +451,6 @@ func (e *Engine) matchOrRequestCollections(
 	// make sure that the requests are dispatched immediately by the requester
 	defer e.request.Force()
 
-	// an optimization to check if collections have been requested already
-	// the executableBlock initially has a nil CompleteCollections, as iterating through
-	// the guarantees, we will create an entry in CompleteCollections for each collection,
-	// and request it from collection node.
-	// therefore, if the CompleteCollections has the same length as the guarantees,
-	// it means either the block has no collection or the collection must have all been requested.
-	if len(executableBlock.Block.Payload.Guarantees) == len(executableBlock.CompleteCollections) {
-		return nil
-	}
-
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
 		coll := &entity.CompleteCollection{
 			Guarantee: guarantee,
@@ -489,6 +500,7 @@ func (e *Engine) matchOrRequestCollections(
 
 		added := collectionsBackdata.Add(blocksNeedingCollection)
 		if !added {
+			// sanity check, should not happen, unless mempool implementation has a bug
 			return fmt.Errorf("collection already mapped to block")
 		}
 
@@ -499,14 +511,6 @@ func (e *Engine) matchOrRequestCollections(
 
 		// queue the collection to be requested from one of the guarantors
 		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
-	}
-
-	// sandity check which ensures we are able to exit early next time
-	if len(executableBlock.Block.Payload.Guarantees) != len(executableBlock.CompleteCollections) {
-		return fmt.Errorf("sanity check failed, the number of collections (%v) does not match with"+
-			"the number of guarantees (%v)",
-			len(executableBlock.CompleteCollections),
-			len(executableBlock.CompleteCollections))
 	}
 
 	return nil
@@ -554,6 +558,7 @@ func (e *Engine) handleComputationResult(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
+
 	// There is one result per transaction
 	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
 
@@ -815,6 +820,38 @@ func (e *Engine) generateExecutionReceipt(
 	}
 
 	return receipt, nil
+}
+
+// check whether we need to trigger state sync
+func (e *Engine) checkStateSync(queue *queue.Queue) {
+	// don't trigger if already triggered
+	if e.syncingState.Load() {
+		return
+	}
+
+	// we will sync state only for sealed blocks, since that guarantees
+	// the consensus nodes have seen the result, and the statecommitment
+	// has been approved by the consensus nodes.
+	// we don't trigger the state sync if the number of sealed but unexecuted blocks
+	// is less than a certain threshold
+	firstUnexecuted := queue.Head.Item
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to query last sealed")
+	}
+
+	// TODO: move to a function
+	shouldTrigger := int(lastSealed.Height)-int(firstUnexecuted.Height()) > e.syncThreshold
+	if !shouldTrigger {
+		return
+	}
+
+	if e.syncingState.CAS(false, true) {
+		e.startStateSync(firstUnexecuted.Height(), lastSealed)
+	}
+}
+
+func (e *Engine) startStateSync(firstKnown *entity.ExecutableBlock) {
 }
 
 // func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlock) {

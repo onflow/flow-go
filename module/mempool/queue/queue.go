@@ -109,6 +109,7 @@ func dequeue(queue *Queue) *Queue {
 }
 
 // TryAdd tries to add a new Node to the queue and returns if the operation has been successful
+// A node can only be added if the parent exists in the
 func (q *Queue) TryAdd(executableBlock Blockify) bool {
 	n, ok := q.Nodes[executableBlock.ParentID()]
 	if !ok {

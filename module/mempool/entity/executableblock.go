@@ -42,7 +42,7 @@ func (c CompleteCollection) Collection() flow.Collection {
 	return flow.Collection{Transactions: c.Transactions}
 }
 
-func (c CompleteCollection) IsComplete() bool {
+func (c CompleteCollection) IsCompleted() bool {
 	return len(c.Transactions) > 0
 }
 
@@ -85,11 +85,13 @@ func (b *ExecutableBlock) Collections() []*CompleteCollection {
 	return collections
 }
 
-func (b *ExecutableBlock) hasAllTransactions() bool {
+// HasAllTransactions returns whether all the transactions for all collections
+// in the block have been received.
+func (b *ExecutableBlock) HasAllTransactions() bool {
 	for _, collection := range b.Block.Payload.Guarantees {
 
 		completeCollection, ok := b.CompleteCollections[collection.ID()]
-		if ok && completeCollection.IsComplete() {
+		if ok && completeCollection.IsCompleted() {
 			continue
 		}
 		return false
@@ -97,6 +99,14 @@ func (b *ExecutableBlock) hasAllTransactions() bool {
 	return true
 }
 
+// HasStartState returns whether the block has StartState, which
+// indicates whether its parent has been executed.
+func (b *ExecutableBlock) HasStartState() bool {
+	return len(b.StartState) > 0
+}
+
+// IsComplete returns whether all the data needed to executed the block are
+// ready.
 func (b *ExecutableBlock) IsComplete() bool {
-	return b.hasAllTransactions() && len(b.StartState) > 0
+	return b.HasAllTransactions() && b.HasStartState()
 }
