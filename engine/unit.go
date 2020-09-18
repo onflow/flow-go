@@ -3,23 +3,31 @@
 package engine
 
 import (
+	"context"
 	"sync"
 	"time"
 )
 
 // Unit handles synchronization management, startup, and shutdown for engines.
 type Unit struct {
-	wg         sync.WaitGroup // tracks in-progress functions
-	once       sync.Once      // ensures that the done channel is only closed once
-	quit       chan struct{}  // used to signal that shutdown has started
-	sync.Mutex                // can be used to synchronize the engine
+	wg         sync.WaitGroup  // tracks in-progress functions
+	once       sync.Once       // ensures that the done channel is only closed once
+	quit       chan struct{}   // used to signal that shutdown has started
+	ctx        context.Context // context that is cancelled when the unit is Done
+	cancel     context.CancelFunc
+	sync.Mutex // can be used to synchronize the engine
 }
 
 // NewUnit returns a new unit.
 func NewUnit() *Unit {
-	return &Unit{
-		quit: make(chan struct{}),
+
+	ctx, cancel := context.WithCancel(context.Background())
+	unit := &Unit{
+		quit:   make(chan struct{}),
+		ctx:    ctx,
+		cancel: cancel,
 	}
+	return unit
 }
 
 // Do synchronously executes the input function f unless the unit has shut down.
@@ -105,6 +113,13 @@ func (u *Unit) Ready(checks ...func()) <-chan struct{} {
 	return ready
 }
 
+// Ctx returns a context with the same lifecycle scope as the unit. In particular,
+// it is cancelled when Done is called, so it can be used as the parent context
+// for processes spawned by any engine whose lifecycle is managed by a unit.
+func (u *Unit) Ctx() context.Context {
+	return u.ctx
+}
+
 // Quit returns a channel that is closed when the unit begins to shut down.
 func (u *Unit) Quit() <-chan struct{} {
 	return u.quit
@@ -119,6 +134,7 @@ func (u *Unit) Quit() <-chan struct{} {
 func (u *Unit) Done(actions ...func()) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
+		u.cancel()
 		u.once.Do(func() {
 			close(u.quit)
 		})
