@@ -45,8 +45,8 @@ func (b *backendEvents) GetEventsForHeightRange(
 		endHeight = head.Height
 	}
 
-	// find the block IDs for all the blocks between min and max height (inclusive)
-	blockIDs := make([]flow.Identifier, 0)
+	// find the block headers for all the blocks between min and max height (inclusive)
+	blockHeaders := make([]*flow.Header, 0)
 
 	for i := startHeight; i <= endHeight; i++ {
 		block, err := b.blocks.ByHeight(i)
@@ -54,10 +54,10 @@ func (b *backendEvents) GetEventsForHeightRange(
 			return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 		}
 
-		blockIDs = append(blockIDs, block.ID())
+		blockHeaders = append(blockHeaders, block.Header)
 	}
 
-	return b.getBlockEventsFromExecutionNode(ctx, blockIDs, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -66,17 +66,33 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 ) ([]flow.BlockEvents, error) {
+
+	// find the block headers for all the block IDs
+	blockHeaders := make([]*flow.Header, 0)
+	for _, blockID := range blockIDs {
+		block, err := b.blocks.ByID(blockID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
+		}
+
+		blockHeaders = append(blockHeaders, block.Header)
+	}
+
 	// forward the request to the execution node
-	return b.getBlockEventsFromExecutionNode(ctx, blockIDs, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
 }
 
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
-	blockIDs []flow.Identifier,
+	blockHeaders []*flow.Header,
 	eventType string,
 ) ([]flow.BlockEvents, error) {
 
 	// create an execution API request for events at block ID
+	blockIDs := make([]flow.Identifier, len(blockHeaders))
+	for i := range blockIDs {
+		blockIDs[i] = blockHeaders[i].ID()
+	}
 	req := execproto.GetEventsForBlockIDsRequest{
 		Type:     eventType,
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
@@ -90,7 +106,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	}
 
 	// convert execution node api result to access node api result
-	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockIDs)
+	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
@@ -100,27 +116,30 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 
 // verifyAndConvertToAccessEvents converts execution node api result to access node api result, and verifies that the results contains
 // results from each block that was requested
-func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDsResponse_Result, requestedBlockIDs []flow.Identifier) ([]flow.BlockEvents, error) {
-	if len(execEvents) != len(requestedBlockIDs) {
+func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDsResponse_Result, requestedBlockHeaders []*flow.Header) ([]flow.BlockEvents, error) {
+	if len(execEvents) != len(requestedBlockHeaders) {
 		return nil, errors.New("number of results does not match number of blocks requested")
 	}
 
-	blockIDSet := map[string]bool{}
-	for _, blockID := range requestedBlockIDs {
-		blockIDSet[blockID.String()] = true
+
+	reqestedBlockHeaderSet := map[string]*flow.Header{}
+	for _, header := range requestedBlockHeaders {
+		reqestedBlockHeaderSet[header.ID().String()] = header
 	}
 
 	results := make([]flow.BlockEvents, len(execEvents))
 
 	for i, result := range execEvents {
-		if !blockIDSet[hex.EncodeToString(result.GetBlockId())] {
+		header, expected := reqestedBlockHeaderSet[hex.EncodeToString(result.GetBlockId())]
+		if !expected {
 			return nil, fmt.Errorf("unexpected blockID from exe node %x", result.GetBlockId())
 		}
 
 		results[i] = flow.BlockEvents{
-			BlockID:     convert.MessageToIdentifier(result.GetBlockId()),
-			BlockHeight: result.GetBlockHeight(),
-			Events:      convert.MessagesToEvents(result.GetEvents()),
+			BlockID:        convert.MessageToIdentifier(result.GetBlockId()),
+			BlockHeight:    result.GetBlockHeight(),
+			BlockTimestamp: header.Timestamp,
+			Events:         convert.MessagesToEvents(result.GetEvents()),
 		}
 	}
 
