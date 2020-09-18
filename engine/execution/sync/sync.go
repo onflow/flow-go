@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 )
 
+// StateSynchronizer returns the state deltas between blocks
 type StateSynchronizer interface {
 	//PersistDelta(blockID flow.Identifier, set flow.RegisterDelta) error
 	DeltaRange(
@@ -18,6 +19,8 @@ type StateSynchronizer interface {
 	) error
 }
 
+// StateSynchronizer wraps the execution state's API to return the state
+// deltas between blocks
 func NewStateSynchronizer(
 	state state.ReadOnlyExecutionState,
 ) StateSynchronizer {

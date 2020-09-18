@@ -2,18 +2,25 @@ package testutil
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/consensus"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	mockhotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/pusher"
+	"github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/provider"
 	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
@@ -24,8 +31,7 @@ import (
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	bootstrapexec "github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/engine/execution/sync"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
+	testmock "github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -33,7 +39,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/chunks"
+	confinalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -48,7 +56,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) mock.GenericNode {
+func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) testmock.GenericNode {
 
 	var i int
 	var participant *flow.Identity
@@ -58,7 +66,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		}
 	}
 
-	log := zerolog.New(os.Stderr).With().Int("index", i).Hex("node_id", identity.NodeID[:]).Logger()
+	log := zerolog.New(os.Stderr).With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
 
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
@@ -108,7 +116,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
-	return mock.GenericNode{
+	return testmock.GenericNode{
 		Log:        log,
 		Metrics:    metrics,
 		Tracer:     tracer,
@@ -128,7 +136,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) mock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) testmock.CollectionNode {
 
 	node := GenericNode(t, hub, identity, identities, chainID, options...)
 
@@ -152,7 +160,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collections, transactions)
 	require.NoError(t, err)
 
-	return mock.CollectionNode{
+	return testmock.CollectionNode{
 		GenericNode:     node,
 		Pool:            pool,
 		Collections:     collections,
@@ -164,7 +172,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 }
 
 // CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID, options ...func(*protocol.State)) []mock.CollectionNode {
+func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID, options ...func(*protocol.State)) []testmock.CollectionNode {
 	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
 
 	// add some extra dummy identities so we have one of each role
@@ -172,7 +180,7 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.Chain
 
 	identities := append(colIdentities, others...)
 
-	nodes := make([]mock.CollectionNode, 0, len(colIdentities))
+	nodes := make([]testmock.CollectionNode, 0, len(colIdentities))
 	for _, identity := range colIdentities {
 		nodes = append(nodes, CollectionNode(t, hub, identity, identities, chainID, options...))
 	}
@@ -180,7 +188,7 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.Chain
 	return nodes
 }
 
-func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID) mock.ConsensusNode {
+func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID) testmock.ConsensusNode {
 
 	node := GenericNode(t, hub, identity, identities, chainID)
 
@@ -211,7 +219,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
-	return mock.ConsensusNode{
+	return testmock.ConsensusNode{
 		GenericNode:     node,
 		Guarantees:      guarantees,
 		Approvals:       approvals,
@@ -222,7 +230,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	}
 }
 
-func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID) []mock.ConsensusNode {
+func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID) []testmock.ConsensusNode {
 	conIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleConsensus))
 	for _, id := range conIdentities {
 		t.Log(id.String())
@@ -233,7 +241,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainI
 
 	identities := append(conIdentities, others...)
 
-	nodes := make([]mock.ConsensusNode, 0, len(conIdentities))
+	nodes := make([]testmock.ConsensusNode, 0, len(conIdentities))
 	for _, identity := range conIdentities {
 		nodes = append(nodes, ConsensusNode(t, hub, identity, identities, chainID))
 	}
@@ -241,7 +249,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainI
 	return nodes
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64, chainID flow.ChainID) mock.ExecutionNode {
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64, chainID flow.ChainID) testmock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities, chainID)
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
@@ -252,6 +260,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	results := storage.NewExecutionResults(node.DB)
 	receipts := storage.NewExecutionReceipts(node.DB, results)
+
+	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
 
 	dbDir := unittest.TempDir(t)
 
@@ -273,8 +283,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, results, receipts, node.DB, node.Tracer,
 	)
 
-	stateSync := sync.NewStateSynchronizer(execState)
-
 	requestEngine, err := requester.New(
 		node.Log, node.Metrics, node.Net, node.Me, node.State,
 		engine.RequestCollections,
@@ -285,7 +293,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, stateSync, metrics,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics,
 	)
 	require.NoError(t, err)
 
@@ -312,6 +320,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
 	require.NoError(t, err)
 
+	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		node.Log,
 		node.Net,
@@ -319,24 +328,28 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		requestEngine,
 		node.State,
 		node.Blocks,
-		node.Payloads,
 		collectionsStorage,
 		eventsStorage,
 		txResultStorage,
 		computationEngine,
 		pusherEngine,
-		syncCore,
 		execState,
-		syncThreshold,
-		filter.Any,
-		false,
 		node.Metrics,
 		node.Tracer,
 		false,
+		rootHead,
 	)
 	require.NoError(t, err)
-
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
+
+	followerCore := createFollowerCore(t, &node, ingestionEngine, rootHead, rootQC)
+
+	// initialize cleaner for DB
+	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
+
+	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
+		node.Headers, node.Payloads, node.State, pendingBlocks, followerCore, syncCore)
+	require.NoError(t, err)
 
 	syncEngine, err := synchronization.New(
 		node.Log,
@@ -345,18 +358,20 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		node.State,
 		node.Blocks,
-		ingestionEngine,
+		followerEng,
 		syncCore,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
 
-	return mock.ExecutionNode{
+	return testmock.ExecutionNode{
 		GenericNode:     node,
 		IngestionEngine: ingestionEngine,
-		ExecutionEngine: computationEngine,
-		ReceiptsEngine:  pusherEngine,
+		FollowerEngine:  followerEng,
 		SyncEngine:      syncEngine,
+		ExecutionEngine: computationEngine,
+		RequestEngine:   requestEngine,
+		ReceiptsEngine:  pusherEngine,
 		BadgerDB:        node.DB,
 		VM:              vm,
 		ExecutionState:  execState,
@@ -366,16 +381,96 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	}
 }
 
-type VerificationOpt func(*mock.VerificationNode)
+func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *model.QuorumCertificate) {
+	rootHead, err := node.State.AtHeight(0).Head()
+	require.NoError(t, err)
+
+	signers, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))
+	require.NoError(t, err)
+
+	signerIDs := signers.NodeIDs()
+
+	rootQC := &model.QuorumCertificate{
+		View:      rootHead.View,
+		BlockID:   rootHead.ID(),
+		SignerIDs: signerIDs,
+		SigData:   unittest.SignatureFixture(),
+	}
+
+	return rootHead, rootQC
+}
+
+type RoundRobinLeaderSelection struct {
+	identities flow.IdentityList
+	me         flow.Identifier
+}
+
+func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+	return s.identities.Filter(selector), nil
+}
+
+func (s *RoundRobinLeaderSelection) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+	id, found := s.identities.ByNodeID(participantID)
+	if !found {
+		return nil, fmt.Errorf("not found")
+	}
+	return id, nil
+}
+
+func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier, error) {
+	return s.identities[int(view)%len(s.identities)].NodeID, nil
+}
+
+func (s *RoundRobinLeaderSelection) Self() flow.Identifier {
+	return s.me
+}
+
+func createFollowerCore(t *testing.T, node *testmock.GenericNode, notifier hotstuff.FinalizationConsumer, rootHead *flow.Header, rootQC *model.QuorumCertificate) module.HotStuffFollower {
+
+	identities, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))
+	require.NoError(t, err)
+
+	committee := &RoundRobinLeaderSelection{
+		identities: identities,
+		me:         node.Me.NodeID(),
+	}
+
+	// mock finalization updater
+	verifier := &mockhotstuff.Verifier{}
+	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	finalizer := confinalizer.NewFinalizer(node.DB, node.Headers, node.State)
+
+	pending := make([]*flow.Header, 0)
+
+	// creates a consensus follower with noop consumer as the notifier
+	followerCore, err := consensus.NewFollower(
+		node.Log,
+		committee,
+		node.Headers,
+		finalizer,
+		verifier,
+		notifier,
+		rootHead,
+		rootQC,
+		rootHead,
+		pending,
+	)
+	require.NoError(t, err)
+	return followerCore
+}
+
+type VerificationOpt func(*testmock.VerificationNode)
 
 func WithVerifierEngine(eng network.Engine) VerificationOpt {
-	return func(node *mock.VerificationNode) {
+	return func(node *testmock.VerificationNode) {
 		node.VerifierEngine = eng
 	}
 }
 
 func WithMatchEngine(eng network.Engine) VerificationOpt {
-	return func(node *mock.VerificationNode) {
+	return func(node *testmock.VerificationNode) {
 		node.MatchEngine = eng
 	}
 }
@@ -391,10 +486,10 @@ func VerificationNode(t testing.TB,
 	chainID flow.ChainID,
 	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
 	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
-	opts ...VerificationOpt) mock.VerificationNode {
+	opts ...VerificationOpt) testmock.VerificationNode {
 
 	var err error
-	node := mock.VerificationNode{
+	node := testmock.VerificationNode{
 		GenericNode: GenericNode(t, hub, identity, identities, chainID),
 	}
 

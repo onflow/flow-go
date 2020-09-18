@@ -11,7 +11,9 @@ import (
 
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/pusher"
+	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/provider"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -86,12 +88,24 @@ type ConsensusNode struct {
 	MatchingEngine  *matching.Engine
 }
 
+func (cn ConsensusNode) Ready() {
+	<-cn.IngestionEngine.Ready()
+	<-cn.MatchingEngine.Ready()
+}
+
+func (cn ConsensusNode) Done() {
+	<-cn.IngestionEngine.Done()
+	<-cn.MatchingEngine.Done()
+}
+
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
 	IngestionEngine *ingestion.Engine
 	ExecutionEngine *computation.Manager
+	RequestEngine   *requester.Engine
 	ReceiptsEngine  *executionprovider.Engine
+	FollowerEngine  *followereng.Engine
 	SyncEngine      *synchronization.Engine
 	BadgerDB        *badger.DB
 	VM              *fvm.VirtualMachine
@@ -105,14 +119,18 @@ func (en ExecutionNode) Ready() {
 	<-en.Ledger.Ready()
 	<-en.ReceiptsEngine.Ready()
 	<-en.IngestionEngine.Ready()
+	<-en.FollowerEngine.Ready()
+	<-en.RequestEngine.Ready()
 	<-en.SyncEngine.Ready()
 }
 
 func (en ExecutionNode) Done() {
 	<-en.IngestionEngine.Done()
 	<-en.ReceiptsEngine.Done()
-	<-en.SyncEngine.Done()
 	<-en.Ledger.Done()
+	<-en.FollowerEngine.Done()
+	<-en.RequestEngine.Done()
+	<-en.SyncEngine.Done()
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()
 }

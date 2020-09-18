@@ -10,7 +10,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -48,7 +47,6 @@ func New(
 	state protocol.ReadOnlyState,
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
-	stateSync sync.StateSynchronizer,
 	metrics module.ExecutionMetrics,
 ) (*Engine, error) {
 
