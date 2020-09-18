@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/epochmgr/factories"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	chainsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/indices"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -100,9 +101,21 @@ func New(
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
+		// start up dependencies
 		<-e.epoch.hotstuff.Ready()
 		<-e.epoch.proposal.Ready()
 		<-e.epoch.sync.Ready()
+	}, func() {
+		// check the current phase on startup, in case we are in setup phase
+		// and haven't yet voted for the next root QC
+		phase, err := e.state.Final().Phase()
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not check phase")
+			return
+		}
+		if phase == flow.EpochPhaseSetup {
+			e.PrepareNextEpoch()
+		}
 	})
 }
 
@@ -115,11 +128,11 @@ func (e *Engine) Done() <-chan struct{} {
 	})
 }
 
-// onEpochSetupPhaseStarted is called either when we transition into the epoch
+// PrepareNextEpoch is called either when we transition into the epoch
 // setup phase, or when the node is restarted during the epoch setup phase. It
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
-func (e *Engine) onEpochSetupPhaseStarted() {
+func (e *Engine) PrepareNextEpoch() {
 	e.unit.Launch(func() {
 
 		epoch := e.state.Final().Epochs().Next()

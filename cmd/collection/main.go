@@ -318,11 +318,22 @@ func main() {
 				return nil, err
 			}
 
+			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
+			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+			rootQCVoter := epochmgr.NewRootQCVoter(
+				node.Logger,
+				node.Me,
+				signer,
+				node.State,
+				nil, // TODO
+			)
+
 			manager, err := epochmgr.New(
 				node.Logger,
 				node.Me,
 				node.State,
 				pool,
+				rootQCVoter,
 				clusterStateFactory,
 				builderFactory,
 				proposalFactory,
