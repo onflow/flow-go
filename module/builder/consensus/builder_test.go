@@ -678,6 +678,8 @@ func (bs *BuilderSuite) TestPayloadReceiptForBlockNotInFork() {
 func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 
 	// create valid receipts for known, unsealed blocks, that are in the fork.
+	// each receipt has a unique result which is not in the fork yet, so every
+	// result should be pushed to the mempool.
 	receipts := []*flow.ExecutionReceipt{}
 	var i uint64
 	for i = 0; i < 5; i++ {
@@ -740,4 +742,44 @@ func (bs *BuilderSuite) TestPayloadReceiptMultipleReceiptsWithDifferentResults()
 	bs.Require().NoError(err)
 	bs.Assert().Equal(receipts, bs.assembled.Receipts, "payload should contain all receipts for a given block")
 	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
+}
+
+// IncorporatedBlockID should correspond to the first block on the fork that
+// contained the result.
+func (bs *BuilderSuite) TestPayloadResultFirstAppearance() {
+	// Insert a receipt for the same result as a receipt that is already on the
+	// fork. The generated IncorporatedResult should reference the ID of the
+	// first block that contained the result.
+
+	// We create receipts for the second block because the first block is
+	// already sealed and the incoming receipt would be skipped
+	secondBlock := bs.blocks[bs.irsList[1].Seal.BlockID]
+	secondBlockResult := secondBlock.Payload.Receipts[0].ExecutionResult
+
+	// create another receipt for the same result in the third block
+	thirdBlock := bs.blocks[bs.irsList[2].Seal.BlockID]
+	duplicateReceipt := unittest.ReceiptForBlockFixture(secondBlock)
+	duplicateReceipt.ExecutionResult = secondBlockResult
+	thirdBlock.Payload.Receipts = append(thirdBlock.Payload.Receipts, duplicateReceipt)
+
+	// add another receipt for the same result to the mempool
+	receiptForExistingResult := unittest.ReceiptForBlockFixture(secondBlock)
+	receiptForExistingResult.ExecutionResult = secondBlockResult
+	bs.pendingReceipts = []*flow.ExecutionReceipt{receiptForExistingResult}
+
+	// Now check that only one IncorporatedResult was added to the mempoool, and
+	// that its IncorporatedBlockID corresponds to the first block
+
+	expectedIncorporatedResults := []*flow.IncorporatedResult{
+		{
+			IncorporatedBlockID: secondBlock.ID(),
+			Result:              &secondBlockResult,
+		},
+	}
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.assembled.Receipts, bs.pendingReceipts, "payload should contain receipts even if they contain an existing result")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
+	bs.Assert().ElementsMatch(bs.incorporatedResults, expectedIncorporatedResults, "should insert incorporated results in mempool")
 }

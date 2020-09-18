@@ -93,7 +93,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	// create the payload with guarantees, seals, and receipts, taken from the
 	// mempools.
-	payload, lastSeal, err := b.buildNextPayload(parentID, nextHeight)
+	// firstAppearances contains is a map of result ID to ID of the first block
+	// on the fork which contained the result.
+	payload, firstAppearances, lastSeal, err := b.buildNextPayload(parentID, nextHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not build payload: %w", err)
 	}
@@ -168,11 +170,25 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	// add execution results to the mempool for the matching engine to seal
 	// them. The results are wrapped in an IncorporatedResult object which keeps
-	// track of which block the result was incorporated in. This information is
-	// necessary for sealing because it affects the result's chunk assignment.
+	// track of which block the result was first incorporated in. This
+	// information is necessary for sealing because it affects the result's
+	// chunk assignment.
 	for _, rec := range payload.Receipts {
+
+		// incorporatedBlockID should be the ID of the first block on this fork
+		// which contained a receipt for the same result. It is either the block
+		// we are currently building (blockID) or the one that was recorded in
+		// firstAppearances.
+
+		incorporatedBlockID := blockID
+
+		firstAppearance, ok := firstAppearances[rec.ExecutionResult.ID()]
+		if ok {
+			incorporatedBlockID = firstAppearance.ID()
+		}
+
 		b.resPool.Add(&flow.IncorporatedResult{
-			IncorporatedBlockID: blockID,
+			IncorporatedBlockID: incorporatedBlockID,
 			Result:              &rec.ExecutionResult,
 		})
 	}
@@ -192,36 +208,41 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 //
 // * Use a common loop for finding duplicates in the blockchain for guarantees,
 //   seals, and receipts.
-func (b *Builder) buildNextPayload(parentID flow.Identifier, nextHeight uint64) (*flow.Payload, *flow.Seal, error) {
+func (b *Builder) buildNextPayload(parentID flow.Identifier, nextHeight uint64) (*flow.Payload, map[flow.Identifier]*flow.Block, *flow.Seal, error) {
 
 	var finalHeight uint64
 	err := b.db.View(operation.RetrieveFinalizedHeight(&finalHeight))
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve finalized height: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 
 	var finalID flow.Identifier
 	err = b.db.View(operation.LookupBlockHeight(finalHeight, &finalID))
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not lookup finalized block: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
 
 	// get list of guarantees to insert
 	guarantees, err := b.getInsertableGuarantees(parentID, finalID, finalHeight, nextHeight)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve the list of guarantees to insert in next payload")
+		return nil, nil, nil, fmt.Errorf("could not retrieve the list of guarantees to insert in next payload")
 	}
 
 	// get list of seals to insert
 	seals, lastSeal, err := b.getInsertableSeals(parentID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve the list of seals to insert in next payload")
+		return nil, nil, nil, fmt.Errorf("could not retrieve the list of seals to insert in next payload")
 	}
 
 	// get list of receipts to insert
 	receipts, err := b.getInsertableReceipts(parentID, finalID, finalHeight)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve the list of receipts to insert in nex payload")
+		return nil, nil, nil, fmt.Errorf("could not retrieve the list of receipts to insert in nex payload")
+	}
+
+	firstAppearances, err := b.getResultFirstAppearances(parentID, nextHeight)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not build map of results to first block appearance")
 	}
 
 	// build the payload so we can get the hash
@@ -232,7 +253,7 @@ func (b *Builder) buildNextPayload(parentID flow.Identifier, nextHeight uint64) 
 		Receipts:   receipts,
 	}
 
-	return payload, lastSeal, nil
+	return payload, firstAppearances, lastSeal, nil
 }
 
 // getInsertableGuarantees returns the list of CollectionGuarantees that should
@@ -594,6 +615,57 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 	sortedReceipts := sortReceipts(receipts)
 
 	return sortedReceipts, nil
+}
+
+// loop through all blocks on fork, from parent to limit, and record for each
+// result included on the fork, what was the first appearance of that result.
+func (b *Builder) getResultFirstAppearances(
+	parentID flow.Identifier,
+	nextHeight uint64) (map[flow.Identifier]*flow.Block, error) {
+
+	// we look back only as far as the expiry limit;
+	// XXX is this cool?
+	limit := nextHeight - uint64(b.cfg.expiry)
+	if limit > nextHeight { // overflow check
+		limit = 0
+	}
+
+	// Look up the root height so we don't look too far back. Initially this is
+	// the genesis block height (aka 0).
+	var rootHeight uint64
+	err := b.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root block height: %w", err)
+	}
+	if limit < rootHeight {
+		limit = rootHeight
+	}
+
+	// Iterate through fork, from parent to limit, and keep track of when a
+	// result was first inserted.
+	firstAppearances := make(map[flow.Identifier]*flow.Block)
+	ancestorID := parentID
+	for {
+		ancestor, err := b.blocks.ByID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get ancestor (%x): %w", ancestorID, err)
+		}
+
+		// track each receipt' result.
+		for _, receipt := range ancestor.Payload.Receipts {
+			// we are looping from top to bottom so the ancestor is necessarily
+			// older or equal to the currently recorded one.
+			firstAppearances[receipt.ExecutionResult.ID()] = ancestor
+		}
+
+		if ancestor.Header.Height <= limit {
+			break
+		}
+
+		ancestorID = ancestor.Header.ParentID
+	}
+
+	return firstAppearances, nil
 }
 
 // sortReceipts takes a map of block-height to execution receipt, and returns
