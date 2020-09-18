@@ -791,14 +791,10 @@ func (e *Engine) saveExecutionResults(
 		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
 		defer span.Finish()
 		blockID := executableBlock.ID()
-		for _, te := range txResults {
-			err = e.transactionResults.Store(blockID, &te)
-			if err != nil {
-
-				return fmt.Errorf("failed to store transaction error: %w", err)
-			}
+		err = e.transactionResults.BatchStore(blockID, txResults)
+		if err != nil {
+			return fmt.Errorf("failed to store transaction result error: %w", err)
 		}
-
 		return nil
 	}()
 	if err != nil {
