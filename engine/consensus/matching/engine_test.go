@@ -763,6 +763,12 @@ func (ms *MatchingSuite) TestSealResultValid() {
 			ms.Assert().Equal(result.BlockID, seal.BlockID)
 		},
 	).Return(true)
+	ms.approvalsPL.On("ByChunk", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			resultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(result.ID(), resultID)
+		},
+	).Return(nil, false)
 
 	err := ms.matching.sealResult(result)
 	ms.Require().NoError(err, "should generate seal on persisted previous result")

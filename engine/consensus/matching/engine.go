@@ -607,6 +607,7 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 }
 
 // collectAggregateSignatures collects approver signatures and identities per chunk
+// TODO: needs testing
 func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) ([]flow.AggregatedSignature, error) {
 	resultID := result.ID()
 	signatures := make([]flow.AggregatedSignature, 0)
@@ -617,12 +618,7 @@ func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) ([]flo
 		var ids []flow.Identifier
 
 		// get approvals for result with chunk index
-		approvals, ok := e.approvals.ByChunk(resultID, chunk.Index)
-		if !ok {
-			// something went wrong as we should be able to get approvals
-			// mempools only cleared after `sealResult` is called.
-			return nil, fmt.Errorf("could not find approvals for result and chunk in mempool")
-		}
+		approvals, _ := e.approvals.ByChunk(resultID, chunk.Index)
 
 		// for each approval collect signature and approver id
 		for _, approval := range approvals {
