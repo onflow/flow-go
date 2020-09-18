@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
 	"github.com/dapperlabs/flow-go/integration/testnet"
+	"github.com/dapperlabs/flow-go/integration/utils/ghost/client"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 )

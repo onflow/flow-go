@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/ghost/engine"
+	"github.com/dapperlabs/flow-go/integration/utils/ghost/engine"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 )

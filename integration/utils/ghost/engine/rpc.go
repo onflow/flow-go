@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine"
-	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
+	ghost "github.com/dapperlabs/flow-go/integration/utils/ghost/protobuf"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"

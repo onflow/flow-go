@@ -9,9 +9,9 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
 	"github.com/dapperlabs/flow-go/integration/convert"
 	"github.com/dapperlabs/flow-go/integration/testnet"
+	"github.com/dapperlabs/flow-go/integration/utils/ghost/client"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/dsl"
 	"github.com/dapperlabs/flow-go/utils/unittest"
