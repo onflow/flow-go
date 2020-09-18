@@ -298,6 +298,12 @@ func ExecutionReceiptFixture() *flow.ExecutionReceipt {
 	}
 }
 
+func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
+	res := ExecutionReceiptFixture()
+	res.ExecutionResult = *ResultForBlockFixture(block)
+	return res
+}
+
 func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &entity.CompleteCollection{

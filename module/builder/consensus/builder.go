@@ -95,7 +95,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// mempools.
 	payload, lastSeal, err := b.buildNextPayload(parentID, nextHeight)
 	if err != nil {
-		return nil, fmt.Errorf("could not build payload: %v", err)
+		return nil, fmt.Errorf("could not build payload: %w", err)
 	}
 
 	// calculate the timestamp and cutoffs
@@ -400,7 +400,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, *f
 	// receipts and check if the mempool contains corresponding seals. Index the
 	// seals by block height (height of the block that the seal is sealing; not
 	// the height of the incorporated result).
-	filteredSeals := map[uint64]*flow.Seal{}
+	filteredSeals := make(map[uint64]*flow.Seal)
 	ancestorID := parentID
 	for ancestorID != sealedID {
 		ancestor, err := b.blocks.ByID(ancestorID)
@@ -415,6 +415,10 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, *f
 				Result:              &receipt.ExecutionResult,
 			}
 
+			// look for a seal that corresponds to this specific incorporated
+			// result. This tells us that the seal is for a result on this fork,
+			// and that it was calculated using the correct block ID for chunk
+			// assignment (the IncorporatedBlockID).
 			incorporatedResultSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
 			if ok {
 				// there is a corresponding seal in the mempool, keep track.
@@ -423,6 +427,8 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, *f
 					return nil, nil, fmt.Errorf("could not get block for id (%d): %w", incorporatedResultSeal.Seal.BlockID, err)
 				}
 
+				// filteredSeals contains only the seals corresponding to
+				// execution results on this fork.
 				filteredSeals[header.Height] = incorporatedResultSeal.Seal
 			}
 		}
@@ -433,7 +439,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, *f
 	orderedSeals := sortSeals(filteredSeals)
 
 	// check states are connected, and stop before maxSealCount
-	collectedSeals := []*flow.Seal{}
+	collectedSeals := make([]*flow.Seal, 0, len(orderedSeals))
 	for _, seal := range orderedSeals {
 		// stop when we hit the max
 		if uint(len(collectedSeals)) >= b.cfg.maxSealCount {
@@ -469,9 +475,12 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, *f
 // 4) If it was already included in the pending part of the chain, skip, but
 //    keep in memory pool for now.
 //
-// 5) Otherwise, this receipt can be included in the payload.
+// 5) If the receipt corresponds to a block that is not on this fork, skip, but
+//    but keep in mempool for now.
 //
-// 6) Receipts have to be ordered by block height.
+// 6) Otherwise, this receipt can be included in the payload.
+//
+// Receipts have to be ordered by block height.
 func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 	finalID flow.Identifier,
 	finalHeight uint64) ([]*flow.ExecutionReceipt, error) {
@@ -481,6 +490,10 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 	if err != nil {
 		return nil, fmt.Errorf("could no retrieve sealed height: %w", err)
 	}
+
+	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
+	// use it to skip receipts that are not for blocks in the fork.
+	forkBlocks := make(map[flow.Identifier]struct{})
 
 	// Create a lookup table of all the receipts that are already inserted in
 	// finalized unsealed blocks. This will be used to filter out duplicates.
@@ -497,16 +510,20 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", header.ID(), err)
 		}
 
+		forkBlocks[header.ID()] = struct{}{}
+
 		for _, recID := range index.ReceiptIDs {
 			finalLookup[recID] = struct{}{}
 		}
 	}
 
 	// iterate through pending blocks, from parent to final, and keep track of
-	// the receipts aready recorded in those blocks.
+	// the receipts already recorded in those blocks.
 	ancestorID := parentID
 	pendingLookup := make(map[flow.Identifier]struct{})
 	for ancestorID != finalID {
+		forkBlocks[ancestorID] = struct{}{}
+
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
@@ -559,6 +576,12 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 		// don't remove from mempool.
 		_, ok = pendingLookup[receipt.ID()]
 		if ok {
+			continue
+		}
+
+		// if the receipt is not for a block on this fork, continue, but don't
+		// remove from mempool
+		if _, ok := forkBlocks[receipt.ExecutionResult.BlockID]; !ok {
 			continue
 		}
 

@@ -658,19 +658,32 @@ func (bs *BuilderSuite) TestPayloadReceiptInPendingBlock() {
 	bs.Assert().Empty(bs.remRecIDs, "should not remove receipts that are already in pending blocks")
 }
 
+// Receipts for blocks that are not on the fork should be skipped but not
+// removed from the mempool
+func (bs *BuilderSuite) TestPayloadReceiptForBlockNotInFork() {
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for a known, unsealed block, not on the fork
+	pendingReceipt := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when receipts correspond to blocks not on the fork")
+	bs.Assert().Empty(bs.remRecIDs, "should not remove receipts that are for blocks not on the fork")
+}
+
 // Valid receipts should be inserted in the payload, sorted by block height.
 func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 
-	// create valid receipts for known, unsealed blocks
+	// create valid receipts for known, unsealed blocks, that are in the fork.
 	receipts := []*flow.ExecutionReceipt{}
 	var i uint64
 	for i = 0; i < 5; i++ {
-		pendingReceipt := unittest.ExecutionReceiptFixture()
-		bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{
-			Height: i,
-		}
+		blockOnFork := bs.blocks[bs.irsList[i].Seal.BlockID]
+		pendingReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
 		receipts = append(receipts, pendingReceipt)
-
 	}
 
 	// shuffle receipts
@@ -706,14 +719,13 @@ func (bs *BuilderSuite) TestPayloadReceiptMultipleReceiptsWithDifferentResults()
 
 	var i uint64
 	for i = 0; i < 5; i++ {
-		// receipt template
-		pendingReceipt := unittest.ExecutionReceiptFixture()
+		blockOnFork := bs.blocks[bs.irsList[i].Seal.BlockID]
+		pendingReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
 		receipts = append(receipts, pendingReceipt)
 
 		// insert 3 receipts for the same block but different results
 		for j := 0; j < 3; j++ {
-			dupReceipt := unittest.ExecutionReceiptFixture()
-			dupReceipt.ExecutionResult.BlockID = pendingReceipt.ExecutionResult.BlockID
+			dupReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
 			receipts = append(receipts, dupReceipt)
 		}
 
@@ -726,6 +738,6 @@ func (bs *BuilderSuite) TestPayloadReceiptMultipleReceiptsWithDifferentResults()
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
-	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain all receipts for a given block")
+	bs.Assert().Equal(receipts, bs.assembled.Receipts, "payload should contain all receipts for a given block")
 	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
 }

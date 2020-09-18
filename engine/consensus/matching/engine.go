@@ -251,10 +251,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	if err == nil {
 		log.Debug().Msg("skipping receipt for sealed block")
 		return nil
-
 	}
 	if !errors.Is(err, storerr.ErrNotFound) {
-		return engine.NewInvalidInputErrorf("error fetching seal: %w", err)
+		return fmt.Errorf("could not retrieve seal: %w", err)
 	}
 
 	// store the receipt in the memory pool
@@ -319,7 +318,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	}
 	if !errors.Is(err, storerr.ErrNotFound) {
-		return engine.NewInvalidInputErrorf("error fetching seal: %w", err)
+		return fmt.Errorf("could not retrieve seal: %w", err)
 	}
 
 	// store in the memory pool (it won't be added if it is already in there).
