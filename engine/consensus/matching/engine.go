@@ -587,10 +587,7 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	}
 
 	// collect aggregate signatures
-	aggregatedSigs, err := e.collectAggregateSignatures(result)
-	if err != nil {
-		return fmt.Errorf("could not collect aggregate signatures: %w", err)
-	}
+	aggregatedSigs := e.collectAggregateSignatures(result)
 
 	// generate & store seal
 	seal := &flow.Seal{
@@ -608,7 +605,7 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
 // collectAggregateSignatures collects approver signatures and identities per chunk
 // TODO: needs testing
-func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) ([]flow.AggregatedSignature, error) {
+func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
 	resultID := result.ID()
 	signatures := make([]flow.AggregatedSignature, 0)
 
@@ -634,7 +631,7 @@ func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) ([]flo
 		signatures = append(signatures, aggSign)
 	}
 
-	return signatures, nil
+	return signatures
 }
 
 // clearPools clears the memory pools of all entities related to blocks that are
