@@ -1,6 +1,7 @@
 package epochmgr
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -33,7 +34,8 @@ type epochreqs struct {
 // engines for an epoch that has ended.
 type Engine struct {
 	unit  *engine.Unit
-	epoch *epochreqs // requirements for the current epoch
+	epoch *epochreqs   // requirements for the current epoch
+	voter *RootQCVoter // manages process of voting for next epoch's QC
 
 	log   zerolog.Logger
 	me    module.Local
@@ -55,6 +57,7 @@ func New(
 	me module.Local,
 	state protocol.State,
 	pool mempool.Transactions,
+	voter *RootQCVoter,
 	clusterStateFactory *factories.ClusterState,
 	builderFactory *factories.Builder,
 	proposalFactory *factories.ProposalEngine,
@@ -68,6 +71,7 @@ func New(
 		me:                  me,
 		state:               state,
 		pool:                pool,
+		voter:               voter,
 		clusterStateFactory: clusterStateFactory,
 		builderFactory:      builderFactory,
 		proposalFactory:     proposalFactory,
@@ -87,7 +91,6 @@ func New(
 	}
 
 	e.epoch = reqs
-	_ = e.state       // TODO lint
 	_ = e.epoch.state // TODO lint
 	return e, nil
 }
@@ -118,8 +121,12 @@ func (e *Engine) Done() <-chan struct{} {
 // next epoch's root cluster QC.
 func (e *Engine) onEpochSetupPhaseStarted() {
 	e.unit.Launch(func() {
-		voter := NewRootQCVoter(e.log, e.me, nil, nil, nil)
-		err := voter.Vote(e.unit.Ctx())
+
+		epoch := e.state.Final().Epochs().Next()
+
+		ctx, cancel := context.WithCancel(e.unit.Ctx())
+		defer cancel()
+		err := e.voter.Vote(ctx, epoch)
 		if err != nil {
 			e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
 		}

@@ -34,7 +34,7 @@ func NewRootQCVoter(
 ) *RootQCVoter {
 
 	voter := &RootQCVoter{
-		log:    log,
+		log:    log.With().Str("module", "root_qc_voter").Logger(),
 		me:     me,
 		signer: signer,
 		state:  state,
@@ -49,10 +49,7 @@ func NewRootQCVoter(
 // submitted. Otherwise, exits when the vote has been successfully submitted.
 //
 // It is safe to run multiple times within a single setup phase.
-func (voter *RootQCVoter) Vote(ctx context.Context) error {
-
-	// retrieve the next epoch
-	epoch := voter.state.Final().Epochs().Next()
+func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error {
 
 	counter, err := epoch.Counter()
 	if err != nil {
