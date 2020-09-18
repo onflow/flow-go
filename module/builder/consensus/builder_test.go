@@ -560,17 +560,16 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 
 	// create valid receipts for known, unsealed blocks
 	receipts := []*flow.ExecutionReceipt{}
-	receiptsMap := make(map[uint64]*flow.ExecutionReceipt)
 	var i uint64
 	for i = 0; i < 5; i++ {
 		pendingReceipt := unittest.ExecutionReceiptFixture()
 		bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{
 			Height: i,
 		}
-		receiptsMap[i] = pendingReceipt
 		receipts = append(receipts, pendingReceipt)
 	}
 
+	// shuffle receipts
 	sr := make([]*flow.ExecutionReceipt, len(receipts))
 	copy(sr, receipts)
 	rand.Seed(time.Now().UnixNano())
@@ -581,5 +580,37 @@ func (bs *BuilderSuite) TestPayloadReceiptSorted() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain receipts ordered by block height")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
+}
+
+// Payloads can contain multiple receipts for a given block.
+func (bs *BuilderSuite) TestPayloadReceiptMultipleReceiptsWithDifferentResults() {
+
+	// create MULTIPLE valid receipts for known, unsealed blocks
+	receipts := []*flow.ExecutionReceipt{}
+
+	var i uint64
+	for i = 0; i < 5; i++ {
+		// receipt template
+		pendingReceipt := unittest.ExecutionReceiptFixture()
+		receipts = append(receipts, pendingReceipt)
+
+		// insert 3 receipts for the same block but different results
+		for j := 0; j < 3; j++ {
+			dupReceipt := unittest.ExecutionReceiptFixture()
+			dupReceipt.ExecutionResult.BlockID = pendingReceipt.ExecutionResult.BlockID
+			receipts = append(receipts, dupReceipt)
+		}
+
+		bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{
+			Height: i,
+		}
+	}
+
+	bs.pendingReceipts = receipts
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain all receipts for a given block")
 	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that have been inserted in payload")
 }
