@@ -223,14 +223,14 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	}
 
 	if kmac.Size() < opSwUInputLenBLSBLS12381 {
-		return verifBool, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+		return verifBool, fmt.Errorf("hasher with at least %d output byte size is required, current size is %d",
 			opSwUInputLenBLSBLS12381, kmac.Size())
 	}
 
 	pkPoints := make([]pointG2, 0, len(pks))
-	for _, pk := range pks {
+	for i, pk := range pks {
 		if pk.Algorithm() != BLSBLS12381 {
-			return verifBool, fmt.Errorf("all keys must be BLS keys")
+			return verifBool, fmt.Errorf("all keys must be BLS keys, key at index %d is %s", i, pk.Algorithm())
 		}
 		// assertion is guaranteed to be correct after the algorithm check
 		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
