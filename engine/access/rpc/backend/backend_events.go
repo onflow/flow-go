@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
@@ -30,11 +29,6 @@ func (b *backendEvents) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 ) ([]flow.BlockEvents, error) {
-
-	err := validateEventType(eventType)
-	if err != nil {
-		return nil, err
-	}
 
 	if endHeight < startHeight {
 		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
@@ -72,12 +66,6 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 ) ([]flow.BlockEvents, error) {
-
-	err := validateEventType(eventType)
-	if err != nil {
-		return nil, err
-	}
-
 	// forward the request to the execution node
 	return b.getBlockEventsFromExecutionNode(ctx, blockIDs, eventType)
 }
@@ -137,11 +125,4 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 	}
 
 	return results, nil
-}
-
-func validateEventType(eventType string) error {
-	if len(strings.TrimSpace(eventType)) == 0 {
-		return status.Error(codes.InvalidArgument, "empty event type")
-	}
-	return nil
 }
