@@ -19,7 +19,7 @@ import (
 type RootQCVoter struct {
 	log    zerolog.Logger
 	me     module.Local
-	signer hotstuff.Signer
+	signer hotstuff.SignerVerifier
 	state  protocol.State
 	client module.QCContractClient // client to the QC aggregator smart contract
 }
@@ -28,7 +28,7 @@ type RootQCVoter struct {
 func NewRootQCVoter(
 	log zerolog.Logger,
 	me module.Local,
-	signer hotstuff.Signer,
+	signer hotstuff.SignerVerifier,
 	state protocol.State,
 	client module.QCContractClient,
 ) *RootQCVoter {

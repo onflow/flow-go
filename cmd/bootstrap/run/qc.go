@@ -66,7 +66,7 @@ func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.
 	return qc, err
 }
 
-func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.Signer, error) {
+func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 	n := len(participantData.Participants)
 	identities := participantData.Identities()
 
@@ -75,7 +75,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		return nil, nil, fmt.Errorf("need at least as many signers as DKG participants, got %v and %v", groupSize, n)
 	}
 
-	signers := make([]hotstuff.Signer, n)
+	signers := make([]hotstuff.SignerVerifier, n)
 	validators := make([]hotstuff.Validator, n)
 
 	forks := &mocks.ForksReader{}

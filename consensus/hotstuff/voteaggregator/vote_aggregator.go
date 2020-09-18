@@ -14,7 +14,7 @@ type VoteAggregator struct {
 	notifier              hotstuff.Consumer
 	committee             hotstuff.Committee
 	voteValidator         hotstuff.Validator
-	signer                hotstuff.Signer
+	signer                hotstuff.SignerVerifier
 	highestPrunedView     uint64
 	pendingVotes          *PendingVotes                               // keeps track of votes whose blocks can not be found
 	viewToBlockIDSet      map[uint64]map[flow.Identifier]struct{}     // for pruning
@@ -25,7 +25,7 @@ type VoteAggregator struct {
 }
 
 // New creates an instance of vote aggregator
-func New(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuff.Committee, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
+func New(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuff.Committee, voteValidator hotstuff.Validator, signer hotstuff.SignerVerifier) *VoteAggregator {
 	return &VoteAggregator{
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,

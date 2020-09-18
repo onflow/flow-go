@@ -77,7 +77,7 @@ func (f *HotStuff) Create(
 
 	// create a signing provider
 	staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, f.me)
-	signer := verification.NewSingleSigner(committee, staking, f.me.NodeID())
+	signer := verification.NewSingleSignerVerifier(committee, staking, f.me.NodeID())
 
 	// setup metrics/logging with the new chain ID
 	metrics := metrics.NewHotstuffCollector(clusterID)
