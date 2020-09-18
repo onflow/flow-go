@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/epochs"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/state/protocol/events"
@@ -40,16 +39,12 @@ type Engine struct {
 	factory EpochComponentsFactory // consolidates creating components for an epoch
 
 	events.Noop // satisfy protocol events consumer interface
-
-	// TODO should be per-epoch eventually, cache here for now
-	pool mempool.Transactions
 }
 
 func New(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
-	pool mempool.Transactions,
 	voter *epochs.RootQCVoter,
 	factory EpochComponentsFactory,
 ) (*Engine, error) {
@@ -59,7 +54,6 @@ func New(
 		log:     log,
 		me:      me,
 		state:   state,
-		pool:    pool,
 		voter:   voter,
 		factory: factory,
 	}

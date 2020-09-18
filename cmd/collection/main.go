@@ -329,17 +329,22 @@ func main() {
 				nil, // TODO
 			)
 
+			factory := factories.NewEpochComponentsFactory(
+				node.Me,
+				pool,
+				builderFactory,
+				clusterStateFactory,
+				hotstuffFactory,
+				proposalFactory,
+				syncFactory,
+			)
+
 			manager, err := epochmgr.New(
 				node.Logger,
 				node.Me,
 				node.State,
-				pool,
 				rootQCVoter,
-				clusterStateFactory,
-				builderFactory,
-				proposalFactory,
-				syncFactory,
-				hotstuffFactory,
+				factory,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create epoch manager: %w", err)
