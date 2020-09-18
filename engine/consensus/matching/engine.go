@@ -587,7 +587,10 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	}
 
 	// collect aggregate signatures
-	aggregatedSigs := e.collectAggregateSignatures(result)
+	aggregatedSigs, err := e.collectAggregateSignatures(result)
+	if err != nil {
+		return fmt.Errorf("could not collect aggregate signatures: %w", err)
+	}
 
 	// generate & store seal
 	seal := &flow.Seal{
@@ -603,30 +606,39 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	return nil
 }
 
-func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
-	approvals := e.approvalsByResult[result.ID()]
+// collectAggregateSignatures collects approver signatures and identities per chunk
+func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) ([]flow.AggregatedSignature, error) {
+	resultID := result.ID()
 	signatures := make([]flow.AggregatedSignature, 0)
 
 	for _, chunk := range result.Chunks {
-		for _, approval := range approvals {
-			if approval.Body.ChunkIndex == chunk.Index {
-				var sigs []crypto.Signature
-				var ids []flow.Identifier
-				for _, approval := range approvals {
-					ids = append(ids, approval.Body.ApproverID)
-					sigs = append(sigs, approval.Body.AttestationSignature)
-				}
+		// temp slices to store signatures and ids
+		var sigs []crypto.Signature
+		var ids []flow.Identifier
 
-				aggSign := flow.AggregatedSignature{
-					VerifierSignatures: sigs,
-					SignerIDs:          ids,
-				}
-				signatures = append(signatures, aggSign)
-			}
+		// get approvals for result with chunk index
+		approvals, ok := e.approvals.ByChunk(resultID, chunk.Index)
+		if !ok {
+			// something went wrong as we should be able to get approvals
+			// mempools only cleared after `sealResult` is called.
+			return nil, fmt.Errorf("could not find approvals for result and chunk in mempool")
 		}
+
+		// for each approval collect signature and approver id
+		for _, approval := range approvals {
+			ids = append(ids, approval.Body.ApproverID)
+			sigs = append(sigs, approval.Body.AttestationSignature)
+		}
+
+		aggSign := flow.AggregatedSignature{
+			VerifierSignatures: sigs,
+			SignerIDs:          ids,
+		}
+
+		signatures = append(signatures, aggSign)
 	}
 
-	return signatures
+	return signatures, nil
 }
 
 // clearPools clears the memory pools of all entities related to blocks that are
