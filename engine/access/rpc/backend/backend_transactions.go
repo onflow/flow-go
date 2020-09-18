@@ -46,6 +46,7 @@ func (b *backendTransactions) SendTransaction(
 
 	err := b.trySendTransaction(ctx, tx)
 	if err != nil {
+		b.transactionMetrics.TransactionSubmissionFailed()
 		return status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
 	}
 
