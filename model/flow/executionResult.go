@@ -5,9 +5,8 @@ import (
 )
 
 type ExecutionResultBody struct {
-	PreviousResultID Identifier      // commit of the previous ER
-	BlockID          Identifier      // commit of the current block
-	FinalStateCommit StateCommitment // final state commitment
+	PreviousResultID Identifier // commit of the previous ER
+	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
 }
 

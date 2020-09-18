@@ -198,7 +198,7 @@ func TestSeed(t *testing.T) {
 			seal := unittest.BlockSealFixture()
 			seal.BlockID = block.ID()
 			seal.ResultID = result.ID()
-			seal.FinalState = result.FinalStateCommit
+			seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 			err := state.Mutate().Bootstrap(block, result, seal)
 			require.NoError(t, err)
@@ -224,7 +224,7 @@ func TestSeed(t *testing.T) {
 			seal := unittest.BlockSealFixture()
 			seal.BlockID = block.ID()
 			seal.ResultID = result.ID()
-			seal.FinalState = result.FinalStateCommit
+			seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 			err := state.Mutate().Bootstrap(block, result, seal)
 			require.NoError(t, err)

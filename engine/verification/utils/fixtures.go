@@ -147,9 +147,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID:          block.ID(),
-			Chunks:           chunks,
-			FinalStateCommit: chunks[len(chunks)-1].EndState,
+			BlockID: block.ID(),
+			Chunks:  chunks,
 		},
 	}
 

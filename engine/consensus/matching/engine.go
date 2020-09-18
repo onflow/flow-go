@@ -208,6 +208,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 
+	chunks := receipt.ExecutionResult.Chunks
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -215,7 +216,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("previous_id", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
-		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
+		Hex("final_state", chunks[chunks.Len()-1].EndState).
 		Logger()
 
 	log.Info().Msg("execution receipt received")
@@ -641,7 +642,7 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	seal := &flow.Seal{
 		BlockID:                result.BlockID,
 		ResultID:               result.ID(),
-		FinalState:             result.FinalStateCommit,
+		FinalState:             result.Chunks[result.Chunks.Len()-1].EndState,
 		AggregatedApprovalSigs: aggregatedSigs,
 	}
 

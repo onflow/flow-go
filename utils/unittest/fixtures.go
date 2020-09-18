@@ -341,7 +341,6 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          IdentifierFixture(),
-			FinalStateCommit: StateCommitmentFixture(),
 			Chunks: flow.ChunkList{
 				ChunkFixture(),
 				ChunkFixture(),
@@ -356,7 +355,6 @@ func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          block.Header.ID(),
-			FinalStateCommit: StateCommitmentFixture(),
 			Chunks:           ChunksFixture(uint(len(block.Payload.Guarantees))),
 		},
 		Signatures: SignaturesFixture(6),
@@ -696,7 +694,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 	var endState flow.StateCommitment
 	if int(index) == len(result.Chunks)-1 {
 		// last chunk in receipt takes final state commitment
-		endState = result.FinalStateCommit
+		endState = StateCommitmentFixture()
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
 		endState = result.Chunks[index+1].StartState

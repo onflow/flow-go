@@ -43,7 +43,7 @@ func TestBootstrapValid(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -98,7 +98,7 @@ func TestBootstrapDuplicateID(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -123,7 +123,7 @@ func TestBootstrapZeroStake(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -147,7 +147,7 @@ func TestBootstrapNoCollection(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -171,7 +171,7 @@ func TestBootstrapNoConsensus(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -195,7 +195,7 @@ func TestBootstrapNoExecution(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -219,7 +219,7 @@ func TestBootstrapNoVerification(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -244,7 +244,7 @@ func TestBootstrapExistingAddress(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -264,7 +264,7 @@ func TestBootstrapNonZeroParent(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -284,7 +284,7 @@ func TestBootstrapNonEmptyCollections(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -304,7 +304,7 @@ func TestBootstrapWithSeal(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
@@ -322,7 +322,7 @@ func TestExtendValid(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -355,7 +355,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		fmt.Printf("root: %x\n", block.ID())
 
@@ -425,7 +425,7 @@ func TestExtendMissingParent(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -461,7 +461,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -519,7 +519,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -565,7 +565,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
@@ -619,7 +619,7 @@ func TestExtendWrongIdentity(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)

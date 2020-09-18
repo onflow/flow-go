@@ -34,7 +34,7 @@ func TestSaveBlockAsReplica(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = b0.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.Chunks[result.Chunks.Len()-1].EndState
 
 		err := state.Mutate().Bootstrap(b0, result, seal)
 		require.NoError(t, err)
