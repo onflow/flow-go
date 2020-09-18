@@ -209,8 +209,21 @@ func (p *P2PNode) Stop() (chan struct{}, error) {
 
 // AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
 func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
-	p.Lock()
-	defer p.Unlock()
+	for _, peer := range peers {
+		pInfo, err := GetPeerInfo(peer)
+		if err != nil {
+			return err
+		}
+
+		err = p.libP2PHost.Connect(ctx, pInfo)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *P2PNode) RemovePeer(ctx context.Context, peers ...NodeAddress) error {
 	for _, peer := range peers {
 		pInfo, err := GetPeerInfo(peer)
 		if err != nil {
