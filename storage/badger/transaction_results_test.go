@@ -44,10 +44,10 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		store := bstorage.NewTransactionResults(db)
 
 		blockID := unittest.IdentifierFixture()
-		txResults := make([]*flow.TransactionResult, 0)
+		txResults := make([]flow.TransactionResult, 0)
 		for i := 0; i < 10; i++ {
 			txID := unittest.IdentifierFixture()
-			expected := &flow.TransactionResult{
+			expected := flow.TransactionResult{
 				TransactionID: txID,
 				ErrorMessage:  "a runtime error " + string(i),
 			}
@@ -59,7 +59,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		for _, txResult := range txResults {
 			actual, err := store.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 			require.Nil(t, err)
-			assert.Equal(t, txResult, actual)
+			assert.Equal(t, txResult, *actual)
 		}
 	})
 }
