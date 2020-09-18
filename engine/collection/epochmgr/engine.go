@@ -116,7 +116,13 @@ func (e *Engine) Done() <-chan struct{} {
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
 func (e *Engine) onEpochSetupPhaseStarted() {
-
+	e.unit.Launch(func() {
+		voter := NewRootQCVoter(e.log, e.me, nil, nil, nil)
+		err := voter.Vote(e.unit.Ctx())
+		if err != nil {
+			e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
+		}
+	})
 }
 
 // setupEpoch sets up cluster state and HotStuff for a new chain for the given

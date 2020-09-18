@@ -119,7 +119,11 @@ func (voter *RootQCVoter) Vote(ctx context.Context) error {
 		log.Info().Msg("submitting vote...")
 		err = voter.client.SubmitVote(ctx, vote)
 		if err != nil {
-			log.Error().Err(err).Msg("could not submit vote")
+			log.Error().Err(err).Msg("could not submit vote - retrying...")
+			continue
 		}
+
+		log.Info().Msg("successfully submitted vote - exiting QC vote process...")
+		return nil
 	}
 }

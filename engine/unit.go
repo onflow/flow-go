@@ -134,9 +134,9 @@ func (u *Unit) Quit() <-chan struct{} {
 func (u *Unit) Done(actions ...func()) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		u.cancel()
 		u.once.Do(func() {
 			close(u.quit)
+			u.cancel()
 		})
 		for _, action := range actions {
 			action()
