@@ -3,6 +3,7 @@ package epochmgr
 import (
 	"io/ioutil"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -10,6 +11,7 @@ import (
 
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	epochmgr "github.com/dapperlabs/flow-go/engine/collection/epochmgr/mock"
+	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	cluster "github.com/dapperlabs/flow-go/state/cluster/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -33,7 +35,9 @@ type Suite struct {
 	currEpoch  *protocol.Epoch
 	nextEpoch  *protocol.Epoch
 
-	components EpochComponents
+	hotstuff *module.HotStuff
+	sync     *module.Engine
+	prop     *module.Engine
 
 	engine *Engine
 }
@@ -49,13 +53,20 @@ func (suite *Suite) SetupTest() {
 	suite.voter = new(module.ClusterRootQCVoter)
 	suite.factory = new(epochmgr.EpochComponentsFactory)
 
-	suite.components.state = new(cluster.State)
-	suite.components.hotstuff = new(module.HotStuff)
-	suite.components.sync = new(module.Engine)
-	suite.components.prop = new(module.Engine)
+	clusterState := new(cluster.State)
+	suite.hotstuff = new(module.HotStuff)
+	suite.sync = new(module.Engine)
+	suite.prop = new(module.Engine)
 	suite.factory.On("Create", mock.Anything).Return(
-		suite.components.state, suite.components.prop, suite.components.sync, suite.components.hotstuff, nil,
+		clusterState, suite.prop, suite.sync, suite.hotstuff, nil,
 	)
+
+	rwReady := make(chan struct{})
+	close(rwReady)
+	var ready <-chan struct{} = rwReady
+	suite.hotstuff.On("Ready").Return(ready)
+	suite.prop.On("Ready").Return(ready)
+	suite.sync.On("Ready").Return(ready)
 
 	suite.snap = new(protocol.Snapshot)
 	suite.epochQuery = new(protocol.EpochQuery)
@@ -79,9 +90,39 @@ func TestEpochManager(t *testing.T) {
 // if we start up during the setup phase, we should kick off the root QC voter
 func (suite *Suite) TestRestartInSetupPhase() {
 
+	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
+	// should call voter with next epoch
+	var called bool
+	suite.voter.On("Vote", mock.Anything, suite.nextEpoch).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			called = true
+		}).Once()
+
+	// start up the engine
+	<-suite.engine.Ready()
+	suite.Assert().Eventually(func() bool {
+		return called
+	}, time.Second, time.Millisecond)
+
+	suite.voter.AssertExpectations(suite.T())
 }
 
 // should kick off root QC voter on setup phase start event
 func (suite *Suite) TestRespondToPhaseChange() {
 
+	// should call voter with next epoch
+	var called bool
+	suite.voter.On("Vote", mock.Anything, suite.nextEpoch).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			called = true
+		}).Once()
+
+	suite.engine.EpochSetupPhaseStarted(0, nil)
+	suite.Assert().Eventually(func() bool {
+		return called
+	}, time.Second, time.Millisecond)
+
+	suite.voter.AssertExpectations(suite.T())
 }

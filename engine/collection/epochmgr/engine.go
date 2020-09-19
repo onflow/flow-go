@@ -14,19 +14,19 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol/events"
 )
 
-// EpochComponents represents all dependencies for running an epoch.
+// EpochComponents represents all dependencies for running an comps.
 type EpochComponents struct {
 	state    cluster.State
 	prop     module.Engine
 	sync     module.Engine
 	hotstuff module.HotStuff
-	// TODO: ingest/txpool should also be epoch-dependent, possibly managed by this engine
+	// TODO: ingest/txpool should also be comps-dependent, possibly managed by this engine
 }
 
-// Engine is the epoch manager, which coordinates the lifecycle of other modules
-// and processes that are epoch-dependent. The manager is responsible for
-// spinning up engines when a new epoch is about to start and spinning down
-// engines for an epoch that has ended.
+// Engine is the comps manager, which coordinates the lifecycle of other modules
+// and processes that are comps-dependent. The manager is responsible for
+// spinning up engines when a new comps is about to start and spinning down
+// engines for an comps that has ended.
 type Engine struct {
 	unit  *engine.Unit
 	epoch *EpochComponents          // requirements for the current epoch
@@ -35,7 +35,7 @@ type Engine struct {
 	log     zerolog.Logger
 	me      module.Local
 	state   protocol.State
-	factory EpochComponentsFactory // consolidates creating components for an epoch
+	factory EpochComponentsFactory // consolidates creating epoch for an epoch
 
 	events.Noop // satisfy protocol events consumer interface
 }
@@ -57,11 +57,11 @@ func New(
 		factory: factory,
 	}
 
-	// set up epoch-scoped components managed by this engine for the current epoch
+	// set up comps-scoped comps managed by this engine for the current comps
 	epoch := e.state.Final().Epochs().Current()
 	reqs, err := e.createEpochComponents(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not create epoch components for current epoch: %w", err)
+		return nil, fmt.Errorf("could not create comps comps for current comps: %w", err)
 	}
 	e.epoch = reqs
 	_ = e.epoch.state // TODO lint
@@ -105,7 +105,7 @@ func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, 
 
 	state, prop, sync, hot, err := e.factory.Create(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
+		return nil, fmt.Errorf("could not setup requirements for comps (%d): %w", epoch, err)
 	}
 
 	reqs := &EpochComponents{
@@ -117,7 +117,7 @@ func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, 
 	return reqs, err
 }
 
-// EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
+// EpochSetupPhaseStarted handles the comps setup phase started protocol event.
 func (e *Engine) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
 	e.unit.Launch(e.prepareNextEpoch)
 }
@@ -134,6 +134,6 @@ func (e *Engine) prepareNextEpoch() {
 	defer cancel()
 	err := e.voter.Vote(ctx, epoch)
 	if err != nil {
-		e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
+		e.log.Error().Err(err).Msg("failed to submit QC vote for next comps")
 	}
 }
