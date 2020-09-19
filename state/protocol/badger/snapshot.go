@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	seed2 "github.com/dapperlabs/flow-go/state/protocol/seed"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -165,7 +166,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}
 
-	seed, err := protocol.SeedFromParentSignature(indices, head.ParentVoterSig)
+	seed, err := seed2.FromParentSignature(indices, head.ParentVoterSig)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}
