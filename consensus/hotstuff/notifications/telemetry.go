@@ -74,9 +74,6 @@ func (t *TelemetryConsumer) OnEventProcessed() {
 func (t *TelemetryConsumer) OnStartingTimeout(info *model.TimerInfo) {
 	if info.Mode == model.ReplicaTimeout {
 		// the PaceMarker starts a new ReplicaTimeout if and only if it transitions to a higher view
-		if !t.pathHandler.IsCurrentPathClosed() {
-			t.pathHandler.NextStep().Msg("PathCompleted")
-		}
 		t.pathHandler.StartNextPath(info.View)
 	}
 	t.pathHandler.NextStep().
@@ -94,6 +91,7 @@ func (t *TelemetryConsumer) OnEnteringView(viewNumber uint64, leader flow.Identi
 }
 
 func (t *TelemetryConsumer) OnReachedTimeout(info *model.TimerInfo) {
+	t.pathHandler.StartNextPath(info.View)
 	t.pathHandler.NextStep().
 		Str("timeout_mode", info.Mode.String()).
 		Time("timeout_start_time", info.StartTime).
@@ -195,6 +193,9 @@ func NewPathHandler(log zerolog.Logger, chain flow.ChainID) *PathHandler {
 // StartNextPath starts a new Path. Implicitly closes previous path if still open.
 // Returns self-reference for chaining
 func (p *PathHandler) StartNextPath(view uint64) *PathHandler {
+	if p.currentPath != nil {
+		p.NextStep().Msg("PathCompleted")
+	}
 	c := p.log.With().
 		Str("path_id", uuid.New().String()).
 		Uint64("view", view)
