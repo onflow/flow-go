@@ -87,7 +87,7 @@ func (e *Engine) Ready() <-chan struct{} {
 			return
 		}
 		if phase == flow.EpochPhaseSetup {
-			e.prepareNextEpoch()
+			e.unit.Launch(e.prepareNextEpoch)
 		}
 	})
 }
@@ -119,7 +119,7 @@ func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, 
 
 // EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
 func (e *Engine) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
-	e.prepareNextEpoch()
+	e.unit.Launch(e.prepareNextEpoch)
 }
 
 // prepareNextEpoch is called either when we transition into the epoch
@@ -127,15 +127,13 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
 func (e *Engine) prepareNextEpoch() {
-	e.unit.Launch(func() {
 
-		epoch := e.state.Final().Epochs().Next()
+	epoch := e.state.Final().Epochs().Next()
 
-		ctx, cancel := context.WithCancel(e.unit.Ctx())
-		defer cancel()
-		err := e.voter.Vote(ctx, epoch)
-		if err != nil {
-			e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
-		}
-	})
+	ctx, cancel := context.WithCancel(e.unit.Ctx())
+	defer cancel()
+	err := e.voter.Vote(ctx, epoch)
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
+	}
 }
