@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encodable"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -34,8 +35,8 @@ type NodeInfoPriv struct {
 	Role           flow.Role
 	Address        string
 	NodeID         flow.Identifier
-	NetworkPrivKey EncodableNetworkPrivKey
-	StakingPrivKey EncodableStakingPrivKey
+	NetworkPrivKey encodable.NetworkPrivKey
+	StakingPrivKey encodable.StakingPrivKey
 }
 
 // Defines the canonical structure for encoding public node info.
@@ -44,8 +45,8 @@ type NodeInfoPub struct {
 	Address       string
 	NodeID        flow.Identifier
 	Stake         uint64
-	NetworkPubKey EncodableNetworkPubKey
-	StakingPubKey EncodableStakingPubKey
+	NetworkPubKey encodable.NetworkPubKey
+	StakingPubKey encodable.StakingPubKey
 }
 
 // NodePrivateKeys is a wrapper for the private keys for a node, comprising all
@@ -156,8 +157,8 @@ func (node NodeInfo) Private() (NodeInfoPriv, error) {
 		Role:           node.Role,
 		Address:        node.Address,
 		NodeID:         node.NodeID,
-		NetworkPrivKey: EncodableNetworkPrivKey{PrivateKey: node.networkPrivKey},
-		StakingPrivKey: EncodableStakingPrivKey{PrivateKey: node.stakingPrivKey},
+		NetworkPrivKey: encodable.NetworkPrivKey{PrivateKey: node.networkPrivKey},
+		StakingPrivKey: encodable.StakingPrivKey{PrivateKey: node.stakingPrivKey},
 	}, nil
 }
 
@@ -168,8 +169,8 @@ func (node NodeInfo) Public() NodeInfoPub {
 		Address:       node.Address,
 		NodeID:        node.NodeID,
 		Stake:         node.Stake,
-		NetworkPubKey: EncodableNetworkPubKey{PublicKey: node.NetworkPubKey()},
-		StakingPubKey: EncodableStakingPubKey{PublicKey: node.StakingPubKey()},
+		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
+		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
 	}
 }
 
@@ -179,8 +180,8 @@ func (node NodeInfo) PartnerPublic() PartnerNodeInfoPub {
 		Role:          node.Role,
 		Address:       node.Address,
 		NodeID:        node.NodeID,
-		NetworkPubKey: EncodableNetworkPubKey{PublicKey: node.NetworkPubKey()},
-		StakingPubKey: EncodableStakingPubKey{PublicKey: node.StakingPubKey()},
+		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
+		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
 	}
 }
 

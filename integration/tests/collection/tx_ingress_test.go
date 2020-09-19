@@ -177,7 +177,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	}
 
 	// ensure the transaction IS NOT included in other cluster collections
-	for _, cluster := range clusters.All() {
+	for _, cluster := range clusters {
 		// skip the target cluster
 		if cluster.Fingerprint() == targetCluster.Fingerprint() {
 			continue
@@ -265,7 +265,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
 	}
 
 	// ensure the transaction IS NOT included in other cluster collections
-	for _, cluster := range clusters.All() {
+	for _, cluster := range clusters {
 		// skip the target cluster
 		if cluster.Fingerprint() == targetCluster.Fingerprint() {
 			continue

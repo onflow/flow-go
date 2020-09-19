@@ -32,7 +32,7 @@ type Engine struct {
 	log         zerolog.Logger             // used to log relevant actions
 	metrics     module.VerificationMetrics // used to capture the performance metrics
 	tracer      module.Tracer              // used for tracing
-	conduit     network.Conduit            // used to propagate result approvals
+	con         network.Conduit            // used to propagate result approvals
 	me          module.Local               // used to access local node information
 	state       protocol.State             // used to access the protocol state
 	rah         hash.Hasher                // used as hasher to sign the result approvals
@@ -64,7 +64,7 @@ func New(
 	}
 
 	var err error
-	e.conduit, err = net.Register(engine.PushApprovals, e)
+	e.con, err = net.Register(engine.PushApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
 	}
@@ -154,15 +154,8 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
-	// extracts list of verifier nodes id
-	//
-	// TODO state extraction should be done based on block references
-	consensusNodes, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		// TODO this error needs more advance handling after MVP
-		return fmt.Errorf("could not load consensus node IDs: %w", err)
-	}
+
+	var err error
 
 	// extracts chunk ID
 	ch, ok := vc.Result.Chunks.ByIndex(vc.Chunk.Index)
@@ -215,8 +208,17 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
 
+	// Extracting consensus node ids
+	// TODO state extraction should be done based on block references
+	consensusNodes, err := e.state.Final().
+		Identities(filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		// TODO this error needs more advance handling after MVP
+		return fmt.Errorf("could not load consensus node IDs: %w", err)
+	}
+
 	// broadcast result approval to the consensus nodes
-	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
+	err = e.con.Publish(approval, filter.HasNodeID(consensusNodes.NodeIDs()...))
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)

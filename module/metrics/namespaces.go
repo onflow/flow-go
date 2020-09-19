@@ -9,6 +9,7 @@ const (
 	namespaceConsensus    = "consensus"
 	namespaceVerification = "verification"
 	namespaceExecution    = "execution"
+	namespaceLoader       = "loader"
 )
 
 // Network subsystems represent the various layers of networking.
@@ -16,6 +17,7 @@ const (
 	// subsystemLibp2p = "libp2p"
 	subsystemGossip = "gossip"
 	subsystemEngine = "engine"
+	subsystemQueue  = "queue"
 )
 
 // Storage subsystems represent the various components of the storage layer.
@@ -27,7 +29,8 @@ const (
 
 // Access subsystem
 const (
-	subsystemTransactionTiming = "transaction_timing"
+	subsystemTransactionTiming     = "transaction_timing"
+	subsystemTransactionSubmission = "transaction_submission"
 )
 
 // Collection subsystem

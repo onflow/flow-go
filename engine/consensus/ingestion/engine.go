@@ -185,7 +185,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	}
 
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
-	clusters, err := e.state.Final().Clusters()
+	clusters, err := e.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return fmt.Errorf("could not get clusters: %w", err)
 	}

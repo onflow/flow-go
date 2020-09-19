@@ -298,7 +298,6 @@ func (a *blsBLS12381Algo) init() error {
 	if err := a.context.initContext(); err != nil {
 		return err
 	}
-	a.context.precCtx = C.init_precomputed_data_BLS12_381()
 
 	// compare the Go and C layer constants as a sanity check
 	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||

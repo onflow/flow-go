@@ -12,7 +12,7 @@ type Block struct {
 	View        uint64
 	BlockID     flow.Identifier
 	ProposerID  flow.Identifier
-	QC          *QuorumCertificate
+	QC          *flow.QuorumCertificate
 	PayloadHash flow.Identifier
 	Timestamp   time.Time
 }
@@ -20,7 +20,7 @@ type Block struct {
 // BlockFromFlow converts a flow header to a hotstuff block.
 func BlockFromFlow(header *flow.Header, parentView uint64) *Block {
 
-	qc := QuorumCertificate{
+	qc := flow.QuorumCertificate{
 		BlockID:   header.ParentID,
 		View:      parentView,
 		SignerIDs: header.ParentVoterIDs,

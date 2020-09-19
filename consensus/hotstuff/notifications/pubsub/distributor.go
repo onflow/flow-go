@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Distributor distributes notifications to a list of subscribers (event consumers).
@@ -13,6 +14,14 @@ import (
 type Distributor struct {
 	subscribers []hotstuff.Consumer
 	lock        sync.RWMutex
+}
+
+func (p *Distributor) OnEventProcessed() {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnEventProcessed()
+	}
 }
 
 func NewDistributor() *Distributor {
@@ -26,19 +35,59 @@ func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.subscribers = append(p.subscribers, consumer)
 }
 
-func (p *Distributor) OnSkippedAhead(view uint64) {
+func (p *Distributor) OnReceiveVote(currentView uint64, vote *model.Vote) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnSkippedAhead(view)
+		subscriber.OnReceiveVote(currentView, vote)
 	}
 }
 
-func (p *Distributor) OnEnteringView(view uint64) {
+func (p *Distributor) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnEnteringView(view)
+		subscriber.OnReceiveProposal(currentView, proposal)
+	}
+}
+
+func (p *Distributor) OnEnteringView(view uint64, leader flow.Identifier) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnEnteringView(view, leader)
+	}
+}
+
+func (p *Distributor) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnQcTriggeredViewChange(qc, newView)
+	}
+}
+
+func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnProposingBlock(proposal)
+	}
+}
+
+func (p *Distributor) OnVoting(vote *model.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnVoting(vote)
+	}
+}
+
+func (p *Distributor) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnQcConstructedFromVotes(qc)
 	}
 }
 
@@ -58,7 +107,7 @@ func (p *Distributor) OnReachedTimeout(timeout *model.TimerInfo) {
 	}
 }
 
-func (p *Distributor) OnQcIncorporated(qc *model.QuorumCertificate) {
+func (p *Distributor) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
@@ -66,7 +115,7 @@ func (p *Distributor) OnQcIncorporated(qc *model.QuorumCertificate) {
 	}
 }
 
-func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *model.QuorumCertificate) {
+func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {

@@ -242,10 +242,10 @@ func main() {
 			build = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
+				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
-				node.Storage.Blocks,
 				guarantees,
 				seals,
 				builder.WithMinInterval(minInterval),
@@ -294,7 +294,6 @@ func main() {
 			var signer hotstuff.Signer
 			signer = verification.NewCombinedSigner(
 				committee,
-				node.DKGState,
 				staking,
 				beacon,
 				merger,
@@ -303,9 +302,9 @@ func main() {
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index)
+			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index, node.RootChainID)
 			// initialize the persister
-			persist := persister.New(node.DB)
+			persist := persister.New(node.DB, node.RootChainID)
 
 			// query the last finalized block and pending blocks for recovery
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
@@ -316,7 +315,6 @@ func main() {
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
-				node.Tracer,
 				notifier,
 				mainMetrics,
 				node.Storage.Headers,

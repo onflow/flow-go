@@ -9,7 +9,7 @@ import (
 type Validator interface {
 
 	// ValidateQC checks the validity of a QC for a given block.
-	ValidateQC(qc *model.QuorumCertificate, block *model.Block) error
+	ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error
 
 	// ValidateProposal checks the validity of a proposal.
 	ValidateProposal(proposal *model.Proposal) error

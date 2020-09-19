@@ -20,18 +20,18 @@ type Mutator struct {
 }
 
 func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
-	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
+
+	// check constraints
+	err := m.state.db.View(func(tx *badger.Txn) error {
 
 		// check chain ID
-		if genesis.Header.ChainID != m.state.chainID {
-			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.Header.ChainID, m.state.chainID)
+		if genesis.Header.ChainID != m.state.clusterID {
+			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.Header.ChainID, m.state.clusterID)
 		}
-
 		// check header number
 		if genesis.Header.Height != 0 {
 			return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Header.Height)
 		}
-
 		// check header parent ID
 		if genesis.Header.ParentID != flow.ZeroID {
 			return fmt.Errorf("genesis parent ID must be zero hash (got %x)", genesis.Header.ParentID)
@@ -43,26 +43,45 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// bootstrap cluster state
+	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
+
+		chainID := genesis.Header.ChainID
 		// insert the block
 		err := procedure.InsertClusterBlock(genesis)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
-
 		// insert block number -> ID mapping
-		err = operation.IndexClusterBlockHeight(genesis.Header.ChainID, genesis.Header.Height, genesis.ID())(tx)
+		err = operation.IndexClusterBlockHeight(chainID, genesis.Header.Height, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis number: %w", err)
 		}
-
 		// insert boundary
-		err = operation.InsertClusterFinalizedHeight(genesis.Header.ChainID, genesis.Header.Height)(tx)
+		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Header.Height)(tx)
+		// insert started view for hotstuff
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
+		}
+		err = operation.InsertStartedView(chainID, genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert started view: %w", err)
+		}
+		// insert voted view for hotstuff
+		err = operation.InsertVotedView(chainID, genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert started view: %w", err)
 		}
 
 		return nil
 	})
+	return err
 }
 
 func (m *Mutator) Extend(block *cluster.Block) error {
@@ -72,8 +91,8 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		payload := block.Payload
 
 		// check chain ID
-		if header.ChainID != m.state.chainID {
-			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
+		if header.ChainID != m.state.clusterID {
+			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.clusterID)
 		}
 
 		// get the chain ID, which determines which cluster state to query

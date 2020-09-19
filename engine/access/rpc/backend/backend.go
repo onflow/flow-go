@@ -55,8 +55,12 @@ func New(
 	transactionMetrics module.TransactionMetrics,
 	collectionGRPCPort uint,
 	connFactory ConnectionFactory,
+	retryEnabled bool,
 ) *Backend {
 	retry := newRetry()
+	if retryEnabled {
+		retry.Activate()
+	}
 
 	b := &Backend{
 		executionRPC: executionRPC,
