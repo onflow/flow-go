@@ -3,7 +3,6 @@ package notifications
 import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/utils/logging"
 
@@ -178,18 +177,18 @@ type PathHandler struct {
 	chain flow.ChainID
 	log   zerolog.Logger
 
-	// currentContext holds a Zerolog Context with the information about the current path.
+	// currentPath holds a Zerolog Context with the information about the current path.
 	// We represent the case where the current path has been closed by nil value.
-	currentContext *zerolog.Context
+	currentPath *zerolog.Context
 }
 
 // NewPathHandler instantiate a new PathHandler.
 // The PathHandler has no currently open path
 func NewPathHandler(log zerolog.Logger, chain flow.ChainID) *PathHandler {
 	return &PathHandler{
-		chain:          chain,
-		log:            log.With().Str("hotstuff", "telemetry").Str("chain", chain.String()).Logger(),
-		currentContext: nil,
+		chain:       chain,
+		log:         log.With().Str("hotstuff", "telemetry").Str("chain", chain.String()).Logger(),
+		currentPath: nil,
 	}
 }
 
@@ -199,7 +198,7 @@ func (p *PathHandler) StartNextPath(view uint64) *PathHandler {
 	c := p.log.With().
 		Str("path_id", uuid.New().String()).
 		Uint64("view", view)
-	p.currentContext = &c
+	p.currentPath = &c
 	return p
 }
 
@@ -207,22 +206,22 @@ func (p *PathHandler) StartNextPath(view uint64) *PathHandler {
 // All Details hereafter, until a new Path is started, are logged as telemetry Errors.
 // Returns self-reference for chaining
 func (p *PathHandler) CloseCurrentPath() *PathHandler {
-	p.currentContext = nil
+	p.currentPath = nil
 	return p
 }
 
 // IsCurrentPathOpen if and only is the most recently started path has been closed.
 func (p *PathHandler) IsCurrentPathClosed() bool {
-	return p.currentContext == nil
+	return p.currentPath == nil
 }
 
 // NextStep returns a Zerolog event for the currently open path. If the current path
 // is closed, the event will be logged as telemetry error.
 func (p *PathHandler) NextStep() *zerolog.Event {
-	if p.currentContext == nil {
-		l := log.With().Str("error", "no path").Logger()
+	if p.currentPath == nil {
+		l := p.log.With().Str("error", "no path").Logger()
 		return l.Error()
 	}
-	l := p.currentContext.Logger()
+	l := p.currentPath.Logger()
 	return l.Info()
 }
