@@ -26,7 +26,6 @@ func TestStoringTransactionResults(t *testing.T) {
 			}
 			txResults = append(txResults, expected)
 		}
-
 		for _, txResult := range txResults {
 			err := store.Store(blockID, txResult)
 			require.Nil(t, err)
@@ -55,7 +54,6 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		}
 		err := store.BatchStore(blockID, txResults)
 		require.Nil(t, err)
-
 		for _, txResult := range txResults {
 			actual, err := store.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 			require.Nil(t, err)
