@@ -35,7 +35,7 @@ type AggregatorSuite struct {
 	participants flow.IdentityList
 	protocol     *protomock.State
 	snapshot     *protomock.Snapshot
-	signer       *mocks.Signer
+	signer       *mocks.SignerVerifier
 	forks        *mocks.Forks
 	committee    hotstuff.Committee
 	validator    hotstuff.Validator
@@ -98,7 +98,7 @@ func (as *AggregatorSuite) SetupTest() {
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
-	as.signer = &mocks.Signer{}
+	as.signer = &mocks.SignerVerifier{}
 	as.signer.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("CreateQC", mock.AnythingOfType("[]*model.Vote")).Return(

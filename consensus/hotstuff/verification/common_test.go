@@ -37,7 +37,7 @@ func MakeSigners(t *testing.T, committee hotstuff.Committee, signerIDs []flow.Id
 	return signers
 }
 
-func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
+func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSignerVerifier {
 	local, err := local.New(nil, priv)
 	require.NoError(t, err)
 	staking := signature.NewAggregationProvider("test_staking", local)
