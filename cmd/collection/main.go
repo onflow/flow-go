@@ -255,7 +255,7 @@ func main() {
 			)
 			return push, err
 		}).
-		// EpochComponents manager encapsulates and manages epoch-dependent engines as we
+		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 

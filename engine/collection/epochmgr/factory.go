@@ -6,9 +6,14 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
-// EpochComponentsFactory TODO
+// EpochComponentsFactory is responsible for creating epoch-scoped components
+// managed by the epoch manager engine for the given epoch.
 type EpochComponentsFactory interface {
-	// Setup TODO
+
+	// Create sets up and instantiates all dependencies for the epoch. It may
+	// be used either for an ongoing epoch (for example, after a restart) or
+	// for an epoch that will start soon. It is safe to call multiple times for
+	// a given epoch counter.
 	Create(epoch protocol.Epoch) (
 		state cluster.State,
 		proposal module.Engine,
