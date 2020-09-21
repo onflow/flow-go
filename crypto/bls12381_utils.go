@@ -152,3 +152,20 @@ func readPointG2(a *pointG2, src []byte) error {
 	}
 	return nil
 }
+
+// This is only a TEST function.
+// It wraps calls to subgroup checks since cgo can't be used
+// in go test files.
+// if inG1 is true, the function tests the membership of a point in G1,
+// otherwise, a point in E1\G1 membership is tested.
+// method is the index of the membership check method as defined in bls12381_utils.h
+func checkG1Test(inG1 int, method int) bool {
+	return C.subgroup_check_G1_test((C.int)(inG1), (C.int)(method)) == valid
+}
+
+// This is only a TEST function.
+// It wraps calls to subgroup checks since cgo can't be used
+// in go test files.
+func benchG1Test() {
+	_ = C.subgroup_check_G1_bench()
+}

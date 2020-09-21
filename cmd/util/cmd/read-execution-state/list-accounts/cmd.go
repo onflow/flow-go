@@ -69,8 +69,8 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ledger := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-		values, err := mForest.Read(stateCommitment, [][]byte{key})
+	ledger := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		values, err := mForest.Read(stateCommitment, [][]byte{state.RegisterID(owner, controller, key)})
 		if err != nil {
 			return nil, err
 		}

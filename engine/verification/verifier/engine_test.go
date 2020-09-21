@@ -39,7 +39,7 @@ type VerifierEngineTestSuite struct {
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
 	chain   flow.Chain
-	conduit *network.Conduit                // mocks conduit for submitting result approvals
+	con     *network.Conduit                // mocks con for submitting result approvals
 	metrics *mockmodule.VerificationMetrics // mocks performance monitoring metrics
 }
 
@@ -53,12 +53,12 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = &protocol.Snapshot{}
-	suite.conduit = &network.Conduit{}
+	suite.con = &network.Conduit{}
 	suite.metrics = &mockmodule.VerificationMetrics{}
 	suite.chain = flow.Testnet.Chain()
 
-	suite.net.On("Register", uint8(engine.PushApprovals), testifymock.Anything).
-		Return(suite.conduit, nil).
+	suite.net.On("Register", engine.PushApprovals, testifymock.Anything).
+		Return(suite.con, nil).
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
@@ -103,7 +103,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1, suite.chain)
+	completeRA := utils.LightExecutionResultFixture(1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
@@ -135,8 +135,8 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	// emission of result approval
 	suite.metrics.On("OnResultApproval").Return()
 
-	suite.conduit.
-		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
+	suite.con.
+		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
 			// check that the approval matches the input execution result
@@ -158,7 +158,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	err := eng.Process(myID, vChunk)
 	suite.Assert().NoError(err)
 	suite.ss.AssertExpectations(suite.T())
-	suite.conduit.AssertExpectations(suite.T())
+	suite.con.AssertExpectations(suite.T())
 
 }
 
@@ -176,8 +176,8 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	suite.metrics.On("OnVerifiableChunkReceived").Return()
 
 	// we shouldn't receive any result approval
-	suite.conduit.
-		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
+	suite.con.
+		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
 			// TODO change this to check challeneges

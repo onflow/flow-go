@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,17 +21,21 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
+const collectionNodesToTry uint = 3
+
 type backendTransactions struct {
-	collectionRPC        accessproto.AccessAPIClient
+	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	executionRPC         execproto.ExecutionAPIClient
 	transactions         storage.Transactions
 	collections          storage.Collections
 	blocks               storage.Blocks
 	state                protocol.State
 	chainID              flow.ChainID
-	transactionValidator *access.TransactionValidator
 	transactionMetrics   module.TransactionMetrics
+	transactionValidator *access.TransactionValidator
 	retry                *Retry
+	collectionGRPCPort   uint
+	connFactory          ConnectionFactory
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -45,13 +50,10 @@ func (b *backendTransactions) SendTransaction(
 		return status.Errorf(codes.InvalidArgument, "invalid transaction: %s", err.Error())
 	}
 
-	req := &accessproto.SendTransactionRequest{
-		Transaction: convert.TransactionToMessage(*tx),
-	}
-
 	// send the transaction to the collection node if valid
-	_, err = b.collectionRPC.SendTransaction(ctx, req)
+	err = b.trySendTransaction(ctx, tx)
 	if err != nil {
+		b.transactionMetrics.TransactionSubmissionFailed()
 		return status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
 	}
 
@@ -63,22 +65,112 @@ func (b *backendTransactions) SendTransaction(
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
-	go b.registerTransactionForRetry(tx)
+	if b.retry.IsActive() {
+		go b.registerTransactionForRetry(tx)
+	}
 
 	return nil
+}
+
+// trySendTransaction tries to transaction to a collection node
+func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
+
+	// if a collection node rpc client was provided at startup, just use that
+	if b.staticCollectionRPC != nil {
+		return b.grpcTxSend(ctx, b.staticCollectionRPC, tx)
+	}
+
+	// otherwise choose a random set of collections nodes to try
+	collAddrs, err := b.chooseCollectionNodes(tx, collectionNodesToTry)
+	if err != nil {
+		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
+	}
+
+	var sendErrors error
+
+	// try sending the transaction to one of the chosen collection nodes
+	for _, addr := range collAddrs {
+		err = b.sendTransactionToCollector(ctx, tx, addr)
+		if err != nil {
+			sendErrors = multierror.Append(sendErrors, err)
+		} else {
+			return nil
+		}
+	}
+	return sendErrors
+}
+
+// chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
+// collection node cluster responsible for the given tx
+func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sampleSize uint) ([]string, error) {
+
+	// retrieve the set of collector clusters
+	clusters, err := b.state.Final().Epochs().Current().Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
+	}
+
+	// get the cluster responsible for the transaction
+	txCluster, ok := clusters.ByTxID(tx.ID())
+	if !ok {
+		return nil, fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
+	}
+
+	// select a random subset of collection nodes from the cluster to be tried in order
+	targetNodes := txCluster.Sample(sampleSize)
+
+	// convert the node addresses of the collection nodes to the GRPC address
+	// (identity list does not directly provide collection nodes gRPC address)
+	var targetAddrs = make([]string, len(targetNodes))
+	for i, id := range targetNodes {
+		// split hostname and port
+		hostnameOrIP, _, err := net.SplitHostPort(id.Address)
+		if err != nil {
+			return nil, err
+		}
+		// use the hostname from identity list and port number as the one passed in as argument
+		grpcAddress := fmt.Sprintf("%s:%d", hostnameOrIP, b.collectionGRPCPort)
+		targetAddrs[i] = grpcAddress
+	}
+
+	return targetAddrs, nil
+}
+
+// sendTransactionToCollection sends the transaction to the given collection node via grpc
+func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
+	tx *flow.TransactionBody,
+	collectionNodeAddr string) error {
+
+	// TODO: Use a connection pool to cache connections
+	collectionRPC, conn, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
+	}
+	defer conn.Close()
+
+	err = b.grpcTxSend(ctx, collectionRPC, tx)
+	if err != nil {
+		return fmt.Errorf("failed to send transaction to collection node at %s: %v", collectionNodeAddr, err)
+	}
+	return nil
+}
+
+func (b *backendTransactions) grpcTxSend(ctx context.Context, client accessproto.AccessAPIClient, tx *flow.TransactionBody) error {
+	colReq := &accessproto.SendTransactionRequest{
+		Transaction: convert.TransactionToMessage(*tx),
+	}
+	_, err := client.SendTransaction(ctx, colReq)
+	return err
 }
 
 // SendRawTransaction sends a raw transaction to the collection node
 func (b *backendTransactions) SendRawTransaction(
 	ctx context.Context,
-	tx *entitiesproto.Transaction,
-) (*accessproto.SendTransactionResponse, error) {
-	req := &accessproto.SendTransactionRequest{
-		Transaction: tx,
-	}
+	tx *flow.TransactionBody,
+) error {
 
 	// send the transaction to the collection node
-	return b.collectionRPC.SendTransaction(ctx, req)
+	return b.trySendTransaction(ctx, tx)
 }
 
 func (b *backendTransactions) GetTransaction(_ context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
@@ -217,9 +309,11 @@ func (b *backendTransactions) lookupTransactionResult(
 			// No result yet, indicate that it has not been executed
 			return false, nil, 0, "", nil
 		}
+		// Other Error trying to retrieve the result, return with err
+		return false, nil, 0, "", err
 	}
 
-	// considered executed as long as some result is returned, even if it's an error
+	// considered executed as long as some result is returned, even if it's an error message
 	return true, events, txStatus, message, nil
 }
 

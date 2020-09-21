@@ -128,8 +128,8 @@ func statusWorker(log zerolog.Logger, workerID int, txs chan *txInFlight, done <
 			result, err := fclient.GetTransactionResult(context.Background(), tx.txID)
 			if err != nil {
 				clientContErrorCounter++
-				log.Trace().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
-					Msg("error getting tx result, putting tx back to queue")
+				log.Warn().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).Err(err).
+					Msg("error getting tx result, will put tx back to queue after sleep")
 
 				// don't put too much pressure on access node
 				time.Sleep(sleepAfterOp)

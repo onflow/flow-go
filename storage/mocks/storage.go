@@ -6,6 +6,7 @@ package mocks
 
 import (
 	flow "github.com/dapperlabs/flow-go/model/flow"
+	v2 "github.com/dgraph-io/badger/v2"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -78,6 +79,21 @@ func (mr *MockBlocksMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockBlocks)(nil).ByID), arg0)
 }
 
+// GetLastFullBlockHeight mocks base method
+func (m *MockBlocks) GetLastFullBlockHeight() (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastFullBlockHeight")
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLastFullBlockHeight indicates an expected call of GetLastFullBlockHeight
+func (mr *MockBlocksMockRecorder) GetLastFullBlockHeight() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastFullBlockHeight", reflect.TypeOf((*MockBlocks)(nil).GetLastFullBlockHeight))
+}
+
 // IndexBlockForCollections mocks base method
 func (m *MockBlocks) IndexBlockForCollections(arg0 flow.Identifier, arg1 []flow.Identifier) error {
 	m.ctrl.T.Helper()
@@ -104,6 +120,34 @@ func (m *MockBlocks) Store(arg0 *flow.Block) error {
 func (mr *MockBlocksMockRecorder) Store(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockBlocks)(nil).Store), arg0)
+}
+
+// StoreTx mocks base method
+func (m *MockBlocks) StoreTx(arg0 *flow.Block) func(*v2.Txn) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreTx", arg0)
+	ret0, _ := ret[0].(func(*v2.Txn) error)
+	return ret0
+}
+
+// StoreTx indicates an expected call of StoreTx
+func (mr *MockBlocksMockRecorder) StoreTx(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreTx", reflect.TypeOf((*MockBlocks)(nil).StoreTx), arg0)
+}
+
+// UpdateLastFullBlockHeight mocks base method
+func (m *MockBlocks) UpdateLastFullBlockHeight(arg0 uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateLastFullBlockHeight", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateLastFullBlockHeight indicates an expected call of UpdateLastFullBlockHeight
+func (mr *MockBlocksMockRecorder) UpdateLastFullBlockHeight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateLastFullBlockHeight", reflect.TypeOf((*MockBlocks)(nil).UpdateLastFullBlockHeight), arg0)
 }
 
 // MockPayloads is a mock of Payloads interface
@@ -437,6 +481,20 @@ func NewMockTransactionResults(ctrl *gomock.Controller) *MockTransactionResults 
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockTransactionResults) EXPECT() *MockTransactionResultsMockRecorder {
 	return m.recorder
+}
+
+// BatchStore mocks base method
+func (m *MockTransactionResults) BatchStore(arg0 flow.Identifier, arg1 []flow.TransactionResult) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchStore indicates an expected call of BatchStore
+func (mr *MockTransactionResultsMockRecorder) BatchStore(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockTransactionResults)(nil).BatchStore), arg0, arg1)
 }
 
 // ByBlockIDTransactionID mocks base method

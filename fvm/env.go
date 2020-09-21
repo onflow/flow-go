@@ -88,22 +88,19 @@ func (e *hostEnv) getLogs() []string {
 
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	v, _ := e.ledger.Get(
-		state.RegisterID(
-			string(owner),
-			"", // TODO: Remove empty controller key
-			string(key),
-		),
+
+		string(owner),
+		"", // TODO: Remove empty controller key
+		string(key),
 	)
 	return v, nil
 }
 
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
 	e.ledger.Set(
-		state.RegisterID(
-			string(owner),
-			"", // TODO: Remove empty controller key
-			string(key),
-		),
+		string(owner),
+		"", // TODO: Remove empty controller key
+		string(key),
 		value,
 	)
 	return nil
@@ -267,6 +264,10 @@ func (e *hostEnv) UnsafeRandom() uint64 {
 func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
 	if e.ctx.Blocks == nil {
 		panic("GetBlockAtHeight is not supported by this environment")
+	}
+
+	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
+		return runtime.BlockHash(e.ctx.BlockHeader.ID()), e.ctx.BlockHeader.Timestamp.UnixNano(), true, nil
 	}
 
 	block, err := e.ctx.Blocks.ByHeight(height)

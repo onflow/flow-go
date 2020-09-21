@@ -19,7 +19,7 @@ import (
 const ServiceAccountPrivateKeyHex = "e3a08ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc430201"
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "5eb3e8cbbcf1c991e9a093080ddaed24747d12e01d69507b65fc16733a775021"
+const GenesisStateCommitmentHex = "57c26b8850b1c54986a9ad59abd178ba633bdd984a0b0b6f489fff28f796081a"
 
 var GenesisStateCommitment flow.StateCommitment
 

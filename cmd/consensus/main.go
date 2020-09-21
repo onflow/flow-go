@@ -79,11 +79,11 @@ func main() {
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&guaranteeLimit, "guarantee-limit", 10000, "maximum number of guarantees in the memory pool")
-			flags.UintVar(&resultLimit, "result-limit", 1000, "maximum number of execution results in the memory pool")
-			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
+			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 10000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
-			flags.UintVar(&sealLimit, "seal-limit", 1000, "maximum number of block seals in the memory pool")
+			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
@@ -154,6 +154,7 @@ func main() {
 				engine.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
+				// requester.WithBatchThreshold(100),
 			)
 			if err != nil {
 				return nil, err
@@ -241,10 +242,10 @@ func main() {
 			build = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
+				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
-				node.Storage.Blocks,
 				guarantees,
 				seals,
 				builder.WithMinInterval(minInterval),
@@ -293,7 +294,6 @@ func main() {
 			var signer hotstuff.Signer
 			signer = verification.NewCombinedSigner(
 				committee,
-				node.DKGState,
 				staking,
 				beacon,
 				merger,
@@ -302,9 +302,9 @@ func main() {
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index)
+			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index, node.RootChainID)
 			// initialize the persister
-			persist := persister.New(node.DB)
+			persist := persister.New(node.DB, node.RootChainID)
 
 			// query the last finalized block and pending blocks for recovery
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
@@ -315,7 +315,6 @@ func main() {
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
-				node.Tracer,
 				notifier,
 				mainMetrics,
 				node.Storage.Headers,

@@ -16,8 +16,7 @@ const (
 
 	CONProcessBlock SpanName = "con.processBlock"
 	// children of CONProcessBlock
-	CONHotEventHandlerStartNewView SpanName = "con.hotstuff.eventHandler.startNewView"
-	CONHotFinalizeBlock            SpanName = "con.hotstuff.finalizeBlock"
+	CONHotFinalizeBlock SpanName = "con.hotstuff.finalizeBlock"
 
 	// Collection Node
 
@@ -34,6 +33,7 @@ const (
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
 	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
 	EXESaveTransactionResults SpanName = "exe.ingestion.saveTransactionResults"
+	EXESaveTransactionEvents  SpanName = "exe.ingestion.saveTransactionEvents"
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 

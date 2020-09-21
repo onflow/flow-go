@@ -139,14 +139,25 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
 	switch resource := event.(type) {
 	case *flow.ExecutionResult:
-		return e.handleExecutionResult(originID, resource)
+		err = e.handleExecutionResult(originID, resource)
 	case *messages.ChunkDataResponse:
-		return e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
+		err = e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	if err != nil {
+		// logs the error instead of returning that.
+		// returning error would be projected at a higher level by network layer.
+		// however, this is an engine-level error, and not network layer error.
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // handleExecutionResult takes a execution result and finds chunks that are assigned to this
@@ -174,7 +185,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		Int("total_chunks", len(result.Chunks)).
 		Logger()
 
-	log.Debug().Msg("start processing execution result")
+	log.Info().Msg("execution result arrived")
 
 	pendingResult := &flow.PendingResult{
 		ExecutorID:      originID,
@@ -197,8 +208,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
 
-	log.Debug().
-		Int("total_chunks", len(pendingResult.ExecutionResult.Chunks)).
+	log.Info().
 		Int("total_assigned_chunks", len(chunks)).
 		Msg("chunk assignment done")
 
@@ -320,7 +330,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		log.Debug().Msg("chunk data requested")
+		log.Info().Msg("chunk data requested")
 	}
 
 }
@@ -331,23 +341,36 @@ func (e *Engine) onTimer() {
 func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 	chunkID := c.ID()
 
-	execNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return fmt.Errorf("could not load execution nodes identities: %w", err)
-	}
-
-	// request from the exeuctor plus another random execution node as a backup
-	nodes := execNodes.Filter(filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID()))).Sample(1).NodeIDs()
-	nodes = append(nodes, c.ExecutorID)
-
+	// creates chunk data pack request event
 	req := &messages.ChunkDataRequest{
 		ChunkID: chunkID,
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
-	err = e.con.Submit(req, nodes...)
+	// find other execution nodes
+	others, err := e.state.Final().
+		Identities(filter.And(
+			filter.HasRole(flow.RoleExecution),
+			filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID()))))
 	if err != nil {
-		return fmt.Errorf("could not submit chunk data pack request for chunk (id=%s): %w", chunkID, err)
+		return fmt.Errorf("could not find other execution nodes identities: %w", err)
+	}
+
+	var selector flow.IdentityFilter
+	// request chunk data pack from another execution node if exists as backup
+	if len(others) > 0 {
+		other := others.Sample(1).NodeIDs()[0]
+		selector = filter.HasNodeID(c.ExecutorID, other)
+	} else {
+		// adds identifier of chunk executor as one recipient to
+		// chunk data request
+		selector = filter.HasNodeID(c.ExecutorID)
+	}
+
+	// publishes the chunk data request to the network
+	err = e.con.Publish(req, selector)
+	if err != nil {
+		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}
 
 	return nil

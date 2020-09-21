@@ -16,5 +16,5 @@ type Network interface {
 	// of the node that wants to communicate across the network. It will return a
 	// conduit which connects the process to a bus allowing it to communicate with
 	// all other engines on the network that are on the same channel.
-	Register(channelID uint8, engine network.Engine) (network.Conduit, error)
+	Register(channelID string, engine network.Engine) (network.Conduit, error)
 }

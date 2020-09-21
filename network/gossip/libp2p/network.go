@@ -1,20 +1,22 @@
 package libp2p
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
 	libp2perrors "github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 )
 
 // Network represents the overlay network of our peer-to-peer network, including
@@ -28,9 +30,10 @@ type Network struct {
 	mw      middleware.Middleware
 	top     middleware.Topology
 	metrics module.NetworkMetrics
-	engines map[uint8]network.Engine
+	engines map[string]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
-	fanout  int             // used to determine number of nodes' neighbors on overlay
+	queue   queue.MessageQueue
+	cancel  context.CancelFunc
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -53,22 +56,28 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
 
-	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := (len(ids) + 1) / 2
-
 	o := &Network{
 		logger:  log,
 		codec:   codec,
 		me:      me,
 		mw:      mw,
-		engines: make(map[uint8]network.Engine),
+		engines: make(map[string]network.Engine),
 		rcache:  rcache,
-		fanout:  fanout,
 		top:     top,
 		metrics: metrics,
 	}
 
 	o.SetIDs(ids)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	o.cancel = cancel
+
+	// setup the message queue
+	// create priority queue
+	o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
+
+	// create workers to read from the queue and call queueSubmitFunc
+	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
 
 	return o, nil
 }
@@ -90,6 +99,7 @@ func (n *Network) Ready() <-chan struct{} {
 func (n *Network) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
+		n.cancel()
 		n.mw.Stop()
 		close(done)
 	}()
@@ -99,7 +109,7 @@ func (n *Network) Done() <-chan struct{} {
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -112,13 +122,16 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 	// Register the middleware for the channelID topic
 	err := n.mw.Subscribe(channelID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to subscribe to channel %d: %w", channelID, err)
+		return nil, fmt.Errorf("failed to subscribe to channel %s: %w", channelID, err)
 	}
 
 	// create the conduit
 	conduit := &Conduit{
 		channelID: channelID,
 		submit:    n.submit,
+		publish:   n.publish,
+		unicast:   n.unicast,
+		multicast: n.multicast,
 	}
 
 	// register engine with provided engineID
@@ -137,7 +150,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	return n.top.Subset(n.ids, n.fanout, n.me.NodeID().String())
+	return n.top.Subset(n.ids, n.fanout(), n.me.NodeID().String())
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
@@ -156,6 +169,12 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 	n.ids = idsMinusMe
 }
 
+// fanout returns the node fanout derived from the identity list
+func (n *Network) fanout() int {
+	// fanout is currently set to half of the system size for connectivity assurance
+	return (len(n.ids) + 1) / 2
+}
+
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if n.rcache.Add(message.EventID, message.ChannelID) {
@@ -164,21 +183,14 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 			Hex("event_id", message.EventID).
 			Logger()
 
-		channelName := engine.ChannelName(uint8(message.ChannelID))
-
 		// drops duplicate message
 		log.Debug().
-			Str("channel", channelName).
+			Str("channel", message.ChannelID).
 			Msg("dropping message due to duplication")
-		n.metrics.NetworkDuplicateMessagesDropped(channelName)
-		return nil
-	}
 
-	// Extract channel id and find the registered engine
-	channelID := uint8(message.ChannelID)
-	en, found := n.engines[channelID]
-	if !found {
-		return libp2perrors.NewInvalidEngineError(channelID, senderID.String())
+		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID)
+
+		return nil
 	}
 
 	// Convert message payload to a known message type
@@ -187,14 +199,25 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		return fmt.Errorf("could not decode event: %w", err)
 	}
 
-	// call the engine asynchronously with the message payload
-	en.Submit(senderID, decodedMessage)
+	// create queue message
+	qm := queue.QueueMessage{
+		Payload:   decodedMessage,
+		Size:      message.Size(),
+		ChannelID: message.ChannelID,
+		SenderID:  senderID,
+	}
+
+	// insert the message in the queue
+	err = n.queue.Insert(qm)
+	if err != nil {
+		return fmt.Errorf("failed to insert message in queue: %w", err)
+	}
 
 	return nil
 }
 
 // genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
+func (n *Network) genNetworkMessage(channelID string, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
 	// encode the payload using the configured codec
 	payload, err := n.codec.Encode(event)
 	if err != nil {
@@ -203,7 +226,7 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
-	_, err = h.Write([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
+	_, err = h.Write([]byte("libp2ppacking" + channelID))
 	if err != nil {
 		return nil, fmt.Errorf("could not hash channel ID as salt: %w", err)
 	}
@@ -227,7 +250,7 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 
 	// cast event to a libp2p.Message
 	msg := &message.Message{
-		ChannelID: uint32(channelID),
+		ChannelID: channelID,
 		EventID:   payloadHash,
 		OriginID:  originID,
 		TargetIDs: emTargets,
@@ -239,7 +262,7 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 
 // submit method submits the given event for the given channel to the overlay layer
 // for processing; it is used by engines through conduits.
-func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
 
 	// genNetworkMessage the event to get payload and event ID
 	msg, err := n.genNetworkMessage(channelID, event, targetIDs...)
@@ -248,11 +271,126 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 	}
 
 	// TODO: dedup the message here
+	if len(targetIDs) > 1 {
+		err = n.mw.Publish(msg, channelID)
+	} else if len(targetIDs) == 1 {
+		err = n.mw.SendDirect(msg, targetIDs[0])
+	} else {
+		return fmt.Errorf("empty target ID list for the message")
+	}
 
-	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not gossip event: %w", err)
 	}
 
 	return nil
+}
+
+// publish sends the message in an unreliable way to the given recipients.
+// In this context, unreliable means that the message is published over a libp2p pub-sub
+// channel and can be read by any node subscribed to that channel.
+// The selector could be used to optimize or restrict delivery.
+func (n *Network) publish(channelID string, message interface{}, selector flow.IdentityFilter) error {
+	// excludes this instance of network from list of targeted ids (if any)
+	// to avoid self loop on delivering this message.
+	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
+
+	// extracts list of recipient identities
+	recipients := n.ids.Filter(selector)
+	if len(recipients) == 0 {
+		return fmt.Errorf("empty target ID list for the message")
+	}
+
+	// generates network message (encoding) based on list of recipients
+	msg, err := n.genNetworkMessage(channelID, message, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("publish could not generate network message: %w", err)
+	}
+
+	// publishes the message through the channelID, however, the message
+	// is only restricted to recipients (if they subscribed to channel ID).
+	err = n.mw.Publish(msg, channelID)
+	if err != nil {
+		return fmt.Errorf("could not publish event: %w", err)
+	}
+
+	return nil
+}
+
+// unicast sends the message in a reliable way to the given recipient.
+// It uses 1-1 direct messaging over the underlying network to deliver the message.
+// It returns an error if unicasting fails.
+func (n *Network) unicast(channelID string, message interface{}, targetID flow.Identifier) error {
+	if targetID == n.me.NodeID() {
+		n.logger.Debug().Msg("network skips self unicasting")
+		return nil
+	}
+
+	// generates network message (encoding) based on list of recipients
+	msg, err := n.genNetworkMessage(channelID, message, targetID)
+	if err != nil {
+		return fmt.Errorf("unicast could not generate network message: %w", err)
+	}
+
+	err = n.mw.SendDirect(msg, targetID)
+	if err != nil {
+		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
+	}
+
+	n.logger.Debug().
+		Msg("message successfully unicasted")
+
+	return nil
+}
+
+// multicast unreliably sends the specified event over the channelID to the specified number of recipients selected from
+// the specified subset.
+// The recipients are selected randomly from the set of identities defined by selectors.
+func (n *Network) multicast(channelID string, message interface{}, num uint, selector flow.IdentityFilter) error {
+	// excludes this instance of network from list of targeted ids (if any)
+	// to avoid self loop on delivering this message.
+	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
+
+	// NOTE: this is where we can add our own selectors, for example to
+	// apply a blacklist or exclude nodes that are in exponential backoff
+	// because they were unavailable
+
+	// chooses `num`-many recipients based on selector
+	recipients := n.ids.Filter(selector).Sample(num).NodeIDs()
+	if len(recipients) < int(num) {
+		return fmt.Errorf("could not find recepients based on selector: Requested: %d, Found: %d", num, len(recipients))
+	}
+
+	// publishes the message to the recipients
+	if err := n.publish(channelID, message, filter.HasNodeID(recipients...)); err != nil {
+		return fmt.Errorf("could not multicast message: %w", err)
+	}
+
+	n.logger.Debug().
+		Msg("message successfully multicasted")
+
+	return nil
+}
+
+// queueSubmitFunc submits the message to the engine synchronously. It is the callback for the queue worker
+// when it gets a message from the queue
+func (n *Network) queueSubmitFunc(message interface{}) {
+	qm := message.(queue.QueueMessage)
+	en, found := n.engines[qm.ChannelID]
+	if !found {
+		n.logger.Error().
+			Err(libp2perrors.NewInvalidEngineError(qm.ChannelID, qm.SenderID.String())).
+			Msg("failed to submit message")
+		return
+	}
+
+	// submit the message to the engine synchronously
+	err := en.Process(qm.SenderID, qm.Payload)
+	if err != nil {
+		n.logger.Error().
+			Str("channel_ID", qm.ChannelID).
+			Str("sender_id", qm.SenderID.String()).
+			Err(err).
+			Msg("failed to process message")
+	}
 }

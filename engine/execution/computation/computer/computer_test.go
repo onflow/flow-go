@@ -38,7 +38,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -65,7 +65,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Once() // just system chunk
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -107,7 +107,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(totalTransactionCount)
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 

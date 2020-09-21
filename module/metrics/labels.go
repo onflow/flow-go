@@ -8,6 +8,7 @@ const (
 	LabelMessage  = "message"
 	LabelNodeID   = "nodeid"
 	LabelNodeRole = "noderole"
+	LabelPriority = "priority"
 )
 
 const (
@@ -56,6 +57,9 @@ const (
 	ResourcePendingBlock             = "pending_block"                // verification node, match engine
 	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
 	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
+	ResourceEpochSetup               = "epoch_setup"
+	ResourceEpochCommit              = "epoch_commit"
+	ResourceEpochStatus              = "epoch_status"
 )
 
 const (

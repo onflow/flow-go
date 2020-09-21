@@ -257,7 +257,6 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
-			fmt.Sprintf("--nclusters=%d", nClusters),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
@@ -355,7 +354,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
-		fmt.Sprintf("--ingress-addr=collection_1:%d", RPCPort),
+		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
 		fmt.Sprintf("--script-addr=execution_1:%d", RPCPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",

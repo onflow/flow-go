@@ -21,7 +21,7 @@ type MeshEngine struct {
 	received chan struct{}    // used as an indicator on reception of messages for testing
 }
 
-func NewMeshEngine(t *testing.T, net module.Network, cap int, engineID uint8) *MeshEngine {
+func NewMeshEngine(t *testing.T, net module.Network, cap int, engineID string) *MeshEngine {
 	te := &MeshEngine{
 		t:        t,
 		event:    make(chan interface{}, cap),
@@ -37,34 +37,34 @@ func NewMeshEngine(t *testing.T, net module.Network, cap int, engineID uint8) *M
 
 // SubmitLocal is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *MeshEngine) SubmitLocal(event interface{}) {
-	require.Fail(te.t, "not implemented")
+func (e *MeshEngine) SubmitLocal(event interface{}) {
+	require.Fail(e.t, "not implemented")
 }
 
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *MeshEngine) Submit(originID flow.Identifier, event interface{}) {
+func (e *MeshEngine) Submit(originID flow.Identifier, event interface{}) {
 	go func() {
-		err := te.Process(originID, event)
+		err := e.Process(originID, event)
 		if err != nil {
-			require.Fail(te.t, "could not process submitted event")
+			require.Fail(e.t, "could not process submitted event")
 		}
 	}()
 }
 
 // ProcessLocal is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *MeshEngine) ProcessLocal(event interface{}) error {
-	require.Fail(te.t, "not implemented")
+func (e *MeshEngine) ProcessLocal(event interface{}) error {
+	require.Fail(e.t, "not implemented")
 	return fmt.Errorf(" unexpected method called")
 }
 
 // Process receives an originID and an event and casts them into the corresponding fields of the
 // MeshEngine. It then flags the received channel on reception of an event.
-func (te *MeshEngine) Process(originID flow.Identifier, event interface{}) error {
+func (e *MeshEngine) Process(originID flow.Identifier, event interface{}) error {
 	// stores the message locally
-	te.originID = originID
-	te.event <- event
-	te.received <- struct{}{}
+	e.originID = originID
+	e.event <- event
+	e.received <- struct{}{}
 	return nil
 }

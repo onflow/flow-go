@@ -11,17 +11,17 @@ NOTE: This package does not provide any security against side channel or tamperi
 
 Cloning Flow repository and following the [installation steps](https://github.com/dapperlabs/flow-go) builds the necessary tools to use Flow cryptography. 
 
-<!--- If you only wish to import the Flow cryptography package to your Go project, please follow the following steps:
+If you only wish to import the Flow cryptography package to your Go project, please follow the following steps:
 
-- Get Flow cryptography package
+- Get Flow cryptography package.
 ```
-go get github.com/dapperlabs/flow-go/crypto
+go get github.com/dapperlabs/flow-go/crypto (to be updated to the new repo)
 ```
 - Install [CMake](https://cmake.org/install/), which is used for building the package.
-- Build the package dependencies:
+- From the package directory in `$GOPATH/pkg/mod/`, build the package dependencies.
 ```
-go generate github.com/dapperlabs/flow-go/crypto
-``` -->
+go generate
+```
 
 ## Algorithms
 
@@ -30,8 +30,8 @@ go generate github.com/dapperlabs/flow-go/crypto
 `crypto/hash` provides the hashing and MAC algorithms required for Flow. All algorithm implement the generic interface `Hasher`. All digests are of the generic type `Hash`.
 
 *Hashing* :
- * Sha3: 256 and 384 output size
- * Sha2: 256 and 384 output size
+ * Sha3: 256 and 384 output sizes
+ * Sha2: 256 and 384 output sizes
 
 *MAC* :
  * KMAC: 128 variant
@@ -42,24 +42,25 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
 
  * ECDSA
     * public keys are uncompressed.
-    * ephemeral key is derived from the private key, hash and an external entropy using a CSPRNG.
-    * only supports NIST P-256 (secp256r1) and secp256k1 curves.
-    * key generation requires a uniformly-distributed seed. 
+    * ephemeral key is derived from the private key, hash and an external entropy using a CSPRNG (based on https://golang.org/pkg/crypto/ecdsa/).
+    * supports NIST P-256 (secp256r1) and secp256k1 curves.
 
  * BLS
-    * only supports [BLS 12-381](https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md) curve.
+    * supports [BLS 12-381](https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md) curve.
     * is optimized for shorter signatures (on G1) 
     * public keys are longer (on G2)
     * supports [compressed](https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization) and uncompressed serialization of G1/G2 points.
     * hash to curve is using the [optimized SWU map](https://eprint.iacr.org/2019/403.pdf).
     * expanding the message is using KMAC 128 with a domain separation tag.
-    * signature verification includes a membership check in in G1.
-    * membership check in G2 is provided outside signature verification.
-    * membership checks in G1 and G2 are using a naive scalar multiplication by the group order.
+    * signature verification includes the signature membership check in G1. 
+    * public key membership check in G2 is provided outside signature verification.
+    * membership check in G1 is using [Bowe's fast check](https://eprint.iacr.org/2019/814.pdf), while membership check in G2 is using a simple scalar multiplication by the group order.
+    * non-interactive aggregation of signatures, public keys and private keys.
+    * multi-signature verification of an aggregated signature of a single message under multiple public keys.
 
  * Future features:
-    * tools for BLS aggregations and batch verification
-    * membership checks in G1 and G2 using [Bowe's method](https://eprint.iacr.org/2019/814.pdf)
+    * more tools for BLS multi signature and batch verification
+    * membership checks in G2 using [Bowe's method](https://eprint.iacr.org/2019/814.pdf)
     * support a G1/G2 swap (signatures on G2 and public keys on G1)
  
 ### PRNG

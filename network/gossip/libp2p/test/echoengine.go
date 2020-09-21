@@ -21,16 +21,17 @@ import (
 type EchoEngine struct {
 	sync.Mutex
 	t        *testing.T
-	con      network.Conduit  // used to directly communicate with the network
-	originID flow.Identifier  // used to keep track of the id of the sender of the messages
-	event    chan interface{} // used to keep track of the events that the node receives
-	received chan struct{}    // used as an indicator on reception of messages for testing
-	echomsg  string           // used as a fix string to be included in the reply echos
-	seen     map[string]int   // used to track the seen events
-	echo     bool             // used to enable or disable echoing back the recvd message
+	con      network.Conduit        // used to directly communicate with the network
+	originID flow.Identifier        // used to keep track of the id of the sender of the messages
+	event    chan interface{}       // used to keep track of the events that the node receives
+	received chan struct{}          // used as an indicator on reception of messages for testing
+	echomsg  string                 // used as a fix string to be included in the reply echos
+	seen     map[string]int         // used to track the seen events
+	echo     bool                   // used to enable or disable echoing back the recvd message
+	send     ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
 }
 
-func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8, echo bool) *EchoEngine {
+func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID string, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
 	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",
@@ -38,6 +39,7 @@ func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8, ec
 		received: make(chan struct{}, cap),
 		seen:     make(map[string]int),
 		echo:     echo,
+		send:     send,
 	}
 
 	c2, err := net.Register(engineID, te)
@@ -82,8 +84,8 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 	te.received <- struct{}{}
 
 	// asserting event as string
-	lip2pEvent, ok := (event).(*message.Echo)
-	require.True(te.t, ok, "could not assert event as Echo")
+	lip2pEvent, ok := (event).(*message.TestMessage)
+	require.True(te.t, ok, "could not assert event as TestMessage")
 
 	// checks for duplication
 	strEvent := lip2pEvent.Text
@@ -102,11 +104,15 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 	}
 
 	// sends a echo back
-	msg := &message.Echo{
+	msg := &message.TestMessage{
 		Text: fmt.Sprintf("%s: %s", te.echomsg, strEvent),
 	}
 
-	err := te.con.Submit(msg, originID)
+	// Sends the message through the conduit's send wrapper
+	// Note: instead of directly interacting with the conduit, we use
+	// the wrapper function here, to enable this same implementation
+	// gets tested with different Conduit methods, i.e., publish, multicast, and unicast.
+	err := te.send(msg, te.con, originID)
 	// we allow one dial failure on echo due to connection tear down
 	// specially when the test is for a single message and not echo
 	// the sender side may close the connection as it does not expect any echo

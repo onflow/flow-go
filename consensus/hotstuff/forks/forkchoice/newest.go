@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // NewestForkChoice implements HotStuff's original fork choice rule:
@@ -62,7 +63,7 @@ func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier hotstuff.Consu
 // is smaller than the view of any qc ForkChoice has seen.
 // Note that tracking the view of the newest qc is for safety purposes
 // and _independent_ of the fork-choice rule.
-func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error) {
+func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
 	choice := fc.preferredParent
 	if choice.Block.View >= curView {
 		// sanity check;
@@ -81,7 +82,7 @@ func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*model.QuorumCertifi
 // Currently, we implement 'Chained HotStuff Protocol' where the fork-choice
 // rule is: "build on newest QC"
 // It assumes the QC has been validated
-func (fc *NewestForkChoice) AddQC(qc *model.QuorumCertificate) error {
+func (fc *NewestForkChoice) AddQC(qc *flow.QuorumCertificate) error {
 	if qc.View <= fc.preferredParent.Block.View {
 		// Per construction, preferredParent.View() is always larger than the last finalized block's view.
 		// Hence, this check suffices to drop all QCs with qc.View <= last_finalized_block.View().
@@ -105,7 +106,7 @@ func (fc *NewestForkChoice) AddQC(qc *model.QuorumCertificate) error {
 	return nil
 }
 
-func (fc *NewestForkChoice) ensureBlockStored(qc *model.QuorumCertificate) (*model.Block, error) {
+func (fc *NewestForkChoice) ensureBlockStored(qc *flow.QuorumCertificate) (*model.Block, error) {
 	block, haveBlock := fc.finalizer.GetBlock(qc.BlockID)
 	if !haveBlock {
 		// This should never happen and indicates an implementation bug.

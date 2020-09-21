@@ -32,7 +32,7 @@ type Engine struct {
 	log         zerolog.Logger             // used to log relevant actions
 	metrics     module.VerificationMetrics // used to capture the performance metrics
 	tracer      module.Tracer              // used for tracing
-	conduit     network.Conduit            // used to propagate result approvals
+	con         network.Conduit            // used to propagate result approvals
 	me          module.Local               // used to access local node information
 	state       protocol.State             // used to access the protocol state
 	rah         hash.Hasher                // used as hasher to sign the result approvals
@@ -64,7 +64,7 @@ func New(
 	}
 
 	var err error
-	e.conduit, err = net.Register(engine.PushApprovals, e)
+	e.con, err = net.Register(engine.PushApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
 	}
@@ -114,12 +114,23 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process receives verifiable chunks, evaluate them and send them for chunk verifier
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
 	switch resource := event.(type) {
 	case *verification.VerifiableChunkData:
-		return e.verifiableChunkHandler(originID, resource)
+		err = e.verifiableChunkHandler(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	if err != nil {
+		// logs the error instead of returning that.
+		// returning error would be projected at a higher level by network layer.
+		// however, this is an engine-level error, and not network layer error.
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // verify handles the core verification process. It accepts a verifiable chunk
@@ -143,15 +154,8 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
-	// extracts list of verifier nodes id
-	//
-	// TODO state extraction should be done based on block references
-	consensusNodes, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		// TODO this error needs more advance handling after MVP
-		return fmt.Errorf("could not load consensus node IDs: %w", err)
-	}
+
+	var err error
 
 	// extracts chunk ID
 	ch, ok := vc.Result.Chunks.ByIndex(vc.Chunk.Index)
@@ -181,6 +185,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
+			e.log.Error().Msg(chFault.String())
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().Msg(chFault.String())
@@ -203,8 +208,17 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
 
+	// Extracting consensus node ids
+	// TODO state extraction should be done based on block references
+	consensusNodes, err := e.state.Final().
+		Identities(filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		// TODO this error needs more advance handling after MVP
+		return fmt.Errorf("could not load consensus node IDs: %w", err)
+	}
+
 	// broadcast result approval to the consensus nodes
-	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
+	err = e.con.Publish(approval, filter.HasNodeID(consensusNodes.NodeIDs()...))
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
@@ -278,6 +292,11 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	// for sake of metrics
 	e.metrics.OnVerifiableChunkReceived()
 
+	e.log.Info().
+		Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+		Hex("result_id", logging.ID(ch.Result.ID())).
+		Msg("verifiable chunk received")
+
 	// starts verification of chunk
 	err := e.verify(ctx, originID, ch)
 
@@ -286,7 +305,6 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 			Err(err).
 			Hex("chunk_id", logging.ID(ch.Chunk.ID())).
 			Msg("could not verify chunk")
-
 	}
 
 	// closes verification performance metrics trackers

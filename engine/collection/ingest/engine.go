@@ -177,7 +177,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// retrieve the set of collector clusters
-	clusters, err := e.state.Final().Clusters()
+	// TODO needs to be per-epoch
+	clusters, err := e.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
