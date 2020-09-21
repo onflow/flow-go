@@ -139,7 +139,8 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 	return sum == computed
 }
 
-// Sample returns simple random sample of length 'size' of the ids or an error if size is greater then the number of ids
+// Sample returns random sample of length 'size' of the ids or an error if size is greater then the number of ids
+// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
 func Sample(size uint, ids ...Identifier) ([]Identifier, error) {
 	n := uint(len(ids))
 	if size > n {
