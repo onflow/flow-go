@@ -8,14 +8,16 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	pbadger "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/protocol/events"
 	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func ProtocolState(t testing.TB, db *badger.DB) *pbadger.State {
 	metrics := metrics.NewNoopCollector()
+	consumer := events.NewNoop()
 	headers, _, seals, index, payloads, blocks, setups, commits, statuses := util.StorageLayer(t, db)
-	proto, err := pbadger.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses)
+	proto, err := pbadger.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
 	require.NoError(t, err)
 	return proto
 }

@@ -30,9 +30,9 @@ type Conduit interface {
 	// to subscribers of the given event on the network layer. It uses a
 	// publish-subscribe layer and can thus not guarantee that the specified
 	// recipients received the event.
-	// By default, the event is published on the channel ID of this Conduit.
-	// However, the set of targeted nodes can be regulated using selector.
-	Publish(event interface{}, selector flow.IdentityFilter) error
+	// The event is published on the channel ID of this Conduit and will be received
+	// by the nodes specified as part of the targetIDs
+	Publish(event interface{}, targetIDs ...flow.Identifier) error
 
 	// Unicast sends the event in a reliable way to the given recipient.
 	// It uses 1-1 direct messaging over the underlying network to deliver the event.
@@ -41,8 +41,8 @@ type Conduit interface {
 
 	// Multicast unreliably sends the specified event over the channelID
 	// to the specified number of recipients selected from the specified subset.
-	// The recipients are selected randomly from the set of identifiers defined by selectors.
-	Multicast(event interface{}, num uint, selector flow.IdentityFilter) error
+	// The recipients are selected randomly from the targetIDs.
+	Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error
 }
 
 // PeerUnreachableError is the error when submitting events to target fails due to the

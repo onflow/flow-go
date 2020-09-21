@@ -214,13 +214,11 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	var (
 		// for quickly looking up tx IDs
 		lookup = make(map[flow.Identifier]struct{}, len(txIDs))
-		// for keeping track of which transactions have been included in
-		// a finalized collection
+		// for keeping track of which transactions have been included in a finalized collection
 		finalized = make(map[flow.Identifier]struct{}, len(txIDs))
-		// for keeping track of proposals we've seen, and which transactions
-		// they contain
+		// for keeping track of proposals we've seen, and which transactions they contain
 		proposals = make(map[flow.Identifier][]flow.Identifier)
-		// incase we see a guarantee first
+		// in case we see a guarantee first
 		guarantees = make(map[flow.Identifier]bool)
 	)
 	for _, txID := range txIDs {
@@ -311,8 +309,8 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
-	setup, ok := suite.net.Seal().ServiceEvents[1].Event.(*flow.EpochSetup)
-	suite.Require().True(ok)
+	setup, ok := suite.net.Seal().ServiceEvents[0].Event.(*flow.EpochSetup)
+	suite.Require().True(ok, "could not get root seal setup")
 	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
 
