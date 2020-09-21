@@ -104,6 +104,7 @@ func Test_TrieUpdateEncodingDecoding(t *testing.T) {
 	pl2 := ledger.NewPayload(*k2, ledger.Value([]byte{'B'}))
 
 	tu := &ledger.TrieUpdate{
+		UUID:     ledger.OperationUUID("uuid"),
 		RootHash: utils.RootHashFixture(),
 		Paths:    []ledger.Path{p1, p2},
 		Payloads: []*ledger.Payload{pl1, pl2},

@@ -14,6 +14,7 @@ type TrieRead struct {
 
 // TrieUpdate holds all data for a trie update
 type TrieUpdate struct {
+	UUID     OperationUUID
 	RootHash RootHash
 	Paths    []Path
 	Payloads []*Payload
@@ -49,6 +50,9 @@ func (u *TrieUpdate) String() string {
 // Equals compares this trie update to another trie update
 func (u *TrieUpdate) Equals(other *TrieUpdate) bool {
 	if other == nil {
+		return false
+	}
+	if !u.UUID.Equals(other.UUID) {
 		return false
 	}
 	if !u.RootHash.Equals(other.RootHash) {

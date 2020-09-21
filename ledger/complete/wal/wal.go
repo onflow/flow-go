@@ -56,6 +56,18 @@ func (w *LedgerWAL) RecordDelete(rootHash ledger.RootHash) error {
 	return nil
 }
 
+func (w *LedgerWAL) RecordUpdateAck(uuid ledger.OperationUUID, newRootHash ledger.RootHash) error {
+
+	bytes := EncodeUpdateAck(uuid, newRootHash)
+
+	err := w.wal.Log(bytes)
+
+	if err != nil {
+		return fmt.Errorf("error while recording update acknowledge in LedgerWAL: %w", err)
+	}
+	return nil
+}
+
 func (w *LedgerWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	return w.Replay(
 		func(forestSequencing *flattener.FlattenedForest) error {

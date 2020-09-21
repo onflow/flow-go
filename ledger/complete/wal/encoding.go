@@ -12,6 +12,7 @@ type WALOperation uint8
 
 const WALUpdate WALOperation = 1
 const WALDelete WALOperation = 2
+const WALUpdateAck WALOperation = 3
 
 /*
 The LedgerWAL update record uses two operations so far - an update which must include all keys and values, and deletion
@@ -51,6 +52,14 @@ func EncodeDelete(rootHash ledger.RootHash) []byte {
 	return buf
 }
 
+func EncodeUpdateAck(uuid ledger.OperationUUID, newRootHash ledger.RootHash) []byte {
+	buf := make([]byte, 0)
+	buf = append(buf, byte(WALUpdateAck))
+	buf = utils.AppendShortData(buf, uuid)
+	buf = utils.AppendShortData(buf, newRootHash)
+	return buf
+}
+
 func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, update *ledger.TrieUpdate, err error) {
 	if len(data) < 4 { // 1 byte op + 2 size + actual data = 4 minimum
 		err = fmt.Errorf("data corrupted, too short to represent operation - hexencoded data: %x", data)
@@ -64,6 +73,19 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 		return
 	case WALDelete:
 		rootHash, _, err = utils.ReadShortData(data[1:])
+		if err != nil {
+			err = fmt.Errorf("cannot read state commitment: %w", err)
+		}
+		return
+	case WALUpdateAck:
+		// TODO(return operation ack)
+		var rest []byte
+		_, rest, err = utils.ReadShortData(data[1:])
+		if err != nil {
+			err = fmt.Errorf("cannot read opeartion uuid: %w", err)
+			return
+		}
+		rootHash, _, err = utils.ReadShortData(rest)
 		if err != nil {
 			err = fmt.Errorf("cannot read state commitment: %w", err)
 		}

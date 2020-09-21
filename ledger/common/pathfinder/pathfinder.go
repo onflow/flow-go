@@ -57,7 +57,7 @@ func UpdateToTrieUpdate(u *ledger.Update, version uint8) (*ledger.TrieUpdate, er
 		return nil, err
 	}
 
-	trieUpdate := &ledger.TrieUpdate{RootHash: ledger.RootHash(u.State()), Paths: paths, Payloads: payloads}
+	trieUpdate := &ledger.TrieUpdate{UUID: u.UUID(), RootHash: ledger.RootHash(u.State()), Paths: paths, Payloads: payloads}
 
 	return trieUpdate, nil
 }

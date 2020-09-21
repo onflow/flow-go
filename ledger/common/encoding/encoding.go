@@ -433,6 +433,10 @@ func EncodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 	buffer := make([]byte, 0)
 
+	// encode UUID  (size and data)
+	buffer = utils.AppendUint8(buffer, uint8(len(t.UUID)))
+	buffer = append(buffer, t.UUID...)
+
 	// encode root hash (size and data)
 	buffer = utils.AppendUint16(buffer, uint16(len(t.RootHash)))
 	buffer = append(buffer, t.RootHash...)
@@ -486,8 +490,19 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 	paths := make([]ledger.Path, 0)
 	payloads := make([]*ledger.Payload, 0)
 
+	// decode uuid
+	uuidSize, rest, err := utils.ReadUint8(inp)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
+
+	uuid, rest, err := utils.ReadSlice(rest, int(uuidSize))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
+
 	// decode root hash
-	rhSize, rest, err := utils.ReadUint16(inp)
+	rhSize, rest, err := utils.ReadUint16(rest)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
@@ -542,7 +557,7 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		}
 		payloads = append(payloads, payload)
 	}
-	return &ledger.TrieUpdate{RootHash: rh, Paths: paths, Payloads: payloads}, nil
+	return &ledger.TrieUpdate{UUID: uuid, RootHash: rh, Paths: paths, Payloads: payloads}, nil
 }
 
 // EncodeTrieProof encodes the content of a proof into a byte slice

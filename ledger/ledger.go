@@ -68,6 +68,7 @@ func (q *Query) SetState(s State) {
 
 // Update holds all data needed for a ledger update
 type Update struct {
+	uuid   OperationUUID
 	state  State
 	keys   []Key
 	values []Value
@@ -86,6 +87,11 @@ func (u *Update) Keys() []Key {
 // Values returns value of the update
 func (u *Update) Values() []Value {
 	return u.values
+}
+
+// UUID returns operation uuid of the update
+func (u *Update) UUID() OperationUUID {
+	return u.uuid
 }
 
 // State returns the state part of this update
@@ -252,4 +258,19 @@ func (v Value) Equals(other Value) bool {
 		return false
 	}
 	return bytes.Equal(v, other)
+}
+
+// OperationUUID encodes a unique id for the operation
+type OperationUUID []byte
+
+func (u OperationUUID) String() string {
+	return hex.EncodeToString(u)
+}
+
+// Equals compares a operation uuid to another one
+func (u OperationUUID) Equals(other OperationUUID) bool {
+	if other == nil {
+		return false
+	}
+	return bytes.Equal(u, other)
 }

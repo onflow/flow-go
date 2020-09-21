@@ -154,6 +154,11 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
 
+	err = l.wal.RecordUpdateAck(trieUpdate.UUID, newRootHash)
+	if err != nil {
+		return nil, fmt.Errorf("cannot update state, error while writing update ack to LedgerWAL: %w", err)
+	}
+
 	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
 	l.metrics.ForestApproxMemorySize(0)
 
