@@ -11,15 +11,15 @@ type SubmitFunc func(channelID string, event interface{}, targetIDs ...flow.Iden
 
 // PublishFunc is a function that broadcasts the specified event
 // to all participants on the given channel.
-type PublishFunc func(channelID string, event interface{}, selector flow.IdentityFilter) error
+type PublishFunc func(channelID string, event interface{}, targetIDs ...flow.Identifier) error
 
 // UnicastFunc is a function that reliably sends the event via reliable 1-1 direct
 // connection in  the underlying network to the target ID.
 type UnicastFunc func(channelID string, event interface{}, targetID flow.Identifier) error
 
 // MulticastFunc is a function that unreliably sends the event in the underlying
-// network to randomly chosen subset of nodes specified by the selector.
-type MulticastFunc func(channelID string, event interface{}, num uint, selector flow.IdentityFilter) error
+// network to randomly chosen subset of nodes from targetIDs
+type MulticastFunc func(channelID string, event interface{}, num uint, targetIDs ...flow.Identifier) error
 
 // Conduit is a helper of the overlay layer which functions as an accessor for
 // sending messages within a single engine process. It sends all messages to
@@ -42,8 +42,8 @@ func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error 
 // to subscribers of the given event on the network layer. It uses a
 // publish-subscribe layer and can thus not guarantee that the specified
 // recipients received the event.
-func (c *Conduit) Publish(event interface{}, selector flow.IdentityFilter) error {
-	return c.publish(c.channelID, event, selector)
+func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+	return c.publish(c.channelID, event, targetIDs...)
 }
 
 // Unicast sends an event in a reliable way to the given recipient.
@@ -54,7 +54,7 @@ func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 }
 
 // Multicast unreliably sends the specified event to the specified number of recipients selected from the specified subset.
-// The recipients are selected randomly from the set of identifiers selected by the selectors.
-func (c *Conduit) Multicast(event interface{}, num uint, selector flow.IdentityFilter) error {
-	return c.multicast(c.channelID, event, num, selector)
+// The recipients are selected randomly from targetIDs
+func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
+	return c.multicast(c.channelID, event, num, targetIDs...)
 }

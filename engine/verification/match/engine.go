@@ -376,19 +376,16 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 		return fmt.Errorf("could not find other execution nodes identities: %w", err)
 	}
 
-	var selector flow.IdentityFilter
+	targetIDs := []flow.Identifier{c.ExecutorID}
+
 	// request chunk data pack from another execution node if exists as backup
 	if len(others) > 0 {
 		other := others.Sample(1).NodeIDs()[0]
-		selector = filter.HasNodeID(c.ExecutorID, other)
-	} else {
-		// adds identifier of chunk executor as one recipient to
-		// chunk data request
-		selector = filter.HasNodeID(c.ExecutorID)
+		targetIDs = append(targetIDs, other)
 	}
 
 	// publishes the chunk data request to the network
-	err = e.con.Publish(req, selector)
+	err = e.con.Publish(req, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}
