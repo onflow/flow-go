@@ -55,7 +55,7 @@ func (ss *SyncSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	// generate own ID
-	ss.participants = unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
+	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleCollection))
 	ss.myID = ss.participants[0].NodeID
 
 	// generate a header for the final state
@@ -366,13 +366,11 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 func (ss *SyncSuite) TestPollHeight() {
 
 	// check that we send to three nodes from our total list
-	consensus := ss.participants.Filter(filter.HasNodeID(ss.participants[1:].NodeIDs()...))
-	ss.conduit.On("Multicast", mock.Anything, uint(3), mock.Anything).Return(nil).Run(
+	others := ss.participants.Filter(filter.HasNodeID(ss.participants[1:].NodeIDs()...))
+	ss.conduit.On("Multicast", mock.Anything, uint(3), others[0].NodeID, others[1].NodeID).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.SyncRequest)
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
-			selector := args.Get(2).(flow.IdentityFilter)
-			ss.Assert().Equal(len(consensus), len(consensus.Filter(selector)))
 		},
 	)
 	err := ss.e.pollHeight()
@@ -386,7 +384,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	batches := unittest.BatchListFixture(1)
 
 	// should submit and mark requested all ranges
-	ss.conduit.On("Multicast", mock.AnythingOfType("*messages.RangeRequest"), uint(3), mock.Anything).Return(nil).Run(
+	ss.conduit.On("Multicast", mock.AnythingOfType("*messages.RangeRequest"), uint(3), mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.RangeRequest)
 			ss.Assert().Equal(ranges[0].From, req.FromHeight)
@@ -396,7 +394,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.core.On("RangeRequested", ranges[0])
 
 	// should submit and mark requested all batches
-	ss.conduit.On("Multicast", mock.AnythingOfType("*messages.BatchRequest"), uint(3), mock.Anything).Return(nil).Run(
+	ss.conduit.On("Multicast", mock.AnythingOfType("*messages.BatchRequest"), uint(3), mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.BatchRequest)
 			ss.Assert().Equal(batches[0].BlockIDs, req.BlockIDs)
