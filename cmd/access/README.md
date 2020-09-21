@@ -49,7 +49,7 @@ an execution node is requested for events for the transaction and the transactio
     2. If either the collection or the block is not found locally, but the transaction has not expired, then it's status is returned as `pending`
     3. If the transaction has neither expired nor is it pending, but the execution node has not yet executed the transaction,
        then the status of the transaction is returned as `finalized`.
-    4. If the execution node has executed the transaction, then if the height of the block containing the transaction is greater than the current chain height,
+    4. If the execution node has executed the transaction, then if the height of the block containing the transaction is greater than the highest sealed block,
     then the status of the transaction is returned as `executed` else it is returned as `sealed`.
     5. If the collection, block, or chain state lookup failed then the status is returned as `unknown`.
 
