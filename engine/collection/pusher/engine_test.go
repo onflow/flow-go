@@ -90,7 +90,7 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 
 	// should submit the collection to consensus nodes
 	consensus := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))
-	suite.conduit.On("Multicast", guarantee, consensus.Count(), mock.Anything).Return(nil)
+	suite.conduit.On("Multicast", guarantee, pusher.DefaultRecipientCount, consensus[0].NodeID).Return(nil)
 
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
@@ -115,5 +115,5 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	err := suite.engine.Process(sender.NodeID, msg)
 	suite.Require().Error(err)
 
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 }
