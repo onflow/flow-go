@@ -328,7 +328,7 @@ func (n *Network) publish(channelID string, message interface{}, targetIDs ...fl
 	n.logger.
 		Debug().
 		Str("channel_id", channelID).
-		Msg("message successfully multicasted")
+		Msg("message successfully published")
 
 	return nil
 }
@@ -357,10 +357,10 @@ func (n *Network) multicast(channelID string, message interface{}, num uint, tar
 
 // removeSelfFilter removes the flow.Identifier of this node if present, from the list of nodes
 func (n *Network) removeSelfFilter(ids ...flow.Identifier) ([]flow.Identifier, error) {
-	targetIDMinusSelf := make([]flow.Identifier, len(ids))
-	for i, t := range ids {
+	targetIDMinusSelf := make([]flow.Identifier, 0, len(ids))
+	for _, t := range ids {
 		if t != n.me.NodeID() {
-			targetIDMinusSelf[i] = t
+			targetIDMinusSelf = append(targetIDMinusSelf, t)
 		}
 	}
 	return targetIDMinusSelf, nil
