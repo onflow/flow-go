@@ -376,9 +376,10 @@ func sampleFilter(size uint, ids ...flow.Identifier) identifierFilter {
 // sendOnChannel sends the message on channelID to targetIDs after applying the all the filters to targetIDs
 func (n *Network) sendOnChannel(channelID string, message interface{}, targetIDs []flow.Identifier, filters ...identifierFilter) error {
 
+	var err error
 	// filter the targetIDs
 	for _, f := range filters {
-		targetIDs, err := f(targetIDs...)
+		targetIDs, err = f(targetIDs...)
 		// if filter failed
 		if err != nil {
 			return err
