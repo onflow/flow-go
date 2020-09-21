@@ -124,7 +124,6 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		transaction.SetReferenceBlockID(referenceBlock.ID())
 
 		refSnapshot := new(protocol.Snapshot)
-		latestSnapshot := new(protocol.Snapshot)
 
 		suite.state.
 			On("AtBlockID", referenceBlock.ID()).
@@ -135,11 +134,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 			Return(&referenceBlock, nil).
 			Twice()
 
-		suite.state.
-			On("Final").
-			Return(latestSnapshot, nil)
-
-		latestSnapshot.
+		suite.snapshot.
 			On("Head").
 			Return(&referenceBlock, nil).
 			Once()
@@ -187,7 +182,6 @@ func (suite *Suite) TestSendExpiredTransaction() {
 		transaction.SetReferenceBlockID(referenceBlock.ID())
 
 		refSnapshot := new(protocol.Snapshot)
-		latestSnapshot := new(protocol.Snapshot)
 
 		suite.state.
 			On("AtBlockID", referenceBlock.ID()).
@@ -198,11 +192,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 			Return(&referenceBlock, nil).
 			Twice()
 
-		suite.state.
-			On("Final").
-			Return(latestSnapshot, nil)
-
-		latestSnapshot.
+		suite.snapshot.
 			On("Head").
 			Return(&latestBlock, nil).
 			Once()
