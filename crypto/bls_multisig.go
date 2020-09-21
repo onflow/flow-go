@@ -20,7 +20,7 @@ import (
 //  - Non-interactive aggregation of multiple private keys into one.
 //  - Non-interactive aggregation of multiple public keys into one.
 //  - Non-interactive subtraction of multiple public keys from an aggregated public key.
-//  - Multi-signature verification of an aggregated signatures of a single message under multiple
+//  - Multi-signature verification of an aggregated signature of a single message under multiple
 //  public keys.
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
