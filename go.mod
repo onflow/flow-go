@@ -21,13 +21,13 @@ require (
 	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
-	github.com/libp2p/go-libp2p v0.10.3
+	github.com/libp2p/go-libp2p v0.11.0
 	github.com/libp2p/go-libp2p-core v0.6.1
-	github.com/libp2p/go-libp2p-pubsub v0.3.3
+	github.com/libp2p/go-libp2p-pubsub v0.3.5
 	github.com/libp2p/go-libp2p-swarm v0.2.8
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
-	github.com/libp2p/go-tcp-transport v0.2.0
-	github.com/multiformats/go-multiaddr v0.2.2
+	github.com/libp2p/go-tcp-transport v0.2.1
+	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.8.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0
 	github.com/onflow/flow-go-sdk v0.8.0
@@ -51,7 +51,6 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
-	google.golang.org/protobuf v1.23.0 // indirect
 	gotest.tools v2.2.0+incompatible
 )
 
