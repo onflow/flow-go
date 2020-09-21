@@ -210,15 +210,27 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 
 #elif (hashToPoint==OPSWU)
 
-const uint64_t a1_data[6] = { 
-    0x5cf428082d584c1d, 0x98936f8da0e0f97f, 0xd8e8981aefd881ac,
-    0xb0ea985383ee66a8, 0x3d693a02c96d4982, 0x00144698a3b8e943,
+const uint64_t p_3div4_data[Fp_DIGITS] = {
+    0xEE7FBFFFFFFFEAAA, 0x07AAFFFFAC54FFFF, 0xD9CC34A83DAC3D89,
+    0xD91DD2E13CE144AF, 0x92C6E9ED90D2EB35, 0x0680447A8E5FF9A6,
+};
+
+const uint64_t p_1div2_data[Fp_DIGITS] = {
+    0xa1fafffffffe5557, 0x995bfff976a3fffe, 0x03f41d24d174ceb4,
+    0xf6547998c1995dbd, 0x778a468f507a6034, 0x020559931f7f8103,
+};
+
+// Isogeny map constants taken from https://eprint.iacr.org/2019/403.pdf (section 4.3)
+// and converted to the Mongtomery domain.
+const uint64_t a1_data[Fp_DIGITS] = { 
+    0x2f65aa0e9af5aa51, 0x86464c2d1e8416c3, 0xb85ce591b7bd31e2,
+    0x27e11c91b5f24e7c, 0x28376eda6bfc1835, 0x155455c3e5071d85,
 };
 
 
-const uint64_t b1_data[6] = { 
-    0xd1cc48e98e172be0, 0x5a23215a316ceaa5, 0xa0b9c14fcef35ef5,
-    0x2016c1f0f24f4070, 0x018b12e8753eee3b, 0x12e2908d11688030, 
+const uint64_t b1_data[Fp_DIGITS] = {  
+    0xfb996971fe22a1e0, 0x9aa93eb35b742d6f, 0x8c476013de99c5c4,
+    0x873e27c3a221e571, 0xca72b5e45a52d888, 0x06824061418a386b,
 };
 
 // check if (U/V) is a square, return 1 if yes, 0 otherwise 
@@ -243,6 +255,127 @@ static int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
     return res;
 }
 
+
+// These constants are taken from https://github.com/kwantam/bls12-381_hash 
+// and converted to the Mongtomery domain. 
+// Copyright 2019 Riad S. Wahby
+const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS] = {
+    {0x4d18b6f3af00131c, 0x19fa219793fee28c, 0x3f2885f1467f19ae,
+     0x23dcea34f2ffb304, 0xd15b58d2ffc00054, 0x0913be200a20bef4,},
+    {0x898985385cdbbd8b, 0x3c79e43cc7d966aa, 0x1597e193f4cd233a,
+     0x8637ef1e4d6623ad, 0x11b22deed20d827b, 0x07097bc5998784ad,},
+    {0xa542583a480b664b, 0xfc7169c026e568c6, 0x5ba2ef314ed8b5a6,
+     0x5b5491c05102f0e7, 0xdf6e99707d2a0079, 0x0784151ed7605524,},
+    {0x494e212870f72741, 0xab9be52fbda43021, 0x26f5577994e34c3d,
+     0x049dfee82aefbd60, 0x65dadd7828505289, 0x0e93d431ea011aeb,},
+    {0x90ee774bd6a74d45, 0x7ada1c8a41bfb185, 0x0f1a8953b325f464,
+     0x104c24211be4805c, 0x169139d319ea7a8f, 0x09f20ead8e532bf6,},
+    {0x6ddd93e2f43626b7, 0xa5482c9aa1ccd7bd, 0x143245631883f4bd,
+     0x2e0a94ccf77ec0db, 0xb0282d480e56489f, 0x18f4bfcbb4368929,},
+    {0x23c5f0c953402dfd, 0x7a43ff6958ce4fe9, 0x2c390d3d2da5df63,
+     0xd0df5c98e1f9d70f, 0xffd89869a572b297, 0x1277ffc72f25e8fe,},
+    {0x79f4f0490f06a8a6, 0x85f894a88030fd81, 0x12da3054b18b6410,
+     0xe2a57f6505880d65, 0xbba074f260e400f1, 0x08b76279f621d028,},
+    {0xe67245ba78d5b00b, 0x8456ba9a1f186475, 0x7888bff6e6b33bb4,
+     0xe21585b9a30f86cb, 0x05a69cdcef55feee, 0x09e699dd9adfa5ac,},
+    {0x0de5c357bff57107, 0x0a0db4ae6b1a10b2, 0xe256bb67b3b3cd8d,
+     0x8ad456574e9db24f, 0x0443915f50fd4179, 0x098c4bf7de8b6375,},
+    {0xe6b0617e7dd929c7, 0xfe6e37d442537375, 0x1dafdeda137a489e,
+     0xe4efd1ad3f767ceb, 0x4a51d8667f0fe1cf, 0x054fdf4bbf1d821c,},
+    {0x72db2a50658d767b, 0x8abf91faa257b3d5, 0xe969d6833764ab47,
+     0x464170142a1009eb, 0xb14f01aadb30be2f, 0x18ae6a856f40715d,},
+};
+
+const uint64_t iso_Dx_data[ELLP_Dx_LEN][Fp_DIGITS] = {
+    {0xb962a077fdb0f945, 0xa6a9740fefda13a0, 0xc14d568c3ed6c544,
+     0xb43fc37b908b133e, 0x9c0b3ac929599016, 0x0165aa6c93ad115f,},
+    {0x23279a3ba506c1d9, 0x92cfca0a9465176a, 0x3b294ab13755f0ff,
+     0x116dda1c5070ae93, 0xed4530924cec2045, 0x083383d6ed81f1ce,},
+    {0x9885c2a6449fecfc, 0x4a2b54ccd37733f0, 0x17da9ffd8738c142,
+     0xa0fba72732b3fafd, 0xff364f36e54b6812, 0x0f29c13c660523e2,},
+    {0xe349cc118278f041, 0xd487228f2f3204fb, 0xc9d325849ade5150,
+     0x43a92bd69c15c2df, 0x1c2c7844bc417be4, 0x12025184f407440c,},
+    {0x587f65ae6acb057b, 0x1444ef325140201f, 0xfbf995e71270da49,
+     0xccda066072436a42, 0x7408904f0f186bb2, 0x13b93c63edf6c015,},
+    {0xfb918622cd141920, 0x4a4c64423ecaddb4, 0x0beb232927f7fb26,
+     0x30f94df6f83a3dc2, 0xaeedd424d780f388, 0x06cc402dd594bbeb,},
+    {0xd41f761151b23f8f, 0x32a92465435719b3, 0x64f436e888c62cb9,
+     0xdf70a9a1f757c6e4, 0x6933a38d5b594c81, 0x0c6f7f7237b46606,},
+    {0x693c08747876c8f7, 0x22c9850bf9cf80f0, 0x8e9071dab950c124,
+     0x89bc62d61c7baf23, 0xbc6be2d8dad57c23, 0x17916987aa14a122,},
+    {0x1be3ff439c1316fd, 0x9965243a7571dfa7, 0xc7f7f62962f5cd81,
+     0x32c6aa9af394361c, 0xbbc2ee18e1c227f4, 0x0c102cbac531bb34,},
+    {0x997614c97bacbf07, 0x61f86372b99192c0, 0x5b8c95fc14353fc3,
+     0xca2b066c2a87492f, 0x16178f5bbf698711, 0x12a6dcd7f0f4e0e8,},
+};
+
+const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS] = {
+    {0x2b567ff3e2837267, 0x1d4d9e57b958a767, 0xce028fea04bd7373,
+     0xcc31a30a0b6cd3df, 0x7d7b18a682692693, 0x0d300744d42a0310,},
+    {0x99c2555fa542493f, 0xfe7f53cc4874f878, 0x5df0608b8f97608a,
+     0x14e03832052b49c8, 0x706326a6957dd5a4, 0x0a8dadd9c2414555,},
+    {0x13d942922a5cf63a, 0x357e33e36e261e7d, 0xcf05a27c8456088d,
+     0x0000bd1de7ba50f0, 0x83d0c7532f8c1fde, 0x13f70bf38bbf2905,},
+    {0x5c57fd95bfafbdbb, 0x28a359a65e541707, 0x3983ceb4f6360b6d,
+     0xafe19ff6f97e6d53, 0xb3468f4550192bf7, 0x0bb6cde49d8ba257,},
+    {0x590b62c7ff8a513f, 0x314b4ce372cacefd, 0x6bef32ce94b8a800,
+     0x6ddf84a095713d5f, 0x64eace4cb0982191, 0x0386213c651b888d,},
+    {0xa5310a31111bbcdd, 0xa14ac0f5da148982, 0xf9ad9cc95423d2e9,
+     0xaa6ec095283ee4a7, 0xcf5b1f022e1c9107, 0x01fddf5aed881793,},
+    {0x65a572b0d7a7d950, 0xe25c2d8183473a19, 0xc2fcebe7cb877dbd,
+     0x05b2d36c769a89b0, 0xba12961be86e9efb, 0x07eb1b29c1dfde1f,},
+    {0x93e09572f7c4cd24, 0x364e929076795091, 0x8569467e68af51b5,
+     0xa47da89439f5340f, 0xf4fa918082e44d64, 0x0ad52ba3e6695a79,},
+    {0x911429844e0d5f54, 0xd03f51a3516bb233, 0x3d587e5640536e66,
+     0xfa86d2a3a9a73482, 0xa90ed5adf1ed5537, 0x149c9c326a5e7393,},
+    {0x462bbeb03c12921a, 0xdc9af5fa0a274a17, 0x9a558ebde836ebed,
+     0x649ef8f11a4fae46, 0x8100e1652b3cdc62, 0x1862bd62c291dacb,},
+    {0x05c9b8ca89f12c26, 0x0194160fa9b9ac4f, 0x6a643d5a6879fa2c,
+     0x14665bdd8846e19d, 0xbb1d0d53af3ff6bf, 0x12c7e1c3b28962e5,},
+    {0xb55ebf900b8a3e17, 0xfedc77ec1a9201c4, 0x1f07db10ea1a4df4,
+     0x0dfbd15dc41a594d, 0x389547f2334a5391, 0x02419f98165871a4,},
+    {0xb416af000745fc20, 0x8e563e9d1ea6d0f5, 0x7c763e17763a0652,
+     0x01458ef0159ebbef, 0x8346fe421f96bb13, 0x0d2d7b829ce324d2,},
+    {0x93096bb538d64615, 0x6f2a2619951d823a, 0x8f66b3ea59514fa4,
+     0xf563e63704f7092f, 0x724b136c4cf2d9fa, 0x046959cfcfd0bf49,},
+    {0xea748d4b6e405346, 0x91e9079c2c02d58f, 0x41064965946d9b59,
+     0xa06731f1d2bbe1ee, 0x07f897e267a33f1b, 0x1017290919210e5f,},
+    {0x872aa6c17d985097, 0xeecc53161264562a, 0x07afe37afff55002,
+     0x54759078e5be6838, 0xc4b92d15db8acca8, 0x106d87d1b51d13b9,},
+};
+
+const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS] = {
+    {0xeb6c359d47e52b1c, 0x18ef5f8a10634d60, 0xddfa71a0889d5b7e,
+     0x723e71dcc5fc1323, 0x52f45700b70d5c69, 0x0a8b981ee47691f1,},
+    {0x616a3c4f5535b9fb, 0x6f5f037395dbd911, 0xf25f4cc5e35c65da,
+     0x3e50dffea3c62658, 0x6a33dca523560776, 0x0fadeff77b6bfe3e,},
+    {0x2be9b66df470059c, 0x24a2c159a3d36742, 0x115dbe7ad10c2a37,
+     0xb6634a652ee5884d, 0x04fe8bb2b8d81af4, 0x01c2a7a256fe9c41,},
+    {0xf27bf8ef3b75a386, 0x898b367476c9073f, 0x24482e6b8c2f4e5f,
+     0xc8e0bbd6fe110806, 0x59b0c17f7631448a, 0x11037cd58b3dbfbd,},
+    {0x31c7912ea267eec6, 0x1dbf6f1c5fcdb700, 0xd30d4fe3ba86fdb1,
+     0x3cae528fbee9a2a4, 0xb1cce69b6aa9ad9a, 0x044393bb632d94fb,},
+    {0xc66ef6efeeb5c7e8, 0x9824c289dd72bb55, 0x71b1a4d2f119981d,
+     0x104fc1aafb0919cc, 0x0e49df01d942a628, 0x096c3a09773272d4,},
+    {0x9abc11eb5fadeff4, 0x32dca50a885728f0, 0xfb1fa3721569734c,
+     0xc4b76271ea6506b3, 0xd466a75599ce728e, 0x0c81d4645f4cb6ed,},
+    {0x4199f10e5b8be45b, 0xda64e495b1e87930, 0xcb353efe9b33e4ff,
+     0x9e9efb24aa6424c6, 0xf08d33680a237465, 0x0d3378023e4c7406,},
+    {0x7eb4ae92ec74d3a5, 0xc341b4aa9fac3497, 0x5be603899e907687,
+     0x03bfd9cca75cbdeb, 0x564c2935a96bfa93, 0x0ef3c33371e2fdb5,},
+    {0x7ee91fd449f6ac2e, 0xe5d5bd5cb9357a30, 0x773a8ca5196b1380,
+     0xd0fda172174ed023, 0x6cb95e0fa776aead, 0x0d22d5a40cec7cff,},
+    {0xf727e09285fd8519, 0xdc9d55a83017897b, 0x7549d8bd057894ae,
+     0x178419613d90d8f8, 0xfce95ebdeb5b490a, 0x0467ffaef23fc49e,},
+    {0xc1769e6a7c385f1b, 0x79bc930deac01c03, 0x5461c75a23ede3b5,
+     0x6e20829e5c230c45, 0x828e0f1e772a53cd, 0x116aefa749127bff,},
+    {0x101c10bf2744c10a, 0xbbf18d053a6a3154, 0xa0ecf39ef026f602,
+     0xfc009d4996dc5153, 0xb9000209d5bd08d3, 0x189e5fe4470cd73c,},
+    {0x7ebd546ca1575ed2, 0xe47d5a981d081b55, 0x57b2b625b6d4ca21,
+     0xb0a1ba04228520cc, 0x98738983c2107ff3, 0x13dddbc4799d81d6,},
+    {0x09319f2e39834935, 0x039e952cbdb05c21, 0x55ba77a9a2f76493,
+     0xfd04e3dfc6086467, 0xfb95832e7d78742e, 0x0ef9c24eccaf5e0e,},
+};
 
 // Maps the field element t to a point p in E1(Fp) where E1: y^2 = g(x) = x^3 + a1*x + b1 
 // using optimized non-constant-time SWU impl
@@ -302,128 +435,6 @@ static inline void map_to_E1_swu(ep_t p, const fp_t t) {
     for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
     free(fp_tmp);
 }
-
-
-// These constants are taken from https://github.com/kwantam/bls12-381_hash 
-// and converted to the Mongtomery domain. 
-// Copyright 2019 Riad S. Wahby
-const uint64_t iso_Nx_data[ELLP_Nx_LEN][6] = {
-    {0xaeac1662734649b7, 0x5610c2d5f2e62d6e, 0xf2627b56cdb4e2c8, 
-     0x6b303e88a2d7005f, 0xb809101dd9981585, 0x11a05f2b1e833340, },
-    {0xe834eef1b3cb83bb, 0x4838f2a6f318c356, 0xf565e33c70d1e86b, 
-     0x7c17e75b2f6a8417, 0x0588bab22147a81c, 0x17294ed3e943ab2f, },
-    {0xe0179f9dac9edcb0, 0x958c3e3d2a09729f, 0x6878e501ec68e25c,
-     0xce032473295983e5, 0x1d1048c5d10a9a1b, 0x0d54005db97678ec, },
-    {0xc5b388641d9b6861, 0x5336e25ce3107193, 0xf1b33289f1b33083,
-     0xd7f5e4656a8dbf25, 0x4e0609d307e55412, 0x1778e7166fcc6db7, },
-    {0x51154ce9ac8895d9, 0x985a286f301e77c4, 0x086eeb65982fac18,
-     0x99db995a1257fb3f, 0x6642b4b3e4118e54, 0x0e99726a3199f443, },
-    {0xcd13c1c66f652983, 0xa0870d2dcae73d19, 0x9ed3ab9097e68f90,
-     0xdb3cb17dd952799b, 0x01d1201bf7a74ab5, 0x1630c3250d7313ff, },
-    {0xddd7f225a139ed84, 0x8da25128c1052eca, 0x9008e218f9c86b2a,
-     0xb11586264f0f8ce1, 0x6a3726c38ae652bf, 0x0d6ed6553fe44d29, },
-    {0x9ccb5618e3f0c88e, 0x39b7c8f8c8f475af, 0xa682c62ef0f27533,
-     0x356de5ab275b4db1, 0xe8743884d1117e53, 0x17b81e7701abdbe2, },
-    {0x6d71986a8497e317, 0x4fa295f296b74e95, 0xa2c596c928c5d1de,
-     0xc43b756ce79f5574, 0x7b90b33563be990d, 0x080d3cf1f9a78fc4, },
-    {0x7f241067be390c9e, 0xa3190b2edc032779, 0x676314baf4bb1b7f,
-     0xdd2ecb803a0c5c99, 0x2e0c37515d138f22, 0x169b1f8e1bcfa7c4, },
-    {0xca67df3f1605fb7b, 0xf69b771f8c285dec, 0xd50af36003b14866,
-     0xfa7dccdde6787f96, 0x72d8ec09d2565b0d, 0x10321da079ce07e2, },
-    {0xa9c8ba2e8ba2d229, 0xc24b1b80b64d391f, 0x23c0bf1bc24c6b68,
-     0x31d79d7e22c837bc, 0xbd1e962381edee3d, 0x06e08c248e260e70, },
-};
-
-const uint64_t iso_Dx_data[ELLP_Dx_LEN][6] = {
-    {0x993cf9fa40d21b1c, 0xb558d681be343df8, 0x9c9588617fc8ac62,
-     0x01d5ef4ba35b48ba, 0x18b2e62f4bd3fa6f, 0x08ca8d548cff19ae, },
-    {0xe5c8276ec82b3bff, 0x13daa8846cb026e9, 0x0126c2588c48bf57,
-     0x7041e8ca0cf0800c, 0x48b4711298e53636, 0x12561a5deb559c43, },
-    {0xfcc239ba5cb83e19, 0xd6a3d0967c94fedc, 0xfca64e00b11aceac,
-     0x6f89416f5a718cd1, 0x8137e629bff2991f, 0x0b2962fe57a3225e, },
-    {0x130de8938dc62cd8, 0x4976d5243eecf5c4, 0x54cca8abc28d6fd0,
-     0x5b08243f16b16551, 0xc83aafef7c40eb54, 0x03425581a58ae2fe, },
-    {0x539d395b3532a21e, 0x9bd29ba81f35781d, 0x8d6b44e833b306da,
-     0xffdfc759a12062bb, 0x0a6f1d5f43e7a07d, 0x13a8e162022914a8, },
-    {0xc02df9a29f6304a5, 0x7400d24bc4228f11, 0x0a43bcef24b8982f,
-     0x395735e9ce9cad4d, 0x55390f7f0506c6e9, 0x0e7355f8e4e667b9, },
-    {0xec2574496ee84a3a, 0xea73b3538f0de06c, 0x4e2e073062aede9c,
-     0x570f5799af53a189, 0x0f3e0c63e0596721, 0x0772caacf1693619, },
-    {0x11f7d99bbdcc5a5e, 0x0fa5b9489d11e2d3, 0x1996e1cdf9822c58,
-     0x6e7f63c21bca68a8, 0x30b3f5b074cf0199, 0x14a7ac2a9d64a8b2, },
-    {0x4776ec3a79a1d641, 0x03826692abba4370, 0x74100da67f398835,
-     0xe07f8d1d7161366b, 0x5e920b3dafc7a3cc, 0x0a10ecf6ada54f82, },
-    {0x2d6384d168ecdd0a, 0x93174e4b4b786500, 0x76df533978f31c15,
-     0xf682b4ee96f7d037, 0x476d6e3eb3a56680, 0x095fc13ab9e92ad4, }, 
-};
-
-const uint64_t iso_Ny_data[ELLP_Ny_LEN][6] = {
-    {0xbe9845719707bb33, 0xcd0c7aee9b3ba3c2, 0x2b52af6c956543d3,
-     0x11ad138e48a86952, 0x259d1f094980dcfa, 0x090d97c81ba24ee0, },
-    {0xe097e75a2e41c696, 0xd6c56711962fa8bf, 0x0f906343eb67ad34,
-     0x1223e96c254f383d, 0xd51036d776fb4683, 0x134996a104ee5811, },
-    {0xb8dfe240c72de1f6, 0xd26d521628b00523, 0xc344be4b91400da7,
-     0x2552e2d658a31ce2, 0xf4a384c86a3b4994, 0x00cc786baa966e66, },
-    {0xa6355c77b0e5f4cb, 0xde405aba9ec61dec, 0x09e4a3ec03251cf9,
-     0xd42aa7b90eeb791c, 0x7898751ad8746757, 0x01f86376e8981c21, },
-    {0x41b6daecf2e8fedb, 0x2ee7f8dc099040a8, 0x79833fd221351adc,
-     0x195536fbe3ce50b8, 0x5caf4fe2a21529c4, 0x08cc03fdefe0ff13, },
-    {0x99b23ab13633a5f0, 0x203f6326c95a8072, 0x76505c3d3ad5544e,
-     0x74a7d0d4afadb7bd, 0x2211e11db8f0a6a0, 0x16603fca40634b6a, },
-    {0xc961f8855fe9d6f2, 0x47a87ac2460f415e, 0x5231413c4d634f37,
-     0xe75bb8ca2be184cb, 0xb2c977d027796b3c, 0x04ab0b9bcfac1bbc, },
-    {0xa15e4ca31870fb29, 0x42f64550fedfe935, 0xfd038da6c26c8426,
-     0x170a05bfe3bdd81f, 0xde9926bd2ca6c674, 0x0987c8d5333ab86f, },
-    {0x60370e577bdba587, 0x69d65201c78607a3, 0x1e8b6e6a1f20cabe,
-     0x8f3abd16679dc26c, 0xe88c9e221e4da1bb, 0x09fc4018bd96684b, },
-    {0x2bafaaebca731c30, 0x9b3f7055dd4eba6f, 0x06985e7ed1e4d43b,
-     0xc42a0ca7915af6fe, 0x223abde7ada14a23, 0x0e1bba7a1186bdb5, },
-    {0xe813711ad011c132, 0x31bf3a5cce3fbafc, 0xd1183e416389e610,
-     0xcd2fcbcb6caf493f, 0x0dfd0b8f1d43fb93, 0x19713e47937cd1be, },
-    {0xce07c8a4d0074d8e, 0x49d9cdf41b44d606, 0x2e6bfe7f911f6432,
-     0x523559b8aaf0c246, 0xb918c143fed2edcc, 0x18b46a908f36f6de, },
-    {0x0d4c04f00b971ef8, 0x06c851c1919211f2, 0xc02710e807b4633f,
-     0x7aa7b12a3426b08e, 0xd155096004f53f44, 0x0b182cac101b9399, },
-    {0x42d9d3f5db980133, 0xc6cf90ad1c232a64, 0x13e6632d3c40659c,
-     0x757b3b080d4c1580, 0x72fc00ae7be315dc, 0x0245a394ad1eca9b, },
-    {0x866b1e715475224b, 0x6ba1049b6579afb7, 0xd9ab0f5d396a7ce4,
-     0x5e673d81d7e86568, 0x02a159f748c4a3fc, 0x05c129645e44cf11, },
-    {0x04b456be69c8b604, 0xb665027efec01c77, 0x57add4fa95af01b2,
-     0xcb181d8f84965a39, 0x4ea50b3b42df2eb5, 0x15e6be4e990f03ce, },
-};
-
-const uint64_t iso_Dy_data[ELLP_Dy_LEN][6] = {
-    {0x01479253b03663c1, 0x07f3688ef60c206d, 0xeec3232b5be72e7a,
-     0x601a6de578980be6, 0x52181140fad0eae9, 0x16112c4c3a9c98b2, },
-    {0x32f6102c2e49a03d, 0x78a4260763529e35, 0xa4a10356f453e01f,
-     0x85c84ff731c4d59c, 0x1a0cbd6c43c348b8, 0x1962d75c2381201e, },
-    {0x1e2538b53dbf67f2, 0xa6757cd636f96f89, 0x0c35a5dd279cd2ec,
-     0x78c4855551ae7f31, 0x6faaae7d6e8eb157, 0x058df3306640da27, },
-    {0xa8d26d98445f5416, 0x727364f2c28297ad, 0x123da489e726af41,
-     0xd115c5dbddbcd30e, 0xf20d23bf89edb4d1, 0x16b7d288798e5395, },
-    {0xda39142311a5001d, 0xa20b15dc0fd2eded, 0x542eda0fc9dec916,
-     0xc6d19c9f0f69bbb0, 0xb00cc912f8228ddc, 0x0be0e079545f43e4, },
-    {0x02c6477faaf9b7ac, 0x49f38db9dfa9cce2, 0xc5ecd87b6f0f5a64,
-     0xb70152c65550d881, 0x9fb266eaac783182, 0x08d9e5297186db2d, },
-    {0x3d1a1399126a775c, 0xd5fa9c01a58b1fb9, 0x5dd365bc400a0051,
-     0x5eecfdfa8d0cf8ef, 0xc3ba8734ace9824b, 0x166007c08a99db2f, },
-    {0x60ee415a15812ed9, 0xb920f5b00801dee4, 0xfeb34fd206357132,
-     0xe5a4375efa1f4fd7, 0x03bcddfabba6ff6e, 0x16a3ef08be3ea7ea, },
-    {0x6b233d9d55535d4a, 0x52cfe2f7bb924883, 0xabc5750c4bf39b48,
-     0xf9fb0ce4c6af5920, 0x1a1be54fd1d74cc4, 0x1866c8ed336c6123, },
-    {0x346ef48bb8913f55, 0xc7385ea3d529b35e, 0x5308592e7ea7d4fb,
-     0x3216f763e13d87bb, 0xea820597d94a8490, 0x167a55cda70a6e1c, },
-    {0x00f8b49cba8f6aa8, 0x71a5c29f4f830604, 0x0e591b36e636a5c8,
-     0x9c6dd039bb61a629, 0x48f010a01ad2911d, 0x04d2f259eea405bd, },
-    {0x9684b529e2561092, 0x16f968986f7ebbea, 0x8c0f9a88cea79135,
-     0x7f94ff8aefce42d2, 0xf5852c1e48c50c47, 0x0accbb67481d033f, },
-    {0x1e99b138573345cc, 0x93000763e3b90ac1, 0x7d5ceef9a00d9b86,
-     0x543346d98adf0226, 0xc3613144b45f1496, 0x0ad6b9514c767fe3, },
-    {0xd1fadc1326ed06f7, 0x420517bd8714cc80, 0xcb748df27942480e,
-     0xbf565b94e72927c1, 0x628bdd0d53cd76f2, 0x02660400eb2e4f3b, },
-    {0x4415473a1d634b8f, 0x5ca2f570f1349780, 0x324efcd6356caa20,
-     0x71c40f65e273b853, 0x6b24255e0d7819c1, 0x0e0fa1d816ddc03e, },
-};
 
 // This code is taken from https://github.com/kwantam/bls12-381_hash 
 // and adapted to use Relic modular arithemtic.  

@@ -49,7 +49,6 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err != nil {
 			return fmt.Errorf("could not store data: %w", err)
 		}
-
 		return nil
 	}
 }

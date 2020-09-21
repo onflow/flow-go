@@ -6,7 +6,6 @@ require (
 	cloud.google.com/go/storage v1.6.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200526041238-ad2360621a1a
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200708192840-30b3e2d5a586
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
@@ -30,7 +29,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.0
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/onflow/cadence v0.8.2
-	github.com/onflow/flow v0.1.4-0.20200918135459-967e2d272597 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0
 	github.com/onflow/flow-go-sdk v0.8.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.6
 	github.com/opentracing/opentracing-go v1.2.0
@@ -53,7 +52,6 @@ require (
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
 	google.golang.org/protobuf v1.23.0 // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
 	gotest.tools v2.2.0+incompatible
 )
 
