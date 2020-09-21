@@ -45,7 +45,7 @@ At a high level it does the following:
 3. If a [GetTransaction](https://github.com/onflow/flow/blob/master/docs/access-api-spec.md#gettransaction) request is received, the transaction is read from local storage and returned if found.
 4. If a [GetTransactionResult](https://github.com/onflow/flow/blob/master/docs/access-api-spec.md#gettransactionresult) request is received,
 an execution node is requested for events for the transaction and the transaction status is derived as follows:
-    1. If the collection containing the transaction and the block containing that collection is found locally, but the transaction has expired then it's status is returned as `expired`.
+    1. If the collection containing the transaction and the block containing that collection is found locally, but the transaction has expired then its status is returned as `expired`.
     2. If either the collection or the block is not found locally, but the transaction has not expired, then it's status is returned as `pending`
     3. If the transaction has neither expired nor is it pending, but the execution node has not yet executed the transaction,
        then the status of the transaction is returned as `finalized`.
