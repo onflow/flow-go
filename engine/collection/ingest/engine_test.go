@@ -198,9 +198,9 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
-	// should route to other node in local cluster
+	// should route to local cluster
 	suite.conduit.
-		On("Multicast", &tx, uint(1), mock.Anything).
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, local.NodeIDs()[0], local.NodeIDs()[1]).
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
@@ -228,13 +228,9 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, remote, func(transaction *flow.TransactionBody) {})
 
-	// should route to both nodes in remote cluster
+	// should route to remote cluster
 	suite.conduit.
-		On("Multicast", &tx, uint(2), mock.Anything).Run(
-		func(args mock.Arguments) {
-			selector := args.Get(2).(flow.IdentityFilter)
-			suite.Assert().Equal(len(remote), len(remote.Filter(selector)))
-		}).
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, remote[0].NodeID, remote[1].NodeID).
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
@@ -262,7 +258,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
 	// should not route to any node
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", &tx, mock.Anything, mock.Anything)
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
 	err := suite.engine.Process(sender.NodeID, &tx)
 	suite.Assert().Nil(err)
@@ -291,7 +287,7 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 		})
 
 	// should not route to any node
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", tx, mock.Anything, mock.Anything)
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
 	_ = suite.engine.ProcessLocal(&tx)
 
