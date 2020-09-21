@@ -355,12 +355,18 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 }
 
 func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
+	chunks := 0
+	if block.Payload != nil {
+		// +1 for system chunk
+		chunks = len(block.Payload.Guarantees) + 1
+	}
+
 	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          block.Header.ID(),
 			FinalStateCommit: StateCommitmentFixture(),
-			Chunks:           ChunksFixture(uint(len(block.Payload.Guarantees))),
+			Chunks:           ChunksFixture(uint(chunks)),
 		},
 		Signatures: SignaturesFixture(6),
 	}
