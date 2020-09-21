@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/indices"
@@ -10,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/pkg/errors"
 )
 
 type EpochComponentsFactory struct {
