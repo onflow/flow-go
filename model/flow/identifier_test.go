@@ -62,22 +62,20 @@ func TestIdentifierSample(t *testing.T) {
 
 	t.Run("Sample creates a random sample", func(t *testing.T) {
 		sampleSize := uint(5)
-		sample, err := flow.Sample(sampleSize, ids...)
-		require.NoError(t, err)
+		sample := flow.Sample(sampleSize, ids...)
 		require.Len(t, sample, int(sampleSize))
 		require.NotEqual(t, sample, ids[:sampleSize])
 	})
 
-	t.Run("sample size greater than total size results in an error", func(t *testing.T) {
+	t.Run("sample size greater than total size results in the original list", func(t *testing.T) {
 		sampleSize := uint(len(ids) + 1)
-		_, err := flow.Sample(sampleSize, ids...)
-		require.Error(t, err)
+		sample := flow.Sample(sampleSize, ids...)
+		require.Equal(t, sample, ids)
 	})
 
 	t.Run("sample size of zero results in an empty list", func(t *testing.T) {
 		sampleSize := uint(0)
-		sample, err := flow.Sample(sampleSize, ids...)
-		require.NoError(t, err)
+		sample := flow.Sample(sampleSize, ids...)
 		require.Empty(t, sample)
 	})
 }

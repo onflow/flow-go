@@ -139,18 +139,19 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 	return sum == computed
 }
 
-// Sample returns random sample of length 'size' of the ids or an error if size is greater then the number of ids
+// Sample returns random sample of length 'size' of the ids
 // [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
-func Sample(size uint, ids ...Identifier) ([]Identifier, error) {
+func Sample(size uint, ids ...Identifier) []Identifier {
 	n := uint(len(ids))
-	if size > n {
-		return nil, fmt.Errorf("insufficient target ids, requested: %d, found %d", size, n)
-	}
 	dup := make([]Identifier, 0, n)
 	dup = append(dup, ids...)
+	// if sample size is greater than total size, return all the elements
+	if n <= size {
+		return dup
+	}
 	for i := uint(0); i < size; i++ {
 		j := uint(rand.Intn(int(n - i)))
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
-	return dup[:size], nil
+	return dup[:size]
 }

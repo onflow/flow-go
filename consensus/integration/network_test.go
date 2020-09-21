@@ -134,10 +134,7 @@ func (n *Network) publish(event interface{}, channelID string, targetIDs ...flow
 // Engines attached to the same channel ID on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
 func (n *Network) multicast(event interface{}, channelID string, num uint, targetIDs ...flow.Identifier) error {
-	targetIDs, err := flow.Sample(num, targetIDs...)
-	if err != nil {
-		return err
-	}
+	targetIDs = flow.Sample(num, targetIDs...)
 	return n.submit(event, channelID, targetIDs...)
 }
 

@@ -367,9 +367,9 @@ func (n *Network) removeSelfFilter(ids ...flow.Identifier) ([]flow.Identifier, e
 }
 
 // sampleFilter returns an identitiferFilter which returns a random sample from ids
-func sampleFilter(size uint, ids ...flow.Identifier) identifierFilter {
+func sampleFilter(size uint) identifierFilter {
 	return func(ids ...flow.Identifier) ([]flow.Identifier, error) {
-		return flow.Sample(size, ids...)
+		return flow.Sample(size, ids...), nil
 	}
 }
 
