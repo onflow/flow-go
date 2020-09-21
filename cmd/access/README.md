@@ -34,8 +34,8 @@ At a high level it does the following:
 
 - **Transaction** - a transaction represents a unit of computation that is submitted to the Flow network.
 - **Collection** - a set of transactions proposed by a cluster of collection nodes.
-- **Header**, also _Block Header_ - a data structure containing the meta-data for a block, including the merkle root hash for the payload as well as the relevant consensus node signatures.
-- **Block** - the combination of a block header with a block contents, representing all of the data necessary to construct and validate the entirety of the block.
+- **Header**, also _Block Header_ - a data structure containing the meta-data for a block, including the Merkle root hash for the payload as well as the relevant consensus node signatures.
+- **Block** - the combination of a block header with block contents, representing all the data necessary to construct and validate the entirety of the block.
 
 ## Processes
 
@@ -49,14 +49,14 @@ an execution node is requested for events for the transaction and the transactio
     2. If either the collection or the block is not found locally, but the transaction has not expired, then it's status is returned as `pending`
     3. If the transaction has neither expired nor is it pending, but the execution node has not yet executed the transaction,
        then the status of the transaction is returned as `finalized`.
-    4. If execution node has executed the transaction, then if the height of the block containing the transaction is greater than the current chain height,
+    4. If the execution node has executed the transaction, then if the height of the block containing the transaction is greater than the current chain height,
     then the status of the transaction is returned as `executed` else it is returned as `sealed`.
-    5. If the collection, block or chain state lookup failed then the status is returned as `unknown`.
+    5. If the collection, block, or chain state lookup failed then the status is returned as `unknown`.
 
 
 ## Engines
 
-Engines are units of application logic which are generally responsible for a well-isolated process that is part of the bigger system. They receive messages from the network on selected channels and submit messages to the network on the same channels.
+Engines are units of application logic that are generally responsible for a well-isolated process that is part of the bigger system. They receive messages from the network on selected channels and submit messages to the network on the same channels.
 
 ### [Follower Engine](../../engine/common/follower)
 
