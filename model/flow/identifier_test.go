@@ -56,7 +56,7 @@ func TestIdentifierSample(t *testing.T) {
 
 	total := 10
 	ids := make([]flow.Identifier, total)
-	for i, _ := range ids {
+	for i := range ids {
 		ids[i] = unittest.IdentifierFixture()
 	}
 
