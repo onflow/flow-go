@@ -122,6 +122,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return identity
 	}, nil)
 
+	txResults.EXPECT().BatchStore(gomock.Any(), gomock.Any()).AnyTimes()
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}

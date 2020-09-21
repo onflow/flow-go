@@ -21,11 +21,8 @@ func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 }
 
 // Append will append the id to the list of identifiers associated with key.
-// If the returned error is nil, the boolean value indicates whether the append was
-// successful, or dropped since the id is already associated with the key.
-func (i *IdentifierMap) Append(key, id flow.Identifier) (bool, error) {
-	appended := false
-	err := i.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+func (i *IdentifierMap) Append(key, id flow.Identifier) error {
+	return i.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		var ids map[flow.Identifier]struct{}
 		entity, ok := backdata[key]
 		if !ok {
@@ -59,11 +56,8 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) (bool, error) {
 		}
 
 		backdata[key] = idMapEntity
-		appended = true
 		return nil
 	})
-
-	return appended, err
 }
 
 // Get returns list of all identifiers associated with key and true, if the key exists in the mempool.
@@ -87,9 +81,62 @@ func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 	return ids, true
 }
 
+// Has returns true if the key exists in the map, i.e., there is at least an id
+// attached to it.
+func (i *IdentifierMap) Has(key flow.Identifier) bool {
+	return i.Backend.Has(key)
+}
+
 // Rem removes the given key with all associated identifiers.
-func (i *IdentifierMap) Rem(id flow.Identifier) bool {
-	return i.Backend.Rem(id)
+func (i *IdentifierMap) Rem(key flow.Identifier) bool {
+	return i.Backend.Rem(key)
+}
+
+// RemIdFromKey removes the id from the list of identifiers associated with key.
+// If the list becomes empty, it also removes the key from the map.
+func (i *IdentifierMap) RemIdFromKey(key, id flow.Identifier) error {
+	err := i.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		// var ids map[flow.Identifier]struct{}
+		entity, ok := backdata[key]
+		if !ok {
+			// entity key has already been removed
+			return nil
+		}
+
+		idMapEntity, ok := entity.(model.IdMapEntity)
+		if !ok {
+			return fmt.Errorf("could not assert entity to IdMapEntity")
+		}
+
+		if _, ok := idMapEntity.IDs[id]; !ok {
+			// id has already been removed from the key map
+			return nil
+		}
+
+		// removes map entry associated with key for update
+		delete(backdata, key)
+
+		// removes id from the secondary map of the key
+		delete(idMapEntity.IDs, id)
+
+		if len(idMapEntity.IDs) == 0 {
+			// all ids related to key are removed, so there is no need
+			// to add key back to the idMapEntity
+			return nil
+		}
+
+		// adds the new ids list associated with key to mempool
+		idMapEntity = model.IdMapEntity{
+			Key: key,
+			IDs: idMapEntity.IDs,
+		}
+
+		backdata[key] = idMapEntity
+
+		return nil
+	})
+
+	return err
 }
 
 // Size returns number of IdMapEntities in mempool

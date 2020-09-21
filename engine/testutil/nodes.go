@@ -387,6 +387,8 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	requestInterval time.Duration,
 	processInterval time.Duration,
+	receiptsLimit uint,
+	chunksLimit uint,
 	failureThreshold uint,
 	chainID flow.ChainID,
 	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
@@ -403,7 +405,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.CachedReceipts == nil {
-		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
 		require.Nil(t, err)
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourceCachedReceipt, node.CachedReceipts.Size)
@@ -411,7 +413,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
@@ -420,7 +422,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ReadyReceipts == nil {
-		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
 		require.Nil(t, err)
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourceReceipt, node.ReadyReceipts.Size)
@@ -428,7 +430,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingResults == nil {
-		node.PendingResults = stdmap.NewPendingResults()
+		node.PendingResults = stdmap.NewResultDataPacks(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
@@ -441,7 +443,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingChunks == nil {
-		node.PendingChunks = match.NewChunks(1000)
+		node.PendingChunks = match.NewChunks(chunksLimit)
 
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.PendingChunks.Size)
@@ -449,7 +451,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedResultIDs == nil {
-		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
+		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
@@ -467,7 +469,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingReceiptIDsByBlock == nil {
-		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
+		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
@@ -476,11 +478,20 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ReceiptIDsByResult == nil {
-		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
+		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, node.ReceiptIDsByResult.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ChunkIDsByResult == nil {
+		node.ChunkIDsByResult, err = stdmap.NewIdentifierMap(chunksLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceChunkIDsByResult, node.ChunkIDsByResult.Size)
 		require.Nil(t, err)
 	}
 
@@ -513,6 +524,7 @@ func VerificationNode(t testing.TB,
 			node.Net,
 			node.Me,
 			node.PendingResults,
+			node.ChunkIDsByResult,
 			node.VerifierEngine,
 			assigner,
 			node.State,

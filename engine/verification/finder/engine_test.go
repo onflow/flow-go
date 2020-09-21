@@ -219,11 +219,11 @@ func (suite *FinderEngineTestSuite) TestCachedToPending() {
 
 	// mocks adding receipt id to mapping mempool based on its result
 	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).
-		Return(true, nil).Once()
+		Return(nil).Once()
 
 	// mocks adding receipt pending for block ID
 	suite.receiptIDsByBlock.On("Append", suite.receipt.ExecutionResult.BlockID, suite.receipt.ID()).
-		Return(true, nil).Once()
+		Return(nil).Once()
 
 	// mocks moving from cached to pending
 	moveWG := sync.WaitGroup{}
