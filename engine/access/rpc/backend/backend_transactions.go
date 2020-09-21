@@ -46,6 +46,7 @@ func (b *backendTransactions) SendTransaction(
 
 	err := b.trySendTransaction(ctx, tx)
 	if err != nil {
+		b.transactionMetrics.TransactionSubmissionFailed()
 		return status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
 	}
 
@@ -57,7 +58,9 @@ func (b *backendTransactions) SendTransaction(
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
-	go b.registerTransactionForRetry(tx)
+	if b.retry.IsActive() {
+		go b.registerTransactionForRetry(tx)
+	}
 
 	return nil
 }
@@ -95,7 +98,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sampleSize uint) ([]string, error) {
 
 	// retrieve the set of collector clusters
-	clusters, err := b.state.Final().Clusters()
+	clusters, err := b.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
@@ -299,9 +302,11 @@ func (b *backendTransactions) lookupTransactionResult(
 			// No result yet, indicate that it has not been executed
 			return false, nil, 0, "", nil
 		}
+		// Other Error trying to retrieve the result, return with err
+		return false, nil, 0, "", err
 	}
 
-	// considered executed as long as some result is returned, even if it's an error
+	// considered executed as long as some result is returned, even if it's an error message
 	return true, events, txStatus, message, nil
 }
 

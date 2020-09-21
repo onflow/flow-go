@@ -20,7 +20,7 @@
 #define DOUBLE_PAIRING 1
 #define SINGLE_PAIRING (DOUBLE_PAIRING^1)
 
-// Signature membership check
+// Signature and public key membership check
 #define MEMBERSHIP_CHECK 1
 
 // algorithm choice for the hashing to G1 

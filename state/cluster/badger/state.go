@@ -12,18 +12,18 @@ import (
 )
 
 type State struct {
-	db       *badger.DB
-	chainID  flow.ChainID // aka cluster ID
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
+	db        *badger.DB
+	clusterID flow.ChainID
+	headers   storage.Headers
+	payloads  storage.ClusterPayloads
 }
 
-func NewState(db *badger.DB, chainID flow.ChainID, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
+func NewState(db *badger.DB, clusterID flow.ChainID, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
 	state := &State{
-		db:       db,
-		chainID:  chainID,
-		headers:  headers,
-		payloads: payloads,
+		db:        db,
+		clusterID: clusterID,
+		headers:   headers,
+		payloads:  payloads,
 	}
 	return state, nil
 }
@@ -34,12 +34,12 @@ func (s *State) Final() cluster.Snapshot {
 	var blockID flow.Identifier
 	err := s.db.View(func(tx *badger.Txn) error {
 		var boundary uint64
-		err := operation.RetrieveClusterFinalizedHeight(s.chainID, &boundary)(tx)
+		err := operation.RetrieveClusterFinalizedHeight(s.clusterID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized boundary: %w", err)
 		}
 
-		err = operation.LookupClusterBlockHeight(s.chainID, boundary, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(s.clusterID, boundary, &blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized ID: %w", err)
 		}

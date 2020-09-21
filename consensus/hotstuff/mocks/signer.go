@@ -39,15 +39,15 @@ func (_m *Signer) CreateProposal(block *model.Block) (*model.Proposal, error) {
 }
 
 // CreateQC provides a mock function with given fields: votes
-func (_m *Signer) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, error) {
+func (_m *Signer) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 	ret := _m.Called(votes)
 
-	var r0 *model.QuorumCertificate
-	if rf, ok := ret.Get(0).(func([]*model.Vote) *model.QuorumCertificate); ok {
+	var r0 *flow.QuorumCertificate
+	if rf, ok := ret.Get(0).(func([]*model.Vote) *flow.QuorumCertificate); ok {
 		r0 = rf(votes)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.QuorumCertificate)
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
 		}
 	}
 

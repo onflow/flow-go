@@ -69,6 +69,12 @@ func (a Address) Hex() string {
 	return hex.EncodeToString(a.Bytes())
 }
 
+// HexWithPrefix returns the hex string representation of the address,
+// including the 0x prefix.
+func (a Address) HexWithPrefix() string {
+	return "0x" + a.Hex()
+}
+
 // String returns the string representation of the address.
 func (a Address) String() string {
 	return a.Hex()

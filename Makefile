@@ -23,7 +23,7 @@ UNAME := $(shell uname)
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
-# docker container registry 
+# docker container registry
 CONTAINER_REGISTRY=gcr.io/dl-flow
 
 export DOCKER_BUILDKIT := 1
@@ -106,7 +106,6 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="state/protocol" -case=underscore -output="state/protocol/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir="state/dkg" -case=underscore -output="state/dkg/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/sync -case=underscore -output="./engine/execution/sync/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
@@ -126,7 +125,6 @@ tidy:
 	cd integration; go mod tidy
 	cd crypto; go mod tidy
 	cd cmd/testclient; go mod tidy
-	cd protobuf; go mod tidy
 	git diff --exit-code
 
 .PHONY: lint
@@ -134,9 +132,9 @@ lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
-# Runs unit tests, coverage, linter
+# Runs linter, unit tests, SKIP FOR NOW coverage
 .PHONY: ci
-ci: install-tools tidy lint test coverage
+ci: install-tools tidy lint test # coverage
 
 # Runs integration tests
 # NOTE: we do not need `docker-build-flow` as this is run as a separate step

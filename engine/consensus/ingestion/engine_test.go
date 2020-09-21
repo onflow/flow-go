@@ -34,6 +34,8 @@ type IngestionSuite struct {
 	head   *flow.Header
 
 	final   *mockprotocol.Snapshot
+	query   *mockprotocol.EpochQuery
+	epoch   *mockprotocol.Epoch
 	headers *mockstorage.Headers
 	pool    *mockmempool.Guarantees
 	con     *mocknetwork.Conduit
@@ -58,8 +60,7 @@ func (is *IngestionSuite) SetupTest() {
 	is.collID = coll.NodeID
 	is.execID = exec.NodeID
 
-	clusters := flow.NewClusterList(1)
-	clusters.Add(0, coll)
+	clusters := flow.ClusterList{flow.IdentityList{coll}}
 
 	identities := flow.IdentityList{con1, con2, con3, coll, exec}
 	lookup := make(map[flow.Identifier]*flow.Identity)
@@ -71,6 +72,8 @@ func (is *IngestionSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
+	is.query = &mockprotocol.EpochQuery{}
+	is.epoch = &mockprotocol.Epoch{}
 	headers := &mockstorage.Headers{}
 	me := &mockmodule.Local{}
 	pool := &mockmempool.Guarantees{}
@@ -93,7 +96,9 @@ func (is *IngestionSuite) SetupTest() {
 		},
 		nil,
 	)
-	final.On("Clusters").Return(clusters, nil)
+	final.On("Epochs").Return(is.query)
+	is.query.On("Current").Return(is.epoch)
+	is.epoch.On("Clustering").Return(clusters, nil)
 
 	// we use the first consensus node as our local identity
 	me.On("NodeID").Return(is.con1ID)

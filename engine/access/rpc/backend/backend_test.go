@@ -79,6 +79,7 @@ func (suite *Suite) TestPing() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	err := backend.Ping(context.Background())
@@ -100,6 +101,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	// query the handler for the latest finalized block
@@ -127,6 +129,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	// query the handler for the latest sealed block
@@ -158,6 +161,7 @@ func (suite *Suite) TestGetTransaction() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -185,6 +189,7 @@ func (suite *Suite) TestGetCollection() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
@@ -252,6 +257,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	// Successfully return empty event list
@@ -352,6 +358,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	// first call - referenced block isn't known yet, so should return pending status
@@ -396,6 +403,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	// query the handler for the latest finalized header
@@ -461,6 +469,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	// execute request
@@ -546,6 +555,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			0,
 			nil,
+			false,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -575,6 +585,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			0,
 			nil,
+			false,
 		)
 
 		// execute request
@@ -603,6 +614,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			0,
 			nil,
+			false,
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -626,7 +638,7 @@ func (suite *Suite) TestGetAccount() {
 
 	// setup the latest sealed block
 	header := unittest.BlockHeaderFixture() // create a mock header
-	seal := unittest.BlockSealFixture()     // create a mock seal
+	seal := unittest.SealFixture()          // create a mock seal
 	seal.BlockID = header.ID()              // make the seal point to the header
 
 	suite.snapshot.
@@ -663,6 +675,7 @@ func (suite *Suite) TestGetAccount() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	suite.Run("happy path - valid request and valid response", func() {
@@ -721,6 +734,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	suite.Run("happy path - valid request and valid response", func() {
@@ -742,6 +756,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		metrics.NewNoopCollector(),
 		0,
 		nil,
+		false,
 	)
 
 	params := backend.GetNetworkParameters(context.Background())

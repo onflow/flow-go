@@ -35,6 +35,7 @@ type Suite struct {
 	proto struct {
 		state    *protocol.State
 		snapshot *protocol.Snapshot
+		params   *protocol.Params
 		mutator  *protocol.Mutator
 	}
 
@@ -61,15 +62,17 @@ func (suite *Suite) SetupTest() {
 	// mock out protocol state
 	suite.proto.state = new(protocol.State)
 	suite.proto.snapshot = new(protocol.Snapshot)
+	suite.proto.params = new(protocol.Params)
 	suite.proto.state.On("Identity").Return(obsIdentity, nil)
 	suite.proto.state.On("Final").Return(suite.proto.snapshot, nil)
+	suite.proto.state.On("Params").Return(suite.proto.params)
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 
 	net := new(module.Network)
 	conduit := new(network.Conduit)
-	net.On("Register", uint8(engine.ReceiveReceipts), mock.Anything).
+	net.On("Register", engine.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
 	suite.request = new(module.Requester)
@@ -87,7 +90,7 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0)
+		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0, false)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
@@ -350,16 +353,30 @@ func (suite *Suite) TestRequestMissingCollections() {
 	})
 }
 
+// TestUpdateLastFullBlockReceivedIndex tests that UpdateLastFullBlockReceivedIndex function keeps the FullBlockIndex
+// upto date and request collections if blocks with missing collections exceed the threshold.
 func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 	blkCnt := 3
+	collPerBlk := 10
 	startHeight := uint64(1000)
 	blocks := make([]flow.Block, blkCnt)
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
+	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
-	// generate the test blocks
+	// generate the test blocks, cgs and collections
 	for i := 0; i < blkCnt; i++ {
+		cgs := make([]*flow.CollectionGuarantee, collPerBlk)
+		for j := 0; j < collPerBlk; j++ {
+			coll := unittest.CollectionFixture(2).Light()
+			collMap[coll.ID()] = &coll
+			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
+				cg.CollectionID = coll.ID()
+			})
+			cgs[j] = cg
+		}
 		block := unittest.BlockFixture()
-		// some blocks may not be present hence add a gap
+		block.Payload.Guarantees = cgs
+		// set the height
 		height := startHeight + uint64(i)
 		block.Header.Height = height
 		blocks[i] = block
@@ -367,6 +384,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 	}
 
 	rootBlk := blocks[0]
+	rootBlkHeight := rootBlk.Header.Height
 	finalizedBlk := blocks[blkCnt-1]
 	finalizedHeight := finalizedBlk.Header.Height
 
@@ -384,8 +402,24 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			return storerr.ErrNotFound
 		})
 
-	// consider no collections are missing
-	suite.collections.On("LightByID", mock.Anything).Return(nil, nil)
+	// blkMissingColl controls which collections are reported as missing by the collections storage mock
+	blkMissingColl := make([]bool, blkCnt)
+	for i := 0; i < blkCnt; i++ {
+		blkMissingColl[i] = false
+		for _, cg := range blocks[i].Payload.Guarantees {
+			j := i
+			suite.collections.On("LightByID", cg.CollectionID).Return(
+				func(cID flow.Identifier) *flow.LightCollection {
+					return collMap[cID]
+				},
+				func(cID flow.Identifier) error {
+					if blkMissingColl[j] {
+						return storerr.ErrNotFound
+					}
+					return nil
+				})
+		}
+	}
 
 	var lastFullBlockHeight uint64
 	var rtnErr error
@@ -404,7 +438,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		// simulate the absence of the full block height index
 		lastFullBlockHeight = 0
 		rtnErr = storerr.ErrNotFound
-		suite.proto.state.On("Root").Return(rootBlk.Header, nil)
+		suite.proto.params.On("Root").Return(rootBlk.Header, nil)
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
 		suite.eng.updateLastFullBlockReceivedIndex()
@@ -428,6 +462,53 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		lastFullBlockHeight = finalizedHeight
 
 		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
+	})
+
+	suite.Run("missing collections are requested", func() {
+		// root block is the last complete block
+		rtnErr = nil
+		lastFullBlockHeight = rootBlkHeight
+
+		// lower the height threshold to request missing collections
+		defaultMissingCollsForBlkThreshold = 2
+
+		// mark all blocks beyond the root block as incomplete
+		for i := 1; i < blkCnt; i++ {
+			blkMissingColl[i] = true
+			// setup receive engine expectations
+			for _, cg := range blocks[i].Payload.Guarantees {
+				suite.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
+			}
+		}
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+
+		// assert that missing collections are requested
+		suite.request.AssertExpectations(suite.T())
+
+		// last full blk index is not advanced
+		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
+	})
+	suite.Run("missing collections are not requested if threshold not reached", func() {
+		// root block is the last complete block
+		rtnErr = nil
+		lastFullBlockHeight = rootBlkHeight
+
+		// raise the height threshold to avoid requesting missing collections
+		defaultMissingCollsForBlkThreshold = 3
+
+		// mark all blocks beyond the root block as incomplete
+		for i := 1; i < blkCnt; i++ {
+			blkMissingColl[i] = true
+		}
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+
+		// assert that missing collections are not requested even though there are collections missing
+		suite.request.AssertExpectations(suite.T())
+
+		// last full blk index is not advanced
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 }

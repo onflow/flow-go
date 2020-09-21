@@ -112,7 +112,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.assertTimeOut = 5 * suite.processInterval
 
 	// mocking the network registration of the engine
-	suite.net.On("Register", uint8(engine.ReceiveReceipts), testifymock.Anything).
+	suite.net.On("Register", engine.ReceiveReceipts, testifymock.Anything).
 		Return(suite.receiptsConduit, nil).
 		Once()
 

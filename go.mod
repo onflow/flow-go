@@ -6,7 +6,6 @@ require (
 	cloud.google.com/go/storage v1.6.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200526041238-ad2360621a1a
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200708192840-30b3e2d5a586
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
@@ -15,6 +14,8 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.4.0
+	github.com/google/go-cmp v0.4.0
+	github.com/google/uuid v1.1.1
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
@@ -28,6 +29,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.0
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/onflow/cadence v0.8.2
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0
 	github.com/onflow/flow-go-sdk v0.8.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.5
 	github.com/opentracing/opentracing-go v1.2.0
@@ -49,7 +51,8 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
-	gopkg.in/yaml.v2 v2.2.8 // indirect
+	google.golang.org/protobuf v1.23.0 // indirect
+	gotest.tools v2.2.0+incompatible
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

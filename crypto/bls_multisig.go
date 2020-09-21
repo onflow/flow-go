@@ -17,7 +17,7 @@ import (
 // existing features:
 //  - the same BLS set-up in bls.go
 //  - Use the proof of possession (PoP) to prevent the Rogue public-key attack.
-//  - Non-interactive aggregation of private keys, public keys or signatures.
+//  - Non-interactive aggregation of private keys, public keys and signatures.
 //  - Non-interactive subtraction of multiple public keys from a (aggregated) public key.
 //  - Multi-signature verification of an aggregated signatures of a single message
 //  under multiple public keys.

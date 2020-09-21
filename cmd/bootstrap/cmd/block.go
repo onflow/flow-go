@@ -9,31 +9,18 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func constructRootBlock(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string, nodeInfos []model.NodeInfo) *flow.Block {
+func constructRootBlock(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) *flow.Block {
 
 	chainID := parseChainID(rootChain)
 	parentID := parseParentID(rootParent)
 	height := rootHeight
 	timestamp := parseRootTimestamp(rootTimestamp)
-	participants := generateIdentityList(nodeInfos)
 
-	block := run.GenerateRootBlock(chainID, parentID, height, timestamp, participants)
+	block := run.GenerateRootBlock(chainID, parentID, height, timestamp)
 
 	writeJSON(model.PathRootBlock, block)
 
 	return block
-}
-
-func generateIdentityList(nodes []model.NodeInfo) flow.IdentityList {
-
-	list := make([]*flow.Identity, 0, len(nodes))
-
-	for _, node := range nodes {
-		ident := node.Identity()
-		list = append(list, ident)
-	}
-
-	return list
 }
 
 func parseChainID(chainID string) flow.ChainID {

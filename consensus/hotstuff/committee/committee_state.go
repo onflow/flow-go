@@ -113,6 +113,12 @@ func (c *Committee) Self() flow.Identifier {
 	return c.myID
 }
 
+// DKG returns the DKG info for the given block.
+func (c *Committee) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+	dkg, err := c.protocolState.AtBlockID(blockID).Epochs().Current().DKG()
+	return dkg, err
+}
+
 // New creates HotStuff committee. This is the generic constructor covering all potential cases.
 // It requires:
 //    * protocolState: the protocol state for the entire network

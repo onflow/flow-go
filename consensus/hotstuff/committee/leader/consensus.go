@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/indices"
@@ -13,7 +12,7 @@ import (
 
 const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months
 
-func NewSelectionForConsensus(count int, rootHeader *flow.Header, rootQC *model.QuorumCertificate, st protocol.State) (*committee.LeaderSelection, error) {
+func NewSelectionForConsensus(count int, rootHeader *flow.Header, rootQC *flow.QuorumCertificate, st protocol.State) (*committee.LeaderSelection, error) {
 	seed, err := ReadSeed(indices.ProtocolConsensusLeaderSelection, rootHeader, rootQC, st)
 	if err != nil {
 		return nil, fmt.Errorf("could not read seed: %w", err)

@@ -16,12 +16,12 @@ type VoteAggregator struct {
 	voteValidator         hotstuff.Validator
 	signer                hotstuff.Signer
 	highestPrunedView     uint64
-	pendingVotes          *PendingVotes                                // keeps track of votes whose blocks can not be found
-	viewToBlockIDSet      map[uint64]map[flow.Identifier]struct{}      // for pruning
-	viewToVoteID          map[uint64]map[flow.Identifier]*model.Vote   // for detecting double voting
-	createdQC             map[flow.Identifier]*model.QuorumCertificate // keeps track of QCs that have been made for blocks
-	blockIDToVotingStatus map[flow.Identifier]*VotingStatus            // keeps track of accumulated votes and stakes for blocks
-	proposerVotes         map[flow.Identifier]*model.Vote              // holds the votes of block proposers, so we can avoid passing around proposals everywhere
+	pendingVotes          *PendingVotes                               // keeps track of votes whose blocks can not be found
+	viewToBlockIDSet      map[uint64]map[flow.Identifier]struct{}     // for pruning
+	viewToVoteID          map[uint64]map[flow.Identifier]*model.Vote  // for detecting double voting
+	createdQC             map[flow.Identifier]*flow.QuorumCertificate // keeps track of QCs that have been made for blocks
+	blockIDToVotingStatus map[flow.Identifier]*VotingStatus           // keeps track of accumulated votes and stakes for blocks
+	proposerVotes         map[flow.Identifier]*model.Vote             // holds the votes of block proposers, so we can avoid passing around proposals everywhere
 }
 
 // New creates an instance of vote aggregator
@@ -35,7 +35,7 @@ func New(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuf
 		pendingVotes:          NewPendingVotes(),
 		viewToBlockIDSet:      make(map[uint64]map[flow.Identifier]struct{}),
 		viewToVoteID:          make(map[uint64]map[flow.Identifier]*model.Vote),
-		createdQC:             make(map[flow.Identifier]*model.QuorumCertificate),
+		createdQC:             make(map[flow.Identifier]*flow.QuorumCertificate),
 		blockIDToVotingStatus: make(map[flow.Identifier]*VotingStatus),
 		proposerVotes:         make(map[flow.Identifier]*model.Vote),
 	}
@@ -73,7 +73,7 @@ func (va *VoteAggregator) StorePendingVote(vote *model.Vote) (bool, error) {
 // The VoteAggregator builds a QC as soon as the number of votes allow this.
 // While subsequent votes (past the required threshold) are not included in the QC anymore,
 // VoteAggregator ALWAYS returns the same QC as the one returned before.
-func (va *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*model.QuorumCertificate, bool, error) {
+func (va *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*flow.QuorumCertificate, bool, error) {
 	if vote.BlockID != block.BlockID {
 		return nil, false, fmt.Errorf("vote and block don't have the same block ID: vote.BlockID (%v), block.BlockID: (%v)",
 			vote.BlockID, block.BlockID)
@@ -165,7 +165,7 @@ func (va *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
 // It returns (nil, false, nil) if not enough votes to build a QC.
 // It returns (nil, false, nil) if the block is stale
 // It returns (nil, false, err) if there is an unknown error
-func (va *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*model.QuorumCertificate, bool, error) {
+func (va *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error) {
 	// return the QC that was built before if exists
 	oldQC, exists := va.createdQC[block.BlockID]
 	if exists {
@@ -322,7 +322,7 @@ func (va *VoteAggregator) updateState(vote *model.Vote) {
 	}
 }
 
-func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*model.QuorumCertificate, bool, error) {
+func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*flow.QuorumCertificate, bool, error) {
 	votingStatus, exists := va.blockIDToVotingStatus[blockID]
 	if !exists { // can not build a qc if voting status doesn't exist
 		return nil, false, nil
@@ -336,6 +336,7 @@ func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*model.QuorumCert
 	}
 
 	va.createdQC[blockID] = qc
+	va.notifier.OnQcConstructedFromVotes(qc)
 	return qc, true, nil
 }
 

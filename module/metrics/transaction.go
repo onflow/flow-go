@@ -20,6 +20,7 @@ type TransactionCollector struct {
 	timeToFinalized            prometheus.Summary
 	timeToExecuted             prometheus.Summary
 	timeToFinalizedExecuted    prometheus.Summary
+	transactionSubmission      *prometheus.CounterVec
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -74,6 +75,12 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			AgeBuckets: 5,
 			BufCap:     500,
 		}),
+		transactionSubmission: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "transaction_submission",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "counter for the success/failure of transaction submissions",
+		}, []string{"result"}),
 	}
 
 	return tc
@@ -90,6 +97,9 @@ func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when t
 }
 
 func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when time.Time) {
+	// Count as submitted as long as it's finalized
+	tc.transactionSubmission.WithLabelValues("success").Inc()
+
 	t, updated := tc.transactionTimings.Adjust(txID, func(t *flow.TransactionTiming) *flow.TransactionTiming {
 		t.Finalized = when
 		return t
@@ -181,4 +191,19 @@ func (tc *TransactionCollector) trackTTFE(t *flow.TransactionTiming, log bool) {
 		tc.log.Info().Str("transaction_id", t.TransactionID.String()).Float64("duration", duration).
 			Msg("transaction time to finalized and executed")
 	}
+}
+
+func (tc *TransactionCollector) TransactionSubmissionFailed() {
+	tc.transactionSubmission.WithLabelValues("failed").Inc()
+}
+
+func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
+	_, exist := tc.transactionTimings.ByID(txID)
+
+	if !exist {
+		// likely previously removed, either executed or expired
+		return
+	}
+	tc.transactionSubmission.WithLabelValues("expired").Inc()
+	tc.transactionTimings.Rem(txID)
 }
