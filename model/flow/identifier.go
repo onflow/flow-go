@@ -5,6 +5,7 @@ package flow
 import (
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"reflect"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -136,4 +137,19 @@ func ConcatSum(ids ...Identifier) Identifier {
 func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 	computed := ConcatSum(fps...)
 	return sum == computed
+}
+
+// Sample returns simple random sample of length 'size' of the ids or an error if size is greater then the number of ids
+func Sample(size uint, ids ...Identifier) ([]Identifier, error) {
+	n := uint(len(ids))
+	if size > n {
+		return nil, fmt.Errorf("insufficient target ids, requested: %d, found %d", size, n)
+	}
+	dup := make([]Identifier, 0, n)
+	dup = append(dup, ids...)
+	for i := uint(0); i < size; i++ {
+		j := uint(rand.Intn(int(n - i)))
+		dup[i], dup[j+i] = dup[j+i], dup[i]
+	}
+	return dup[:size], nil
 }

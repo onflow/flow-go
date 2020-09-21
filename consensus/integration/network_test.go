@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/network"
 )
 
@@ -127,39 +126,18 @@ func (n *Network) unicast(event interface{}, channelID string, targetID flow.Ide
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel ID on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(event interface{}, channelID string, selector flow.IdentityFilter) error {
-	// excludes this instance of network from list of targeted ids (if any)
-	// to avoid self loop on delivering this message.
-	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.originID)))
-
-	// extracts list of recipient identities
-	targetIDs := n.hub.identities.Filter(selector).NodeIDs()
-	if len(targetIDs) == 0 {
-		return fmt.Errorf("empty target ID list for the message")
-	}
-
+func (n *Network) publish(event interface{}, channelID string, targetIDs ...flow.Identifier) error {
 	return n.submit(event, channelID, targetIDs...)
-
 }
 
 // multicast is called when an Engine attached to the channel ID is sending an event to a number of randomly chosen
 // Engines attached to the same channel ID on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(event interface{}, channelID string, num uint, selector flow.IdentityFilter) error {
-	// excludes this instance of network from list of targeted ids (if any)
-	// to avoid self loop on delivering this message.
-	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.originID)))
-
-	// NOTE: this is where we can add our own selectors, for example to
-	// apply a blacklist or exclude nodes that are in exponential backoff
-	// because they were unavailable
-
-	// chooses `num`-many recipients based on selector
-	targetIDs := n.hub.identities.Filter(selector).Sample(num).NodeIDs()
-	if len(targetIDs) < int(num) {
-		return fmt.Errorf("could not find recepients based on selector: Requested: %d, Found: %d", num, len(targetIDs))
+func (n *Network) multicast(event interface{}, channelID string, num uint, targetIDs ...flow.Identifier) error {
+	targetIDs, err := flow.Sample(num, targetIDs...)
+	if err != nil {
+		return err
 	}
-
 	return n.submit(event, channelID, targetIDs...)
 }
 
@@ -173,16 +151,16 @@ func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error 
 	return c.net.submit(event, c.channelID, targetIDs...)
 }
 
-func (c *Conduit) Publish(event interface{}, selector flow.IdentityFilter) error {
-	return c.net.publish(event, c.channelID, selector)
+func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+	return c.net.publish(event, c.channelID, targetIDs...)
 }
 
 func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 	return c.net.unicast(event, c.channelID, targetID)
 }
 
-func (c *Conduit) Multicast(event interface{}, num uint, selector flow.IdentityFilter) error {
-	return c.net.multicast(event, c.channelID, num, selector)
+func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
+	return c.net.multicast(event, c.channelID, num, targetIDs...)
 }
 
 type message struct {

@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -100,46 +99,23 @@ func (n *Network) unicast(channelID string, event interface{}, targetID flow.Ide
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel ID on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(channelID string, event interface{}, selector flow.IdentityFilter) error {
-	// excludes this instance of Network from list of targeted ids (if any)
-	// to avoid self loop on delivering this message.
-	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
-
-	// filters in target ids based on selector
-	targetIDs, err := n.state.Final().Identities(selector)
-	if err != nil {
-		return fmt.Errorf("publish could not extract identities based on selector: %w", err)
-	}
+func (n *Network) publish(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
 
 	if len(targetIDs) == 0 {
 		return fmt.Errorf("publish found empty target ID list for the message")
 	}
 
-	return n.submit(channelID, event, targetIDs.NodeIDs()...)
-
+	return n.submit(channelID, event, targetIDs...)
 }
 
 // multicast is called when an engine attached to the channel ID is sending an event to a number of randomly chosen
 // Engines attached to the same channel ID on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(channelID string, event interface{}, num uint, selector flow.IdentityFilter) error {
-	// excludes this instance of Network from list of targeted ids (if any)
-	// to avoid self loop on delivering this message.
-	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
-
-	// filters in target ids based on selector
-	ids, err := n.state.Final().Identities(selector)
+func (n *Network) multicast(channelID string, event interface{}, num uint, targetIDs ...flow.Identifier) error {
+	targetIDs, err := flow.Sample(num, targetIDs...)
 	if err != nil {
-		return fmt.Errorf("multicast could not extract identities based on selector: %w", err)
+		return err
 	}
-
-	// samples `num`-many ids from the shortlisted target ids
-	targetIDs := ids.Sample(num).NodeIDs()
-	if len(targetIDs) < int(num) {
-		return fmt.Errorf("multicast could not find recepients based on selector: Requested: %d, Found: %d", num,
-			len(targetIDs))
-	}
-
 	return n.submit(channelID, event, targetIDs...)
 }
 

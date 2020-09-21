@@ -267,7 +267,7 @@ docker-build-access-debug:
 
 .PHONY: docker-build-ghost
 docker-build-ghost:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=ghost --target production \
+	docker build -f ./ghost/Dockerfile --ssh default --build-arg TARGET=ghost --target production \
 		-t "$(CONTAINER_REGISTRY)/ghost:latest" -t "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-ghost-debug
