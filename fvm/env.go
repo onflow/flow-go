@@ -266,7 +266,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 		panic("GetBlockAtHeight is not supported by this environment")
 	}
 
-	blockFromHeader := func(header *flow.Header) runtime.Block{
+	blockFromHeader := func(header *flow.Header) runtime.Block {
 		return runtime.Block{
 			Height:    header.Height,
 			View:      header.View,
