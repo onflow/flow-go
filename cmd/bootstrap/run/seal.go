@@ -6,7 +6,7 @@ func GenerateRootSeal(result *flow.ExecutionResult) *flow.Seal {
 	seal := &flow.Seal{
 		BlockID:    result.BlockID,
 		ResultID:   result.ID(),
-		FinalState: result.FinalStateCommit,
+		FinalState: result.Chunks[result.Chunks.Len()-1].EndState,
 	}
 	return seal
 }

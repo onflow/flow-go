@@ -5,12 +5,19 @@ import (
 )
 
 func Result(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
+	chunks := flow.ChunkList{}
+	chunk := &flow.Chunk{
+		Index:    0,
+		EndState: commit,
+	}
+
+	chunks.Insert(chunk)
+
 	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID:          block.ID(),
 			PreviousResultID: flow.ZeroID,
-			FinalStateCommit: commit,
-			Chunks:           nil,
+			Chunks:           chunks,
 		},
 		Signatures: nil,
 	}

@@ -452,8 +452,9 @@ func SetupMockVerifierEng(t testing.TB,
 func VerifiableDataChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunkData {
 	var endState flow.StateCommitment
 	// last chunk
+	chunks := er.Receipt.ExecutionResult.Chunks
 	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
-		endState = er.Receipt.ExecutionResult.FinalStateCommit
+		endState = chunks[chunks.Len()-1].EndState
 	} else {
 		endState = er.Receipt.ExecutionResult.Chunks[chunkIndex+1].StartState
 	}

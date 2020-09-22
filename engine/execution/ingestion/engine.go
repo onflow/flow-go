@@ -679,8 +679,12 @@ func (e *Engine) handleComputationResult(
 	}
 
 	chunks := receipt.ExecutionResult.Chunks
+	finalState := startState
+	if len(chunks) > 0 {
+		finalState = chunks[chunks.Len()-1].EndState
+	}
 
-	return chunks[chunks.Len()-1].EndState, nil
+	return finalState, nil
 }
 
 func (e *Engine) saveExecutionResults(
