@@ -133,21 +133,15 @@ func (bs *BuilderSuite) createAndRecordBlock(previous *flow.Block) *flow.Block {
 	return block
 }
 
-// Create a seal for the result's block, and link it to the previous seal's
-// final state, thereby creating a valid chain. The corresponding
+// Create a seal for the result's block. The corresponding
 // IncorporatedResultSeal, which ties the seal to the incorporated result it
 // seals, is also recorded for future access.
 func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
-	initial := bs.lastSeal.FinalState
-	final := unittest.StateCommitmentFixture()
-	if len(bs.chain) > 0 {
-		initial = bs.chain[len(bs.chain)-1].FinalState
-	}
+
 	seal := &flow.Seal{
-		BlockID:      incorporatedResult.Result.BlockID,
-		ResultID:     incorporatedResult.Result.ID(),
-		InitialState: initial,
-		FinalState:   final,
+		BlockID:    incorporatedResult.Result.BlockID,
+		ResultID:   incorporatedResult.Result.ID(),
+		FinalState: incorporatedResult.Result.FinalStateCommit,
 	}
 	bs.chain = append(bs.chain, seal)
 
@@ -155,6 +149,7 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	}
+
 	bs.irsMap[incorporatedResultSeal.ID()] = incorporatedResultSeal
 	bs.irsList = append(bs.irsList, incorporatedResultSeal)
 }
@@ -208,10 +203,9 @@ func (bs *BuilderSuite) SetupTest() {
 	first := bs.createAndRecordBlock(nil)
 	bs.firstID = first.ID()
 	bs.lastSeal = &flow.Seal{
-		BlockID:      first.ID(),
-		ResultID:     flow.ZeroID,
-		InitialState: unittest.StateCommitmentFixture(),
-		FinalState:   unittest.StateCommitmentFixture(),
+		BlockID:    first.ID(),
+		ResultID:   flow.ZeroID,
+		FinalState: unittest.StateCommitmentFixture(),
 	}
 	bs.seals[first.ID()] = bs.lastSeal
 
@@ -548,39 +542,8 @@ func (bs *BuilderSuite) TestPayloadSealSomeValid() {
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
 }
 
-func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
-
-	// remove the seal at the start
-	cutoff := bs.irsMap
-	first := bs.irsList[0]
-	delete(cutoff, first.ID())
-
-	bs.pendingSeals = cutoff
-
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
-	bs.Require().NoError(err)
-	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().Empty(bs.assembled.Seals, "should have not included any seals from cutoff chain")
-}
-
-func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
-
-	// remove the 4th seal
-	brokenChain := bs.irsMap
-	fourth := bs.irsList[3]
-	delete(brokenChain, fourth.ID())
-
-	bs.pendingSeals = brokenChain
-
-	// use both valid and non-valid seals for chain
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
-	bs.Require().NoError(err)
-	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().ElementsMatch(bs.chain[:3], bs.assembled.Seals, "should have included only beginning of broken chain")
-}
-
-// Receipts for unknown blocks should not be inserted, and should be removed
-// from the mempool.
+// // Receipts for unknown blocks should not be inserted, and should be removed
+// // from the mempool.
 func (bs *BuilderSuite) TestPayloadReceiptUnknownBlock() {
 
 	bs.pendingReceipts = []*flow.ExecutionReceipt{}

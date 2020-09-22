@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -551,24 +552,39 @@ func (e *Engine) sealResult(result *flow.IncorporatedResult) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload index: %w", err)
 	}
+
+	// ER contains c + 1 chunks where c is number of collections in a block
+	// the extra chunk is the SystemChunk
 	if len(result.Result.Chunks) != len(index.CollectionIDs) {
 		return errInvalidChunks
 	}
 
-	// ensure that previous result is known. The builder will ensure that the
-	// seals are correctly chained.
+	// ensure that previous result is known.
 	previousID := result.Result.PreviousResultID
-	previous, err := e.resultsDB.ByID(previousID)
+	_, err = e.resultsDB.ByID(previousID)
 	if err != nil {
 		return errUnknownPrevious
 	}
 
-	// generate and submit the seal to the mempool
+	// store the result to make it persistent for later checks
+	err = e.resultsDB.Store(result.Result)
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		return fmt.Errorf("could not store sealing result: %w", err)
+	}
+	err = e.resultsDB.Index(result.Result.BlockID, result.Result.ID())
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		return fmt.Errorf("could not index sealing result: %w", err)
+	}
+
+	// collect aggregate signatures
+	aggregatedSigs := e.collectAggregateSignatures(result.Result)
+
+	// generate & store seal
 	seal := &flow.Seal{
-		BlockID:      result.Result.BlockID,
-		ResultID:     result.ID(),
-		InitialState: previous.FinalStateCommit,
-		FinalState:   result.Result.FinalStateCommit,
+		BlockID:                result.Result.BlockID,
+		ResultID:               result.Result.ID(),
+		FinalState:             result.Result.FinalStateCommit,
+		AggregatedApprovalSigs: aggregatedSigs,
 	}
 
 	// we don't care whether the seal is already in the mempool
@@ -577,13 +593,38 @@ func (e *Engine) sealResult(result *flow.IncorporatedResult) error {
 		Seal:               seal,
 	})
 
-	// store the result to make it persistent for later checks
-	err = e.resultsDB.Store(result.Result)
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not store sealing result: %w", err)
+	return nil
+}
+
+// collectAggregateSignatures collects approver signatures and identities per chunk
+// TODO: needs testing
+func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
+	resultID := result.ID()
+	signatures := make([]flow.AggregatedSignature, 0, len(result.Chunks))
+
+	for _, chunk := range result.Chunks {
+		// get approvals for result with chunk index
+		approvals, _ := e.approvals.ByChunk(resultID, chunk.Index)
+
+		// temp slices to store signatures and ids
+		sigs := make([]crypto.Signature, 0, len(approvals))
+		ids := make([]flow.Identifier, 0, len(approvals))
+
+		// for each approval collect signature and approver id
+		for _, approval := range approvals {
+			ids = append(ids, approval.Body.ApproverID)
+			sigs = append(sigs, approval.Body.AttestationSignature)
+		}
+
+		aggSign := flow.AggregatedSignature{
+			VerifierSignatures: sigs,
+			SignerIDs:          ids,
+		}
+
+		signatures = append(signatures, aggSign)
 	}
 
-	return nil
+	return signatures
 }
 
 // clearPools clears the memory pools of all entities related to blocks that are

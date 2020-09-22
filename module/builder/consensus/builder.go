@@ -3,7 +3,6 @@
 package consensus
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"sort"
@@ -459,16 +458,11 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, *f
 	// order the seals in ascending order
 	orderedSeals := sortSeals(filteredSeals)
 
-	// check states are connected, and stop before maxSealCount
+	// don't collect more than maxSealCount
 	collectedSeals := make([]*flow.Seal, 0, len(orderedSeals))
 	for _, seal := range orderedSeals {
 		// stop when we hit the max
 		if uint(len(collectedSeals)) >= b.cfg.maxSealCount {
-			break
-		}
-
-		// check states
-		if !bytes.Equal(seal.InitialState, lastSeal.FinalState) {
 			break
 		}
 

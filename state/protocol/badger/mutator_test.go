@@ -355,7 +355,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.InitialState = nil
 		seal.FinalState = result.FinalStateCommit
 
 		fmt.Printf("root: %x\n", block.ID())
@@ -376,10 +375,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 		first.Header.PayloadHash = first.Payload.Hash()
 
 		extend := &flow.Seal{
-			BlockID:      first.ID(),
-			ResultID:     flow.ZeroID,
-			InitialState: seal.FinalState,
-			FinalState:   unittest.StateCommitmentFixture(),
+			BlockID:    first.ID(),
+			ResultID:   flow.ZeroID,
+			FinalState: unittest.StateCommitmentFixture(),
 		}
 
 		second := unittest.BlockFixture()
@@ -586,9 +584,8 @@ func TestExtendSealNotConnected(t *testing.T) {
 
 		// create seal for the block
 		second := &flow.Seal{
-			BlockID:      extend.ID(),
-			InitialState: unittest.StateCommitmentFixture(), // not root state
-			FinalState:   unittest.StateCommitmentFixture(),
+			BlockID:    extend.ID(),
+			FinalState: unittest.StateCommitmentFixture(),
 		}
 
 		sealing := unittest.BlockFixture()
