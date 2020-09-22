@@ -46,8 +46,7 @@ func (f *BuilderFactory) Create(
 	pool mempool.Transactions,
 ) (module.Builder, *finalizer.Finalizer, error) {
 
-	var payloadBuilder module.Builder
-	payloadBuilder = builder.NewBuilder(
+	build := builder.NewBuilder(
 		f.db,
 		f.mainChainHeaders,
 		clusterHeaders,
@@ -64,5 +63,5 @@ func (f *BuilderFactory) Create(
 		f.metrics,
 	)
 
-	return payloadBuilder, final, nil
+	return build, final, nil
 }
