@@ -258,11 +258,11 @@ func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarante
 }
 
 func BlockSealFixture() *flow.Seal {
+	// AggregatedApprovalSigs can be added when needed
 	return &flow.Seal{
-		BlockID:      IdentifierFixture(),
-		ResultID:     IdentifierFixture(),
-		InitialState: StateCommitmentFixture(),
-		FinalState:   StateCommitmentFixture(),
+		BlockID:    IdentifierFixture(),
+		ResultID:   IdentifierFixture(),
+		FinalState: StateCommitmentFixture(),
 	}
 }
 
@@ -270,9 +270,6 @@ func BlockSealsFixture(n int) []*flow.Seal {
 	seals := make([]*flow.Seal, 0, n)
 	for i := 0; i < n; i++ {
 		seal := BlockSealFixture()
-		if i > 0 {
-			seal.InitialState = seals[i-1].FinalState
-		}
 		seals = append(seals, seal)
 	}
 	return seals

@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -589,25 +590,52 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 		return fmt.Errorf("could not index sealing result: %w", err)
 	}
 
-	previous, err := e.resultsDB.ByID(result.PreviousResultID)
-	if err != nil {
-		// at this point the result should be sealable which implies that the
-		// previous result is known and sealed. Any error here is not expected.
-		return err
-	}
+	// collect aggregate signatures
+	aggregatedSigs := e.collectAggregateSignatures(result)
 
 	// generate & store seal
 	seal := &flow.Seal{
-		BlockID:      result.BlockID,
-		ResultID:     result.ID(),
-		InitialState: previous.FinalStateCommit,
-		FinalState:   result.FinalStateCommit,
+		BlockID:                result.BlockID,
+		ResultID:               result.ID(),
+		FinalState:             result.FinalStateCommit,
+		AggregatedApprovalSigs: aggregatedSigs,
 	}
 
 	// we don't care whether the seal is already in the mempool
 	_ = e.seals.Add(seal)
 
 	return nil
+}
+
+// collectAggregateSignatures collects approver signatures and identities per chunk
+// TODO: needs testing
+func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
+	resultID := result.ID()
+	signatures := make([]flow.AggregatedSignature, 0, len(result.Chunks))
+
+	for _, chunk := range result.Chunks {
+		// get approvals for result with chunk index
+		approvals, _ := e.approvals.ByChunk(resultID, chunk.Index)
+
+		// temp slices to store signatures and ids
+		sigs := make([]crypto.Signature, 0, len(approvals))
+		ids := make([]flow.Identifier, 0, len(approvals))
+
+		// for each approval collect signature and approver id
+		for _, approval := range approvals {
+			ids = append(ids, approval.Body.ApproverID)
+			sigs = append(sigs, approval.Body.AttestationSignature)
+		}
+
+		aggSign := flow.AggregatedSignature{
+			VerifierSignatures: sigs,
+			SignerIDs:          ids,
+		}
+
+		signatures = append(signatures, aggSign)
+	}
+
+	return signatures
 }
 
 // clearPools clears the memory pools of all entities related to blocks that are
