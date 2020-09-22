@@ -31,7 +31,7 @@ require (
 	github.com/onflow/cadence v0.8.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0
 	github.com/onflow/flow-go-sdk v0.8.0
-	github.com/onflow/flow/protobuf/go/flow v0.1.5
+	github.com/onflow/flow/protobuf/go/flow v0.1.7
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
