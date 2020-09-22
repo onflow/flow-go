@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	synccore "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -412,7 +413,7 @@ func (e *Engine) pollHeight() error {
 		Nonce:  rand.Uint64(),
 		Height: final.Height,
 	}
-	err = e.con.Multicast(req, 3, participants.NodeIDs()...)
+	err = e.con.Multicast(req, synccore.DefaultPollNodes, participants.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send sync request: %w", err)
 	}
@@ -440,7 +441,7 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Multicast(req, 3, participants.NodeIDs()...)
+		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants.NodeIDs()...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
@@ -459,7 +460,7 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Multicast(req, 3, participants.NodeIDs()...)
+		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants.NodeIDs()...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
