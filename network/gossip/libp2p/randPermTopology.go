@@ -32,28 +32,15 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 		return nil, fmt.Errorf("cannot sample topology idList %d smaller than desired fanout %d", len(idList), size)
 	}
 
-	// use the node's identifier as the random generator seed
-	rndSeed := make([]byte, 32)
-	copy(rndSeed, seed)
-	rng, err := random.NewRand(rndSeed)
-	if err != nil {
-		return nil, fmt.Errorf("cannot seed the prng: %w", err)
-	}
-
-	// find a random subset of the given size from the list
-	fanoutIDs, err := randomSubset(idList, size, rng)
-	if err != nil {
-		return nil, fmt.Errorf("cannot sample topology: %w", err)
-	}
-
-	remainder := idList.Filter(filter.Not(filter.In(fanoutIDs)))
+	anyNodeTypeSample := idList.Sample(uint(size))
+	remainder := idList.Filter(filter.Not(filter.In(anyNodeTypeSample)))
 
 	// find one id for each role from the remaining list,
 	// if it is not already part of fanoutIDs
 	oneOfEachRoleIDs := make(flow.IdentityList, 0)
 	for _, role := range flow.Roles() {
 
-		if len(fanoutIDs.Filter(filter.HasRole(role))) > 0 {
+		if len(anyNodeTypeSample.Filter(filter.HasRole(role))) > 0 {
 			// we already have a node with this role
 			continue
 		}
@@ -64,6 +51,7 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 			continue
 		}
 
+		selectedID := ids.Sample(1)
 		// choose 1 out of all the remaining nodes of this role
 		selectedID := rng.UintN(uint64(len(ids)))
 
@@ -116,3 +104,5 @@ func randomSubset(ids flow.IdentityList, size int, rnd random.Rand) (flow.Identi
 
 	return copy[:size], nil
 }
+
+
