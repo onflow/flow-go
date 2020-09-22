@@ -45,7 +45,7 @@ func TestOnBlockProposalValid(t *testing.T) {
 	me.On("NodeID").Return(localID)
 	state.On("Final").Return(final).Once()
 	final.On("Identities", mock.Anything).Return(identities[1:], nil).Once()
-	con.On("Submit", params...).Return(nil).Once()
+	con.On("Publish", params...).Return(nil).Once()
 
 	err := e.onBlockProposal(localID, proposal)
 	require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestOnBlockProposalSubmitFail(t *testing.T) {
 	me.On("NodeID").Return(localID)
 	state.On("Final").Return(final).Once()
 	final.On("Identities", mock.Anything).Return(identities[1:], nil).Once()
-	con.On("Submit", params...).Return(errors.New("submit failed")).Once()
+	con.On("Publish", params...).Return(errors.New("submit failed")).Once()
 
 	err := e.onBlockProposal(localID, proposal)
 	require.Error(t, err)

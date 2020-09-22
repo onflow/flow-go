@@ -142,7 +142,7 @@ func (is *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 	is.pool.On("Add", guarantee).Return(true)
 
 	// check that we call the submit with the correct consensus node IDs
-	is.con.On("Submit", guarantee, mock.Anything, mock.Anything).Run(
+	is.con.On("Publish", guarantee, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			nodeID1 := args.Get(1).(flow.Identifier)
 			nodeID2 := args.Get(2).(flow.Identifier)

@@ -246,7 +246,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	}
 
 	// send the collection guarantee to all consensus committee
-	err = e.con.Submit(guarantee, committee.NodeIDs()...)
+	err = e.con.Publish(guarantee, committee.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send guarantee: %w", err)
 	}
