@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/dgraph-io/badger/v2"

@@ -34,7 +34,7 @@ func NewParticipant(
 	builder module.Builder,
 	updater module.Finalizer,
 	persist hotstuff.Persister,
-	signer hotstuff.Signer,
+	signer hotstuff.SignerVerifier,
 	communicator hotstuff.Communicator,
 	rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate,

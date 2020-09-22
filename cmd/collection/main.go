@@ -16,6 +16,7 @@ import (
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/collection/epochmgr"
+	"github.com/dapperlabs/flow-go/engine/collection/epochmgr/factories"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/pusher"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
@@ -27,6 +28,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
+	"github.com/dapperlabs/flow-go/module/epochs"
 	confinalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -257,12 +259,12 @@ func main() {
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			clusterStateFactory, err := epochmgr.NewClusterStateFactory(node.DB, node.Metrics.Cache)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache)
 			if err != nil {
 				return nil, err
 			}
 
-			builderFactory, err := epochmgr.NewBuilderFactory(
+			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
 				node.Storage.Headers,
 				node.Tracer,
@@ -275,7 +277,7 @@ func main() {
 				return nil, err
 			}
 
-			proposalFactory, err := epochmgr.NewProposalEngineFactory(
+			proposalFactory, err := factories.NewProposalEngineFactory(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -290,7 +292,7 @@ func main() {
 				return nil, err
 			}
 
-			syncFactory, err := epochmgr.NewSyncEngineFactory(
+			syncFactory, err := factories.NewSyncEngineFactory(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -301,7 +303,7 @@ func main() {
 				return nil, err
 			}
 
-			hotstuffFactory, err := epochmgr.NewHotStuffFactory(
+			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
 				node.DB,
@@ -317,17 +319,40 @@ func main() {
 				return nil, err
 			}
 
+			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
+			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+			rootQCVoter := epochs.NewRootQCVoter(
+				node.Logger,
+				node.Me,
+				signer,
+				node.State,
+				nil, // TODO
+			)
+
+			factory := factories.NewEpochComponentsFactory(
+				node.Me,
+				pool,
+				builderFactory,
+				clusterStateFactory,
+				hotstuffFactory,
+				proposalFactory,
+				syncFactory,
+			)
+
 			manager, err := epochmgr.New(
 				node.Logger,
 				node.Me,
 				node.State,
-				pool,
-				clusterStateFactory,
-				builderFactory,
-				proposalFactory,
-				syncFactory,
-				hotstuffFactory,
+				rootQCVoter,
+				factory,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create epoch manager: %w", err)
+			}
+
+			// register the manager for protocol events
+			node.ProtocolEvents.AddConsumer(manager)
+
 			return manager, err
 		}).
 		Run()

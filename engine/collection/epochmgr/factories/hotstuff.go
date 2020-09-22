@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/dgraph-io/badger/v2"
@@ -87,7 +87,7 @@ func (f *HotStuffFactory) Create(
 
 	// create a signing provider
 	staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, f.me)
-	var signer hotstuff.Signer = verification.NewSingleSigner(clusterCommittee, staking, f.me.NodeID())
+	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(clusterCommittee, staking, f.me.NodeID())
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	persist := persister.New(f.db, clusterID)

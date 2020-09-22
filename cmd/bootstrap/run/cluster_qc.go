@@ -54,12 +54,12 @@ func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *clus
 	return qc, err
 }
 
-func createClusterValidators(participants []bootstrap.NodeInfo) ([]hotstuff.Validator, []hotstuff.Signer, error) {
+func createClusterValidators(participants []bootstrap.NodeInfo) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 
 	n := len(participants)
 	identities := bootstrap.ToIdentityList(participants)
 
-	signers := make([]hotstuff.Signer, n)
+	signers := make([]hotstuff.SignerVerifier, n)
 	validators := make([]hotstuff.Validator, n)
 
 	forks := &mocks.ForksReader{}
@@ -84,7 +84,7 @@ func createClusterValidators(participants []bootstrap.NodeInfo) ([]hotstuff.Vali
 
 		// create signer for participant
 		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, me)
-		signer := verification.NewSingleSigner(committee, provider, participant.NodeID)
+		signer := verification.NewSingleSignerVerifier(committee, provider, participant.NodeID)
 		signers[i] = signer
 
 		// create validator

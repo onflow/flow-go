@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol/seed"
 )
 
 // ReadSeed returns the random seed, used by the leader selection.
@@ -20,7 +21,7 @@ import (
 // For case 3-4, we will read the seed from both rootQC and protocol state, and do a
 //     santity check to ensure they are identical.
 func ReadSeed(indices []uint32, rootHeader *flow.Header, rootQC *flow.QuorumCertificate, st protocol.State) ([]byte, error) {
-	seed, err := protocol.SeedFromParentSignature(indices, rootQC.SigData)
+	seed, err := seed.FromParentSignature(indices, rootQC.SigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not read seed from root QC: %w", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol/seed"
 )
 
 // SetupEpoch represents an epoch that has been setup, but not committed.
@@ -58,7 +59,7 @@ func (es *SetupEpoch) DKG() (protocol.DKG, error) {
 }
 
 func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
-	return protocol.SeedFromRandomSource(indices, es.setupEvent.RandomSource)
+	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
 }
 
 func NewSetupEpoch(setupEvent *flow.EpochSetup) *SetupEpoch {

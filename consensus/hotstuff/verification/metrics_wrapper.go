@@ -9,17 +9,17 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
-// SignerMetricsWrapper implements the hotstuff.Signer interface.
-// It wraps a hotstuff.Signer instance and measures the time which the HotStuff's core logic
-// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
+// SignerMetricsWrapper implements the hotstuff.SignerVerifier interface.
+// It wraps a hotstuff.SignerVerifier instance and measures the time which the HotStuff's core logic
+// spends in the hotstuff.SignerVerifier component, i.e. the with crypto-related operations.
 // The measured time durations are reported as values for the
 // SignerProcessingDuration metric.
 type SignerMetricsWrapper struct {
-	signer  hotstuff.Signer
+	signer  hotstuff.SignerVerifier
 	metrics module.HotstuffMetrics
 }
 
-func NewMetricsWrapper(signer hotstuff.Signer, metrics module.HotstuffMetrics) *SignerMetricsWrapper {
+func NewMetricsWrapper(signer hotstuff.SignerVerifier, metrics module.HotstuffMetrics) *SignerMetricsWrapper {
 	return &SignerMetricsWrapper{
 		signer:  signer,
 		metrics: metrics,

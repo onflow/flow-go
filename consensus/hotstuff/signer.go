@@ -5,11 +5,14 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Signer is responsible for creating votes, proposals and QC's for a given
-// block.
-type Signer interface {
+// SignerVerifier can sign and verify HotStuff entities.
+type SignerVerifier interface {
+	Signer
 	Verifier
+}
 
+// Signer is responsible for creating votes, proposals and QC's for a given block.
+type Signer interface {
 	// CreateProposal creates a proposal for the given block.
 	CreateProposal(block *model.Block) (*model.Proposal, error)
 

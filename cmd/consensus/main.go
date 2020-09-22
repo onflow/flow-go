@@ -291,7 +291,7 @@ func main() {
 			committee = committeeImpl.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
 			// initialize the combined signer for hotstuff
-			var signer hotstuff.Signer
+			var signer hotstuff.SignerVerifier
 			signer = verification.NewCombinedSigner(
 				committee,
 				staking,
