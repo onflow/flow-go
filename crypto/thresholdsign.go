@@ -60,24 +60,29 @@ type thresholdSigner struct {
 	// the threshold signature. It is equal to nil if less than (t+1) shares are
 	// received
 	thresholdSignature Signature
+	// stagedShare stores a temporary share that is staged but not committed yet
+	// to the list of shares. stagedOrig is the index related to stagedShare
+	stagedShare Signature
+	stagedOrig  int
 }
 
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
-// size is the number of participants
-func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
+// size is the number of participants, threshold is the threshold value
+func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)
 	}
 	if currentIndex >= size || currentIndex < 0 {
 		return nil, fmt.Errorf("The current index must be between 0 and %d", size-1)
 	}
+	if threshold >= size || threshold < 0 {
+		return nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
+	}
 
 	// initialize BLS settings
 	_ = newBLSBLS12381()
 
-	// optimal threshold (t) to allow the largest number of malicious nodes (m)
-	threshold := optimalThreshold(size)
 	// internal list of valid signature shares
 	shares := make([]byte, 0, (threshold+1)*SignatureLenBLSBLS12381)
 	signers := make([]index, 0, threshold+1)
@@ -90,6 +95,8 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*thre
 		shares:             shares,
 		signers:            signers,
 		thresholdSignature: nil,
+		stagedShare:        nil,
+		stagedOrig:         -1,
 	}, nil
 }
 
@@ -127,7 +134,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
 	// add the node own signature
-	valid, err := s.AddSignatureShare(s.currentIndex, share)
+	valid, err := s.AddShare(s.currentIndex, share)
 	if err != nil {
 		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
@@ -157,6 +164,7 @@ func (s *thresholdSigner) VerifyThresholdSignature(thresholdSignature Signature)
 // ClearShares clears the shares and signers lists
 func (s *thresholdSigner) ClearShares() {
 	s.thresholdSignature = nil
+	s.emptyStagedShare()
 	s.signers = s.signers[:0]
 	s.shares = s.shares[:0]
 }
@@ -167,36 +175,90 @@ func (s *thresholdSigner) EnoughShares() bool {
 	return len(s.signers) == (s.threshold + 1)
 }
 
-// AddSignatureShare processes a signature share
+func (s *thresholdSigner) emptyStagedShare() {
+	s.stagedShare = nil
+	s.stagedOrig = -1
+}
+
+// AddShare adds a signature share to the local list of shares.
+//
 // If the share is valid, not perviously added and the threshold is not reached yet,
-// it is appended to a local list of valid shares
-// The function returns true if the share is valid, false otherwise
-func (s *thresholdSigner) AddSignatureShare(orig int, share Signature) (bool, error) {
+// it is appended to the local list of valid shares. This is equivelent to staging
+// and commiting a share at the same step.
+// The function returns true if the share is valid and new, false otherwise.
+func (s *thresholdSigner) AddShare(orig int, share Signature) (bool, error) {
+	// stage the share
+	verif, err := s.VerifyAndStageShare(orig, share)
+	if err != nil {
+		return false, fmt.Errorf("add signature failed: %w", err)
+	}
+	if verif {
+		// commit the share
+		err = s.CommitShare()
+		if err != nil {
+			return true, fmt.Errorf("add signature failed: %w", err)
+		}
+	}
+	return verif, nil
+}
+
+// VerifyAndStageShare verifies a signature share without adding it to the local list of shares.
+//
+// If the share is valid and new, it is stored temporarily till is it committed to the shares
+// list using CommitShare.
+// Any call to VerifyAndStageShare, AddShare or CommitShare empties the staged share.
+// If the threshold is already reached, the VerifyAndStageShare still verifies the share.
+// The function returns true if the share is valid and new, false otherwise.
+func (s *thresholdSigner) VerifyAndStageShare(orig int, share Signature) (bool, error) {
+	// empty the staged share
+	s.emptyStagedShare()
+
 	if orig >= s.size || orig < 0 {
 		return false, errors.New("orig input is invalid")
 	}
 
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
-		return false, fmt.Errorf("add signature share failed: %w", err)
+		return false, fmt.Errorf("signature share is invalid: %w", err)
 	}
-	// check if share is valid and threshold is not reached
-	if verif && !s.EnoughShares() {
-		// check if the share is new
-		isSeen := false
-		for _, e := range s.signers {
-			if e == index(orig) {
-				isSeen = true
-				break
-			}
-		}
-		if !isSeen {
-			// append the share
-			s.shares = append(s.shares, share...)
-			s.signers = append(s.signers, index(orig))
+
+	// check if the share is new
+	isSeen := false
+	for _, e := range s.signers {
+		if e == index(orig) {
+			isSeen = true
+			break
 		}
 	}
-	return verif, nil
+
+	// assign the temp share
+	if verif && !isSeen {
+		// store the share temporarily
+		s.stagedShare = share
+		s.stagedOrig = orig
+		return true, nil
+	}
+	return false, nil
+}
+
+// CommitShare commits the staged signature to the local list of shares if the threshold
+// is not reached.
+//
+// The staged share is stored by the latest call to VerifyAndStageShare. Calling CommitShare
+// empties the staged share.
+func (s *thresholdSigner) CommitShare() error {
+	if s.stagedShare == nil || s.stagedOrig == -1 {
+		return fmt.Errorf("there is no signature to commit")
+	}
+	// append the staged share
+	if !s.EnoughShares() {
+		s.shares = append(s.shares, s.stagedShare...)
+		s.signers = append(s.signers, index(s.stagedOrig))
+	}
+
+	// empty the staged share
+	s.emptyStagedShare()
+	return nil
 }
 
 // ThresholdSignature returns the threshold signature if the threshold was reached, nil otherwise
@@ -214,7 +276,7 @@ func (s *thresholdSigner) ThresholdSignature() (Signature, error) {
 		s.thresholdSignature = thresholdSignature
 		return thresholdSignature, nil
 	}
-	return nil, errors.New("The number of signatures shares does not reach the threshold")
+	return nil, errors.New("there are not enough signatures shares")
 }
 
 // ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
@@ -226,11 +288,13 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	}
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
-	C.G1_lagrangeInterpolateAtZero(
+	if C.G1_lagrangeInterpolateAtZero(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&s.shares[0]),
 		(*C.uint8_t)(&s.signers[0]), (C.int)(len(s.signers)),
-	)
+	) != valid {
+		return nil, errors.New("reading signatures has failed")
+	}
 
 	// Verify the computed signature
 	verif, err := s.VerifyThresholdSignature(thresholdSignature)
@@ -247,6 +311,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 
 // ReconstructThresholdSignature is a stateless api that takes a list of
 // signatures and their signers's indices and returns the threshold signature.
+//
 // size is the size of the threshold signature group
 // The function does not check the validity of the shares, and does not check
 // the validity of the resulting signature. It also does not check the signatures signers
@@ -255,19 +320,22 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // ReconstructThresholdSignature returns:
 // - error if the inputs are not in the correct range or if the threshold is not reached
 // - Signature: the threshold signature if there is no returned error, nil otherwise
-func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
+func ReconstructThresholdSignature(size int, threshold int,
+	shares []Signature, signers []int) (Signature, error) {
 	// initialize BLS settings
 	_ = newBLSBLS12381()
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d",
 			ThresholdMinSize, ThresholdMaxSize)
 	}
+	if threshold >= size || threshold < 0 {
+		return nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
+	}
 
 	if len(shares) != len(signers) {
 		return nil, errors.New("The number of signature shares is not matching the number of signers")
 	}
-	// check if the threshold was not reached
-	threshold := optimalThreshold(size)
+
 	if len(shares) < threshold+1 {
 		return nil, errors.New("The number of signatures does not reach the threshold")
 	}
@@ -285,26 +353,33 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
-	C.G1_lagrangeInterpolateAtZero(
+	if C.G1_lagrangeInterpolateAtZero(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&flatShares[0]),
 		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),
-	)
+	) != valid {
+		return nil, errors.New("reading signatures has failed")
+	}
 	return thresholdSignature, nil
 }
 
-// EnoughShares is a stateless function that takes the size of the threshold
-// signature group and a shares number and returns true if the shares number
-// is enough to reconstruct a threshold signature
-// The function assumes the threshold value is equal to floor((n-1)/2)
-func EnoughShares(size int, sharesNumber int) bool {
-	return sharesNumber >= (optimalThreshold(size) + 1)
+// EnoughShares is a stateless function that takes the value of the threshold
+// and a shares number and returns true if the shares number is enough
+// to reconstruct a threshold signature.
+func EnoughShares(threshold int, sharesNumber int) bool {
+	return sharesNumber > threshold
 }
 
-func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
+// ThresholdSignKeyGen is a centralized key generation for a BLS-based
+// threeshold signature scheme.
+func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
-	// set threshold
-	threshold := optimalThreshold(size)
+	if size < ThresholdMinSize || size > ThresholdMaxSize {
+		return nil, nil, nil, fmt.Errorf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)
+	}
+	if threshold >= size || threshold < 0 {
+		return nil, nil, nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
+	}
 	// initialize BLS settings
 	_ = newBLSBLS12381()
 	// the scalars x and G2 points y

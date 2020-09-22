@@ -34,9 +34,9 @@ func (_m *ExecutionMetrics) ExecutionGasUsedPerBlock(gas uint64) {
 	_m.Called(gas)
 }
 
-// ExecutionLastExecutedBlockView provides a mock function with given fields: view
-func (_m *ExecutionMetrics) ExecutionLastExecutedBlockView(view uint64) {
-	_m.Called(view)
+// ExecutionLastExecutedBlockHeight provides a mock function with given fields: height
+func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
+	_m.Called(height)
 }
 
 // ExecutionStateReadsPerBlock provides a mock function with given fields: reads
@@ -52,6 +52,11 @@ func (_m *ExecutionMetrics) ExecutionStateStorageDiskTotal(bytes int64) {
 // ExecutionStorageStateCommitment provides a mock function with given fields: bytes
 func (_m *ExecutionMetrics) ExecutionStorageStateCommitment(bytes int64) {
 	_m.Called(bytes)
+}
+
+// ExecutionSync provides a mock function with given fields: syncing
+func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
+	_m.Called(syncing)
 }
 
 // ExecutionTotalExecutedTransactions provides a mock function with given fields: numExecuted

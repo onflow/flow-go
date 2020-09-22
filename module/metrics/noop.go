@@ -17,6 +17,9 @@ func NewNoopCollector() *NoopCollector {
 func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)            {}
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
 func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string)              {}
+func (nc *NoopCollector) MessageAdded(priority int)                                 {}
+func (nc *NoopCollector) MessageRemoved(priority int)                               {}
+func (nc *NoopCollector) QueueDuration(duration time.Duration, priority int)        {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)              {}
@@ -68,8 +71,6 @@ func (nc *NoopCollector) OnVerifiableChunkReceived()                            
 func (nc *NoopCollector) OnChunkDataPackReceived()                                  {}
 func (nc *NoopCollector) OnChunkDataPackRequested()                                 {}
 func (nc *NoopCollector) OnResultApproval()                                         {}
-func (nc *NoopCollector) OnChunkVerificationStarted(chunkID flow.Identifier)        {}
-func (nc *NoopCollector) OnChunkVerificationFinished(chunkID flow.Identifier)       {}
 func (nc *NoopCollector) LogVerifiableChunkSize(size float64)                       {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)      {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)     {}
@@ -77,7 +78,7 @@ func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                   
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                  {}
 func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)               {}
-func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)                {}
+func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)            {}
 func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                       {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                         {}
@@ -100,4 +101,10 @@ func (nc *NoopCollector) ExecutionCollectionRequestRetried()                    
 func (nc *NoopCollector) TransactionParsed(dur time.Duration)                       {}
 func (nc *NoopCollector) TransactionChecked(dur time.Duration)                      {}
 func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)                  {}
+func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)  {}
+func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time) {}
+func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)  {}
+func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                   {}
+func (nc *NoopCollector) TransactionSubmissionFailed()                              {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                   {}
+func (ec *NoopCollector) ExecutionSync(syncing bool)                                {}

@@ -36,7 +36,7 @@ func TestLatestSealEjector(t *testing.T) {
 			err := headers.Store(&header)
 			require.Nil(t, err)
 
-			seal := unittest.BlockSealFixture()
+			seal := unittest.SealFixture()
 			seal.BlockID = header.ID()
 			ok := pool.Add(seal)
 			assert.True(t, ok)

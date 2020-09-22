@@ -2,79 +2,52 @@
 
 package engine
 
-import "fmt"
-
-// Enum of channel IDs to avoid accidental conflicts.
-const (
-
-	// Reserved 000-009
-
-	// Collection 010-029
-	CollectionProvider             = 10 // providing collections/transactions to non-collection nodes
-	CollectionIngest               = 11 // ingesting transactions and routing to appropriate cluster
-	ProtocolClusterConsensus       = 20 // cluster-specific consensus protocol
-	ProtocolClusterSynchronization = 21 // cluster-specific consensus synchronization
-
-	// Observation 030-049
-
-	// Consensus 050-099
-	BlockProvider           = 50 // providing blocks to non-consensus nodes
-	BlockPropagation        = 51 // propagating entities to be included in blocks between consensus nodes
-	ProtocolConsensus       = 60 // consensus protocol
-	ProtocolSynchronization = 66 // synchronization protocol
-
-	// Execution 100-199
-	ExecutionReceiptProvider = 100
-	ExecutionStateProvider   = 101
-	ExecutionComputer        = 102
-	ChunkDataPackProvider    = 103
-	ExecutionSync            = 104
-
-	// Verification 150-199
-	ApprovalProvider = 150
-
-	// Testing 200-255
-	SimulationColdstuff = 200
+import (
+	"fmt"
 )
 
-func ChannelName(channelID uint8) string {
-	switch channelID {
-	case CollectionProvider:
-		return "CollectionProvider"
-	case CollectionIngest:
-		return "CollectionIngest"
-	case ProtocolClusterConsensus:
-		return "ProtocolClusterConsensus"
-	case ProtocolClusterSynchronization:
-		return "ProtocolClusterSynchronization"
-	case BlockProvider:
-		return "BlockProvider"
-	case BlockPropagation:
-		return "BlockPropagation"
-	case ProtocolConsensus:
-		return "ProtocolConsensus"
-	case ProtocolSynchronization:
-		return "ProtocolSynchronization"
-	case ExecutionReceiptProvider:
-		return "ExecutionReceiptProvider"
-	case ExecutionStateProvider:
-		return "ExecutionStateProvider"
-	case ExecutionComputer:
-		return "ExecutionComputer"
-	case ChunkDataPackProvider:
-		return "ChunkDataPackProvider"
-	case ExecutionSync:
-		return "ExecutionSync"
-	case ApprovalProvider:
-		return "ApprovalProvider"
-	case SimulationColdstuff:
-		return "SimulationColdstuff"
-	}
-	return fmt.Sprintf("unknown-channel-%d", channelID)
-}
+// channel IDs
+const (
+
+	// Channels used for testing
+	TestNetwork = "test-network"
+	TestMetrics = "test-metrics"
+
+	// Channels for consensus protocols
+	ConsensusCommittee = "consensus-committee"
+	ConsensusCluster   = "consensus-cluster"
+
+	// Channels for protocols actively synchronizing state across nodes
+	SyncCommittee = "sync-committee"
+	SyncCluster   = "sync-cluster"
+	SyncExecution = "sync-execution"
+
+	// Channels for actively pushing entities to subscribers
+	PushTransactions = "push-transactions"
+	PushGuarantees   = "push-guarantees"
+	PushBlocks       = "push-blocks"
+	PushReceipts     = "push-receipts"
+	PushApprovals    = "push-approvals"
+
+	// Channels for actively requesting missing entities
+	RequestCollections       = "request-collections"
+	RequestChunks            = "request-chunks"
+	RequestReceiptsByBlockID = "request-receipts-by-block-id"
+
+	// Channel aliases to make the code more readable / more robust to errors
+	ReceiveTransactions = PushTransactions
+	ReceiveGuarantees   = PushGuarantees
+	ReceiveBlocks       = PushBlocks
+	ReceiveReceipts     = PushReceipts
+	ReceiveApprovals    = PushApprovals
+
+	ProvideCollections       = RequestCollections
+	ProvideChunks            = RequestChunks
+	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
+)
 
 // FullyQualifiedChannelName returns the unique channel name made up of channel name string suffixed with root block id
 // The root block id is used to prevent cross talks between nodes on different sporks
-func FullyQualifiedChannelName(channelID uint8, rootBlockID string) string {
-	return fmt.Sprintf("%s/%s", ChannelName(channelID), rootBlockID)
+func FullyQualifiedChannelName(channelID string, rootBlockID string) string {
+	return fmt.Sprintf("%s/%s", channelID, rootBlockID)
 }

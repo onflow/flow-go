@@ -42,7 +42,7 @@ type Engine struct {
 	headers        storage.Headers
 	payloads       storage.ClusterPayloads
 	pending        module.PendingClusterBlockBuffer // pending block cache
-	participants   flow.IdentityList                // consensus participants in our cluster
+	cluster        flow.IdentityList                // consensus participants in our cluster
 
 	sync     module.BlockRequester
 	hotstuff module.HotStuff
@@ -63,14 +63,20 @@ func New(
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
 	cache module.PendingClusterBlockBuffer,
-	sync module.BlockRequester,
 ) (*Engine, error) {
 
-	participants, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
+	// find my cluster for the current epoch
+	// TODO this should flow from cluster state as source of truth
+	clusters, err := protoState.Final().Epochs().Current().Clustering()
 	if err != nil {
-		return nil, fmt.Errorf("could not get cluster participants: %w", err)
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+	cluster, _, found := clusters.ByNodeID(me.NodeID())
+	if !found {
+		return nil, fmt.Errorf("could not find cluster for self")
 	}
 
+	// create the proposal engine
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "proposal").Logger(),
@@ -85,26 +91,31 @@ func New(
 		headers:        headers,
 		payloads:       payloads,
 		pending:        cache,
-		participants:   participants,
-		sync:           sync,
-		hotstuff:       nil, // use WithHotStuff
+		cluster:        cluster,
+		hotstuff:       nil, // must use WithHotStuff
+		sync:           nil, // must use WithSync
 	}
 
-	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
-
-	con, err := net.Register(engine.ProtocolClusterConsensus, e)
+	// register network conduit
+	con, err := net.Register(engine.ConsensusCluster, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
 
+	// log the mempool size off the bat
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
+
 	return e, nil
 }
 
-// WithConsensus adds the consensus algorithm to the engine. This must be
-// called before the engine can start.
-func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
+func (e *Engine) WithHotStuff(hot module.HotStuff) *Engine {
 	e.hotstuff = hot
+	return e
+}
+
+func (e *Engine) WithSync(sync module.BlockRequester) *Engine {
+	e.sync = sync
 	return e
 }
 
@@ -112,24 +123,18 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 // started. For proposal engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
+	if e.hotstuff == nil {
+		panic("must initialize compliance engine with hotstuff module")
+	}
 	if e.sync == nil {
 		panic("must initialize compliance engine with synchronization module")
 	}
-	if e.hotstuff == nil {
-		panic("must initialize compliance engine with hotstuff engine")
-	}
-	return e.unit.Ready(func() {
-		<-e.hotstuff.Ready()
-	})
+	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		e.log.Debug().Msg("shutting down hotstuff eventloop")
-		<-e.hotstuff.Done()
-		e.log.Debug().Msg("all components have been shut down")
-	})
+	return e.unit.Done()
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -198,13 +203,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 // for the next collection) to all the collection nodes in our cluster.
 func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
 
-	log := e.log.With().
-		Hex("block_id", logging.ID(header.ID())).
-		Uint64("block_height", header.Height).
-		Logger()
-
-	log.Debug().Msg("preparing to broadcast proposal from hotstuff")
-
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -222,6 +220,13 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
+	log := e.log.With().
+		Hex("block_id", logging.ID(header.ID())).
+		Uint64("block_height", header.Height).
+		Logger()
+
+	log.Debug().Msg("preparing to broadcast proposal from hotstuff")
+
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
@@ -232,7 +237,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := e.protoState.Final().Identities(filter.And(
-		filter.In(e.participants),
+		filter.In(e.cluster),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {
@@ -273,46 +278,33 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 // process processes events for the proposal engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
-	//TODO currently it is possible for network messages to be received
-	// and passed to the engine before the engine has been setup
-	// (ie had Ready called). This is a quickfix to get around the issue
-	// but ultimately we should start receiving over the network only
-	// once all the engines are ready.
-	if e.sync == nil {
-		return fmt.Errorf("missing sync dependency")
+	// skip any message as long as we don't have the dependencies
+	if e.hotstuff == nil || e.sync == nil {
+		return fmt.Errorf("still initializing")
 	}
-	if e.hotstuff == nil {
-		return fmt.Errorf("missing hotstuff dependency")
-	}
-
-	// just process one event at a time for now
 
 	switch ev := event.(type) {
 	case *events.SyncedClusterBlock:
-		e.before(metrics.MessageSyncedClusterBlock)
-		defer e.after(metrics.MessageSyncedClusterBlock)
+		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageSyncedClusterBlock)
+		e.unit.Lock()
+		defer e.engMetrics.MessageHandled(metrics.EngineProposal, metrics.MessageSyncedClusterBlock)
+		defer e.unit.Unlock()
 		return e.onSyncedBlock(originID, ev)
 	case *messages.ClusterBlockProposal:
-		e.before(metrics.MessageClusterBlockProposal)
-		defer e.after(metrics.MessageClusterBlockProposal)
+		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
+		e.unit.Lock()
+		defer e.engMetrics.MessageHandled(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
+		defer e.unit.Unlock()
 		return e.onBlockProposal(originID, ev)
 	case *messages.ClusterBlockVote:
-		e.before(metrics.MessageClusterBlockVote)
-		defer e.after(metrics.MessageClusterBlockVote)
+		// we don't lock the engine on vote messages, because votes are passed
+		// directly to HotStuff with no extra validation by compliance layer.
+		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+		defer e.engMetrics.MessageHandled(metrics.EngineProposal, metrics.MessageClusterBlockVote)
 		return e.onBlockVote(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-}
-
-func (e *Engine) before(msg string) {
-	e.engMetrics.MessageReceived(metrics.EngineProposal, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.engMetrics.MessageHandled(metrics.EngineProposal, msg)
 }
 
 // onSyncedBlock processes a block synced by the synchronization engine.

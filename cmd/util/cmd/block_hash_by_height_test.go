@@ -115,7 +115,7 @@ func storeAndIndexHeader(t *testing.T, db *badger.DB, headers *bstorage.Headers,
 }
 
 func storeAndIndexSealFor(t *testing.T, db *badger.DB, seals *bstorage.Seals, h *flow.Header) {
-	seal := unittest.BlockSealFixture()
+	seal := unittest.SealFixture()
 	seal.BlockID = h.ID()
 
 	err := seals.Store(seal)

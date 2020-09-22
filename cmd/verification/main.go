@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
@@ -68,7 +69,8 @@ func main() {
 		processedResultsIDs *stdmap.Identifiers        // used in finder engine
 		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
 		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
-		pendingResults      *stdmap.PendingResults     // used in match engine
+		chunkIDsByResult    *stdmap.IdentifierMap      // used in match engine
+		pendingResults      *stdmap.ResultDataPacks    // used in match engine
 		pendingChunks       *match.Chunks              // used in match engine
 		headerStorage       *storage.Headers           // used in match and finder engines
 		syncCore            *synchronization.Core      // used in follower engine
@@ -157,6 +159,20 @@ func main() {
 
 			return nil
 		}).
+		Module("chunk ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
+			chunkIDsByResult, err = stdmap.NewIdentifierMap(chunkLimit)
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkIDsByResult, chunkIDsByResult.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
+			return nil
+		}).
 		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)
 			if err != nil {
@@ -172,7 +188,7 @@ func main() {
 			return nil
 		}).
 		Module("pending results mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingResults = stdmap.NewPendingResults()
+			pendingResults = stdmap.NewResultDataPacks(receiptLimit)
 
 			// registers size method of backend for metrics
 			err = node.Metrics.Mempool.Register(metrics.ResourcePendingResult, pendingResults.Size)
@@ -249,6 +265,7 @@ func main() {
 				node.Network,
 				node.Me,
 				pendingResults,
+				chunkIDsByResult,
 				verifierEng,
 				assigner,
 				node.State,
@@ -279,28 +296,33 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.Storage.Payloads, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 			merger := signature.NewCombiner()
 
+			// initialize and pre-generate leader selections from the seed
+			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
+			}
+
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

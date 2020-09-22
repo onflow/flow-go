@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
+	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -30,6 +31,7 @@ type LibP2PNodeTestSuite struct {
 	suite.Suite
 	ctx    context.Context
 	cancel context.CancelFunc // used to cancel the context
+	logger zerolog.Logger
 }
 
 // TestLibP2PNodesTestSuite runs all the test methods in this test suit
@@ -39,8 +41,9 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 
 // SetupTests initiates the test setups prior to each test
 func (l *LibP2PNodeTestSuite) SetupTest() {
+	l.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	l.ctx, l.cancel = context.WithCancel(context.Background())
-	golog.SetAllLoggers(golog.LevelInfo)
+	golog.SetAllLoggers(golog.LevelDebug)
 }
 
 // TestMultiAddress evaluates correct translations from
@@ -88,7 +91,7 @@ func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 	defer l.cancel()
 
 	// creates a single
-	nodes, _ := l.CreateNodes(1)
+	nodes, _ := l.CreateNodes(1, nil, false)
 
 	// stops the created node
 	done, err := nodes[0].Stop()
@@ -121,7 +124,7 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 		for j := 0; j < 10; j++ {
 			rinfo, err := GetPeerInfo(address)
 			require.NoError(l.Suite.T(), err)
-			assert.True(l.Suite.T(), rinfo.String() == info.String(), fmt.Sprintf("inconsistent id generated"))
+			assert.True(l.Suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
 		}
 	}
 }
@@ -135,7 +138,7 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 	count := 3
 
 	// Creates nodes
-	nodes, addrs := l.CreateNodes(count)
+	nodes, addrs := l.CreateNodes(count, nil, false)
 	defer l.StopNodes(nodes)
 
 	// Adds the remaining nodes to the first node as its set of peers
@@ -163,7 +166,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 	count := 2
 
 	// Creates nodes
-	nodes, addrs := l.CreateNodes(count)
+	nodes, addrs := l.CreateNodes(count, nil, false)
 	defer l.StopNodes(nodes)
 
 	address2 := addrs[1]
@@ -216,7 +219,7 @@ func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 
 	// Creates peers
-	peers, addrs := l.CreateNodes(count, handler)
+	peers, addrs := l.CreateNodes(count, handler, false)
 	defer l.StopNodes(peers)
 	require.Len(l.T(), addrs, count)
 
@@ -301,7 +304,7 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 	}
 
 	// Creates peers
-	peers, addrs := l.CreateNodes(2, handler)
+	peers, addrs := l.CreateNodes(2, handler, false)
 	defer l.StopNodes(peers)
 
 	for i := 0; i < count; i++ {
@@ -339,10 +342,90 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 	}
 }
 
+// TestPing tests that a node can ping another node
+func (l *LibP2PNodeTestSuite) TestPing() {
+	defer l.cancel()
+
+	// creates two nodes
+	nodes, nodeAddr := l.CreateNodes(2, nil, false)
+	defer l.StopNodes(nodes)
+
+	node1 := nodes[0]
+	node2 := nodes[1]
+	node1Addr := nodeAddr[0]
+	node2Addr := nodeAddr[1]
+
+	// test node1 can ping node 2
+	_, err := node1.Ping(l.ctx, node2Addr)
+	require.NoError(l.T(), err)
+
+	// test node 2 can ping node 1
+	_, err = node2.Ping(l.ctx, node1Addr)
+	require.NoError(l.T(), err)
+}
+
+// TestConnectionGating tests node allow listing by peer.ID
+func (l *LibP2PNodeTestSuite) TestConnectionGating() {
+	defer l.cancel()
+
+	// create 2 nodes
+	nodes, nodeAddrs := l.CreateNodes(2, nil, true)
+
+	node1 := nodes[0]
+	node1Addr := nodeAddrs[0]
+	defer l.StopNode(node1)
+
+	node2 := nodes[1]
+	node2Addr := nodeAddrs[1]
+	defer l.StopNode(node2)
+
+	requireError := func(err error) {
+		require.Error(l.T(), err)
+		require.True(l.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection))
+	}
+
+	l.Run("outbound connection to a not-allowed node is rejected", func() {
+		// node1 and node2 both have no allowListed peers
+		_, err := node1.CreateStream(l.ctx, node2Addr)
+		requireError(err)
+		_, err = node2.CreateStream(l.ctx, node1Addr)
+		requireError(err)
+	})
+
+	l.Run("inbound connection from an allowed node is rejected", func() {
+
+		// node1 allowlists node2 but node2 does not allowlists node1
+		err := node1.UpdateAllowlist([]NodeAddress{node2Addr}...)
+		require.NoError(l.T(), err)
+
+		// node1 attempts to connect to node2
+		// node2 should reject the inbound connection
+		_, err = node1.CreateStream(l.ctx, node2Addr)
+		require.Error(l.T(), err)
+	})
+
+	l.Run("outbound connection to an approved node is allowed", func() {
+
+		// node1 allowlists node2
+		err := node1.UpdateAllowlist([]NodeAddress{node2Addr}...)
+		require.NoError(l.T(), err)
+		// node2 allowlists node1
+		err = node2.UpdateAllowlist([]NodeAddress{node1Addr}...)
+		require.NoError(l.T(), err)
+
+		// node1 should be allowed to connect to node2
+		_, err = node1.CreateStream(l.ctx, node2Addr)
+		require.NoError(l.T(), err)
+		// node2 should be allowed to connect to node1
+		_, err = node2.CreateStream(l.ctx, node1Addr)
+		require.NoError(l.T(), err)
+	})
+}
+
 // CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHandler) ([]*P2PNode, []NodeAddress) {
+func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandler, allowList bool) ([]*P2PNode, []NodeAddress) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*P2PNode
@@ -356,14 +439,14 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 
 	// creating nodes
 	var nodeAddrs []NodeAddress
-	for i := 1; i <= count; i++ {
+	for i := 0; i < count; i++ {
 
-		name := fmt.Sprintf("node%d", i)
+		name := fmt.Sprintf("node%d", i+1)
 		pkey, err := generateNetworkingKey(name)
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler...)
+		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler, allowList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
@@ -371,7 +454,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 }
 
 func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
-	handler ...network.StreamHandler) (*P2PNode, NodeAddress) {
+	handler network.StreamHandler, allowList bool) (*P2PNode, NodeAddress) {
 	n := &P2PNode{}
 	nodeID := NodeAddress{
 		Name:   name,
@@ -379,26 +462,27 @@ func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip str
 		Port:   port,
 		PubKey: key.GetPublic(),
 	}
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	var handlerFunc network.StreamHandler
-	if len(handler) > 0 {
+	if handler != nil {
 		// use the callback that has been passed in
-		handlerFunc = handler[0]
+		handlerFunc = handler
 	} else {
 		// use a default call back
 		handlerFunc = func(network.Stream) {}
 	}
 
-	err := n.Start(l.ctx, nodeID, logger, key, handlerFunc, rootID)
+	err := n.Start(l.ctx, nodeID, l.logger, key, handlerFunc, rootID, allowList, nil)
 	require.NoError(l.T(), err)
 	require.Eventuallyf(l.T(), func() bool {
-		ip, p := n.GetIPPort()
-		return ip != "" && p != ""
+		ip, p, err := n.GetIPPort()
+		return err == nil && ip != "" && p != ""
 	}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %s", name))
 
 	// get the actual IP and port that have been assigned by the subsystem
-	nodeID.IP, nodeID.Port = n.GetIPPort()
+	nodeID.IP, nodeID.Port, err = n.GetIPPort()
+	require.NoError(l.T(), err)
+
 	return n, nodeID
 }
 

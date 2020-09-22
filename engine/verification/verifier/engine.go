@@ -7,11 +7,13 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -26,15 +28,16 @@ import (
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)
 type Engine struct {
-	unit    *engine.Unit               // used to control startup/shutdown
-	log     zerolog.Logger             // used to log relevant actions
-	metrics module.VerificationMetrics // used to capture the performance metrics
-	tracer  module.Tracer              // used for tracing
-	conduit network.Conduit            // used to propagate result approvals
-	me      module.Local               // used to access local node information
-	state   protocol.State             // used to access the protocol state
-	rah     hash.Hasher                // used as hasher to sign the result approvals
-	chVerif module.ChunkVerifier       // used to verify chunks
+	unit        *engine.Unit               // used to control startup/shutdown
+	log         zerolog.Logger             // used to log relevant actions
+	metrics     module.VerificationMetrics // used to capture the performance metrics
+	tracer      module.Tracer              // used for tracing
+	con         network.Conduit            // used to propagate result approvals
+	me          module.Local               // used to access local node information
+	state       protocol.State             // used to access the protocol state
+	rah         hash.Hasher                // used as hasher to sign the result approvals
+	chVerif     module.ChunkVerifier       // used to verify chunks
+	spockHasher hash.Hasher                // used for generating spocks
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -49,18 +52,19 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:    engine.NewUnit(),
-		log:     log.With().Str("engine", "verifier").Logger(),
-		metrics: metrics,
-		tracer:  tracer,
-		state:   state,
-		me:      me,
-		chVerif: chVerif,
-		rah:     utils.NewResultApprovalHasher(),
+		unit:        engine.NewUnit(),
+		log:         log.With().Str("engine", "verifier").Logger(),
+		metrics:     metrics,
+		tracer:      tracer,
+		state:       state,
+		me:          me,
+		chVerif:     chVerif,
+		rah:         utils.NewResultApprovalHasher(),
+		spockHasher: crypto.NewBLSKMAC(encoding.SPOCKTag),
 	}
 
 	var err error
-	e.conduit, err = net.Register(engine.ApprovalProvider, e)
+	e.con, err = net.Register(engine.PushApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
 	}
@@ -110,12 +114,23 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process receives verifiable chunks, evaluate them and send them for chunk verifier
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
 	switch resource := event.(type) {
 	case *verification.VerifiableChunkData:
-		return e.verifyWithMetrics(originID, resource)
+		err = e.verifiableChunkHandler(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	if err != nil {
+		// logs the error instead of returning that.
+		// returning error would be projected at a higher level by network layer.
+		// however, this is an engine-level error, and not network layer error.
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // verify handles the core verification process. It accepts a verifiable chunk
@@ -124,7 +139,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 //
 // If any part of verification fails, an error is returned, indicating to the
 // initiating engine that the verification must be re-tried.
-func (e *Engine) verify(ctx context.Context, originID flow.Identifier, vc *verification.VerifiableChunkData) error {
+func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
+	vc *verification.VerifiableChunkData) error {
 	// log it first
 	log := e.log.With().Timestamp().
 		Hex("origin", logging.ID(originID)).
@@ -138,15 +154,8 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier, vc *verif
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
-	// extracts list of verifier nodes id
-	//
-	// TODO state extraction should be done based on block references
-	consensusNodes, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		// TODO this error needs more advance handling after MVP
-		return fmt.Errorf("could not load consensus node IDs: %w", err)
-	}
+
+	var err error
 
 	// extracts chunk ID
 	ch, ok := vc.Result.Chunks.ByIndex(vc.Chunk.Index)
@@ -157,18 +166,26 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier, vc *verif
 
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
-	chFault, err := e.chVerif.Verify(vc)
+
+	var spockSecret []byte
+	var chFault chmodels.ChunkFault
+	if vc.IsSystemChunk {
+		spockSecret, chFault, err = e.chVerif.SystemChunkVerify(vc)
+	} else {
+		spockSecret, chFault, err = e.chVerif.Verify(vc)
+	}
 	span.Finish()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot verify chunk: %w", err)
 	}
 
 	// if any fault found with the chunk
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
+			e.log.Error().Msg(chFault.String())
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().Msg(chFault.String())
@@ -176,7 +193,8 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier, vc *verif
 			// TODO raise challenge
 			e.log.Error().Msg(chFault.String())
 		default:
-			return engine.NewInvalidInputErrorf("unknown type of chunk fault is recieved (type: %T) : %v", chFault, chFault.String())
+			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",
+				chFault, chFault.String())
 		}
 		// don't do anything else, but skip generating result approvals
 		return nil
@@ -184,14 +202,23 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier, vc *verif
 
 	// Generate result approval
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
-	approval, err := e.GenerateResultApproval(vc.Chunk.Index, vc.Result.ID(), vc.Header.ID())
+	approval, err := e.GenerateResultApproval(vc.Chunk.Index, vc.Result.ID(), vc.Header.ID(), spockSecret)
 	span.Finish()
 	if err != nil {
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
 
+	// Extracting consensus node ids
+	// TODO state extraction should be done based on block references
+	consensusNodes, err := e.state.Final().
+		Identities(filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		// TODO this error needs more advance handling after MVP
+		return fmt.Errorf("could not load consensus node IDs: %w", err)
+	}
+
 	// broadcast result approval to the consensus nodes
-	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
+	err = e.con.Publish(approval, consensusNodes.NodeIDs()...)
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
@@ -203,8 +230,12 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier, vc *verif
 	return nil
 }
 
-// GenerateResultApproval generates result approval for specific chunk of a exec receipt
-func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Identifier, blockID flow.Identifier) (*flow.ResultApproval, error) {
+// GenerateResultApproval generates result approval for specific chunk of an execution receipt.
+func (e *Engine) GenerateResultApproval(chunkIndex uint64,
+	execResultID flow.Identifier,
+	blockID flow.Identifier,
+	spockSecret []byte,
+) (*flow.ResultApproval, error) {
 
 	// attestation
 	atst := flow.Attestation{
@@ -220,12 +251,18 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 		return nil, fmt.Errorf("could not sign attestation: %w", err)
 	}
 
+	// generates spock
+	spock, err := e.me.SignFunc(spockSecret, e.spockHasher, crypto.SPOCKProve)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate SPoCK: %w", err)
+	}
+
 	// result approval body
 	body := flow.ResultApprovalBody{
 		Attestation:          atst,
 		ApproverID:           e.me.NodeID(),
 		AttestationSignature: atstSign,
-		Spock:                nil,
+		Spock:                spock,
 	}
 
 	// generates a signature over result approval body
@@ -241,8 +278,8 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 	}, nil
 }
 
-// verifyWithMetrics acts as a wrapper around the verify method that captures its performance-related metrics
-func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunkData) error {
+// verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics
+func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verification.VerifiableChunkData) error {
 	ctx := context.Background()
 	if span, ok := e.tracer.GetSpan(ch.Result.ID(), trace.VERProcessExecutionResult); ok {
 		defer span.Finish()
@@ -255,15 +292,21 @@ func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.Ve
 	// for sake of metrics
 	e.metrics.OnVerifiableChunkReceived()
 
-	// starts verification performance metrics trackers
-	if ch.ChunkDataPack != nil {
-		e.metrics.OnChunkVerificationStarted(ch.ChunkDataPack.ChunkID)
-	}
+	e.log.Info().
+		Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+		Hex("result_id", logging.ID(ch.Result.ID())).
+		Msg("verifiable chunk received")
+
 	// starts verification of chunk
 	err := e.verify(ctx, originID, ch)
-	// closes verification performance metrics trackers
-	if ch.ChunkDataPack != nil {
-		e.metrics.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
+
+	if err != nil {
+		e.log.Debug().
+			Err(err).
+			Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+			Msg("could not verify chunk")
 	}
-	return err
+
+	// closes verification performance metrics trackers
+	return nil
 }

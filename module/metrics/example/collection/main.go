@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
 	"github.com/dapperlabs/flow-go/module/trace"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -29,8 +30,8 @@ func main() {
 			NetworkCollector:    metrics.NewNetworkCollector(),
 		}
 
-		topic1 := engine.ChannelName(engine.CollectionProvider)
-		topic2 := engine.ChannelName(engine.CollectionIngest)
+		topic1 := engine.TestNetwork
+		topic2 := engine.TestMetrics
 
 		for i := 0; i < 100; i++ {
 			collector.TransactionIngested(unittest.IdentifierFixture())
@@ -46,6 +47,12 @@ func main() {
 			collector.NetworkMessageReceived(rand.Intn(1000), topic1)
 			collector.NetworkMessageReceived(rand.Intn(1000), topic2)
 
+			priority1 := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
+			collector.MessageRemoved(priority1)
+			collector.QueueDuration(time.Millisecond*time.Duration(rand.Intn(1000)), priority1)
+
+			priority2 := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
+			collector.MessageAdded(priority2)
 			time.Sleep(1 * time.Second)
 		}
 	})

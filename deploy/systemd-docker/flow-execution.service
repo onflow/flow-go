@@ -31,7 +31,6 @@ ExecStart=docker run --rm \
 	--bootstrapdir=/bootstrap \
 	--datadir=/data/protocol \
 	--triedir=/data/execution \
-    --nclusters=${FLOW_NETWORK_COLLECTION_CLUSTER_COUNT} \
 	--rpc-addr=0.0.0.0:9000 \
 	--bind 0.0.0.0:3569 \
 	--loglevel=ERROR

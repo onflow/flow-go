@@ -17,10 +17,11 @@ import (
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	clusterstate "github.com/dapperlabs/flow-go/state/cluster"
+	clusterstateimpl "github.com/dapperlabs/flow-go/state/cluster/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -70,7 +71,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 	)
-	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection)
+	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection, testnet.WithAdditionalFlag("--block-rate-delay=1ms"))
 
 	suite.nClusters = nClusters
 
@@ -120,9 +121,14 @@ func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
 	return client
 }
 
-func (suite *CollectorSuite) Clusters() *flow.ClusterList {
-	identities := suite.net.Identities()
-	clusters := protocol.Clusters(suite.nClusters, identities)
+func (suite *CollectorSuite) Clusters() flow.ClusterList {
+	seal := suite.net.Seal()
+	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	suite.Require().True(ok)
+
+	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
+	clusters, err := flow.NewClusterList(setup.Assignments, collectors)
+	suite.Require().Nil(err)
 	return clusters
 }
 
@@ -160,7 +166,8 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 		tx.SetScript(append(tx.Script, '/', '/'))
 		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.ID, acct.signer)
 		require.Nil(suite.T(), err)
-		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
+		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
+		require.True(suite.T(), ok)
 		if routed.Fingerprint() == target.Fingerprint() {
 			break
 		}
@@ -207,12 +214,12 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	var (
 		// for quickly looking up tx IDs
 		lookup = make(map[flow.Identifier]struct{}, len(txIDs))
-		// for keeping track of which transactions have been included in
-		// a finalized collection
+		// for keeping track of which transactions have been included in a finalized collection
 		finalized = make(map[flow.Identifier]struct{}, len(txIDs))
-		// for keeping track of proposals we've seen, and which transactions
-		// they contain
+		// for keeping track of proposals we've seen, and which transactions they contain
 		proposals = make(map[flow.Identifier][]flow.Identifier)
+		// in case we see a guarantee first
+		guarantees = make(map[flow.Identifier]bool)
 	)
 	for _, txID := range txIDs {
 		lookup[txID] = struct{}{}
@@ -232,12 +239,26 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			header := val.Header
 			collection := val.Payload.Collection
 			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
-			proposals[collection.ID()] = collection.Light().Transactions
+			if guarantees[collection.ID()] {
+				for _, txID := range collection.Light().Transactions {
+					finalized[txID] = struct{}{}
+				}
+
+				if len(finalized) == len(lookup) {
+					return
+				}
+			} else {
+				proposals[collection.ID()] = collection.Light().Transactions
+			}
 
 		case *flow.CollectionGuarantee:
 			finalizedTxIDs, ok := proposals[val.CollectionID]
 			if !ok {
 				suite.T().Logf("got unseen guarantee (id=%x)", val.CollectionID)
+				guarantees[val.CollectionID] = true
+				continue
+			} else {
+				suite.T().Logf("got guarantee (id=%x)", val.CollectionID)
 			}
 			for _, txID := range finalizedTxIDs {
 				finalized[txID] = struct{}{}
@@ -271,9 +292,10 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Container {
 
 	clusters := suite.Clusters()
-	require.True(suite.T(), clusterIdx < uint(clusters.Size()), "invalid cluster index")
+	require.True(suite.T(), clusterIdx < uint(len(clusters)), "invalid cluster index")
 
-	cluster := clusters.ByIndex(clusterIdx)
+	cluster, ok := clusters.ByIndex(clusterIdx)
+	require.True(suite.T(), ok)
 	node, ok := cluster.ByIndex(nodeIdx)
 	require.True(suite.T(), ok, "invalid node index")
 
@@ -282,12 +304,14 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 
 // ClusterStateFor returns a cluster state instance for the collector node
 // with the given ID.
-func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.State {
+func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateimpl.State {
 
-	myCluster, ok := suite.Clusters().ByNodeID(id)
+	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
-	chainID := protocol.ChainIDForCluster(myCluster)
+	setup, ok := suite.net.Seal().ServiceEvents[0].Event.(*flow.EpochSetup)
+	suite.Require().True(ok, "could not get root seal setup")
+	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
 
 	db, err := node.DB()
@@ -298,7 +322,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	headers := storage.NewHeaders(metrics, db)
 	payloads := storage.NewClusterPayloads(metrics, db)
 
-	state, err := clusterstate.NewState(db, chainID, headers, payloads)
+	state, err := clusterstateimpl.NewState(db, rootBlock.Header.ChainID, headers, payloads)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state

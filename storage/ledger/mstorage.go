@@ -26,7 +26,7 @@ const (
 // Every update to the MTrieStorage creates a new state commitment which captures the state of the storage.
 // Under the hood, it uses binary merkle tries to generate inclusion and noninclusion proofs.
 // MTrieStorage is fork-aware that means any update can applied at any previous statecommitments which forms a tree of tries (forest).
-// The forrest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
+// The forest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
 // In order to limit the memory usage and maintain the performance storage only keeps limited number of
 // tries and purge the old ones (LRU-based); in other words MTrieStorage is not designed to be used
 // for archival use but make it possible for other software components to reconstruct very old tries using write-ahead logs.

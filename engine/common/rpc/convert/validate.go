@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"strings"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -9,7 +11,7 @@ import (
 
 // Common validation and conversion for incoming Access API requests
 
-// Address validates the input address and returns a flow address if valid and error otherwise
+// Address validates the input address and returns a Flow address if valid and error otherwise
 func Address(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
 	if len(rawAddress) == 0 {
 		return flow.EmptyAddress, status.Error(codes.InvalidArgument, "address cannot be empty")
@@ -22,13 +24,6 @@ func Address(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
 	}
 
 	return address, nil
-}
-
-func BlockHeight(start, end uint64) error {
-	if end < start {
-		return status.Error(codes.InvalidArgument, "invalid start or end height")
-	}
-	return nil
 }
 
 func BlockID(blockID []byte) (flow.Identifier, error) {
@@ -60,11 +55,11 @@ func CollectionID(collectionID []byte) (flow.Identifier, error) {
 	return flow.HashToID(collectionID), nil
 }
 
-func EventType(eventType string) (flow.EventType, error) {
-	if eventType == "" {
+func EventType(eventType string) (string, error) {
+	if len(strings.TrimSpace(eventType)) == 0 {
 		return "", status.Error(codes.InvalidArgument, "invalid event type")
 	}
-	return flow.EventType(eventType), nil
+	return eventType, nil
 }
 
 func TransactionID(txID []byte) (flow.Identifier, error) {

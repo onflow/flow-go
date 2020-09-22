@@ -2,11 +2,11 @@ package utils
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 )
 
@@ -28,21 +28,24 @@ type txInFlight struct {
 // transactions by txID, in case of transaction state change
 // it calls the provided callbacks
 type TxTracker struct {
+	log           zerolog.Logger
 	numbOfWorkers int
 	txs           chan *txInFlight
 	done          chan bool
-	stats         *StatsTracker
+	stats         *TxStatsTracker
 }
 
 // NewTxTracker returns a new instance of TxTracker
-func NewTxTracker(maxCap int,
+func NewTxTracker(
+	log zerolog.Logger,
+	maxCap int,
 	numberOfWorkers int,
 	accessNodeAddress string,
-	verbose bool,
 	sleepAfterOp time.Duration,
-	stats *StatsTracker) (*TxTracker, error) {
+	stats *TxStatsTracker) (*TxTracker, error) {
 
 	txt := &TxTracker{
+		log:           log,
 		numbOfWorkers: numberOfWorkers,
 		txs:           make(chan *txInFlight, maxCap),
 		done:          make(chan bool, numberOfWorkers),
@@ -52,8 +55,7 @@ func NewTxTracker(maxCap int,
 		if err != nil {
 			return nil, err
 		}
-		time.Sleep(sleepAfterOp) // creating parity
-		go statusWorker(i, txt.txs, txt.done, fclient, stats, verbose, sleepAfterOp)
+		go statusWorker(log, i, txt.txs, txt.done, fclient, stats, sleepAfterOp)
 	}
 	return txt, nil
 }
@@ -81,7 +83,7 @@ func (txt *TxTracker) AddTx(txID flowsdk.Identifier,
 		expiresAt:   time.Now().Add(time.Duration(timeoutInSec) * time.Second),
 		stat:        &TxStats{isExpired: false},
 	}
-	fmt.Printf("%v tx added to tx tracker\n", txID)
+	txt.log.Debug().Str("tx_id", txID.String()).Msg("tx added to tx tracker")
 	txt.txs <- newTx
 }
 
@@ -94,37 +96,44 @@ func (txt *TxTracker) Stop() {
 	close(txt.txs)
 }
 
-func statusWorker(workerID int, txs chan *txInFlight, done <-chan bool, fclient *client.Client, stats *StatsTracker, verbose bool, sleepAfterOp time.Duration) {
+func statusWorker(log zerolog.Logger, workerID int, txs chan *txInFlight, done <-chan bool, fclient *client.Client, stats *TxStatsTracker, sleepAfterOp time.Duration) {
+	log.Debug().Int("worker_id", workerID).Msg("worker started")
+
 	clientContErrorCounter := 0
 
 	for {
 		select {
 		case <-done:
-			fmt.Printf("worker %d stoped!\n", workerID)
+			log.Debug().Int("worker_id", workerID).Msg("worker stopped")
 			return
 		case tx := <-txs:
+			log.Trace().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).Msg("took tx from queue")
 
 			if clientContErrorCounter > 10 {
-				fmt.Printf("worker %d: calling client has failed for the last 10 times\n", workerID)
+				log.Error().Int("worker_id", workerID).Msg("calling client has failed for the last 10 times")
 				return
 			}
 			if tx.expiresAt.Before(time.Now()) {
 				if tx.onTimeout != nil {
 					go tx.onTimeout(tx.txID)
 				}
-				if verbose {
-					fmt.Printf("worker %d: status process for tx %v is timed out.\n", workerID, tx.txID)
-				}
+				log.Info().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
+					Msg("status process for tx timed out")
 				tx.stat.isExpired = true
 				stats.AddTxStats(tx.stat)
 				continue
 			}
-			if verbose {
-				fmt.Printf("worker %d: status update request sent for tx %v \n", workerID, tx.txID)
-			}
+			log.Trace().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
+				Msg("status update request sent for tx")
 			result, err := fclient.GetTransactionResult(context.Background(), tx.txID)
 			if err != nil {
 				clientContErrorCounter++
+				log.Warn().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).Err(err).
+					Msg("error getting tx result, will put tx back to queue after sleep")
+
+				// don't put too much pressure on access node
+				time.Sleep(sleepAfterOp)
+
 				txs <- tx
 				continue
 			}
@@ -139,47 +148,64 @@ func statusWorker(workerID int, txs chan *txInFlight, done <-chan bool, fclient 
 						}
 						tx.lastStatus = flowsdk.TransactionStatusFinalized
 						tx.stat.TTF = time.Since(tx.createdAt)
-						if verbose {
-							fmt.Printf("worker %d tx %v has been finalized in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
-						}
+						log.Trace().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
+							Msgf("tx has been finalized in %v seconds", time.Since(tx.createdAt).Seconds())
 					case flowsdk.TransactionStatusExecuted:
 						if tx.onExecuted != nil {
 							go tx.onExecuted(tx.txID, result)
 						}
 						tx.lastStatus = flowsdk.TransactionStatusExecuted
 						tx.stat.TTE = time.Since(tx.createdAt)
-						if verbose {
-							fmt.Printf("worker %d tx %v has been executed in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
-						}
+						log.Trace().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
+							Msgf("tx has been executed in %v seconds", time.Since(tx.createdAt).Seconds())
 					case flowsdk.TransactionStatusSealed:
+						// sometimes we miss the executed call and just get sealed directly
+						if tx.lastStatus != flowsdk.TransactionStatusExecuted {
+							if tx.onExecuted != nil {
+								go tx.onExecuted(tx.txID, result)
+							}
+							// TODO fix me
+							// tx.stat.TTE = time.Since(tx.createdAt)
+						}
 						if tx.onSealed != nil {
 							go tx.onSealed(tx.txID, result)
 						}
 
 						tx.stat.TTS = time.Since(tx.createdAt)
 						stats.AddTxStats(tx.stat)
-						if verbose {
-							fmt.Printf("worker %d tx %v has been sealed in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
-						}
+						log.Trace().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
+							Msgf("tx has been sealed in %v seconds", time.Since(tx.createdAt).Seconds())
 						continue
 					case flowsdk.TransactionStatusUnknown:
-						err := fmt.Errorf("worker %d tx %v got into an unknown status after %v seconds", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
+						log.Warn().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
+							Msgf("got into an unknown status after %v seconds", time.Since(tx.createdAt).Seconds())
 						if tx.onError != nil {
 							go tx.onError(tx.txID, err)
 						}
 						tx.stat.isExpired = true
 						stats.AddTxStats(tx.stat)
-						if verbose {
-							fmt.Println(err)
+						continue
+					case flowsdk.TransactionStatusExpired:
+						if tx.onExpired != nil {
+							go tx.onExpired(tx.txID)
 						}
+						tx.stat.isExpired = true
+						stats.AddTxStats(tx.stat)
+						log.Warn().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
+							Msgf("tx has been expired in %v seconds", time.Since(tx.createdAt).Seconds())
 						continue
 					}
 				}
 			}
-			// put it back
-			txs <- tx
+
+			log.Trace().Int("worker_id", workerID).Str("tx_id", tx.txID.String()).
+				Msg("empty result, putting tx back to queue")
+
 			// don't put too much pressure on access node
 			time.Sleep(sleepAfterOp)
+
+			// put it back
+			txs <- tx
 		}
 	}
 }

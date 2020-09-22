@@ -20,7 +20,7 @@ func TestSubmitTransaction(t *testing.T) {
 	engine := mock.Engine{}
 
 	h := handler{
-		chainID: flow.Mainnet,
+		chainID: flow.Testnet,
 		engine:  &engine,
 	}
 

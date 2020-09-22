@@ -14,11 +14,11 @@ type Network struct {
 }
 
 // Register provides a mock function with given fields: channelID, engine
-func (_m *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
+func (_m *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
 	ret := _m.Called(channelID, engine)
 
 	var r0 network.Conduit
-	if rf, ok := ret.Get(0).(func(uint8, network.Engine) network.Conduit); ok {
+	if rf, ok := ret.Get(0).(func(string, network.Engine) network.Conduit); ok {
 		r0 = rf(channelID, engine)
 	} else {
 		if ret.Get(0) != nil {
@@ -27,7 +27,7 @@ func (_m *Network) Register(channelID uint8, engine network.Engine) (network.Con
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint8, network.Engine) error); ok {
+	if rf, ok := ret.Get(1).(func(string, network.Engine) error); ok {
 		r1 = rf(channelID, engine)
 	} else {
 		r1 = ret.Error(1)

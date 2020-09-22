@@ -14,7 +14,7 @@ type RcvCache struct {
 // RcvCacheEntry represents an entry for the RcvCache
 type RcvCacheEntry struct {
 	eventID   string
-	channelID uint32
+	channelID string
 }
 
 // NewRcvCache creates and returns a new RcvCache
@@ -33,7 +33,7 @@ func NewRcvCache(size int) (*RcvCache, error) {
 
 // Add adds a new message to the cache if not already present. Returns true if the message was already in the cache and false
 // otherwise
-func (r *RcvCache) Add(eventID []byte, channelID uint32) bool {
+func (r *RcvCache) Add(eventID []byte, channelID string) bool {
 	entry := RcvCacheEntry{
 		eventID:   string(eventID),
 		channelID: channelID,

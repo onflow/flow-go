@@ -328,7 +328,7 @@ type QCSuite struct {
 	participants flow.IdentityList
 	signers      flow.IdentityList
 	block        *model.Block
-	qc           *model.QuorumCertificate
+	qc           *flow.QuorumCertificate
 	committee    *mocks.Committee
 	verifier     *mocks.Verifier
 	validator    *Validator

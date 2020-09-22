@@ -15,6 +15,13 @@ func NewExecutionReceiptHasher() hash.Hasher {
 	return h
 }
 
+// NewSPOCKHasher generates and returns a hasher for signing
+// and verification of SPoCKs
+func NewSPOCKHasher() hash.Hasher {
+	h := crypto.NewBLSKMAC(encoding.SPOCKTag)
+	return h
+}
+
 // NewHasher returns one of the hashers supported by Flow transactions.
 func NewHasher(algo hash.HashingAlgorithm) (hash.Hasher, error) {
 	switch algo {

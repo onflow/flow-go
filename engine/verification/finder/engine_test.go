@@ -112,7 +112,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.assertTimeOut = 5 * suite.processInterval
 
 	// mocking the network registration of the engine
-	suite.net.On("Register", uint8(engine.ExecutionReceiptProvider), testifymock.Anything).
+	suite.net.On("Register", engine.ReceiveReceipts, testifymock.Anything).
 		Return(suite.receiptsConduit, nil).
 		Once()
 
@@ -219,11 +219,11 @@ func (suite *FinderEngineTestSuite) TestCachedToPending() {
 
 	// mocks adding receipt id to mapping mempool based on its result
 	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).
-		Return(true, nil).Once()
+		Return(nil).Once()
 
 	// mocks adding receipt pending for block ID
 	suite.receiptIDsByBlock.On("Append", suite.receipt.ExecutionResult.BlockID, suite.receipt.ID()).
-		Return(true, nil).Once()
+		Return(nil).Once()
 
 	// mocks moving from cached to pending
 	moveWG := sync.WaitGroup{}

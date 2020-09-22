@@ -30,6 +30,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 func TestFinalizeClusterBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		parent := unittest.ClusterBlockFixture()
+
 		block := unittest.ClusterBlockWithParent(&parent)
 
 		err := db.Update(InsertClusterBlock(&block))

@@ -16,12 +16,13 @@ package crypto
 //    (https://eprint.iacr.org/2019/403.pdf section 4)
 //  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag
 //  - signature verification checks the membership of signature in G1
-//  - the public key membership check in G2 is implemented separately
-//  - membership checks in G1 and G2 are using a naive scalar multiplication with the group order
+//  - the public key membership check in G2 is implemented separately from the signature verification.
+//  - membership check in G1 is implemented using fast Bowe's check (https://eprint.iacr.org/2019/814.pdf)
+//  - membership check in G2 is using a simple scalar multiplication with the group order
 
 // future features:
-//  - signature aggregations
-//  - membership checks in G1 and G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
+//  - multi-signature and batch verification
+//  - membership checks G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
@@ -73,12 +74,17 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	if kmac == nil {
 		return nil, errors.New("Sign requires a Hasher")
 	}
+	// check hasher output size
+	if kmac.Size() < opSwUInputLenBLSBLS12381 {
+		return nil, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+			opSwUInputLenBLSBLS12381, kmac.Size())
+	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 	return newBLSBLS12381().blsSign(&sk.scalar, h), nil
 }
 
-// BLS_KMACFunction is the customizer used for KMAC in BLS
+// blsKMACFunction is the customizer used for KMAC in BLS
 const blsKMACFunction = "H2C"
 
 // NewBLSKMAC returns a new KMAC128 instance with the right parameters
@@ -101,6 +107,11 @@ func NewBLSKMAC(tag string) hash.Hasher {
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if kmac == nil {
 		return false, errors.New("VerifyBytes requires a Hasher")
+	}
+	// check hasher output size
+	if kmac.Size() < opSwUInputLenBLSBLS12381 {
+		return false, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+			opSwUInputLenBLSBLS12381, kmac.Size())
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
@@ -125,6 +136,24 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	// error is not checked as it is guaranteed to be nil; len(seed)<maxScalarSize
 	mapToZr(&(sk.scalar), seed)
 	return sk, nil
+}
+
+// GeneratePOP returns a proof of possession (PoP) for the receiver private key
+// using the given hasher.
+//
+// The hasher must be independant from the hashers used for signatures
+// or SPoCK proofs. In the case of KMAC, this means a specific domain tag must
+// be used for PoP and not used for other domains.
+func (sk *PrKeyBLSBLS12381) GeneratePOP(kmac hash.Hasher) (Signature, error) {
+	// sign the public key
+	return sk.Sign(sk.PublicKey().Encode(), kmac)
+}
+
+// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
+// using the given hasher.
+func (pk *PubKeyBLSBLS12381) VerifyPOP(s Signature, kmac hash.Hasher) (bool, error) {
+	// verify the signature against the public key
+	return pk.Verify(s, pk.Encode(), kmac)
 }
 
 // decodePrivateKey decodes a slice of bytes into a private key.
@@ -269,7 +298,6 @@ func (a *blsBLS12381Algo) init() error {
 	if err := a.context.initContext(); err != nil {
 		return err
 	}
-	a.context.precCtx = C.init_precomputed_data_BLS12_381()
 
 	// compare the Go and C layer constants as a sanity check
 	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||

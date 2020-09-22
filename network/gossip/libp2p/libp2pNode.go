@@ -3,9 +3,11 @@ package libp2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +21,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
+	"github.com/libp2p/go-libp2p/config"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
@@ -26,10 +30,13 @@ import (
 	netwk "github.com/dapperlabs/flow-go/network"
 )
 
-// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
-// All nodes communicate with each other using this protocol id suffixed with the id of the root block
 const (
-	FlowLibP2PProtocolIDPrefix string = "/flow/push/"
+	// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
+	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
+	FlowLibP2PProtocolIDPrefix = "/flow/push/"
+
+	// Maximum time to wait for a ping reply from a remote node
+	PingTimeoutSecs = time.Second * 4
 )
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
@@ -54,12 +61,20 @@ type P2PNode struct {
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
 	conMgr               ConnManager                     // the connection manager passed in to libp2p
+	connGater            *connGater                      // the connection gator passed in to libp2p
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 }
 
 // Start starts a libp2p node on the given address.
-func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, key lcrypto.PrivKey,
-	handler network.StreamHandler, rootBlockID string, psOption ...pubsub.Option) error {
+func (p *P2PNode) Start(ctx context.Context,
+	n NodeAddress,
+	logger zerolog.Logger,
+	key lcrypto.PrivKey,
+	handler network.StreamHandler,
+	rootBlockID string,
+	allowList bool,
+	allowListAddrs []NodeAddress,
+	psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
 
@@ -85,16 +100,34 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		return tpt
 	})
 
-	// libp2p.New constructs a new libp2p Host.
-	// Other options can be added here.
-	host, err := libp2p.New(
-		ctx,
-		libp2p.ListenAddrs(sourceMultiAddr),
-		libp2p.ConnectionManager(p.conMgr),
-		//libp2p.NoSecurity,
-		libp2p.Identity(key),
-		transport,
+	// gather all the options for the libp2p node
+	var options []config.Option
+	options = append(options,
+		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
+		libp2p.Identity(key),                // pass in the networking key
+		libp2p.ConnectionManager(p.conMgr),  // set the connection manager
+		transport,                           // set the protocol
+		libp2p.Ping(true),                   // enable ping
 	)
+
+	// if allowlisting is enabled, create a connection gator with allowListAddrs
+	if allowList {
+
+		// convert each of the allowList address to libp2p peer infos
+		allowListPInfos, err := GetPeerInfos(allowListAddrs...)
+		if err != nil {
+			return fmt.Errorf("failed to create approved list of peers: %w", err)
+		}
+
+		// create a connection gater
+		p.connGater = newConnGater(allowListPInfos, p.logger)
+
+		// provide the connection gater as an option to libp2p
+		options = append(options, libp2p.ConnectionGater(p.connGater))
+	}
+
+	// create the libp2p host
+	host, err := libp2p.New(ctx, options...)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
@@ -112,7 +145,11 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	p.topics = make(map[string]*pubsub.Topic)
 	p.subs = make(map[string]*pubsub.Subscription)
 
-	ip, port := p.GetIPPort()
+	ip, port, err := p.GetIPPort()
+	if err != nil {
+		return fmt.Errorf("failed to find IP and port on which the node was started: %w", err)
+	}
+
 	p.logger.Debug().
 		Str("name", p.name).
 		Str("address", fmt.Sprintf("%s:%s", ip, port)).
@@ -220,25 +257,36 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		default:
 		}
 
+		// remove the peer from the peer store if present
+		p.libP2PHost.Peerstore().ClearAddrs(targetID)
+
+		// cancel the dial back off (if any), since we want to connect immediately
+		network := p.libP2PHost.Network()
+		if swm, ok := network.(*swarm.Swarm); ok {
+			swm.Backoff().Clear(targetID)
+		}
+
 		// if this is a retry attempt, wait for some time before retrying
-		if err != nil {
+		if retries > 0 {
 			// choose a random interval between 0 and 5 ms to retry
 			r := rand.Intn(5)
 			time.Sleep(time.Duration(r) * time.Millisecond)
-
-			// remove the peer from the peer store if present
-			p.libP2PHost.Peerstore().ClearAddrs(targetID)
-
-			// cancel the dial back off, since we want to retry immediately
-			n := p.libP2PHost.Network()
-			if s, ok := n.(*swarm.Swarm); ok {
-				s.Backoff().Clear(targetID)
-			}
 		}
 
-		// Add node address as a peer
+		// add node address as a peer
 		err = p.AddPeers(ctx, n)
 		if err != nil {
+
+			// if the connection was rejected due to invalid node id, skip the re-attempt
+			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
+				return s, fmt.Errorf("invalid node id: %w", err)
+			}
+
+			// if the connection was rejected due to allowlisting, skip the re-attempt
+			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
+				return s, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
+			}
+
 			errs = multierror.Append(errs, err)
 			continue
 		}
@@ -272,16 +320,21 @@ func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
 	return pInfo, err
 }
 
-// GetIPPort returns the IP and Port the libp2p node is listening on.
-func (p *P2PNode) GetIPPort() (ip string, port string) {
-	for _, a := range p.libP2PHost.Network().ListenAddresses() {
-		if ip, e := a.ValueForProtocol(multiaddr.P_IP4); e == nil {
-			if p, e := a.ValueForProtocol(multiaddr.P_TCP); e == nil {
-				return ip, p
-			}
+func GetPeerInfos(addrs ...NodeAddress) ([]peer.AddrInfo, error) {
+	peerInfos := make([]peer.AddrInfo, len(addrs))
+	var err error
+	for i, addr := range addrs {
+		peerInfos[i], err = GetPeerInfo(addr)
+		if err != nil {
+			return []peer.AddrInfo{}, err
 		}
 	}
-	return "", ""
+	return peerInfos, err
+}
+
+// GetIPPort returns the IP and Port the libp2p node is listening on.
+func (p *P2PNode) GetIPPort() (string, string, error) {
+	return IPPortFromMultiAddress(p.libP2PHost.Network().ListenAddresses()...)
 }
 
 // Subscribe subscribes the node to the given topic and returns the subscription
@@ -359,6 +412,44 @@ func (p *P2PNode) Publish(ctx context.Context, topic string, data []byte) error 
 	return nil
 }
 
+// Ping pings a remote node and returns the time it took to ping the remote node if successful or the error
+func (p *P2PNode) Ping(ctx context.Context, target NodeAddress) (time.Duration, error) {
+
+	pingError := func(err error) (time.Duration, error) {
+		return -1, fmt.Errorf("failed to ping %s (%s:%s): %w", target.Name, target.IP, target.Port, err)
+	}
+
+	// convert the target node address to libp2p peer info
+	targetInfo, err := GetPeerInfo(target)
+	if err != nil {
+		return pingError(err)
+	}
+
+	// connect to the target node
+	err = p.libP2PHost.Connect(ctx, targetInfo)
+	if err != nil {
+		return pingError(err)
+	}
+
+	// create a cancellable ping context
+	pctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// ping the target
+	resultChan := ping.Ping(pctx, p.libP2PHost, targetInfo.ID)
+
+	// read the result channel
+	select {
+	case res := <-resultChan:
+		if res.Error != nil {
+			return pingError(err)
+		}
+		return res.RTT, nil
+	case <-time.After(PingTimeoutSecs):
+		return pingError(fmt.Errorf("timed out after %d seconds", PingTimeoutSecs))
+	}
+}
+
 // MultiaddressStr receives a node address and returns
 // its corresponding Libp2p Multiaddress in string format
 // in current implementation IP part of the node address is
@@ -373,6 +464,47 @@ func MultiaddressStr(address NodeAddress) string {
 	// could not parse it as an IP address and returns the dns version of the
 	// multi-address
 	return fmt.Sprintf("/dns4/%s/tcp/%s", address.IP, address.Port)
+}
+
+// IPPortFromMultiAddress returns the IP/hostname and the port for the given multi-addresses
+// associated with a libp2p host
+func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error) {
+
+	var ipOrHostname, port string
+	var err error
+
+	for _, a := range addrs {
+		// try and get the dns4 hostname
+		ipOrHostname, err = a.ValueForProtocol(multiaddr.P_DNS4)
+		if err != nil {
+			// if dns4 hostname is not found, try and get the IP address
+			ipOrHostname, err = a.ValueForProtocol(multiaddr.P_IP4)
+			if err != nil {
+				continue // this may not be a TCP IP multiaddress
+			}
+		}
+
+		// if either IP address or hostname is found, look for the port number
+		port, err = a.ValueForProtocol(multiaddr.P_TCP)
+		if err != nil {
+			// an IPv4 or DNS4 based multiaddress should have a port number
+			return "", "", err
+		}
+
+		//there should only be one valid IPv4 address
+		return ipOrHostname, port, nil
+	}
+	return "", "", fmt.Errorf("ip address or hostname not found")
+}
+
+// UpdateAllowlist allows the peer allowlist to be updated
+func (p *P2PNode) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
+	whilelistPInfos, err := GetPeerInfos(allowListAddrs...)
+	if err != nil {
+		return fmt.Errorf("failed to create approved list of peers: %w", err)
+	}
+	p.connGater.update(whilelistPInfos)
+	return nil
 }
 
 func generateProtocolID(rootBlockID string) protocol.ID {
