@@ -251,6 +251,184 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Equal(t, expectedErr, tx.Err.Error())
 		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
 	})
+
+	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+
+		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		assert.Error(t, tx.Err)
+
+		expectedErr := "Execution failed:\ncode deployment requires authorization from the service account\n"
+
+		assert.Equal(t, expectedErr, tx.Err.Error())
+		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+	})
+}
+
+func TestBlockContext_DeployContract_UpdateCode(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt)
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+
+	t.Run("account update with update code succeeds as service account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.AddCounterContractTransaction(accounts[0], chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+	})
+
+	t.Run("account update with update code succeeds as service account and can be used by other contracts in same account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.AddCounterContractTransaction(accounts[0], chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+
+		txBody = testutil.AddCounterImportContractTransaction(accounts[0], chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx = fvm.Transaction(txBody)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+	})
+
+	t.Run("account update with update code fails if not signed by service account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.AddUnauthorizedCounterContractTransaction(accounts[0])
+
+		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		assert.Error(t, tx.Err)
+
+		expectedErr := "Execution failed:\ncode deployment requires authorization from the service account\n"
+
+		assert.Equal(t, expectedErr, tx.Err.Error())
+		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+	})
+
+	t.Run("account update with update code fails if not signed by service account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.AddUnauthorizedCounterContractTransaction(accounts[0])
+
+		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		assert.Error(t, tx.Err)
+
+		expectedErr := "Execution failed:\ncode deployment requires authorization from the service account\n"
+
+		assert.Equal(t, expectedErr, tx.Err.Error())
+		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+	})
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
@@ -558,9 +736,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		require.Len(t, tx.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
 			float64(block1.Header.Timestamp.Unix())), tx.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), tx.Logs[1])
 	})
 
@@ -585,9 +763,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, script.Err)
 
 		require.Len(t, script.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
 			float64(block1.Header.Timestamp.Unix())), script.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), script.Logs[1])
 	})
 

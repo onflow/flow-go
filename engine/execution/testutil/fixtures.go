@@ -35,6 +35,20 @@ func CreateContractDeploymentTransaction(contract string, authorizer flow.Addres
 		AddAuthorizer(chain.ServiceAddress())
 }
 
+func CreateContractAddCodeTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(contract))
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount, service: AuthAccount) {
+                signer.contracts.add(name: "%s", code: "%s".decodeHex())
+              }
+            }`, contractName, encoded)),
+		).
+		AddAuthorizer(authorizer).
+		AddAuthorizer(chain.ServiceAddress())
+}
+
 func CreateUnauthorizedContractDeploymentTransaction(contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
@@ -44,6 +58,19 @@ func CreateUnauthorizedContractDeploymentTransaction(contract string, authorizer
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
+		).
+		AddAuthorizer(authorizer)
+}
+
+func CreateUnauthorizedContractAddCodeTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(contract))
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount) {
+                signer.contracts.add(name: "%s", code: "%s".decodeHex())
+              }
+            }`, contractName, encoded)),
 		).
 		AddAuthorizer(authorizer)
 }

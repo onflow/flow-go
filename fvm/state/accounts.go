@@ -52,7 +52,8 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	}
 
 	var code []byte
-	code, err = a.GetCode(address)
+	// TODO: check this
+	code, err = a.GetCode(string(address.Bytes()), address)
 	if err != nil {
 		return nil, err
 	}
@@ -257,13 +258,13 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 	return nil
 }
 
-func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
+func (a *Accounts) GetCode(name string, address flow.Address) ([]byte, error) {
 
-	code, err := a.ledger.Get(string(address.Bytes()),
+	code, err := a.ledger.Get(name,
 		string(address.Bytes()),
 		keyCode)
 	if err != nil {
-		return nil, newLedgerGetError(keyCode, address, err)
+		return nil, newLedgerGetError(name, address, err)
 	}
 
 	return code, nil
@@ -276,7 +277,7 @@ func (a *Accounts) TouchCode(address flow.Address) {
 		keyCode)
 }
 
-func (a *Accounts) SetCode(address flow.Address, code []byte) error {
+func (a *Accounts) SetCode(name string, address flow.Address, code []byte) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -287,7 +288,7 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 	}
 
 	var prevCode []byte
-	prevCode, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyCode)
+	prevCode, err = a.ledger.Get(name, string(address.Bytes()), keyCode)
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
@@ -297,7 +298,7 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 		return nil
 	}
 
-	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), keyCode, code)
+	a.ledger.Set(name, string(address.Bytes()), keyCode, code)
 
 	return nil
 }
