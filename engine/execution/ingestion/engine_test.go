@@ -303,6 +303,7 @@ func TestBlockOutOfOrder(t *testing.T) {
 
 	runWithEngine(t, func(ctx testingContext) {
 
+		// TODO: blocks need signer IDS for collections to be generated to have chunks
 		executableBlockA := unittest.ExecutableBlockFixture(nil)
 		executableBlockB := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
 		executableBlockC := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
