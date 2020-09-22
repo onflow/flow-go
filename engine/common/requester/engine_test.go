@@ -112,7 +112,7 @@ func TestDispatchRequestVarious(t *testing.T) {
 	var nonce uint64
 
 	con := &network.Conduit{}
-	con.On("Submit", mock.Anything, mock.Anything).Run(
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			request := args.Get(0).(*messages.EntityRequest)
 			originID := args.Get(1).(flow.Identifier)
@@ -186,7 +186,7 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 	}
 
 	con := &network.Conduit{}
-	con.On("Submit", mock.Anything, mock.Anything).Run(
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			request := args.Get(0).(*messages.EntityRequest)
 			assert.Len(t, request.EntityIDs, int(batchLimit))
