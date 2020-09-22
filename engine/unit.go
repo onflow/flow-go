@@ -10,12 +10,10 @@ import (
 
 // Unit handles synchronization management, startup, and shutdown for engines.
 type Unit struct {
-	wg         sync.WaitGroup  // tracks in-progress functions
-	once       sync.Once       // ensures that the done channel is only closed once
-	quit       chan struct{}   // used to signal that shutdown has started
-	ctx        context.Context // context that is cancelled when the unit is Done
-	cancel     context.CancelFunc
-	sync.Mutex // can be used to synchronize the engine
+	wg         sync.WaitGroup     // tracks in-progress functions
+	ctx        context.Context    // context that is cancelled when the unit is Done
+	cancel     context.CancelFunc // cancels the context
+	sync.Mutex                    // can be used to synchronize the engine
 }
 
 // NewUnit returns a new unit.
@@ -23,7 +21,6 @@ func NewUnit() *Unit {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	unit := &Unit{
-		quit:   make(chan struct{}),
 		ctx:    ctx,
 		cancel: cancel,
 	}
@@ -35,7 +32,7 @@ func NewUnit() *Unit {
 // until after f returns.
 func (u *Unit) Do(f func() error) error {
 	select {
-	case <-u.quit:
+	case <-u.ctx.Done():
 		return nil
 	default:
 	}
@@ -48,7 +45,7 @@ func (u *Unit) Do(f func() error) error {
 // down. If f is executed, the unit will not shut down until after f returns.
 func (u *Unit) Launch(f func()) {
 	select {
-	case <-u.quit:
+	case <-u.ctx.Done():
 		return
 	default:
 	}
@@ -64,7 +61,7 @@ func (u *Unit) Launch(f func()) {
 func (u *Unit) LaunchAfter(delay time.Duration, f func()) {
 	u.Launch(func() {
 		select {
-		case <-u.quit:
+		case <-u.ctx.Done():
 			return
 		case <-time.After(delay):
 			f()
@@ -82,13 +79,13 @@ func (u *Unit) LaunchPeriodically(f func(), interval time.Duration, delay time.D
 		defer ticker.Stop()
 		for {
 			select {
-			case <-u.quit:
+			case <-u.ctx.Done():
 				return
 			default:
 			}
 
 			select {
-			case <-u.quit:
+			case <-u.ctx.Done():
 				return
 			case <-ticker.C:
 				f()
@@ -122,7 +119,7 @@ func (u *Unit) Ctx() context.Context {
 
 // Quit returns a channel that is closed when the unit begins to shut down.
 func (u *Unit) Quit() <-chan struct{} {
-	return u.quit
+	return u.ctx.Done()
 }
 
 // Done returns a channel that is closed when the unit is done. A unit is done
@@ -134,10 +131,7 @@ func (u *Unit) Quit() <-chan struct{} {
 func (u *Unit) Done(actions ...func()) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		u.once.Do(func() {
-			close(u.quit)
-			u.cancel()
-		})
+		u.cancel()
 		for _, action := range actions {
 			action()
 		}
