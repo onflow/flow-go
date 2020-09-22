@@ -75,8 +75,8 @@ func wrapEvent(e Event) eventWrapper {
 
 // BlockEvents contains events emitted in a single block.
 type BlockEvents struct {
-	BlockID     Identifier
-	BlockHeight uint64
+	BlockID        Identifier
+	BlockHeight    uint64
 	BlockTimestamp time.Time
-	Events      []Event
+	Events         []Event
 }

@@ -121,7 +121,6 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 		return nil, errors.New("number of results does not match number of blocks requested")
 	}
 
-
 	reqestedBlockHeaderSet := map[string]*flow.Header{}
 	for _, header := range requestedBlockHeaders {
 		reqestedBlockHeaderSet[header.ID().String()] = header

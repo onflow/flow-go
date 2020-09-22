@@ -447,10 +447,10 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	expected := make([]flow.BlockEvents, len(blockHeaders))
 	for i := 0; i < len(blockHeaders); i++ {
 		expected[i] = flow.BlockEvents{
-			BlockID:     blockHeaders[i].ID(),
-			BlockHeight: uint64(i),
+			BlockID:        blockHeaders[i].ID(),
+			BlockHeight:    uint64(i),
 			BlockTimestamp: blockHeaders[i].Timestamp,
-			Events:      events,
+			Events:         events,
 		}
 	}
 
@@ -545,10 +545,10 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			height := uint64(5) // an arbitrary height
 
 			results[i] = flow.BlockEvents{
-				BlockID:     header.ID(),
-				BlockHeight: height,
+				BlockID:        header.ID(),
+				BlockHeight:    height,
 				BlockTimestamp: header.Timestamp,
-				Events:      events,
+				Events:         events,
 			}
 
 			exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
@@ -800,14 +800,6 @@ func (suite *Suite) assertAllExpectations() {
 func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
-}
-
-func getIDs(n int) []flow.Identifier {
-	ids := make([]flow.Identifier, n)
-	for i := range ids {
-		ids[i] = unittest.IdentifierFixture()
-	}
-	return ids
 }
 
 func getEvents(n int) []flow.Event {
