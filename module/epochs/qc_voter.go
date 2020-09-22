@@ -3,6 +3,7 @@ package epochs
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -22,6 +23,8 @@ type RootQCVoter struct {
 	signer hotstuff.Signer
 	state  protocol.State
 	client module.QCContractClient // client to the QC aggregator smart contract
+
+	wait time.Duration // how long to sleep in between vote attempts
 }
 
 // NewRootQCVoter returns a new root QC voter, configured for a particular epoch.
@@ -39,6 +42,7 @@ func NewRootQCVoter(
 		signer: signer,
 		state:  state,
 		client: client,
+		wait:   time.Second * 10,
 	}
 	return voter
 }
@@ -85,6 +89,11 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 	for {
 		attempts++
 		log := log.With().Int("attempt", attempts).Logger()
+
+		// for all attempts after the first, wait before re-trying
+		if attempts > 1 {
+			time.Sleep(voter.wait)
+		}
 
 		// check that our context is still valid
 		select {
