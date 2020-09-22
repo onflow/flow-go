@@ -438,22 +438,15 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
 
-	var publicKeys []flow.AccountPublicKey
-
-	publicKeys, err = e.accounts.GetPublicKeys(accountAddress)
+	err = e.accounts.AppendPublicKey(accountAddress, publicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return err
+		return fmt.Errorf("failed to add public key to account: %w", err)
 	}
 
-	publicKeys = append(publicKeys, publicKey)
-
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.accounts.SetPublicKeys(accountAddress, publicKeys)
+	return nil
 }
 
 // RemoveAccountKey revokes a public key by index from an existing account.
