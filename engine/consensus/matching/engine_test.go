@@ -749,6 +749,22 @@ func (ms *MatchingSuite) TestSealResultValid() {
 	result.PreviousResultID = previous.ID()
 	ms.sealedResults[previous.ID()] = previous
 
+	realApprovalPool, err := stdmap.NewApprovals(1000)
+	ms.Require().NoError(err)
+	ms.matching.approvals = realApprovalPool
+
+	// create 1 approval for each chunk in result and add to mempool
+	approver := ms.approvers[0]
+	for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
+		approval := unittest.ResultApprovalFixture()
+		approval.Body.BlockID = block.Header.ID()
+		approval.Body.ExecutionResultID = result.ID()
+		approval.Body.ApproverID = approver.NodeID
+		approval.Body.ChunkIndex = index
+		_, err := ms.matching.approvals.Add(approval)
+		ms.Require().NoError(err)
+	}
+
 	// check match when we are storing entities
 	ms.sealedResultsDB.On("Store", mock.Anything).Run(
 		func(args mock.Arguments) {
@@ -764,7 +780,17 @@ func (ms *MatchingSuite) TestSealResultValid() {
 		},
 	).Return(true)
 
-	err := ms.matching.sealResult(result)
+	// check that sigs has chunks many signatures
+	sigs := ms.matching.collectAggregateSignatures(result)
+	ms.Equal(len(sigs), result.Chunks.Len())
+
+	// check that each aggregated signature has 1 signer and signature
+	for _, sig := range sigs {
+		ms.Equal(len(sig.SignerIDs), 1)
+		ms.Equal(len(sig.VerifierSignatures), 1)
+	}
+
+	err = ms.matching.sealResult(result)
 	ms.Require().NoError(err, "should generate seal on persisted previous result")
 
 	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)

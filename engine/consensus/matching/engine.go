@@ -566,6 +566,9 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload index: %w", err)
 	}
+
+	// ER contains c + 1 chunks where c is number of collections in a block
+	// the extra chunk is the SystemChunk
 	if len(result.Chunks) != len(index.CollectionIDs) {
 		return errInvalidChunks
 	}
@@ -604,27 +607,32 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	return nil
 }
 
+// collectAggregateSignatures collects approver signatures and identities per chunk
+// TODO: needs testing
 func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
-	approvals := e.approvalsByResult[result.ID()]
-	signatures := make([]flow.AggregatedSignature, 0)
+	resultID := result.ID()
+	signatures := make([]flow.AggregatedSignature, 0, len(result.Chunks))
 
 	for _, chunk := range result.Chunks {
-		for _, approval := range approvals {
-			if approval.Body.ChunkIndex == chunk.Index {
-				var sigs []crypto.Signature
-				var ids []flow.Identifier
-				for _, approval := range approvals {
-					ids = append(ids, approval.Body.ApproverID)
-					sigs = append(sigs, approval.Body.AttestationSignature)
-				}
+		// get approvals for result with chunk index
+		approvals, _ := e.approvals.ByChunk(resultID, chunk.Index)
 
-				aggSign := flow.AggregatedSignature{
-					VerifierSignatures: sigs,
-					SignerIDs:          ids,
-				}
-				signatures = append(signatures, aggSign)
-			}
+		// temp slices to store signatures and ids
+		sigs := make([]crypto.Signature, 0, len(approvals))
+		ids := make([]flow.Identifier, 0, len(approvals))
+
+		// for each approval collect signature and approver id
+		for _, approval := range approvals {
+			ids = append(ids, approval.Body.ApproverID)
+			sigs = append(sigs, approval.Body.AttestationSignature)
 		}
+
+		aggSign := flow.AggregatedSignature{
+			VerifierSignatures: sigs,
+			SignerIDs:          ids,
+		}
+
+		signatures = append(signatures, aggSign)
 	}
 
 	return signatures
