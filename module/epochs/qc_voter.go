@@ -106,6 +106,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		voted, err := voter.client.Voted(ctx)
 		if err != nil {
 			log.Error().Err(err).Msg("could not check vote status")
+			continue
 		} else if voted {
 			log.Info().Msg("already voted - exiting QC vote process...")
 			return nil
