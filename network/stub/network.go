@@ -1,6 +1,7 @@
 package stub
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -19,6 +20,7 @@ import (
 // When an engine is attached on a Network instance, the mocked Network delivers
 // all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
+	ctx context.Context
 	sync.Mutex
 	state        protocol.State            // used to represent full protocol state of the attached node.
 	me           module.Local              // used to represent information of the attached node.
@@ -33,6 +35,7 @@ type Network struct {
 // in order for a mock hub to find each other.
 func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	net := &Network{
+		ctx:     context.Background(),
 		state:   state,
 		me:      me,
 		hub:     hub,
@@ -52,11 +55,16 @@ func (n *Network) GetID() flow.Identifier {
 // Register registers an Engine of the attached node to the channel ID via a Conduit, and returns the
 // Conduit instance.
 func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
+	n.Lock()
+	defer n.Unlock()
 	_, ok := n.engines[channelID]
 	if ok {
 		return nil, errors.Errorf("engine code already taken (%s)", channelID)
 	}
+	ctx, cancel := context.WithCancel(n.ctx)
 	conduit := &Conduit{
+		ctx:       ctx,
+		cancel:    cancel,
 		channelID: channelID,
 		submit:    n.submit,
 		publish:   n.publish,
@@ -65,6 +73,13 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 	}
 	n.engines[channelID] = engine
 	return conduit, nil
+}
+
+func (n *Network) Unregister(channelID string) error {
+	n.Lock()
+	defer n.Unlock()
+	delete(n.engines, channelID)
+	return nil
 }
 
 // submit is called when the attached Engine to the channel ID is sending an event to an

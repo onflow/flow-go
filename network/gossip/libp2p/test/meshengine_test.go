@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -145,6 +146,30 @@ func (m *MeshEngineTestSuite) TestMaxMessageSize_Publish() {
 	m.messageSizeScenario(m.Publish, libp2p.DefaultMaxPubSubMsgSize)
 }
 
+// TestUnregister_Publish tests that an engine cannot send any message using Publish
+// or receive any messages after the conduit is closed
+func (m *MeshEngineTestSuite) TestUnregister_Publish() {
+	m.conduitCloseScenario(m.Publish)
+}
+
+// TestUnregister_Publish tests that an engine cannot send any message using Multicast
+// or receive any messages after the conduit is closed
+func (m *MeshEngineTestSuite) TestUnregister_Multicast() {
+	m.conduitCloseScenario(m.Multicast)
+}
+
+// TestUnregister_Publish tests that an engine cannot send any message using Submit
+// or receive any messages after the conduit is closed
+func (m *MeshEngineTestSuite) TestUnregister_Submit() {
+	m.conduitCloseScenario(m.Submit)
+}
+
+// TestUnregister_Publish tests that an engine cannot send any message using Unicast
+// or receive any messages after the conduit is closed
+func (m *MeshEngineTestSuite) TestUnregister_Unicast() {
+	m.conduitCloseScenario(m.Unicast)
+}
+
 // allToAllScenario creates a complete mesh of the engines
 // each engine x then sends a "hello from node x" to other engines
 // it evaluates the correctness of message delivery as well as content of the message
@@ -286,7 +311,7 @@ func (m *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFunc, s
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// others keeps the identifier of all nodes except node that is sender.
 	others := m.ids.Filter(filter.Not(filter.HasNodeID(m.ids[0].NodeID))).NodeIDs()
@@ -314,6 +339,70 @@ func (m *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFunc, s
 	for index, e := range engs[1:] {
 		assert.Len(m.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
 	}
+}
+
+// conduitCloseScenario tests after a Conduit is closed, an engine cannot send or receive a message for that channel ID
+func (m *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFunc) {
+
+	optionalSleep(send)
+
+	// creating engines
+	count := len(m.nets)
+	engs := make([]*MeshEngine, 0)
+	wg := sync.WaitGroup{}
+
+	for i := range m.nets {
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.TestNetwork)
+		engs = append(engs, eng)
+	}
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
+
+	// unregister a random engine from the test topic by calling close on it's conduit
+	unregisterIndex := rand.Intn(count)
+	err := engs[unregisterIndex].con.Close()
+	assert.NoError(m.T(), err)
+
+	// each node attempts to broadcast a message to all others
+	for i := range m.nets {
+		event := &message.TestMessage{
+			Text: fmt.Sprintf("hello from node %v", i),
+		}
+
+		// others keeps the identifier of all nodes except ith node
+		others := m.ids.Filter(filter.Not(filter.HasNodeID(m.ids[i].NodeID))).NodeIDs()
+
+		if i == unregisterIndex {
+			// assert that unsubscribed engine cannot publish on that topic
+			require.Error(m.Suite.T(), send(event, engs[i].con, others...))
+			continue
+		}
+
+		require.NoError(m.Suite.T(), send(event, engs[i].con, others...))
+	}
+
+	// fire a goroutine to listen for incoming messages for each engine except for the one which unregistered
+	for i := range m.nets {
+		if i == unregisterIndex {
+			continue
+		}
+		wg.Add(1)
+		go func(e *MeshEngine) {
+			expectedMsgCnt := count - 2 // count less self and unsubscribed engine
+			for x := 0; x < expectedMsgCnt; x++ {
+				<-e.received
+			}
+			wg.Done()
+		}(engs[i])
+	}
+
+	// assert every one except the unsubscribed engine received the message
+	unittest.AssertReturnsBefore(m.Suite.T(), wg.Wait, 2*time.Second)
+
+	// assert that the unregistered engine did not receive the message
+	unregisteredEng := engs[unregisterIndex]
+	assert.Emptyf(m.T(), unregisteredEng.received, "unregistered engine received the topic message")
 }
 
 // extractSenderID returns a bool array with the index i true if there is a message from node i in the provided messages.

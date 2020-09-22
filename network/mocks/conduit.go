@@ -33,6 +33,20 @@ func (m *MockConduit) EXPECT() *MockConduitMockRecorder {
 	return m.recorder
 }
 
+// Close mocks base method
+func (m *MockConduit) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close
+func (mr *MockConduitMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockConduit)(nil).Close))
+}
+
 // Multicast mocks base method
 func (m *MockConduit) Multicast(arg0 interface{}, arg1 uint, arg2 ...flow.Identifier) error {
 	m.ctrl.T.Helper()

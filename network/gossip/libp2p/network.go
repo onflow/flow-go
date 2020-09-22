@@ -3,7 +3,6 @@ package libp2p
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
-	libp2perrors "github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
@@ -23,18 +21,18 @@ type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
-	sync.RWMutex
-	logger  zerolog.Logger
-	codec   network.Codec
-	ids     flow.IdentityList
-	me      module.Local
-	mw      middleware.Middleware
-	top     middleware.Topology
-	metrics module.NetworkMetrics
-	engines map[string]network.Engine
-	rcache  *cache.RcvCache // used to deduplicate incoming messages
-	queue   queue.MessageQueue
-	cancel  context.CancelFunc
+	logger          zerolog.Logger
+	codec           network.Codec
+	ids             flow.IdentityList
+	me              module.Local
+	mw              middleware.Middleware
+	top             middleware.Topology
+	metrics         module.NetworkMetrics
+	rcache          *cache.RcvCache // used to deduplicate incoming messages
+	queue           queue.MessageQueue
+	ctx             context.Context
+	cancel          context.CancelFunc
+	subscriptionMgr *subscriptionManager
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -58,20 +56,21 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:  log,
-		codec:   codec,
-		me:      me,
-		mw:      mw,
-		engines: make(map[string]network.Engine),
-		rcache:  rcache,
-		top:     top,
-		metrics: metrics,
+		logger:          log,
+		codec:           codec,
+		me:              me,
+		mw:              mw,
+		rcache:          rcache,
+		top:             top,
+		metrics:         metrics,
+		subscriptionMgr: newSubscriptionManager(mw),
 	}
 
 	o.SetIDs(ids)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	o.cancel = cancel
+	o.ctx = ctx
 
 	// setup the message queue
 	// create priority queue
@@ -111,33 +110,38 @@ func (n *Network) Done() <-chan struct{} {
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
-	n.Lock()
-	defer n.Unlock()
 
-	// check if the engine engineID is already taken
-	_, ok := n.engines[channelID]
-	if ok {
-		return nil, fmt.Errorf("engine already registered (%d)", engine)
-	}
-
-	// Register the middleware for the channelID topic
-	err := n.mw.Subscribe(channelID)
+	err := n.subscriptionMgr.register(channelID, engine)
 	if err != nil {
-		return nil, fmt.Errorf("failed to subscribe to channel %s: %w", channelID, err)
+		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channelID, err)
 	}
+
+	// create a cancellable child context
+	ctx, cancel := context.WithCancel(n.ctx)
 
 	// create the conduit
 	conduit := &Conduit{
+		ctx:       ctx,
+		cancel:    cancel,
 		channelID: channelID,
 		submit:    n.submit,
 		publish:   n.publish,
 		unicast:   n.unicast,
 		multicast: n.multicast,
+		close:     n.unregister,
 	}
 
-	// register engine with provided engineID
-	n.engines[channelID] = engine
 	return conduit, nil
+}
+
+// unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
+// receive messages from that channelID
+func (n *Network) unregister(channelID string) error {
+	err := n.subscriptionMgr.unregister(channelID)
+	if err != nil {
+		return fmt.Errorf("failed to unregister engine for channelID %s: %w", channelID, err)
+	}
+	return nil
 }
 
 // Identity returns a map of all flow.Identifier to flow identity by querying the flow state
@@ -410,21 +414,23 @@ func (n *Network) sendOnChannel(channelID string, message interface{}, targetIDs
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QueueMessage)
-	en, found := n.engines[qm.ChannelID]
-	if !found {
+	eng, err := n.subscriptionMgr.getEngine(qm.ChannelID)
+	if err != nil {
 		n.logger.Error().
-			Err(libp2perrors.NewInvalidEngineError(qm.ChannelID, qm.SenderID.String())).
+			Err(err).
+			Str("channel_id", qm.ChannelID).
+			Str("sender_id", qm.SenderID.String()).
 			Msg("failed to submit message")
 		return
 	}
 
 	// submit the message to the engine synchronously
-	err := en.Process(qm.SenderID, qm.Payload)
+	err = eng.Process(qm.SenderID, qm.Payload)
 	if err != nil {
 		n.logger.Error().
-			Str("channel_ID", qm.ChannelID).
-			Str("sender_id", qm.SenderID.String()).
 			Err(err).
+			Str("channel_id", qm.ChannelID).
+			Str("sender_id", qm.SenderID.String()).
 			Msg("failed to process message")
 	}
 }
