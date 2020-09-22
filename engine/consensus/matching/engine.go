@@ -607,15 +607,15 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 // TODO: needs testing
 func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
 	resultID := result.ID()
-	signatures := make([]flow.AggregatedSignature, 0)
+	signatures := make([]flow.AggregatedSignature, 0, len(result.Chunks))
 
 	for _, chunk := range result.Chunks {
-		// temp slices to store signatures and ids
-		var sigs []crypto.Signature
-		var ids []flow.Identifier
-
 		// get approvals for result with chunk index
 		approvals, _ := e.approvals.ByChunk(resultID, chunk.Index)
+
+		// temp slices to store signatures and ids
+		sigs := make([]crypto.Signature, 0, len(approvals))
+		ids := make([]flow.Identifier, 0, len(approvals))
 
 		// for each approval collect signature and approver id
 		for _, approval := range approvals {
