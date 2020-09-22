@@ -8,10 +8,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/fvm/state"
+	"github.com/dapperlabs/flow-go/ledger/partial"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 type VirtualMachine interface {
@@ -90,16 +89,23 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 		return nil, nil, fmt.Errorf("missing chunk data pack")
 	}
 
-	// constructing a partial trie given chunk data package
-	psmt, err := ptrie.NewPSMT(chunkDataPack.StartState,
-		ledger.RegisterKeySize,
-		chunkDataPack.Registers(),
-		chunkDataPack.Values(),
-		chunkDataPack.Proofs(),
-	)
+	// // constructing a partial trie given chunk data package
+	// psmt, err := ptrie.NewPSMT(chunkDataPack.StartState,
+	// 	ledger.RegisterKeySize,
+	// 	chunkDataPack.Registers(),
+	// 	chunkDataPack.Values(),
+	// 	chunkDataPack.Proofs(),
+	// )
+	// if err != nil {
+	// 	// TODO provide more details based on the error type
+	// 	return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", err, chIndex, execResID),
+	// 		nil
+	// }
+
+	pledg, err := partial.NewLedger(chunkDataPack.Proofs(), chunkDataPack.StartState)
 	if err != nil {
 		// TODO provide more details based on the error type
-		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", err, chIndex, execResID),
+		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial ledger: ", err, chIndex, execResID),
 			nil
 	}
 
@@ -111,8 +117,8 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
 		k := state.RegisterID(owner, controller, key)
-
 		val, ok := regMap[string(k)]
+		// TODO pledg.get()
 		if !ok {
 			unknownRegTouch[string(k)] = true
 			return nil, fmt.Errorf("missing register")
@@ -154,7 +160,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// this returns the expected end state commitment after updates and the list of
 	// register keys that was not provided by the chunk data package (err).
 	regs, values := chunkView.Delta().RegisterUpdates()
-	expEndStateComm, failedKeys, err := psmt.Update(regs, values)
+	expEndStateComm, failedKeys, err := pledg.Update(regs, values)
 	if err != nil {
 		return nil, chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
 	}
