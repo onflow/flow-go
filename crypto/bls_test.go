@@ -94,7 +94,7 @@ func TestBLSPOP(t *testing.T) {
 // it against the signature of the message under an aggregated private key.
 // Verify the aggregated signature using the multi-signature verification with
 // one message.
-func TestAggregateSignatures(t *testing.T) {
+func TestAggregateSignaturesOneMessage(t *testing.T) {
 	// random message
 	input := make([]byte, 100)
 	_, err := rand.Read(input)
@@ -297,4 +297,125 @@ func TestRemovePubKeys(t *testing.T) {
 	assert.True(t, BLSkey.Equals(partialPk),
 		fmt.Sprintf("incorrect key %s, should be %s, keys are %s",
 			partialPk, BLSkey, pks))
+}
+
+// BLS multi-signature
+// signature aggregation sanity check
+//
+// Aggregate n signatures of distinct messages under different keys,
+// and verify the aggregated signature using the multi-signature verification with
+// many message.
+func TestAggregateSignaturesManyMessages(t *testing.T) {
+	mrand.Seed(time.Now().UnixNano())
+
+	// number of signatures to aggregate
+	sigsNum := mrand.Intn(20) + 1
+	sigs := make([]Signature, 0, sigsNum)
+
+	// number of keys
+	keysNum := mrand.Intn(sigsNum) + 1
+	sks := make([]PrivateKey, 0, keysNum)
+	pks := make([]PublicKey, 0, keysNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	// generate the keys
+	for i := 0; i < keysNum; i++ {
+		sk := randomSK(t, seed)
+		sks = append(sks, sk)
+		pks = append(pks, sk.PublicKey())
+	}
+
+	// number of messages (could be more or less than keys)
+	msgsNum := mrand.Intn(sigsNum) + 1
+	messages := make([][]byte, msgsNum)
+	for i := 0; i < msgsNum; i++ {
+		_, err := rand.Read(messages[i])
+		require.NoError(t, err)
+	}
+
+	inputMsgs := make([]Hasher, 0, sigsNum)
+	inputPks := make([]Hasher, 0, sigsNum)
+	inputKmacs := make([]Hasher, 0, sigsNum)
+
+	// create the signatures
+	for i := 0; i < sigsNum; i++ {
+		kmac := NewBLSKMAC("test tag")
+		// pick a key randomly from the list
+		sk := sks[mrand.Intn(keysNum)]
+		// pick a message randomly from the list
+		msg := messages[mrand.Intn(msgsNum)]
+
+		s, err := sk.Sign(msg, inputKmacs[i])
+
+		require.NoError(t, err)
+		sigs = append(sigs, s)
+		sks = append(sks, sk)
+		pks = append(pks, sk.PublicKey())
+
+		inputKmacs = append(inputKmacs, kmac)
+	}
+	// aggregate private keys
+	aggSk, err := AggregatePrivateKeys(sks)
+	require.NoError(t, err)
+	expectedSig, err := aggSk.Sign(input, kmac)
+	require.NoError(t, err)
+	// aggregate signatures
+	aggSig, err := AggregateSignatures(sigs)
+	require.NoError(t, err)
+	// First check: check the signatures are equal
+	assert.Equal(t, aggSig, expectedSig,
+		fmt.Sprintf("incorrect signature %s, should be %s, private keys are %s, input is %x",
+			aggSig, expectedSig, sks, input))
+	// Second check: Verify the aggregated signature
+	valid, err := VerifySignatureOneMessage(pks, aggSig, input, kmac)
+	require.NoError(t, err)
+	assert.True(t, valid,
+		fmt.Sprintf("Verification of %s failed, signature should be %s private keys are %s, input is %x",
+			aggSig, expectedSig, sks, input))
+
+	// check if one the signatures is not correct
+	input[0] ^= 1
+	randomIndex := mrand.Intn(sigsNum)
+	sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+	input[0] ^= 1
+	aggSig, err = AggregateSignatures(sigs)
+	require.NoError(t, err)
+	assert.NotEqual(t, aggSig, expectedSig,
+		fmt.Sprintf("signature %s shouldn't be %s private keys are %s, input is %x",
+			aggSig, expectedSig, sks, input))
+	valid, err = VerifySignatureOneMessage(pks, aggSig, input, kmac)
+	require.NoError(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("verification of signature %s should fail, it shouldn't be %s private keys are %s, input is %x",
+			aggSig, expectedSig, sks, input))
+	sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+	// check if one the public keys is not correct
+	randomIndex = mrand.Intn(sigsNum)
+	newSk := randomSK(t, seed)
+	sks[randomIndex] = newSk
+	pks[randomIndex] = newSk.PublicKey()
+	aggSk, err = AggregatePrivateKeys(sks)
+	require.NoError(t, err)
+	expectedSig, err = aggSk.Sign(input, kmac)
+	require.NoError(t, err)
+	assert.NotEqual(t, aggSig, expectedSig,
+		fmt.Sprintf("signature %s shouldn't be %s, private keys are %s, input is %x, wrong key is of index %d",
+			aggSig, expectedSig, sks, input, randomIndex))
+	valid, err = VerifySignatureOneMessage(pks, aggSig, input, kmac)
+	require.NoError(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("signature %s should fail, shouldn't be %s, private keys are %s, input is %x, wrong key is of index %d",
+			aggSig, expectedSig, sks, input, randomIndex))
+
+	// test the empty list case
+	aggSk, err = AggregatePrivateKeys(sks[:0])
+	assert.NoError(t, err)
+	expectedSig, err = aggSk.Sign(input, kmac)
+	aggSig, err = AggregateSignatures(sigs[:0])
+	assert.NoError(t, err)
+	assert.Equal(t, aggSig, expectedSig,
+		fmt.Sprintf("wrong empty list key %s", sks))
+	valid, err = VerifySignatureOneMessage(pks[:0], aggSig, input, kmac)
+	assert.Error(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("verification should pass with empty list key %s", sks))
 }
