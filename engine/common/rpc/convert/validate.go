@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"strings"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -54,7 +56,7 @@ func CollectionID(collectionID []byte) (flow.Identifier, error) {
 }
 
 func EventType(eventType string) (string, error) {
-	if eventType == "" {
+	if len(strings.TrimSpace(eventType)) == 0 {
 		return "", status.Error(codes.InvalidArgument, "invalid event type")
 	}
 	return eventType, nil

@@ -218,7 +218,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 
 	// broadcast result approval to the consensus nodes
-	err = e.con.Publish(approval, filter.HasNodeID(consensusNodes.NodeIDs()...))
+	err = e.con.Publish(approval, consensusNodes.NodeIDs()...)
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)

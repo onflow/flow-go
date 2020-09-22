@@ -6,7 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// ReceiptDataPack represents a receipt with some metadata.
+// ReceiptDataPack represents an execution receipt with some metadata.
+// This is an internal entity for verification node.
 type ReceiptDataPack struct {
 	Receipt  *flow.ExecutionReceipt
 	OriginID flow.Identifier
