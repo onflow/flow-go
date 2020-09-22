@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/access"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -27,7 +26,7 @@ type Engine struct {
 	log                  zerolog.Logger
 	engMetrics           module.EngineMetrics
 	colMetrics           module.CollectionMetrics
-	con                  network.Conduit
+	conduit              network.Conduit
 	me                   module.Local
 	state                protocol.State
 	pool                 mempool.Transactions
@@ -73,12 +72,12 @@ func New(
 		transactionValidator: transactionValidator,
 	}
 
-	con, err := net.Register(engine.PushTransactions, e)
+	conduit, err := net.Register(engine.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
-	e.con = con
+	e.conduit = conduit
 
 	return e, nil
 }
@@ -211,17 +210,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// propagate it to all members of the responsible cluster
 	if originID == localID {
 
-		// always send the transaction to one node in the responsible cluster
-		// send to additional nodes based on configuration
-		targetIDs := txCluster.
-			Filter(filter.Not(filter.HasNodeID(localID))).
-			Sample(e.config.PropagationRedundancy + 1)
+		log.Debug().Msg("propagating transaction to cluster")
 
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
-			Msg("propagating transaction to cluster")
-
-		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
+		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
 		}

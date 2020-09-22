@@ -27,7 +27,7 @@ type Suite struct {
 	identities   flow.IdentityList
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
-	con          *network.Conduit
+	conduit      *network.Conduit
 	me           *module.Local
 	pool         *mempool.Transactions
 	collections  *storage.Collections
@@ -55,8 +55,8 @@ func (suite *Suite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	net := new(module.Network)
-	suite.con = new(network.Conduit)
-	net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
+	suite.conduit = new(network.Conduit)
+	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)
@@ -88,10 +88,9 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 
-	recipient := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0]
-
 	// should submit the collection to consensus nodes
-	suite.con.On("Submit", guarantee, recipient.NodeID).Return(nil)
+	consensus := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))
+	suite.conduit.On("Multicast", guarantee, pusher.DefaultRecipientCount, consensus[0].NodeID).Return(nil)
 
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
@@ -99,7 +98,7 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 	err := suite.engine.ProcessLocal(msg)
 	suite.Require().Nil(err)
 
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // should be able to submit collection guarantees to consensus nodes
@@ -109,7 +108,6 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 
 	// send from a non-allowed role
 	sender := suite.identities.Filter(filter.HasRole(flow.RoleVerification))[0]
-	recipient := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0]
 
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
@@ -117,5 +115,5 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	err := suite.engine.Process(sender.NodeID, msg)
 	suite.Require().Error(err)
 
-	suite.con.AssertNotCalled(suite.T(), "Submit", guarantee, recipient.NodeID)
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 }
