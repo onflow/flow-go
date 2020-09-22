@@ -120,6 +120,20 @@ func (_m *Middleware) Subscribe(channelID string) error {
 	return r0
 }
 
+// Unsubscribe provides a mock function with given fields: channelID
+func (_m *Middleware) Unsubscribe(channelID string) error {
+	ret := _m.Called(channelID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(channelID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateAllowList provides a mock function with given fields:
 func (_m *Middleware) UpdateAllowList() error {
 	ret := _m.Called()

@@ -67,9 +67,9 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
 
 	if !proposalKeyVerified {
-		return &MissingSignatureForProposalKeyError{
-			Address: tx.ProposalKey.Address,
-			KeyID:   tx.ProposalKey.KeyID,
+		return &InvalidProposalKeyMissingSignatureError{
+			Address:  tx.ProposalKey.Address,
+			KeyIndex: tx.ProposalKey.KeyID,
 		}
 	}
 
@@ -106,16 +106,9 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 	weights = make(map[flow.Address]int)
 
 	for _, txSig := range signatures {
-		accountKey, valid, err := v.verifyAccountSignature(accounts, txSig, message)
+		accountKey, err := v.verifyAccountSignature(accounts, txSig, message)
 		if err != nil {
 			return nil, false, err
-		}
-
-		if !valid {
-			return nil, false, &InvalidSignaturePublicKeyError{
-				Address: txSig.Address,
-				KeyID:   txSig.KeyID,
-			}
 		}
 
 		if v.sigIsForProposalKey(txSig, proposalKey) {
@@ -139,31 +132,25 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	accounts *state.Accounts,
 	txSig flow.TransactionSignature,
 	message []byte,
-) (*flow.AccountPublicKey, bool, error) {
-	var ok bool
-	var err error
-
-	ok, err = accounts.Exists(txSig.Address)
+) (*flow.AccountPublicKey, error) {
+	accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyID)
 	if err != nil {
-		return nil, false, err
+		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
+			return nil, &InvalidSignaturePublicKeyDoesNotExistError{
+				Address:  txSig.Address,
+				KeyIndex: txSig.KeyID,
+			}
+		}
+
+		return nil, err
 	}
 
-	if !ok {
-		return nil, false, &InvalidSignatureAccountError{Address: txSig.Address}
+	if accountKey.Revoked {
+		return nil, &InvalidSignaturePublicKeyRevokedError{
+			Address:  txSig.Address,
+			KeyIndex: txSig.KeyID,
+		}
 	}
-
-	var accountKeys []flow.AccountPublicKey
-
-	accountKeys, err = accounts.GetPublicKeys(txSig.Address)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if int(txSig.KeyID) >= len(accountKeys) {
-		return nil, false, &InvalidSignatureAccountError{Address: txSig.Address}
-	}
-
-	accountKey := &accountKeys[txSig.KeyID]
 
 	valid, err := v.SignatureVerifier.Verify(
 		txSig.Signature,
@@ -174,21 +161,24 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	)
 	if err != nil {
 		if errors.Is(err, ErrInvalidHashAlgorithm) {
-			return nil, false, &InvalidHashAlgorithmError{
+			return nil, &InvalidHashAlgorithmError{
 				Address:  txSig.Address,
-				KeyID:    txSig.KeyID,
+				KeyIndex: txSig.KeyID,
 				HashAlgo: accountKey.HashAlgo,
 			}
 		}
 
-		return nil, false, &PublicKeyVerificationError{
-			Address: txSig.Address,
-			KeyID:   txSig.KeyID,
-			Err:     err,
+		return nil, err
+	}
+
+	if !valid {
+		return nil, &InvalidSignatureVerificationError{
+			Address:  txSig.Address,
+			KeyIndex: txSig.KeyID,
 		}
 	}
 
-	return accountKey, valid, nil
+	return &accountKey, nil
 }
 
 func (v *TransactionSignatureVerifier) hasSufficientKeyWeight(

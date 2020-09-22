@@ -422,6 +422,12 @@ func (m *Middleware) Subscribe(channelID string) error {
 	return nil
 }
 
+// Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
+func (m *Middleware) Unsubscribe(channelID string) error {
+	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
+	return m.libP2PNode.UnSubscribe(topic)
+}
+
 // processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
 

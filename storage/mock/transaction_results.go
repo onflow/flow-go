@@ -12,6 +12,20 @@ type TransactionResults struct {
 	mock.Mock
 }
 
+// BatchStore provides a mock function with given fields: blockID, transactionResults
+func (_m *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
+	ret := _m.Called(blockID, transactionResults)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.TransactionResult) error); ok {
+		r0 = rf(blockID, transactionResults)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ByBlockIDTransactionID provides a mock function with given fields: blockID, transactionID
 func (_m *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResult, error) {
 	ret := _m.Called(blockID, transactionID)

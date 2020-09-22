@@ -23,8 +23,3 @@ func (er ExecutionResult) ID() Identifier {
 func (er ExecutionResult) Checksum() Identifier {
 	return MakeID(er)
 }
-
-type PendingResult struct {
-	ExecutorID      Identifier
-	ExecutionResult *ExecutionResult
-}

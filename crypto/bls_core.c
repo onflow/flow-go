@@ -31,25 +31,21 @@ int check_membership_Zr(const bn_t a){
 
 // checks if input point s is on the curve E1 
 // and is in the subgroup G1
-// membership check in G1 is using a naive scalar multiplication by the group order
-// TODO: switch to the faster Bowe check 
+// membership check in G1 is using a naive scalar multiplication by the group order 
 static int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
     if (!ep_is_valid(p))
         return INVALID;
     // check p is in G1
-    ep_t inf;
-    ep_new(inf);
-    // check p^order == infinity
-    // use basic double & add as lwnaf reduces the expo modulo r
-    // TODO : write a simple lwnaf without reduction
-    ep_mul_basic(inf, p, &core_get()->ep_r);
-    if (!ep_is_infty(inf)){
-        ep_free(inf);
-        return INVALID;
-    }
-    ep_free(inf);
+    #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
+    return simple_subgroup_check_G1(p);
+    #elif MEMBERSHIP_CHECK_G1 == BOWE
+    // section 3.2 from https://eprint.iacr.org/2019/814.pdf
+    return bowe_subgroup_check_G1(p);
+    #else
+    return INVALID;
+    #endif
 #endif
     return VALID;
 }
@@ -64,17 +60,14 @@ int check_membership_G2(const ep2_t p){
     if (!ep2_is_valid((ep2_st*)p))
         return INVALID;
     // check p is in G2
-    ep2_t inf;
-    ep2_new(inf);
-    // check p^order == infinity
-    // use basic double & add as lwnaf reduces the expo modulo r
-    // TODO : write a simple lwnaf without reduction
-    ep2_mul_basic(inf, (ep2_st*)p, &core_get()->ep_r);
-    if (!ep2_is_infty(inf)){
-        ep2_free(inf);
-        return INVALID;
-    }
-    ep2_free(inf);
+    #if MEMBERSHIP_CHECK_G2 == EXP_ORDER
+    return simple_subgroup_check_G2(p);
+    #elif MEMBERSHIP_CHECK_G2 == BOWE
+    // TODO: implement Bowe's check
+    return INVALID;
+    #else
+    return INVALID;
+    #endif
 #endif
     return VALID;
 }
