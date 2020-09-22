@@ -31,6 +31,7 @@ type AccountPublicKey struct {
 	HashAlgo  hash.HashingAlgorithm
 	SeqNumber uint64
 	Weight    int
+	Revoked   bool
 }
 
 func (a AccountPublicKey) MarshalJSON() ([]byte, error) {

@@ -132,11 +132,12 @@ type VerificationNode struct {
 	CachedReceipts           mempool.ReceiptDataPacks
 	ReadyReceipts            mempool.ReceiptDataPacks
 	PendingReceipts          mempool.ReceiptDataPacks
-	PendingResults           mempool.PendingResults
+	PendingResults           mempool.ResultDataPacks
 	ProcessedResultIDs       mempool.Identifiers
 	BlockIDsCache            mempool.Identifiers
 	PendingReceiptIDsByBlock mempool.IdentifierMap
 	ReceiptIDsByResult       mempool.IdentifierMap
+	ChunkIDsByResult         mempool.IdentifierMap
 	PendingChunks            *match.Chunks
 	HeaderStorage            storage.Headers
 	VerifierEngine           network.Engine

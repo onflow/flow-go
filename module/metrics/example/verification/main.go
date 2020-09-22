@@ -11,7 +11,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/test"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	vermodel "github.com/dapperlabs/flow-go/model/verification"
 	"github.com/dapperlabs/flow-go/module/buffer"
@@ -113,7 +112,7 @@ func demo() {
 		}
 
 		// creates pending results mempool, and registers size method of backend for metrics
-		pendingResults := stdmap.NewPendingResults()
+		pendingResults := stdmap.NewResultDataPacks(100)
 		err = mempoolCollector.Register(metrics.ResourcePendingResult, pendingResults.Size)
 		if err != nil {
 			panic(err)
@@ -189,21 +188,21 @@ func demo() {
 			}
 
 			if rand.Int()%2 == 0 {
-				_, err := receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
+				err := receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
 				if err != nil {
 					panic(err)
 				}
 			}
 
 			if rand.Int()%2 == 0 {
-				_, err = receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
+				err = receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
 				if err != nil {
 					panic(err)
 				}
 			}
 
 			if rand.Int()%2 == 0 {
-				pendingResults.Add(&flow.PendingResult{
+				pendingResults.Add(&vermodel.ResultDataPack{
 					ExecutorID:      receipt.ExecutorID,
 					ExecutionResult: &receipt.ExecutionResult,
 				})

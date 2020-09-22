@@ -6,6 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
@@ -66,6 +67,14 @@ func (f *HotStuffFactory) Create(
 	rootQC *flow.QuorumCertificate,
 ) (*hotstuff.EventLoop, error) {
 
+	// setup metrics/logging with the new chain ID
+	metrics := metrics.NewHotstuffCollector(clusterID)
+	notifier := pubsub.NewDistributor()
+	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
+	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
+	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, clusterID))
+	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
+
 	selector := filter.And(filter.In(cluster), filter.HasStake(true))
 	translator := clusterkv.NewTranslator(payloads, f.protoState)
 	selection, err := committee.ComputeLeaderSelectionFromSeed(rootHeader.View, seed, leader.EstimatedSixMonthOfViews, cluster)
@@ -73,17 +82,13 @@ func (f *HotStuffFactory) Create(
 		return nil, err
 	}
 
-	committee := committee.New(f.protoState, translator, f.me.NodeID(), selector, cluster.NodeIDs(), selection)
+	clusterCommittee := committee.New(f.protoState, translator, f.me.NodeID(), selector, cluster.NodeIDs(), selection)
+	clusterCommittee = committee.NewMetricsWrapper(clusterCommittee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
 	staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, f.me)
-	signer := verification.NewSingleSigner(committee, staking, f.me.NodeID())
-
-	// setup metrics/logging with the new chain ID
-	metrics := metrics.NewHotstuffCollector(clusterID)
-	notifier := pubsub.NewDistributor()
-	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
-	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
+	var signer hotstuff.Signer = verification.NewSingleSigner(clusterCommittee, staking, f.me.NodeID())
+	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	persist := persister.New(f.db, clusterID)
 
@@ -97,7 +102,7 @@ func (f *HotStuffFactory) Create(
 		notifier,
 		metrics,
 		headers,
-		committee,
+		clusterCommittee,
 		builder,
 		updater,
 		persist,
