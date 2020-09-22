@@ -184,6 +184,20 @@ IDLoop:
 	return dup
 }
 
+// Selector returns an identity filter function that selects only identities
+// within this identity list.
+func (il IdentityList) Selector() IdentityFilter {
+
+	lookup := make(map[Identifier]struct{})
+	for _, identity := range il {
+		lookup[identity.NodeID] = struct{}{}
+	}
+	return func(identity *Identity) bool {
+		_, exists := lookup[identity.NodeID]
+		return exists
+	}
+}
+
 // Order will sort the list using the given sort function.
 func (il IdentityList) Order(less IdentityOrder) IdentityList {
 	dup := make(IdentityList, 0, len(il))

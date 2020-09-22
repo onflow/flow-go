@@ -44,7 +44,7 @@ type Suite struct {
 
 	me           *module.Local
 	net          *module.Network
-	con          *network.Conduit
+	conduit      *network.Conduit
 	pool         *mempool.Transactions
 	transactions *storage.Transactions
 	headers      *storage.Headers
@@ -96,8 +96,8 @@ func (suite *Suite) SetupTest() {
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.net = new(module.Network)
-	suite.con = new(network.Conduit)
-	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
+	suite.conduit = new(network.Conduit)
+	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
 
 	suite.pool = new(mempool.Transactions)
 	suite.pool.On("Size").Return(uint(0))
@@ -282,7 +282,7 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 	// proposal should not have been submitted to consensus algo
 	suite.hotstuff.AssertNotCalled(suite.T(), "SubmitProposal")
 	// parent block should be requested
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestHandleProposalWithPendingChildren() {
