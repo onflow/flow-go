@@ -565,6 +565,9 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload index: %w", err)
 	}
+
+	// ER contains c + 1 chunks where c is number of collections in a block
+	// the extra chunk is the SystemChunk
 	if len(result.Chunks) != len(index.CollectionIDs) {
 		return errInvalidChunks
 	}
