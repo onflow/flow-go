@@ -261,27 +261,35 @@ func (e *hostEnv) UnsafeRandom() uint64 {
 }
 
 // GetBlockAtHeight returns the block at the given height.
-func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
+func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	if e.ctx.Blocks == nil {
 		panic("GetBlockAtHeight is not supported by this environment")
 	}
 
+	blockFromHeader := func(header *flow.Header) runtime.Block{
+		return runtime.Block{
+			Height:    header.Height,
+			View:      header.View,
+			Hash:      runtime.BlockHash(header.ID()),
+			Timestamp: header.Timestamp.UnixNano(),
+		}
+	}
+
 	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
-		return runtime.BlockHash(e.ctx.BlockHeader.ID()), e.ctx.BlockHeader.Timestamp.UnixNano(), true, nil
+		return blockFromHeader(e.ctx.BlockHeader), true, nil
 	}
 
 	block, err := e.ctx.Blocks.ByHeight(height)
 	// TODO: remove dependency on storage
 	if errors.Is(err, storage.ErrNotFound) {
-		return runtime.BlockHash{}, 0, false, nil
+		return runtime.Block{}, false, nil
 	} else if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return runtime.BlockHash{}, 0, false, fmt.Errorf(
-			"unexpected failure of GetBlockAtHeight, height %v: %w", height, err)
+		return runtime.Block{}, false, fmt.Errorf("unexpected failure of GetBlockAtHeight, height %v: %w", height, err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
+	return blockFromHeader(block.Header), true, nil
 }
 
 // Transaction Environment Functions
