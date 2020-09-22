@@ -50,6 +50,8 @@ type Suite struct {
 	execClient *accessmock.ExecutionAPIClient
 	me         *module.Local
 	chainID    flow.ChainID
+	metrics    *metrics.NoopCollector
+	backend    *backend.Backend
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -63,62 +65,95 @@ func (suite *Suite) SetupTest() {
 	suite.net = new(module.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
+
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
+
 	suite.request = new(module.Requester)
 	suite.request.On("EntityByID", mock.Anything, mock.Anything)
+
 	suite.me = new(module.Local)
-	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
-	suite.me.On("NodeID").Return(obsIdentity.NodeID)
+
+	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
+	suite.me.
+		On("NodeID").
+		Return(accessIdentity.NodeID)
+
 	suite.chainID = flow.Testnet
+	suite.metrics = metrics.NewNoopCollector()
 }
 
-func (suite *Suite) TestSendAndGetTransaction() {
-
+func (suite *Suite) RunTest(
+	f func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers),
+) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		referenceBlock := unittest.BlockHeaderFixture()
-		transaction := unittest.TransactionFixture()
-		transaction.SetReferenceBlockID(referenceBlock.ID())
-
-		// create storage
-		metrics := metrics.NewNoopCollector()
-		transactions := storage.NewTransactions(metrics, db)
+		headers, _, _, _, _, blocks, _, _, _ := util.StorageLayer(suite.T(), db)
+		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
 
-		backend := backend.New(
+		suite.backend = backend.New(
 			suite.state,
-			nil,
+			suite.execClient,
 			suite.collClient,
-			nil,
-			nil,
+			blocks,
+			headers,
 			collections,
 			transactions,
 			suite.chainID,
-			metrics,
+			suite.metrics,
 			uint(9000),
 			nil,
 			false,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain())
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
 
-		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.snapshot, nil)
-		suite.snapshot.On("Head").Return(&referenceBlock, nil).Once()
+		f(handler, db, blocks, headers)
+	})
+}
+
+func (suite *Suite) TestSendAndGetTransaction() {
+	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.Blocks, _ *storage.Headers) {
+		referenceBlock := unittest.BlockHeaderFixture()
+		transaction := unittest.TransactionFixture()
+		transaction.SetReferenceBlockID(referenceBlock.ID())
+
+		refSnapshot := new(protocol.Snapshot)
+
+		suite.state.
+			On("AtBlockID", referenceBlock.ID()).
+			Return(refSnapshot, nil)
+
+		refSnapshot.
+			On("Head").
+			Return(&referenceBlock, nil).
+			Twice()
+
+		suite.snapshot.
+			On("Head").
+			Return(&referenceBlock, nil).
+			Once()
+
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
 		sendReq := &accessproto.SendTransactionRequest{
 			Transaction: expected,
 		}
 		sendResp := accessproto.SendTransactionResponse{}
-		suite.collClient.On("SendTransaction", mock.Anything, mock.Anything).Return(&sendResp, nil).Once()
+
+		suite.collClient.
+			On("SendTransaction", mock.Anything, mock.Anything).
+			Return(&sendResp, nil).
+			Once()
 
 		// Send transaction
 		resp, err := handler.SendTransaction(context.Background(), sendReq)
-		require.NoError(suite.T(), err)
-		require.NotNil(suite.T(), resp)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(resp)
 
 		id := transaction.ID()
 		getReq := &accessproto.GetTransactionRequest{
@@ -127,11 +162,47 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 		// Get transaction
 		gResp, err := handler.GetTransaction(context.Background(), getReq)
-		require.NoError(suite.T(), err)
-		require.NotNil(suite.T(), gResp)
+		suite.Require().NoError(err)
+		suite.Require().NotNil(gResp)
 
 		actual := gResp.GetTransaction()
-		require.Equal(suite.T(), expected, actual)
+		suite.Require().Equal(expected, actual)
+	})
+}
+
+func (suite *Suite) TestSendExpiredTransaction() {
+	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.Blocks, _ *storage.Headers) {
+		referenceBlock := unittest.BlockHeaderFixture()
+
+		// create latest block that is past the expiry window
+		latestBlock := unittest.BlockHeaderFixture()
+		latestBlock.Height = referenceBlock.Height + flow.DefaultTransactionExpiry*2
+
+		transaction := unittest.TransactionFixture()
+		transaction.SetReferenceBlockID(referenceBlock.ID())
+
+		refSnapshot := new(protocol.Snapshot)
+
+		suite.state.
+			On("AtBlockID", referenceBlock.ID()).
+			Return(refSnapshot, nil)
+
+		refSnapshot.
+			On("Head").
+			Return(&referenceBlock, nil).
+			Twice()
+
+		suite.snapshot.
+			On("Head").
+			Return(&latestBlock, nil).
+			Once()
+
+		req := &accessproto.SendTransactionRequest{
+			Transaction: convert.TransactionToMessage(transaction.TransactionBody),
+		}
+
+		_, err := handler.SendTransaction(context.Background(), req)
+		suite.Require().Error(err)
 	})
 }
 
@@ -255,9 +326,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 }
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, _ *storage.Headers) {
 
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Guarantees, _ *storage.Seals,
-		_ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks, _ *storage.EpochSetups, _ *storage.EpochCommits, _ *storage.EpochStatuses) {
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
 		// test block2 get by height
@@ -270,23 +340,6 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		// the follower logic should update height index on the block storage when a block is finalized
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
-
-		backend := backend.New(
-			suite.state,
-			nil,
-			suite.collClient,
-			blocks,
-			headers,
-			nil,
-			nil,
-			suite.chainID,
-			metrics.NewNoopCollector(),
-			0,
-			nil,
-			false,
-		)
-
-		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
@@ -357,7 +410,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed blocked
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks, _ *storage.EpochSetups, _ *storage.EpochCommits, _ *storage.EpochStatuses) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers) {
+
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
 
@@ -367,6 +421,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
+
+		suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
 
@@ -394,24 +451,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
 			transactions, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
-
-		// create the handler (called by the grpc engine)
-		backend := backend.New(
-			suite.state,
-			suite.execClient,
-			suite.collClient,
-			blocks,
-			headers,
-			collections,
-			transactions,
-			suite.chainID,
-			metrics,
-			0,
-			nil,
-			false,
-		)
-
-		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
@@ -448,7 +487,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks, _ *storage.EpochSetups, _ *storage.EpochCommits, _ *storage.EpochStatuses) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers) {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()
@@ -468,22 +507,6 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 
 		ctx := context.Background()
-
-		backend := backend.New(
-			suite.state,
-			suite.execClient,
-			suite.collClient,
-			blocks,
-			headers,
-			nil, nil,
-			suite.chainID,
-			metrics.NewNoopCollector(),
-			0,
-			nil,
-			false,
-		)
-
-		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		script := []byte("dummy script")
 
@@ -513,6 +536,8 @@ func (suite *Suite) TestExecuteScript() {
 		}
 
 		suite.Run("execute script at latest block", func() {
+			suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 			expectedResp := setupExecClientMock(lastBlock.ID())
 			req := accessproto.ExecuteScriptAtLatestBlockRequest{
 				Script: script,

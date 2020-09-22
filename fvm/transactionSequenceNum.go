@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"errors"
+
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -28,26 +30,31 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 ) error {
 	proposalKey := tx.ProposalKey
 
-	accountKeys, err := accounts.GetPublicKeys(proposalKey.Address)
+	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyID)
 	if err != nil {
+		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
+			return &InvalidProposalKeyPublicKeyDoesNotExistError{
+				Address:  proposalKey.Address,
+				KeyIndex: proposalKey.KeyID,
+			}
+		}
+
 		return err
 	}
 
-	if int(proposalKey.KeyID) >= len(accountKeys) {
-		return &ProposalKeyDoesNotExistError{
-			Address: proposalKey.Address,
-			KeyID:   proposalKey.KeyID,
+	if accountKey.Revoked {
+		return &InvalidProposalKeyPublicKeyRevokedError{
+			Address:  proposalKey.Address,
+			KeyIndex: proposalKey.KeyID,
 		}
 	}
-
-	accountKey := accountKeys[proposalKey.KeyID]
 
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
 		return &InvalidProposalKeySequenceNumberError{
 			Address:           proposalKey.Address,
-			KeyID:             proposalKey.KeyID,
+			KeyIndex:          proposalKey.KeyID,
 			CurrentSeqNumber:  accountKey.SeqNumber,
 			ProvidedSeqNumber: proposalKey.SequenceNumber,
 		}
@@ -55,13 +62,10 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey.SeqNumber++
 
-	var updatedAccountKeyBytes []byte
-	updatedAccountKeyBytes, err = flow.EncodeAccountPublicKey(accountKey)
+	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyID, accountKey)
 	if err != nil {
 		return err
 	}
-
-	accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyID, updatedAccountKeyBytes)
 
 	return nil
 }

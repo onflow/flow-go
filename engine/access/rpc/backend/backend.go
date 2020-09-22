@@ -72,17 +72,18 @@ func New(
 			state:        state,
 		},
 		backendTransactions: backendTransactions{
-			staticCollectionRPC: collectionRPC,
-			executionRPC:        executionRPC,
-			state:               state,
-			chainID:             chainID,
-			collections:         collections,
-			blocks:              blocks,
-			transactions:        transactions,
-			transactionMetrics:  transactionMetrics,
-			retry:               retry,
-			collectionGRPCPort:  collectionGRPCPort,
-			connFactory:         connFactory,
+			staticCollectionRPC:  collectionRPC,
+			executionRPC:         executionRPC,
+			state:                state,
+			chainID:              chainID,
+			collections:          collections,
+			blocks:               blocks,
+			transactions:         transactions,
+			transactionValidator: configureTransactionValidator(state),
+			transactionMetrics:   transactionMetrics,
+			retry:                retry,
+			collectionGRPCPort:   collectionGRPCPort,
+			connFactory:          connFactory,
 		},
 		backendEvents: backendEvents{
 			executionRPC: executionRPC,
@@ -109,6 +110,20 @@ func New(
 	retry.SetBackend(b)
 
 	return b
+}
+
+func configureTransactionValidator(state protocol.State) *access.TransactionValidator {
+	return access.NewTransactionValidator(
+		access.NewProtocolStateBlocks(state),
+		access.TransactionValidationOptions{
+			Expiry:                       flow.DefaultTransactionExpiry,
+			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
+			AllowEmptyReferenceBlockID:   false,
+			AllowUnknownReferenceBlockID: false,
+			MaxGasLimit:                  flow.DefaultMaxGasLimit,
+			CheckScriptsParse:            true,
+		},
+	)
 }
 
 // Ping responds to requests when the server is up.

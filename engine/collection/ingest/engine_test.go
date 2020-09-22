@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/access"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
@@ -133,7 +134,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &IncompleteTransactionError{}))
+		suite.Assert().True(errors.As(err, &access.IncompleteTransactionError{}))
 	})
 
 	suite.Run("gas limit exceeds the maximum allowed", func() {
@@ -142,7 +143,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &GasLimitExceededError{}))
+		suite.Assert().True(errors.As(err, &access.InvalidGasLimitError{}))
 	})
 
 	suite.Run("invalid reference block ID", func() {
@@ -151,7 +152,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &ErrUnknownReferenceBlock))
+		suite.Assert().True(errors.As(err, &access.ErrUnknownReferenceBlock))
 	})
 
 	suite.Run("un-parseable script", func() {
@@ -161,7 +162,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &InvalidScriptError{}))
+		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
 	})
 
 	suite.Run("invalid signature", func() {
@@ -170,7 +171,6 @@ func (suite *Suite) TestInvalidTransaction() {
 	})
 
 	suite.Run("expired reference block ID", func() {
-
 		// "finalize" a sufficiently high block that root block is expired
 		final := unittest.BlockFixture()
 		final.Header.Height = suite.root.Header.Height + flow.DefaultTransactionExpiry + 1
@@ -181,7 +181,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &ExpiredTransactionError{}))
+		suite.Assert().True(errors.As(err, &access.ExpiredTransactionError{}))
 	})
 }
 
