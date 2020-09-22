@@ -10,6 +10,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -17,6 +18,7 @@ import (
 )
 
 var _ runtime.Interface = &hostEnv{}
+var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx           Context
@@ -84,31 +86,28 @@ func (e *hostEnv) getLogs() []string {
 	return e.logs
 }
 
-func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
+func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	v, _ := e.ledger.Get(
-		state.RegisterID(
-			string(owner),
-			string(controller),
-			string(key),
-		),
+
+		string(owner),
+		"", // TODO: Remove empty controller key
+		string(key),
 	)
 	return v, nil
 }
 
-func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
+func (e *hostEnv) SetValue(owner, key, value []byte) error {
 	e.ledger.Set(
-		state.RegisterID(
-			string(owner),
-			string(controller),
-			string(key),
-		),
+		string(owner),
+		"", // TODO: Remove empty controller key
+		string(key),
 		value,
 	)
 	return nil
 }
 
-func (e *hostEnv) ValueExists(owner, controller, key []byte) (exists bool, err error) {
-	v, err := e.GetValue(owner, controller, key)
+func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
+	v, err := e.GetValue(owner, key)
 	if err != nil {
 		return false, err
 	}
@@ -230,6 +229,14 @@ func (e *hostEnv) VerifySignature(
 	return valid
 }
 
+func (e *hostEnv) HighLevelStorageEnabled() bool {
+	return e.ctx.SetValueHandler != nil
+}
+
+func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadence.Value) error {
+	return e.ctx.SetValueHandler(flow.Address(owner), key, value)
+}
+
 // Block Environment Functions
 
 // GetCurrentBlockHeight returns the current block height.
@@ -257,6 +264,10 @@ func (e *hostEnv) UnsafeRandom() uint64 {
 func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
 	if e.ctx.Blocks == nil {
 		panic("GetBlockAtHeight is not supported by this environment")
+	}
+
+	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
+		return runtime.BlockHash(e.ctx.BlockHeader.ID()), e.ctx.BlockHeader.Timestamp.UnixNano(), true, nil
 	}
 
 	block, err := e.ctx.Blocks.ByHeight(height)

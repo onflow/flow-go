@@ -74,7 +74,7 @@ func New(
 		tracer:                   tracer,
 	}
 
-	_, err := net.Register(engine.ExecutionReceiptProvider, e)
+	_, err := net.Register(engine.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution receipt provider channel: %w", err)
 	}
@@ -132,12 +132,23 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
 	switch resource := event.(type) {
 	case *flow.ExecutionReceipt:
-		return e.handleExecutionReceipt(originID, resource)
+		err = e.handleExecutionReceipt(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	if err != nil {
+		// logs the error instead of returning that.
+		// returning error would be projected at a higher level by network layer.
+		// however, this is an engine-level error, and not network layer error.
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // handleExecutionReceipt receives an execution receipt and adds it to the cached receipt mempool.
@@ -161,7 +172,8 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).Logger()
-	log.Info().Msg("execution receipt arrived")
+	log.Info().
+		Msg("execution receipt arrived")
 
 	// monitoring: increases number of received execution receipts
 	e.metrics.OnExecutionReceiptReceived()
@@ -174,8 +186,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	}
 
 	ok = e.cachedReceipts.Add(rdp)
-	log.Info().
-		Bool("cached", ok).
+	if !ok {
+		return fmt.Errorf("duplicate execution receipt. receipt_id: %x", logging.ID(receiptID))
+	}
+	log.Debug().
 		Msg("execution receipt successfully handled")
 
 	return nil
@@ -216,7 +230,10 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 
 // processResult submits the result to the match engine.
 // originID is the identifier of the node that initially sends a receipt containing this result.
-func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, result *flow.ExecutionResult) error {
+// It returns true and nil if the result is submitted successfully to the match engine.
+// Otherwise, it returns false, and error if the result is not going successfully to the match engine. It returns false,
+// and nil, if the result has already been processed.
+func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, result *flow.ExecutionResult) (bool, error) {
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindProcessResult)
 	defer span.Finish()
 
@@ -225,21 +242,21 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 		e.log.Debug().
 			Hex("result_id", logging.ID(resultID)).
 			Msg("result already processed")
-		return nil
+		return false, nil
 	}
 	err := e.match.Process(originID, result)
 	if err != nil {
-		return fmt.Errorf("submission error to match engine: %w", err)
+		return false, fmt.Errorf("submission error to match engine: %w", err)
 	}
 
-	e.log.Debug().
+	e.log.Info().
 		Hex("result_id", logging.ID(resultID)).
 		Msg("result submitted to match engine")
 
 	// monitoring: increases number of execution results sent
 	e.metrics.OnExecutionResultSent()
 
-	return nil
+	return true, nil
 }
 
 // onResultProcessed is called whenever a result is processed completely and
@@ -335,7 +352,7 @@ func (e *Engine) checkCachedReceipts() {
 				}
 
 				// marks receipt pending for its block ID
-				_, err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
+				err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
 				if err != nil {
 					e.log.Error().
 						Err(err).
@@ -346,7 +363,7 @@ func (e *Engine) checkCachedReceipts() {
 			}
 
 			// records the execution receipt id based on its result id
-			_, err := e.receiptIDsByResult.Append(resultID, receiptID)
+			err := e.receiptIDsByResult.Append(resultID, receiptID)
 			if err != nil {
 				log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
 			}
@@ -441,13 +458,18 @@ func (e *Engine) checkReadyReceipts() {
 			receiptID := rdp.Receipt.ID()
 			resultID := rdp.Receipt.ExecutionResult.ID()
 
-			err := e.processResult(ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
+			ok, err := e.processResult(ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
 					Hex("receipt_id", logging.ID(receiptID)).
 					Hex("result_id", logging.ID(resultID)).
 					Msg("could not process result")
+				return
+			}
+
+			if !ok {
+				// result has already been processed, no cleanup is needed
 				return
 			}
 
@@ -488,4 +510,5 @@ func (e *Engine) onTimer() {
 	}()
 
 	wg.Wait()
+
 }

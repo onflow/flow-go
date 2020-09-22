@@ -40,6 +40,8 @@ type Committee struct {
 	//TODO: ultimately, the own identity of the node is necessary for signing.
 	//      Ideally, we would move the method for checking whether an Identifier refers to this node to the signer.
 	myID flow.Identifier // my own identifier
+	// pre-generated leader selection
+	leaderSelection *LeaderSelection
 }
 
 // Identities returns a IdentityList with legitimate HotStuff participants for the specified block.
@@ -96,7 +98,10 @@ func (c *Committee) LeaderForView(view uint64) (flow.Identifier, error) {
 	// As long as there are no Epochs, this implementation will never return an error, as
 	// leaders can be pre-determined for every view. This will change, when Epochs are added.
 	// The API already contains the error return parameter, to be future-proof.
-	leaderIndex := int(view) % len(c.epochParticipants)
+	leaderIndex, err := c.leaderSelection.LeaderIndexForView(view)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("can not get leader index for view: %w", err)
+	}
 	return c.epochParticipants[leaderIndex], nil
 }
 
@@ -108,24 +113,38 @@ func (c *Committee) Self() flow.Identifier {
 	return c.myID
 }
 
+// DKG returns the DKG info for the given block.
+func (c *Committee) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+	dkg, err := c.protocolState.AtBlockID(blockID).Epochs().Current().DKG()
+	return dkg, err
+}
+
 // New creates HotStuff committee. This is the generic constructor covering all potential cases.
 // It requires:
 //    * protocolState: the protocol state for the entire network
 //    * blockTranslator: translates a block from the current HotStuff committee to a block of the main consensus committee to determine legitimacy of nodes
 //    * myID: ID of the current node. CAUTION: this does not make the current node part of the HotStuff committee
-//    * filter: filter which retains only legitimate participants for the current consensus instance.
+//    * membersFilter: filter which retains only legitimate participants for the current consensus instance.
 //      It must filter for: node role, non-zero stake, and potentially the collector cluster (if applicable)
 //    * epochParticipants: all nodes that were part of the initially released list of participants for this HotStuff instance.
 //	    All participants for the current Epoch retain their spot as primaries for the respective views (even if they are slashed!)
 //
 // While you can use this constructor to generate a committee state for the main consensus,
 // the function `NewMainConsensusCommitteeState` provides a more concise API.
-func New(protocolState protocol.State, blockTranslator BlockTranslator, myID flow.Identifier, filter flow.IdentityFilter, epochParticipants flow.IdentifierList) hotstuff.Committee {
+func New(
+	protocolState protocol.State,
+	blockTranslator BlockTranslator,
+	myID flow.Identifier,
+	membersFilter flow.IdentityFilter,
+	epochParticipants flow.IdentifierList,
+	leaderSelection *LeaderSelection,
+) hotstuff.Committee {
 	return &Committee{
 		protocolState:     protocolState,
 		blockTranslator:   blockTranslator,
-		membersFilter:     filter,
+		membersFilter:     membersFilter,
 		epochParticipants: epochParticipants,
+		leaderSelection:   leaderSelection,
 		myID:              myID,
 	}
 }
@@ -137,7 +156,7 @@ func New(protocolState protocol.State, blockTranslator BlockTranslator, myID flo
 //
 // For constructing committees for other HotStuff instances (such as collector HotStuff instances), please use the
 // generic `New` function.
-func NewMainConsensusCommitteeState(protocolState protocol.State, myID flow.Identifier) (hotstuff.Committee, error) {
+func NewMainConsensusCommitteeState(protocolState protocol.State, myID flow.Identifier, leaderSelection *LeaderSelection) (hotstuff.Committee, error) {
 
 	// finding all consensus members
 	epochConsensusMembers, err := protocolState.Final().Identities(filter.HasRole(flow.RoleConsensus))
@@ -154,5 +173,6 @@ func NewMainConsensusCommitteeState(protocolState protocol.State, myID flow.Iden
 	}
 
 	consensusNodeFilter := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
-	return New(protocolState, blockTranslator, myID, consensusNodeFilter, epochConsensusMembers.NodeIDs()), nil
+
+	return New(protocolState, blockTranslator, myID, consensusNodeFilter, epochConsensusMembers.NodeIDs(), leaderSelection), nil
 }

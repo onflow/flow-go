@@ -10,7 +10,7 @@ import (
 type PendingMessage struct {
 	// The sender node id
 	From      flow.Identifier
-	ChannelID uint8
+	ChannelID string
 	Event     interface{}
 	// The id of the receiver nodes
 	TargetIDs []flow.Identifier

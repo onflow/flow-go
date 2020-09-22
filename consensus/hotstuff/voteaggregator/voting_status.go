@@ -59,7 +59,7 @@ func (vs *VotingStatus) CanBuildQC() bool {
 
 // TryBuildQC returns a QC if the existing votes are enought to build a QC, otherwise
 // an error will be returned.
-func (vs *VotingStatus) TryBuildQC() (*model.QuorumCertificate, bool, error) {
+func (vs *VotingStatus) TryBuildQC() (*flow.QuorumCertificate, bool, error) {
 
 	// check if there are enough votes to build QC
 	if !vs.CanBuildQC() {

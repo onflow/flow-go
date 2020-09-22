@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"github.com/dapperlabs/flow-go/model/encodable"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -11,6 +12,6 @@ type PartnerNodeInfoPub struct {
 	Role          flow.Role
 	Address       string
 	NodeID        flow.Identifier
-	NetworkPubKey EncodableNetworkPubKey
-	StakingPubKey EncodableStakingPubKey
+	NetworkPubKey encodable.NetworkPubKey
+	StakingPubKey encodable.StakingPubKey
 }

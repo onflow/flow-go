@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	state2 "github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -68,7 +69,7 @@ type ExecutionState interface {
 	// PersistChunkDataPack stores a chunk data pack by chunk ID.
 	PersistChunkDataPack(context.Context, *flow.ChunkDataPack) error
 
-	PersistExecutionResult(context.Context, flow.Identifier, flow.ExecutionResult) error
+	PersistExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
 
 	PersistStateInteractions(context.Context, flow.Identifier, []*delta.Snapshot) error
 
@@ -76,14 +77,15 @@ type ExecutionState interface {
 }
 
 type state struct {
-	tracer           module.Tracer
-	ls               storage.Ledger
-	commits          storage.Commits
-	blocks           storage.Blocks
-	collections      storage.Collections
-	chunkDataPacks   storage.ChunkDataPacks
-	executionResults storage.ExecutionResults
-	db               *badger.DB
+	tracer         module.Tracer
+	ls             storage.Ledger
+	commits        storage.Commits
+	blocks         storage.Blocks
+	collections    storage.Collections
+	chunkDataPacks storage.ChunkDataPacks
+	results        storage.ExecutionResults
+	receipts       storage.ExecutionReceipts
+	db             *badger.DB
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -93,26 +95,29 @@ func NewExecutionState(
 	blocks storage.Blocks,
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
-	executionResult storage.ExecutionResults,
+	results storage.ExecutionResults,
+	receipts storage.ExecutionReceipts,
 	db *badger.DB,
 	tracer module.Tracer,
 ) ExecutionState {
 	return &state{
-		tracer:           tracer,
-		ls:               ls,
-		commits:          commits,
-		blocks:           blocks,
-		collections:      collections,
-		chunkDataPacks:   chunkDataPacks,
-		executionResults: executionResult,
-		db:               db,
+		tracer:         tracer,
+		ls:             ls,
+		commits:        commits,
+		blocks:         blocks,
+		collections:    collections,
+		chunkDataPacks: chunkDataPacks,
+		results:        results,
+		receipts:       receipts,
+		db:             db,
 	}
 }
 
 func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
-	return func(key flow.RegisterID) ([]byte, error) {
+	return func(owner, controller, key string) (flow.RegisterValue, error) {
+
 		values, err := ledger.GetRegisters(
-			[]flow.RegisterID{key},
+			[]flow.RegisterID{state2.RegisterID(owner, controller, key)},
 			commitment,
 		)
 		if err != nil {
@@ -213,26 +218,34 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 		defer span.Finish()
 	}
 
-	res, err := s.executionResults.ByBlockID(blockID)
+	result, err := s.results.ByBlockID(blockID)
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return res.ID(), nil
+	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionResult(ctx context.Context, blockID flow.Identifier, result flow.ExecutionResult) error {
+func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
 	if s.tracer != nil {
 		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistExecutionResult)
 		defer span.Finish()
 	}
 
-	err := s.executionResults.Store(&result)
+	err := s.receipts.Store(receipt)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 	// TODO if the second operation fails we should remove stored execution result
 	// This is global execution storage problem - see TODO at the top
-	return s.executionResults.Index(blockID, result.ID())
+	err = s.receipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
+	if err != nil {
+		return fmt.Errorf("could not index execution receipt: %w", err)
+	}
+	err = s.results.Index(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
+	if err != nil {
+		return fmt.Errorf("could not index execution result: %w", err)
+	}
+	return nil
 }
 
 func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Identifier, views []*delta.Snapshot) error {

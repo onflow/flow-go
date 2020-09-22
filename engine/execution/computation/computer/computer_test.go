@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	computermock "github.com/dapperlabs/flow-go/engine/execution/computation/computer/mock"
@@ -27,22 +28,51 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
-			Twice()
+			Times(2 + 1) // 2 txs in collection + system chunk
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
+
+		vm.AssertExpectations(t)
+	})
+
+	t.Run("empty block still computes system chunk", func(t *testing.T) {
+
+		execCtx := fvm.NewContext()
+
+		vm := new(computermock.VirtualMachine)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
+
+		// create an empty block
+		block := generateBlock(0, 0)
+
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Once() // just system chunk
+
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TransactionResult, 1)
 
 		vm.AssertExpectations(t)
 	})
@@ -52,12 +82,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
 		eventsPerTransaction := 2
-		totalTransactionCount := collectionCount * transactionsPerCollection
+		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
 		totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
@@ -76,7 +107,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(totalTransactionCount)
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -84,7 +115,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
-		assert.Len(t, result.StateSnapshots, collectionCount)
+		assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
 
 		// all events should have been collected
 		assert.Len(t, result.Events, totalEventCount)
@@ -110,7 +141,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.ElementsMatch(t, expectedResults, result.TransactionResult)
+		assert.ElementsMatch(t, expectedResults, result.TransactionResult[0:len(result.TransactionResult)-1]) //strip system chunk
 
 		vm.AssertExpectations(t)
 	})
@@ -167,7 +198,7 @@ func generateEvents(eventCount int) []cadence.Event {
 	events := make([]cadence.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := cadence.Event{EventType: cadence.EventType{
+		event := cadence.Event{EventType: &cadence.EventType{
 			Identifier: "whatever",
 		}}
 		events[i] = event

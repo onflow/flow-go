@@ -30,6 +30,5 @@ ExecStart=docker run --rm \
 	--bootstrapdir=/bootstrap \
 	--datadir=/data/protocol \
 	--ingress-addr=0.0.0.0:9000 \
-	--nclusters=${FLOW_NETWORK_COLLECTION_CLUSTER_COUNT} \
 	--bind 0.0.0.0:3569 \
 	--loglevel=ERROR

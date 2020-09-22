@@ -33,7 +33,10 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	}
 }
 
-// GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed
+// GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed.
+//
+// It is recommended to use a secure crypto RNG to generate the seed.
+// The seed must have a minimum entropy (depending on the algorithm) and should be uniformly random.
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
@@ -92,6 +95,9 @@ type PrivateKey interface {
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
 	Equals(PrivateKey) bool
+	// GeneratePOP returns a proof of possession (PoP) for the receiver private key
+	// using the given hasher.
+	GeneratePOP(hash.Hasher) (Signature, error)
 }
 
 // PublicKey is an unspecified signature scheme public key.
@@ -110,4 +116,7 @@ type PublicKey interface {
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
 	Equals(PublicKey) bool
+	// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
+	// using the given hasher.
+	VerifyPOP(Signature, hash.Hasher) (bool, error)
 }

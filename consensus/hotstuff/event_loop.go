@@ -104,7 +104,7 @@ func (el *EventLoop) loop() {
 
 		// same as before
 		case <-timeoutChannel:
-			// meansure how long the event loop was idle waiting for an
+			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
@@ -161,7 +161,12 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 	received := time.Now()
 
 	proposal := model.ProposalFromFlow(proposalHeader, parentView)
-	el.proposals <- proposal
+
+	select {
+	case el.proposals <- proposal:
+	case <-el.unit.Quit():
+		return
+	}
 
 	// the wait duration is measured as how long it takes from a block being
 	// received to event handler commencing the processing of the block
@@ -173,7 +178,12 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 	received := time.Now()
 
 	vote := model.VoteFromFlow(originID, blockID, view, sigData)
-	el.votes <- vote
+
+	select {
+	case el.votes <- vote:
+	case <-el.unit.Quit():
+		return
+	}
 
 	// the wait duration is measured as how long it takes from a vote being
 	// received to event handler commencing the processing of the vote

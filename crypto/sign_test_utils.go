@@ -35,13 +35,13 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		result, err := pk.Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.True(t, result, fmt.Sprintf(
-			"Verification should succeed:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 		// test with a different message
 		input[0] ^= 1
 		result, err = pk.Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 		input[0] ^= 1
 		// test with a valid but different key
 		seed[0] ^= 1
@@ -50,7 +50,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		result, err = wrongSk.PublicKey().Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 	}
 }
 
@@ -166,4 +166,40 @@ func benchSign(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 		sk.Sign(input, halg)
 	}
 	b.StopTimer()
+}
+
+// testPOP tests proofs of possession
+func testPOP(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
+	t.Logf("Testing proof of possession for %s", salg)
+	// make sure the length is larger than minimum lengths of all the signaure algos
+	seedMinLength := 48
+	seed := make([]byte, seedMinLength)
+	input := make([]byte, 100)
+
+	loops := 10
+	for j := 0; j < loops; j++ {
+		n, err := rand.Read(seed)
+		require.Equal(t, n, seedMinLength)
+		require.NoError(t, err)
+		sk, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		_, err = rand.Read(input)
+		require.NoError(t, err)
+		s, err := sk.GeneratePOP(halg)
+		require.NoError(t, err)
+		pk := sk.PublicKey()
+		// test a valid PoP
+		result, err := pk.VerifyPOP(s, halg)
+		require.NoError(t, err)
+		assert.True(t, result, fmt.Sprintf(
+			"Verification should succeed:\n signature:%s\n private key:%s", s, sk))
+		// test with a valid but different key
+		seed[0] ^= 1
+		wrongSk, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		result, err = wrongSk.PublicKey().VerifyPOP(s, halg)
+		require.NoError(t, err)
+		assert.False(t, result, fmt.Sprintf(
+			"Verification should fail:\n signature:%s\n private key:%s", s, sk))
+	}
 }

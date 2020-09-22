@@ -3,6 +3,7 @@ package verifier_test
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -14,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
-	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
+	"github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -38,7 +39,7 @@ type VerifierEngineTestSuite struct {
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
 	chain   flow.Chain
-	conduit *network.Conduit                // mocks conduit for submitting result approvals
+	con     *network.Conduit                // mocks con for submitting result approvals
 	metrics *mockmodule.VerificationMetrics // mocks performance monitoring metrics
 }
 
@@ -52,12 +53,12 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = &protocol.Snapshot{}
-	suite.conduit = &network.Conduit{}
+	suite.con = &network.Conduit{}
 	suite.metrics = &mockmodule.VerificationMetrics{}
 	suite.chain = flow.Testnet.Chain()
 
-	suite.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
-		Return(suite.conduit, nil).
+	suite.net.On("Register", engine.PushApprovals, testifymock.Anything).
+		Return(suite.con, nil).
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
@@ -69,12 +70,19 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	n, err := rand.Read(seed)
 	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(suite.T(), err)
+
+	// creates private key of verification node
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(suite.T(), err)
 	suite.sk = sk
+
 	// tag of hasher should be the same as the tag of engine's hasher
 	suite.hasher = utils.NewResultApprovalHasher()
-	suite.me = mocklocal.NewMockLocal(sk, flow.Identifier{}, suite.T())
+
+	// defines the identity of verification node and attaches its key.
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	verIdentity.StakingPubKey = sk.PublicKey()
+	suite.me = mocklocal.NewMockLocal(sk, verIdentity.NodeID, suite.T())
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
@@ -95,7 +103,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1, suite.chain)
+	completeRA := utils.LightExecutionResultFixture(1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
@@ -126,12 +134,9 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	suite.metrics.On("OnVerifiableChunkReceived").Return()
 	// emission of result approval
 	suite.metrics.On("OnResultApproval").Return()
-	// chunk verification
-	suite.metrics.On("OnChunkVerificationStarted", vChunk.ChunkDataPack.ChunkID).Return()
-	suite.metrics.On("OnChunkVerificationFinished", vChunk.ChunkDataPack.ChunkID).Return()
 
-	suite.conduit.
-		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
+	suite.con.
+		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
 			// check that the approval matches the input execution result
@@ -144,13 +149,16 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 			suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
 			bodyID := ra.Body.ID()
 			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
+
+			// spock should be non-nil
+			suite.Assert().NotNil(ra.Body.Spock)
 		}).
 		Once()
 
 	err := eng.Process(myID, vChunk)
 	suite.Assert().NoError(err)
 	suite.ss.AssertExpectations(suite.T())
-	suite.conduit.AssertExpectations(suite.T())
+	suite.con.AssertExpectations(suite.T())
 
 }
 
@@ -168,8 +176,8 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	suite.metrics.On("OnVerifiableChunkReceived").Return()
 
 	// we shouldn't receive any result approval
-	suite.conduit.
-		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
+	suite.con.
+		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
 			// TODO change this to check challeneges
@@ -186,11 +194,6 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		{unittest.VerifiableChunkDataFixture(uint64(3)), nil},
 	}
 	for _, test := range tests {
-		// mocks metrics
-		// chunk verification
-		suite.metrics.On("OnChunkVerificationStarted", test.vc.ChunkDataPack.ChunkID).Return()
-		suite.metrics.On("OnChunkVerificationFinished", test.vc.ChunkDataPack.ChunkID).Return()
-
 		err := eng.Process(myID, test.vc)
 		suite.Assert().NoError(err)
 	}
@@ -199,26 +202,30 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 type ChunkVerifierMock struct {
 }
 
-func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) (chmodel.ChunkFault, error) {
+func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
+	if vc.IsSystemChunk {
+		return nil, nil, fmt.Errorf("wrong method invoked for verifying system chunk")
+	}
+
 	switch vc.Chunk.Index {
 	case 0:
-		return nil, nil
+		return []byte{}, nil, nil
 	// return error
 	case 1:
-		return chmodel.NewCFMissingRegisterTouch(
+		return nil, chmodel.NewCFMissingRegisterTouch(
 			[]string{"test missing register touch"},
 			vc.Chunk.Index,
 			vc.Result.ID()), nil
 
 	case 2:
-		return chmodel.NewCFInvalidVerifiableChunk(
+		return nil, chmodel.NewCFInvalidVerifiableChunk(
 			"test",
 			errors.New("test invalid verifiable chunk"),
 			vc.Chunk.Index,
 			vc.Result.ID()), nil
 
 	case 3:
-		return chmodel.NewCFNonMatchingFinalState(
+		return nil, chmodel.NewCFNonMatchingFinalState(
 			unittest.StateCommitmentFixture(),
 			unittest.StateCommitmentFixture(),
 			vc.Chunk.Index,
@@ -227,7 +234,14 @@ func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) (chmodel
 	// TODO add cases for challenges
 	// return successful by default
 	default:
-		return nil, nil
+		return nil, nil, nil
 	}
 
+}
+
+func (v ChunkVerifierMock) SystemChunkVerify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
+	if !vc.IsSystemChunk {
+		return nil, nil, fmt.Errorf("wrong method invoked for verifying non-system chunk")
+	}
+	return nil, nil, nil
 }

@@ -33,6 +33,44 @@ func (m *MockConduit) EXPECT() *MockConduitMockRecorder {
 	return m.recorder
 }
 
+// Multicast mocks base method
+func (m *MockConduit) Multicast(arg0 interface{}, arg1 uint, arg2 ...flow.Identifier) error {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Multicast", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Multicast indicates an expected call of Multicast
+func (mr *MockConduitMockRecorder) Multicast(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Multicast", reflect.TypeOf((*MockConduit)(nil).Multicast), varargs...)
+}
+
+// Publish mocks base method
+func (m *MockConduit) Publish(arg0 interface{}, arg1 ...flow.Identifier) error {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0}
+	for _, a := range arg1 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Publish", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Publish indicates an expected call of Publish
+func (mr *MockConduitMockRecorder) Publish(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0}, arg1...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockConduit)(nil).Publish), varargs...)
+}
+
 // Submit mocks base method
 func (m *MockConduit) Submit(arg0 interface{}, arg1 ...flow.Identifier) error {
 	m.ctrl.T.Helper()
@@ -50,4 +88,18 @@ func (mr *MockConduitMockRecorder) Submit(arg0 interface{}, arg1 ...interface{})
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0}, arg1...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Submit", reflect.TypeOf((*MockConduit)(nil).Submit), varargs...)
+}
+
+// Unicast mocks base method
+func (m *MockConduit) Unicast(arg0 interface{}, arg1 flow.Identifier) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Unicast", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Unicast indicates an expected call of Unicast
+func (mr *MockConduitMockRecorder) Unicast(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockConduit)(nil).Unicast), arg0, arg1)
 }

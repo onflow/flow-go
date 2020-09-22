@@ -3,12 +3,11 @@
 package ingest
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/parser"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/access"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -17,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -25,14 +23,15 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit       *engine.Unit
-	log        zerolog.Logger
-	engMetrics module.EngineMetrics
-	colMetrics module.CollectionMetrics
-	con        network.Conduit
-	me         module.Local
-	state      protocol.State
-	pool       mempool.Transactions
+	unit                 *engine.Unit
+	log                  zerolog.Logger
+	engMetrics           module.EngineMetrics
+	colMetrics           module.CollectionMetrics
+	con                  network.Conduit
+	me                   module.Local
+	state                protocol.State
+	pool                 mempool.Transactions
+	transactionValidator *access.TransactionValidator
 
 	config Config
 }
@@ -51,18 +50,30 @@ func New(
 
 	logger := log.With().Str("engine", "ingest").Logger()
 
+	transactionValidator := access.NewTransactionValidator(
+		access.NewProtocolStateBlocks(state),
+		access.TransactionValidationOptions{
+			Expiry:                       flow.DefaultTransactionExpiry,
+			ExpiryBuffer:                 config.ExpiryBuffer,
+			AllowUnknownReferenceBlockID: config.AllowUnknownReference,
+			MaxGasLimit:                  flow.DefaultMaxGasLimit,
+			CheckScriptsParse:            config.CheckScriptsParse,
+		},
+	)
+
 	e := &Engine{
-		unit:       engine.NewUnit(),
-		log:        logger,
-		engMetrics: engMetrics,
-		colMetrics: colMetrics,
-		me:         me,
-		state:      state,
-		pool:       pool,
-		config:     config,
+		unit:                 engine.NewUnit(),
+		log:                  logger,
+		engMetrics:           engMetrics,
+		colMetrics:           colMetrics,
+		me:                   me,
+		state:                state,
+		pool:                 pool,
+		config:               config,
+		transactionValidator: transactionValidator,
 	}
 
-	con, err := net.Register(engine.CollectionIngest, e)
+	con, err := net.Register(engine.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -160,21 +171,26 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// first, we check if the transaction is valid
-	err := e.validateTransaction(tx)
+	err := e.transactionValidator.Validate(tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
 	}
 
 	// retrieve the set of collector clusters
-	clusters, err := e.state.Final().Clusters()
+	// TODO needs to be per-epoch
+	clusters, err := e.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
 
 	// get the locally assigned cluster and the cluster responsible for the transaction
-	txCluster := clusters.ByTxID(tx.ID())
+	txCluster, ok := clusters.ByTxID(tx.ID())
+	if !ok {
+		return fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
+	}
+
 	localID := e.me.NodeID()
-	localCluster, ok := clusters.ByNodeID(localID)
+	localCluster, _, ok := clusters.ByNodeID(localID)
 	if !ok {
 		return fmt.Errorf("could not get local cluster")
 	}
@@ -214,82 +230,6 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	log.Info().Msg("transaction processed")
-
-	return nil
-}
-
-// validateTransaction validates the transaction in order to determine whether
-// the transaction should be included in a collection.
-func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
-
-	// ensure all required fields are set
-	missingFields := tx.MissingFields()
-	if len(missingFields) > 0 {
-		return IncompleteTransactionError{Missing: missingFields}
-	}
-
-	// ensure the gas limit is not over the maximum
-	if tx.GasLimit > e.config.MaxGasLimit {
-		return GasLimitExceededError{Actual: tx.GasLimit, Maximum: e.config.MaxGasLimit}
-	}
-
-	// ensure the reference block is valid
-	err := e.checkTransactionExpiry(tx)
-	if err != nil {
-		return err
-	}
-
-	if e.config.CheckScriptsParse {
-		// ensure the script is at least parse-able
-		_, _, err = parser.ParseProgram(string(tx.Script))
-		if err != nil {
-			return InvalidScriptError{ParserErr: err}
-		}
-	}
-
-	// TODO check account/payer signatures
-
-	return nil
-}
-
-// checkTransactionExpiry checks whether a transaction's reference block ID is
-// valid. Returns nil if the reference is valid, returns an error if the
-// reference is invalid or we failed to check it.
-func (e *Engine) checkTransactionExpiry(tx *flow.TransactionBody) error {
-
-	// look up the reference block
-	ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
-	if errors.Is(err, storage.ErrNotFound) {
-		// the transaction references an unknown block - at this point we decide
-		// whether to consider it expired based on configuration
-		if e.config.AllowUnknownReference {
-			return nil
-		}
-		return ErrUnknownReferenceBlock
-	}
-	if err != nil {
-		return fmt.Errorf("could not get reference block: %w", err)
-	}
-
-	// get the latest finalized block we know about
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get finalized header: %w", err)
-	}
-
-	diff := final.Height - ref.Height
-	// check for overflow
-	if ref.Height > final.Height {
-		diff = 0
-	}
-	// discard transactions that are expired, or that will expire sooner than
-	// our configured buffer allows
-	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {
-		return ExpiredTransactionError{
-			RefHeight:   ref.Height,
-			FinalHeight: final.Height,
-		}
-	}
 
 	return nil
 }

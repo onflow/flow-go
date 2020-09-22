@@ -9,6 +9,8 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -30,22 +32,29 @@ var (
 // Engine is the matching engine, which matches execution receipts with result
 // approvals to create block seals.
 type Engine struct {
-	unit      *engine.Unit         // used to control startup/shutdown
-	log       zerolog.Logger       // used to log relevant actions with context
-	metrics   module.EngineMetrics // used to track sent and received messages
-	tracer    module.Tracer
-	mempool   module.MempoolMetrics    // used to track mempool size
-	state     protocol.State           // used to access the  protocol state
-	me        module.Local             // used to access local node information
-	resultsDB storage.ExecutionResults // used to permanently store results
-	sealsDB   storage.Seals            // used to check existing seals
-	headersDB storage.Headers          // used to check sealed headers
-	indexDB   storage.Index
-	results   mempool.Results          // holds execution results in memory
-	receipts  mempool.Receipts         // holds execution receipts in memory
-	approvals mempool.Approvals        // holds result approvals in memory
-	seals     mempool.Seals            // holds block seals in memory
-	missing   map[flow.Identifier]uint // track how often a block was missing
+	unit            *engine.Unit         // used to control startup/shutdown
+	log             zerolog.Logger       // used to log relevant actions with context
+	metrics         module.EngineMetrics // used to track sent and received messages
+	tracer          module.Tracer
+	mempool         module.MempoolMetrics    // used to track mempool size
+	state           protocol.State           // used to access the  protocol state
+	me              module.Local             // used to access local node information
+	requester       module.Requester         // used to request missing execution receipts by block ID
+	resultsDB       storage.ExecutionResults // used to permanently store results
+	sealsDB         storage.Seals            // used to check existing seals
+	headersDB       storage.Headers          // used to check sealed headers
+	indexDB         storage.Index
+	results         mempool.Results          // holds execution results in memory
+	receipts        mempool.Receipts         // holds execution receipts in memory
+	approvals       mempool.Approvals        // holds result approvals in memory
+	seals           mempool.Seals            // holds block seals in memory
+	missing         map[flow.Identifier]uint // track how often a block was missing
+	checkingSealing *atomic.Bool             // used to rate limit the checksealing call
+
+	// how many blocks between sealed/finalized before we request execcution receipts
+	requestReceiptThreshold uint
+	// how many unsealed results to check when check sealing
+	maxUnsealedResults int
 }
 
 // New creates a new collection propagation engine.
@@ -57,6 +66,7 @@ func New(
 	net module.Network,
 	state protocol.State,
 	me module.Local,
+	requester module.Requester,
 	resultsDB storage.ExecutionResults,
 	sealsDB storage.Seals,
 	headersDB storage.Headers,
@@ -69,22 +79,26 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:      engine.NewUnit(),
-		log:       log.With().Str("engine", "matching").Logger(),
-		metrics:   collector,
-		tracer:    tracer,
-		mempool:   mempool,
-		state:     state,
-		me:        me,
-		resultsDB: resultsDB,
-		sealsDB:   sealsDB,
-		headersDB: headersDB,
-		indexDB:   indexDB,
-		results:   results,
-		receipts:  receipts,
-		approvals: approvals,
-		seals:     seals,
-		missing:   make(map[flow.Identifier]uint),
+		unit:                    engine.NewUnit(),
+		log:                     log.With().Str("engine", "matching").Logger(),
+		metrics:                 collector,
+		tracer:                  tracer,
+		mempool:                 mempool,
+		state:                   state,
+		me:                      me,
+		requester:               requester,
+		resultsDB:               resultsDB,
+		sealsDB:                 sealsDB,
+		headersDB:               headersDB,
+		indexDB:                 indexDB,
+		results:                 results,
+		receipts:                receipts,
+		approvals:               approvals,
+		seals:                   seals,
+		missing:                 make(map[flow.Identifier]uint),
+		checkingSealing:         atomic.NewBool(false),
+		requestReceiptThreshold: 10,
+		maxUnsealedResults:      200,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
@@ -93,13 +107,13 @@ func New(
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
 	// register engine with the receipt provider
-	_, err := net.Register(engine.ExecutionReceiptProvider, e)
+	_, err := net.Register(engine.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
 	// register engine with the approval provider
-	_, err = net.Register(engine.ApprovalProvider, e)
+	_, err = net.Register(engine.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
 	}
@@ -153,18 +167,33 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	switch ev := event.(type) {
 	case *flow.ExecutionReceipt:
 		e.metrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		defer e.metrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
 		e.metrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		defer e.metrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
+	}
+}
+
+// HandleReceipts handles receipts we have explicitly requested by block ID.
+func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
+
+	e.log.Debug().Msg("received receipt from requester engine")
+
+	err := e.process(originID, receipt)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not process receipt")
 	}
 }
 
@@ -315,8 +344,21 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 // checkSealing checks if there is anything worth sealing at the moment.
 func (e *Engine) checkSealing() {
+	// rate limit the check sealing
+	if e.checkingSealing.Load() {
+		return
+	}
+
 	e.unit.Lock()
 	defer e.unit.Unlock()
+
+	// only check sealing when no one else is checking
+	canCheck := e.checkingSealing.CAS(false, true)
+	if !canCheck {
+		return
+	}
+
+	defer e.checkingSealing.Store(false)
 
 	start := time.Now()
 
@@ -330,6 +372,13 @@ func (e *Engine) checkSealing() {
 	// skip if no results can be sealed yet
 	if len(results) == 0 {
 		return
+	}
+
+	// don't overflow the seal mempool
+	space := e.seals.Limit() - e.seals.Size()
+	if len(results) > int(space) {
+		e.log.Debug().Int("space", int(space)).Int("results", len(results)).Msg("cut and return the first x results")
+		results = results[:space]
 	}
 
 	e.log.Info().Int("num_results", len(results)).Msg("identified sealable execution results")
@@ -361,6 +410,13 @@ func (e *Engine) checkSealing() {
 	}
 
 	// process the results
+
+	final, err := e.state.Final().Head()
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not get finalized header")
+		return
+	}
+
 	var sealedResultIDs []flow.Identifier
 	var sealedBlockIDs []flow.Identifier
 	for _, result := range results {
@@ -371,7 +427,7 @@ func (e *Engine) checkSealing() {
 			Hex("block_id", result.BlockID[:]).
 			Logger()
 
-		err := e.sealResult(result)
+		err := e.sealResult(result, final)
 		if err == errUnknownBlock {
 			log.Debug().Msg("skipping sealable result with unknown sealed block")
 			continue
@@ -389,8 +445,9 @@ func (e *Engine) checkSealing() {
 		sealedResultIDs = append(sealedResultIDs, result.ID())
 		sealedBlockIDs = append(sealedBlockIDs, result.BlockID)
 
-		log.Info().Msg("sealed execution result")
 	}
+
+	log.Debug().Int("sealed", len(sealedResultIDs)).Msg("sealed execution results")
 
 	// clear the memory pools
 	e.clearPools(sealedResultIDs)
@@ -407,6 +464,8 @@ func (e *Engine) checkSealing() {
 	}
 }
 
+// sealableResults traverse through unsealed and finalized blocks, and request their results
+// if is missing and return all the results that are matched with enough approvals.
 func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 	var results []*flow.ExecutionResult
@@ -422,6 +481,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	threshold := verifiers.TotalStake() / 3 * 2
 
 	// check for stored execution results that don't have a corresponding seal
+	// last sealed block
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealed height: %w", err)
@@ -431,10 +491,23 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		return nil, fmt.Errorf("could not get finalized height: %w", err)
 	}
 
-	for height := sealed.Height; height < final.Height; height++ {
+	// keep track of any missing execution results for finalized blocks
+	missingByBlockID := make(map[flow.Identifier]struct{})
+	// order the missing blocks by height from low to high
+	// such that when passing them to the missing block requester,
+	// they can be requested in the right order.
+	// the right order gives the priority to the execution result of lower
+	// height blocks to be requested first, since a gap in the sealing
+	// heights would stop the sealing.
+	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, e.maxUnsealedResults)
 
-		// stop searching if we would overflow the seal mempool
-		if e.seals.Size()+uint(len(results)) >= e.seals.Limit() {
+	// traverse each unsealed and finalized block with height from low to high,
+	// if the result has been received, then add it to the list of results,
+	// if the result is missing, then add the blockID to a missing block list in
+	// order to request them.
+	for height := sealed.Height; height < final.Height; height++ {
+		// add at most <maxUnsealedResults> number of results
+		if len(missingBlocksOrderedByHeight) >= int(e.maxUnsealedResults) {
 			break
 		}
 
@@ -445,25 +518,29 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 			return nil, fmt.Errorf("could not get header (height=%d): %w", height, err)
 		}
 
+		blockID := header.ID()
 		// get the execution result for the block at this height
-		result, err := e.resultsDB.ByBlockID(header.ID())
-		if err != nil {
-			e.log.Error().
-				Err(err).
-				Uint64("block_height", height).
-				Hex("block_id", logging.ID(header.ID())).
-				Msg("could not get execution result")
+		result, err := e.resultsDB.ByBlockID(blockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			missingByBlockID[blockID] = struct{}{}
+			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
 			continue
 		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get execution result (block_id=%x): %w", blockID, err)
+		}
 		results = append(results, result)
+
 	}
 
 	// get all available approvals once
 	approvals := e.approvals.All()
 
-	// go through all results and check which ones we have enough approvals for
+	// results can be stored in either result DB (results received enough approvals) or
+	// result mempool (results have not received enough approvals).
+	// go through all pending results in the result mempool and check which ones
+	// we have enough approvals for, and add them to the matched result list.
 	for _, result := range e.results.All() {
-
 		// get the node IDs for all approvers of this result
 		// TODO: check for duplicate approver
 		var approverIDs []flow.Identifier
@@ -473,6 +550,11 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 				approverIDs = append(approverIDs, approval.Body.ApproverID)
 			}
 		}
+
+		// NOTE: we could've avoided adding these results to the missingByBlockID
+		// in the first place if the results mempool allows us to query result by blockID.
+		// The workaround here is to delete it.
+		delete(missingByBlockID, result.BlockID)
 
 		// get all of the approver identities and check threshold
 		approvers := verifiers.Filter(filter.And(
@@ -491,10 +573,32 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		results = append(results, result)
 	}
 
+	e.log.Info().
+		Uint64("final", final.Height).
+		Uint64("sealed", sealed.Height).
+		Uint("threshold", e.requestReceiptThreshold).
+		Int("missing", len(missingByBlockID)).
+		Int("missingCount", len(missingBlocksOrderedByHeight)).
+		Msg("check missing receipts")
+
+	// request missing execution results, if sealed height is low enough
+	if uint(final.Height-sealed.Height) >= e.requestReceiptThreshold {
+		requestedCount := 0
+		for _, blockID := range missingBlocksOrderedByHeight {
+			if _, ok := missingByBlockID[blockID]; ok {
+				e.requester.EntityByID(blockID, filter.Any)
+				requestedCount++
+			}
+		}
+		e.log.Info().
+			Int("count", requestedCount).
+			Msg("requested missing results")
+	}
+
 	return results, nil
 }
 
-func (e *Engine) sealResult(result *flow.ExecutionResult) error {
+func (e *Engine) sealResult(result *flow.ExecutionResult, final *flow.Header) error {
 
 	// check if we know the block the result pertains to
 	_, err := e.headersDB.ByBlockID(result.BlockID)

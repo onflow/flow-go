@@ -4,9 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dapperlabs/flow-core-contracts/contracts"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
+	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -97,7 +98,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address) flow.Address {
 	flowToken := b.createAccount()
 
-	contract := contracts.FlowToken(fungibleToken.Hex())
+	contract := contracts.FlowToken(fungibleToken.HexWithPrefix())
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
@@ -114,7 +115,10 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken flow.Address) flow.Address {
 	flowFees := b.createAccount()
 
-	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
+	contract := contracts.FlowFees(
+		fungibleToken.HexWithPrefix(),
+		flowToken.HexWithPrefix(),
+	)
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
@@ -129,7 +133,11 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 }
 
 func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
-	contract := contracts.FlowServiceAccount(fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
+	contract := contracts.FlowServiceAccount(
+		fungibleToken.HexWithPrefix(),
+		flowToken.HexWithPrefix(),
+		feeContract.HexWithPrefix(),
+	)
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,

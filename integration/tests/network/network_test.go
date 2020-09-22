@@ -59,7 +59,7 @@ func TestNetwork(t *testing.T) {
 	sender := ids[0]
 	targets := ids[1:]
 
-	event := &message.Echo{
+	event := &message.TestMessage{
 		Text: fmt.Sprintf("hello"),
 	}
 
@@ -77,7 +77,7 @@ func TestNetwork(t *testing.T) {
 
 	// seed a message, it should propagate to all nodes.
 	// (unlike regular nodes, a ghost node subscribes to all topics)
-	err = ghostClient.Send(ctx, engine.CollectionProvider, event, targets...)
+	err = ghostClient.Send(ctx, engine.PushGuarantees, event, targets...)
 	assert.NoError(t, err)
 
 	// wait for all read loops to finish
@@ -145,7 +145,7 @@ func readLoop(ctx context.Context, id flow.Identifier, net *testnet.FlowNetwork,
 		}
 
 		switch v := event.(type) {
-		case *message.Echo:
+		case *message.TestMessage:
 			t.Logf("%s: %s: %s\n", id.String(), actualOriginID.String(), v.Text)
 			assert.Equal(t, expectedOrigin, actualOriginID)
 			assert.Equal(t, expectedMsg, v.Text)

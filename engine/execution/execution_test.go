@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -58,9 +59,9 @@ func TestExecutionFlow(t *testing.T) {
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1, &tx2}}
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx3, &tx4}}
 
-	collections := map[flow.Identifier]flow.Collection{
-		col1.ID(): col1,
-		col2.ID(): col2,
+	collections := map[flow.Identifier]*flow.Collection{
+		col1.ID(): &col1,
+		col2.ID(): &col2,
 	}
 
 	block := unittest.BlockWithParentFixture(genesis)
@@ -87,30 +88,42 @@ func TestExecutionFlow(t *testing.T) {
 	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 
-	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
-	collectionEngine.On("Submit", exeID.NodeID, mock.Anything).
+	providerEngine := new(network.Engine)
+	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
+	providerEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			originID, _ := args[0].(flow.Identifier)
-			req, _ := args[1].(*messages.CollectionRequest)
+			originID := args.Get(0).(flow.Identifier)
+			req := args.Get(1).(*messages.EntityRequest)
 
-			col, exists := collections[req.ID]
-			assert.True(t, exists)
-
-			res := &messages.CollectionResponse{
-				Collection: col,
+			var entities []flow.Entity
+			for _, entityID := range req.EntityIDs {
+				coll, exists := collections[entityID]
+				require.True(t, exists)
+				entities = append(entities, coll)
 			}
 
-			err := colConduit.Submit(res, originID)
+			var blobs [][]byte
+			for _, entity := range entities {
+				blob, _ := msgpack.Marshal(entity)
+				blobs = append(blobs, blob)
+			}
+
+			res := &messages.EntityResponse{
+				Nonce:     req.Nonce,
+				EntityIDs: req.EntityIDs,
+				Blobs:     blobs,
+			}
+
+			err := provConduit.Submit(res, originID)
 			assert.NoError(t, err)
 		}).
-		Return(nil).
-		Times(len(collections))
+		Once().
+		Return(nil)
 
 	var receipt *flow.ExecutionReceipt
 
 	verificationEngine := new(network.Engine)
-	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
+	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
@@ -121,13 +134,13 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
-			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks))
+			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks)-1) // don't count system chunk
 
 			for i, chunk := range receipt.ExecutionResult.Chunks {
 				assert.EqualValues(t, i, chunk.CollectionIndex)
@@ -144,7 +157,7 @@ func TestExecutionFlow(t *testing.T) {
 		return receipt != nil
 	}, time.Second*10, time.Millisecond*500)
 
-	collectionEngine.AssertExpectations(t)
+	providerEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
 }
@@ -193,8 +206,8 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	actualCalls := 0
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensus1Node.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
-	_, _ = consensus2Node.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	_, _ = consensus1Node.Net.Register(engine.ReceiveReceipts, consensusEngine)
+	_, _ = consensus2Node.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) { actualCalls++ }).
 		Return(nil)
@@ -204,12 +217,12 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal1b)
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2) // block 2 cannot be executed if parent (block1 is missing)
 
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 2
 	})
 
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal1)
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 6
 	}) // now block 3 and 2 can be executed
 
@@ -218,7 +231,8 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	consensusEngine.AssertExpectations(t)
 }
 
-// TODO merge this test with TestSyncFlow in engine/execution/sync_test.go
+// Tests synchronisation and make sure it picks up blocks
+// processing after syncing range (block3)
 func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
@@ -250,7 +264,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	require.NoError(t, err)
 	seq++
 
-	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
+	col1 := &flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
 	block1 := unittest.BlockWithParentFixture(genesis)
 	block1.Header.View = 1
 	block1.Header.ProposerID = conID.ID()
@@ -261,13 +275,15 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	})
 
 	proposal1 := unittest.ProposalFromBlock(&block1)
+	blob1, _ := msgpack.Marshal(col1)
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
 	tx2 := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err = execTestutil.SignTransactionAsServiceAccount(tx2, seq, chain)
 	require.NoError(t, err)
+	seq++
 
-	col2 := flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
+	col2 := &flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	block2.Header.View = 2
 	block2.Header.ProposerID = conID.ID()
@@ -276,32 +292,57 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			{CollectionID: col2.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
 		},
 	})
+
 	proposal2 := unittest.ProposalFromBlock(&block2)
+	blob2, _ := msgpack.Marshal(col2)
+
+	tx3 := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = execTestutil.SignTransactionAsServiceAccount(tx3, seq, chain)
+	require.NoError(t, err)
+
+	col3 := &flow.Collection{Transactions: []*flow.TransactionBody{tx3}}
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.Header.View = 3
+	block3.Header.ProposerID = conID.ID()
+	block3.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{CollectionID: col3.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
+		},
+	})
+
+	blob3, _ := msgpack.Marshal(col3)
+	proposal3 := unittest.ProposalFromBlock(&block3)
 
 	// setup mocks and assertions
 	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
+	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
 	collectionEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[0].(flow.Identifier)
-			req := args[1].(*messages.CollectionRequest)
-			if req.ID == col1.ID() {
-				err := colConduit.Submit(&messages.CollectionResponse{Collection: col1}, originID)
+			req := args[1].(*messages.EntityRequest)
+			if req.EntityIDs[0] == col1.ID() {
+				res := &messages.EntityResponse{Blobs: [][]byte{blob1}, EntityIDs: req.EntityIDs[:1]}
+				err := colConduit.Submit(res, originID)
 				assert.NoError(t, err)
-			} else if req.ID == col2.ID() {
-				err := colConduit.Submit(&messages.CollectionResponse{Collection: col2}, originID)
+			} else if req.EntityIDs[0] == col2.ID() {
+				res := &messages.EntityResponse{Blobs: [][]byte{blob2}, EntityIDs: req.EntityIDs[:1]}
+				err := colConduit.Submit(res, originID)
+				assert.NoError(t, err)
+			} else if req.EntityIDs[0] == col3.ID() {
+				res := &messages.EntityResponse{Blobs: [][]byte{blob3}, EntityIDs: req.EntityIDs[:1]}
+				err := colConduit.Submit(res, originID)
 				assert.NoError(t, err)
 			} else {
-				assert.Fail(t, "requesting unexpected collection", req.ID)
+				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
 			}
 		}).
 		Return(nil).
-		Twice()
+		Times(3)
 
 	receiptsReceived := 0
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receiptsReceived++
@@ -319,7 +360,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe1Node.IngestionEngine.Submit(conID.NodeID, proposal1)
 
 	// ensure block 1 has been executed
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return receiptsReceived == 1
 	})
 	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
@@ -336,17 +377,20 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	defer exe2Node.Done()
 	exe2Node.AssertHighestExecutedBlock(t, genesis)
 
-	// submit block2 from consensus node to execution node 2 (who does not have block1), but not to execution node 1
-	exe2Node.IngestionEngine.Submit(conID.NodeID, proposal2)
+	// submit block2 and block 3 from consensus node to execution node 2 (who does not have block1), but not to execution node 1
+	err = exe2Node.IngestionEngine.Process(conID.NodeID, proposal2)
+	assert.NoError(t, err)
+	err = exe2Node.IngestionEngine.Process(conID.NodeID, proposal3)
+	assert.NoError(t, err)
 
-	// ensure block 1 and 2 have been executed
-	hub.Eventually(t, func() bool {
-		return receiptsReceived == 2
+	// ensure block 1, 2 and 3 have been executed
+	hub.DeliverAllEventually(t, func() bool {
+		return receiptsReceived == 3
 	})
 
 	// ensure state has been synced across both nodes
 	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
-	exe2Node.AssertHighestExecutedBlock(t, block2.Header)
+	exe2Node.AssertHighestExecutedBlock(t, block3.Header)
 
 	scExe2Block1, err := exe2Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block1.ID())
 	assert.NoError(t, err)
@@ -398,7 +442,7 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 
 	// register sync engine
 	syncEngine := new(network.Engine)
-	syncConduit, _ := consensusNode.Net.Register(engine.ProtocolSynchronization, syncEngine)
+	syncConduit, _ := consensusNode.Net.Register(engine.SyncCommittee, syncEngine)
 	syncEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[0].(flow.Identifier)
@@ -442,6 +486,34 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 
 				err := syncConduit.Submit(res, originID)
 				assert.NoError(t, err)
+			case *messages.RangeRequest:
+
+				consensusNode.Log.Debug().
+					Hex("origin", originID[:]).
+					Uint64("from_height", msg.FromHeight).
+					Uint64("to_height", msg.ToHeight).
+					Uint64("nonce", msg.Nonce).
+					Msg("protocol range request received")
+
+				blocks := make([]*flow.Block, 0)
+				for height := msg.FromHeight; height <= msg.ToHeight; height++ {
+					if height == block1.Header.Height {
+						blocks = append(blocks, &block1)
+					} else if height == block2.Header.Height {
+						blocks = append(blocks, &block2)
+					} else {
+						require.FailNow(t, "unknown block requested: %v", height)
+					}
+				}
+
+				// send the response
+				res := &messages.BlockResponse{
+					Nonce:  msg.Nonce,
+					Blocks: blocks,
+				}
+
+				err := syncConduit.Submit(res, originID)
+				assert.NoError(t, err)
 			default:
 				t.Errorf("unexpected msg to sync engine: %T, %v", args[1], args[1])
 			}
@@ -451,7 +523,7 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 
 	// register consensus engine to track receipts
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receiptsReceived++
@@ -469,7 +541,7 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 	exeNode.IngestionEngine.Submit(conID.NodeID, proposal2)
 
 	// ensure block 1 has been executed
-	hub.EventuallyUntil(t, func() bool {
+	hub.DeliverAllEventuallyUntil(t, func() bool {
 		return receiptsReceived == 2
 	}, 30*time.Second, 500*time.Millisecond)
 
@@ -518,8 +590,8 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	var receipt *flow.ExecutionReceipt
 
 	verificationEngine := new(network.Engine)
-	_, _ = verification1Node.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
-	_, _ = verification2Node.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
+	_, _ = verification1Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
+	_, _ = verification2Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			actualCalls++
@@ -531,9 +603,43 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	exeNode.IngestionEngine.SubmitLocal(proposal)
 
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 2
 	})
 
 	verificationEngine.AssertExpectations(t)
+}
+
+func TestReceiveTheSameDeltaMultipleTimes(t *testing.T) {
+	hub := stub.NewNetworkHub()
+
+	chainID := flow.Mainnet
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	ver1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	ver2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+
+	identities := unittest.CompleteIdentitySet(colID, exeID, ver1ID, ver2ID)
+
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
+	defer exeNode.Done()
+
+	genesis, err := exeNode.State.AtHeight(0).Head()
+	require.NoError(t, err)
+
+	delta := unittest.StateDeltaWithParentFixture(genesis)
+	delta.ExecutableBlock.StartState = unittest.GenesisStateCommitment
+	delta.EndState = unittest.GenesisStateCommitment
+
+	fmt.Printf("block id: %v, delta for block (%v)'s parent id: %v\n", genesis.ID(), delta.Block.ID(), delta.ParentID())
+	exeNode.IngestionEngine.SubmitLocal(delta)
+	time.Sleep(time.Second)
+
+	exeNode.IngestionEngine.SubmitLocal(delta)
+	// handling the same delta again to verify the DB calls in saveExecutionResults
+	// are idempotent, if they weren't, it will hit log.Fatal and crash before
+	// sleep is done
+	time.Sleep(time.Second)
+
 }

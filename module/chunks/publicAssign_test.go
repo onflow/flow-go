@@ -196,6 +196,9 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 // TestChunkAssignmentOneToOne evaluates chunk assignment against
 // several single chunk to single node assignment
 func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToOne() {
+	// covers an edge case assigning 1 chunk to a single verifier node
+	a.ChunkAssignmentScenario(1, 1, 1)
+
 	// assigning 10 chunks to one node
 	a.ChunkAssignmentScenario(10, 1, 1)
 	// assigning 10 chunks to 2 nodes

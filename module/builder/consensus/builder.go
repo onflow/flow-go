@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
@@ -23,23 +24,34 @@ import (
 type Builder struct {
 	metrics  module.MempoolMetrics
 	db       *badger.DB
+	state    protocol.State
 	seals    storage.Seals
 	headers  storage.Headers
 	index    storage.Index
-	blocks   storage.Blocks
 	guarPool mempool.Guarantees
 	sealPool mempool.Seals
 	cfg      Config
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, index storage.Index, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
+func NewBuilder(
+	metrics module.MempoolMetrics,
+	db *badger.DB,
+	state protocol.State,
+	headers storage.Headers,
+	seals storage.Seals,
+	index storage.Index,
+	guarPool mempool.Guarantees,
+	sealPool mempool.Seals,
+	options ...func(*Config),
+) *Builder {
 
 	// initialize default config
 	cfg := Config{
-		minInterval: 500 * time.Millisecond,
-		maxInterval: 10 * time.Second,
-		expiry:      flow.DefaultTransactionExpiry,
+		minInterval:  500 * time.Millisecond,
+		maxInterval:  10 * time.Second,
+		maxSealCount: 100,
+		expiry:       flow.DefaultTransactionExpiry,
 	}
 
 	// apply option parameters
@@ -50,10 +62,10 @@ func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.He
 	b := &Builder{
 		metrics:  metrics,
 		db:       db,
+		state:    state,
 		headers:  headers,
 		seals:    seals,
 		index:    index,
-		blocks:   blocks,
 		guarPool: guarPool,
 		sealPool: sealPool,
 		cfg:      cfg,
@@ -215,10 +227,18 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// enter this loop, because last sealed height is higher than finalized
 	unchained := false
 	var seals []*flow.Seal
+	var sealCount uint
 	for height := sealed.Height + 1; height <= finalized; height++ {
 		if len(byBlock) == 0 {
 			break
 		}
+
+		// add at most <maxSealCount> number of seals in a new block proposal
+		// in order to prevent the block payload from being too big.
+		if sealCount >= b.cfg.maxSealCount {
+			break
+		}
+
 		header, err := b.headers.ByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block for height (%d): %w", height, err)
@@ -233,6 +253,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			return nil, fmt.Errorf("seal execution states do not connect in finalized")
 		}
 		seals = append(seals, next)
+		sealCount++
 		delete(byBlock, blockID)
 		last = next
 	}
@@ -283,7 +304,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	// build the payload so we can get the hash
 	payload := &flow.Payload{
-		Identities: nil,
 		Guarantees: guarantees,
 		Seals:      seals,
 	}
@@ -330,24 +350,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		Header:  header,
 		Payload: payload,
 	}
-	err = b.blocks.Store(proposal)
+
+	err = b.state.Mutate().Extend(proposal)
 	if err != nil {
-		return nil, fmt.Errorf("could not store proposal: %w", err)
+		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	// update protocol state index for the seal and initialize children index
-	blockID := proposal.ID()
-	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index proposal seal: %w", err)
-		}
-		err = operation.InsertBlockChildren(blockID, nil)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert empty block children: %w", err)
-		}
-		return nil
-	})
-
-	return header, err
+	return header, nil
 }

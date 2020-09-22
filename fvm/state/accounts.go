@@ -71,7 +71,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 }
 
 func (a *Accounts) Exists(address flow.Address) (bool, error) {
-	exists, err := a.ledger.Get(RegisterID(string(address.Bytes()), "", keyExists))
+	exists, err := a.ledger.Get(string(address.Bytes()), "", keyExists)
 	if err != nil {
 		return false, newLedgerGetError(keyExists, address, err)
 	}
@@ -97,9 +97,9 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, err
 	}
 
 	// mark that this account exists
-	a.ledger.Set(RegisterID(string(newAddress.Bytes()), "", keyExists), []byte{1})
+	a.ledger.Set(string(newAddress.Bytes()), "", keyExists, []byte{1})
 
-	a.ledger.Set(RegisterID(string(newAddress.Bytes()), string(newAddress.Bytes()), keyCode), nil)
+	a.ledger.Set(string(newAddress.Bytes()), string(newAddress.Bytes()), keyCode, nil)
 
 	err = a.SetPublicKeys(newAddress, publicKeys)
 	if err != nil {
@@ -114,7 +114,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, err
 
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
 	publicKey, err := a.ledger.Get(
-		RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex)),
+		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
 	)
 	if err != nil {
 		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
@@ -135,7 +135,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
 	var countBytes []byte
 	countBytes, err = a.ledger.Get(
-		RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount),
+		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
 	)
 	if err != nil {
 		return nil, newLedgerGetError(keyPublicKeyCount, address, err)
@@ -186,7 +186,7 @@ func (a *Accounts) SetPublicKey(
 	}
 
 	a.ledger.Set(
-		RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex)),
+		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
 		encodedPublicKey,
 	)
 
@@ -198,7 +198,7 @@ func (a *Accounts) SetPublicKeys(address flow.Address, publicKeys []flow.Account
 	var existingCount uint64
 
 	countBytes, err := a.ledger.Get(
-		RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount),
+		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
 	)
 	if err != nil {
 		return newLedgerGetError(keyPublicKeyCount, address, err)
@@ -221,7 +221,7 @@ func (a *Accounts) SetPublicKeys(address flow.Address, publicKeys []flow.Account
 	newKeyCount := new(big.Int).SetUint64(newCount)
 
 	a.ledger.Set(
-		RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount),
+		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
 		newKeyCount.Bytes(),
 	)
 
@@ -235,20 +235,17 @@ func (a *Accounts) SetPublicKeys(address flow.Address, publicKeys []flow.Account
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		a.ledger.Delete(RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKey(i)))
+		a.ledger.Delete(string(address.Bytes()), string(address.Bytes()), keyPublicKey(i))
 	}
 
 	return nil
 }
 
 func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
-	key := RegisterID(
-		string(address.Bytes()),
-		string(address.Bytes()),
-		keyCode,
-	)
 
-	code, err := a.ledger.Get(key)
+	code, err := a.ledger.Get(string(address.Bytes()),
+		string(address.Bytes()),
+		keyCode)
 	if err != nil {
 		return nil, newLedgerGetError(keyCode, address, err)
 	}
@@ -257,13 +254,10 @@ func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
 }
 
 func (a *Accounts) TouchCode(address flow.Address) {
-	key := RegisterID(
-		string(address.Bytes()),
-		string(address.Bytes()),
-		keyCode,
-	)
 
-	a.ledger.Touch(key)
+	a.ledger.Touch(string(address.Bytes()),
+		string(address.Bytes()),
+		keyCode)
 }
 
 func (a *Accounts) SetCode(address flow.Address, code []byte) error {
@@ -276,10 +270,8 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 		return fmt.Errorf("account with address %s does not exist", address)
 	}
 
-	key := RegisterID(string(address.Bytes()), string(address.Bytes()), keyCode)
-
 	var prevCode []byte
-	prevCode, err = a.ledger.Get(key)
+	prevCode, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyCode)
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
@@ -289,7 +281,7 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 		return nil
 	}
 
-	a.ledger.Set(key, code)
+	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), keyCode, code)
 
 	return nil
 }

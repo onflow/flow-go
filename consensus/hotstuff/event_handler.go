@@ -13,7 +13,7 @@ type EventHandler interface {
 	// participant.
 	OnReceiveVote(vote *model.Vote) error
 
-	// OnReceiveProposal processes ablock proposal received fro another HotStuff
+	// OnReceiveProposal processes a block proposal received fro another HotStuff
 	// consensus participant.
 	OnReceiveProposal(proposal *model.Proposal) error
 

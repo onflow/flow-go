@@ -49,7 +49,13 @@ func New(
 	blocks storage.Blocks,
 	comp network.Engine,
 	core module.SyncCore,
+	opts ...OptionFunc,
 ) (*Engine, error) {
+
+	opt := DefaultConfig()
+	for _, f := range opts {
+		f(opt)
+	}
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -61,12 +67,12 @@ func New(
 		blocks:       blocks,
 		comp:         comp,
 		core:         core,
-		pollInterval: 8 * time.Second,
-		scanInterval: 2 * time.Second,
+		pollInterval: opt.pollInterval,
+		scanInterval: opt.scanInterval,
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolSynchronization, e)
+	con, err := net.Register(engine.SyncCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -335,7 +341,12 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Bloc
 
 // checkLoop will regularly scan for items that need requesting.
 func (e *Engine) checkLoop() {
-	poll := time.NewTicker(e.pollInterval)
+	pollChan := make(<-chan time.Time)
+	if e.pollInterval > 0 {
+		poll := time.NewTicker(e.pollInterval)
+		pollChan = poll.C
+		defer poll.Stop()
+	}
 	scan := time.NewTicker(e.scanInterval)
 
 CheckLoop:
@@ -350,7 +361,7 @@ CheckLoop:
 		select {
 		case <-e.unit.Quit():
 			break CheckLoop
-		case <-poll.C:
+		case <-pollChan:
 			errs := e.pollHeight()
 			if errs.ErrorOrNil() == nil {
 				continue
@@ -382,7 +393,6 @@ CheckLoop:
 
 	// some minor cleanup
 	scan.Stop()
-	poll.Stop()
 }
 
 // pollHeight will send a synchronization request to three random nodes.
@@ -449,6 +459,11 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
 		}
+		e.log.Debug().
+			Uint64("range_from", req.FromHeight).
+			Uint64("range_to", req.ToHeight).
+			Uint64("range_nonce", req.Nonce).
+			Msg("range requested")
 		e.core.RangeRequested(ran)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 	}

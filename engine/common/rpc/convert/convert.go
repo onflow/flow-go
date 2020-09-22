@@ -1,18 +1,22 @@
 package convert
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/golang/protobuf/ptypes"
-
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+var ErrEmptyMessage = errors.New("protobuf message is empty")
+
 func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
 	if m == nil {
-		return flow.TransactionBody{}, fmt.Errorf("message is empty")
+		return flow.TransactionBody{}, ErrEmptyMessage
 	}
 
 	t := flow.NewTransactionBody()
@@ -112,21 +116,20 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header) (entities.BlockHeader, error) {
+func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t, err := ptypes.TimestampProto(h.Timestamp)
 	if err != nil {
-		return entities.BlockHeader{}, err
+		return nil, err
 	}
 
-	bh := entities.BlockHeader{
+	return &entities.BlockHeader{
 		Id:        id[:],
 		ParentId:  h.ParentID[:],
 		Height:    h.Height,
 		Timestamp: t,
-	}
-	return bh, nil
+	}, nil
 }
 
 func BlockToMessage(h *flow.Block) (*entities.Block, error) {
@@ -158,6 +161,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 		BlockSeals:           seals,
 		Signatures:           [][]byte{h.Header.ParentVoterSig},
 	}
+
 	return &bh, nil
 }
 
@@ -192,26 +196,62 @@ func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
 	}
 
 	collectionID := c.ID()
+
 	ce := &entities.Collection{
 		Id:             collectionID[:],
 		TransactionIds: transactionsIDs,
 	}
+
 	return ce, nil
 }
 
+func LightCollectionToMessage(c *flow.LightCollection) (*entities.Collection, error) {
+	if c == nil || c.Transactions == nil {
+		return nil, fmt.Errorf("invalid collection")
+	}
+
+	collectionID := c.ID()
+
+	return &entities.Collection{
+		Id:             collectionID[:],
+		TransactionIds: IdentifiersToMessages(c.Transactions),
+	}, nil
+}
+
 func EventToMessage(e flow.Event) *entities.Event {
-	id := e.TransactionID
 	return &entities.Event{
 		Type:             string(e.Type),
-		TransactionId:    id[:],
+		TransactionId:    e.TransactionID[:],
 		TransactionIndex: e.TransactionIndex,
 		EventIndex:       e.EventIndex,
 		Payload:          e.Payload,
 	}
 }
 
-func AccountToMessage(a *flow.Account) (*entities.Account, error) {
+func MessageToAccount(m *entities.Account) (*flow.Account, error) {
+	if m == nil {
+		return nil, ErrEmptyMessage
+	}
 
+	accountKeys := make([]flow.AccountPublicKey, len(m.GetKeys()))
+	for i, key := range m.GetKeys() {
+		accountKey, err := MessageToAccountKey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		accountKeys[i] = *accountKey
+	}
+
+	return &flow.Account{
+		Address: flow.BytesToAddress(m.GetAddress()),
+		Balance: m.GetBalance(),
+		Code:    m.GetCode(),
+		Keys:    accountKeys,
+	}, nil
+}
+
+func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 	keys := make([]*entities.AccountKey, len(a.Keys))
 	for i, k := range a.Keys {
 		messageKey, err := AccountKeyToMessage(k)
@@ -229,9 +269,33 @@ func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 	}, nil
 }
 
+func MessageToAccountKey(m *entities.AccountKey) (*flow.AccountPublicKey, error) {
+	if m == nil {
+		return nil, ErrEmptyMessage
+	}
+
+	sigAlgo := crypto.SigningAlgorithm(m.GetSignAlgo())
+	hashAlgo := hash.HashingAlgorithm(m.GetHashAlgo())
+
+	publicKey, err := crypto.DecodePublicKey(sigAlgo, m.GetPublicKey())
+	if err != nil {
+		return nil, err
+	}
+
+	return &flow.AccountPublicKey{
+		Index:     int(m.GetIndex()),
+		PublicKey: publicKey,
+		SignAlgo:  sigAlgo,
+		HashAlgo:  hashAlgo,
+		Weight:    int(m.GetWeight()),
+		SeqNumber: uint64(m.GetSequenceNumber()),
+	}, nil
+}
+
 func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) {
 	publicKey := a.PublicKey.Encode()
 	return &entities.AccountKey{
+		Index:          uint32(a.Index),
 		PublicKey:      publicKey,
 		SignAlgo:       uint32(a.SignAlgo),
 		HashAlgo:       uint32(a.HashAlgo),
@@ -241,6 +305,26 @@ func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) 
 	}, nil
 }
 
+func MessagesToEvents(l []*entities.Event) []flow.Event {
+	events := make([]flow.Event, len(l))
+
+	for i, m := range l {
+		events[i] = MessageToEvent(m)
+	}
+
+	return events
+}
+
+func MessageToEvent(m *entities.Event) flow.Event {
+	return flow.Event{
+		Type:             flow.EventType(m.GetType()),
+		TransactionID:    flow.HashToID(m.GetTransactionId()),
+		TransactionIndex: m.GetTransactionIndex(),
+		EventIndex:       m.GetEventIndex(),
+		Payload:          m.GetPayload(),
+	}
+}
+
 func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
 	events := make([]*entities.Event, len(flowEvents))
 	for i, e := range flowEvents {
@@ -248,4 +332,28 @@ func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
 		events[i] = event
 	}
 	return events
+}
+
+func IdentifierToMessage(i flow.Identifier) []byte {
+	return i[:]
+}
+
+func MessageToIdentifier(b []byte) flow.Identifier {
+	return flow.HashToID(b)
+}
+
+func IdentifiersToMessages(l []flow.Identifier) [][]byte {
+	results := make([][]byte, len(l))
+	for i, item := range l {
+		results[i] = IdentifierToMessage(item)
+	}
+	return results
+}
+
+func MessagesToIdentifiers(l [][]byte) []flow.Identifier {
+	results := make([]flow.Identifier, len(l))
+	for i, item := range l {
+		results[i] = MessageToIdentifier(item)
+	}
+	return results
 }

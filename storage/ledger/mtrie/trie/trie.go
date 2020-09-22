@@ -109,7 +109,7 @@ func (mt *MTrie) String() string {
 	return trieStr + mt.root.FmtStr("", "")
 }
 
-// TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
+// TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(keys [][]byte) ([][]byte, error) {
 	return mt.read(mt.root, keys)
 }
@@ -537,6 +537,51 @@ func Load(path string) (*MTrie, error) {
 	}
 
 	return trie, nil
+}
+
+// DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
+func (mt *MTrie) DumpAsJSON(path string) error {
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	err = mt.dumpAsJSON(mt.root, writer)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (mt *MTrie) dumpAsJSON(n *node.Node, writer *bufio.Writer) error {
+	if key := n.Key(); key != nil {
+		str := "{\"key\": \"" + hex.EncodeToString(key) +
+			"\", \"value\": \"" + hex.EncodeToString(n.Value()) + "\"}\n"
+		_, err := writer.WriteString(str)
+		if err != nil {
+			return err
+		}
+		writer.Flush()
+	}
+
+	if lChild := n.LeftChild(); lChild != nil {
+		err := mt.dumpAsJSON(lChild, writer)
+		if err != nil {
+			return err
+		}
+	}
+
+	if rChild := n.RigthChild(); rChild != nil {
+		err := mt.dumpAsJSON(rChild, writer)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // constructTrieFromKeyValuePairs constructs a trie from the given key-value pairs.

@@ -31,14 +31,20 @@ func TestBootstrapLedger(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		if !assert.Equal(t, unittest.GenesisStateCommitment, stateCommitment) {
-			t.Logf("Actual state commitment: %s", hex.EncodeToString(stateCommitment))
+		expectedStateCommitment := unittest.GenesisStateCommitment
+
+		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
+			t.Logf(
+				"Incorrect state commitment: got %s, expected %s",
+				hex.EncodeToString(stateCommitment),
+				hex.EncodeToString(expectedStateCommitment),
+			)
 		}
 	})
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("6ed7f5fa6a7595cc08c5aeba1bdc921aa74ceb231e06adb3b8570f363f1a5772")
+	var expectedStateCommitment, _ = hex.DecodeString("aa80c4fa382987114fcd1db9ea8f483d25919e981f88b999f57ab24a9fb012de")
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
@@ -57,7 +63,11 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 		require.NoError(t, err)
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
-			t.Logf("Actual state commitment: %s", hex.EncodeToString(stateCommitment))
+			t.Logf(
+				"Incorrect state commitment: got %s, expected %s",
+				hex.EncodeToString(stateCommitment),
+				hex.EncodeToString(expectedStateCommitment),
+			)
 		}
 	})
 }
