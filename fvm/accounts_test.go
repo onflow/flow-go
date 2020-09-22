@@ -20,9 +20,7 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 	ctx = fvm.NewContextFromParent(
 		ctx,
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
-			fvm.NewTransactionInvocator(),
-		}),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
 	)
 
 	txBody := flow.NewTransactionBody().
@@ -228,9 +226,7 @@ func TestCreateAccount(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
-			fvm.NewTransactionInvocator(),
-		}),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
 	}
 
 	t.Run("Single account",
@@ -295,9 +291,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(true),
-		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
-			fvm.NewTransactionInvocator(),
-		}),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
 	}
 
 	t.Run("Unauthorized account payer",
@@ -398,9 +392,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
-			fvm.NewTransactionInvocator(),
-		}),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
 	}
 
 	t.Run("Add to empty key list",
@@ -559,9 +551,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
-			fvm.NewTransactionInvocator(),
-		}),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
 	}
 
 	t.Run("Non-existent key",
