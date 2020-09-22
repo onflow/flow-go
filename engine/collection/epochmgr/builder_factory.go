@@ -44,9 +44,10 @@ func (f *BuilderFactory) Create(
 	clusterHeaders storage.Headers,
 	clusterPayloads storage.ClusterPayloads,
 	pool mempool.Transactions,
-) (*builder.Builder, *finalizer.Finalizer, error) {
+) (module.Builder, *finalizer.Finalizer, error) {
 
-	build := builder.NewBuilder(
+	var payloadBuilder module.Builder
+	payloadBuilder = builder.NewBuilder(
 		f.db,
 		f.mainChainHeaders,
 		clusterHeaders,
@@ -63,5 +64,5 @@ func (f *BuilderFactory) Create(
 		f.metrics,
 	)
 
-	return build, final, nil
+	return payloadBuilder, final, nil
 }
