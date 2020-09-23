@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/lifecycle"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/state/protocol/events"
@@ -23,19 +24,30 @@ type EpochComponents struct {
 	// TODO: ingest/txpool should also be epoch-dependent, possibly managed by this engine
 }
 
+// Ready starts all epoch components.
+func (ec *EpochComponents) Ready() <-chan struct{} {
+	return lifecycle.AllReady(ec.prop, ec.sync, ec.hotstuff)
+}
+
+// Done stops all epoch components.
+func (ec *EpochComponents) Done() <-chan struct{} {
+	return lifecycle.AllDone(ec.prop, ec.sync, ec.hotstuff)
+}
+
 // Engine is the epoch manager, which coordinates the lifecycle of other modules
 // and processes that are epoch-dependent. The manager is responsible for
 // spinning up engines when a new epoch is about to start and spinning down
 // engines for an epoch that has ended.
 type Engine struct {
-	unit  *engine.Unit
-	epoch *EpochComponents          // requirements for the current epoch
-	voter module.ClusterRootQCVoter // manages process of voting for next epoch's QC
+	unit *engine.Unit
 
 	log     zerolog.Logger
 	me      module.Local
 	state   protocol.State
-	factory EpochComponentsFactory // consolidates creating epoch for an epoch
+	factory EpochComponentsFactory    // consolidates creating epoch for an epoch
+	voter   module.ClusterRootQCVoter // manages process of voting for next epoch's QC
+
+	epochs map[uint64]*EpochComponents // epoch-scoped components per epoch
 
 	events.Noop // satisfy protocol events consumer interface
 }
@@ -55,16 +67,21 @@ func New(
 		state:   state,
 		voter:   voter,
 		factory: factory,
+		epochs:  make(map[uint64]*EpochComponents),
 	}
 
 	// set up epoch-scoped epoch managed by this engine for the current epoch
 	epoch := e.state.Final().Epochs().Current()
-	reqs, err := e.createEpochComponents(epoch)
+	counter, err := epoch.Counter()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch counter: %w", err)
+	}
+	components, err := e.createEpochComponents(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch components for current epoch: %w", err)
 	}
-	e.epoch = reqs
-	_ = e.epoch.state // TODO lint
+
+	e.epochs[counter] = components
 
 	return e, nil
 }
@@ -74,10 +91,13 @@ func New(
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
-		// start up dependencies
-		<-e.epoch.hotstuff.Ready()
-		<-e.epoch.prop.Ready()
-		<-e.epoch.sync.Ready()
+		// Start up components for all epochs. This is typically a single epoch
+		// but can be multiple near epoch boundaries
+		epochs := make([]module.ReadyDoneAware, 0, len(e.epochs))
+		for _, epoch := range e.epochs {
+			epochs = append(epochs, epoch)
+		}
+		<-lifecycle.AllReady(epochs...)
 	}, func() {
 		// check the current phase on startup, in case we are in setup phase
 		// and haven't yet voted for the next root QC
@@ -95,9 +115,13 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		<-e.epoch.hotstuff.Done()
-		<-e.epoch.prop.Done()
-		<-e.epoch.sync.Done()
+		// Stop components for all epochs. This is typically a single epoch
+		// but can be multiple near epoch boundaries
+		epochs := make([]module.ReadyDoneAware, 0, len(e.epochs))
+		for _, epoch := range e.epochs {
+			epochs = append(epochs, epoch)
+		}
+		<-lifecycle.AllDone(epochs...)
 	})
 }
 
@@ -108,13 +132,13 @@ func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, 
 		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
 	}
 
-	reqs := &EpochComponents{
+	components := &EpochComponents{
 		state:    state,
 		prop:     prop,
 		sync:     sync,
 		hotstuff: hot,
 	}
-	return reqs, err
+	return components, err
 }
 
 // EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
