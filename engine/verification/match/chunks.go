@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
 type ChunkStatus struct {

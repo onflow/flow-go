@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestValidateProposal(t *testing.T) {

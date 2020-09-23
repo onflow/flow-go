@@ -7,9 +7,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 type backendScripts struct {

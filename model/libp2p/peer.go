@@ -1,7 +1,7 @@
 package libp2p
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Peer holds the information we know about a peer on the network, such as his

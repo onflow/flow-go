@@ -1,7 +1,7 @@
 package messages
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // EntityRequest is a request for a set of entities, each keyed by an

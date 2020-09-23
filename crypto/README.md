@@ -9,13 +9,13 @@ NOTE: This package does not provide any security against side channel or tamperi
 
 ## Package import
 
-Cloning Flow repository and following the [installation steps](https://github.com/dapperlabs/flow-go) builds the necessary tools to use Flow cryptography. 
+Cloning Flow repository and following the [installation steps](https://github.com/onflow/flow-go) builds the necessary tools to use Flow cryptography. 
 
 If you only wish to import the Flow cryptography package to your Go project, please follow the following steps:
 
 - Get Flow cryptography package.
 ```
-go get github.com/dapperlabs/flow-go/crypto (to be updated to the new repo)
+go get github.com/onflow/flow-go/crypto (to be updated to the new repo)
 ```
 - Install [CMake](https://cmake.org/install/), which is used for building the package.
 - From the package directory in `$GOPATH/pkg/mod/`, build the package dependencies.

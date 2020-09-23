@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 type StateSynchronizer interface {

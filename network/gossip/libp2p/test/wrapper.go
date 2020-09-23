@@ -3,8 +3,8 @@ package test
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 )
 
 // ConduitSendWrapperFunc is a wrapper around the set of methods offered by the

@@ -1,8 +1,8 @@
 package cluster
 
 import (
-	"github.com/dapperlabs/flow-go/model/fingerprint"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Payload is the payload for blocks in collection node cluster consensus.
