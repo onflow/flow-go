@@ -4,6 +4,7 @@ package flow
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/fingerprint"
@@ -74,7 +75,8 @@ func wrapEvent(e Event) eventWrapper {
 
 // BlockEvents contains events emitted in a single block.
 type BlockEvents struct {
-	BlockID     Identifier
-	BlockHeight uint64
-	Events      []Event
+	BlockID        Identifier
+	BlockHeight    uint64
+	BlockTimestamp time.Time
+	Events         []Event
 }
