@@ -107,7 +107,7 @@ func (e *Engine) Ready() <-chan struct{} {
 			return
 		}
 		if phase == flow.EpochPhaseSetup {
-			e.unit.Launch(e.prepareNextEpoch)
+			e.unit.Launch(e.onEpochSetupPhaseStarted)
 		}
 	})
 }
@@ -141,16 +141,26 @@ func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, 
 	return components, err
 }
 
-// EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
-func (e *Engine) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
-	e.unit.Launch(e.prepareNextEpoch)
+// EpochTransition handles the epoch transition protocol event.
+func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
+
+	epoch := e.state.Final().Epochs().Current()
+	_ = epoch
+
+	// start components for this epoch
+	// set up trigger to shut down previous epoch components after max expiry
 }
 
-// prepareNextEpoch is called either when we transition into the epoch
+// EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
+func (e *Engine) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
+	e.unit.Launch(e.onEpochSetupPhaseStarted)
+}
+
+// onEpochSetupPhaseStarted is called either when we transition into the epoch
 // setup phase, or when the node is restarted during the epoch setup phase. It
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
-func (e *Engine) prepareNextEpoch() {
+func (e *Engine) onEpochSetupPhaseStarted() {
 
 	epoch := e.state.Final().Epochs().Next()
 
