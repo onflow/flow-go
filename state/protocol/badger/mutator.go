@@ -909,9 +909,8 @@ func (m *Mutator) MarkValid(blockID flow.Identifier) error {
 		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
 	}
 
-	// Emmit BlockReadyForProcessing Event:
-	// we want to suppress events for the root block, hence we just ignore everything with height
-	// smaller or equal to the root block
+	// root blocks and blocks below the root block are considered as "processed", 
+	// so we don't want to trigger `BlockReadyForProcessing` event for them.
 	parent, err := m.state.headers.ByBlockID(parentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
