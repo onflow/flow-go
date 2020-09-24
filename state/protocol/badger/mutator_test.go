@@ -1385,3 +1385,29 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		assert.Equal(t, seal3.FinalState, finalCommit)
 	})
 }
+
+func TestMakeValid(t *testing.T) {
+	t.Run("should trigger BlockProcessable with parent block", func(t *testing.T) {
+		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+			// bootstrap the root block
+			block1, result, seal := unittest.BootstrapFixture(participants)
+			block1.Payload.Guarantees = nil
+			block1.Header.PayloadHash = block1.Payload.Hash()
+			err := state.Mutate().Bootstrap(block1, result, seal)
+			require.NoError(t, err)
+
+			// create block2 and block3
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.Payload.Guarantees = nil
+			block2.Header.PayloadHash = block2.Payload.Hash()
+			err = state.Mutate().Extend(&block2)
+			require.Nil(t, err)
+
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.Payload.Guarantees = nil
+			block3.Header.PayloadHash = block3.Payload.Hash()
+			err = state.Mutate().HeaderExtend(&block3)
+			require.Nil(t, err)
+		})
+	})
+}
