@@ -85,11 +85,11 @@ func decodeAccountPublicKeyWrapper(b []byte) (accountPublicKeyWrapper, error) {
 		}
 
 		return accountPublicKeyWrapper{
-			PublicKey: wrapper.PublicKey,
-			SignAlgo:  wrapper.SignAlgo,
-			HashAlgo:  wrapper.HashAlgo,
-			Weight:    wrapper.Weight,
-			SeqNumber: wrapper.SeqNumber,
+			PublicKey: legacyWrapper.PublicKey,
+			SignAlgo:  legacyWrapper.SignAlgo,
+			HashAlgo:  legacyWrapper.HashAlgo,
+			Weight:    legacyWrapper.Weight,
+			SeqNumber: legacyWrapper.SeqNumber,
 			Revoked:   false, // all legacy keys are not revoked
 		}, nil
 	}
