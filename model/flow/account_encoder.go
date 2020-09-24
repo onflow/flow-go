@@ -19,6 +19,16 @@ type accountPublicKeyWrapper struct {
 	Revoked   bool
 }
 
+// legacyAccountPublicKeyWrapper is an RLP wrapper for the old public key format that does
+// not contain a Revoked field.
+type legacyAccountPublicKeyWrapper struct {
+	PublicKey []byte
+	SignAlgo  uint
+	HashAlgo  uint
+	Weight    uint
+	SeqNumber uint64
+}
+
 // runtimeAccountPublicKeyWrapper must match format used in Transaction
 // currently should match SDK AccountKey encoded format
 type runtimeAccountPublicKeyWrapper struct {
@@ -36,10 +46,8 @@ type accountPrivateKeyWrapper struct {
 }
 
 func EncodeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
-	publicKey := a.PublicKey.Encode()
-
 	w := accountPublicKeyWrapper{
-		PublicKey: publicKey,
+		PublicKey: a.PublicKey.Encode(),
 		SignAlgo:  uint(a.SignAlgo),
 		HashAlgo:  uint(a.HashAlgo),
 		Weight:    uint(a.Weight),
@@ -63,10 +71,34 @@ func EncodeRuntimeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
 	return rlp.EncodeToBytes(&w)
 }
 
-func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
-	var w accountPublicKeyWrapper
+func decodeAccountPublicKeyWrapper(b []byte) (accountPublicKeyWrapper, error) {
+	var wrapper accountPublicKeyWrapper
 
-	err := rlp.DecodeBytes(b, &w)
+	err := rlp.DecodeBytes(b, &wrapper)
+	if err != nil {
+		// public key data may be stored in legacy format, so convert
+		var legacyWrapper legacyAccountPublicKeyWrapper
+
+		err := rlp.DecodeBytes(b, &legacyWrapper)
+		if err != nil {
+			return accountPublicKeyWrapper{}, err
+		}
+
+		return accountPublicKeyWrapper{
+			PublicKey: wrapper.PublicKey,
+			SignAlgo:  wrapper.SignAlgo,
+			HashAlgo:  wrapper.HashAlgo,
+			Weight:    wrapper.Weight,
+			SeqNumber: wrapper.SeqNumber,
+			Revoked:   false, // all legacy keys are not revoked
+		}, nil
+	}
+
+	return wrapper, nil
+}
+
+func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
+	w, err := decodeAccountPublicKeyWrapper(b)
 	if err != nil {
 		return AccountPublicKey{}, err
 	}
