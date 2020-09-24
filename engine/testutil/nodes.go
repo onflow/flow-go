@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
@@ -338,6 +337,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 		false,
 		rootHead,
+		filter.Any,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -381,7 +381,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	}
 }
 
-func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *model.QuorumCertificate) {
+func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.QuorumCertificate) {
 	rootHead, err := node.State.AtHeight(0).Head()
 	require.NoError(t, err)
 
@@ -390,7 +390,7 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *model.Quo
 
 	signerIDs := signers.NodeIDs()
 
-	rootQC := &model.QuorumCertificate{
+	rootQC := &flow.QuorumCertificate{
 		View:      rootHead.View,
 		BlockID:   rootHead.ID(),
 		SignerIDs: signerIDs,
@@ -425,7 +425,11 @@ func (s *RoundRobinLeaderSelection) Self() flow.Identifier {
 	return s.me
 }
 
-func createFollowerCore(t *testing.T, node *testmock.GenericNode, notifier hotstuff.FinalizationConsumer, rootHead *flow.Header, rootQC *model.QuorumCertificate) module.HotStuffFollower {
+func (s *RoundRobinLeaderSelection) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+	return nil, fmt.Errorf("error")
+}
+
+func createFollowerCore(t *testing.T, node *testmock.GenericNode, notifier hotstuff.FinalizationConsumer, rootHead *flow.Header, rootQC *flow.QuorumCertificate) module.HotStuffFollower {
 
 	identities, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)

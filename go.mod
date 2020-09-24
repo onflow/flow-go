@@ -7,6 +7,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200708192840-30b3e2d5a586
+	github.com/dapperlabs/flow-go/integration v0.0.0-00010101000000-000000000000 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger v1.6.1
 	github.com/dgraph-io/badger/v2 v2.0.3

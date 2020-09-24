@@ -212,6 +212,15 @@ func main() {
 				requester.WithBatchInterval(requestInterval),
 			)
 
+			preferredExeFilter := filter.Any
+			preferredExeNodeID, err := flow.HexStringToIdentifier(preferredExeNodeIDStr)
+			if err == nil {
+				node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
+				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
+			} else if err != nil && preferredExeNodeIDStr != "" {
+				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
+			}
+
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
@@ -232,6 +241,7 @@ func main() {
 				node.Tracer,
 				true,
 				node.RootBlock.Header,
+				preferredExeFilter,
 			)
 
 			// TODO: we should solve these mutual dependencies better
@@ -269,7 +279,7 @@ func main() {
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

@@ -20,6 +20,7 @@ import (
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mocks"
@@ -148,6 +149,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		tracer,
 		false,
 		&flow.Header{},
+		filter.Any,
 	)
 	require.NoError(t, err)
 

@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
@@ -58,7 +57,7 @@ type Engine struct {
 	extensiveLogging   bool
 	spockHasher        hash.Hasher
 	root               *flow.Header
-	syncingState       atomic.Bool // a state variable to avoid triggering state sync while state syncing is progress
+	checkingSyncing    mutex.Lock
 	syncThreshold      int
 	syncHeight         uint64
 	syncFilter         flow.IdentityFilter
@@ -217,6 +216,8 @@ func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 // Main handling
 
+// handle block will process the incoming block.
+// the block has passed the consensus validation.
 func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 
 	e.metrics.StartBlockReceivedToExecuted(block.ID())
@@ -225,6 +226,8 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
+
+	parentCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
 
 	// acquiring the lock so that there is one process modifying the queue
 	return e.mempool.Run(
@@ -243,8 +246,10 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 				return nil
 			}
 
+			// whenever the queue grows, we need to check whether the state sync should be
+			// triggered.
 			// TODO: run in a different goroutine
-			e.checkStateSync(queue)
+			go e.checkStateSyncStart(queue)
 
 			// check if this block has been executed already
 
@@ -254,25 +259,23 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			// a block is executable if the following conditions are all true
 			// 1) the parent state commitment is ready
 			// 2) the collections for the block payload are ready
-			// 3) TODO: the child block is ready to query the randomness
+			// 3) TODO: the child block is ready for querying the randomness
 
 			// check if the block's parent has been executed. (we can't execute the block if the parent has
 			// not been executed yet)
-			if executableBlock.HasStartState() {
-				// check if there is a statecommitment for the parent block
-				parentCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
+			// check if there is a statecommitment for the parent block
+			parentCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
 
-				// if we found the statecommitment for the parent block, then add it to the executable block.
-				if err == nil {
-					executableBlock.StartState = parentCommitment
-				} else if !errors.Is(err, storage.ErrNotFound) {
-					// if there is exception, then crash
-					e.log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
-				}
+			// if we found the statecommitment for the parent block, then add it to the executable block.
+			if err == nil {
+				executableBlock.StartState = parentCommitment
+			} else if !errors.Is(err, storage.ErrNotFound) {
+				// if there is exception, then crash
+				e.log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
 			}
 
 			// check if we have all the collections for the block, and request them if there is missing.
-			err := e.matchOrRequestCollections(executableBlock, blockByCollection)
+			err = e.matchOrRequestCollections(executableBlock, blockByCollection)
 			if err != nil {
 				return fmt.Errorf("cannot send collection requests: %w", err)
 			}
@@ -334,25 +337,38 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	e.metrics.ExecutionLastExecutedBlockHeight(executableBlock.Block.Header.Height)
 
-	e.onBlockExecuted(executableBlock, finalState)
+	err = e.onBlockExecuted(executableBlock, finalState)
+	if err != nil {
+		e.log.Err(err).Msg("failed in process block's children")
+	}
 }
 
-// we've executed the block, now we need to check if its children can be executed
-// the executionQueues stores blocks as a tree:
-// 10 <- 11 <- 12
-// 	 ^-- 13
-// 14 <- 15 <- 16
-// if block 10 is the one just executed, then we will remove it from the queue, and add
-// its children back, meaning the tree will become:
-// 11 <- 12
-// 13
-// 14 <- 15 <- 16
+// we've executed the block, now we need to check:
+// 1. whether the state syncing can be turned off
+// 2. whether its children can be executed
+//   the executionQueues stores blocks as a tree:
+//
+//   10 <- 11 <- 12
+//   	 ^-- 13
+//   14 <- 15 <- 16
+//
+//   if block 10 is the one just executed, then we will remove it from the queue, and add
+//   its children back, meaning the tree will become:
+//
+//   11 <- 12
+//   13
+//   14 <- 15 <- 16
+
 func (e *Engine) onBlockExecuted(executedBlock *entity.ExecutableBlock, finalState flow.StateCommitment) error {
+
+	e.checkStateSyncStop(executedBlock)
+
 	err := e.mempool.Run(
 		func(
 			blockByCollection *stdmap.BlockByCollectionBackdata,
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
+
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executedBlock.ID())
 			if !exists {
@@ -927,10 +943,9 @@ func (e *Engine) generateExecutionReceipt(
 // we will sync state only for sealed blocks, since that guarantees
 // the consensus nodes have seen the result, and the statecommitment
 // has been approved by the consensus nodes.
-func (e *Engine) checkStateSync(queue *queue.Queue) {
-	// acquire the lock to trigger state sync
-	// if state sync is already triggered, it won't trigger again
-	if !e.syncingState.CAS(false, true) {
+func (e *Engine) checkStateSyncStart(queue *queue.Queue) {
+	if e.syncingState.Load() {
+		// state sync is already triggered, it won't trigger again.
 		return
 	}
 
@@ -958,6 +973,28 @@ func (e *Engine) checkStateSync(queue *queue.Queue) {
 	}
 }
 
+// if the state sync is on, check whether it can be turned off by checking
+// whether the executed block has passed the target height.
+func (e *Engine) checkStateSyncStop(executedBlock *entity.ExecutableBlock) {
+	if !e.syncingState.Load() {
+		// state sync was not started
+		return
+	}
+
+	reachedSyncTarget := executedBlock.Block.Header.Height >= e.syncHeight
+
+	if !reachedSyncTarget {
+		// have not reached sync target
+		return
+	}
+
+	// reached the sync target, we should turn off the syncing
+	turnedOff := e.syncingState.CAS(true, false)
+	if turnedOff {
+		e.metrics.ExecutionSync(false)
+	}
+}
+
 // check whether state sync should be triggered by taking
 // the start and end heights for sealed and unexecuted blocks,
 // as well as a threshold
@@ -966,9 +1003,12 @@ func shouldTriggerStateSync(startHeight, endHeight uint64, threshold int) bool {
 }
 
 func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
-	// update the
+	if !e.syncingState.CAS(false, true) {
+		// some other process has already entered the startStateSync
+		return nil
+	}
+
 	e.metrics.ExecutionSync(true)
-	defer e.metrics.ExecutionSync(false)
 
 	e.syncHeight = toHeight
 
@@ -980,7 +1020,9 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 	}
 
 	if len(otherNodes) == 0 {
-		//
+		e.log.Error().Msg("no available execution node to sync state from")
+		e.syncingState.CAS(true, false)
+		return nil
 	}
 
 	randomExecutionNode := otherNodes[rand.Intn(len(otherNodes))]
@@ -1184,7 +1226,7 @@ func (e *Engine) validateStateDelta(delta *messages.ExecutionStateDelta) error {
 	return nil
 }
 
-func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) error {
+func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 	// TODO - validate state sync, reject invalid messages
 	executionReceipt, err := e.saveExecutionResults(
 		context.Background(),
@@ -1206,8 +1248,6 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) error {
 			Hex("delta_start_state", delta.StartState).
 			Err(err).Msg("processing sync message produced unexpected state commitment")
 	}
-
-	return nil
 }
 
 // generateChunkDataPack creates a chunk data pack

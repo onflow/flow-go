@@ -28,7 +28,6 @@ import (
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
-	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/state/protocol/events"
 	"github.com/dapperlabs/flow-go/storage"
@@ -117,7 +116,6 @@ type FlowNodeBuilder struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             *protocol.State
-	DKGState          *wrapper.State
 	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
 	MsgValidators     []validators.MessageValidator
