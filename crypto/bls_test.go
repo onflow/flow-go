@@ -356,12 +356,12 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 	aggSig, err := AggregateSignatures(sigs)
 	require.NoError(t, err)
 	// Verify the aggregated signature
-	_, err = VerifySignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
+	valid, err := VerifySignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
 	fmt.Println(sigsNum, keysNum, msgsNum)
-	//require.NoError(t, err)
-	//assert.True(t, valid,
-	//	fmt.Sprintf("Verification of %s failed, signature should be %s private keys are %s, input is %x",
-	//		aggSig, expectedSig, sks, input))
+	require.NoError(t, err)
+	assert.True(t, valid,
+		fmt.Sprintf("Verification of %s failed, should be valid, private keys are %s, inputs are %x, input public keys are %s",
+			aggSig, sks, inputMsgs, inputPks))
 
 	// check if one the signatures is not correct
 	/*input[0] ^= 1

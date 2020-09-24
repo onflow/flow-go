@@ -252,6 +252,7 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 	}
 
 	//compare the 2 maps
+	fmt.Println(len(mapPerHash), len(mapPerPk))
 	if len(mapPerHash) < len(mapPerPk) {
 		// aggregate per hash
 		flatHashes := make([]byte, 0)
