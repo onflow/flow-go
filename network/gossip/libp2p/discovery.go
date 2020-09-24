@@ -38,7 +38,8 @@ func (d *Discovery) Advertise(_ context.Context, _ string, _ ...discovery.Option
 	}
 }
 
-// FindPeers returns a channel providing all peers of the node.
+// FindPeers returns a channel providing all peers of the node. No parameters are needed as of now since the overlay.Identity
+// provides all the information about the other nodes.
 func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
 
 	// if middleware has been stopped, don't return any peers

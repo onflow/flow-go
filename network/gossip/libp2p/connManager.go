@@ -21,10 +21,7 @@ func NewConnManager(log zerolog.Logger) ConnManager {
 		log:         log,
 		NullConnMgr: connmgr.NullConnMgr{},
 	}
-	n := &network.NotifyBundle{ListenCloseF: cn.ListenCloseNotifee,
-		ListenF:       cn.ListenNotifee,
-		ConnectedF:    cn.Connected,
-		DisconnectedF: cn.Disconnected}
+	n := &network.NotifyBundle{ListenCloseF: cn.ListenCloseNotifee, ListenF: cn.ListenNotifee, DisconnectedF: cn.Disconnected}
 	cn.n = n
 	return cn
 }
