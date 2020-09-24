@@ -16,7 +16,7 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/btcsuite/btcd/btcec"
 )

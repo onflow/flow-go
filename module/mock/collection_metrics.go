@@ -3,8 +3,8 @@
 package mock
 
 import (
-	cluster "github.com/dapperlabs/flow-go/model/cluster"
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	cluster "github.com/onflow/flow-go/model/cluster"
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )

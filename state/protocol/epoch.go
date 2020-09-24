@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // EpochQuery defines the different ways to query for epoch information

@@ -1,8 +1,8 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Committee accounts for the fact that we might have multiple HotStuff instances

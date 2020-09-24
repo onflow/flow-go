@@ -3,8 +3,8 @@ package common
 import (
 	"bytes"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // TODO move this to proof itself

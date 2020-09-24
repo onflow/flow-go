@@ -10,8 +10,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // insert will encode the given entity using JSON and will insert the resulting
@@ -203,7 +203,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 		// simple lexicographic comparison (ie. bytes.Compare) rather than
 		// explicitly comparing prefixes.
 		//
-		// See https://github.com/dapperlabs/flow-go/pull/3310#issuecomment-618127494
+		// See https://github.com/onflow/flow-go/pull/3310#issuecomment-618127494
 		// for discussion and more detail on this.
 
 		// If start is bigger than end, we have a backwards iteration:

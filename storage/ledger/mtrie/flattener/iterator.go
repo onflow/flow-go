@@ -1,8 +1,8 @@
 package flattener
 
 import (
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/node"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/trie"
 )
 
 // NodeIterator is an iterator over the nodes in a trie.

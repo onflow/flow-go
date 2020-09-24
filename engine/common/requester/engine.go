@@ -9,14 +9,14 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // HandleFunc is a function provided to the requester engine to handle an entity
@@ -329,7 +329,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
-	err = e.con.Submit(req, providerID)
+	err = e.con.Unicast(req, providerID)
 	if err != nil {
 		return true, fmt.Errorf("could not send request: %w", err)
 	}

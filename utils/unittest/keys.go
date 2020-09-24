@@ -3,7 +3,7 @@ package unittest
 import (
 	"crypto/rand"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 func NetworkingKey() (crypto.PrivateKey, error) {

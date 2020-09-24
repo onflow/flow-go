@@ -5,7 +5,7 @@ package order
 import (
 	"bytes"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func ByNodeIDAsc(identity1 *flow.Identity, identity2 *flow.Identity) bool {

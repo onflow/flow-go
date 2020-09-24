@@ -3,8 +3,8 @@ package events
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Distributor distributes events to a list of subscribers.
