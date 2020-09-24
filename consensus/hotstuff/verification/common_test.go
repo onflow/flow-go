@@ -16,12 +16,12 @@ import (
 	"github.com/dapperlabs/flow-go/module/signature"
 )
 
-func MakeSigners(t *testing.T, committee hotstuff.Committee, signerIDs []flow.Identifier, stakingKeys []crypto.PrivateKey, beaconKeys []crypto.PrivateKey) []hotstuff.Signer {
+func MakeSigners(t *testing.T, committee hotstuff.Committee, signerIDs []flow.Identifier, stakingKeys []crypto.PrivateKey, beaconKeys []crypto.PrivateKey) []hotstuff.SignerVerifier {
 
 	// generate our consensus node identities
 	require.NotEmpty(t, signerIDs)
 
-	var signers []hotstuff.Signer
+	var signers []hotstuff.SignerVerifier
 	if len(beaconKeys) != len(stakingKeys) {
 		for i, signerID := range signerIDs {
 			signer := MakeStakingSigner(t, committee, signerID, stakingKeys[i])
@@ -37,11 +37,11 @@ func MakeSigners(t *testing.T, committee hotstuff.Committee, signerIDs []flow.Id
 	return signers
 }
 
-func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
+func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSignerVerifier {
 	local, err := local.New(nil, priv)
 	require.NoError(t, err)
 	staking := signature.NewAggregationProvider("test_staking", local)
-	signer := NewSingleSigner(committee, staking, signerID)
+	signer := NewSingleSignerVerifier(committee, staking, signerID)
 	return signer
 }
 

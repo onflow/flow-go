@@ -24,9 +24,11 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+const testChannel = "test-channel"
+
 var rootID = unittest.BlockFixture().ID().String()
 
-type MiddlewareTestSuit struct {
+type MiddlewareTestSuite struct {
 	suite.Suite
 	size    int           // used to determine number of middlewares under test
 	mws     []*Middleware // used to keep track of middlewares under test
@@ -37,11 +39,12 @@ type MiddlewareTestSuit struct {
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
 func TestMiddlewareTestSuit(t *testing.T) {
-	suite.Run(t, new(MiddlewareTestSuit))
+	suite.Run(t, new(MiddlewareTestSuite))
 }
 
 // SetupTest initiates the test setups prior to each test
-func (m *MiddlewareTestSuit) SetupTest() {
+func (m *MiddlewareTestSuite) SetupTest() {
+
 	m.size = 2 // operates on two middlewares
 
 	m.metrics = metrics.NewNoopCollector()
@@ -51,17 +54,17 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
 	// starts the middlewares
-	m.StartMiddlewares()
+	m.startMiddlewares()
 }
 
-func (m *MiddlewareTestSuit) TearDownTest() {
-	m.StopMiddlewares()
+func (m *MiddlewareTestSuite) TearDownTest() {
+	m.stopMiddlewares()
 }
 
 // TestPingRawReception tests the middleware for solely the
 // reception of a single ping message by a node that is sent from another node
 // it does not evaluate the type and content of the message
-func (m *MiddlewareTestSuit) TestPingRawReception() {
+func (m *MiddlewareTestSuite) TestPingRawReception() {
 	m.Ping(mockery.Anything, mockery.Anything)
 }
 
@@ -69,28 +72,28 @@ func (m *MiddlewareTestSuit) TestPingRawReception() {
 // upon reception at the receiver side
 // it does not evaluate content of the payload
 // it does not evaluate anything related to the sender id
-func (m *MiddlewareTestSuit) TestPingTypeReception() {
+func (m *MiddlewareTestSuite) TestPingTypeReception() {
 	m.Ping(mockery.Anything, mockery.AnythingOfType("*message.Message"))
 }
 
 // TestPingIDType tests the middleware against both the type of sender id
 // and content of the payload of the event upon reception at the receiver side
 // it does not evaluate the actual value of the sender ID
-func (m *MiddlewareTestSuit) TestPingIDType() {
+func (m *MiddlewareTestSuite) TestPingIDType() {
 	msg := createMessage(m.ids[0], m.ids[1])
 	m.Ping(mockery.AnythingOfType("flow.Identifier"), msg)
 }
 
 // TestPingContentReception tests the middleware against both
 // the payload and sender ID of the event upon reception at the receiver side
-func (m *MiddlewareTestSuit) TestPingContentReception() {
+func (m *MiddlewareTestSuite) TestPingContentReception() {
 	msg := createMessage(m.ids[0], m.ids[1])
 	m.Ping(m.mws[0].me, msg)
 }
 
 // TestMultiPing tests the middleware against type of received payload
 // of distinct messages that are sent concurrently from a node to another
-func (m *MiddlewareTestSuit) TestMultiPing() {
+func (m *MiddlewareTestSuite) TestMultiPing() {
 	// one distinct message
 	m.MultiPing(1)
 
@@ -101,8 +104,8 @@ func (m *MiddlewareTestSuit) TestMultiPing() {
 	m.MultiPing(10)
 }
 
-// StartMiddleware creates mock overlays for each middleware, and starts the middlewares
-func (m *MiddlewareTestSuit) StartMiddlewares() {
+// startMiddleware creates mock overlays for each middleware, and starts the middlewares
+func (m *MiddlewareTestSuite) startMiddlewares() {
 
 	idMaps := make([]map[flow.Identifier]flow.Identity, m.size)
 
@@ -140,9 +143,11 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		}
 		idMap := idMaps[i]
 		idMap[flowID.NodeID] = flowID
+	}
 
+	for _, mw := range m.mws {
 		// update whitelist so that nodes can talk to each other
-		err = m.mws[i].UpdateAllowList()
+		err := mw.UpdateAllowList()
 		require.NoError(m.Suite.T(), err)
 	}
 }
@@ -150,7 +155,7 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 // Ping sends a message from the first middleware of the test suit to the last one
 // expectID and expectPayload are what we expect the receiver side to evaluate the
 // incoming ping against, it can be mocked or typed data
-func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
+func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
 
 	ch := make(chan struct{})
 	// extracts sender id based on the mock option
@@ -183,7 +188,7 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 
 // Ping sends count-many distinct messages concurrently from the first middleware of the test suit to the last one
 // It evaluates the correctness of reception of the content of the messages, as well as the sender ID
-func (m *MiddlewareTestSuit) MultiPing(count int) {
+func (m *MiddlewareTestSuite) MultiPing(count int) {
 	wg := sync.WaitGroup{}
 	// extracts sender id based on the mock option
 	var err error
@@ -215,7 +220,7 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 // TestEcho sends an echo message from first middleware to the last middleware
 // the last middleware echos back the message. The test evaluates the correctness
 // of the message reception as well as its content
-func (m *MiddlewareTestSuit) TestEcho() {
+func (m *MiddlewareTestSuite) TestEcho() {
 
 	wg := sync.WaitGroup{}
 	// extracts sender id based on the mock option
@@ -259,7 +264,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 
 // TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
 // size beyond the permissible unicast message size returns an error.
-func (m *MiddlewareTestSuit) TestMaxMessageSize_SendDirect() {
+func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	firstNode := 0
 	lastNode := m.size - 1
 
@@ -288,7 +293,7 @@ func (m *MiddlewareTestSuit) TestMaxMessageSize_SendDirect() {
 
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
 // size beyond the permissible publish message size returns an error.
-func (m *MiddlewareTestSuit) TestMaxMessageSize_Publish() {
+func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	firstNode := 0
 	lastNode := m.size - 1
 
@@ -313,12 +318,56 @@ func (m *MiddlewareTestSuit) TestMaxMessageSize_Publish() {
 	msg.Payload = encodedEvent
 
 	// sends a direct message from first node to the last node
-	err = m.mws[firstNode].Publish(msg, "0")
+	err = m.mws[firstNode].Publish(msg, testChannel)
 	require.Error(m.Suite.T(), err)
 }
 
+// TestUnsubscribe tests that an engine can unsubscribe from a topic it was earlier subscribed to and stop receiving
+// messages
+func (m *MiddlewareTestSuite) TestUnsubscribe() {
+
+	// initially subscribe the nodes to the channel
+	for _, mw := range m.mws {
+		err := mw.Subscribe(testChannel)
+		require.NoError(m.Suite.T(), err)
+	}
+
+	// wait for nodes to form a mesh
+	time.Sleep(2 * time.Second)
+
+	origin := 0
+	target := m.size - 1
+
+	originID := m.ids[origin]
+	message1 := createMessage(m.ids[origin], m.ids[target], "hello1")
+
+	m.ov[target].On("Receive", originID, mockery.Anything).Return(nil).Once()
+
+	// first test that when both nodes are subscribed to the channel, the target node receives the message
+	err := m.mws[origin].Publish(message1, testChannel)
+	assert.NoError(m.T(), err)
+
+	assert.Eventually(m.T(), func() bool {
+		return m.ov[target].AssertCalled(m.T(), "Receive", originID, mockery.Anything)
+	}, 2*time.Second, time.Millisecond)
+
+	// now unsubscribe the target node from the channel
+	err = m.mws[target].Unsubscribe(testChannel)
+	assert.NoError(m.T(), err)
+
+	// create and send a new message on the channel from the origin node
+	message2 := createMessage(m.ids[origin], m.ids[target], "hello2")
+	err = m.mws[origin].Publish(message2, testChannel)
+	assert.NoError(m.T(), err)
+
+	// assert that the new message is not received by the target node
+	assert.Never(m.T(), func() bool {
+		return !m.ov[target].AssertNumberOfCalls(m.T(), "Receive", 1)
+	}, 2*time.Second, time.Millisecond)
+}
+
 // createMiddelwares creates middlewares with mock overlay for each middleware
-func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []*Middleware) {
+func (m *MiddlewareTestSuite) createMiddleWares(count int) ([]flow.Identifier, []*Middleware) {
 	var mws []*Middleware
 	var ids []flow.Identifier
 
@@ -369,7 +418,7 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 	}
 
 	return &message.Message{
-		ChannelID: "1",
+		ChannelID: testChannel,
 		EventID:   []byte("1"),
 		OriginID:  originID[:],
 		TargetIDs: [][]byte{targetID[:]},
@@ -377,7 +426,7 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 	}
 }
 
-func (m *MiddlewareTestSuit) StopMiddlewares() {
+func (m *MiddlewareTestSuite) stopMiddlewares() {
 	// start all the middlewares
 	for i := 0; i < m.size; i++ {
 		// start the middleware
@@ -390,7 +439,7 @@ func (m *MiddlewareTestSuit) StopMiddlewares() {
 }
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
-func (m *MiddlewareTestSuit) generateNetworkingKey(seed []byte) crypto.PrivateKey {
+func (m *MiddlewareTestSuite) generateNetworkingKey(seed []byte) crypto.PrivateKey {
 	s := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(s, seed)
 	prvKey, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, s)

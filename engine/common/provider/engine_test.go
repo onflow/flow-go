@@ -59,7 +59,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	state.On("Final").Return(final, nil)
 
 	con := &network.Conduit{}
-	con.On("Submit", mock.Anything, mock.Anything).Run(
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
@@ -132,7 +132,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	state.On("Final").Return(final, nil)
 
 	con := &network.Conduit{}
-	con.On("Submit", mock.Anything, mock.Anything).Run(
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
@@ -205,7 +205,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	state.On("Final").Return(final, nil)
 
 	con := &network.Conduit{}
-	con.On("Submit", mock.Anything, mock.Anything).Run(
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)

@@ -38,3 +38,17 @@ func BlockFromFlow(header *flow.Header, parentView uint64) *Block {
 
 	return &block
 }
+
+// GenesisBlockFromFlow returns a HotStuff block model representing a genesis
+// block based on the given header.
+func GenesisBlockFromFlow(header *flow.Header) *Block {
+	genesis := &Block{
+		BlockID:     header.ID(),
+		View:        header.View,
+		ProposerID:  header.ProposerID,
+		QC:          nil,
+		PayloadHash: header.PayloadHash,
+		Timestamp:   header.Timestamp,
+	}
+	return genesis
+}

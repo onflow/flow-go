@@ -44,6 +44,9 @@ type Middleware interface {
 	// Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
 	Subscribe(channelID string) error
 
+	// Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
+	Unsubscribe(channelID string) error
+
 	// Ping pings the target node and returns the ping RTT or an error
 	Ping(targetID flow.Identifier) (time.Duration, error)
 

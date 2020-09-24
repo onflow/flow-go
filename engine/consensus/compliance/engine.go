@@ -173,7 +173,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	}
 
 	// send the vote the desired recipient
-	err := e.con.Submit(vote, recipientID)
+	err := e.con.Unicast(vote, recipientID)
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
@@ -254,7 +254,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		// broadcast the proposal to consensus nodes
-		err = e.con.Submit(proposal, recipients.NodeIDs()...)
+		err = e.con.Publish(proposal, recipients.NodeIDs()...)
 		if err != nil {
 			log.Error().Err(err).Msg("could not send proposal message")
 		}

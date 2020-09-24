@@ -16,12 +16,13 @@ package crypto
 //    (https://eprint.iacr.org/2019/403.pdf section 4)
 //  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag
 //  - signature verification checks the membership of signature in G1
-//  - the public key membership check in G2 is implemented separately
-//  - membership checks in G1 and G2 are using a naive scalar multiplication with the group order
+//  - the public key membership check in G2 is implemented separately from the signature verification.
+//  - membership check in G1 is implemented using fast Bowe's check (https://eprint.iacr.org/2019/814.pdf)
+//  - membership check in G2 is using a simple scalar multiplication with the group order
 
 // future features:
 //  - multi-signature and batch verification
-//  - membership checks in G1 and G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
+//  - membership checks G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
@@ -297,7 +298,6 @@ func (a *blsBLS12381Algo) init() error {
 	if err := a.context.initContext(); err != nil {
 		return err
 	}
-	a.context.precCtx = C.init_precomputed_data_BLS12_381()
 
 	// compare the Go and C layer constants as a sanity check
 	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||

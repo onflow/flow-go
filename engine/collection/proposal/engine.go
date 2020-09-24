@@ -33,7 +33,7 @@ type Engine struct {
 	colMetrics     module.CollectionMetrics
 	engMetrics     module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
-	con            network.Conduit
+	conduit        network.Conduit
 	me             module.Local
 	protoState     protocol.State  // flow-wide protocol chain state
 	clusterState   clusterkv.State // cluster-specific chain state
@@ -97,11 +97,11 @@ func New(
 	}
 
 	// register network conduit
-	con, err := net.Register(engine.ConsensusCluster, e)
+	conduit, err := net.Register(engine.ConsensusCluster, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
-	e.con = con
+	e.conduit = conduit
 
 	// log the mempool size off the bat
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
@@ -177,7 +177,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	err := e.con.Submit(vote, recipientID)
+	err := e.conduit.Unicast(vote, recipientID)
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
@@ -254,7 +254,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Payload: payload,
 		}
 
-		err = e.con.Submit(msg, recipients.NodeIDs()...)
+		err = e.conduit.Publish(msg, recipients.NodeIDs()...)
 		if err != nil {
 			log.Error().Err(err).Msg("could not broadcast proposal")
 			return

@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/rs/zerolog"

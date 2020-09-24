@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	synccore "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -191,7 +192,7 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		Height: final.Height,
 		Nonce:  req.Nonce,
 	}
-	err = e.con.Submit(res, originID)
+	err = e.con.Unicast(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send sync response: %w", err)
 	}
@@ -252,7 +253,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
-	err = e.con.Submit(res, originID)
+	err = e.con.Unicast(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send range response: %w", err)
 	}
@@ -301,7 +302,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
-	err := e.con.Submit(res, originID)
+	err := e.con.Unicast(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send batch response: %w", err)
 	}
@@ -362,18 +363,11 @@ CheckLoop:
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-pollChan:
-			errs := e.pollHeight()
-			if errs.ErrorOrNil() == nil {
-				continue
+			err := e.pollHeight()
+			if err != nil {
+				e.log.Error().Err(err).Msg("could not poll heights")
 			}
 
-			// if there are errors, and errors are all PeerUnreachableError, then log as warn
-			// otherwise log as error
-			if network.AllPeerUnreachableError(errs.WrappedErrors()...) {
-				e.log.Warn().Err(errs).Msg("could not poll heights due to peer unreachable")
-			} else {
-				e.log.Error().Err(errs).Msg("could not poll heights")
-			}
 		case <-scan.C:
 			final, err := e.state.Final().Head()
 			if err != nil {
@@ -396,15 +390,12 @@ CheckLoop:
 }
 
 // pollHeight will send a synchronization request to three random nodes.
-func (e *Engine) pollHeight() *multierror.Error {
-
-	var errs *multierror.Error
+func (e *Engine) pollHeight() error {
 
 	// get the last finalized header
 	final, err := e.state.Final().Head()
 	if err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("could not get last finalized header: %w", err))
-		return errs
+		return fmt.Errorf("could not get last finalized header: %w", err)
 	}
 
 	// get all of the consensus nodes from the state
@@ -414,26 +405,22 @@ func (e *Engine) pollHeight() *multierror.Error {
 	))
 
 	if err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("could not send get consensus identities: %w", err))
-		return errs
+		return fmt.Errorf("could not send get consensus identities: %w", err)
 	}
 
 	// send the request for synchronization
-	for _, targetID := range participants.Sample(3).NodeIDs() {
-
-		req := &messages.SyncRequest{
-			Nonce:  rand.Uint64(),
-			Height: final.Height,
-		}
-		err := e.con.Submit(req, targetID)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
-		}
-
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+	req := &messages.SyncRequest{
+		Nonce:  rand.Uint64(),
+		Height: final.Height,
+	}
+	err = e.con.Multicast(req, synccore.DefaultPollNodes, participants.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send sync request: %w", err)
 	}
 
-	return errs
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+
+	return err
 }
 
 // sendRequests sends a request for each range and batch.
@@ -454,7 +441,7 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Submit(req, participants.Sample(3).NodeIDs()...)
+		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants.NodeIDs()...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
@@ -473,7 +460,7 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Submit(req, participants.Sample(3).NodeIDs()...)
+		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants.NodeIDs()...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue

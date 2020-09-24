@@ -1,4 +1,4 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/dgraph-io/badger/v2"
@@ -44,7 +44,7 @@ func (f *BuilderFactory) Create(
 	clusterHeaders storage.Headers,
 	clusterPayloads storage.ClusterPayloads,
 	pool mempool.Transactions,
-) (*builder.Builder, *finalizer.Finalizer, error) {
+) (module.Builder, *finalizer.Finalizer, error) {
 
 	build := builder.NewBuilder(
 		f.db,

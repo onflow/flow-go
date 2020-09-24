@@ -352,7 +352,7 @@ func (e *Engine) checkCachedReceipts() {
 				}
 
 				// marks receipt pending for its block ID
-				_, err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
+				err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
 				if err != nil {
 					e.log.Error().
 						Err(err).
@@ -363,7 +363,7 @@ func (e *Engine) checkCachedReceipts() {
 			}
 
 			// records the execution receipt id based on its result id
-			_, err := e.receiptIDsByResult.Append(resultID, receiptID)
+			err := e.receiptIDsByResult.Append(resultID, receiptID)
 			if err != nil {
 				log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
 			}

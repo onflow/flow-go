@@ -188,7 +188,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 		EntityIDs: entityIDs,
 		Blobs:     blobs,
 	}
-	err = e.con.Submit(res, originID)
+	err = e.con.Unicast(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send response: %w", err)
 	}

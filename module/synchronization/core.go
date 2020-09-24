@@ -10,6 +10,16 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+const (
+	// DefaultPollNodes is the default number of nodes we send a message to on
+	// each poll interval.
+	DefaultPollNodes uint = 3
+
+	// DefaultBlockRequestNodes is the default number of nodes we request a
+	// block resource from.
+	DefaultBlockRequestNodes uint = 3
+)
+
 type Config struct {
 	RetryInterval time.Duration // the initial interval before we retry a request, uses exponential backoff
 	Tolerance     uint          // determines how big of a difference in block heights we tolerated before actively syncing with range requests

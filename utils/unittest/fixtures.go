@@ -8,6 +8,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -829,6 +830,15 @@ func QuorumCertificateFixture() *flow.QuorumCertificate {
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
 		SigData:   SeedFixture(32 * 3),
+	}
+}
+
+func VoteFixture() *hotstuff.Vote {
+	return &hotstuff.Vote{
+		View:     uint64(rand.Uint32()),
+		BlockID:  IdentifierFixture(),
+		SignerID: IdentifierFixture(),
+		SigData:  RandomBytes(128),
 	}
 }
 
