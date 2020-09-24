@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/crypto/random"
-	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/random"
+	chunkmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
 // PublicAssignment implements an instance of the Public Chunk Assignment algorithm

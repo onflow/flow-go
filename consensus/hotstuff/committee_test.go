@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 )
 
 // TestLevelledForest_AddVertex tests that Vertex can be added twice without problems

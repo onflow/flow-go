@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"math"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // connectedGraph returns a random subset of length (n+1)/2.

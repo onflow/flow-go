@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
 )
 
 // TestSingleQueueWorkers tests that a single worker can successfully read all elements from the queue

@@ -3,7 +3,7 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Approvals implements the result approvals memory pool of the consensus nodes,

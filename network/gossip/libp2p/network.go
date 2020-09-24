@@ -6,15 +6,15 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/gossip/libp2p/cache"
+	"github.com/onflow/flow-go/network/gossip/libp2p/message"
+	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
+	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
+	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 )
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)

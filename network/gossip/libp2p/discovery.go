@@ -10,8 +10,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 )
 
 // Discovery implements the discovery.Discovery interface to provide libp2p a way to discover other nodes

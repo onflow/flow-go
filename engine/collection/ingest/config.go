@@ -1,7 +1,7 @@
 package ingest
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Config defines configuration for the transaction ingest engine.

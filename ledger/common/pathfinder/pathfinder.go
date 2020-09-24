@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger"
 )
 
 // PathByteSize captures number of bytes each path takes

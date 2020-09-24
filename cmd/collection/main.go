@@ -6,35 +6,37 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/collection/epochmgr"
-	"github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/collection/pusher"
-	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/provider"
-	consync "github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/buffer"
-	builder "github.com/dapperlabs/flow-go/module/builder/collection"
-	confinalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
-	"github.com/dapperlabs/flow-go/module/ingress"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/module/synchronization"
-	storagekv "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
+	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
+	"github.com/onflow/flow-go/engine/collection/ingest"
+	"github.com/onflow/flow-go/engine/collection/pusher"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/provider"
+	consync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/buffer"
+	builder "github.com/onflow/flow-go/module/builder/collection"
+	"github.com/onflow/flow-go/module/epochs"
+	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/ingress"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/synchronization"
+	storagekv "github.com/onflow/flow-go/storage/badger"
 )
 
 func main() {
@@ -257,12 +259,12 @@ func main() {
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			clusterStateFactory, err := epochmgr.NewClusterStateFactory(node.DB, node.Metrics.Cache)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache)
 			if err != nil {
 				return nil, err
 			}
 
-			builderFactory, err := epochmgr.NewBuilderFactory(
+			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
 				node.Storage.Headers,
 				node.Tracer,
@@ -275,7 +277,7 @@ func main() {
 				return nil, err
 			}
 
-			proposalFactory, err := epochmgr.NewProposalEngineFactory(
+			proposalFactory, err := factories.NewProposalEngineFactory(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -290,7 +292,7 @@ func main() {
 				return nil, err
 			}
 
-			syncFactory, err := epochmgr.NewSyncEngineFactory(
+			syncFactory, err := factories.NewSyncEngineFactory(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -301,7 +303,7 @@ func main() {
 				return nil, err
 			}
 
-			hotstuffFactory, err := epochmgr.NewHotStuffFactory(
+			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
 				node.DB,
@@ -317,17 +319,40 @@ func main() {
 				return nil, err
 			}
 
+			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
+			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+			rootQCVoter := epochs.NewRootQCVoter(
+				node.Logger,
+				node.Me,
+				signer,
+				node.State,
+				nil, // TODO
+			)
+
+			factory := factories.NewEpochComponentsFactory(
+				node.Me,
+				pool,
+				builderFactory,
+				clusterStateFactory,
+				hotstuffFactory,
+				proposalFactory,
+				syncFactory,
+			)
+
 			manager, err := epochmgr.New(
 				node.Logger,
 				node.Me,
 				node.State,
-				pool,
-				clusterStateFactory,
-				builderFactory,
-				proposalFactory,
-				syncFactory,
-				hotstuffFactory,
+				rootQCVoter,
+				factory,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create epoch manager: %w", err)
+			}
+
+			// register the manager for protocol events
+			node.ProtocolEvents.AddConsumer(manager)
+
 			return manager, err
 		}).
 		Run()

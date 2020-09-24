@@ -6,12 +6,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/metrics/example"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics/example"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func main() {

@@ -8,10 +8,10 @@ import (
 
 	"google.golang.org/grpc"
 
-	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network"
-	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
+	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
+	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 )
 
 // GhostClient is a client for the ghost node.

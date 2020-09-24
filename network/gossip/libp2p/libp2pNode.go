@@ -27,7 +27,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
-	netwk "github.com/dapperlabs/flow-go/network"
+	netwk "github.com/onflow/flow-go/network"
 )
 
 const (

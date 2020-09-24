@@ -3,32 +3,43 @@ package verification
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
+
+// SingleSignerVerifier wraps single signer and verifier.
+type SingleSignerVerifier struct {
+	*SingleSigner
+	*SingleVerifier
+}
+
+// NewSingleSignerVerifier initializes a single signer with the given dependencies:
+// - the given hotstuff committee's state is used to retrieve public keys for the verifier;
+// - the given signer is used to generate signatures for the local node;
+// - the given signer ID is used as identifier for our signatures.
+func NewSingleSignerVerifier(committee hotstuff.Committee, signer module.AggregatingSigner, signerID flow.Identifier) *SingleSignerVerifier {
+	sc := &SingleSignerVerifier{
+		SingleVerifier: NewSingleVerifier(committee, signer),
+		SingleSigner:   NewSingleSigner(signer, signerID),
+	}
+	return sc
+}
 
 // SingleSigner is a signer capable of adding single signatures that can be
 // aggregated to data structures.
 type SingleSigner struct {
-	*SingleVerifier
 	signer   module.AggregatingSigner
 	signerID flow.Identifier
 }
 
-// NewSingleSigner initializes a single signer with the given dependencies:
-// - the given hotstuff committee's state is used to retrieve public keys for the verifier;
-// - the given signer is used to generate signatures for the local node;
-// - the given signer ID is used as identifier for our signatures.
-func NewSingleSigner(committee hotstuff.Committee, signer module.AggregatingSigner, signerID flow.Identifier) *SingleSigner {
-	sc := &SingleSigner{
-		SingleVerifier: NewSingleVerifier(committee, signer),
-		signer:         signer,
-		signerID:       signerID,
+func NewSingleSigner(signer module.AggregatingSigner, signerID flow.Identifier) *SingleSigner {
+	return &SingleSigner{
+		signer:   signer,
+		signerID: signerID,
 	}
-	return sc
 }
 
 // CreateProposal creates a proposal with a single signature for the given block.

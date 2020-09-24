@@ -1,5 +1,5 @@
 language: go
-go_import_path: github.com/dapperlabs/flow-go
+go_import_path: github.com/onflow/flow-go
 
 go:
   - 1.13

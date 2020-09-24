@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/gossip/libp2p"
 )
 
 type Conduit struct {
