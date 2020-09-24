@@ -93,7 +93,8 @@ func (n *TopologyTestSuite) TestMembership() {
 
 // TestDeteministicity verifies that the same seed generates the same topology
 func (n *TopologyTestSuite) TestDeteministicity() {
-	top := topology.NewRandPermTopology(flow.RoleCollection, unittest.IdentifierFixture())
+	top, err := topology.NewRandPermTopology(flow.RoleCollection, unittest.IdentifierFixture())
+	require.NoError(n.Suite.T(), err)
 	// topology of size count/2
 	topSize := uint(n.count / 2)
 	var previous, current []string
@@ -132,7 +133,8 @@ func (n *TopologyTestSuite) TestUniqueness() {
 		current = nil
 		// generate a new topology with a the same ids, size but a different seed for each iteration
 		identity, _ := n.ids.ByIndex(uint(i))
-		top := topology.NewRandPermTopology(flow.RoleCollection, identity.NodeID)
+		top, err := topology.NewRandPermTopology(flow.RoleCollection, identity.NodeID)
+		require.NoError(n.Suite.T(), err)
 		idMap, err := top.Subset(n.ids, topSize)
 		require.NoError(n.Suite.T(), err)
 

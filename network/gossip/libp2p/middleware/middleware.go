@@ -70,4 +70,3 @@ type Connection interface {
 	Send(msg interface{}) error
 	Receive() (interface{}, error)
 }
-

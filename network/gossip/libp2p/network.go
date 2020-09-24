@@ -156,10 +156,10 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	 subset, err := n.top.Subset(n.ids, n.fanout())
-	 if err != nil {
-	 	return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
-	 }
+	subset, err := n.top.Subset(n.ids, n.fanout())
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
+	}
 
 	// creates a map of all the selected ids
 	topMap := make(map[flow.Identifier]flow.Identity)
@@ -188,7 +188,7 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 // fanout returns the node fanout derived from the identity list
 func (n *Network) fanout() uint {
 	// fanout is currently set to half of the system size for connectivity assurance
-	return uint(len(n.ids) + 1) / 2
+	return uint(len(n.ids)+1) / 2
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
