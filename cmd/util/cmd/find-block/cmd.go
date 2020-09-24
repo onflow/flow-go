@@ -7,10 +7,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/badger"
 )
 
 var (

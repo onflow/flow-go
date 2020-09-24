@@ -6,7 +6,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/storage"
 )
 
 func handleError(err error, t interface{}) error {

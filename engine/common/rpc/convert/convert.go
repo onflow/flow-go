@@ -7,9 +7,9 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")

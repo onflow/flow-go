@@ -3,10 +3,10 @@ package libp2p
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/random"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 )
 
 var _ middleware.Topology = &RandPermTopology{}

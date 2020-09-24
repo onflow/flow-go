@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Conduit represents the interface for engines to communicate over the
@@ -43,6 +43,10 @@ type Conduit interface {
 	// to the specified number of recipients selected from the specified subset.
 	// The recipients are selected randomly from the targetIDs.
 	Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error
+
+	// Close unsubscribes from the channel ID of this conduit. After calling close,
+	// the conduit can no longer be used to send a message.
+	Close() error
 }
 
 // PeerUnreachableError is the error when submitting events to target fails due to the

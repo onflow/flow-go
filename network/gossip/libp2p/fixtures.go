@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	message2 "github.com/dapperlabs/flow-go/model/libp2p/message"
-	"github.com/dapperlabs/flow-go/network/codec/json"
+	message2 "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network/codec/json"
 )
 
 // NetworkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.

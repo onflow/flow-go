@@ -7,8 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // Account represents an account on the Flow network.

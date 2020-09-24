@@ -9,19 +9,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine/collection/proposal"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realstorage "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/collection/proposal"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	network "github.com/onflow/flow-go/network/mock"
+	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	realstorage "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -44,7 +44,7 @@ type Suite struct {
 
 	me           *module.Local
 	net          *module.Network
-	con          *network.Conduit
+	conduit      *network.Conduit
 	pool         *mempool.Transactions
 	transactions *storage.Transactions
 	headers      *storage.Headers
@@ -96,8 +96,8 @@ func (suite *Suite) SetupTest() {
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.net = new(module.Network)
-	suite.con = new(network.Conduit)
-	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
+	suite.conduit = new(network.Conduit)
+	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
 
 	suite.pool = new(mempool.Transactions)
 	suite.pool.On("Size").Return(uint(0))
@@ -282,7 +282,7 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 	// proposal should not have been submitted to consensus algo
 	suite.hotstuff.AssertNotCalled(suite.T(), "SubmitProposal")
 	// parent block should be requested
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestHandleProposalWithPendingChildren() {

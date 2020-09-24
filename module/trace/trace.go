@@ -11,7 +11,7 @@ import (
 	"github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type SpanName string

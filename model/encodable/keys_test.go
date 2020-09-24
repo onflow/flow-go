@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 func TestEncodableNetworkPubKey(t *testing.T) {

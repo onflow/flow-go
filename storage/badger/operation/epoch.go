@@ -1,7 +1,7 @@
 package operation
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/dgraph-io/badger/v2"
 )

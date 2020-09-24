@@ -12,9 +12,9 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var _ runtime.Interface = &hostEnv{}

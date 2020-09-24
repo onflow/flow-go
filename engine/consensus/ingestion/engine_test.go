@@ -8,15 +8,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	mockmempool "github.com/dapperlabs/flow-go/module/mempool/mock"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	mockmodule "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/trace"
-	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
-	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	mockstorage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	mockmempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/metrics"
+	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestIngestion(t *testing.T) {
@@ -142,7 +142,7 @@ func (is *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 	is.pool.On("Add", guarantee).Return(true)
 
 	// check that we call the submit with the correct consensus node IDs
-	is.con.On("Submit", guarantee, mock.Anything, mock.Anything).Run(
+	is.con.On("Publish", guarantee, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			nodeID1 := args.Get(1).(flow.Identifier)
 			nodeID2 := args.Get(2).(flow.Identifier)

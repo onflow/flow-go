@@ -1,8 +1,8 @@
 package fvm
 
 import (
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type TransactionFeeDeductor struct{}

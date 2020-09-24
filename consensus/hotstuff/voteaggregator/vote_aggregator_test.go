@@ -12,18 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state"
-	protomock "github.com/dapperlabs/flow-go/state/protocol/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state"
+	protomock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestAggregator(t *testing.T) {
@@ -35,7 +35,7 @@ type AggregatorSuite struct {
 	participants flow.IdentityList
 	protocol     *protomock.State
 	snapshot     *protomock.Snapshot
-	signer       *mocks.Signer
+	signer       *mocks.SignerVerifier
 	forks        *mocks.Forks
 	committee    hotstuff.Committee
 	validator    hotstuff.Validator
@@ -98,7 +98,7 @@ func (as *AggregatorSuite) SetupTest() {
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
-	as.signer = &mocks.Signer{}
+	as.signer = &mocks.SignerVerifier{}
 	as.signer.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("CreateQC", mock.AnythingOfType("[]*model.Vote")).Return(

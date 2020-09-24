@@ -3,18 +3,18 @@ package run
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 type Participant struct {
@@ -43,18 +43,11 @@ func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.
 		return nil, err
 	}
 
-	hotBlock := model.Block{
-		BlockID:     block.ID(),
-		View:        block.Header.View,
-		ProposerID:  block.Header.ProposerID,
-		QC:          nil,
-		PayloadHash: block.Header.PayloadHash,
-		Timestamp:   block.Header.Timestamp,
-	}
+	hotBlock := model.GenesisBlockFromFlow(block.Header)
 
 	votes := make([]*model.Vote, 0, len(signers))
 	for _, signer := range signers {
-		vote, err := signer.CreateVote(&hotBlock)
+		vote, err := signer.CreateVote(hotBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -68,12 +61,12 @@ func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.
 	}
 
 	// validate QC
-	err = validators[0].ValidateQC(qc, &hotBlock)
+	err = validators[0].ValidateQC(qc, hotBlock)
 
 	return qc, err
 }
 
-func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.Signer, error) {
+func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 	n := len(participantData.Participants)
 	identities := participantData.Identities()
 
@@ -82,7 +75,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		return nil, nil, fmt.Errorf("need at least as many signers as DKG participants, got %v and %v", groupSize, n)
 	}
 
-	signers := make([]hotstuff.Signer, n)
+	signers := make([]hotstuff.SignerVerifier, n)
 	validators := make([]hotstuff.Validator, n)
 
 	forks := &mocks.ForksReader{}

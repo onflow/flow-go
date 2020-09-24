@@ -3,8 +3,8 @@ package verification
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // makeVoteMessage generates the message we have to sign in order to be able

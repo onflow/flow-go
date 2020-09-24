@@ -1,4 +1,4 @@
-module github.com/dapperlabs/flow-go/cmd/testclient
+module github.com/onflow/flow-go/cmd/testclient
 
 go 1.13
 
