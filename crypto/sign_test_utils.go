@@ -3,7 +3,9 @@ package crypto
 import (
 	"crypto/rand"
 	"fmt"
+	mrand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,6 +20,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	seedMinLength := 48
 	seed := make([]byte, seedMinLength)
 	input := make([]byte, 100)
+	mrand.Seed(time.Now().UnixNano())
 
 	loops := 50
 	for j := 0; j < loops; j++ {
@@ -51,6 +54,12 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
 			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+		// test a wrong signature length
+		invalidLen := mrand.Intn(len(s))
+		result, err = pk.Verify(s[:invalidLen], input, halg)
+		assert.Error(t, err)
+		assert.False(t, result, fmt.Sprintf(
+			"Verification should fail:\n signature:%s\n with invalid length %d", s[:invalidLen], invalidLen))
 	}
 }
 
