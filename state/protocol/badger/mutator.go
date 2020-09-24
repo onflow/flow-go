@@ -871,18 +871,18 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 }
 
 // MakeValid marks the block as valid in protocol state, and triggers
-// `BlockReadyForProcessing` event to notify that its parent block is processable.
+// `BlockProcessable` event to notify that its parent block is processable.
 // why the parent block is processable, not the block itself?
 // because a block having a child block means it has been verified
-// by the majority of consensus participants. 
-// Hence, if a block has passed the header validity check, its parent block 
-// must have passed both the header validity check and the body validity check. 
-// So that consensus followers can skip the block body validity checks and wait 
+// by the majority of consensus participants.
+// Hence, if a block has passed the header validity check, its parent block
+// must have passed both the header validity check and the body validity check.
+// So that consensus followers can skip the block body validity checks and wait
 // for its child to arrive, and if the child passes the header validity check, it means
-// the consensus participants have done a complete check on its parent block, 
-// so consensus followers can trust consensus nodes did the right job, and start 
+// the consensus participants have done a complete check on its parent block,
+// so consensus followers can trust consensus nodes did the right job, and start
 // processing the parent block.
-// NOTE: since a parent can have multiple children, `BlockReadyForProcessing` event
+// NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
 func (m *Mutator) MarkValid(blockID flow.Identifier) error {
 	header, err := m.state.headers.ByBlockID(blockID)
@@ -909,8 +909,8 @@ func (m *Mutator) MarkValid(blockID flow.Identifier) error {
 		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
 	}
 
-	// root blocks and blocks below the root block are considered as "processed", 
-	// so we don't want to trigger `BlockReadyForProcessing` event for them.
+	// root blocks and blocks below the root block are considered as "processed",
+	// so we don't want to trigger `BlockProcessable` event for them.
 	parent, err := m.state.headers.ByBlockID(parentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
@@ -923,7 +923,7 @@ func (m *Mutator) MarkValid(blockID flow.Identifier) error {
 	if rootHeight >= parent.Height {
 		return nil
 	}
-	m.state.consumer.BlockReadyForProcessing(parent)
+	m.state.consumer.BlockProcessable(parent)
 
 	return nil
 }

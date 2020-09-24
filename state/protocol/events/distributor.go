@@ -32,11 +32,11 @@ func (d *Distributor) BlockFinalized(block *flow.Header) {
 	}
 }
 
-func (d *Distributor) BlockReadyForProcessing(block *flow.Header) {
+func (d *Distributor) BlockProcessable(block *flow.Header) {
 	d.mu.RLock()
 	defer d.mu.RLock()
 	for _, sub := range d.subscribers {
-		sub.BlockReadyForProcessing(block)
+		sub.BlockProcessable(block)
 	}
 }
 

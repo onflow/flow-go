@@ -17,8 +17,8 @@ func (_m *Consumer) BlockFinalized(block *flow.Header) {
 	_m.Called(block)
 }
 
-// BlockReadyForProcessing provides a mock function with given fields: block
-func (_m *Consumer) BlockReadyForProcessing(block *flow.Header) {
+// BlockProcessable provides a mock function with given fields: block
+func (_m *Consumer) BlockProcessable(block *flow.Header) {
 	_m.Called(block)
 }
 
