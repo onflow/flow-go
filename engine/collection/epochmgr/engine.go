@@ -3,6 +3,7 @@ package epochmgr
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/state/protocol/events"
 )
+
+const DefaultStartupTimeout = 30 * time.Second
 
 // EpochComponents represents all dependencies for running an epoch.
 type EpochComponents struct {
@@ -39,17 +42,18 @@ func (ec *EpochComponents) Done() <-chan struct{} {
 // spinning up engines when a new epoch is about to start and spinning down
 // engines for an epoch that has ended.
 type Engine struct {
-	unit *engine.Unit
-
-	log     zerolog.Logger
-	me      module.Local
-	state   protocol.State
-	factory EpochComponentsFactory    // consolidates creating epoch for an epoch
-	voter   module.ClusterRootQCVoter // manages process of voting for next epoch's QC
-
-	epochs map[uint64]*EpochComponents // epoch-scoped components per epoch
-
 	events.Noop // satisfy protocol events consumer interface
+
+	unit         *engine.Unit
+	log          zerolog.Logger
+	me           module.Local
+	state        protocol.State
+	factory      EpochComponentsFactory    // consolidates creating epoch for an epoch
+	voter        module.ClusterRootQCVoter // manages process of voting for next epoch's QC
+	heightEvents events.Heights            // allows subscribing to particular heights
+
+	epochs         map[uint64]*EpochComponents // epoch-scoped components per epoch
+	startupTimeout time.Duration               // how long we wait for epoch components to start up
 }
 
 func New(
@@ -61,13 +65,14 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:    engine.NewUnit(),
-		log:     log,
-		me:      me,
-		state:   state,
-		voter:   voter,
-		factory: factory,
-		epochs:  make(map[uint64]*EpochComponents),
+		unit:           engine.NewUnit(),
+		log:            log,
+		me:             me,
+		state:          state,
+		voter:          voter,
+		factory:        factory,
+		epochs:         make(map[uint64]*EpochComponents),
+		startupTimeout: DefaultStartupTimeout,
 	}
 
 	// set up epoch-scoped epoch managed by this engine for the current epoch
@@ -143,17 +148,63 @@ func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, 
 
 // EpochTransition handles the epoch transition protocol event.
 func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
-
-	epoch := e.state.Final().Epochs().Current()
-	_ = epoch
-
-	// start components for this epoch
-	// set up trigger to shut down previous epoch components after max expiry
+	e.unit.Launch(func() {
+		err := e.onEpochTransition(first)
+		if err != nil {
+			// failing to complete epoch transition is a fatal error
+			e.log.Fatal().Err(err).Msg("failed to complete epoch transition")
+		}
+	})
 }
 
 // EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
 func (e *Engine) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
 	e.unit.Launch(e.onEpochSetupPhaseStarted)
+}
+
+// onEpochTransition is called when we transition to a new epoch. It arranges
+// to shut down the last epoch's components and starts up the new epoch's.
+func (e *Engine) onEpochTransition(first *flow.Header) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
+	epoch := e.state.Final().Epochs().Current()
+	counter, err := epoch.Counter()
+	if err != nil {
+		return fmt.Errorf("could not get epoch counter: %w", err)
+	}
+
+	// exit early and log if the epoch already exists
+	_, exists := e.epochs[counter]
+	if exists {
+		e.log.Warn().Msgf("epoch transition: components for epoch %d already setup", counter)
+		return nil
+	}
+
+	// create components for new epoch
+	components, err := e.createEpochComponents(epoch)
+	if err != nil {
+		return fmt.Errorf("could not create epoch components: %w", err)
+	}
+
+	// start up components
+	err = e.startEpochComponents(counter, components)
+	if err != nil {
+		return fmt.Errorf("could not start epoch components: %w", err)
+	}
+
+	// set up trigger to shut down previous epoch components after max expiry
+	e.heightEvents.OnHeight(first.Height+flow.DefaultTransactionExpiry, func() {
+		e.unit.Lock()
+		defer e.unit.Unlock()
+
+		err := e.stopEpochComponents(counter - 1)
+		if err != nil {
+			e.log.Error().Err(err).Msgf("epoch transition: failed to stop components for epoch %d", counter-1)
+		}
+	})
+
+	return nil
 }
 
 // onEpochSetupPhaseStarted is called either when we transition into the epoch
@@ -169,5 +220,40 @@ func (e *Engine) onEpochSetupPhaseStarted() {
 	err := e.voter.Vote(ctx, epoch)
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
+	}
+}
+
+// startEpochComponents starts the components for the given epoch and adds them
+// to the engine's internal mapping.
+//
+// CAUTION: the caller MUST acquire the engine lock.
+func (e *Engine) startEpochComponents(counter uint64, components *EpochComponents) error {
+
+	select {
+	case <-components.Ready():
+		e.epochs[counter] = components
+		return nil
+	case <-time.After(e.startupTimeout):
+		return fmt.Errorf("could not start epoch %d components after %s", counter, e.startupTimeout)
+	}
+}
+
+// stopEpochComponents stops the components for the given epoch and removes them
+// from the engine's internal mapping.
+//
+// CAUTION: the caller MUST acquire the engine lock.
+func (e *Engine) stopEpochComponents(counter uint64) error {
+
+	components, exists := e.epochs[counter]
+	if !exists {
+		return fmt.Errorf("can not stop non-existent epoch %d", counter)
+	}
+
+	select {
+	case <-components.Done():
+		delete(e.epochs, counter)
+		return nil
+	case <-time.After(e.startupTimeout):
+		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)
 	}
 }
