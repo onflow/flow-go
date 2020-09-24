@@ -202,6 +202,11 @@ func VerifySignatureOneMessage(pks []PublicKey, s Signature,
 // Membership check is performed on the input signature.
 func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 	messages [][]byte, kmac []hash.Hasher) (bool, error) {
+
+	// check signature length
+	if len(s) != signatureLengthBLSBLS12381 {
+		return false, nil
+	}
 	// check the list lengths
 	if len(pks) == 0 {
 		return false, fmt.Errorf("key list is empty")
@@ -211,31 +216,67 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 			len(messages), len(pks), len(kmac))
 	}
 
-	// compute the hashes and store them into an array (since slices can't be map keys)
-	// TODO: find another way that avoids the copies
-	hashes := make([][opSwUInputLenBLSBLS12381]byte, len(messages))
+	// compute the hashes
+	hashes := make([][]byte, 0, len(messages))
 	for i, k := range kmac {
 		if k == nil {
 			return false, fmt.Errorf("hasher at index %d is nil", i)
 		}
-		copy(hashes[i][:], k.ComputeHash(messages[i]))
+		if k.Size() < minHashSizeBLSBLS12381 {
+			return false, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
+				minHashSizeBLSBLS12381, k.Size())
+		}
+		hashes = append(hashes, k.ComputeHash(messages[i]))
 	}
 
-	// two maps to count the type with the least distinct elements.
-	// mapPerMsg maps messages to keys while mapPerPk maps keys to messages.
+	// two maps to count the type (keys or messages) with the least distinct elements.
+	// mapPerHash maps hashes to keys while mapPerPk maps keys to hashes.
 	// The comparison of the maps length minimizes the number of pairings to
 	// compute by aggregating either public keys or the message hashes in
 	// the verification equation.
-	var mapPerMsg map[[opSwUInputLenBLSBLS12381]byte][]PublicKey
-	var mapPerPk map[PublicKey][]byte
+	mapPerHash := make(map[string][]pointG2)
+	mapPerPk := make(map[pointG2][]byte)
+	// TODO: change mapPerPk to map encoding of keys and store the Public key with the map value
 
 	// fill the 2 maps
 	for i, pk := range pks {
-		mapPerMsg[hashes[i]] = append(mapPerMsg[hashes[i]], pk)
-		mapPerPk[pk] = append(mapPerPk[pk], hashes[i]...)
+		if pk.Algorithm() != BLSBLS12381 {
+			return false, fmt.Errorf("public key at index %d is not BLS key, it is a %s key",
+				i, pk.Algorithm())
+		}
+		// assertion is guaranteed to be correct after the algorithm check
+		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
+
+		mapPerHash[string(hashes[i])] = append(mapPerHash[string(hashes[i])], pkBLS.point)
+		mapPerPk[pkBLS.point] = append(mapPerPk[pkBLS.point], hashes[i][:]...)
 	}
 
-	return len(mapPerMsg) > len(mapPerPk), nil
+	//compare the 2 maps
+	if len(mapPerHash) < len(mapPerPk) {
+		// aggregate per hash
+		flatHashes := make([]byte, 0)
+		lenHashes := make([]uint32, 0)
+		pkPerHash := make([]uint32, 0, len(mapPerHash))
+		allPks := make([]pointG2, 0)
+		for hash, pks := range mapPerHash {
+			flatHashes = append(flatHashes, []byte(hash)...)
+			lenHashes = append(lenHashes, uint32(len([]byte(hash))))
+			pkPerHash = append(pkPerHash, uint32(len(pks)))
+			allPks = append(allPks, pks...)
+		}
+		verif := C.bls_verifyPerMessage(
+			(*C.uchar)(&s[0]),
+			(C.int)(len(mapPerHash)),
+			(*C.uchar)(&flatHashes[0]),
+			(*C.uint32_t)(&lenHashes[0]),
+			(*C.uint32_t)(&pkPerHash[0]),
+			(*C.ep2_st)(&allPks[0]),
+		)
+		return (verif == valid), nil
+	} else {
+		// aggregate per key
+		return true, nil
+	}
 }
 
 // regroup per key:

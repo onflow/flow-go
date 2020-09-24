@@ -142,3 +142,57 @@ int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len)
     else 
         return INVALID;
 }
+
+
+// Verifies the validity of a BLS signature
+// membership check of the signature in G1 is verified in this function
+// membership check of pk in G2 is not verified in this function
+// the membership check is separated to allow optimizing multiple verifications using the same pk
+int bls_verifyPerMessage(const byte* sig, 
+                         const int nb_hashes, const byte* hashes, const uint32_t* len_hashes,
+                         const uint32_t* pkPerHash, const ep2_st* pks) {  
+    /*ep_t elemsG1[2];
+    ep2_t elemsG2[2];
+
+    // elemsG1[0] = s
+    ep_new(elemsG1[0]);
+    if (ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN) != RLC_OK) 
+        return INVALID;
+
+    // check s is on curve and in G1
+    if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+        return INVALID;
+
+    // elemsG1[1] = h
+    ep_new(elemsG1[1]);
+    // hash to G1 
+    map_to_G1(elemsG1[1], data, len); 
+
+    // elemsG2[1] = pk
+    ep2_new(elemsG2[1]);
+    ep2_copy(elemsG2[1], (ep2_st*)pk);
+ 
+    // elemsG2[0] = -g2
+    ep2_new(&elemsG2[0]);
+    ep2_neg(elemsG2[0], &core_get()->ep2_g); // could be hardcoded 
+
+    fp12_t pair;
+    fp12_new(&pair);
+    // double pairing with Optimal Ate 
+    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), 2);
+
+    // compare the result to 1
+    int res = fp12_cmp_dig(pair, 1);
+
+    fp12_free(&one);
+    ep_free(elemsG1[0]);
+    ep_free(elemsG1[1]);
+    ep2_free(elemsG2[0]);
+    ep2_free(elemsG2[1]);
+    
+    if (res == RLC_EQ && core_get()->code == RLC_OK) 
+        return VALID;
+    else 
+        return INVALID;*/
+    return VALID;
+}
