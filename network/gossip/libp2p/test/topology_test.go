@@ -1,6 +1,7 @@
 package test
 
 import (
+	"math"
 	"os"
 	"sort"
 	"testing"
@@ -38,9 +39,10 @@ func TestNetworkTestSuit(t *testing.T) {
 func (n *TopologyTestSuite) SetupTest() {
 	n.count = 100
 	n.ids = CreateIDs(n.count)
-	rndSubsetSize := n.count / 2
+	rndSubsetSize := int(math.Ceil(float64(n.count+1) / 2))
 	oneOfEachNodetype := 0 // there is only one node type in this test
-	halfOfRemainingNodes := (n.count - rndSubsetSize - oneOfEachNodetype) / 2
+	remaining := n.count - rndSubsetSize - oneOfEachNodetype
+	halfOfRemainingNodes := int(math.Ceil(float64(remaining+1) / 2))
 	n.expectedSize = rndSubsetSize + oneOfEachNodetype + halfOfRemainingNodes
 
 	// takes firs id as the current nodes id
