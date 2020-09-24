@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/crypto/random"
-	chmodels "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
-	chmodule "github.com/dapperlabs/flow-go/module/chunks"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/test"
+	"github.com/onflow/flow-go/crypto/random"
+	chmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
+	chmodule "github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 )
 
 // PublicAssignmentTestSuite contains tests against methods of the PublicAssignment scheme

@@ -35,7 +35,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // blsBLS12381Algo, embeds SignAlgo

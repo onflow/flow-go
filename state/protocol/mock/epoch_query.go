@@ -3,7 +3,7 @@
 package mock
 
 import (
-	protocol "github.com/dapperlabs/flow-go/state/protocol"
+	protocol "github.com/onflow/flow-go/state/protocol"
 	mock "github.com/stretchr/testify/mock"
 )
 

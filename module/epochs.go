@@ -3,8 +3,8 @@ package module
 import (
 	"context"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // ClusterRootQCVoter is responsible for submitting a vote to the cluster QC

@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/ledger"
+	"github.com/onflow/flow-go/storage/ledger/ptrie"
+	"github.com/onflow/flow-go/storage/ledger/utils"
 )
 
 func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }

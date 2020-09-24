@@ -3,9 +3,9 @@ package unittest
 import (
 	"github.com/stretchr/testify/mock"
 
-	module "github.com/dapperlabs/flow-go/module/mock"
-	netint "github.com/dapperlabs/flow-go/network"
-	network "github.com/dapperlabs/flow-go/network/mock"
+	module "github.com/onflow/flow-go/module/mock"
+	netint "github.com/onflow/flow-go/network"
+	network "github.com/onflow/flow-go/network/mock"
 )
 
 // RegisterNetwork returns a mocked network and conduit

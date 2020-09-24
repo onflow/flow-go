@@ -1,8 +1,8 @@
 package mempool
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/verification"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 )
 
 // ReceiptDataPacks represents a concurrency-safe memory pool for ReceiptDataPack data structure.

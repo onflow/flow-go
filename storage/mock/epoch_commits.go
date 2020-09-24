@@ -3,8 +3,8 @@
 package mock
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
 	badger "github.com/dgraph-io/badger/v2"
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )

@@ -3,7 +3,7 @@ package notifications
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // SlashingViolationsConsumer is an implementation of the notifications consumer that logs a

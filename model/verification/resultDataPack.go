@@ -1,7 +1,7 @@
 package verification
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ResultDataPack represents an execution result with some metadata.

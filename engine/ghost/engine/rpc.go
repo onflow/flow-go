@@ -7,13 +7,13 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/engine"
-	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
-	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
-	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/engine"
+	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
+	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the gRPC server.

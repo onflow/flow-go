@@ -3,8 +3,8 @@
 package mock
 
 import (
-	coldstuff "github.com/dapperlabs/flow-go/model/coldstuff"
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	coldstuff "github.com/onflow/flow-go/model/coldstuff"
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )

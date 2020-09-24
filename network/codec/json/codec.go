@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/onflow/flow-go/network"
 )
 
 // Codec represents a JSON codec for our network.

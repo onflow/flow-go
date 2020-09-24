@@ -1,8 +1,8 @@
 package coldstuff
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	model "github.com/dapperlabs/flow-go/model/coldstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	model "github.com/onflow/flow-go/model/coldstuff"
 )
 
 // Communicator is the interface for sending messages to other nodes within

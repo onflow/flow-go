@@ -3,7 +3,7 @@ package flow
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/utils/slices"
+	"github.com/onflow/flow-go/utils/slices"
 )
 
 // A ChainID is a unique identifier for a specific Flow network instance.

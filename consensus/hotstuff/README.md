@@ -129,7 +129,7 @@ In other words, we transition into the next view due to reaching quorum in the l
 A central, non-trivial functionality of the PaceMaker is to _skip views_. 
 Specifically, given a QC with view `qc.view`, the Pacemaker will skip ahead to view `qc.view + 1` if `currentView ≤ qc.view`.
   
-<img src="https://github.com/dapperlabs/flow-go/blob/79f48bf9fe067778a19f89f6b9b5ee03972b6c78/docs/PaceMaker.png" width="200">
+<img src="https://github.com/onflow/flow-go/blob/master/docs/PaceMaker.png" width="200">
  
  
 
