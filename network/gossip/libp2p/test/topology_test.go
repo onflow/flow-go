@@ -51,7 +51,7 @@ func (n *TopologyTestSuite) SetupTest() {
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	key, err := GenerateNetworkingKey(me.NodeID)
-	require.NoError(n.Suite.T(), err)
+	require.NoError(n.T(), err)
 
 	metrics := metrics.NewNoopCollector()
 
@@ -65,38 +65,38 @@ func (n *TopologyTestSuite) SetupTest() {
 		libp2p.DefaultMaxUnicastMsgSize,
 		libp2p.DefaultMaxPubSubMsgSize,
 		unittest.IdentifierFixture().String())
-	require.NoError(n.Suite.T(), err)
+	require.NoError(n.T(), err)
 
 	// creates and mocks a network instance
 	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
-	require.NoError(n.Suite.T(), err)
-	require.Len(n.Suite.T(), nets, 1)
+	require.NoError(n.T(), err)
+	require.Len(n.T(), nets, 1)
 	n.nets = nets[0]
 }
 
 func (n *TopologyTestSuite) TestTopologySize() {
 	// topology of size the entire network
 	top, err := n.nets.Topology()
-	require.NoError(n.Suite.T(), err)
-	require.Len(n.Suite.T(), top, n.expectedSize)
+	require.NoError(n.T(), err)
+	require.Len(n.T(), top, n.expectedSize)
 }
 
 // TestMembership evaluates every id in topology to be a protocol id
 func (n *TopologyTestSuite) TestMembership() {
 	top, err := n.nets.Topology()
-	require.NoError(n.Suite.T(), err)
-	require.Len(n.Suite.T(), top, n.expectedSize)
+	require.NoError(n.T(), err)
+	require.Len(n.T(), top, n.expectedSize)
 
 	// every id in topology should be an id of the protocol
 	for id := range top {
-		require.Contains(n.Suite.T(), n.ids.NodeIDs(), id)
+		require.Contains(n.T(), n.ids.NodeIDs(), id)
 	}
 }
 
 // TestDeteministicity verifies that the same seed generates the same topology
 func (n *TopologyTestSuite) TestDeteministicity() {
 	top, err := topology.NewRandPermTopology(flow.RoleCollection, unittest.IdentifierFixture())
-	require.NoError(n.Suite.T(), err)
+	require.NoError(n.T(), err)
 	// topology of size count/2
 	topSize := uint(n.count / 2)
 	var previous, current []string
@@ -106,7 +106,7 @@ func (n *TopologyTestSuite) TestDeteministicity() {
 		current = nil
 		// generate a new topology with a the same ids, size and seed
 		idMap, err := top.Subset(n.ids, topSize)
-		require.NoError(n.Suite.T(), err)
+		require.NoError(n.T(), err)
 
 		for _, v := range idMap {
 			current = append(current, v.NodeID.String())
@@ -119,7 +119,7 @@ func (n *TopologyTestSuite) TestDeteministicity() {
 		}
 
 		// assert that a different seed generates a different topology
-		require.Equal(n.Suite.T(), previous, current)
+		require.Equal(n.T(), previous, current)
 	}
 }
 
@@ -136,9 +136,9 @@ func (n *TopologyTestSuite) TestUniqueness() {
 		// generate a new topology with a the same ids, size but a different seed for each iteration
 		identity, _ := n.ids.ByIndex(uint(i))
 		top, err := topology.NewRandPermTopology(flow.RoleCollection, identity.NodeID)
-		require.NoError(n.Suite.T(), err)
+		require.NoError(n.T(), err)
 		idMap, err := top.Subset(n.ids, topSize)
-		require.NoError(n.Suite.T(), err)
+		require.NoError(n.T(), err)
 
 		for _, v := range idMap {
 			current = append(current, v.NodeID.String())
@@ -150,6 +150,6 @@ func (n *TopologyTestSuite) TestUniqueness() {
 		}
 
 		// assert that a different seed generates a different topology
-		require.NotEqual(n.Suite.T(), previous, current)
+		require.NotEqual(n.T(), previous, current)
 	}
 }

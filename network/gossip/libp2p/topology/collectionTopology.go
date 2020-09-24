@@ -13,11 +13,11 @@ import (
 type CollectionTopology struct {
 	RandPermTopology
 	nodeID flow.Identifier
-	state  protocol.State
+	state  protocol.ReadOnlyState
 	seed   int64
 }
 
-func NewCollectionTopology(nodeID flow.Identifier, state protocol.State) (CollectionTopology, error) {
+func NewCollectionTopology(nodeID flow.Identifier, state protocol.ReadOnlyState) (CollectionTopology, error) {
 	rpt, err := NewRandPermTopology(flow.RoleCollection, nodeID)
 	if err != nil {
 		return CollectionTopology{}, err
@@ -29,9 +29,20 @@ func NewCollectionTopology(nodeID flow.Identifier, state protocol.State) (Collec
 	}, nil
 }
 
-// Subset samples the idList and returns a list of nodes to connect with so that this node is directly or indirectly
-// connected to all other nodes in the same cluster, to all other nodes, to atleast one node of each
-// type and to all other nodes of the same type
+// Subset samples the idList and returns a list of nodes to connect with such that:
+// a. this node is directly or indirectly connected to all other nodes in the same cluster
+// b. to all other nodes
+// c. to at least one node of each type and
+///d. to all other nodes of the same type.
+// The collection nodes within a collection cluster need to form a connected graph among themselves independent of any
+// other nodes to ensure reliable dissemination of cluster specific topic messages. e.g ClusterBlockProposal
+// Similarly, all nodes of network need to form a connected graph, to ensure reliable dissemination of messages for
+// topics subscribed by all node types e.g. BlockProposals
+// Each node should be connected to at least one node of each type to ensure nodes don't form an island of a specific
+// role, specially since some node types are represented by a very small number of nodes (e.g. few access nodes compared
+//to tens or hundreds of collection nodes)
+// Finally, all nodes of the same type should form a connected graph for exchanging messages for role specific topics
+// e.g. Transaction
 func (c CollectionTopology) Subset(idList flow.IdentityList, fanout uint) (flow.IdentityList, error) {
 
 	randPermSample, err := c.RandPermTopology.Subset(idList, fanout)

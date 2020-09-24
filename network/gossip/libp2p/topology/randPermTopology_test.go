@@ -82,7 +82,7 @@ func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Ro
 	}
 
 	n := len(ids)
-	var adjencyMap = make(map[flow.Identifier]flow.IdentityList, n)
+	adjencyMap := make(map[flow.Identifier]flow.IdentityList, n)
 
 	for _, id := range ids {
 		rpt, err := topology.NewRandPermTopology(id.Role, id.NodeID)
@@ -93,10 +93,10 @@ func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Ro
 	}
 
 	// check that nodes of the same role form a connected graph
-	checkConnectednessByRole(r.T(), adjencyMap, minorityRole)
+	checkConnectednessByRole(r.T(), adjencyMap, ids, minorityRole)
 
 	// check that nodes form a connected graph
-	checkConnectedness(r.T(), adjencyMap)
+	checkConnectedness(r.T(), adjencyMap, ids)
 }
 
 // TestSubsetDeterminism tests that if the id list remains the same, the Topology.Subset call always yields the same
@@ -141,39 +141,25 @@ func createDistribution(total int, minority flow.Role) map[flow.Role]int {
 	return countMap
 }
 
-func checkConnectednessByRole(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, role flow.Role) {
-	checkGraphConnected(t, adjMap, filter.HasRole(role))
+func checkConnectednessByRole(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, role flow.Role) {
+	checkGraphConnected(t, adjMap, ids, filter.HasRole(role))
 }
 
-func checkConnectedness(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList) {
-	checkGraphConnected(t, adjMap, filter.Any)
+func checkConnectedness(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList) {
+	checkGraphConnected(t, adjMap, ids, filter.Any)
 }
 
 // checkGraphConnected checks if the graph represented by the adjacency matrix is connected.
 // It traverses the adjacency map starting from an arbitrary node and checks if all nodes that satisfy the filter
 // were visited.
-func checkGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, f flow.IdentityFilter) {
+func checkGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, f flow.IdentityFilter) {
 
 	// find the expected node count from the adjacency matrix
-	expectedIDs := make(flow.IdentityList, 0)
-	for _, v := range adjMap {
-		// filter each row to get nodes that satisfy the filter
-		ids := v.Filter(f)
-		if ids.Count() > 0 {
-			expectedIDs = append(expectedIDs, ids.Filter(filter.Not(filter.In(expectedIDs)))...)
-		}
-	}
+	expectedIDs := ids.Filter(f)
 	expectedCount := len(expectedIDs)
 
-	var startID flow.Identifier
 	// start with an arbitrary node which satisfies the filter
-	for _, v := range adjMap {
-		ids := v.Filter(f)
-		if ids.Count() > 0 {
-			startID = ids.Sample(1)[0].NodeID
-		}
-		break
-	}
+	startID := expectedIDs.Sample(1)[0].NodeID
 
 	visited := make(map[flow.Identifier]bool)
 	dfs(startID, adjMap, visited, f)

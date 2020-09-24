@@ -56,7 +56,7 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	if tops == nil {
 		tops = make([]topology.Topology, count)
 		for i := range tops {
-			rpt, err := topology.NewRandPermTopology(flow.RoleCollection, ids[i].NodeID)
+			rpt, err := topology.NewRandPermTopology(ids[i].Role, ids[i].NodeID)
 			if err != nil {
 				return nil, fmt.Errorf("could not create network: %w", err)
 			}

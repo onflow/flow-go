@@ -51,7 +51,7 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, fanout uint) (flow.Id
 		var selectedIDs flow.IdentityList
 
 		// connect to one of each type
-		selectedIDs, remainder = oneOfEachRoleSample(remainder, r.seed, role)
+		selectedIDs, remainder = oneOfEachRoleSample(idList, r.seed, role)
 
 		// add it to result
 		result = append(result, selectedIDs...)

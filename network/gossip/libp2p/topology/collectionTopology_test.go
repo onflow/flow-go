@@ -61,14 +61,14 @@ func (suite *CollectionTopologyTestSuite) TestSubset() {
 	}
 
 	// check that all collection nodes are either directly connected or indirectly connected via other collection nodes
-	checkConnectednessByRole(suite.T(), adjencyMap, flow.RoleCollection)
+	checkConnectednessByRole(suite.T(), adjencyMap, suite.collectors, flow.RoleCollection)
 
 	// check that each of the collection clusters forms a connected graph
 	for _, cluster := range suite.clusterList {
-		checkConnectednessByCluster(suite.T(), adjencyMap, cluster)
+		checkConnectednessByCluster(suite.T(), adjencyMap, cluster, suite.collectors)
 	}
 }
 
-func checkConnectednessByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, cluster flow.IdentityList) {
-	checkGraphConnected(t, adjMap, filter.In(cluster))
+func checkConnectednessByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, cluster flow.IdentityList, ids flow.IdentityList) {
+	checkGraphConnected(t, adjMap, ids, filter.In(cluster))
 }
