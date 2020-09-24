@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -92,7 +93,7 @@ func (n *TopologyTestSuite) TestMembership() {
 
 // TestDeteministicity verifies that the same seed generates the same topology
 func (n *TopologyTestSuite) TestDeteministicity() {
-	top := libp2p.NewRandPermTopology(flow.RoleCollection)
+	top := topology.NewRandPermTopology(flow.RoleCollection)
 	// topology of size count/2
 	topSize := n.count / 2
 	var previous, current []string
@@ -121,7 +122,7 @@ func (n *TopologyTestSuite) TestDeteministicity() {
 
 // TestUniqueness verifies that different seeds generates different topologies
 func (n *TopologyTestSuite) TestUniqueness() {
-	top := libp2p.NewRandPermTopology(flow.RoleCollection)
+	top := topology.NewRandPermTopology(flow.RoleCollection)
 	// topology of size count/2
 	topSize := n.count / 2
 	var previous, current []string

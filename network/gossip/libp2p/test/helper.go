@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -55,7 +56,7 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	// if no topology is passed in, use the default topology for all networks
 	if tops == nil {
 		tops = make([]middleware.Topology, count)
-		rpt := libp2p.NewRandPermTopology(flow.RoleCollection)
+		rpt := topology.NewRandPermTopology(flow.RoleCollection)
 		for i := range tops {
 			tops[i] = rpt
 		}
