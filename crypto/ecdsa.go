@@ -99,9 +99,15 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 
 // verifyHash implements ECDSA signature verification
 func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
+	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
+
+	if len(sig) != 2*Nlen {
+		return false, fmt.Errorf("signature length is %d, must be %d",
+			len(sig), 2*Nlen)
+	}
+
 	var r big.Int
 	var s big.Int
-	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
 	r.SetBytes(sig[:Nlen])
 	s.SetBytes(sig[Nlen:])
 	return goecdsa.Verify(pk.goPubKey, h, &r, &s), nil
