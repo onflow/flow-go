@@ -1388,7 +1388,9 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 
 func TestMakeValid(t *testing.T) {
 	t.Run("should trigger BlockProcessable with parent block", func(t *testing.T) {
-		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		consumer := &mockprotocol.Consumer{}
+
+		util.RunWithProtocolStateAndConsumer(t, consumer, func(db *badger.DB, state *protocol.State) {
 			// bootstrap the root block
 			block1, result, seal := unittest.BootstrapFixture(participants)
 			block1.Payload.Guarantees = nil
@@ -1406,8 +1408,25 @@ func TestMakeValid(t *testing.T) {
 			block3 := unittest.BlockWithParentFixture(block2.Header)
 			block3.Payload.Guarantees = nil
 			block3.Header.PayloadHash = block3.Payload.Hash()
-			err = state.Mutate().HeaderExtend(&block3)
+			err = state.Mutate().Extend(&block3)
 			require.Nil(t, err)
+
+			consumer.On("BlockProcessable", mock.Anything).Return()
+
+			// make valid on block2 and block3
+			err = state.Mutate().MarkValid(block2.ID())
+			require.NoError(t, err)
+
+			// because the parent block is the root block,
+			// BlockProcessable is not triggered on root block.
+			consumer.AssertNotCalled(t, "BlockProcessable")
+
+			err = state.Mutate().MarkValid(block3.ID())
+			require.NoError(t, err)
+
+			// because the parent is not a rook block,
+			// block3's parent is block2
+			consumer.AssertCalled(t, "BlockProcessable", block2.Header)
 		})
 	})
 }

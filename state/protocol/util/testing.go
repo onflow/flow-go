@@ -57,3 +57,23 @@ func RunWithProtocolStateDeps(t testing.TB, create createState, f func(*badger.D
 		f(db, proto)
 	})
 }
+
+func RunWithProtocolStateAndConsumer(t testing.TB, consumer protocol.Consumer, f func(*badger.DB, *pbadger.State)) {
+	RunWithProtocolStateDeps(t, func(
+		metrics module.ComplianceMetrics,
+		db *badger.DB,
+		headers storage.Headers,
+		seals storage.Seals,
+		index storage.Index,
+		payloads storage.Payloads,
+		blocks storage.Blocks,
+		setups storage.EpochSetups,
+		commits storage.EpochCommits,
+		statuses storage.EpochStatuses,
+		c protocol.Consumer,
+	) (*pbadger.State, error) {
+		proto, err := pbadger.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
+		require.NoError(t, err)
+		return proto, nil
+	}, f)
+}
