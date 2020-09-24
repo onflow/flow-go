@@ -29,11 +29,9 @@ func TestCollectionTopologyTestSuite(t *testing.T) {
 }
 
 func (suite *CollectionTopologyTestSuite) SetupTest() {
-
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.epochQuery = new(protocol.EpochQuery)
-
 	nClusters := 3
 	nCollectors := 7
 	suite.collectors = unittest.IdentityListFixture(nCollectors, unittest.WithRole(flow.RoleCollection))
@@ -49,6 +47,8 @@ func (suite *CollectionTopologyTestSuite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Times(nCollectors)
 }
 
+// TestSubset tests that the collection nodes using CollectionTopology form a connected graph and nodes within the same
+// collection clusters also form a connected graph
 func (suite *CollectionTopologyTestSuite) TestSubset() {
 	var adjencyMap = make(map[flow.Identifier]flow.IdentityList, len(suite.collectors))
 	// for each of the collector node, find a subset of nodes it should connect to using the CollectionTopology

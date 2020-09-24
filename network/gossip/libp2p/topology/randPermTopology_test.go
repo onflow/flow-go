@@ -149,6 +149,9 @@ func checkConnectedness(t *testing.T, adjMap map[flow.Identifier]flow.IdentityLi
 	checkGraphConnected(t, adjMap, filter.Any)
 }
 
+// checkGraphConnected checks if the graph represented by the adjacency matrix is connected.
+// It traverses the adjacency map starting from an arbitrary node and checks if all nodes that satisfy the filter
+// were visited.
 func checkGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, f flow.IdentityFilter) {
 
 	// find the expected node count from the adjacency matrix
