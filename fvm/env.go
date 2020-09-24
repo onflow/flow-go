@@ -12,9 +12,9 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var _ runtime.Interface = &hostEnv{}
@@ -418,7 +418,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 //
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
-func (e *transactionEnv) AddAccountKey(address runtime.Address, encPublicKey []byte) (err error) {
+func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey []byte) (err error) {
 	accountAddress := flow.Address(address)
 
 	var ok bool
@@ -436,31 +436,24 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encPublicKey []b
 
 	var publicKey flow.AccountPublicKey
 
-	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encPublicKey, 0)
+	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
 
-	var publicKeys []flow.AccountPublicKey
-
-	publicKeys, err = e.accounts.GetPublicKeys(accountAddress)
+	err = e.accounts.AppendPublicKey(accountAddress, publicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return err
+		return fmt.Errorf("failed to add public key to account: %w", err)
 	}
 
-	publicKeys = append(publicKeys, publicKey)
-
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.accounts.SetPublicKeys(accountAddress, publicKeys)
+	return nil
 }
 
-// RemoveAccountKey removes a public key by index from an existing account.
+// RemoveAccountKey revokes a public key by index from an existing account.
 //
 // This function returns an error if the specified account does not exist, the
-// provided key is invalid, or if key deletion fails.
-func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+// provided key is invalid, or if key revoking fails.
+func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int) (encodedPublicKey []byte, err error) {
 	accountAddress := flow.Address(address)
 
 	var ok bool
@@ -476,38 +469,26 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (p
 		return nil, fmt.Errorf("account with address %s does not exist", address)
 	}
 
-	var publicKeys []flow.AccountPublicKey
+	if keyIndex < 0 {
+		return nil, fmt.Errorf("key index must be positve, received %d", keyIndex)
+	}
 
-	publicKeys, err = e.accounts.GetPublicKeys(accountAddress)
+	var publicKey flow.AccountPublicKey
+	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return publicKey, err
+		return nil, err
 	}
 
-	if index < 0 || index > len(publicKeys)-1 {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return publicKey, fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
-	}
+	// mark this key as revoked
+	publicKey.Revoked = true
 
-	removedKey := publicKeys[index]
-
-	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
-
-	err = e.accounts.SetPublicKeys(accountAddress, publicKeys)
-	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return publicKey, err
-	}
-
-	var removedKeyBytes []byte
-
-	removedKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(removedKey)
+	encodedPublicKey, err = e.accounts.SetPublicKey(accountAddress, uint64(keyIndex), publicKey)
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202 {
-		return nil, fmt.Errorf("cannot encode removed runtime account key: %w", err)
+		return nil, fmt.Errorf("failed to revoke account key: %w", err)
 	}
 
-	return removedKeyBytes, nil
+	return encodedPublicKey, nil
 }
 
 // UpdateAccountCode updates the deployed code on an existing account.

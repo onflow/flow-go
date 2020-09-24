@@ -12,29 +12,29 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/provider"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	executionSync "github.com/dapperlabs/flow-go/engine/execution/sync"
-	"github.com/dapperlabs/flow-go/engine/execution/utils"
-	"github.com/dapperlabs/flow-go/model/events"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/module/mempool/queue"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	executionSync "github.com/onflow/flow-go/engine/execution/sync"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // An Engine receives and saves incoming blocks.
@@ -771,23 +771,30 @@ func (e *Engine) saveExecutionResults(
 	}
 
 	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
+		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionEvents)
 		defer span.Finish()
 
+		blockID := executableBlock.ID()
 		if len(events) > 0 {
-			err = e.events.Store(executableBlock.ID(), events)
+			err = e.events.Store(blockID, events)
 			if err != nil {
 				return fmt.Errorf("failed to store events: %w", err)
 			}
 		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
 
-		for _, te := range txResults {
-			err = e.transactionResults.Store(executableBlock.ID(), &te)
-			if err != nil {
-				return fmt.Errorf("failed to store transaction error: %w", err)
-			}
+	err = func() error {
+		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
+		defer span.Finish()
+		blockID := executableBlock.ID()
+		err = e.transactionResults.BatchStore(blockID, txResults)
+		if err != nil {
+			return fmt.Errorf("failed to store transaction result error: %w", err)
 		}
-
 		return nil
 	}()
 	if err != nil {

@@ -8,10 +8,10 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
@@ -153,27 +153,15 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 
 		// 5) initialize values related to the epoch logic
-		err = operation.InsertEpochCounter(setup.Counter)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch counter: %w", err)
-		}
-		err = operation.IndexEpochStart(setup.Counter, root.Header.View)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index epoch start: %w", err)
-		}
-		err = operation.InsertEpochHeight(setup.Counter, root.Header.Height)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch height: %w", err)
-		}
-		err = m.state.setups.StoreTx(setup)(tx)
+		err = m.state.epoch.setups.StoreTx(setup)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochSetup event: %w", err)
 		}
-		err = m.state.commits.StoreTx(commit)(tx)
+		err = m.state.epoch.commits.StoreTx(commit)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochCommit event: %w", err)
 		}
-		err = m.state.epochStatuses.StoreTx(root.ID(), flow.NewEpochStatus(setup.ID(), commit.ID(), flow.ZeroID, flow.ZeroID))(tx)
+		err = m.state.epoch.statuses.StoreTx(root.ID(), flow.NewEpochStatus(setup.ID(), commit.ID(), flow.ZeroID, flow.ZeroID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochStatus: %w", err)
 		}
@@ -626,28 +614,43 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve sealed header: %w", err)
 	}
 
-	// EPOCH: A block inserted into the protocol state is already a valid
-	// extension;
+	// EPOCH: A block inserted into the protocol state is already a valid extension
 
-	// We also map the epoch to the height of its last finalized block; this is
-	// important in order to efficiently be able to look up epoch snapshots.
-
-	epochState, err := m.state.epochStatuses.ByBlockID(blockID)
+	epochStatus, err := m.state.epoch.statuses.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
-	setup, err := m.state.setups.ByID(epochState.CurrentEpoch.SetupID)
+	setup, err := m.state.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
 
-	var ops []func(*badger.Txn) error
-	if header.View > setup.FinalView { // first block of next Epoch in this fork
-		ops = append(ops, operation.UpdateEpochCounter(setup.Counter))
-		ops = append(ops, operation.IndexEpochStart(setup.Counter, header.View))
-		ops = append(ops, operation.InsertEpochHeight(setup.Counter, header.Height))
-	} else {
-		ops = append(ops, operation.UpdateEpochHeight(setup.Counter, header.Height))
+	payload := block.Payload
+	// track protocol events that should be emitted
+	var events []func()
+	for _, seal := range payload.Seals {
+		for _, event := range seal.ServiceEvents {
+			switch ev := event.Event.(type) {
+			case *flow.EpochSetup:
+				events = append(events, func() { m.state.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
+			case *flow.EpochCommit:
+				events = append(events, func() { m.state.consumer.EpochCommittedPhaseStarted(ev.Counter-1, header) })
+			default:
+				return fmt.Errorf("invalid service event type in payload (%T)", event)
+			}
+		}
+	}
+
+	// retrieve the final view of the current epoch w.r.t. the parent block
+	finalView, err := m.state.AtBlockID(header.ParentID).Epochs().Current().FinalView()
+	if err != nil {
+		return fmt.Errorf("could not get parent epoch final view: %w", err)
+	}
+
+	// if this block's view exceeds the final view of its parent's current epoch,
+	// this block begins the next epoch
+	if header.View > finalView {
+		events = append(events, func() { m.state.consumer.EpochTransition(setup.Counter, header) })
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;
@@ -673,23 +676,22 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
-		for _, op := range ops {
-			err = op(tx)
-			if err != nil {
-				return fmt.Errorf("could not apply additional operation: %w", err)
-			}
-		}
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not execute finalization: %w", err)
 	}
 
-	// FOURTH: metrics
+	// FOURTH: metrics and events
 
 	m.state.metrics.FinalizedHeight(header.Height)
 	m.state.metrics.SealedHeight(sealed.Height)
 	m.state.metrics.BlockFinalized(block)
+
+	m.state.consumer.BlockFinalized(header)
+	for _, emit := range events {
+		emit()
+	}
 
 	for _, seal := range block.Payload.Seals {
 
@@ -719,13 +721,13 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 // consistency requirements of the protocol.
 func (m *Mutator) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 
-	parentStatus, err := m.state.epochStatuses.ByBlockID(block.ParentID)
+	parentStatus, err := m.state.epoch.statuses.ByBlockID(block.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
 	}
 
 	// Retrieve EpochSetup and EpochCommit event for parent block's Epoch
-	parentSetup, err := m.state.setups.ByID(parentStatus.CurrentEpoch.SetupID)
+	parentSetup, err := m.state.epoch.setups.ByID(parentStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
 	}
@@ -774,7 +776,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
 	}
 
-	activeSetup, err := m.state.setups.ByID(epochStatus.CurrentEpoch.SetupID)
+	activeSetup, err := m.state.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
 	}
@@ -822,7 +824,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				epochStatus.NextEpoch.SetupID = ev.ID()
 
 				// we'll insert the setup event when we insert the block
-				ops = append(ops, m.state.setups.StoreTx(ev))
+				ops = append(ops, m.state.epoch.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
 
@@ -843,7 +845,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				}
 
 				// Finally, the commit should commit all the necessary information.
-				setup, err := m.state.setups.ByID(epochStatus.NextEpoch.SetupID)
+				setup, err := m.state.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
 				}
@@ -856,7 +858,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				epochStatus.NextEpoch.CommitID = ev.ID()
 
 				// we'll insert the commit event when we insert the block
-				ops = append(ops, m.state.commits.StoreTx(ev))
+				ops = append(ops, m.state.epoch.commits.StoreTx(ev))
 
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
@@ -865,7 +867,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 	}
 
 	// we always index the epoch status, even when there are no service events
-	ops = append(ops, m.state.epochStatuses.StoreTx(block.ID(), epochStatus))
+	ops = append(ops, m.state.epoch.statuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
 }

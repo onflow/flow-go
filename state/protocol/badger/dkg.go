@@ -3,8 +3,8 @@ package badger
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type DKG struct {

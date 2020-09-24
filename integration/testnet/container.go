@@ -13,7 +13,7 @@ import (
 
 	"github.com/dapperlabs/testingdock"
 
-	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/bootstrap"
 )
 
 var (

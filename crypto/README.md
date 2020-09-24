@@ -9,13 +9,13 @@ NOTE: This package does not provide any security against side channel or tamperi
 
 ## Package import
 
-Cloning Flow repository and following the [installation steps](https://github.com/dapperlabs/flow-go) builds the necessary tools to use Flow cryptography. 
+Cloning Flow repository and following the [installation steps](https://github.com/onflow/flow-go) builds the necessary tools to use Flow cryptography. 
 
 If you only wish to import the Flow cryptography package to your Go project, please follow the following steps:
 
 - Get Flow cryptography package.
 ```
-go get github.com/dapperlabs/flow-go/crypto
+go get github.com/onflow/flow-go/crypto (to be updated to the new repo)
 ```
 - Install [CMake](https://cmake.org/install/), which is used for building the package.
 - From the package directory in `$GOPATH/pkg/mod/`, build the package dependencies.
@@ -54,11 +54,13 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * expanding the message is using KMAC 128 with a domain separation tag.
     * signature verification includes the signature membership check in G1. 
     * public key membership check in G2 is provided outside signature verification.
-    * membership checks in G1 and G2 are using a naive scalar multiplication by the group order.
+    * membership check in G1 is using [Bowe's fast check](https://eprint.iacr.org/2019/814.pdf), while membership check in G2 is using a simple scalar multiplication by the group order.
+    * non-interactive aggregation of signatures, public keys and private keys.
+    * multi-signature verification of an aggregated signature of a single message under multiple public keys.
 
  * Future features:
-    * tools for BLS aggregations and batch verification
-    * membership checks in G1 and G2 using [Bowe's method](https://eprint.iacr.org/2019/814.pdf)
+    * more tools for BLS multi signature and batch verification
+    * membership checks in G2 using [Bowe's method](https://eprint.iacr.org/2019/814.pdf)
     * support a G1/G2 swap (signatures on G2 and public keys on G1)
  
 ### PRNG

@@ -3,7 +3,7 @@ package stub
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // PendingMessage is a pending message to be sent

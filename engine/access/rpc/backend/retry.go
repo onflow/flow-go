@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // retryFrequency has to be less than TransactionExpiry or else this module does nothing

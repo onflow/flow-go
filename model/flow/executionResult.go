@@ -1,7 +1,7 @@
 package flow
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 type ExecutionResultBody struct {
@@ -22,9 +22,4 @@ func (er ExecutionResult) ID() Identifier {
 
 func (er ExecutionResult) Checksum() Identifier {
 	return MakeID(er)
-}
-
-type PendingResult struct {
-	ExecutorID      Identifier
-	ExecutionResult *ExecutionResult
 }

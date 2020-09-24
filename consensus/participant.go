@@ -6,22 +6,22 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/eventhandler"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/forkchoice"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	validatorImpl "github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
-	"github.com/dapperlabs/flow-go/consensus/recovery"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
+	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks/forkchoice"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/consensus/hotstuff/voter"
+	"github.com/onflow/flow-go/consensus/recovery"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/storage"
 )
 
 // NewParticipant initialize the EventLoop instance and recover the forks' state with all pending block
@@ -34,7 +34,7 @@ func NewParticipant(
 	builder module.Builder,
 	updater module.Finalizer,
 	persist hotstuff.Persister,
-	signer hotstuff.Signer,
+	signer hotstuff.SignerVerifier,
 	communicator hotstuff.Communicator,
 	rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate,

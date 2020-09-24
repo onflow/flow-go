@@ -1,9 +1,9 @@
 package common
 
 import (
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // default value and default hash value for a default node

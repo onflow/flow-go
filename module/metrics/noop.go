@@ -3,8 +3,8 @@ package metrics
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type NoopCollector struct{}
@@ -104,5 +104,7 @@ func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)              
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)  {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time) {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)  {}
+func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                   {}
+func (nc *NoopCollector) TransactionSubmissionFailed()                              {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                   {}
 func (ec *NoopCollector) ExecutionSync(syncing bool)                                {}

@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Consumer defines a set of events that occur within the protocol state, that

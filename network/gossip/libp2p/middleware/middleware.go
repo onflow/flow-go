@@ -5,8 +5,8 @@ package middleware
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 )
 
 // Middleware represents the middleware layer, which manages the connections to
@@ -43,6 +43,9 @@ type Middleware interface {
 
 	// Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
 	Subscribe(channelID string) error
+
+	// Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
+	Unsubscribe(channelID string) error
 
 	// Ping pings the target node and returns the ping RTT or an error
 	Ping(targetID flow.Identifier) (time.Duration, error)

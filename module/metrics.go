@@ -3,9 +3,9 @@ package module
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // Network Metrics
@@ -295,6 +295,12 @@ type TransactionMetrics interface {
 	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
 	// works if the transaction was earlier added as received.
 	TransactionExecuted(txID flow.Identifier, when time.Time)
+
+	// TransactionExpired tracks number of expired transactions
+	TransactionExpired(txID flow.Identifier)
+
+	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
+	TransactionSubmissionFailed()
 }
 
 type PingMetrics interface {

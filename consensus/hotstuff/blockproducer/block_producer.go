@@ -3,22 +3,22 @@ package blockproducer
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // BlockProducer is responsible for producing new block proposals
 type BlockProducer struct {
-	signer    hotstuff.Signer
+	signer    hotstuff.SignerVerifier
 	committee hotstuff.Committee
 	builder   module.Builder
 }
 
 // New creates a new BlockProducer which wraps the chain compliance layer block builder
 // to provide hotstuff with block proposals.
-func New(signer hotstuff.Signer, committee hotstuff.Committee, builder module.Builder) (*BlockProducer, error) {
+func New(signer hotstuff.SignerVerifier, committee hotstuff.Committee, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
 		committee: committee,

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {

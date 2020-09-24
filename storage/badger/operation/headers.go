@@ -5,7 +5,7 @@ package operation
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {

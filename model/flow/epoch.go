@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encodable"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encodable"
 )
 
 // EpochPhase represents a phase of the Epoch Preparation Protocol. The phase
@@ -17,12 +17,12 @@ import (
 // An epoch begins in the staking phase, then transitions to the setup phase in
 // the block containing the EpochSetup service event, then to the committed
 // phase in the block containing the EpochCommit service event.
-// |<--  EpochPhaseStaking -->|<-- EpochPhaseSetup -->|<-- EpochCommittedPhase -->|<-- EpochPhaseStaking -->...
+// |<--  EpochPhaseStaking -->|<-- EpochPhaseSetup -->|<-- EpochPhaseCommitted -->|<-- EpochPhaseStaking -->...
 // |<------------------------------- Epoch N ------------------------------------>|<-- Epoch N + 1 --...
 type EpochPhase int
 
 const (
-	EpochPhaseUnknown EpochPhase = iota
+	EpochPhaseUndefined EpochPhase = iota
 	EpochPhaseStaking
 	EpochPhaseSetup
 	EpochPhaseCommitted
@@ -30,10 +30,10 @@ const (
 
 func (p EpochPhase) String() string {
 	return [...]string{
-		"EpochPhaseUnknown",
-		"EpochStakingPhase",
-		"EpochSetupPhase",
-		"EpochCommittedPhase",
+		"EpochPhaseUndefined",
+		"EpochPhaseStaking",
+		"EpochPhaseSetup",
+		"EpochPhaseCommitted",
 	}[p]
 }
 
@@ -285,12 +285,11 @@ func (es *EpochStatus) Valid() bool {
 func (es *EpochStatus) Phase() EpochPhase {
 
 	if !es.Valid() {
-		return EpochPhaseUnknown
+		return EpochPhaseUndefined
 	}
 	if es.NextEpoch.SetupID == ZeroID {
 		return EpochPhaseStaking
 	}
-
 	if es.NextEpoch.CommitID == ZeroID {
 		return EpochPhaseSetup
 	}
