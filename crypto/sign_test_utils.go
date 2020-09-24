@@ -55,11 +55,15 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		assert.False(t, result, fmt.Sprintf(
 			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 		// test a wrong signature length
-		invalidLen := mrand.Intn(len(s))
-		result, err = pk.Verify(s[:invalidLen], input, halg)
+		invalidLen := mrand.Intn(2 * len(s)) // try random invalid lengths
+		if invalidLen == len(s) {            // map to an invalid length
+			invalidLen = 0
+		}
+		invalidSig := make([]byte, invalidLen)
+		result, err = pk.Verify(invalidSig, input, halg)
 		assert.Error(t, err)
 		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n with invalid length %d", s[:invalidLen], invalidLen))
+			"Verification should fail:\n signature:%s\n with invalid length %d", invalidSig, invalidLen))
 	}
 }
 
