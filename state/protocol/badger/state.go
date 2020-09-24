@@ -25,6 +25,7 @@ type State struct {
 	setups        storage.EpochSetups
 	commits       storage.EpochCommits
 	epochStatuses storage.EpochStatuses
+	consumer      protocol.Consumer
 	cfg           Config
 }
 
@@ -34,6 +35,7 @@ func NewState(
 	metrics module.ComplianceMetrics, db *badger.DB,
 	headers storage.Headers, seals storage.Seals, index storage.Index, payloads storage.Payloads, blocks storage.Blocks,
 	setups storage.EpochSetups, commits storage.EpochCommits, statuses storage.EpochStatuses,
+	consumer protocol.Consumer,
 ) (*State, error) {
 
 	s := &State{
@@ -47,6 +49,7 @@ func NewState(
 		setups:        setups,
 		commits:       commits,
 		epochStatuses: statuses,
+		consumer:      consumer,
 		cfg:           DefaultConfig(),
 	}
 

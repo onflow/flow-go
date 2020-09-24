@@ -94,6 +94,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not insert root block: %w", err)
 		}
+		err = operation.InsertBlockValidity(root.ID(), true)(tx)
+		if err != nil {
+			return fmt.Errorf("could not mark root block as valid: %w", err)
+		}
+
 		err = operation.IndexBlockHeight(root.Header.Height, root.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index root block: %w", err)
@@ -445,7 +450,7 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		delete(byBlock, blockID)
 		last = next
 	}
-	// In case no seals are left, we skip the remaining part: 
+	// In case no seals are left, we skip the remaining part:
 	if len(byBlock) == 0 {
 		return last, nil
 	}
@@ -684,7 +689,6 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 
 	m.state.metrics.FinalizedHeight(header.Height)
 	m.state.metrics.SealedHeight(sealed.Height)
-
 	m.state.metrics.BlockFinalized(block)
 
 	for _, seal := range block.Payload.Seals {
@@ -864,4 +868,62 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 	ops = append(ops, m.state.epochStatuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
+}
+
+// MakeValid marks the block as valid in protocol state, and triggers
+// `BlockProcessable` event to notify that its parent block is processable.
+// why the parent block is processable, not the block itself?
+// because a block having a child block means it has been verified
+// by the majority of consensus participants.
+// Hence, if a block has passed the header validity check, its parent block
+// must have passed both the header validity check and the body validity check.
+// So that consensus followers can skip the block body validity checks and wait
+// for its child to arrive, and if the child passes the header validity check, it means
+// the consensus participants have done a complete check on its parent block,
+// so consensus followers can trust consensus nodes did the right job, and start
+// processing the parent block.
+// NOTE: since a parent can have multiple children, `BlockProcessable` event
+// could be triggered multiple times for the same block.
+func (m *Mutator) MarkValid(blockID flow.Identifier) error {
+	header, err := m.state.headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", blockID, err)
+	}
+	parentID := header.ParentID
+	var isParentValid bool
+	err = m.state.db.View(operation.RetrieveBlockValidity(parentID, &isParentValid))
+	if err != nil {
+		return fmt.Errorf("could not retrieve validity of parent block (%x): %w", parentID, err)
+	}
+	if !isParentValid {
+		return fmt.Errorf("can only mark block as valid whose parent is valid")
+	}
+
+	err = operation.RetryOnConflict(
+		m.state.db.Update,
+		operation.SkipDuplicates(
+			operation.InsertBlockValidity(blockID, true),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
+	}
+
+	// root blocks and blocks below the root block are considered as "processed",
+	// so we don't want to trigger `BlockProcessable` event for them.
+	parent, err := m.state.headers.ByBlockID(parentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
+	}
+	var rootHeight uint64
+	err = m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root block's height: %w", err)
+	}
+	if rootHeight >= parent.Height {
+		return nil
+	}
+	m.state.consumer.BlockProcessable(parent)
+
+	return nil
 }
