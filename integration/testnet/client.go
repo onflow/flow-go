@@ -13,9 +13,9 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/dsl"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/dsl"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // AccessClient is a GRPC client of the Access API exposed by the Flow network.

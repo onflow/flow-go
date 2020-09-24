@@ -3,7 +3,7 @@ package cmd
 import (
 	"crypto/rand"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // shhh ;)

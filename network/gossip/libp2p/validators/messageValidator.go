@@ -1,6 +1,6 @@
 package validators
 
-import "github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
+import "github.com/onflow/flow-go/network/gossip/libp2p/message"
 
 // MessageValidator validates the incoming message.
 type MessageValidator interface {

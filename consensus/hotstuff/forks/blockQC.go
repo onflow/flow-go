@@ -1,8 +1,8 @@
 package forks
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // BlockQC is a Block with a QC that pointing to it, meaning a Quorum Certified Block.

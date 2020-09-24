@@ -1,9 +1,9 @@
 package epochmgr
 
 import (
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // EpochComponentsFactory is responsible for creating epoch-scoped components

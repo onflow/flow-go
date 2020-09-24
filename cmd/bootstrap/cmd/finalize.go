@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/encodable"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var (

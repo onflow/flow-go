@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/verification/match"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/engine/verification/match"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // when maxAttempt is set to 3, CanTry will only return true for the first 3 times.

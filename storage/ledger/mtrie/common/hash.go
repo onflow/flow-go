@@ -1,6 +1,6 @@
 package common
 
-import "github.com/dapperlabs/flow-go/crypto/hash"
+import "github.com/onflow/flow-go/crypto/hash"
 
 var emptySlice []byte
 var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)

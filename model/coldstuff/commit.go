@@ -3,7 +3,7 @@
 package coldstuff
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Commit is a coldstuff consensus event to commit a block.
