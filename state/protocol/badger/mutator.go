@@ -885,11 +885,11 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 // NOTE: since a parent can have multiple children, `BlockReadyForProcessing` event
 // could be triggered multiple times for the same block.
 func (m *Mutator) MarkValid(blockID flow.Identifier) error {
-	block, err := m.state.headers.ByBlockID(blockID)
+	header, err := m.state.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header for %x: %w", blockID, err)
 	}
-	parentID := block.ParentID
+	parentID := header.ParentID
 	var isParentValid bool
 	err = m.state.db.View(operation.RetrieveBlockValidity(parentID, &isParentValid))
 	if err != nil {
