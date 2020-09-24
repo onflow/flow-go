@@ -154,7 +154,7 @@ func checkConnectedness(t *testing.T, adjMap map[flow.Identifier]flow.IdentityLi
 // were visited.
 func checkGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, f flow.IdentityFilter) {
 
-	// find the expected node count from the adjacency matrix
+	// filter the ids and find the expected node count
 	expectedIDs := ids.Filter(f)
 	expectedCount := len(expectedIDs)
 
