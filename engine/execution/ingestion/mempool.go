@@ -7,8 +7,8 @@ import (
 )
 
 type Mempool struct {
-	BlockByCollection *stdmap.BlockByCollections
 	ExecutionQueue    *stdmap.Queues
+	BlockByCollection *stdmap.BlockByCollections
 }
 
 func (m *Mempool) Run(f func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueue *stdmap.QueuesBackdata) error) error {

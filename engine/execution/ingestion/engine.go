@@ -1,9 +1,11 @@
 package ingestion
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -21,11 +23,14 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/mempool/queue"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/trace"
+	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -55,6 +60,10 @@ type Engine struct {
 	root               *flow.Header
 	syncingState       atomic.Bool // a state variable to avoid triggering state sync while state syncing is progress
 	syncThreshold      int
+	syncHeight         uint64
+	syncFilter         flow.IdentityFilter
+	syncConduit        network.Conduit
+	syncDeltas         mempool.Deltas
 }
 
 func New(
@@ -74,6 +83,7 @@ func New(
 	tracer module.Tracer,
 	extLog bool,
 	root *flow.Header,
+	syncFilter flow.IdentityFilter,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -99,7 +109,16 @@ func New(
 		tracer:             tracer,
 		extensiveLogging:   extLog,
 		root:               root,
+		syncFilter:         syncFilter,
 	}
+
+	// move to state syncing engine
+	syncConduit, err := net.Register(engine.SyncExecution, &eng)
+	if err != nil {
+		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
+	}
+
+	eng.syncConduit = syncConduit
 
 	return &eng, nil
 }
@@ -122,6 +141,31 @@ func (e *Engine) Done() <-chan struct{} {
 // finish being executed.
 func (e *Engine) Wait() {
 	e.wg.Wait() // wait for block execution
+}
+
+func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+	return e.unit.Do(func() error {
+		return e.process(originID, event)
+	})
+}
+
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	var err error
+
+	switch resource := event.(type) {
+	case *messages.ExecutionStateSyncRequest:
+		err = e.handleStateSyncRequest(originID, resource)
+	case *messages.ExecutionStateDelta:
+		err = e.handleStateDeltaResponse(originID, resource)
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
+
+	if err != nil {
+		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+	}
+
+	return nil
 }
 
 // OnBlockIncorporated handles the new incorporated blocks (blocks that
@@ -177,7 +221,8 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 				return nil
 			}
 
-			e.checkStateSync(queue, executableBlock)
+			// TODO: run in a different goroutine
+			e.checkStateSync(queue)
 
 			// check if this block has been executed already
 
@@ -259,23 +304,35 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionStateStorageDiskTotal(diskTotal)
 	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
 
-	// we've executed the block, now we need to check if its children can be executed
-	// the executionQueues stores blocks as a tree:
-	// 10 <- 11 <- 12
-	// 	 ^-- 13
-	// 14 <- 15 <- 16
-	// if block 10 is the one just executed, then we will remove it from the queue, and add
-	// its children back, meaning the tree will become:
-	// 11 <- 12
-	// 13
-	// 14 <- 15 <- 16
-	err = e.mempool.Run(
+	e.log.Info().
+		Hex("block_id", logging.Entity(executableBlock)).
+		Uint64("block_height", executableBlock.Block.Header.Height).
+		Hex("final_state", finalState).
+		Msg("block executed")
+
+	e.metrics.ExecutionLastExecutedBlockHeight(executableBlock.Block.Header.Height)
+
+	e.onBlockExecuted(executableBlock, finalState)
+}
+
+// we've executed the block, now we need to check if its children can be executed
+// the executionQueues stores blocks as a tree:
+// 10 <- 11 <- 12
+// 	 ^-- 13
+// 14 <- 15 <- 16
+// if block 10 is the one just executed, then we will remove it from the queue, and add
+// its children back, meaning the tree will become:
+// 11 <- 12
+// 13
+// 14 <- 15 <- 16
+func (e *Engine) onBlockExecuted(executedBlock *entity.ExecutableBlock, finalState flow.StateCommitment) error {
+	err := e.mempool.Run(
 		func(
 			blockByCollection *stdmap.BlockByCollectionBackdata,
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
 			// find the block that was just executed
-			executionQueue, exists := executionQueues.ByID(executableBlock.ID())
+			executionQueue, exists := executionQueues.ByID(executedBlock.ID())
 			if !exists {
 				return fmt.Errorf("fatal error - executed block not present in execution queue")
 			}
@@ -305,28 +362,38 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 			}
 
 			// remove the executed block
-			executionQueues.Rem(executableBlock.ID())
+			executionQueues.Rem(executedBlock.ID())
 
 			return nil
 		})
 
 	if err != nil {
 		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock)).
+			Hex("block_id", logging.Entity(executedBlock)).
 			Msg("error while requeueing blocks after execution")
 	}
 
-	e.log.Info().
-		Hex("block_id", logging.Entity(executableBlock)).
-		Uint64("block_height", executableBlock.Block.Header.Height).
-		Hex("final_state", finalState).
-		Msg("block executed")
-	e.metrics.ExecutionLastExecutedBlockHeight(executableBlock.Block.Header.Height)
+	return nil
 }
 
 // executeBlockIfComplete checks whether the block is ready to be executed.
 // if yes, execute the block
 func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
+	if !eb.HasStartState() {
+		return false
+	}
+
+	// if the eb has parent statecommitment, and we have the delta for this block
+	// then apply the delta
+	// note the block ID is the delta's ID
+	delta, found := e.syncDeltas.ByID(eb.Block.ID())
+	if found {
+		go e.applyStateDelta(delta)
+		return true
+	}
+
+	// if don't have the delta, then check if everything is ready for executing
+	// the block
 	if eb.IsComplete() {
 		e.log.Debug().
 			Hex("block_id", logging.Entity(eb)).
@@ -570,6 +637,7 @@ func (e *Engine) handleComputationResult(
 		result.TransactionResult,
 		startState,
 	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -582,6 +650,7 @@ func (e *Engine) handleComputationResult(
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
 
+// save the execution result of a block
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
 	executableBlock *entity.ExecutableBlock,
@@ -823,376 +892,294 @@ func (e *Engine) generateExecutionReceipt(
 }
 
 // check whether we need to trigger state sync
+// queue - the queue contains all the unexecuted blocks along the same fork.
+// we will check the state sync if the number of sealed and unexecuted blocks
+// has passed a certain threshold.
+// we will sync state only for sealed blocks, since that guarantees
+// the consensus nodes have seen the result, and the statecommitment
+// has been approved by the consensus nodes.
 func (e *Engine) checkStateSync(queue *queue.Queue) {
-	// don't trigger if already triggered
-	if e.syncingState.Load() {
+	// acquire the lock to trigger state sync
+	// if state sync is already triggered, it won't trigger again
+	if !e.syncingState.CAS(false, true) {
 		return
 	}
 
-	// we will sync state only for sealed blocks, since that guarantees
-	// the consensus nodes have seen the result, and the statecommitment
-	// has been approved by the consensus nodes.
-	// we don't trigger the state sync if the number of sealed but unexecuted blocks
-	// is less than a certain threshold
+	// getting the blocks for determining whether to trigger.
+	// the queue head has the lowest height, which is also the first unexecuted block
 	firstUnexecuted := queue.Head.Item
 	lastSealed, err := e.state.Sealed().Head()
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("failed to query last sealed")
 	}
 
-	// TODO: move to a function
-	shouldTrigger := int(lastSealed.Height)-int(firstUnexecuted.Height()) > e.syncThreshold
-	if !shouldTrigger {
+	startHeight, endHeight := firstUnexecuted.Height(), lastSealed.Height
+
+	// check whether we should trigger
+	if !shouldTriggerStateSync(startHeight, endHeight, e.syncThreshold) {
 		return
 	}
 
-	if e.syncingState.CAS(false, true) {
-		e.startStateSync(firstUnexecuted.Height(), lastSealed)
+	err = e.startStateSync(startHeight, endHeight)
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Uint64("from", startHeight).
+			Uint64("to", endHeight).Msg("failed to start state sync")
 	}
 }
 
-func (e *Engine) startStateSync(firstKnown *entity.ExecutableBlock) {
+// check whether state sync should be triggered by taking
+// the start and end heights for sealed and unexecuted blocks,
+// as well as a threshold
+func shouldTriggerStateSync(startHeight, endHeight uint64, threshold int) bool {
+	return int64(endHeight)-int64(startHeight) > int64(threshold)
 }
 
-// func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlock) {
-// 	// find latest finalized block with state commitment
-// 	// this way we maximise chance of path existing between it and fresh one
-// 	// TODO - this doesn't make sense if we treat every block as finalized (MVP)
-//
-// 	targetBlockID := firstKnown.Block.Header.ParentID
-// 	targetHeight := firstKnown.Block.Header.Height - 1
-//
-// 	e.syncTargetBlockID.Store(targetBlockID)
-// 	e.metrics.ExecutionSync(e.syncInProgress.Load())
-//
-// 	e.log.Info().
-// 		Hex("target_id", targetBlockID[:]).
-// 		Uint64("target_height", targetHeight).
-// 		Msg("starting state synchronization")
-//
-// 	lastExecutedHeight, lastExecutedBlockID, err := e.execState.GetHighestExecutedBlockID(ctx)
-// 	if err != nil {
-// 		e.log.Fatal().Err(err).Msg("error while starting sync - cannot find highest executed block")
-// 	}
-//
-// 	if lastExecutedHeight == targetHeight && lastExecutedBlockID != targetBlockID {
-// 		e.log.Error().Err(err).Msg("error while starting sync - first known not on same branch as last executed block")
-// 		// Mark sync as no longer in progress, and allow any additional incoming blocks to kick off sync again with a different block
-// 		e.syncInProgress.Store(false)
-// 		e.metrics.ExecutionSync(e.syncInProgress.Load())
-// 		return
-// 	}
-//
-// 	e.log.Debug().
-// 		Msgf("syncing from height %d to height %d", lastExecutedHeight, targetHeight)
-//
-// 	otherNodes, err := e.state.Final().Identities(filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter(), e.syncFilter))
-// 	if err != nil {
-// 		e.log.Fatal().Err(err).Msg("error while finding other execution nodes identities")
-// 		return
-// 	}
-//
-// 	if e.syncByBlocks || len(otherNodes) == 0 {
-// 		e.log.Debug().
-// 			Msgf("no other execution nodes found, request last block instead at height %d", targetHeight)
-// 		for reqHeight := lastExecutedHeight + 1; reqHeight <= targetHeight; reqHeight++ {
-// 			e.blockSync.RequestHeight(reqHeight)
-// 		}
-//
-// 		e.unit.Launch(func() {
-// 			// Track progress and prune
-// 			tick := time.NewTicker(time.Minute)
-// 			for {
-// 				select {
-// 				case <-e.unit.Quit():
-// 					break
-// 				case <-tick.C:
-// 					lastExecutedHeight, lastExecutedBlockID, err := e.execState.GetHighestExecutedBlockID(ctx)
-// 					if err != nil {
-// 						e.log.Fatal().Err(err).Msg("error while starting sync - cannot find highest executed block")
-// 					}
-//
-// 					if lastExecutedHeight > targetHeight {
-// 						// We made it!
-// 						e.syncInProgress.Store(false)
-// 						e.metrics.ExecutionSync(e.syncInProgress.Load())
-// 						return
-// 					}
-//
-// 					// Still need to sync, log something
-// 					e.log.Info().
-// 						Uint64("last_executed_height", lastExecutedHeight).
-// 						Uint64("target_height", targetHeight).
-// 						Msgf("syncing ...")
-//
-// 					last, err := e.blocks.ByID(lastExecutedBlockID)
-// 					if err != nil {
-// 						e.log.Error().Err(err).Msg("could not get ;ast executed block")
-// 						continue
-// 					}
-//
-// 					e.blockSync.Prune(last.Header)
-// 				}
-// 			}
-//
-// 		})
-// 		return
-// 	}
-//
-// 	// select other node at random
-// 	// TODO - protocol which surveys other nodes for state
-// 	// TODO - ability to sync from multiple servers
-// 	// TODO - handle byzantine other node that does not send response
-// 	otherNodeIdentity := otherNodes[rand.Intn(len(otherNodes))]
-//
-// 	exeStateReq := messages.ExecutionStateSyncRequest{
-// 		CurrentBlockID: lastExecutedBlockID,
-// 		TargetBlockID:  targetBlockID,
-// 	}
-//
-// 	e.log.Debug().
-// 		Hex("target_node", logging.Entity(otherNodeIdentity)).
-// 		Hex("current_block_id", logging.ID(exeStateReq.CurrentBlockID)).
-// 		Hex("target_block_id", logging.ID(exeStateReq.TargetBlockID)).
-// 		Msg("requesting execution state sync")
-//
-// 	err = e.syncConduit.Submit(&exeStateReq, otherNodeIdentity.NodeID)
-//
-// 	if err != nil {
-// 		e.log.Fatal().
-// 			Err(err).
-// 			Str("target_node_id", otherNodeIdentity.NodeID.String()).
-// 			Msg("error while requesting state sync from other node")
-// 	}
-// }
+func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
+	// update the
+	e.metrics.ExecutionSync(true)
+	defer e.metrics.ExecutionSync(false)
 
-// func (e *Engine) handleExecutionStateDelta(
-// 	ctx context.Context,
-// 	executionStateDelta *messages.ExecutionStateDelta,
-// 	originID flow.Identifier,
-// ) error {
-//
-// 	// sync queues contains the fetched state deltas stored the orphan deltas
-// 	// in a fork-aware tree
-// 	// when receive a state delta, we check whether this delta can be used so
-// 	// that we don't need to execute the block.
-// 	// if yes, we apply the delta
-// 	// if not, we add the delta the sync queues as orphan deltas.
-// 	return e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
-// 		log := e.log.With().
-// 			Hex("block_id", logging.Entity(executionStateDelta.Block)).
-// 			Uint64("block_height", executionStateDelta.Block.Header.Height).
-// 			Logger()
-//
-// 		// check if the delta is an extension of any orphan deltas
-// 		// if yes, then add it to the orphan deltas.
-// 		// since an extension of orphan can't be used, we return here
-// 		if queue, added := tryEnqueue(executionStateDelta, backdata); added {
-// 			log.Debug().
-// 				Msg("added block to existing orphan queue")
-//
-// 			// before we return, we double check if the delta could fill the gap of another orphan
-// 			// which could merge two orphans into one.
-// 			e.tryRequeueOrphans(executionStateDelta, queue, backdata)
-// 			return nil
-// 		}
-//
-// 		// since the delta is not an extension of the delta queue, then adding it,
-// 		// if it doesn't exist before, then add it as a delta orphan
-// 		// if it exists, then still execute it again.
-// 		// TODO: maybe we could return nil when !added
-// 		newQueue := queue.NewQueue(executionStateDelta)
-// 		added := backdata.Add(newQueue)
-// 		if added {
-// 			// add the new branch as a new orphan
-// 			e.tryRequeueOrphans(executionStateDelta, newQueue, backdata)
-// 		}
-//
-// 		// since the delta is not an extension of the delta queue
-// 		// check if the parent state (StateCommitment) exists in the storage, which would
-// 		// mean the parent has been executed by ourselves already
-// 		stateCommitment, getStateCommitmentErr := e.execState.StateCommitmentByBlockID(ctx, executionStateDelta.ParentID())
-// 		if getStateCommitmentErr != nil && !errors.Is(getStateCommitmentErr, storage.ErrNotFound) {
-// 			log.Fatal().Msgf("unexpected error while accessing storage for sync deltas, shutting down: %v", getStateCommitmentErr)
-// 		}
-//
-// 		// if the parent state for the orphan deltas doesn't exist,
-// 		// it means this delta is really an orphan, so we stop here, waiting for either
-// 		// the delta for the parent to come or the parent block to be executed.
-// 		if errors.Is(getStateCommitmentErr, storage.ErrNotFound) {
-// 			return nil
-// 		}
-//
-// 		// sanity check that if the state for the parent block already exists,
-// 		// then the delta's start state must be equal to that.
-// 		if !bytes.Equal(stateCommitment, executionStateDelta.StartState) {
-// 			return fmt.Errorf("internal inconsistency with delta for block (%v) - state commitment for parent retrieved from DB (%x) different from start state in delta! (%x)",
-// 				executionStateDelta.ParentID(),
-// 				stateCommitment,
-// 				executionStateDelta.StartState)
-// 		}
-//
-// 		// if the parent state exists for the orphan delta, we could apply this delta.
-// 		e.syncWg.Add(1)
-// 		go e.saveDelta(ctx, executionStateDelta)
-//
-// 		return nil
-// 	})
-// }
+	e.syncHeight = toHeight
 
-// func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.ExecutionStateDelta) {
-//
-// 	defer e.syncWg.Done()
-//
-// 	log := e.log.With().
-// 		Hex("block_id", logging.Entity(executionStateDelta.Block)).
-// 		Uint64("block_height", executionStateDelta.Block.Header.Height).
-// 		Logger()
-//
-// 	// synchronize DB writing to avoid tx conflicts with multiple blocks arriving fast
-// 	err := e.blocks.Store(executionStateDelta.Block)
-// 	if err != nil {
-// 		// It's possible for the parent of the target block to have arrived already. Don't fail here
-// 		if !errors.Is(err, storage.ErrAlreadyExists) {
-// 			log.Fatal().
-// 				Err(err).Msg("could not store block from delta")
-// 		}
-// 	}
-//
-// 	for _, collection := range executionStateDelta.CompleteCollections {
-// 		collection := collection.Collection()
-// 		err := e.collections.Store(&collection)
-// 		if err != nil {
-// 			log.Fatal().
-// 				Err(err).Msg("could not store collection from delta")
-// 		}
-// 	}
-//
-// 	// TODO - validate state sync, reject invalid messages, change provider
-// 	executionReceipt, err := e.saveExecutionResults(
-// 		ctx,
-// 		&executionStateDelta.ExecutableBlock,
-// 		executionStateDelta.StateInteractions,
-// 		executionStateDelta.Events,
-// 		executionStateDelta.TransactionResults,
-// 		executionStateDelta.StartState,
-// 	)
-//
-// 	if err != nil {
-// 		log.Fatal().Err(err).Msg("fatal error while processing sync message")
-// 	}
-//
-// 	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, executionStateDelta.EndState) {
-// 		log.Fatal().
-// 			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit).
-// 			Hex("delta_end_state", executionStateDelta.EndState).
-// 			Hex("delta_start_state", executionStateDelta.StartState).
-// 			Err(err).Msg("processing sync message produced unexpected state commitment")
-// 	}
-//
-// 	targetBlockIDValue := e.syncTargetBlockID.Load()
-//
-// 	// if we received a delta but we never synced, abort
-// 	if targetBlockIDValue == nil {
-// 		return
-// 	}
-//
-// 	targetBlockID := targetBlockIDValue.(flow.Identifier)
-//
-// 	// last block was saved
-// 	if targetBlockID == executionStateDelta.Block.ID() {
-// 		log.Debug().Msg("final target sync block received, processing")
-//
-// 		err = e.mempool.Run(
-// 			func(
-// 				blockByCollection *stdmap.BlockByCollectionBackdata,
-// 				executionQueues *stdmap.QueuesBackdata,
-// 				orphanQueues *stdmap.QueuesBackdata,
-// 			) error {
-// 				var syncedQueue *queue.Queue
-// 				hadQueue := false
-//
-// 				for _, q := range orphanQueues.All() {
-// 					if q.Head.Item.(*entity.ExecutableBlock).Block.Header.ParentID == targetBlockID {
-// 						syncedQueue = q
-// 						hadQueue = true
-// 						break
-// 					}
-// 				}
-// 				if !hadQueue {
-// 					log.Fatal().Msgf("orphan queues do not contain final block ID (%s)", targetBlockID)
-// 				}
-//
-// 				orphanQueues.Rem(syncedQueue.ID())
-//
-// 				// if the state we generated from applying this is not equal to EndState we would have panicked earlier
-// 				executableBlock := syncedQueue.Head.Item.(*entity.ExecutableBlock)
-// 				executableBlock.StartState = executionStateDelta.EndState
-//
-// 				err = e.matchOrRequestCollections(executableBlock, blockByCollection)
-// 				if err != nil {
-// 					return fmt.Errorf("cannot send collection requests: %w", err)
-// 				}
-//
-// 				added := executionQueues.Add(syncedQueue)
-// 				if !added {
-// 					log.Fatal().Msgf("cannot add queue to execution queues")
-// 				}
-//
-// 				if executableBlock.IsComplete() {
-//
-// 					log.Debug().Msg("block complete - executing")
-//
-// 					e.wg.Add(1)
-// 					go e.executeBlock(context.Background(), executableBlock)
-// 				}
-// 				e.syncInProgress.Store(false)
-// 				e.metrics.ExecutionSync(e.syncInProgress.Load())
-// 				log.Debug().Msg("final target sync block processed")
-//
-// 				return nil
-// 			})
-//
-// 		if err != nil {
-// 			log.Err(err).Msg("error while processing final target sync block")
-// 		}
-//
-// 		return
-// 	}
-//
-// 	err = e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
-//
-// 		executionQueue, exists := backdata.ByID(executionStateDelta.Block.ID())
-// 		if !exists {
-// 			return fmt.Errorf("fatal error - synced delta not present in sync queue")
-// 		}
-// 		_, newQueues := executionQueue.Dismount()
-// 		for _, queue := range newQueues {
-// 			if !bytes.Equal(
-// 				queue.Head.Item.(*messages.ExecutionStateDelta).StartState,
-// 				executionReceipt.ExecutionResult.FinalStateCommit,
-// 			) {
-// 				return fmt.Errorf("internal incosistency with delta - state commitment for after applying delta different from start state of next one! ")
-// 			}
-//
-// 			added := backdata.Add(queue)
-// 			if !added {
-// 				return fmt.Errorf("fatal error cannot add children block to sync queue")
-// 			}
-//
-// 			e.syncWg.Add(1)
-// 			go e.saveDelta(ctx, queue.Head.Item.(*messages.ExecutionStateDelta))
-// 		}
-// 		backdata.Rem(executionStateDelta.Block.ID())
-// 		return nil
-// 	})
-//
-// 	if err != nil {
-// 		log.Err(err).Msg("error while requeueing delta after saving")
-// 	}
-//
-// 	log.Debug().Msg("finished processing sync delta")
-// }
+	otherNodes, err := e.state.Final().Identities(
+		filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter(), e.syncFilter))
+
+	if err != nil {
+		return fmt.Errorf("error while finding other execution nodes identities")
+	}
+
+	if len(otherNodes) == 0 {
+		//
+	}
+
+	randomExecutionNode := otherNodes[rand.Intn(len(otherNodes))]
+
+	exeStateReq := messages.ExecutionStateSyncRequest{
+		FromHeight: fromHeight,
+		ToHeight:   toHeight,
+	}
+
+	e.log.Debug().
+		Hex("target_node", logging.Entity(randomExecutionNode)).
+		Uint64("from", fromHeight).
+		Uint64("to", toHeight).
+		Msg("requesting execution state sync")
+
+	// TODO: running periodically
+	err = e.syncConduit.Submit(&exeStateReq, randomExecutionNode.NodeID)
+
+	if err != nil {
+		return fmt.Errorf("error while sending state sync req to other node (%v): %w",
+			randomExecutionNode,
+			err)
+	}
+	return nil
+}
+
+// handle the state sync request from other execution.
+// the state sync requests are for sealed blocks.
+// we will check if the requested heights have been sealed and
+// executed, return return the state deltas as much as possible.
+func (e *Engine) handleStateSyncRequest(
+	originID flow.Identifier,
+	req *messages.ExecutionStateSyncRequest) error {
+
+	// the request must be from an execution node
+	id, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+	}
+
+	if id.Role != flow.RoleExecution {
+		return fmt.Errorf("invalid role for requesting state synchronization: %v, %s", originID, id.Role)
+	}
+
+	// validate that from height must be smaller than to height
+	if req.FromHeight >= req.ToHeight {
+		return engine.NewInvalidInputErrorf("invalid state sync request (from: %x, to: %d)",
+			req.FromHeight, req.ToHeight)
+	}
+
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not get last sealed: %w", err)
+	}
+
+	sealedHeight := lastSealed.Height
+
+	// ignore requests for unsealed height
+	if req.FromHeight > sealedHeight {
+		e.log.Info().
+			Uint64("sealed", sealedHeight).
+			Uint64("from", req.FromHeight).
+			Uint64("to", req.ToHeight).
+			Msg("requesting unsealed height")
+		return nil
+	}
+
+	// fromHeight, toHeight must be sealed height
+	fromHeight, toHeight := req.FromHeight, req.ToHeight
+	if toHeight > sealedHeight {
+		toHeight = sealedHeight
+	}
+
+	// for each height starting from fromHeight to toHeight,
+	// query the statecommitment, and if exists, send the
+	// state delta
+	// TOOD: add context
+	ctx := context.Background()
+	err = e.deltaRange(ctx, fromHeight, toHeight,
+		func(delta *messages.ExecutionStateDelta) {
+			err := e.syncConduit.Submit(delta, originID)
+			if err != nil {
+				e.log.Error().Err(err).Msg("could not submit block delta")
+			}
+		})
+
+	if err != nil {
+		return fmt.Errorf("could not send deltas: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uint64,
+	onDelta func(*messages.ExecutionStateDelta)) error {
+
+	for height := fromHeight; height <= toHeight; height++ {
+		header, err := e.state.AtHeight(height).Head()
+		if err != nil {
+			return fmt.Errorf("could not query block header at height: %v", height)
+		}
+
+		blockID := header.ID()
+		_, err = e.execState.StateCommitmentByBlockID(ctx, blockID)
+
+		if err == nil {
+			// this block has been executed, we will send the delta
+			delta, err := e.execState.RetrieveStateDelta(ctx, blockID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve state delta for block %v, %w", blockID, err)
+			}
+
+			onDelta(delta)
+
+		} else if !errors.Is(err, storage.ErrNotFound) {
+			// this block has not been executed, continue
+			continue
+		} else {
+			return fmt.Errorf("could not query statecommitment for height: %v", height)
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) handleStateDeltaResponse(originID flow.Identifier, delta *messages.ExecutionStateDelta) error {
+
+	// the request must be from an execution node
+	id, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+	}
+
+	if id.Role != flow.RoleExecution {
+		return fmt.Errorf("invalid role for sending state deltas: %v, %s", originID, id.Role)
+	}
+
+	// check if the block has been executed already
+	// delta ID is block ID
+	blockID := delta.ID()
+	_, err = e.execState.StateCommitmentByBlockID(context.Background(), blockID)
+
+	if err == nil {
+		// the block has been executed, ignore
+		return nil
+	}
+
+	// exception
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not get know block was executed or not: %w", err)
+	}
+
+	// block not executed yet, check if the block has been sealed
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("failed to query last sealed height")
+	}
+
+	blockHeight := delta.ExecutableBlock.Block.Header.Height
+	isUnsealed := blockHeight > lastSealed.Height
+
+	if isUnsealed {
+		// we never query delta for unsealed blocks, ignore
+		return nil
+	}
+
+	err = e.validateStateDelta(delta)
+	if err != nil {
+		return fmt.Errorf("failed to validate the state delta: %w", err)
+	}
+
+	// TODO: validate the delta with the child block's statecommitment
+	// TODO: execute the block if executable
+	// TODO: add collection
+	// TODO: acquire lock
+
+	e.syncDeltas.Add(delta)
+
+	return nil
+}
+
+func (e *Engine) validateStateDelta(delta *messages.ExecutionStateDelta) error {
+	// must match the statecommitment for parent block
+	parentCommitment, err := e.execState.StateCommitmentByBlockID(context.Background(), delta.ParentID())
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not get parent sttecommitment: %w", err)
+	}
+
+	// the parent block has not been executed yet, skip
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil
+	}
+
+	if !bytes.Equal(parentCommitment, delta.StartState) {
+		return engine.NewInvalidInputErrorf("internal inconsistency with delta for block (%v) - state commitment for parent retrieved from DB (%x) different from start state in delta! (%x)",
+			delta.ParentID(),
+			parentCommitment,
+			delta.StartState)
+	}
+
+	return nil
+}
+
+func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) error {
+	// TODO - validate state sync, reject invalid messages
+	executionReceipt, err := e.saveExecutionResults(
+		context.Background(),
+		&delta.ExecutableBlock,
+		delta.StateInteractions,
+		delta.Events,
+		delta.TransactionResults,
+		delta.StartState,
+	)
+
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("fatal error while processing sync message")
+	}
+
+	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, delta.EndState) {
+		e.log.Fatal().
+			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit).
+			Hex("delta_end_state", delta.EndState).
+			Hex("delta_start_state", delta.StartState).
+			Err(err).Msg("processing sync message produced unexpected state commitment")
+	}
+
+	return nil
+}
 
 // generateChunkDataPack creates a chunk data pack
 func generateChunkDataPack(

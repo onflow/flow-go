@@ -221,7 +221,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
 		if ancestor.Height < finalized {
-			return state.NewOutdatedExtensionErrorf("candidate block conflicts with finalized state (ancestor: %d final: %d)",
+			return state.NewOutdatedExtensionErrorf("candidate block connects to a finalized block (%d), which is below the last finalized block (%d)",
 				ancestor.Height, finalized)
 		}
 		ancestorID = ancestor.ParentID
