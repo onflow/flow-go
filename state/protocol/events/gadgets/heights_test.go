@@ -3,9 +3,8 @@ package gadgets
 import (
 	"testing"
 
+	"github.com/onflow/flow-go/utils/unittest"
 	"gotest.tools/assert"
-
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestHeights(t *testing.T) {

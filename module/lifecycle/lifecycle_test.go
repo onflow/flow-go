@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/lifecycle"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type readydone struct{}

@@ -3,7 +3,7 @@ package lifecycle
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/module"
 )
 
 // AllReady calls Ready on all input components and returns a channel that is

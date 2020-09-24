@@ -3,8 +3,8 @@ package gadgets
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/events"
 )
 
 // Heights is a protocol events consumer that provides an interface to
