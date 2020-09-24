@@ -260,23 +260,23 @@ func (e *hostEnv) UnsafeRandom() uint64 {
 	return binary.LittleEndian.Uint64(buf)
 }
 
+func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
+	return runtime.Block{
+		Height:    header.Height,
+		View:      header.View,
+		Hash:      runtime.BlockHash(header.ID()),
+		Timestamp: header.Timestamp.UnixNano(),
+	}
+}
+
 // GetBlockAtHeight returns the block at the given height.
 func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	if e.ctx.Blocks == nil {
 		panic("GetBlockAtHeight is not supported by this environment")
 	}
 
-	blockFromHeader := func(header *flow.Header) runtime.Block {
-		return runtime.Block{
-			Height:    header.Height,
-			View:      header.View,
-			Hash:      runtime.BlockHash(header.ID()),
-			Timestamp: header.Timestamp.UnixNano(),
-		}
-	}
-
 	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
-		return blockFromHeader(e.ctx.BlockHeader), true, nil
+		return runtimeBlockFromHeader(e.ctx.BlockHeader), true, nil
 	}
 
 	block, err := e.ctx.Blocks.ByHeight(height)
@@ -289,7 +289,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return blockFromHeader(block.Header), true, nil
+	return runtimeBlockFromHeader(block.Header), true, nil
 }
 
 // Transaction Environment Functions
