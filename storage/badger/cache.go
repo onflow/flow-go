@@ -6,8 +6,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 func withLimit(limit uint) func(*Cache) {

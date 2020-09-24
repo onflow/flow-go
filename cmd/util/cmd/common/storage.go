@@ -4,7 +4,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 func InitStorage(datadir string) *badger.DB {

@@ -9,8 +9,8 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state

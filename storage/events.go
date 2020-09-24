@@ -1,6 +1,6 @@
 package storage
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import "github.com/onflow/flow-go/model/flow"
 
 // Events represents persistent storage for events.
 type Events interface {

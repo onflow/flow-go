@@ -3,9 +3,9 @@ package cluster
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/storage"
 )
 
 // FindLatest retrieves the latest finalized header and all of its pending

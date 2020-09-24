@@ -1,7 +1,7 @@
 package module
 
 import (
-	model "github.com/dapperlabs/flow-go/model/coldstuff"
+	model "github.com/onflow/flow-go/model/coldstuff"
 )
 
 // ColdStuff is the interface for accepting proposals, votes, and commits to

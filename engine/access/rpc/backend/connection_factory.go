@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"google.golang.org/grpc"
 
-	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 // ConnectionFactory is used to create an access api client

@@ -6,8 +6,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	mtrie "github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
-	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+	mtrie "github.com/onflow/flow-go/storage/ledger/mtrie/trie"
+	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 var (

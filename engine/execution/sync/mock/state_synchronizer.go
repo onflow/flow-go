@@ -5,8 +5,8 @@ package mock
 import (
 	context "context"
 
-	flow "github.com/dapperlabs/flow-go/model/flow"
-	messages "github.com/dapperlabs/flow-go/model/messages"
+	flow "github.com/onflow/flow-go/model/flow"
+	messages "github.com/onflow/flow-go/model/messages"
 
 	mock "github.com/stretchr/testify/mock"
 )

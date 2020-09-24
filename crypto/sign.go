@@ -4,7 +4,7 @@ package crypto
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // revive:disable:var-naming

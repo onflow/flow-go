@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/utils/io"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 func generateRandomSeeds(n int) [][]byte {

@@ -10,7 +10,7 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
