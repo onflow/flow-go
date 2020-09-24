@@ -210,12 +210,13 @@ func (p *P2PNode) Stop() (chan struct{}, error) {
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
 func (p *P2PNode) AddPeer(ctx context.Context, peer NodeAddress) error {
-
 	pInfo, err := GetPeerInfo(peer)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add peer %s: %w", peer.Name, err)
 	}
 
+	p.Lock()
+	defer p.Unlock()
 	err = p.libP2PHost.Connect(ctx, pInfo)
 	if err != nil {
 		return err
@@ -226,12 +227,13 @@ func (p *P2PNode) AddPeer(ctx context.Context, peer NodeAddress) error {
 
 // RemovePeer closes the connection with the peer
 func (p *P2PNode) RemovePeer(ctx context.Context, peer NodeAddress) error {
-
 	pInfo, err := GetPeerInfo(peer)
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
 	}
 
+	p.Lock()
+	defer p.Unlock()
 	conns := p.libP2PHost.Network().ConnsToPeer(pInfo.ID)
 	// close all connections with the peer
 	for _, c := range conns {
