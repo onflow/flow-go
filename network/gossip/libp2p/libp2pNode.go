@@ -208,19 +208,36 @@ func (p *P2PNode) Stop() (chan struct{}, error) {
 	return done, nil
 }
 
-// AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
-func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
-	p.Lock()
-	defer p.Unlock()
-	for _, peer := range peers {
-		pInfo, err := GetPeerInfo(peer)
-		if err != nil {
-			return err
-		}
+// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
+func (p *P2PNode) AddPeer(ctx context.Context, peer NodeAddress) error {
 
-		err = p.libP2PHost.Connect(ctx, pInfo)
+	pInfo, err := GetPeerInfo(peer)
+	if err != nil {
+		return err
+	}
+
+	err = p.libP2PHost.Connect(ctx, pInfo)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemovePeer closes the connection with the peer
+func (p *P2PNode) RemovePeer(ctx context.Context, peer NodeAddress) error {
+
+	pInfo, err := GetPeerInfo(peer)
+	if err != nil {
+		return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
+	}
+
+	conns := p.libP2PHost.Network().ConnsToPeer(pInfo.ID)
+	// close all connections with the peer
+	for _, c := range conns {
+		err = c.Close()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
 		}
 	}
 	return nil
@@ -274,7 +291,7 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		}
 
 		// add node address as a peer
-		err = p.AddPeers(ctx, n)
+		err = p.AddPeer(ctx, n)
 		if err != nil {
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
