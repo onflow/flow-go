@@ -81,12 +81,12 @@ func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Ro
 		ids = append(ids, roleIDs...)
 	}
 
-
 	n := len(ids)
 	var adjencyMap = make(map[flow.Identifier]flow.IdentityList, n)
 
 	for _, id := range ids {
-		rpt := topology.NewRandPermTopology(id.Role, id.NodeID)
+		rpt, err := topology.NewRandPermTopology(id.Role, id.NodeID)
+		r.NoError(err)
 		top, err := rpt.Subset(ids, uint(n))
 		r.NoError(err)
 		adjencyMap[id.NodeID] = top
@@ -104,9 +104,10 @@ func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Ro
 func (r *RandPermTopologyTestSuite) TestSubsetDeterminism() {
 	ids := unittest.IdentityListFixture(100, unittest.WithAllRoles())
 	for _, id := range ids {
-		rpt := topology.NewRandPermTopology(flow.RoleConsensus, id.NodeID)
+		rpt, err := topology.NewRandPermTopology(flow.RoleConsensus, id.NodeID)
+		r.NoError(err)
 		var prev flow.IdentityList
-		for i:=0;i<10;i++ {
+		for i := 0; i < 10; i++ {
 			current, err := rpt.Subset(ids, uint(100))
 			r.NoError(err)
 			if prev != nil {

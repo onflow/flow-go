@@ -61,9 +61,9 @@ func oneOfEachRoleSample(ids flow.IdentityList, seed int64, role flow.Role) (flo
 }
 
 // seedFromID generates the seed to be used for the random function
-func seedFromID(id flow.Identifier) int64 {
+func seedFromID(id flow.Identifier) (int64, error) {
 	var seed int64
 	buf := bytes.NewBuffer(id[:])
-	binary.Read(buf, binary.LittleEndian, &seed)
-	return seed
+	err := binary.Read(buf, binary.LittleEndian, &seed)
+	return seed, err
 }

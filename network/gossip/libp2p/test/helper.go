@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -45,7 +44,7 @@ func CreateIDs(count int) []*flow.Identity {
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
 func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool,
-	tops ...middleware.Topology) ([]*libp2p.Network, error) {
+	tops ...topology.Topology) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -55,9 +54,12 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 
 	// if no topology is passed in, use the default topology for all networks
 	if tops == nil {
-		tops = make([]middleware.Topology, count)
-		rpt := topology.NewRandPermTopology(flow.RoleCollection)
+		tops = make([]topology.Topology, count)
 		for i := range tops {
+			rpt, err := topology.NewRandPermTopology(flow.RoleCollection, ids[i].NodeID)
+			if err != nil {
+				return nil, fmt.Errorf("could not create network: %w", err)
+			}
 			tops[i] = rpt
 		}
 	}
@@ -69,7 +71,7 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
 		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, mws[i], csize, tops[i], metrics)
 		if err != nil {
-			return nil, fmt.Errorf("could not create error %w", err)
+			return nil, fmt.Errorf("could not create network: %w", err)
 		}
 
 		nets = append(nets, net)

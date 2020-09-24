@@ -184,7 +184,11 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get node id: %w", err)
 		}
 		nodeRole := nodeID.Role
-		topology := topology2.NewRandPermTopology(nodeRole)
+		// TODO: switch topology based on role type
+		topology, err := topology2.NewRandPermTopology(nodeRole, nodeID.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not create topology: %w", err)
+		}
 
 		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, fnb.Middleware, 10e6, topology, fnb.Metrics.Network)
 		if err != nil {

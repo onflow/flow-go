@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -15,11 +16,12 @@ import (
 
 type CollectionTopologyTestSuite struct {
 	suite.Suite
-	state      *protocol.State
-	snapshot   *protocol.Snapshot
-	epochQuery *protocol.EpochQuery
-	ids flow.IdentityList
-	collectors flow.IdentityList
+	state       *protocol.State
+	snapshot    *protocol.Snapshot
+	epochQuery  *protocol.EpochQuery
+	clusterList flow.ClusterList
+	ids         flow.IdentityList
+	collectors  flow.IdentityList
 }
 
 func TestCollectionTopologyTestSuite(t *testing.T) {
@@ -39,6 +41,7 @@ func (suite *CollectionTopologyTestSuite) SetupTest() {
 	assignments := unittest.ClusterAssignment(uint(nClusters), suite.collectors)
 	clusters, err := flow.NewClusterList(assignments, suite.collectors)
 	require.NoError(suite.T(), err)
+	suite.clusterList = clusters
 	epoch := new(protocol.Epoch)
 	epoch.On("Clustering").Return(clusters, nil).Times(nCollectors)
 	suite.epochQuery.On("Current").Return(epoch).Times(nCollectors)
@@ -50,7 +53,8 @@ func (suite *CollectionTopologyTestSuite) TestSubset() {
 	var adjencyMap = make(map[flow.Identifier]flow.IdentityList, len(suite.collectors))
 	// for each of the collector node, find a subset of nodes it should connect to using the CollectionTopology
 	for _, c := range suite.collectors {
-		collectionTopology := topology.NewCollectionTopology(c.NodeID, suite.state)
+		collectionTopology, err := topology.NewCollectionTopology(c.NodeID, suite.state)
+		assert.NoError(suite.T(), err)
 		subset, err := collectionTopology.Subset(suite.ids, uint(len(suite.ids)))
 		assert.NoError(suite.T(), err)
 		adjencyMap[c.NodeID] = subset
@@ -58,6 +62,13 @@ func (suite *CollectionTopologyTestSuite) TestSubset() {
 
 	// check that all collection nodes are either directly connected or indirectly connected via other collection nodes
 	checkConnectednessByRole(suite.T(), adjencyMap, flow.RoleCollection)
+
+	// check that each of the collection clusters forms a connected graph
+	for _, cluster := range suite.clusterList {
+		checkConnectednessByCluster(suite.T(), adjencyMap, cluster)
+	}
 }
 
-func checkConnectednessByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, cluster)
+func checkConnectednessByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, cluster flow.IdentityList) {
+	checkGraphConnected(t, adjMap, filter.In(cluster))
+}

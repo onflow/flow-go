@@ -17,12 +17,16 @@ type CollectionTopology struct {
 	seed   int64
 }
 
-func NewCollectionTopology(nodeID flow.Identifier, state protocol.State) *CollectionTopology {
-	return &CollectionTopology{
-		RandPermTopology: NewRandPermTopology(flow.RoleCollection, nodeID),
+func NewCollectionTopology(nodeID flow.Identifier, state protocol.State) (CollectionTopology, error) {
+	rpt, err := NewRandPermTopology(flow.RoleCollection, nodeID)
+	if err != nil {
+		return CollectionTopology{}, err
+	}
+	return CollectionTopology{
+		RandPermTopology: rpt,
 		nodeID:           nodeID,
 		state:            state,
-	}
+	}, nil
 }
 
 // Subset samples the idList and returns a list of nodes to connect with so that this node is directly or indirectly
@@ -40,7 +44,6 @@ func (c CollectionTopology) Subset(idList flow.IdentityList, fanout uint) (flow.
 		return nil, fmt.Errorf("failed to find cluster peers for node %s", c.nodeID.String())
 	}
 	clusterSample, _ := connectedGraphSample(clusterPeers, c.seed)
-
 
 	// include only those cluster peers which have not already been chosen by RandPermTopology
 	uniqueClusterSample := clusterSample.Filter(filter.Not(filter.In(randPermSample)))
@@ -60,7 +63,6 @@ func (c CollectionTopology) clusterPeers() (flow.IdentityList, error) {
 		return nil, err
 	}
 
-	clusterList.IndexOf()
 	myCluster, _, found := clusterList.ByNodeID(c.nodeID)
 	if !found {
 		return nil, fmt.Errorf("failed to find the cluster for node ID %s", c.nodeID.String())

@@ -17,14 +17,18 @@ var _ Topology = &RandPermTopology{}
 // form a connected graph with no islands.
 type RandPermTopology struct {
 	myRole flow.Role
-	seed int64
+	seed   int64
 }
 
-func NewRandPermTopology(role flow.Role, id flow.Identifier) RandPermTopology {
+func NewRandPermTopology(role flow.Role, id flow.Identifier) (RandPermTopology, error) {
+	seed, err := seedFromID(id)
+	if err != nil {
+		return RandPermTopology{}, fmt.Errorf("failed to seed topology: %w", err)
+	}
 	return RandPermTopology{
 		myRole: role,
-		seed: seedFromID(id),
-	}
+		seed:   seed,
+	}, nil
 }
 
 func (r RandPermTopology) Subset(idList flow.IdentityList, fanout uint) (flow.IdentityList, error) {
@@ -52,7 +56,6 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, fanout uint) (flow.Id
 		// add it to result
 		result = append(result, selectedIDs...)
 	}
-
 
 	// connect to (n+1)/2 other nodes of the same type to ensure all nodes of the same type are fully connected
 	selfRoleIDs, _ := connectedGraphByRoleSample(remainder, r.seed, r.myRole) // ignore the remaining ids

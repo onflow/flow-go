@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
 )
 
 // SparseTopologyTestSuite test 1-k messaging in a sparsely connected network
@@ -213,20 +213,15 @@ type IndexBoundTopology struct {
 }
 
 // Returns a subset of ids bounded by [minIndex, maxIndex) for the SparseTopology
-func (ibt IndexBoundTopology) Subset(idList flow.IdentityList, _ int, _ string) (map[flow.Identifier]flow.Identity, error) {
-	subsetLen := ibt.maxIndex - ibt.minIndex
-	var result = make(map[flow.Identifier]flow.Identity, subsetLen)
+func (ibt IndexBoundTopology) Subset(idList flow.IdentityList, _ uint) (flow.IdentityList, error) {
 	sub := idList[ibt.minIndex:ibt.maxIndex]
-	for _, id := range sub {
-		result[id.ID()] = *id
-	}
-	return result, nil
+	return sub, nil
 }
 
 // createSparseTopology creates topologies for nodes such that subsets have one overlapping node
 // e.g. top 1 - 0,1,2,3; top 2 - 3,4,5,6; top 3 - 6,7,8,9
-func createSparseTopology(count int, subsets int) []middleware.Topology {
-	tops := make([]middleware.Topology, count)
+func createSparseTopology(count int, subsets int) []topology.Topology {
+	tops := make([]topology.Topology, count)
 	subsetLen := count / subsets
 	for i := 0; i < count; i++ {
 		s := i / subsets          // which subset does this node belong to
@@ -248,8 +243,8 @@ func createSparseTopology(count int, subsets int) []middleware.Topology {
 
 // createDisjointedTopology creates topologies for nodes such that subsets don't have any overlap
 // e.g. top 1 - 0,1,2; top 2 - 3,4,5; top 3 - 6,7,8
-func createDisjointedTopology(count int, subsets int) []middleware.Topology {
-	tops := make([]middleware.Topology, count)
+func createDisjointedTopology(count int, subsets int) []topology.Topology {
+	tops := make([]topology.Topology, count)
 	subsetLen := count / subsets
 	for i := 0; i < count; i++ {
 		s := i / subsets          // which subset does this node belong to
