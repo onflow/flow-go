@@ -28,14 +28,12 @@ CONTAINER_REGISTRY=gcr.io/dl-flow
 
 export DOCKER_BUILDKIT := 1
 
-.PHONY: clean-relic
-clean-relic:
-	rm -rf crypto/relic
-
+.PHONY: crypto/relic
 crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive
 
+.PHONY: crypto/relic/build
 crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
@@ -139,7 +137,7 @@ lint:
 
 # Runs unit tests, SKIP FOR NOW linter, coverage
 .PHONY: ci
-ci: clean-relic install-tools tidy test # lint coverage
+ci: install-tools tidy test # lint coverage
 
 # Runs integration tests
 .PHONY: ci-integration
