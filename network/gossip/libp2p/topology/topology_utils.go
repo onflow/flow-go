@@ -29,7 +29,7 @@ func connectedGraphByRole(ids flow.IdentityList, seed int64, role flow.Role) flo
 }
 
 // oneOfEachRole returns one random id of the given role
-func oneOfEachRole(ids flow.IdentityList, seed int64, role flow.Role) flow.IdentityList {
+func oneOfRole(ids flow.IdentityList, seed int64, role flow.Role) flow.IdentityList {
 	filteredIds := ids.Filter(filter.HasRole(role))
 	if len(filteredIds) == 0 {
 		// there are no more nodes of this role to choose from
