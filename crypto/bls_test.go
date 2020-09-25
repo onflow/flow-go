@@ -48,15 +48,16 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 	// generate a key pair
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	sk := randomSK(t, seed)
+	sig := make([]byte, SignatureLenBLSBLS12381)
 	// empty hasher
 	_, err := sk.Sign(seed, nil)
 	assert.Error(t, err)
-	_, err = sk.PublicKey().Verify(Signature{}, seed, nil)
+	_, err = sk.PublicKey().Verify(sig, seed, nil)
 	assert.Error(t, err)
 	// short size hasher
 	_, err = sk.Sign(seed, hash.NewSHA2_256())
 	assert.Error(t, err)
-	_, err = sk.PublicKey().Verify(Signature{}, seed, hash.NewSHA2_256())
+	_, err = sk.PublicKey().Verify(sig, seed, hash.NewSHA2_256())
 	assert.Error(t, err)
 }
 
