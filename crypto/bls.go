@@ -106,8 +106,7 @@ func NewBLSKMAC(tag string) hash.Hasher {
 // The public key is only read by the function.
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if len(s) != signatureLengthBLSBLS12381 {
-		return false, fmt.Errorf("signature length is %d, must be %d",
-			len(s), signatureLengthBLSBLS12381)
+		return false, nil
 	}
 
 	if kmac == nil {

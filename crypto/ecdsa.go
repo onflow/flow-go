@@ -102,8 +102,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
 
 	if len(sig) != 2*Nlen {
-		return false, fmt.Errorf("signature length is %d, must be %d",
-			len(sig), 2*Nlen)
+		return false, nil
 	}
 
 	var r big.Int

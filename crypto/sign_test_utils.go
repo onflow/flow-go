@@ -61,7 +61,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		}
 		invalidSig := make([]byte, invalidLen)
 		result, err = pk.Verify(invalidSig, input, halg)
-		assert.Error(t, err)
+		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
 			"Verification should fail:\n signature:%s\n with invalid length %d", invalidSig, invalidLen))
 	}
