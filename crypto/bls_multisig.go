@@ -247,7 +247,12 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 	// the verification equation.
 	mapPerHash := make(map[string][]pointG2)
 	mapPerPk := make(map[pointG2][][]byte)
-	// TODO: change mapPerPk to map encoding of keys and store the Public key with the map value
+	// Note: mapPerPk is using a cgo structure as map keys which may lead to 2 equal public keys
+	// being considered distinct. This does not make the verification equation wrong but leads to
+	// computing extra pairings. This case is considered unlikely to happen since a caller is likely
+	// to use the same struct for a same public key.
+	// One way to fix this is to use the public key encoding as the map keys and store the "pointG2"
+	// structure with the map value, which adds more complexity and processing time.
 
 	// fill the 2 maps
 	for i, pk := range pks {
@@ -262,9 +267,10 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 		mapPerPk[pkBLS.point] = append(mapPerPk[pkBLS.point], hashes[i])
 	}
 
-	//compare the 2 maps
+	//compare the 2 maps for the shortest length
 	if len(mapPerHash) < len(mapPerPk) {
-		// aggregate per distinct hashes
+		// aggregate keys per distinct hashes
+		// using the linearity of the pairing on the G2 variables.
 		flatDistinctHashes := make([]byte, 0)
 		lenHashes := make([]uint32, 0)
 		pkPerHash := make([]uint32, 0, len(mapPerHash))
@@ -284,8 +290,10 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 			(*C.ep2_st)(&allPks[0]),
 		)
 		return (verif == valid), nil
+
 	} else {
-		// aggregate per distinct key
+		// aggregate hashes per distinct key
+		// using the linearity of the pairing on the G1 variables.
 		distinctPks := make([]pointG2, 0, len(mapPerPk))
 		hashPerPk := make([]uint32, 0, len(mapPerPk))
 		flatHashes := make([]byte, 0)
