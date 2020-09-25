@@ -1268,7 +1268,10 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		err = state.Mutate().HeaderExtend(&extend)
 		require.NoError(t, err)
 
-		// create another block with the same height and view, that is coming after
+		// create another block that points to the previous block `extend` as parent
+		// but has _same_ height as parent. This violates the condition that a child's
+		// height must increment the parent's height by one, i.e. it should be rejected 
+		// by the follower right away 
 		extend.Header.ParentID = extend.Header.ID()
 		extend.Header.Height = 1
 		extend.Header.View = 2
@@ -1306,7 +1309,10 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
-		// add 2 blocks, the second finalizing/sealing the state of the first
+		// add 2 blocks, where:
+		// first block is added and then finalized; 
+		// second block is a sibling to the finalized block 
+		// The Follower should reject this block as an outdated chain extension
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
@@ -1413,7 +1419,7 @@ func TestMakeValid(t *testing.T) {
 
 			consumer.On("BlockProcessable", mock.Anything).Return()
 
-			// make valid on block2 and block3
+			// make valid on block2
 			err = state.Mutate().MarkValid(block2.ID())
 			require.NoError(t, err)
 

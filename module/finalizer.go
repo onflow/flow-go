@@ -6,8 +6,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Finalizer is used by the consensus algorithm to inform protocol state for
-// about certain events.
+// Finalizer is used by the consensus algorithm to inform other components for (such
+// as the protocol state) about validity of block headers and finalization of blocks. 
 //
 // Since we have two different protocol states: one for the main consensus,
 // the other for the collection cluster consensus, the Finalizer interface
