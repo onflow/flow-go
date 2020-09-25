@@ -3,8 +3,9 @@ package gadgets
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/utils/unittest"
-	"gotest.tools/assert"
 )
 
 func TestHeights(t *testing.T) {
