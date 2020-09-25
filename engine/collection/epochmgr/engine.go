@@ -62,6 +62,7 @@ func New(
 	state protocol.State,
 	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
+	heightEvents events.Heights,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -71,6 +72,7 @@ func New(
 		state:          state,
 		voter:          voter,
 		factory:        factory,
+		heightEvents:   heightEvents,
 		epochs:         make(map[uint64]*EpochComponents),
 		startupTimeout: DefaultStartupTimeout,
 	}
@@ -195,13 +197,15 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 
 	// set up trigger to shut down previous epoch components after max expiry
 	e.heightEvents.OnHeight(first.Height+flow.DefaultTransactionExpiry, func() {
-		e.unit.Lock()
-		defer e.unit.Unlock()
+		e.unit.Launch(func() {
+			e.unit.Lock()
+			defer e.unit.Unlock()
 
-		err := e.stopEpochComponents(counter - 1)
-		if err != nil {
-			e.log.Error().Err(err).Msgf("epoch transition: failed to stop components for epoch %d", counter-1)
-		}
+			err := e.stopEpochComponents(counter - 1)
+			if err != nil {
+				e.log.Error().Err(err).Msgf("epoch transition: failed to stop components for epoch %d", counter-1)
+			}
+		})
 	})
 
 	return nil
