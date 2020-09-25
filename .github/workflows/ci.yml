@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: 
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Granting private modules access
+      run: |
+        git config --global url."https://${{ secrets.GO_MODULES_TOKEN }}:x-oauth-basic@github.com/onflow".insteadOf "https://github.com/onflow"
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.14'
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run tests
+      run: make ci
+  golangci:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Granting private modules access
+      run: |
+        git config --global url."https://${{ secrets.GO_MODULES_TOKEN }}:x-oauth-basic@github.com/onflow".insteadOf "https://github.com/onflow"
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Build relic
+      run: make clean-relic && make crypto/relic/build
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v1.2.1
+      with:
+        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+        version: v1.29
+        args: -v --build-tags relic

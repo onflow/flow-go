@@ -28,6 +28,10 @@ CONTAINER_REGISTRY=gcr.io/dl-flow
 
 export DOCKER_BUILDKIT := 1
 
+.PHONY: clean-relic
+clean-relic:
+	rm -rf crypto/relic
+
 crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive
@@ -46,7 +50,7 @@ cmd/util/util:
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.29.0; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -133,9 +137,9 @@ lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
-# Runs linter, unit tests, SKIP FOR NOW coverage
+# Runs unit tests, SKIP FOR NOW linter, coverage
 .PHONY: ci
-ci: install-tools tidy lint test # coverage
+ci: clean-relic install-tools tidy test # lint coverage
 
 # Runs integration tests
 # NOTE: we do not need `docker-build-flow` as this is run as a separate step
