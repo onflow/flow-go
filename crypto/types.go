@@ -22,20 +22,6 @@ func (f SigningAlgorithm) String() string {
 	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1"}[f]
 }
 
-// StringToSigningAlgorithm converts a string to a SigningAlgorithm.
-func StringToSigningAlgorithm(s string) SigningAlgorithm {
-	switch s {
-	case BLSBLS12381.String():
-		return BLSBLS12381
-	case ECDSAP256.String():
-		return ECDSAP256
-	case ECDSASecp256k1.String():
-		return ECDSASecp256k1
-	default:
-		return UnknownSigningAlgorithm
-	}
-}
-
 const (
 	// minimum targeted bits of security
 	securityBits = 128
