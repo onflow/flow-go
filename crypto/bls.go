@@ -105,6 +105,10 @@ func NewBLSKMAC(tag string) hash.Hasher {
 // If the hasher used is KMAC128, the hasher is only read.
 // The public key is only read by the function.
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
+	if len(s) != signatureLengthBLSBLS12381 {
+		return false, nil
+	}
+
 	if kmac == nil {
 		return false, errors.New("VerifyBytes requires a Hasher")
 	}
@@ -113,6 +117,7 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
 			opSwUInputLenBLSBLS12381, kmac.Size())
 	}
+
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 
@@ -328,9 +333,7 @@ func (a *blsBLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 
 // Checks the validity of a bls signature through the C layer
 func (a *blsBLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
-	if len(s) != signatureLengthBLSBLS12381 {
-		return false
-	}
+
 	verif := C.bls_verify((*C.ep2_st)(pk),
 		(*C.uchar)(&s[0]),
 		(*C.uchar)(&data[0]),
