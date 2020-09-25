@@ -142,10 +142,8 @@ lint:
 ci: clean-relic install-tools tidy test # lint coverage
 
 # Runs integration tests
-# NOTE: we do not need `docker-build-flow` as this is run as a separate step
-# on Teamcity
 .PHONY: ci-integration
-ci-integration: install-tools
+ci-integration: crypto/relic/build
 	$(MAKE) -C integration ci-integration-test
 
 # Runs benchmark tests
