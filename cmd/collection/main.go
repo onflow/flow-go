@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storagekv "github.com/onflow/flow-go/storage/badger"
 )
 
@@ -339,12 +340,16 @@ func main() {
 				syncFactory,
 			)
 
+			heightEvents := gadgets.NewHeights()
+			node.ProtocolEvents.AddConsumer(heightEvents)
+
 			manager, err := epochmgr.New(
 				node.Logger,
 				node.Me,
 				node.State,
 				rootQCVoter,
 				factory,
+				heightEvents,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create epoch manager: %w", err)
