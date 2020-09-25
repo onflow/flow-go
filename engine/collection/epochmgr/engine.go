@@ -176,12 +176,19 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 		return fmt.Errorf("could not get epoch counter: %w", err)
 	}
 
+	log := e.log.With().
+		Uint64("epoch_height", first.Height).
+		Uint64("epoch_counter", counter).
+		Logger()
+
 	// exit early and log if the epoch already exists
 	_, exists := e.epochs[counter]
 	if exists {
-		e.log.Warn().Msgf("epoch transition: components for epoch %d already setup", counter)
+		log.Warn().Msg("epoch transition: components for new epoch already setup")
 		return nil
 	}
+
+	log.Info().Msg("epoch transition: creating components for new epoch...")
 
 	// create components for new epoch
 	components, err := e.createEpochComponents(epoch)
@@ -195,16 +202,23 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 		return fmt.Errorf("could not start epoch components: %w", err)
 	}
 
+	log.Info().Msg("epoch transition: new epoch components started successfully")
+
 	// set up trigger to shut down previous epoch components after max expiry
 	e.heightEvents.OnHeight(first.Height+flow.DefaultTransactionExpiry, func() {
 		e.unit.Launch(func() {
 			e.unit.Lock()
 			defer e.unit.Unlock()
 
+			log.Info().Msg("epoch transition: stopping components for previous epoch...")
+
 			err := e.stopEpochComponents(counter - 1)
 			if err != nil {
 				e.log.Error().Err(err).Msgf("epoch transition: failed to stop components for epoch %d", counter-1)
+				return
 			}
+
+			log.Info().Msg("epoch transition: previous epoch components stopped successfully")
 		})
 	})
 
