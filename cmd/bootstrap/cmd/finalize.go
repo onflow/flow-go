@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/encodable"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var (
@@ -140,7 +140,7 @@ func init() {
 	finalizeCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	finalizeCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
 	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
-	finalizeCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 1, "epoch counter for the epoch beginning with the root block")
+	finalizeCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "epoch counter for the epoch beginning with the root block")
 
 	_ = finalizeCmd.MarkFlagRequired("root-chain")
 	_ = finalizeCmd.MarkFlagRequired("root-parent")

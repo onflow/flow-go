@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
-	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
+	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 )
 
 func TestUpdate(t *testing.T) {

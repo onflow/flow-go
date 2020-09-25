@@ -3,10 +3,10 @@ package partial
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/encoding"
-	"github.com/dapperlabs/flow-go/ledger/common/pathfinder"
-	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/partial/ptrie"
 )
 
 // PathFinderVersion captures the version of path finder that the partial ledger uses

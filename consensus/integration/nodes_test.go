@@ -11,31 +11,32 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
-	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/buffer"
-	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/signature"
-	synccore "github.com/dapperlabs/flow-go/module/synchronization"
-	"github.com/dapperlabs/flow-go/module/trace"
-	networkmock "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	storagemock "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/consensus/compliance"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/buffer"
+	builder "github.com/onflow/flow-go/module/builder/consensus"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
+	synccore "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/module/trace"
+	networkmock "github.com/onflow/flow-go/network/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/events"
+	storage "github.com/onflow/flow-go/storage/badger"
+	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const hotstuffTimeout = 100 * time.Millisecond
@@ -134,8 +135,9 @@ func createNode(
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)
 	statusesDB := storage.NewEpochStatuses(metrics, db)
+	consumer := events.NewNoop()
 
-	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB)
+	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(root, result, seal)

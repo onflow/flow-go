@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Times implements the times memory pool used to store time.Times for an idetifier to track transaction metrics in

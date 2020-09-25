@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/flattener"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/trie"
 )
 
 func TestEmptyTrie(t *testing.T) {

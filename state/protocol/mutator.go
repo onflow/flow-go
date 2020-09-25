@@ -3,7 +3,7 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Mutator represents an interface to modify the persistent protocol state in a

@@ -5,12 +5,13 @@ package flow
 import (
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"reflect"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/fingerprint"
-	"github.com/dapperlabs/flow-go/storage/merkle"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/storage/merkle"
 )
 
 // Identifier represents a 32-byte unique identifier for an entity.
@@ -136,4 +137,21 @@ func ConcatSum(ids ...Identifier) Identifier {
 func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 	computed := ConcatSum(fps...)
 	return sum == computed
+}
+
+// Sample returns random sample of length 'size' of the ids
+// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+func Sample(size uint, ids ...Identifier) []Identifier {
+	n := uint(len(ids))
+	dup := make([]Identifier, 0, n)
+	dup = append(dup, ids...)
+	// if sample size is greater than total size, return all the elements
+	if n <= size {
+		return dup
+	}
+	for i := uint(0); i < size; i++ {
+		j := uint(rand.Intn(int(n - i)))
+		dup[i], dup[j+i] = dup[j+i], dup[i]
+	}
+	return dup[:size]
 }

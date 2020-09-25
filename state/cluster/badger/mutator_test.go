@@ -12,16 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	model "github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
-	"github.com/dapperlabs/flow-go/storage/util"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	model "github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/cluster"
+	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/events"
+	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type MutatorSuite struct {
@@ -60,8 +61,9 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
+	consumer := events.NewNoop()
 
-	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses)
+	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
 	require.NoError(suite.T(), err)
 }
 

@@ -1,9 +1,9 @@
 package run
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/onflow/flow-go/crypto"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // RunFastKG is an alternative to RunDKG that runs much faster by using centralized threshold signature key generation.

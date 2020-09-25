@@ -4,8 +4,8 @@ package encoding
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // Version captures the maximum version of encoding that this code supports

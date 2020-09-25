@@ -7,47 +7,65 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type State struct {
-	metrics       module.ComplianceMetrics
-	db            *badger.DB
-	headers       storage.Headers
-	seals         storage.Seals
-	index         storage.Index
-	payloads      storage.Payloads
-	blocks        storage.Blocks
-	setups        storage.EpochSetups
-	commits       storage.EpochCommits
-	epochStatuses storage.EpochStatuses
-	cfg           Config
+	metrics  module.ComplianceMetrics
+	db       *badger.DB
+	headers  storage.Headers
+	seals    storage.Seals
+	index    storage.Index
+	payloads storage.Payloads
+	blocks   storage.Blocks
+	epoch    struct {
+		setups   storage.EpochSetups
+		commits  storage.EpochCommits
+		statuses storage.EpochStatuses
+	}
+	consumer protocol.Consumer
+	cfg      Config
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
 func NewState(
-	metrics module.ComplianceMetrics, db *badger.DB,
-	headers storage.Headers, seals storage.Seals, index storage.Index, payloads storage.Payloads, blocks storage.Blocks,
-	setups storage.EpochSetups, commits storage.EpochCommits, statuses storage.EpochStatuses,
+	metrics module.ComplianceMetrics,
+	db *badger.DB,
+	headers storage.Headers,
+	seals storage.Seals,
+	index storage.Index,
+	payloads storage.Payloads,
+	blocks storage.Blocks,
+	setups storage.EpochSetups,
+	commits storage.EpochCommits,
+	statuses storage.EpochStatuses,
+	consumer protocol.Consumer,
 ) (*State, error) {
 
 	s := &State{
-		metrics:       metrics,
-		db:            db,
-		headers:       headers,
-		seals:         seals,
-		index:         index,
-		payloads:      payloads,
-		blocks:        blocks,
-		setups:        setups,
-		commits:       commits,
-		epochStatuses: statuses,
-		cfg:           DefaultConfig(),
+		metrics:  metrics,
+		db:       db,
+		headers:  headers,
+		seals:    seals,
+		index:    index,
+		payloads: payloads,
+		blocks:   blocks,
+		epoch: struct {
+			setups   storage.EpochSetups
+			commits  storage.EpochCommits
+			statuses storage.EpochStatuses
+		}{
+			setups:   setups,
+			commits:  commits,
+			statuses: statuses,
+		},
+		consumer: consumer,
+		cfg:      DefaultConfig(),
 	}
 
 	return s, nil

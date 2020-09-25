@@ -33,6 +33,7 @@ const (
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
 	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
 	EXESaveTransactionResults SpanName = "exe.ingestion.saveTransactionResults"
+	EXESaveTransactionEvents  SpanName = "exe.ingestion.saveTransactionEvents"
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 

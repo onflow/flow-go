@@ -6,8 +6,8 @@ import (
 	"io"
 	"math"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/flattener"
 )
 
 type WALOperation uint8

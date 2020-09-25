@@ -1,7 +1,7 @@
 package run
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func GenerateRootResult(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {

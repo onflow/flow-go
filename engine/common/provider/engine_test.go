@@ -8,15 +8,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/metrics"
+	network "github.com/onflow/flow-go/network/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestOnEntityRequestFull(t *testing.T) {
@@ -59,7 +59,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	state.On("Final").Return(final, nil)
 
 	con := &network.Conduit{}
-	con.On("Submit", mock.Anything, mock.Anything).Run(
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
@@ -132,7 +132,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	state.On("Final").Return(final, nil)
 
 	con := &network.Conduit{}
-	con.On("Submit", mock.Anything, mock.Anything).Run(
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
@@ -205,7 +205,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	state.On("Final").Return(final, nil)
 
 	con := &network.Conduit{}
-	con.On("Submit", mock.Anything, mock.Anything).Run(
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)

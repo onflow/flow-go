@@ -3,9 +3,9 @@ package unittest
 import (
 	"github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	protint "github.com/dapperlabs/flow-go/state/protocol"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/model/flow"
+	protint "github.com/onflow/flow-go/state/protocol"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
 )
 
 // FinalizedProtocolStateWithParticipants returns a protocol state with finalized participants

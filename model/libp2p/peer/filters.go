@@ -5,7 +5,7 @@ package peer
 import (
 	"encoding/hex"
 
-	libp2p2 "github.com/dapperlabs/flow-go/model/libp2p"
+	libp2p2 "github.com/onflow/flow-go/model/libp2p"
 )
 
 // Not negates the wrapped filter.

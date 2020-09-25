@@ -8,21 +8,21 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/events"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state"
-	clusterkv "github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state"
+	clusterkv "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Engine is the collection proposal engine, which packages pending
@@ -33,7 +33,7 @@ type Engine struct {
 	colMetrics     module.CollectionMetrics
 	engMetrics     module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
-	con            network.Conduit
+	conduit        network.Conduit
 	me             module.Local
 	protoState     protocol.State  // flow-wide protocol chain state
 	clusterState   clusterkv.State // cluster-specific chain state
@@ -97,11 +97,11 @@ func New(
 	}
 
 	// register network conduit
-	con, err := net.Register(engine.ConsensusCluster, e)
+	conduit, err := net.Register(engine.ConsensusCluster, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
-	e.con = con
+	e.conduit = conduit
 
 	// log the mempool size off the bat
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
@@ -177,7 +177,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	err := e.con.Submit(vote, recipientID)
+	err := e.conduit.Unicast(vote, recipientID)
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
@@ -254,7 +254,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Payload: payload,
 		}
 
-		err = e.con.Submit(msg, recipients.NodeIDs()...)
+		err = e.conduit.Publish(msg, recipients.NodeIDs()...)
 		if err != nil {
 			log.Error().Err(err).Msg("could not broadcast proposal")
 			return

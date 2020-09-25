@@ -1,12 +1,12 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 type ClusterStateFactory struct {

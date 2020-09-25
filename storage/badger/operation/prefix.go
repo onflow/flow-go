@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
@@ -43,7 +43,7 @@ const (
 	codeBlockValidity       = 43 // validity of block per HotStuff
 
 	// codes for indexing multiple identifiers by identifier
-	// 51 was used for identity indexes before epochs
+	// NOTE: 51 was used for identity indexes before epochs
 	codeBlockChildren         = 50 // index mapping block ID to children blocks
 	codePayloadGuarantees     = 52 // index mapping block ID to payload guarantees
 	codePayloadSeals          = 53 // index mapping block ID to payload seals
@@ -52,11 +52,8 @@ const (
 	codeBlockEpochStatus      = 56 // index mapping block ID to epoch status
 
 	// codes related to epoch information
-	codeEpochCounter = 60 // epoch counter of latest finalized block
-	codeEpochStart   = 61 // view of first finalized block in epoch
-	codeEpochHeight  = 62 // height of highest finalized block in epoch
-	codeEpochSetup   = 63 // index mapping EpochSetup event ID to full event
-	codeEpochCommit  = 64 // index mapping EpochCommit event ID to full event
+	codeEpochSetup  = 60 // EpochSetup service event, keyed by ID
+	codeEpochCommit = 61 // EpochCommit service event, keyed by ID
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

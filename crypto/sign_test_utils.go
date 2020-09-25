@@ -3,12 +3,14 @@ package crypto
 import (
 	"crypto/rand"
 	"fmt"
+	mrand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // tests sign and verify are consistent for multiple generated keys and messages
@@ -18,6 +20,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	seedMinLength := 48
 	seed := make([]byte, seedMinLength)
 	input := make([]byte, 100)
+	mrand.Seed(time.Now().UnixNano())
 
 	loops := 50
 	for j := 0; j < loops; j++ {
@@ -35,13 +38,13 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		result, err := pk.Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.True(t, result, fmt.Sprintf(
-			"Verification should succeed:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 		// test with a different message
 		input[0] ^= 1
 		result, err = pk.Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 		input[0] ^= 1
 		// test with a valid but different key
 		seed[0] ^= 1
@@ -50,7 +53,17 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		result, err = wrongSk.PublicKey().Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+		// test a wrong signature length
+		invalidLen := mrand.Intn(2 * len(s)) // try random invalid lengths
+		if invalidLen == len(s) {            // map to an invalid length
+			invalidLen = 0
+		}
+		invalidSig := make([]byte, invalidLen)
+		result, err = pk.Verify(invalidSig, input, halg)
+		require.NoError(t, err)
+		assert.False(t, result, fmt.Sprintf(
+			"Verification should fail:\n signature:%s\n with invalid length %d", invalidSig, invalidLen))
 	}
 }
 

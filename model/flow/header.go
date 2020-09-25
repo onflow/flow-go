@@ -6,8 +6,8 @@ import (
 
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/fingerprint"
 )
 
 // Header contains all meta-data for a block, as well as a hash representing

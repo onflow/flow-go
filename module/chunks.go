@@ -1,10 +1,10 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/crypto/random"
-	"github.com/dapperlabs/flow-go/engine/verification"
-	chmodels "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/flow-go/engine/verification"
+	chmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ChunkAssigner presents an interface for assigning chunks to the verifier nodes

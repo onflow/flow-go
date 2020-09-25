@@ -3,7 +3,7 @@ package operation
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func InsertSeal(sealID flow.Identifier, seal *flow.Seal) func(*badger.Txn) error {

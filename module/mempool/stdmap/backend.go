@@ -6,7 +6,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Backdata implements a generic memory pool backed by a Go map.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
-	netwk "github.com/dapperlabs/flow-go/network"
+	netwk "github.com/onflow/flow-go/network"
 )
 
 const (
@@ -275,10 +276,17 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		// add node address as a peer
 		err = p.AddPeers(ctx, n)
 		if err != nil {
+
+			// if the connection was rejected due to invalid node id, skip the re-attempt
+			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
+				return s, fmt.Errorf("invalid node id: %w", err)
+			}
+
 			// if the connection was rejected due to allowlisting, skip the re-attempt
 			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
 				return s, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
 			}
+
 			errs = multierror.Append(errs, err)
 			continue
 		}

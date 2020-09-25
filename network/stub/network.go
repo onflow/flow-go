@@ -1,17 +1,17 @@
 package stub
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Network is a mocked Network layer made for testing engine's behavior.
@@ -20,6 +20,7 @@ import (
 // When an engine is attached on a Network instance, the mocked Network delivers
 // all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
+	ctx context.Context
 	sync.Mutex
 	state        protocol.State            // used to represent full protocol state of the attached node.
 	me           module.Local              // used to represent information of the attached node.
@@ -34,6 +35,7 @@ type Network struct {
 // in order for a mock hub to find each other.
 func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	net := &Network{
+		ctx:     context.Background(),
 		state:   state,
 		me:      me,
 		hub:     hub,
@@ -53,11 +55,16 @@ func (n *Network) GetID() flow.Identifier {
 // Register registers an Engine of the attached node to the channel ID via a Conduit, and returns the
 // Conduit instance.
 func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
+	n.Lock()
+	defer n.Unlock()
 	_, ok := n.engines[channelID]
 	if ok {
 		return nil, errors.Errorf("engine code already taken (%s)", channelID)
 	}
+	ctx, cancel := context.WithCancel(n.ctx)
 	conduit := &Conduit{
+		ctx:       ctx,
+		cancel:    cancel,
 		channelID: channelID,
 		submit:    n.submit,
 		publish:   n.publish,
@@ -66,6 +73,13 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 	}
 	n.engines[channelID] = engine
 	return conduit, nil
+}
+
+func (n *Network) Unregister(channelID string) error {
+	n.Lock()
+	defer n.Unlock()
+	delete(n.engines, channelID)
+	return nil
 }
 
 // submit is called when the attached Engine to the channel ID is sending an event to an
@@ -100,46 +114,20 @@ func (n *Network) unicast(channelID string, event interface{}, targetID flow.Ide
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel ID on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(channelID string, event interface{}, selector flow.IdentityFilter) error {
-	// excludes this instance of Network from list of targeted ids (if any)
-	// to avoid self loop on delivering this message.
-	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
-
-	// filters in target ids based on selector
-	targetIDs, err := n.state.Final().Identities(selector)
-	if err != nil {
-		return fmt.Errorf("publish could not extract identities based on selector: %w", err)
-	}
+func (n *Network) publish(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
 
 	if len(targetIDs) == 0 {
 		return fmt.Errorf("publish found empty target ID list for the message")
 	}
 
-	return n.submit(channelID, event, targetIDs.NodeIDs()...)
-
+	return n.submit(channelID, event, targetIDs...)
 }
 
 // multicast is called when an engine attached to the channel ID is sending an event to a number of randomly chosen
 // Engines attached to the same channel ID on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(channelID string, event interface{}, num uint, selector flow.IdentityFilter) error {
-	// excludes this instance of Network from list of targeted ids (if any)
-	// to avoid self loop on delivering this message.
-	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
-
-	// filters in target ids based on selector
-	ids, err := n.state.Final().Identities(selector)
-	if err != nil {
-		return fmt.Errorf("multicast could not extract identities based on selector: %w", err)
-	}
-
-	// samples `num`-many ids from the shortlisted target ids
-	targetIDs := ids.Sample(num).NodeIDs()
-	if len(targetIDs) < int(num) {
-		return fmt.Errorf("multicast could not find recepients based on selector: Requested: %d, Found: %d", num,
-			len(targetIDs))
-	}
-
+func (n *Network) multicast(channelID string, event interface{}, num uint, targetIDs ...flow.Identifier) error {
+	targetIDs = flow.Sample(num, targetIDs...)
 	return n.submit(channelID, event, targetIDs...)
 }
 

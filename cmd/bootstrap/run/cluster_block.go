@@ -3,9 +3,9 @@ package run
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
 )
 
 func GenerateRootClusterBlocks(epoch uint64, clusters flow.ClusterList) []*cluster.Block {

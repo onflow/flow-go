@@ -3,7 +3,7 @@ package utils
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger"
 )
 
 // SplitByPath splits an slice of payloads based on the value of bit (bitIndex) of paths

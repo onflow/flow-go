@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // Node defines an Mtrie node
