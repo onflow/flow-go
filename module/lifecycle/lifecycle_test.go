@@ -37,7 +37,7 @@ func TestAllDone(t *testing.T) {
 		unittest.ReadyDoneify(components[i])
 	}
 
-	unittest.AssertClosesBefore(t, lifecycle.AllReady(components...), time.Second)
+	unittest.AssertClosesBefore(t, lifecycle.AllDone(components...), time.Second)
 
 	for _, component := range components {
 		mock := component.(*module.ReadyDoneAware)
