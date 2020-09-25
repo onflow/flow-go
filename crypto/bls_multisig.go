@@ -38,7 +38,9 @@ import "C"
 // is commutative.
 // No subgroup membership check is performed on the input signatures.
 func AggregateSignatures(sigs []Signature) (Signature, error) {
+	// initialize BLS context
 	_ = newBLSBLS12381()
+
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	for _, sig := range sigs {
@@ -53,8 +55,8 @@ func AggregateSignatures(sigs []Signature) (Signature, error) {
 		sigsPointer = (*C.uchar)(nil)
 	}
 
-	// add the points in the C layeer
-	if C.ep_sum_vector(
+	// add the points in the C layer
+	if C.ep_sum_vector_byte(
 		(*C.uchar)(&aggregatedSig[0]),
 		sigsPointer,
 		(C.int)(len(sigs)),
@@ -70,7 +72,9 @@ func AggregateSignatures(sigs []Signature) (Signature, error) {
 // is commutative. The slice can be empty.
 // No check is performed on the input private keys.
 func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
+	// initialize BLS context
 	_ = newBLSBLS12381()
+
 	scalars := make([]scalar, 0, len(keys))
 	for _, sk := range keys {
 		if sk.Algorithm() != BLSBLS12381 {
@@ -102,7 +106,9 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // is commutative. The slice can be empty.
 // No check is performed on the input public keys.
 func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
+	// initialize BLS context
 	_ = newBLSBLS12381()
+
 	points := make([]pointG2, 0, len(keys))
 	for _, pk := range keys {
 		if pk.Algorithm() != BLSBLS12381 {
@@ -136,7 +142,9 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 // is commutative. The slice of keys to be removed can be empty.
 // No check is performed on the input public keys.
 func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
+	// initialize BLS context
 	_ = newBLSBLS12381()
+
 	if aggKey.Algorithm() != BLSBLS12381 {
 		return nil, fmt.Errorf("all keys must be BLS keys")
 	}
@@ -203,6 +211,9 @@ func VerifySignatureOneMessage(pks []PublicKey, s Signature,
 func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 	messages [][]byte, kmac []hash.Hasher) (bool, error) {
 
+	// initialize BLS context
+	_ = newBLSBLS12381()
+
 	// check signature length
 	if len(s) != signatureLengthBLSBLS12381 {
 		return false, nil
@@ -235,7 +246,7 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 	// compute by aggregating either public keys or the message hashes in
 	// the verification equation.
 	mapPerHash := make(map[string][]pointG2)
-	mapPerPk := make(map[pointG2][]byte)
+	mapPerPk := make(map[pointG2][][]byte)
 	// TODO: change mapPerPk to map encoding of keys and store the Public key with the map value
 
 	// fill the 2 maps
@@ -248,40 +259,53 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
 
 		mapPerHash[string(hashes[i])] = append(mapPerHash[string(hashes[i])], pkBLS.point)
-		mapPerPk[pkBLS.point] = append(mapPerPk[pkBLS.point], hashes[i][:]...)
+		mapPerPk[pkBLS.point] = append(mapPerPk[pkBLS.point], hashes[i])
 	}
 
 	//compare the 2 maps
-	fmt.Println(len(mapPerHash), len(mapPerPk))
 	if len(mapPerHash) < len(mapPerPk) {
-		// aggregate per hash
-		flatHashes := make([]byte, 0)
+		// aggregate per distinct hashes
+		flatDistinctHashes := make([]byte, 0)
 		lenHashes := make([]uint32, 0)
 		pkPerHash := make([]uint32, 0, len(mapPerHash))
 		allPks := make([]pointG2, 0)
-		for hash, pks := range mapPerHash {
-			flatHashes = append(flatHashes, []byte(hash)...)
+		for hash, pksVal := range mapPerHash {
+			flatDistinctHashes = append(flatDistinctHashes, []byte(hash)...)
 			lenHashes = append(lenHashes, uint32(len([]byte(hash))))
-			pkPerHash = append(pkPerHash, uint32(len(pks)))
-			allPks = append(allPks, pks...)
+			pkPerHash = append(pkPerHash, uint32(len(pksVal)))
+			allPks = append(allPks, pksVal...)
 		}
-		verif := C.bls_verifyPerMessage(
+		verif := C.bls_verifyPerDistinctMessage(
 			(*C.uchar)(&s[0]),
 			(C.int)(len(mapPerHash)),
-			(*C.uchar)(&flatHashes[0]),
+			(*C.uchar)(&flatDistinctHashes[0]),
 			(*C.uint32_t)(&lenHashes[0]),
 			(*C.uint32_t)(&pkPerHash[0]),
 			(*C.ep2_st)(&allPks[0]),
 		)
 		return (verif == valid), nil
 	} else {
-		// aggregate per key
-		return true, nil
+		// aggregate per distinct key
+		distinctPks := make([]pointG2, 0, len(mapPerPk))
+		hashPerPk := make([]uint32, 0, len(mapPerPk))
+		flatHashes := make([]byte, 0)
+		lenHashes := make([]uint32, 0)
+		for pk, hashesVal := range mapPerPk {
+			distinctPks = append(distinctPks, pk)
+			hashPerPk = append(hashPerPk, uint32(len(hashesVal)))
+			for _, h := range hashesVal {
+				flatHashes = append(flatHashes, h...)
+				lenHashes = append(lenHashes, uint32(len(h)))
+			}
+		}
+
+		verif := C.bls_verifyPerDistinctKey(
+			(*C.uchar)(&s[0]),
+			(C.int)(len(mapPerPk)),
+			(*C.ep2_st)(&distinctPks[0]),
+			(*C.uint32_t)(&hashPerPk[0]),
+			(*C.uchar)(&flatHashes[0]),
+			(*C.uint32_t)(&lenHashes[0]))
+		return (verif == valid), nil
 	}
 }
-
-// regroup per key:
-// f( ep2_st* keys, int* nb_per_key, byte* msg_flattened)
-//
-// regroup per msg:
-// g( byte* msgs, int* nb_per_msg, ep_st* keys)

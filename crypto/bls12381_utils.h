@@ -91,9 +91,10 @@ void     bn_randZr(bn_t);
 void     bn_randZr_star(bn_t);
 void     bn_map_to_Zr_star(bn_t, const uint8_t*, int);
 
-int      ep_sum_vector(byte*, const byte*, const int);
 void     bn_sum_vector(bn_t, bn_st*, int);
+void     ep_sum_vector(ep_t, ep_st*, const int);
 void     ep2_sum_vector(ep2_t, ep2_st* , int);
+int      ep_sum_vector_byte(byte*, const byte*, const int);
 void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, int len);
 
 int simple_subgroup_check_G1(const ep_t);
