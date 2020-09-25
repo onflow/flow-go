@@ -558,9 +558,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		require.Len(t, tx.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
 			float64(block1.Header.Timestamp.Unix())), tx.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), tx.Logs[1])
 	})
 
@@ -585,9 +585,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, script.Err)
 
 		require.Len(t, script.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
 			float64(block1.Header.Timestamp.Unix())), script.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), script.Logs[1])
 	})
 
