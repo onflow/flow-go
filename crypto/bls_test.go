@@ -182,7 +182,7 @@ func TestAggregateSignaturesOneMessage(t *testing.T) {
 	valid, err = VerifySignatureOneMessage(pks[:0], aggSig, input, kmac)
 	assert.Error(t, err)
 	assert.False(t, valid,
-		fmt.Sprintf("verification should pass with empty list key %s", sks))
+		fmt.Sprintf("verification should fail with empty list key %s", sks))
 }
 
 // BLS multi-signature
@@ -376,19 +376,55 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, valid,
 		fmt.Sprintf("Verification of %s should fail, private keys are %s, inputs are %x, input public keys are %s",
-			aggSig, sks, inputMsgs, inputPks)) /*
+			aggSig, sks, inputMsgs, inputPks))
 
+	// test the empty keys case
+	valid, err = VerifySignatureManyMessages(inputPks[:0], aggSig, inputMsgs, inputKmacs)
+	assert.Error(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("verification should fail with empty list key"))
 
-		// test the empty list case
-		aggSk, err = AggregatePrivateKeys(sks[:0])
-		assert.NoError(t, err)
-		expectedSig, err = aggSk.Sign(input, kmac)
-		aggSig, err = AggregateSignatures(sigs[:0])
-		assert.NoError(t, err)
-		assert.Equal(t, aggSig, expectedSig,
-			fmt.Sprintf("wrong empty list key %s", sks))
-		valid, err = VerifySignatureOneMessage(pks[:0], aggSig, input, kmac)
-		assert.Error(t, err)
-		assert.False(t, valid,
-			fmt.Sprintf("verification should pass with empty list key %s", sks))*/
+	// test inconsistent input arrays
+	valid, err = VerifySignatureManyMessages(inputPks, aggSig, inputMsgs[:sigsNum-1], inputKmacs)
+	assert.Error(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("verification should fail with empty list key"))
+
+	valid, err = VerifySignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs[:sigsNum-1])
+	assert.Error(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("verification should fail with empty list key"))
+}
+
+// VerifySignatureManyMessages bench
+// Bench the slowest case where all messages and public keys are distinct.
+// (2*n) pairings without aggrgetion Vs (n+1) pairings with aggregation.
+// The function is faster whenever there are redundant messages or public keys.
+func BenchmarkVerifySignatureManyMessages(b *testing.B) {
+	// inputs
+	sigsNum := 100
+	inputKmacs := make([]hash.Hasher, 0, sigsNum)
+	sigs := make([]Signature, 0, sigsNum)
+	pks := make([]PublicKey, 0, sigsNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	inputMsgs := make([][]byte, 0, sigsNum)
+	kmac := NewBLSKMAC("bench tag")
+
+	// create the signatures
+	for i := 0; i < sigsNum; i++ {
+		input := make([]byte, 100)
+		_, _ = mrand.Read(seed)
+		sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
+		s, _ := sk.Sign(input, kmac)
+		sigs = append(sigs, s)
+		pks = append(pks, sk.PublicKey())
+		inputKmacs = append(inputKmacs, kmac)
+		inputMsgs = append(inputMsgs, input)
+	}
+	aggSig, _ := AggregateSignatures(sigs)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = VerifySignatureManyMessages(pks, aggSig, inputMsgs, inputKmacs)
+	}
+	b.StopTimer()
 }
