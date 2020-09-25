@@ -1424,7 +1424,7 @@ func TestMakeValid(t *testing.T) {
 			err = state.Mutate().MarkValid(block3.ID())
 			require.NoError(t, err)
 
-			// because the parent is not a rook block,
+			// because the parent is not a root block, BlockProcessable event should be emitted
 			// block3's parent is block2
 			consumer.AssertCalled(t, "BlockProcessable", block2.Header)
 		})
