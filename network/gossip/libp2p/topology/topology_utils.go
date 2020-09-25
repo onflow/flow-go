@@ -28,7 +28,7 @@ func connectedGraphByRole(ids flow.IdentityList, seed int64, role flow.Role) flo
 	return connectedGraph(filteredIds, seed)
 }
 
-// oneOfEachRole returns one random id of the given role
+// oneOfRole returns one random id of the given role
 func oneOfRole(ids flow.IdentityList, seed int64, role flow.Role) flow.IdentityList {
 	filteredIds := ids.Filter(filter.HasRole(role))
 	if len(filteredIds) == 0 {
@@ -55,7 +55,7 @@ func connectedGraphByRoleSample(ids flow.IdentityList, seed int64, role flow.Rol
 }
 
 func oneOfEachRoleSample(ids flow.IdentityList, seed int64, role flow.Role) (flow.IdentityList, flow.IdentityList) {
-	result := oneOfEachRole(ids, seed, role)
+	result := oneOfRole(ids, seed, role)
 	remainder := ids.Filter(filter.Not(filter.In(result)))
 	return result, remainder
 }
