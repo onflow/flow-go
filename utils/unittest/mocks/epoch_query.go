@@ -8,10 +8,11 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// EpochQuery implements protocol.EpochQuery for testing purposes.
 type EpochQuery struct {
 	t         *testing.T
-	counter   uint64
-	byCounter map[uint64]protocol.Epoch
+	counter   uint64                    // represents the current epoch
+	byCounter map[uint64]protocol.Epoch // all epochs
 }
 
 func NewEpochQuery(t *testing.T, counter uint64, epochs ...protocol.Epoch) *EpochQuery {
