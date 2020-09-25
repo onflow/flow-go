@@ -168,7 +168,10 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 			}
 		}
 
-		return nil, err
+		return nil, &InvalidSignatureVerificationError{
+			Address:  txSig.Address,
+			KeyIndex: txSig.KeyID,
+		}
 	}
 
 	if !valid {
