@@ -51,7 +51,8 @@ import (
 //         1. the block is missing (consensus hasn’t received this executed block yet)
 //         2. the approvals for a certain chunk are insufficient (skip for now, because we seal results without approvals)
 //         3. there is some chunk didn’t receive enough approvals
-//         4. there is no seal for its parent result
+//         4. the previous result is not known
+//         5. the previous result references the wrong block
 //     2. It should seal a matched result if the approvals are sufficient
 // 5. Matching engine should request results from execution nodes:
 //     1. If there are unsealed and finalized blocks, it should request the execution receipts from the execution nodes.
@@ -223,6 +224,9 @@ func (ms *MatchingSuite) SetupTest() {
 			if !found {
 				return nil
 			}
+			if block.Payload == nil {
+				return nil
+			}
 			return block.Payload.Index()
 		},
 		func(blockID flow.Identifier) error {
@@ -296,7 +300,7 @@ func (ms *MatchingSuite) SetupTest() {
 		mempool:                 metrics,
 		state:                   ms.state,
 		requester:               ms.requester,
-		sealedResultsDB:         ms.sealedResultsDB,
+		resultsDB:               ms.sealedResultsDB,
 		headersDB:               ms.headersDB,
 		indexDB:                 ms.indexDB,
 		results:                 ms.resultsPL,
@@ -553,29 +557,122 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestMatchedResultsEmptyMempools() {
+func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
 
 	// try to get matched results with nothing in memory pools
-	results, err := ms.matching.matchedResults()
+	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err, "should not error with empty mempools")
 	ms.Assert().Empty(results, "should not have matched results with empty mempools")
 }
 
-func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
+func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 
-	// add a block with a specific guarantee to the DB
+	// try to seal a result for which we don't have the index payload
+	result := unittest.ExecutionResultFixture()
+
+	ms.pendingResults[result.ID()] = result
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+
+	ms.Assert().Empty(results, "should not select result with unknown block")
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Rem", 0)
+}
+
+func (ms *MatchingSuite) TestSealableResulstUnsealedPrevious() {
+
+	// try to seal a result with a missing previous result
 	block := unittest.BlockFixture()
-	block.Payload.Guarantees = nil
 	ms.blocks[block.Header.ID()] = &block
-
-	// add a result for this block to the DB
 	result := unittest.ResultForBlockFixture(&block)
+
+	ms.pendingResults[result.ID()] = result
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+
+	ms.Assert().Empty(results, "should not select result with unsealed previous")
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Rem", 0)
+}
+
+// let R1 be a result that references block A, and R2 be R1's parent result.
+// Then R2 should reference A's parent.
+func (ms *MatchingSuite) TestSealableResultsInvalidSubgraph() {
+	// try to seal a result with a persisted previous result
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+	result := unittest.ResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture() // previous does not reference the same block as block parent
+	result.PreviousResultID = previous.ID()
+	ms.sealedResults[previous.ID()] = previous
+
+	ms.pendingResults[result.ID()] = result
+
+	// check calls have the correct parameters, and return 0 approvals
+	ms.resultsPL.On("Rem", mock.Anything).Run(
+		func(args mock.Arguments) {
+			resultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(result.ID(), resultID)
+		},
+	).Return(true)
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+
+	ms.Assert().Empty(results, "should not select result with invalid subgraph")
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Rem", 1)
+}
+
+func (ms *MatchingSuite) TestSealResultInvalidChunks() {
+
+	// try to seal a result with a mismatching chunk count (one too many)
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+	result := unittest.ResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture()
+	previous.BlockID = block.Header.ParentID
+	result.PreviousResultID = previous.ID()
+	ms.sealedResults[previous.ID()] = previous
+
+	// add an extra chunk
+	chunk := unittest.ChunkFixture()
+	chunk.Index = uint64(len(block.Payload.Guarantees))
+	result.Chunks = append(result.Chunks, chunk)
+
+	ms.pendingResults[result.ID()] = result
+
+	// check calls have the correct parameters, and return 0 approvals
+	ms.resultsPL.On("Rem", mock.Anything).Run(
+		func(args mock.Arguments) {
+			resultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(result.ID(), resultID)
+		},
+	).Return(true)
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+
+	ms.Assert().Empty(results, "should not select result with invalid number of chunks")
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Rem", 1)
+}
+
+func (ms *MatchingSuite) TestSealableResultsNoPayload() {
+
+	block := unittest.BlockFixture()
+	block.Payload = nil // empty payload
+	ms.blocks[block.Header.ID()] = &block
+	result := unittest.ResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture()
+	previous.BlockID = block.Header.ParentID
+	result.PreviousResultID = previous.ID()
+	ms.sealedResults[previous.ID()] = previous
+
 	ms.pendingResults[result.ID()] = result
 
 	assignment := chunks.NewAssignment()
 	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
-	results, err := ms.matching.matchedResults()
+	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	if ms.Assert().Len(results, 1, "should select result for empty block") {
 		sealable := results[0]
@@ -583,15 +680,20 @@ func (ms *MatchingSuite) TestMatchedResultsNoPayload() {
 	}
 }
 
-func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
+func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 
-	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
 	ms.blocks[block.Header.ID()] = &block
-
-	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture()
+	previous.BlockID = block.Header.ParentID
+	result.PreviousResultID = previous.ID()
+	ms.sealedResults[previous.ID()] = previous
+
 	ms.pendingResults[result.ID()] = result
+
+	assignment := chunks.NewAssignment()
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	// check calls have the correct parameters, and return 0 approvals
 	ms.approvalsPL.On("ByChunk", mock.Anything, mock.Anything).Run(
@@ -599,43 +701,40 @@ func (ms *MatchingSuite) TestMatchedResultsInsufficientApprovals() {
 			resultID := args.Get(0).(flow.Identifier)
 			ms.Assert().Equal(result.ID(), resultID)
 		},
-	).Return(nil, false)
+	).Return(make(map[flow.Identifier]*flow.ResultApproval), true)
 
-	assignment := chunks.NewAssignment()
-	approvers := ms.approvers[:3]
-	for _, chunk := range result.Chunks {
-		assignment.Add(chunk, approvers.NodeIDs())
-	}
-	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
-
-	results, err := ms.matching.matchedResults()
+	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "should not select result with insufficient approvals")
 }
 
-func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
+func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 
-	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
 	ms.blocks[block.Header.ID()] = &block
-
-	// add a result for this block to the mempool
 	result := unittest.ResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture()
+	previous.BlockID = block.Header.ParentID
+	result.PreviousResultID = previous.ID()
+	ms.sealedResults[previous.ID()] = previous
+
 	ms.pendingResults[result.ID()] = result
 
+	// assign each chunk to each approver
 	assignment := chunks.NewAssignment()
-	approvers := ms.approvers[:3]
 	for _, chunk := range result.Chunks {
-		assignment.Add(chunk, approvers.NodeIDs())
+		assignment.Add(chunk, ms.approvers.NodeIDs())
 	}
 	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
+	// not using mock for approvals pool because we need the internal indexing
+	// logic
 	realApprovalPool, err := stdmap.NewApprovals(1000)
 	ms.Require().NoError(err)
 	ms.matching.approvals = realApprovalPool
 
 	// add enough approvals for each chunk
-	for _, approver := range approvers {
+	for _, approver := range ms.approvers {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
 			approval := unittest.ResultApprovalFixture()
 			approval.Body.BlockID = block.Header.ID()
@@ -647,7 +746,7 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 		}
 	}
 
-	results, err := ms.matching.matchedResults()
+	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	if ms.Assert().Len(results, 1, "should select result with sufficient approvals") {
 		sealable := results[0]
@@ -655,13 +754,17 @@ func (ms *MatchingSuite) TestMatchedResultsSufficientApprovals() {
 	}
 }
 
-func (ms *MatchingSuite) TestMatchedResultsUnassignedVerifiers() {
+func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 
-	// add a block with a specific guarantee to the DB
 	block := unittest.BlockFixture()
-
-	// add a result for this block to the mempool
+	ms.blocks[block.Header.ID()] = &block
 	result := unittest.ResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture()
+	previous.BlockID = block.Header.ParentID
+	result.PreviousResultID = previous.ID()
+	ms.sealedResults[previous.ID()] = previous
+
+	ms.pendingResults[result.ID()] = result
 
 	// list of 3 approvers
 	assignedApprovers := ms.approvers[:3]
@@ -671,6 +774,8 @@ func (ms *MatchingSuite) TestMatchedResultsUnassignedVerifiers() {
 	for _, chunk := range result.Chunks {
 		assignment.Add(chunk, assignedApprovers.NodeIDs())
 	}
+	// mock assigner
+	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	realApprovalPool, err := stdmap.NewApprovals(1000)
 	ms.Require().NoError(err)
@@ -688,55 +793,9 @@ func (ms *MatchingSuite) TestMatchedResultsUnassignedVerifiers() {
 		ms.Require().NoError(err)
 	}
 
-	// mock assigner
-	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
-
-	results, err := ms.matching.matchedResults()
+	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Len(results, 0, "should not count approvals from unassigned verifiers")
-}
-
-func (ms *MatchingSuite) TestSealResultMissingBlock() {
-
-	// try to seal a result for which we don't have the index payload
-	result := unittest.ExecutionResultFixture()
-
-	err := ms.matching.sealResult(result)
-	ms.Require().Equal(errUnknownBlock, err, "should get unknown block error on missing block")
-
-	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
-	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-func (ms *MatchingSuite) TestSealResultInvalidChunks() {
-
-	// try to seal a result with a mismatching chunk count
-	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
-	result := unittest.ResultForBlockFixture(&block)
-	chunk := unittest.ChunkFixture()
-	chunk.Index = uint64(len(block.Payload.Guarantees))
-	result.Chunks = append(result.Chunks, chunk)
-
-	err := ms.matching.sealResult(result)
-	ms.Require().Equal(errInvalidChunks, err, "should get invalid chunks error on wrong chunk count")
-
-	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
-	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-func (ms *MatchingSuite) TestSealResultUnsealedPrevious() {
-
-	// try to seal a result with a missing previous result
-	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
-	result := unittest.ResultForBlockFixture(&block)
-
-	err := ms.matching.sealResult(result)
-	ms.Require().Equal(errUnsealedPrevious, err, "should get unsealed previous error on missing previous result")
-
-	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
-	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
 func (ms *MatchingSuite) TestSealResultValid() {
@@ -746,6 +805,7 @@ func (ms *MatchingSuite) TestSealResultValid() {
 	ms.blocks[block.Header.ID()] = &block
 	result := unittest.ResultForBlockFixture(&block)
 	previous := unittest.ExecutionResultFixture()
+	previous.BlockID = block.Header.ParentID
 	result.PreviousResultID = previous.ID()
 	ms.sealedResults[previous.ID()] = previous
 
