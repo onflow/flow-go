@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
+	st "github.com/onflow/flow-go/state"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -64,11 +65,11 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.RetrieveSeal(sealID, seal))
 		require.NoError(t, err)
 
-		assert.Equal(t, block.Header.Height, finalized)
-		assert.Equal(t, block.Header.Height, sealed)
-		assert.Equal(t, block.ID(), genesisID)
-		assert.Equal(t, block.ID(), seal.BlockID)
-		assert.Equal(t, block.Header, &header)
+		require.Equal(t, block.Header.Height, finalized)
+		require.Equal(t, block.Header.Height, sealed)
+		require.Equal(t, block.ID(), genesisID)
+		require.Equal(t, block.ID(), seal.BlockID)
+		require.Equal(t, block.Header, &header)
 	})
 }
 
@@ -362,8 +363,8 @@ func TestExtendValid(t *testing.T) {
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
-		assert.NoError(t, err)
-		assert.Equal(t, seal.FinalState, finalCommit)
+		require.NoError(t, err)
+		require.Equal(t, seal.FinalState, finalCommit)
 
 		consumer.On("BlockFinalized", extend.Header).Once()
 		err = state.Mutate().Finalize(extend.ID())
@@ -383,7 +384,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 		finalCommit, err := state.Final().Commit()
 		require.NoError(t, err)
-		assert.Equal(t, seal.FinalState, finalCommit, "original commit should be root commit")
+		require.Equal(t, seal.FinalState, finalCommit, "original commit should be root commit")
 
 		first := unittest.BlockWithParentFixture(root.Header)
 		first.SetPayload(flow.Payload{})
@@ -408,21 +409,21 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 		finalCommit, err = state.Final().Commit()
 		require.NoError(t, err)
-		assert.Equal(t, seal.FinalState, finalCommit, "commit should not change before finalizing")
+		require.Equal(t, seal.FinalState, finalCommit, "commit should not change before finalizing")
 
 		err = state.Mutate().Finalize(first.ID())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		finalCommit, err = state.Final().Commit()
 		require.NoError(t, err)
-		assert.Equal(t, seal.FinalState, finalCommit, "commit should not change after finalizing non-sealing block")
+		require.Equal(t, seal.FinalState, finalCommit, "commit should not change after finalizing non-sealing block")
 
 		err = state.Mutate().Finalize(second.ID())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		finalCommit, err = state.Final().Commit()
 		require.NoError(t, err)
-		assert.Equal(t, extend.FinalState, finalCommit, "commit should change after finalizing sealing block")
+		require.Equal(t, extend.FinalState, finalCommit, "commit should change after finalizing sealing block")
 	})
 }
 
@@ -443,13 +444,13 @@ func TestExtendMissingParent(t *testing.T) {
 
 		err = state.Mutate().Extend(&extend)
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
 }
 
@@ -483,7 +484,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
 }
 
@@ -529,13 +530,13 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		extend.Header.ParentID = block.Header.ID()
 
 		err = state.Mutate().Extend(&extend)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.Error(t, err)
+		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
 }
 
@@ -574,12 +575,13 @@ func TestExtendSealNotConnected(t *testing.T) {
 
 		err = state.Mutate().Extend(&sealing)
 		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(sealing.ID(), &sealID))
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
 }
 
@@ -599,6 +601,7 @@ func TestExtendWrongIdentity(t *testing.T) {
 
 		err = state.Mutate().Extend(&extend)
 		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
 }
 
@@ -613,6 +616,7 @@ func TestExtendInvalidChainID(t *testing.T) {
 
 		err := state.Mutate().Extend(&block)
 		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
 }
 
@@ -661,8 +665,8 @@ func TestExtendHighestSeal(t *testing.T) {
 		require.Nil(t, err)
 
 		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
-		assert.NoError(t, err)
-		assert.Equal(t, seal3.FinalState, finalCommit)
+		require.NoError(t, err)
+		require.Equal(t, seal3.FinalState, finalCommit)
 	})
 }
 
@@ -692,7 +696,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// we should begin the epoch in the staking phase
 		phase, err := state.AtBlockID(root.ID()).Phase()
 		assert.Nil(t, err)
-		assert.Equal(t, flow.EpochPhaseStaking, phase)
+		require.Equal(t, flow.EpochPhaseStaking, phase)
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(root.Header)
@@ -736,13 +740,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// now that the setup event has been emitted, we should be in the setup phase
 		phase, err = state.AtBlockID(block2.ID()).Phase()
 		assert.Nil(t, err)
-		assert.Equal(t, flow.EpochPhaseSetup, phase)
+		require.Equal(t, flow.EpochPhaseSetup, phase)
 
 		// we should NOT be able to query epoch 2 wrt block 1
 		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
-		assert.Error(t, err)
+		require.Error(t, err)
 		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// we should be able to query epoch 2 wrt block 2
 		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
@@ -752,7 +756,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
 		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// ensure an epoch phase transition when we finalize the event
 		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block2.Header).Once()
@@ -782,7 +786,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should NOT be able to query epoch 2 commit info wrt block 2
 		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// now epoch 2 is fully ready, we can query anything we want about it wrt block 3 (or later)
 		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
@@ -795,7 +799,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// how that the commit event has been emitted, we should be in the committed phase
 		phase, err = state.AtBlockID(block3.ID()).Phase()
 		assert.Nil(t, err)
-		assert.Equal(t, flow.EpochPhaseCommitted, phase)
+		require.Equal(t, flow.EpochPhaseCommitted, phase)
 
 		// expect epoch phase transition once we finalize block 3
 		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block3.Header)
@@ -806,7 +810,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// we should still be in epoch 1
 		epochCounter, err := state.AtBlockID(block3.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
-		assert.Equal(t, epoch1Setup.Counter, epochCounter)
+		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
 		// block 4 has the final view of the epoch
 		block4 := unittest.BlockWithParentFixture(block3.Header)
@@ -819,7 +823,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// we should still be in epoch 1, since epochs are inclusive of final view
 		epochCounter, err = state.AtBlockID(block4.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
-		assert.Equal(t, epoch1Setup.Counter, epochCounter)
+		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
 		// block 5 has a view > final view of epoch 1, it will be considered the first block of epoch 2
 		block5 := unittest.BlockWithParentFixture(block4.Header)
@@ -833,13 +837,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// now, at long last, we are in epoch 2
 		epochCounter, err = state.AtBlockID(block5.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
-		assert.Equal(t, epoch2Setup.Counter, epochCounter)
+		require.Equal(t, epoch2Setup.Counter, epochCounter)
 
 		// we should begin epoch 2 in staking phase
 		// how that the commit event has been emitted, we should be in the committed phase
 		phase, err = state.AtBlockID(block5.ID()).Phase()
 		assert.Nil(t, err)
-		assert.Equal(t, flow.EpochPhaseStaking, phase)
+		require.Equal(t, flow.EpochPhaseStaking, phase)
 
 		// expect epoch transition once we finalize block 5
 		consumer.On("EpochTransition", epoch2Setup.Counter, block5.Header).Once()
@@ -924,11 +928,11 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// should be able query each epoch from the appropriate reference block
 		setup1FinalView, err := state.AtBlockID(block3.ID()).Epochs().Next().FinalView()
 		assert.Nil(t, err)
-		assert.Equal(t, nextEpochSetup1.FinalView, setup1FinalView)
+		require.Equal(t, nextEpochSetup1.FinalView, setup1FinalView)
 
 		setup2FinalView, err := state.AtBlockID(block4.ID()).Epochs().Next().FinalView()
 		assert.Nil(t, err)
-		assert.Equal(t, nextEpochSetup2.FinalView, setup2FinalView)
+		require.Equal(t, nextEpochSetup2.FinalView, setup2FinalView)
 	})
 }
 
@@ -982,6 +986,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 			err = state.Mutate().Extend(&block)
 			require.Error(t, err)
+			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
 		t.Run("invalid final view", func(t *testing.T) {
@@ -994,6 +999,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			})
 			err = state.Mutate().Extend(&block)
 			require.Error(t, err)
+			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
 		t.Run("empty seed", func(t *testing.T) {
@@ -1007,6 +1013,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 			err = state.Mutate().Extend(&block)
 			require.Error(t, err)
+			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 	})
 }
@@ -1074,6 +1081,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			})
 			err = state.Mutate().Extend(&block)
 			require.Error(t, err)
+			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
 		// insert the epoch setup
@@ -1098,6 +1106,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			})
 			err := state.Mutate().Extend(&block)
 			require.Error(t, err)
+			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
 		t.Run("inconsistent cluster QCs", func(t *testing.T) {
@@ -1218,8 +1227,8 @@ func TestHeaderExtendValid(t *testing.T) {
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
-		assert.NoError(t, err)
-		assert.Equal(t, seal.FinalState, finalCommit)
+		require.NoError(t, err)
+		require.Equal(t, seal.FinalState, finalCommit)
 	})
 }
 
@@ -1240,13 +1249,13 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 
 		err = state.Mutate().HeaderExtend(&extend)
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
 }
 
@@ -1270,8 +1279,8 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 
 		// create another block that points to the previous block `extend` as parent
 		// but has _same_ height as parent. This violates the condition that a child's
-		// height must increment the parent's height by one, i.e. it should be rejected 
-		// by the follower right away 
+		// height must increment the parent's height by one, i.e. it should be rejected
+		// by the follower right away
 		extend.Header.ParentID = extend.Header.ID()
 		extend.Header.Height = 1
 		extend.Header.View = 2
@@ -1283,7 +1292,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
 }
 
@@ -1310,8 +1319,8 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		// add 2 blocks, where:
-		// first block is added and then finalized; 
-		// second block is a sibling to the finalized block 
+		// first block is added and then finalized;
+		// second block is a sibling to the finalized block
 		// The Follower should reject this block as an outdated chain extension
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
@@ -1332,13 +1341,14 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		extend.Header.ParentID = block.Header.ID()
 
 		err = state.Mutate().HeaderExtend(&extend)
-		assert.Error(t, err)
+		require.Error(t, err)
+		require.True(t, st.IsOutdatedExtensionError(err), err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		require.Error(t, err)
+		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
 }
 
@@ -1387,8 +1397,8 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		require.Nil(t, err)
 
 		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
-		assert.NoError(t, err)
-		assert.Equal(t, seal3.FinalState, finalCommit)
+		require.NoError(t, err)
+		require.Equal(t, seal3.FinalState, finalCommit)
 	})
 }
 

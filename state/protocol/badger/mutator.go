@@ -243,7 +243,7 @@ func (m *Mutator) headerExtend(candidate *flow.Block) error {
 
 	parent, err := m.state.headers.ByBlockID(header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve parent: %w", err)
+		return state.NewInvalidExtensionErrorf("could not retrieve parent: %s", err)
 	}
 	if header.ChainID != parent.ChainID {
 		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
@@ -800,24 +800,24 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				// We should only have a single epoch setup event per epoch.
 				if epochStatus.NextEpoch.SetupID != flow.ZeroID {
 					// true iff EpochSetup event for NEXT epoch was already included before
-					return nil, fmt.Errorf("duplicate epoch setup service event")
+					return nil, state.NewInvalidExtensionError("duplicate epoch setup service event")
 				}
 
 				// The setup event should have the counter increased by one.
 				if ev.Counter != counter+1 {
-					return nil, fmt.Errorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
+					return nil, state.NewInvalidExtensionErrorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
 				}
 
 				// The final view needs to be after the current epoch final view.
 				// NOTE: This kind of operates as an overflow check for the other checks.
 				if ev.FinalView <= activeSetup.FinalView {
-					return nil, fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
+					return nil, state.NewInvalidExtensionErrorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
 				}
 
 				// Finally, the epoch setup event must contain all necessary information.
 				err = validSetup(ev)
 				if err != nil {
-					return nil, fmt.Errorf("invalid epoch setup: %w", err)
+					return nil, state.NewInvalidExtensionErrorf("invalid epoch setup: %s", err)
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -831,27 +831,27 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				// We should only have a single epoch commit event per epoch.
 				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
 					// true iff EpochEpochCommitSetup event for NEXT epoch was already included before
-					return nil, fmt.Errorf("duplicate epoch commit service event")
+					return nil, state.NewInvalidExtensionError("duplicate epoch commit service event")
 				}
 
 				// The epoch setup event needs to happen before the commit.
 				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
-					return nil, fmt.Errorf("missing epoch setup for epoch commit")
+					return nil, state.NewInvalidExtensionError("missing epoch setup for epoch commit")
 				}
 
 				// The commit event should have the counter increased by one.
 				if ev.Counter != counter+1 {
-					return nil, fmt.Errorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
+					return nil, state.NewInvalidExtensionErrorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
 				}
 
 				// Finally, the commit should commit all the necessary information.
 				setup, err := m.state.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
-					return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
+					return nil, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
 				}
 				err = validCommit(ev, setup)
 				if err != nil {
-					return nil, fmt.Errorf("invalid epoch commit: %w", err)
+					return nil, state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
