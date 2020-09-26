@@ -97,7 +97,7 @@ func decodeAccountPublicKeyWrapper(b []byte) (accountPublicKeyWrapper, error) {
 	return wrapper, nil
 }
 
-func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
+func DecodeAccountPublicKey(b []byte, index uint64) (AccountPublicKey, error) {
 	w, err := decodeAccountPublicKeyWrapper(b)
 	if err != nil {
 		return AccountPublicKey{}, err
@@ -112,6 +112,7 @@ func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
 	}
 
 	return AccountPublicKey{
+		Index:     int(index),
 		PublicKey: publicKey,
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
