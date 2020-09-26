@@ -3,8 +3,8 @@ package state
 import (
 	"strings"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // A Ledger is the storage interface used by the virtual machine to read and write register values.

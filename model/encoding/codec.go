@@ -1,7 +1,7 @@
 package encoding
 
 import (
-	"github.com/dapperlabs/flow-go/model/encoding/json"
+	"github.com/onflow/flow-go/model/encoding/json"
 )
 
 // Encodable is a type that defines a canonical encoding.

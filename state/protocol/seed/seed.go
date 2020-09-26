@@ -1,18 +1,18 @@
-package protocol
+package seed
 
 import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/module/signature"
 )
 
-// SeedFromParentSignature reads the raw random seed from a combined signature.
+// FromParentSignature reads the raw random seed from a combined signature.
 // the combinedSig must be from a QuorumCertificate. The indices can be used to
 // generate task-specific seeds from the same signature.
-func SeedFromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
+func FromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
 	// split the parent voter sig into staking & beacon parts
 	combiner := signature.NewCombiner()
 	sigs, err := combiner.Split(combinedSig)
@@ -23,11 +23,11 @@ func SeedFromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]
 		return nil, fmt.Errorf("invalid block signature split")
 	}
 
-	return SeedFromRandomSource(indices, sigs[1])
+	return FromRandomSource(indices, sigs[1])
 }
 
-// SeedFromRandomSource generates a task-specific seed (task is determined by indices).
-func SeedFromRandomSource(indices []uint32, sor []byte) ([]byte, error) {
+// FromRandomSource generates a task-specific seed (task is determined by indices).
+func FromRandomSource(indices []uint32, sor []byte) ([]byte, error) {
 	if len(indices)*4 > hash.KmacMaxParamsLen {
 		return nil, fmt.Errorf("unsupported number of indices")
 	}

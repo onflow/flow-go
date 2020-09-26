@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 func TestProduceVote(t *testing.T) {
@@ -31,7 +31,7 @@ func createVoter(t *testing.T, blockView uint64, lastVotedView uint64, isBlockSa
 	persist := &mocks.Persister{}
 	persist.On("PutVoted", mock.Anything).Return(nil)
 
-	signer := &mocks.Signer{}
+	signer := &mocks.SignerVerifier{}
 	signer.On("CreateVote", mock.Anything).Return(expectVote, nil)
 
 	voter := New(signer, forks, persist, lastVotedView)

@@ -5,12 +5,23 @@ package flow
 import (
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // accountPublicKeyWrapper is used for encoding and decoding.
 type accountPublicKeyWrapper struct {
+	PublicKey []byte
+	SignAlgo  uint
+	HashAlgo  uint
+	Weight    uint
+	SeqNumber uint64
+	Revoked   bool
+}
+
+// legacyAccountPublicKeyWrapper is an RLP wrapper for the old public key format that does
+// not contain a Revoked field.
+type legacyAccountPublicKeyWrapper struct {
 	PublicKey []byte
 	SignAlgo  uint
 	HashAlgo  uint
@@ -35,14 +46,13 @@ type accountPrivateKeyWrapper struct {
 }
 
 func EncodeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
-	publicKey := a.PublicKey.Encode()
-
 	w := accountPublicKeyWrapper{
-		PublicKey: publicKey,
+		PublicKey: a.PublicKey.Encode(),
 		SignAlgo:  uint(a.SignAlgo),
 		HashAlgo:  uint(a.HashAlgo),
 		Weight:    uint(a.Weight),
 		SeqNumber: a.SeqNumber,
+		Revoked:   a.Revoked,
 	}
 
 	return rlp.EncodeToBytes(&w)
@@ -61,10 +71,34 @@ func EncodeRuntimeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
 	return rlp.EncodeToBytes(&w)
 }
 
-func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
-	var w accountPublicKeyWrapper
+func decodeAccountPublicKeyWrapper(b []byte) (accountPublicKeyWrapper, error) {
+	var wrapper accountPublicKeyWrapper
 
-	err := rlp.DecodeBytes(b, &w)
+	err := rlp.DecodeBytes(b, &wrapper)
+	if err != nil {
+		// public key data may be stored in legacy format, so convert
+		var legacyWrapper legacyAccountPublicKeyWrapper
+
+		err := rlp.DecodeBytes(b, &legacyWrapper)
+		if err != nil {
+			return accountPublicKeyWrapper{}, err
+		}
+
+		return accountPublicKeyWrapper{
+			PublicKey: legacyWrapper.PublicKey,
+			SignAlgo:  legacyWrapper.SignAlgo,
+			HashAlgo:  legacyWrapper.HashAlgo,
+			Weight:    legacyWrapper.Weight,
+			SeqNumber: legacyWrapper.SeqNumber,
+			Revoked:   false, // all legacy keys are not revoked
+		}, nil
+	}
+
+	return wrapper, nil
+}
+
+func DecodeAccountPublicKey(b []byte, index uint64) (AccountPublicKey, error) {
+	w, err := decodeAccountPublicKeyWrapper(b)
 	if err != nil {
 		return AccountPublicKey{}, err
 	}
@@ -78,11 +112,13 @@ func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
 	}
 
 	return AccountPublicKey{
+		Index:     int(index),
 		PublicKey: publicKey,
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
 		Weight:    int(w.Weight),
 		SeqNumber: w.SeqNumber,
+		Revoked:   w.Revoked,
 	}, nil
 }
 

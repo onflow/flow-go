@@ -3,9 +3,9 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type SignatureVerifier interface {
@@ -53,8 +53,31 @@ func newHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
 	case hash.SHA3_256:
 		return hash.NewSHA3_256()
 	}
-
 	return nil
+}
+
+// StringToSigningAlgorithm converts a string to a SigningAlgorithm.
+func StringToSigningAlgorithm(s string) crypto.SigningAlgorithm {
+	switch s {
+	case crypto.ECDSAP256.String():
+		return crypto.ECDSAP256
+	case crypto.ECDSASecp256k1.String():
+		return crypto.ECDSASecp256k1
+	default:
+		return crypto.UnknownSigningAlgorithm
+	}
+}
+
+// StringToHashingAlgorithm converts a string to a HashingAlgorithm.
+func StringToHashingAlgorithm(s string) hash.HashingAlgorithm {
+	switch s {
+	case hash.SHA2_256.String():
+		return hash.SHA2_256
+	case hash.SHA3_256.String():
+		return hash.SHA3_256
+	default:
+		return hash.UnknownHashingAlgorithm
+	}
 }
 
 // verifySignatureFromRuntime is an adapter that performs signature verification using
@@ -68,8 +91,8 @@ func verifySignatureFromRuntime(
 	rawSigAlgo string,
 	rawHashAlgo string,
 ) (bool, error) {
-	sigAlgo := crypto.StringToSigningAlgorithm(rawSigAlgo)
-	hashAlgo := hash.StringToHashingAlgorithm(rawHashAlgo)
+	sigAlgo := StringToSigningAlgorithm(rawSigAlgo)
+	hashAlgo := StringToHashingAlgorithm(rawHashAlgo)
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {

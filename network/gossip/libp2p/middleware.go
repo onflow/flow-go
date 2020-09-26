@@ -16,15 +16,15 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/gossip/libp2p/message"
+	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
+	"github.com/onflow/flow-go/network/gossip/libp2p/validators"
 )
 
 type communicationMode int
@@ -420,6 +420,12 @@ func (m *Middleware) Subscribe(channelID string) error {
 	go rs.receiveLoop(m.wg)
 
 	return nil
+}
+
+// Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
+func (m *Middleware) Unsubscribe(channelID string) error {
+	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
+	return m.libP2PNode.UnSubscribe(topic)
 }
 
 // processMessage processes a message and eventually passes it to the overlay

@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type PubSubTestSuite struct {

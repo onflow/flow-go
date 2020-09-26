@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/ledger/mtrie"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/proof"
 )
 
 func TestBatchProofEncoderDecoder(t *testing.T) {

@@ -1,6 +1,6 @@
 package generator
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import "github.com/onflow/flow-go/model/flow"
 
 type Identifiers struct {
 	count int

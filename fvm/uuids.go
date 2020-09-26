@@ -3,7 +3,7 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 type UUIDGenerator struct {

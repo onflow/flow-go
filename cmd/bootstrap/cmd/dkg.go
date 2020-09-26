@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/encodable"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 )
 
 func runDKG(nodes []model.NodeInfo) model.DKGData {

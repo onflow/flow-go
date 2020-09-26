@@ -1,8 +1,8 @@
 package ejectors
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // LatestSeal is a mempool ejector for block seals that ejects newest-first.

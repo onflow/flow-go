@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // SporkingTestSuite tests that the network layer behaves as expected after a spork.
@@ -77,7 +77,7 @@ func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	// assert that stream creation failed
 	assert.Error(h.T(), err)
 	// assert that it failed with the expected error
-	assert.Regexp(h.T(), ".*failed to negotiate security protocol: connected to wrong peer.*", err)
+	assert.Regexp(h.T(), ".*failed to negotiate security protocol.*", err)
 }
 
 // TestProtocolChangeAfterHardSpoon tests that a node from the old chain cannot talk to a node in the new chain if

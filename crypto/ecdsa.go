@@ -16,7 +16,7 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/btcsuite/btcd/btcec"
 )
@@ -99,9 +99,14 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 
 // verifyHash implements ECDSA signature verification
 func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
+	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
+
+	if len(sig) != 2*Nlen {
+		return false, nil
+	}
+
 	var r big.Int
 	var s big.Int
-	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
 	r.SetBytes(sig[:Nlen])
 	s.SetBytes(sig[Nlen:])
 	return goecdsa.Verify(pk.goPubKey, h, &r, &s), nil

@@ -9,16 +9,17 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	realprotocol "github.com/dapperlabs/flow-go/state/protocol"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	network "github.com/onflow/flow-go/network/mock"
+	realprotocol "github.com/onflow/flow-go/state/protocol"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -27,8 +28,9 @@ type Suite struct {
 	N_COLLECTORS int
 	N_CLUSTERS   uint
 
-	con *network.Conduit
-	me  *module.Local
+	conduit *network.Conduit
+	me      *module.Local
+	conf    Config
 
 	pool *mempool.Transactions
 
@@ -62,8 +64,8 @@ func (suite *Suite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	net := new(module.Network)
-	suite.con = new(network.Conduit)
-	net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil).Once()
+	suite.conduit = new(network.Conduit)
+	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil).Once()
 
 	collectors := unittest.IdentityListFixture(suite.N_COLLECTORS, unittest.WithRole(flow.RoleCollection))
 	me := collectors[0]
@@ -120,7 +122,8 @@ func (suite *Suite) SetupTest() {
 	suite.epochQuery.On("Current").Return(suite.epoch)
 	suite.epoch.On("Clustering").Return(suite.clusters, nil)
 
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pool, DefaultConfig())
+	suite.conf = DefaultConfig()
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pool, suite.conf)
 	suite.Require().Nil(err)
 }
 
@@ -133,7 +136,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &IncompleteTransactionError{}))
+		suite.Assert().True(errors.As(err, &access.IncompleteTransactionError{}))
 	})
 
 	suite.Run("gas limit exceeds the maximum allowed", func() {
@@ -142,7 +145,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &GasLimitExceededError{}))
+		suite.Assert().True(errors.As(err, &access.InvalidGasLimitError{}))
 	})
 
 	suite.Run("invalid reference block ID", func() {
@@ -151,7 +154,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &ErrUnknownReferenceBlock))
+		suite.Assert().True(errors.As(err, &access.ErrUnknownReferenceBlock))
 	})
 
 	suite.Run("un-parseable script", func() {
@@ -161,7 +164,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &InvalidScriptError{}))
+		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
 	})
 
 	suite.Run("invalid signature", func() {
@@ -170,7 +173,6 @@ func (suite *Suite) TestInvalidTransaction() {
 	})
 
 	suite.Run("expired reference block ID", func() {
-
 		// "finalize" a sufficiently high block that root block is expired
 		final := unittest.BlockFixture()
 		final.Header.Height = suite.root.Header.Height + flow.DefaultTransactionExpiry + 1
@@ -181,7 +183,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &ExpiredTransactionError{}))
+		suite.Assert().True(errors.As(err, &access.ExpiredTransactionError{}))
 	})
 }
 
@@ -196,11 +198,9 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
-	recipient := local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))[0]
-
-	// should route to other node in local cluster
-	suite.con.
-		On("Submit", &tx, recipient.NodeID).
+	// should route to local cluster
+	suite.conduit.
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, local.NodeIDs()[0], local.NodeIDs()[1]).
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
@@ -210,7 +210,7 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	stored, ok := suite.transactions[tx.ID()]
 	suite.Assert().True(ok)
 	suite.Assert().Equal(tx.ID(), stored.ID())
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // should not store transactions for a different cluster and should propagate
@@ -228,19 +228,9 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, remote, func(transaction *flow.TransactionBody) {})
 
-	// should route to both nodes in remote cluster
-	suite.con.
-		On("Submit", &tx, mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			lookup := make(map[flow.Identifier]bool)
-			for _, arg := range args[1:] {
-				lookup[arg.(flow.Identifier)] = true
-			}
-			for _, recipientID := range remote.NodeIDs() {
-				suite.Assert().True(lookup[recipientID])
-			}
-			suite.Assert().Equal(len(lookup), len(remote.NodeIDs()))
-		}).
+	// should route to remote cluster
+	suite.conduit.
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, remote[0].NodeID, remote[1].NodeID).
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
@@ -249,7 +239,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	// should not be added to local mempool
 	_, ok = suite.transactions[tx.ID()]
 	suite.Assert().False(ok)
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // should not propagate transactions received from another node (that node is
@@ -268,8 +258,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
 	// should not route to any node
-	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything)
-	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything, mock.Anything)
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
 	err := suite.engine.Process(sender.NodeID, &tx)
 	suite.Assert().Nil(err)
@@ -278,7 +267,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	stored, ok := suite.transactions[tx.ID()]
 	suite.Assert().True(ok)
 	suite.Assert().Equal(tx.ID(), stored.ID())
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // should not route or store invalid transactions
@@ -298,13 +287,12 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 		})
 
 	// should not route to any node
-	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything)
-	suite.con.AssertNotCalled(suite.T(), "Submit", tx, mock.Anything, mock.Anything)
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
 	_ = suite.engine.ProcessLocal(&tx)
 
 	// should not be added to local mempool
 	_, ok = suite.transactions[tx.ID()]
 	suite.Assert().False(ok)
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }

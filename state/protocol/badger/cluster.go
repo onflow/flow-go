@@ -1,8 +1,8 @@
 package badger
 
 import (
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Cluster implements interface protocol.Cluster

@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ChunkDataPacks represents persistent storage for chunk data packs.

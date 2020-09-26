@@ -4,8 +4,8 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkconvert "github.com/onflow/flow-go-sdk/client/convert"
 
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func ToSDKTx(tx flow.TransactionBody) sdk.Transaction {
