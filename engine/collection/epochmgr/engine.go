@@ -204,7 +204,14 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 
 	log.Info().Msg("epoch transition: new epoch components started successfully")
 
-	// set up trigger to shut down previous epoch components after max expiry
+	// Finally we set up a trigger to shut down the components of the previous
+	// epoch once we can no longer produce valid collections there. Transactions
+	// referencing blocks from the previous epoch are only valid for inclusion
+	// in collections built by clusters from that epoch. Consequently, it remains
+	// possible for the previous epoch's cluster to produce valid collections
+	// until all such transactions have expired. In fact, since these transactions
+	// can NOT be included by clusters in the new epoch, we MUST continue producing
+	// these collections within the previous epoch's clusters.
 	e.heightEvents.OnHeight(first.Height+flow.DefaultTransactionExpiry, func() {
 		e.unit.Launch(func() {
 			e.unit.Lock()
