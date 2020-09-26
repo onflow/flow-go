@@ -27,9 +27,26 @@ type Mutator interface {
 	// state.
 	Extend(block *flow.Block) error
 
-	// Finalize finalizes the block with the given hash, and all of its parents
-	// up to the finalized protocol state. It modifies the persistent immutable
-	// protocol state accordingly and forwards the pointer to the latest
-	// finalized state.
+	// HeaderExtend is a lighter version of Extend that checks whether the given
+	// block is a valid extension of the protocol state by checking only the block
+	// header.
+	// Useful for consensus follower to check the block with lower cost, and
+	// rely on consensus participants for the full block check, including the block
+	// payload
+	HeaderExtend(block *flow.Block) error
+
+	// Finalize finalizes the block with the given hash.
+	// At this level, we can only finalize one block at a time. This implies
+	// that the parent of the pending block that is to be finalized has
+	// to be the last finalized block.
+	// It modifies the persistent immutable protocol state accordingly and
+	// forwards the pointer to the latest finalized state.
 	Finalize(blockID flow.Identifier) error
+
+	// MarkValid marks the block header with the given block hash as valid.
+	// At this level, we can only mark one block at a time as valid. This
+	// implies that the parent of the block to be marked as valid
+	// has to be already valid.
+	// It modifies the persistent immutable protocol state accordingly.
+	MarkValid(blockID flow.Identifier) error
 }

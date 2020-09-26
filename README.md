@@ -1,6 +1,6 @@
 # Flow [![GoDoc](https://godoc.org/github.com/onflow/flow-go?status.svg)](https://godoc.org/github.com/onflow/flow-go)
 
-Flow is a fast, secure, and developer-friendly blockchain built to support the 
+Flow is a fast, secure, and developer-friendly blockchain built to support the
 next generation of games, apps and the digital assets that power them. Read more
 about it [here](https://github.com/onflow/flow).
 
@@ -30,11 +30,11 @@ about it [here](https://github.com/onflow/flow).
 
 ## Documentation
 
-You can find an overview of the Flow architecture on the [documentation website](https://www.onflow.org/primer). 
+You can find an overview of the Flow architecture on the [documentation website](https://www.onflow.org/primer).
 
-Development on Flow is divided into work streams. Each work stream has a home 
+Development on Flow is divided into work streams. Each work stream has a home
 directory containing high-level documentation for the stream, as well as links
-to documentation for relevant components used by that work stream. 
+to documentation for relevant components used by that work stream.
 
 The following table lists all work streams and links to their home directory and documentation:
 
@@ -64,10 +64,7 @@ git submodule update --init --recursive
 ### Install Dependencies
 
 - Install [Go](https://golang.org/doc/install) (Flow supports Go 1.13 and later)
-- Install [CMake](https://cmake.org/install/), which is used for building the crypto library [Relic](https://github.com/relic-toolkit/relic).
-
-  To build Relic run `make crypto/relic/build`
-
+- Install [CMake](https://cmake.org/install/), which is used for building the crypto library
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running
   a local network and integration tests
 - All remaining dependencies can be installed automatically:
@@ -78,11 +75,17 @@ make install-tools
 
 At this point, you should be ready to build, test, and run Flow! 🎉
 
+Note: if there is error about "relic" or "crypto", trying force removing the relic build and reinstall the tools again:
+```bash
+rm -rf crypto/relic
+make install-tools
+```
+
 ## Development Workflow
 
 ### Testing
 
-Flow has a unit test suite and an integration test suite. Unit tests for a module 
+Flow has a unit test suite and an integration test suite. Unit tests for a module
 live within the module they are testing. Integration tests live in `integration/tests`.
 
 Run the unit test suite:
@@ -99,7 +102,7 @@ make integration-test
 
 ### Building
 
-The recommended way to build and run Flow for local development is using Docker. 
+The recommended way to build and run Flow for local development is using Docker.
 
 Build a Docker image for all nodes:
 ```bash
@@ -113,12 +116,12 @@ make docker-build-$ROLE
 
 ### Local Network
 
-A local version of the network can be run for manual testing and integration. 
+A local version of the network can be run for manual testing and integration.
 See the [Local Network Guide](/integration/localnet/README.md) for instructions.
 
 ### Code Generation
 
-Generated code is kept up to date in the repository, so should be committed whenever it changes. 
+Generated code is kept up to date in the repository, so should be committed whenever it changes.
 
 Run all code generators:
 
