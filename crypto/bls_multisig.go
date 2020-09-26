@@ -239,8 +239,17 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
+	// an invalid signature with an incorrect header but correct length
+	invalidSig := make([]byte, signatureLengthBLSBLS12381)
+	invalidSig[0] = 0xC1 // incorrect header
 	for _, sig := range sigs {
-		flatSigs = append(flatSigs, sig...)
+		if len(sig) == signatureLengthBLSBLS12381 {
+			flatSigs = append(flatSigs, sig...)
+		} else {
+			// is the signature length is invalid, replace it by an invalid point
+			// that fails the deserialization in C.ep_read_bin_compact
+			flatSigs = append(flatSigs, invalidSig...)
+		}
 	}
 
 	// hash the input to 128 bytes

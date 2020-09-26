@@ -348,19 +348,16 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     const int G1size = (G1_BYTES/(SERIALIZATION+1));
     if (len!=G1size) {
-        THROW(ERR_NO_BUFFER);
         return RLC_ERR;
     }
     // check if the point is infinity
     if (bin[0] & 0x40) {
         // check if the remaining bits are cleared
         if (bin[0] & 0x3F) {
-            THROW(ERR_NO_VALID);
             return RLC_ERR;
         }
         for (int i=1; i<G1size-1; i++) {
             if (bin[i]) {
-                THROW(ERR_NO_VALID);
                 return RLC_ERR;
             } 
         }
@@ -372,7 +369,6 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     int y_is_odd = (bin[0] >> 5) & 1;
 
     if (y_is_odd && (!compressed)) {
-        THROW(ERR_NO_VALID);
         return RLC_ERR;
     } 
 
@@ -496,7 +492,6 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
-        THROW(ERR_NO_VALID);
         return RLC_ERR;
     }
 
@@ -504,12 +499,10 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     if (bin[0] & 0x40) {
         // the remaining bits need to be cleared
         if (bin[0] & 0x3F) {
-            THROW(ERR_NO_VALID);
             return RLC_ERR;
         }
         for (int i=1; i<G2size-1; i++) {
             if (bin[i]) {
-                THROW(ERR_NO_VALID);
                 return RLC_ERR;
             } 
         }
@@ -519,7 +512,6 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     byte compressed = bin[0] >> 7;
     byte y_is_odd = (bin[0] >> 5) & 1;
     if (y_is_odd && (!compressed)) {
-        THROW(ERR_NO_VALID);
         return RLC_ERR;
     } 
 	a->norm = 1;
@@ -536,7 +528,6 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     fp2_read_bin(a->x, temp, 2*Fp_BYTES);
     free(temp);
 
-    
     if (SERIALIZATION == UNCOMPRESSED) {
         fp2_read_bin(a->y, bin + 2*Fp_BYTES, 2*Fp_BYTES);
         return RLC_OK;

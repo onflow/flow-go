@@ -35,7 +35,7 @@ func BenchmarkBLSBLS12381Verify(b *testing.B) {
 }
 
 func randomSK(t *testing.T, seed []byte) PrivateKey {
-	n, err := rand.Read(seed)
+	n, err := mrand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
@@ -306,6 +306,8 @@ func TestRemovePubKeys(t *testing.T) {
 // batch verification technique and compares the result to verifying each signature
 // separately.
 func TestBatchVerify(t *testing.T) {
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
 	// random message
 	input := make([]byte, 100)
 	_, err := mrand.Read(input)
@@ -313,8 +315,6 @@ func TestBatchVerify(t *testing.T) {
 	// hasher
 	kmac := NewBLSKMAC("test tag")
 	// number of signatures to aggregate
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
 	sigsNum := mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
@@ -352,20 +352,23 @@ func TestBatchVerify(t *testing.T) {
 	})
 
 	for i := 0; i < invalidSigsNum; i++ { // alter invalidSigsNum random signatures
-		changeSignature(sigs[indices[i]])
+		alterSignature(sigs[indices[i]])
 		expectedValid[indices[i]] = false
 	}
 
 	valid, err = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
 	require.NoError(t, err)
-	assert.Equal(t, valid, expectedValid,
-		fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
+	assert.Equal(t, expectedValid, valid,
+		fmt.Sprintf("Verification of %s failed\n private keys are %s\n input is %x\n results is %v",
 			sigs, sks, input, valid))
 
 	// all signatures are invalid
 	for i := invalidSigsNum; i < sigsNum; i++ { // alter the remaining random signatures
-		changeSignature(sigs[indices[i]])
+		alterSignature(sigs[indices[i]])
 		expectedValid[indices[i]] = false
+		if i%5 == 0 {
+			sigs[indices[i]] = sigs[indices[i]][:3] // test the short signatures
+		}
 	}
 
 	valid, err = BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
@@ -377,13 +380,11 @@ func TestBatchVerify(t *testing.T) {
 	// test the empty list case
 	valid, err = BatchVerifySignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
 	require.Error(t, err)
-	//require.Nil(t, aggSig)
 	assert.Equal(t, valid, []bool{},
 		fmt.Sprintf("verification should fail with empty list key, got %v", valid))
 	// test incorrect inputs
 	valid, err = BatchVerifySignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
 	require.Error(t, err)
-	//require.Nil(t, aggSig)
 	assert.Equal(t, valid, []bool{},
 		fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
 	// test wrong hasher
@@ -398,7 +399,7 @@ func TestBatchVerify(t *testing.T) {
 }
 
 // alter or fix a signature
-func changeSignature(s Signature) {
+func alterSignature(s Signature) {
 	// this causes the signature to remain in G1 and be invalid
 	// OR to be a non-point in G1 (either on curve or not)
 	// which tests multiple error cases.
@@ -458,7 +459,7 @@ func BenchmarkBatchVerifyUnHappyPath(b *testing.B) {
 	}
 
 	// only one invalid signature
-	changeSignature(sigs[sigsNum/2])
+	alterSignature(sigs[sigsNum/2])
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// all signatures are valid

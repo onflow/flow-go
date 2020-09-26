@@ -246,10 +246,10 @@ static void bls_batchVerify_tree(const node* root, const int len, byte* results,
 // same message under multiple public keys.
 void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
      const byte* sigs_bytes, const byte* data, const int data_len) {  
+
     // initialize results to undefined
     memset(results, UNDEFINED, sigs_len);
     
-
     // build the arrays of G1 and G2 elements to verify
     ep2_st* pks = (ep2_st*) malloc(sigs_len * sizeof(ep2_st));
     ep_st* sigs = (ep_st*) malloc(sigs_len * sizeof(ep_st));
@@ -266,7 +266,8 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
         // multiply signatures and public keys at the same index by random coefficients
         } else {
             // random non-zero coefficient of a least 128 bits
-            bn_rand(r, RLC_POS, SEC_BITS);
+            //bn_rand(r, RLC_POS, SEC_BITS);
+            bn_new(r);bn_set_dig(r,0);
             bn_add_dig(r, r, 1); 
             ep_mul_lwnaf(&sigs[i], &sigs[i], r);
             ep2_mul_lwnaf(&pks[i], (ep2_st*) &pks_input[i], r);      
