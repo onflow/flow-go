@@ -246,7 +246,7 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 		if len(sig) == signatureLengthBLSBLS12381 {
 			flatSigs = append(flatSigs, sig...)
 		} else {
-			// is the signature length is invalid, replace it by an invalid point
+			// if the signature length is invalid, replace it by an invalid array
 			// that fails the deserialization in C.ep_read_bin_compact
 			flatSigs = append(flatSigs, invalidSig...)
 		}

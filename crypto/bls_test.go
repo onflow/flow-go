@@ -35,7 +35,7 @@ func BenchmarkBLSBLS12381Verify(b *testing.B) {
 }
 
 func randomSK(t *testing.T, seed []byte) PrivateKey {
-	n, err := mrand.Read(seed)
+	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
@@ -306,8 +306,7 @@ func TestRemovePubKeys(t *testing.T) {
 // batch verification technique and compares the result to verifying each signature
 // separately.
 func TestBatchVerify(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
+	mrand.Seed(time.Now().UnixNano())
 	// random message
 	input := make([]byte, 100)
 	_, err := mrand.Read(input)
