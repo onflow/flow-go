@@ -35,7 +35,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // blsBLS12381Algo, embeds SignAlgo
@@ -115,8 +115,7 @@ func NewBLSKMAC(tag string) hash.Hasher {
 // The public key is only read by the function.
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if len(s) != signatureLengthBLSBLS12381 {
-		return false, fmt.Errorf("signature length is %d, must be %d",
-			len(s), signatureLengthBLSBLS12381)
+		return false, nil
 	}
 
 	if kmac == nil {
@@ -127,6 +126,7 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
 			minHashSizeBLSBLS12381, kmac.Size())
 	}
+
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 

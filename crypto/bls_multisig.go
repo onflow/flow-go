@@ -5,7 +5,7 @@ package crypto
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // BLS multi-signature using BLS12-381 curve

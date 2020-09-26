@@ -6,9 +6,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestIdentifierFormat(t *testing.T) {
@@ -49,4 +50,32 @@ func TestIdentifierJSON(t *testing.T) {
 	err = json.Unmarshal(bz, &actual)
 	assert.NoError(t, err)
 	assert.Equal(t, id, actual)
+}
+
+func TestIdentifierSample(t *testing.T) {
+
+	total := 10
+	ids := make([]flow.Identifier, total)
+	for i := range ids {
+		ids[i] = unittest.IdentifierFixture()
+	}
+
+	t.Run("Sample creates a random sample", func(t *testing.T) {
+		sampleSize := uint(5)
+		sample := flow.Sample(sampleSize, ids...)
+		require.Len(t, sample, int(sampleSize))
+		require.NotEqual(t, sample, ids[:sampleSize])
+	})
+
+	t.Run("sample size greater than total size results in the original list", func(t *testing.T) {
+		sampleSize := uint(len(ids) + 1)
+		sample := flow.Sample(sampleSize, ids...)
+		require.Equal(t, sample, ids)
+	})
+
+	t.Run("sample size of zero results in an empty list", func(t *testing.T) {
+		sampleSize := uint(0)
+		sample := flow.Sample(sampleSize, ids...)
+		require.Empty(t, sample)
+	})
 }

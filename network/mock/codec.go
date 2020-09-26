@@ -5,7 +5,7 @@ package mock
 import (
 	io "io"
 
-	network "github.com/dapperlabs/flow-go/network"
+	network "github.com/onflow/flow-go/network"
 	mock "github.com/stretchr/testify/mock"
 )
 

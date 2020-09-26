@@ -13,9 +13,9 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/common"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/node"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/proof"
 )
 
 const (

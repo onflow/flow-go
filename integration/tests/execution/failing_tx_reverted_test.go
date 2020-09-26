@@ -9,8 +9,8 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
-	"github.com/dapperlabs/flow-go/integration/tests/common"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestExecutionFailingTxReverted(t *testing.T) {

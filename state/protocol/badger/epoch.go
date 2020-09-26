@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/flow/order"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 // SetupEpoch represents an epoch that has been setup, but not committed.
@@ -58,7 +59,7 @@ func (es *SetupEpoch) DKG() (protocol.DKG, error) {
 }
 
 func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
-	return protocol.SeedFromRandomSource(indices, es.setupEvent.RandomSource)
+	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
 }
 
 func NewSetupEpoch(setupEvent *flow.EpochSetup) *SetupEpoch {

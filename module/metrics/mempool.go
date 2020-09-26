@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/dapperlabs/flow-go/engine"
+	"github.com/onflow/flow-go/engine"
 )
 
 type EntriesFunc func() uint

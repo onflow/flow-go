@@ -9,27 +9,27 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/collection/pusher"
-	"github.com/dapperlabs/flow-go/engine/common/provider"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
-	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
-	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/verification/finder"
-	"github.com/dapperlabs/flow-go/engine/verification/match"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
+	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
+	"github.com/onflow/flow-go/engine/collection/pusher"
+	"github.com/onflow/flow-go/engine/common/provider"
+	"github.com/onflow/flow-go/engine/common/synchronization"
+	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion"
+	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/verification/finder"
+	"github.com/onflow/flow-go/engine/verification/match"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 // GenericNode implements a generic in-process node for tests.
@@ -132,11 +132,12 @@ type VerificationNode struct {
 	CachedReceipts           mempool.ReceiptDataPacks
 	ReadyReceipts            mempool.ReceiptDataPacks
 	PendingReceipts          mempool.ReceiptDataPacks
-	PendingResults           mempool.PendingResults
+	PendingResults           mempool.ResultDataPacks
 	ProcessedResultIDs       mempool.Identifiers
 	BlockIDsCache            mempool.Identifiers
 	PendingReceiptIDsByBlock mempool.IdentifierMap
 	ReceiptIDsByResult       mempool.IdentifierMap
+	ChunkIDsByResult         mempool.IdentifierMap
 	PendingChunks            *match.Chunks
 	HeaderStorage            storage.Headers
 	VerifierEngine           network.Engine

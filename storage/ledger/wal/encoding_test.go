@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/flattener"
 )
 
 func TestUpdate(t *testing.T) {

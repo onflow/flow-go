@@ -7,7 +7,17 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
+)
+
+const (
+	// DefaultPollNodes is the default number of nodes we send a message to on
+	// each poll interval.
+	DefaultPollNodes uint = 3
+
+	// DefaultBlockRequestNodes is the default number of nodes we request a
+	// block resource from.
+	DefaultBlockRequestNodes uint = 3
 )
 
 type Config struct {
@@ -33,7 +43,7 @@ func DefaultConfig() Config {
 // and collection nodes.
 //
 // Core should be wrapped by a type-aware engine that manages the specifics of
-// each chain. Example: https://github.com/dapperlabs/flow-go/blob/master/engine/common/synchronization/engine.go
+// each chain. Example: https://github.com/onflow/flow-go/blob/master/engine/common/synchronization/engine.go
 //
 // Core is NOT safe for concurrent use by multiple goroutines. Wrapping engines
 // are responsible for avoid concurrent access.

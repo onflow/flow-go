@@ -9,16 +9,16 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/verification"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type Engine struct {
@@ -352,7 +352,7 @@ func (e *Engine) checkCachedReceipts() {
 				}
 
 				// marks receipt pending for its block ID
-				_, err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
+				err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
 				if err != nil {
 					e.log.Error().
 						Err(err).
@@ -363,7 +363,7 @@ func (e *Engine) checkCachedReceipts() {
 			}
 
 			// records the execution receipt id based on its result id
-			_, err := e.receiptIDsByResult.Append(resultID, receiptID)
+			err := e.receiptIDsByResult.Append(resultID, receiptID)
 			if err != nil {
 				log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
 			}

@@ -1,4 +1,4 @@
-module github.com/dapperlabs/flow-go/crypto
+module github.com/onflow/flow-go/crypto
 
 go 1.13
 

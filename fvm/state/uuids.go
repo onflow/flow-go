@@ -3,7 +3,7 @@ package state
 import (
 	"encoding/binary"
 
-	"github.com/dapperlabs/flow-go/utils/slices"
+	"github.com/onflow/flow-go/utils/slices"
 )
 
 const keyUUID = "uuid"

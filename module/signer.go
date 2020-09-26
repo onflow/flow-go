@@ -1,7 +1,7 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // Signer is a simple cryptographic signer that can sign a simple message to

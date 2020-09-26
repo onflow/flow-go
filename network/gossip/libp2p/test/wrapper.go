@@ -3,9 +3,8 @@ package test
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 )
 
 // ConduitSendWrapperFunc is a wrapper around the set of methods offered by the
@@ -24,7 +23,7 @@ func (c *ConduitWrapper) Submit(msg interface{}, conduit network.Conduit, target
 // Publish defines a function that receives a message, conduit of an engine instance, and
 // a set target IDs. It then sends the message to the target IDs using the Publish method of conduit.
 func (c *ConduitWrapper) Publish(msg interface{}, conduit network.Conduit, targetIDs ...flow.Identifier) error {
-	return conduit.Publish(msg, filter.HasNodeID(targetIDs...))
+	return conduit.Publish(msg, targetIDs...)
 }
 
 // Unicast defines a function that receives a message, conduit of an engine instance, and
@@ -42,5 +41,5 @@ func (c *ConduitWrapper) Unicast(msg interface{}, conduit network.Conduit, targe
 // Multicast defines a function that receives a message, conduit of an engine instance, and
 // a set of target ID. It then sends the message to the target IDs using the Multicast method of conduit.
 func (c *ConduitWrapper) Multicast(msg interface{}, conduit network.Conduit, targetIDs ...flow.Identifier) error {
-	return conduit.Multicast(msg, uint(len(targetIDs)), filter.HasNodeID(targetIDs...))
+	return conduit.Multicast(msg, uint(len(targetIDs)), targetIDs...)
 }

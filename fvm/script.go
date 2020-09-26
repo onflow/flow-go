@@ -4,9 +4,9 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/hash"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/hash"
 )
 
 func Script(code []byte) *ScriptProcedure {

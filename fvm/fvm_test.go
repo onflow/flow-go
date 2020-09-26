@@ -14,14 +14,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/fvm"
-	fvmmock "github.com/dapperlabs/flow-go/fvm/mock"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/fvm"
+	fvmmock "github.com/onflow/flow-go/fvm/mock"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func vmTest(
@@ -58,12 +58,6 @@ func vmTest(
 
 		f(t, vm, chain, ctx, ledger)
 	}
-}
-
-func encodeJSONCDC(t *testing.T, value cadence.Value) []byte {
-	b, err := jsoncdc.Encode(value)
-	require.NoError(t, err)
-	return b
 }
 
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
@@ -440,188 +434,6 @@ var createAccountScript = []byte(`
     }
 `)
 
-func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
-	rt := runtime.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.New(rt)
-
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
-
-	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-	require.NoError(t, err)
-
-	ledger := testutil.RootBootstrappedLedger(vm, ctx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
-	require.NoError(t, err)
-
-	addAccountCreatorTemplate := `
-    import FlowServiceAccount from 0x%s
-    transaction {
-        let serviceAccountAdmin: &FlowServiceAccount.Administrator
-        prepare(signer: AuthAccount) {
-            // Borrow reference to FlowServiceAccount Administrator resource.
-            //
-            self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
-                ?? panic("Unable to borrow reference to administrator resource")
-        }
-        execute {
-            // Add account to account creator allow list.
-            //
-            // Will emit AccountCreatorAdded(accountCreator: accountCreator).
-            //
-            self.serviceAccountAdmin.addAccountCreator(0x%s)
-        }
-    }
-    `
-
-	addAccountCreator := func(account flow.Address, seqNum uint64) {
-		script := []byte(
-			fmt.Sprintf(addAccountCreatorTemplate,
-				chain.ServiceAddress().String(),
-				account.String(),
-			),
-		)
-
-		txBody := flow.NewTransactionBody().
-			SetScript(script).
-			AddAuthorizer(chain.ServiceAddress())
-
-		err = testutil.SignTransactionAsServiceAccount(txBody, seqNum, chain)
-		require.NoError(t, err)
-
-		tx := fvm.Transaction(txBody)
-
-		err := vm.Run(ctx, tx, ledger)
-		require.NoError(t, err)
-
-		assert.NoError(t, tx.Err)
-	}
-
-	removeAccountCreatorTemplate := `
-    import FlowServiceAccount from 0x%s
-    transaction {
-        let serviceAccountAdmin: &FlowServiceAccount.Administrator
-        prepare(signer: AuthAccount) {
-            // Borrow reference to FlowServiceAccount Administrator resource.
-            //
-            self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
-                ?? panic("Unable to borrow reference to administrator resource")
-        }
-        execute {
-            // Remove account from account creator allow list.
-            //
-            // Will emit AccountCreatorRemoved(accountCreator: accountCreator).
-            //
-            self.serviceAccountAdmin.removeAccountCreator(0x%s)
-        }
-    }
-    `
-
-	removeAccountCreator := func(account flow.Address, seqNum uint64) {
-		script := []byte(
-			fmt.Sprintf(
-				removeAccountCreatorTemplate,
-				chain.ServiceAddress(),
-				account.String(),
-			),
-		)
-
-		txBody := flow.NewTransactionBody().
-			SetScript(script).
-			AddAuthorizer(chain.ServiceAddress())
-
-		err = testutil.SignTransactionAsServiceAccount(txBody, seqNum, chain)
-		require.NoError(t, err)
-
-		tx := fvm.Transaction(txBody)
-
-		err := vm.Run(ctx, tx, ledger)
-		require.NoError(t, err)
-
-		assert.NoError(t, tx.Err)
-	}
-
-	t.Run("Invalid account creator", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			AddAuthorizer(accounts[0])
-
-		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
-		require.NoError(t, err)
-
-		err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
-		require.NoError(t, err)
-
-		tx := fvm.Transaction(txBody)
-
-		err := vm.Run(ctx, tx, ledger)
-		require.NoError(t, err)
-
-		assert.Error(t, tx.Err)
-	})
-
-	t.Run("Valid account creator", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			AddAuthorizer(chain.ServiceAddress())
-
-		err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
-		require.NoError(t, err)
-
-		tx := fvm.Transaction(txBody)
-
-		err := vm.Run(ctx, tx, ledger)
-		require.NoError(t, err)
-
-		assert.NoError(t, tx.Err)
-	})
-
-	t.Run("Account creation succeeds when added to authorized accountCreators", func(t *testing.T) {
-		addAccountCreator(accounts[0], 1)
-
-		txBody := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			SetPayer(accounts[0]).
-			SetProposalKey(accounts[0], 0, 0).
-			AddAuthorizer(accounts[0])
-
-		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
-		require.NoError(t, err)
-
-		tx := fvm.Transaction(txBody)
-
-		err := vm.Run(ctx, tx, ledger)
-		require.NoError(t, err)
-
-		assert.NoError(t, tx.Err)
-	})
-
-	t.Run("Account creation fails when removed from authorized accountCreators", func(t *testing.T) {
-		removeAccountCreator(accounts[0], 2)
-
-		txBody := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			SetPayer(accounts[0]).
-			SetProposalKey(accounts[0], 0, 0).
-			AddAuthorizer(accounts[0])
-
-		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
-		require.NoError(t, err)
-
-		tx := fvm.Transaction(txBody)
-
-		err := vm.Run(ctx, tx, ledger)
-		require.NoError(t, err)
-
-		assert.Error(t, tx.Err)
-	})
-}
-
 func TestBlockContext_ExecuteScript(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
@@ -746,9 +558,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		require.Len(t, tx.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
 			float64(block1.Header.Timestamp.Unix())), tx.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), tx.Logs[1])
 	})
 
@@ -773,9 +585,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, script.Err)
 
 		require.Len(t, script.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
 			float64(block1.Header.Timestamp.Unix())), script.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), script.Logs[1])
 	})
 
@@ -1094,10 +906,10 @@ func TestSignatureVerification(t *testing.T) {
 
 			t.Run("Valid", func(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
-					encodeJSONCDC(t, publicKeys),
-					encodeJSONCDC(t, message),
-					encodeJSONCDC(t, signatures),
-					encodeJSONCDC(t, weight),
+					jsoncdc.MustEncode(publicKeys),
+					jsoncdc.MustEncode(message),
+					jsoncdc.MustEncode(signatures),
+					jsoncdc.MustEncode(weight),
 				)
 
 				err := vm.Run(ctx, script, ledger)
@@ -1111,10 +923,10 @@ func TestSignatureVerification(t *testing.T) {
 				_, invalidRawMessage := createMessage("bar")
 
 				script := fvm.Script(code).WithArguments(
-					encodeJSONCDC(t, publicKeys),
-					encodeJSONCDC(t, invalidRawMessage),
-					encodeJSONCDC(t, signatures),
-					encodeJSONCDC(t, weight),
+					jsoncdc.MustEncode(publicKeys),
+					jsoncdc.MustEncode(invalidRawMessage),
+					jsoncdc.MustEncode(signatures),
+					jsoncdc.MustEncode(weight),
 				)
 
 				err := vm.Run(ctx, script, ledger)
@@ -1133,10 +945,10 @@ func TestSignatureVerification(t *testing.T) {
 				})
 
 				script := fvm.Script(code).WithArguments(
-					encodeJSONCDC(t, publicKeys),
-					encodeJSONCDC(t, message),
-					encodeJSONCDC(t, invalidRawSignatures),
-					encodeJSONCDC(t, weight),
+					jsoncdc.MustEncode(publicKeys),
+					jsoncdc.MustEncode(message),
+					jsoncdc.MustEncode(invalidRawSignatures),
+					jsoncdc.MustEncode(weight),
 				)
 
 				err := vm.Run(ctx, script, ledger)
@@ -1154,10 +966,10 @@ func TestSignatureVerification(t *testing.T) {
 				})
 
 				script := fvm.Script(code).WithArguments(
-					encodeJSONCDC(t, invalidPublicKeys),
-					encodeJSONCDC(t, message),
-					encodeJSONCDC(t, signatures),
-					encodeJSONCDC(t, weight),
+					jsoncdc.MustEncode(invalidPublicKeys),
+					jsoncdc.MustEncode(message),
+					jsoncdc.MustEncode(signatures),
+					jsoncdc.MustEncode(weight),
 				)
 
 				err := vm.Run(ctx, script, ledger)
@@ -1195,10 +1007,10 @@ func TestSignatureVerification(t *testing.T) {
 				})
 
 				script := fvm.Script(code).WithArguments(
-					encodeJSONCDC(t, publicKeys),
-					encodeJSONCDC(t, message),
-					encodeJSONCDC(t, signatures),
-					encodeJSONCDC(t, weight),
+					jsoncdc.MustEncode(publicKeys),
+					jsoncdc.MustEncode(message),
+					jsoncdc.MustEncode(signatures),
+					jsoncdc.MustEncode(weight),
 				)
 
 				err := vm.Run(ctx, script, ledger)
@@ -1215,10 +1027,10 @@ func TestSignatureVerification(t *testing.T) {
 				})
 
 				script := fvm.Script(code).WithArguments(
-					encodeJSONCDC(t, publicKeys),
-					encodeJSONCDC(t, message),
-					encodeJSONCDC(t, signatures),
-					encodeJSONCDC(t, weight),
+					jsoncdc.MustEncode(publicKeys),
+					jsoncdc.MustEncode(message),
+					jsoncdc.MustEncode(signatures),
+					jsoncdc.MustEncode(weight),
 				)
 
 				err := vm.Run(ctx, script, ledger)
@@ -1234,10 +1046,10 @@ func TestSignatureVerification(t *testing.T) {
 				})
 
 				script := fvm.Script(code).WithArguments(
-					encodeJSONCDC(t, publicKeys),
-					encodeJSONCDC(t, message),
-					encodeJSONCDC(t, signatures),
-					encodeJSONCDC(t, weight),
+					jsoncdc.MustEncode(publicKeys),
+					jsoncdc.MustEncode(message),
+					jsoncdc.MustEncode(signatures),
+					jsoncdc.MustEncode(weight),
 				)
 
 				err := vm.Run(ctx, script, ledger)

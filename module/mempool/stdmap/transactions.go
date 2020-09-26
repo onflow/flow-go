@@ -5,7 +5,7 @@ package stdmap
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Transactions implements the transactions memory pool of the consensus nodes,

@@ -1,6 +1,6 @@
 package committee
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import "github.com/onflow/flow-go/model/flow"
 
 // BlockTranslator is a support component for determining a reference point in
 // the protocol state to use when assessing validity of a block.

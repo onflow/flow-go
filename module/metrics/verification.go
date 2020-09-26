@@ -5,7 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type VerificationCollector struct {

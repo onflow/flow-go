@@ -1,7 +1,7 @@
 package messages
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // BlockProposal is part of the consensus protocol and represents the the leader

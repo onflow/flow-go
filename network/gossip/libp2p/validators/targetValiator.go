@@ -5,8 +5,8 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 )
 
 var _ MessageValidator = &TargetValidator{}

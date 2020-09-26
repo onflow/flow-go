@@ -3,7 +3,7 @@ package ingestion
 //revive:disable:unexported-return
 
 import (
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
 type Mempool struct {

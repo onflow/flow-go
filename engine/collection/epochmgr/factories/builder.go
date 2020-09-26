@@ -1,14 +1,14 @@
-package epochmgr
+package factories
 
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/module"
-	builder "github.com/dapperlabs/flow-go/module/builder/collection"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/module"
+	builder "github.com/onflow/flow-go/module/builder/collection"
+	finalizer "github.com/onflow/flow-go/module/finalizer/collection"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/storage"
 )
 
 type BuilderFactory struct {
@@ -44,7 +44,7 @@ func (f *BuilderFactory) Create(
 	clusterHeaders storage.Headers,
 	clusterPayloads storage.ClusterPayloads,
 	pool mempool.Transactions,
-) (*builder.Builder, *finalizer.Finalizer, error) {
+) (module.Builder, *finalizer.Finalizer, error) {
 
 	build := builder.NewBuilder(
 		f.db,
