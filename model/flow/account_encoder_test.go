@@ -46,9 +46,10 @@ func TestDecodeAccountPublicKey_Legacy(t *testing.T) {
 	b, err := rlp.EncodeToBytes(&w)
 	require.NoError(t, err)
 
-	accountKey, err := flow.DecodeAccountPublicKey(b)
+	accountKey, err := flow.DecodeAccountPublicKey(b, 1)
 	require.NoError(t, err)
 
+	assert.Equal(t, 1, accountKey.Index)
 	assert.Equal(t, publicKey, accountKey.PublicKey)
 	assert.Equal(t, sigAlgo, accountKey.SignAlgo)
 	assert.Equal(t, hashAlgo, accountKey.HashAlgo)
