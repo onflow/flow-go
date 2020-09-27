@@ -289,6 +289,7 @@ func MessageToAccountKey(m *entities.AccountKey) (*flow.AccountPublicKey, error)
 		HashAlgo:  hashAlgo,
 		Weight:    int(m.GetWeight()),
 		SeqNumber: uint64(m.GetSequenceNumber()),
+		Revoked:   m.GetRevoked(),
 	}, nil
 }
 
