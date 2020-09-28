@@ -96,7 +96,7 @@ func (p *PublicAssignment) rngByBlockID(stateSnapshot protocol.Snapshot) (random
 
 	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate seed: %v", err)
+		return nil, fmt.Errorf("could not generate seed: %w", err)
 	}
 
 	rng, err := random.NewRand(seed)

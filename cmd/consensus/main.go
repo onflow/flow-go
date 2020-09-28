@@ -70,6 +70,7 @@ func main() {
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
 		seals          mempool.Seals
+		match          *matching.Engine
 		prov           *provider.Engine
 		requesterEng   *requester.Engine
 		syncCore       *synchronization.Core
@@ -144,7 +145,7 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			sealedResultsDB := bstorage.NewExecutionResults(node.DB)
+			resultsDB := bstorage.NewExecutionResults(node.DB)
 			requesterEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -165,7 +166,7 @@ func main() {
 				return nil, fmt.Errorf("could not create public assignment: %w", err)
 			}
 
-			match, err := matching.New(
+			match, err = matching.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
@@ -174,7 +175,7 @@ func main() {
 				node.State,
 				node.Me,
 				requesterEng,
-				sealedResultsDB,
+				resultsDB,
 				node.Storage.Headers,
 				node.Storage.Index,
 				results,
@@ -272,6 +273,9 @@ func main() {
 					guarantees,
 					seals,
 				)),
+				finalizer.WithInformValid(
+					match.OnMakeValid,
+				),
 			)
 
 			// initialize the aggregating signature module for staking signatures

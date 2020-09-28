@@ -175,6 +175,19 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	}
 }
 
+// OnMakeValid is called by the finalizer when a block is marked as having
+// passed consensus validation.
+func (e *Engine) OnMakeValid(blockID flow.Identifier) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
+	fmt.Printf("XXX Consensus Matching Engine / OnMakeValid(%s)\n", blockID)
+
+	go e.checkSealing()
+
+	return nil
+}
+
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
@@ -216,9 +229,16 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
 	}
 
-	// get the identity of the origin node, so we can check if it's a valid
-	// source for a execution receipt (usually execution nodes)
-	identity, err := e.state.Final().Identity(originID)
+	// if the receipt is for an unknow block, cache it. It will be processed
+	// later with OnMakeValid
+	_, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
+	if err != nil {
+		// XXX
+		_ = e.receipts.Add(receipt)
+		return nil
+	}
+
+	identity, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
 			return engine.NewInvalidInputErrorf("could not get executor identity: %w", err)
@@ -292,9 +312,16 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
 	}
 
-	// get the identity of the origin node, so we can check if it's a valid
-	// source for a result approval (usually verification node)
-	identity, err := e.state.Final().Identity(originID)
+	// if the approval is for an unknow block, cache it. It will be processed
+	// later with OnMakeValid
+	_, err := e.state.AtBlockID(approval.Body.BlockID).Head()
+	if err != nil {
+		// XXX
+		_, _ = e.approvals.Add(approval)
+		return nil
+	}
+
+	identity, err := e.state.AtBlockID(approval.Body.BlockID).Identity(originID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
 			return engine.NewInvalidInputErrorf("could not get approval identity: %w", err)
@@ -783,6 +810,7 @@ func (e *Engine) requestPending() error {
 		requestedCount := 0
 		for _, blockID := range missingBlocksOrderedByHeight {
 			e.requester.EntityByID(blockID, filter.Any)
+			requestedCount++
 		}
 		e.log.Info().
 			Int("count", requestedCount).
