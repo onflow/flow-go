@@ -32,6 +32,14 @@ func (d *Distributor) BlockFinalized(block *flow.Header) {
 	}
 }
 
+func (d *Distributor) BlockProcessable(block *flow.Header) {
+	d.mu.RLock()
+	defer d.mu.RLock()
+	for _, sub := range d.subscribers {
+		sub.BlockProcessable(block)
+	}
+}
+
 func (d *Distributor) EpochTransition(newEpoch uint64, first *flow.Header) {
 	d.mu.RLock()
 	defer d.mu.RLock()
