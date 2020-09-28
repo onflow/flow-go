@@ -820,44 +820,6 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 	}
 }
 
-func ChunkDataPackIsRequestedNTimes(t *testing.T, timeout time.Duration, con *network.Conduit, n int,
-	f func(*messages.ChunkDataRequest)) <-chan []*messages.ChunkDataRequest {
-	reqs := make([]*messages.ChunkDataRequest, 0)
-	c := make(chan []*messages.ChunkDataRequest, 1)
-
-	wg := &sync.WaitGroup{}
-
-	// to counter race condition in concurrent invocations of Run
-	mutex := &sync.Mutex{}
-	wg.Add(n)
-	// chunk data was requested once, and return the chunk data pack when requested
-	// called with 3 mock.Anything, the first is the request, the second and third are the 2
-	// execution nodes
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		req := args.Get(0).(*messages.ChunkDataRequest)
-		reqs = append(reqs, req)
-
-		fmt.Printf("con.Submit is called for chunk:%v\n", req.ChunkID)
-
-		go func() {
-			f(req)
-			wg.Done()
-		}()
-
-	}).Return(nil).Times(n)
-
-	go func() {
-		unittest.AssertReturnsBefore(t, wg.Wait, timeout)
-		c <- reqs
-		close(c)
-	}()
-
-	return c
-}
-
 func hashResult(res *flow.ExecutionResult) []byte {
 	h := hash.NewSHA3_384()
 
