@@ -57,7 +57,8 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, fanout uint) (flow.Id
 		result = append(result, selectedIDs...)
 	}
 
-	// connect to (n+1)/2 other nodes of the same type to ensure all nodes of the same type are fully connected
+	// connect to (k+1)/2 other nodes of the same type to ensure all nodes of the same type are fully connected,
+	// where k is the number of nodes of each type
 	selfRoleIDs, _ := connectedGraphByRoleSample(remainder, r.seed, r.myRole) // ignore the remaining ids
 
 	result = append(result, selfRoleIDs...)

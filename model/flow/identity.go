@@ -268,8 +268,8 @@ func (il IdentityList) Sample(size uint) IdentityList {
 	return dup[:size]
 }
 
-// RandomDeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
-func (il IdentityList) RandomDeterministicSample(size uint, seed int64) IdentityList {
+// DeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
+func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
 	rand.Seed(seed)
 	return il.Sample(size)
 }

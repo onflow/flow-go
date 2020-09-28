@@ -15,7 +15,7 @@ func connectedGraph(ids flow.IdentityList, seed int64) flow.IdentityList {
 	// choose (n+1)/2 random nodes so that each node in the graph will have a degree >= (n+1) / 2,
 	// guaranteeing a connected graph.
 	size := uint(math.Ceil(float64(len(ids)+1) / 2))
-	return ids.RandomDeterministicSample(size, seed)
+	return ids.DeterministicSample(size, seed)
 }
 
 // connectedGraph returns a random subset of length (n+1)/2 of the specified role
@@ -37,7 +37,7 @@ func oneOfRole(ids flow.IdentityList, seed int64, role flow.Role) flow.IdentityL
 	}
 
 	// choose 1 out of all the remaining nodes of this role
-	selectedID := filteredIds.RandomDeterministicSample(1, seed)
+	selectedID := filteredIds.DeterministicSample(1, seed)
 
 	return selectedID
 }
