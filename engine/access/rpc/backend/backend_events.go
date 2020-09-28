@@ -133,6 +133,11 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 		if !expected {
 			return nil, fmt.Errorf("unexpected blockID from exe node %x", result.GetBlockId())
 		}
+		if result.GetBlockHeight() != header.Height {
+			return nil, fmt.Errorf("unexpected block height %x for block %x from exe node",
+				result.GetBlockHeight(),
+				result.GetBlockId())
+		}
 
 		results[i] = flow.BlockEvents{
 			BlockID:        convert.MessageToIdentifier(result.GetBlockId()),
