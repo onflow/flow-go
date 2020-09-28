@@ -254,10 +254,8 @@ func (n *Network) genNetworkMessage(channelID string, event interface{}, targetI
 	selfID := n.me.NodeID()
 	originID := selfID[:]
 
-	// get message type
-	// get event type, remove the asterisk prefix if present, remove package names if present
-	eventFqdn := strings.Split(strings.TrimLeft(fmt.Sprintf("%T", event), "*"), ".")
-	msgType := eventFqdn[len(eventFqdn)-1]
+	// get message type from event type and remove the asterisk prefix if present
+	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
 
 	// cast event to a libp2p.Message
 	msg := &message.Message{
