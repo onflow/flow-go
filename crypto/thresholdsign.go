@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // BLS-based threshold signature on BLS 12-381 curve

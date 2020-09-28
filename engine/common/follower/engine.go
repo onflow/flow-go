@@ -7,17 +7,17 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/events"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type Engine struct {
@@ -299,7 +299,10 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Payload: proposal.Payload,
 	}
 
-	err := e.state.Mutate().Extend(block)
+	// check whether the block is a valid extension of the chain.
+	// it only checks the block header, since checking block body is expensive.
+	// The full block check is done by the consensus participants.
+	err := e.state.Mutate().HeaderExtend(block)
 	// if the error is a known invalid extension of the protocol state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {

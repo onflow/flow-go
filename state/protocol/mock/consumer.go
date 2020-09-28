@@ -3,7 +3,7 @@
 package mock
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -14,6 +14,11 @@ type Consumer struct {
 
 // BlockFinalized provides a mock function with given fields: block
 func (_m *Consumer) BlockFinalized(block *flow.Header) {
+	_m.Called(block)
+}
+
+// BlockProcessable provides a mock function with given fields: block
+func (_m *Consumer) BlockProcessable(block *flow.Header) {
 	_m.Called(block)
 }
 

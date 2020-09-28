@@ -8,10 +8,10 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
@@ -94,6 +94,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not insert root block: %w", err)
 		}
+		err = operation.InsertBlockValidity(root.ID(), true)(tx)
+		if err != nil {
+			return fmt.Errorf("could not mark root block as valid: %w", err)
+		}
+
 		err = operation.IndexBlockHeight(root.Header.Height, root.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index root block: %w", err)
@@ -171,8 +176,59 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 	})
 }
 
-func (m *Mutator) Extend(candidate *flow.Block) error {
+func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
+	// check if he block header is a valid extension of the finalized state
+	err := m.headerExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("header does not compliance the chain state: %w", err)
+	}
 
+	// find the last seal at the parent block
+	last, err := m.lastSealed(candidate)
+	if err != nil {
+		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+	}
+
+	// insert the block and index the last seal for the block
+	err = m.insert(candidate, last)
+	if err != nil {
+		return fmt.Errorf("failed to insert the block: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Mutator) Extend(candidate *flow.Block) error {
+	// check if the block header is a valid extension of the finalized state
+	err := m.headerExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("header does not compliance the chain state: %w", err)
+	}
+
+	// check if the guarantees in the payload is a valid extension of the finalized state
+	err = m.guaranteeExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
+	}
+
+	// check if the seals in the payload is a valid extension of the finalized state
+	// return the last seal at the parent block
+	last, err := m.sealExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+	}
+
+	// insert the block and index the last seal for the block
+	err = m.insert(candidate, last)
+	if err != nil {
+		return fmt.Errorf("failed to insert the block: %w", err)
+	}
+	return nil
+}
+
+// header compliance check to verify if the given block connects to the
+// last finalized block.
+func (m *Mutator) headerExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
 
@@ -187,7 +243,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	parent, err := m.state.headers.ByBlockID(header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve parent: %w", err)
+		return state.NewInvalidExtensionErrorf("could not retrieve parent: %s", err)
 	}
 	if header.ChainID != parent.ChainID {
 		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
@@ -203,13 +259,13 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// valid in the context of the entire state. For this, the block needs to
 	// directly connect, through its ancestors, to the last finalized block.
 
-	var finalized uint64
-	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	var finalizedHeight uint64
+	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 	var finalID flow.Identifier
-	err = m.state.db.View(operation.LookupBlockHeight(finalized, &finalID))
+	err = m.state.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized block: %w", err)
 	}
@@ -220,17 +276,23 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
-		if ancestor.Height < finalized {
+		if ancestor.Height < finalizedHeight {
 			return state.NewOutdatedExtensionErrorf("candidate block connects to a finalized block (%d), which is below the last finalized block (%d)",
-				ancestor.Height, finalized)
+				ancestor.Height, finalizedHeight)
 		}
 		ancestorID = ancestor.ParentID
 	}
 
-	// FOURTH: The header is now fully validated. Next is the guarantee part of
-	// the payload compliance check. None of the blocks should have included a
-	// guarantee that was expired at the block height, nor should it have been
-	// included in any previous payload.
+	return nil
+}
+
+// The guarantee part of the payload compliance check.
+// None of the blocks should have included a
+// guarantee that was expired at the block height, nor should it have been
+// included in any previous payload.
+func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
+	header := candidate.Header
+	payload := candidate.Payload
 
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
@@ -243,7 +305,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// look up the root height so we don't look too far back
 	// initially this is the genesis block height (aka 0).
 	var rootHeight uint64
-	err = m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	err := m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve root block height: %w", err)
 	}
@@ -252,7 +314,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
-	ancestorID = header.ParentID
+	ancestorID := header.ParentID
 	lookup := make(map[flow.Identifier]struct{})
 	for {
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
@@ -294,12 +356,19 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		}
 	}
 
-	// FIFTH: For compliance of the seal payload, we need them to create a valid
-	// chain of seals on our branch of the chain, starting at the block directly
-	// after the last sealed block all the way to at most the parent. We use
-	// deterministic lookup by height for the finalized part of the chain and
-	// then make a list of unfinalized blocks for the remainder, if any seals
-	// remain.
+	return nil
+}
+
+// The compliance of the seal payload.
+// we need them to create a valid chain of seals on our branch of the chain,
+// starting at the block directly after the last sealed block all the way to
+// at most the parent.
+// We use deterministic lookup by height for the finalized part of the chain and
+// then make a list of unfinalized blocks for the remainder, if any seals
+// remain.
+func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
+	header := candidate.Header
+	payload := candidate.Payload
 
 	// map each seal to the block it is sealing for easy lookup; we will need to
 	// successfully connect _all_ of these seals to the last sealed block for
@@ -308,8 +377,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	for _, seal := range payload.Seals {
 		byBlock[seal.BlockID] = seal
 	}
-	if len(payload.Seals) > len(byBlock) {
-		return state.NewInvalidExtensionErrorf("multiple seals for the same block")
+	if len(payload.Seals) != len(byBlock) {
+		return nil, state.NewInvalidExtensionErrorf("multiple seals for the same block")
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -317,69 +386,91 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// for the candidate block, which remains at the same sealed state
 	last, err := m.state.seals.ByBlockID(header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
+		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
+	}
+
+	// if there is no seal in the block payload, use the last sealed block of the parent
+	// block as the last sealed block of the given block.
+	if len(payload.Seals) == 0 {
+		return last, nil
 	}
 
 	// get the last sealed block; we use its height to iterate forwards through
 	// the finalized blocks which still need sealing
 	sealed, err := m.state.headers.ByBlockID(last.BlockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+	}
+
+	var finalizedHeight uint64
+	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
+	}
+	var finalID flow.Identifier
+	err = m.state.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
 
 	// we now go from last sealed height plus one to finalized height and check
 	// if we have the seal for each of them step by step; often we will not even
 	// enter this loop, because last sealed height is higher than finalized
-	for height := sealed.Height + 1; height <= finalized; height++ {
+	for height := sealed.Height + 1; height <= finalizedHeight; height++ {
+		// as we are iterating the finalized blocks, if there is all the seals
+		// have been used to seal the finalized blocks, and there is no more seal left,
+		// we could exit earlier with the last seal
 		if len(byBlock) == 0 {
-			break
+			return last, nil
 		}
 		header, err := m.state.headers.ByHeight(height)
 		if err != nil {
-			return fmt.Errorf("could not get block for sealed height (%d): %w", height, err)
+			return nil, fmt.Errorf("could not get block for sealed height (%d): %w", height, err)
 		}
 		blockID := header.ID()
 		next, found := byBlock[blockID]
 		if !found {
-			return state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
+			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
 		}
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return state.NewInvalidExtensionError("seal execution states do not connect in finalized")
+			return nil, state.NewInvalidExtensionError("seal execution states do not connect in finalized")
 		}
 		delete(byBlock, blockID)
 		last = next
 	}
-
-	// NOTE: We could skip the remaining part in case no seals are left; it is,
-	// however, cheap, and it's what we will always do during normal operation,
-	// where we only seal the last 1-3 blocks, which are not yet finalized.
-
+	// In case no seals are left, we skip the remaining part:
+	if len(byBlock) == 0 {
+		return last, nil
+	}
 	// Once we have filled in seals for all finalized blocks we need to check
 	// the non-finalized blocks backwards; collect all of them, from direct
 	// parent to just before finalized, and see if we can use up the rest of the
 	// seals. We need to stop collecting ancestors either when reaching the
 	// finalized state, or when reaching the last sealed block.
-	ancestorID = header.ParentID
+	ancestorID := header.ParentID
 	var pendingIDs []flow.Identifier
 	for ancestorID != finalID && ancestorID != last.BlockID {
 		pendingIDs = append(pendingIDs, ancestorID)
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
+			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
 		ancestorID = ancestor.ParentID
 	}
+
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
+		// as we are iterating the pendings blocks, if there is no more seal left,
+		// we exit earlier with the last seal
 		if len(byBlock) == 0 {
-			break
+			return last, nil
 		}
 		pendingID := pendingIDs[i]
 		next, found := byBlock[pendingID]
 		if !found {
-			return state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
+			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
 		}
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return state.NewInvalidExtensionErrorf("seal execution states do not connect in pending")
+			return nil, state.NewInvalidExtensionErrorf("seal execution states do not connect in pending")
 		}
 		delete(byBlock, pendingID)
 		last = next
@@ -387,8 +478,49 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	// This is just a sanity check; at this point, no seals should be left.
 	if len(byBlock) > 0 {
-		return fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
+		return nil, fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
 	}
+
+	return last, nil
+}
+
+// finding the last sealed block on the chain of which the given block is extending
+// for instance, here is the chain state: block 100 is the head, block 97 is finalized,
+// and 95 is the last sealed block at the state of block 100.
+// 95 (sealed) <- 96 <- 97 (finalized) <- 98 <- 99 <- 100
+// Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
+// be the last sealed for block 101.
+func (m *Mutator) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
+	header := candidate.Header
+	payload := candidate.Payload
+
+	// getting the last sealed block
+	last, err := m.state.seals.ByBlockID(header.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
+	}
+
+	// if the payload of the block has seals, then the last seal is the seal for the highest
+	// block
+	if len(payload.Seals) > 0 {
+		var highestHeader *flow.Header
+		for i, seal := range payload.Seals {
+			header, err := m.state.headers.ByBlockID(seal.BlockID)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve the header %v for seal: %w", seal.BlockID, err)
+			}
+
+			if i == 0 || header.Height > highestHeader.Height {
+				highestHeader = header
+				last = seal
+			}
+		}
+	}
+
+	return last, nil
+}
+
+func (m *Mutator) insert(candidate *flow.Block, last *flow.Seal) error {
 
 	// SIXTH: epoch transitions and service events
 	//    (i) Determine protocol state for block's _current_ Epoch.
@@ -407,6 +539,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
+	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 		// insert the block into the database AND cache
 		err := m.state.blocks.StoreTx(candidate)(tx)
@@ -415,7 +548,6 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		}
 
 		// index the latest sealed block in this fork
-		blockID := candidate.ID()
 		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
@@ -437,6 +569,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 		return nil
 	})
+
 	if err != nil {
 		return fmt.Errorf("could not execute state extension: %w", err)
 	}
@@ -667,24 +800,24 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				// We should only have a single epoch setup event per epoch.
 				if epochStatus.NextEpoch.SetupID != flow.ZeroID {
 					// true iff EpochSetup event for NEXT epoch was already included before
-					return nil, fmt.Errorf("duplicate epoch setup service event")
+					return nil, state.NewInvalidExtensionError("duplicate epoch setup service event")
 				}
 
 				// The setup event should have the counter increased by one.
 				if ev.Counter != counter+1 {
-					return nil, fmt.Errorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
+					return nil, state.NewInvalidExtensionErrorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
 				}
 
 				// The final view needs to be after the current epoch final view.
 				// NOTE: This kind of operates as an overflow check for the other checks.
 				if ev.FinalView <= activeSetup.FinalView {
-					return nil, fmt.Errorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
+					return nil, state.NewInvalidExtensionErrorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
 				}
 
 				// Finally, the epoch setup event must contain all necessary information.
 				err = validSetup(ev)
 				if err != nil {
-					return nil, fmt.Errorf("invalid epoch setup: %w", err)
+					return nil, state.NewInvalidExtensionErrorf("invalid epoch setup: %s", err)
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -698,27 +831,27 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				// We should only have a single epoch commit event per epoch.
 				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
 					// true iff EpochEpochCommitSetup event for NEXT epoch was already included before
-					return nil, fmt.Errorf("duplicate epoch commit service event")
+					return nil, state.NewInvalidExtensionError("duplicate epoch commit service event")
 				}
 
 				// The epoch setup event needs to happen before the commit.
 				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
-					return nil, fmt.Errorf("missing epoch setup for epoch commit")
+					return nil, state.NewInvalidExtensionError("missing epoch setup for epoch commit")
 				}
 
 				// The commit event should have the counter increased by one.
 				if ev.Counter != counter+1 {
-					return nil, fmt.Errorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
+					return nil, state.NewInvalidExtensionErrorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
 				}
 
 				// Finally, the commit should commit all the necessary information.
 				setup, err := m.state.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
-					return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
+					return nil, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
 				}
 				err = validCommit(ev, setup)
 				if err != nil {
-					return nil, fmt.Errorf("invalid epoch commit: %w", err)
+					return nil, state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -737,4 +870,62 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 	ops = append(ops, m.state.epoch.statuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
+}
+
+// MakeValid marks the block as valid in protocol state, and triggers
+// `BlockProcessable` event to notify that its parent block is processable.
+// why the parent block is processable, not the block itself?
+// because a block having a child block means it has been verified
+// by the majority of consensus participants.
+// Hence, if a block has passed the header validity check, its parent block
+// must have passed both the header validity check and the body validity check.
+// So that consensus followers can skip the block body validity checks and wait
+// for its child to arrive, and if the child passes the header validity check, it means
+// the consensus participants have done a complete check on its parent block,
+// so consensus followers can trust consensus nodes did the right job, and start
+// processing the parent block.
+// NOTE: since a parent can have multiple children, `BlockProcessable` event
+// could be triggered multiple times for the same block.
+func (m *Mutator) MarkValid(blockID flow.Identifier) error {
+	header, err := m.state.headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", blockID, err)
+	}
+	parentID := header.ParentID
+	var isParentValid bool
+	err = m.state.db.View(operation.RetrieveBlockValidity(parentID, &isParentValid))
+	if err != nil {
+		return fmt.Errorf("could not retrieve validity of parent block (%x): %w", parentID, err)
+	}
+	if !isParentValid {
+		return fmt.Errorf("can only mark block as valid whose parent is valid")
+	}
+
+	err = operation.RetryOnConflict(
+		m.state.db.Update,
+		operation.SkipDuplicates(
+			operation.InsertBlockValidity(blockID, true),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
+	}
+
+	// root blocks and blocks below the root block are considered as "processed",
+	// so we don't want to trigger `BlockProcessable` event for them.
+	parent, err := m.state.headers.ByBlockID(parentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
+	}
+	var rootHeight uint64
+	err = m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root block's height: %w", err)
+	}
+	if rootHeight >= parent.Height {
+		return nil
+	}
+	m.state.consumer.BlockProcessable(parent)
+
+	return nil
 }

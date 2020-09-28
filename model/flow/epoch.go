@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encodable"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encodable"
 )
 
 // EpochPhase represents a phase of the Epoch Preparation Protocol. The phase

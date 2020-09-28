@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/bootstrap"
 )
 
 const nodeID string = "0000000000000000000000000000000000000000000000000000000000000001"

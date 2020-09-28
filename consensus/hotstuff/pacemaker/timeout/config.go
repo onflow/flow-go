@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // Config contains the configuration parameters for ExponentialIncrease-LinearDecrease

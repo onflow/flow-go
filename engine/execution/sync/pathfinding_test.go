@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	state "github.com/onflow/flow-go/engine/execution/state/mock"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestPathfinding(t *testing.T) {

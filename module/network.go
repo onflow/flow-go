@@ -3,7 +3,7 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/onflow/flow-go/network"
 )
 
 // Network represents the network layer of the node. It allows processes that

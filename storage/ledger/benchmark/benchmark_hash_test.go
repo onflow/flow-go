@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
-	"github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/common"
+	"github.com/onflow/flow-go/storage/ledger/utils"
 )
 
 // GENERAL COMMENT:

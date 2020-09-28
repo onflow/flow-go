@@ -1,8 +1,8 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/verification"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 )
 
 // ResultDataPacks implements the ResultDataPacks mempool interface.

@@ -4,9 +4,9 @@ package bootstrap
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encodable"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // NodeInfoType enumerates the two different options for

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/module"
 )
 
 // MessageQueue is the interface of the inbound message queue

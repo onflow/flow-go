@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/module/local"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/module/local"
 )
 
 const NUM_AGG_TEST = 7

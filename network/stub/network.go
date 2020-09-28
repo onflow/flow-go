@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Network is a mocked Network layer made for testing engine's behavior.

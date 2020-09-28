@@ -1,7 +1,7 @@
 package entity
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // A complete collection contains the guarantee and the transactions.
