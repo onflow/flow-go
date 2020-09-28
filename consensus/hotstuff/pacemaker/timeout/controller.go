@@ -23,6 +23,8 @@ type Controller struct {
 // We use 1E9 milliseconds which is about 11 days for a single timout (i.e. more than a full epoch)
 const timeoutCap float64 = 1e9
 
+const sensitivity uint64 = 1000
+
 // NewController creates a new Controller.
 func NewController(timeoutConfig Config) *Controller {
 	// the initial value for the timeout channel is a closed channel which returns immediately
@@ -87,14 +89,14 @@ func (t *Controller) computeTimeoutDuration(mode model.TimeoutMode) time.Duratio
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
-	return time.Duration(t.cfg.ReplicaTimeout * 1e6)
+	return time.Duration(float64(uint64(t.cfg.ReplicaTimeout)/sensitivity*sensitivity) * 1e6)
 }
 
 // VoteCollectionTimeout returns the duration of Vote aggregation _after_ receiving a block
 // during which the primary tries to aggregate votes for the view where it is leader
 func (t *Controller) VoteCollectionTimeout() time.Duration {
 	// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
-	return time.Duration(t.cfg.ReplicaTimeout * 1e6 * t.cfg.VoteAggregationTimeoutFraction)
+	return time.Duration(float64(uint64(t.cfg.ReplicaTimeout)/sensitivity*sensitivity) * 1e6 * t.cfg.VoteAggregationTimeoutFraction)
 }
 
 // OnTimeout indicates to the Controller that the timeout was reached
