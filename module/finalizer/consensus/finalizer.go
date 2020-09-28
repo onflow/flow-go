@@ -7,10 +7,10 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // Finalizer is a simple wrapper around our temporary state to clean up after a
@@ -126,10 +126,10 @@ func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
 		return err
 	}
 
-	return operation.RetryOnConflict(
-		f.db.Update,
-		operation.SkipDuplicates(
-			operation.InsertBlockValidity(blockID, true),
-		),
-	)
+	err = f.state.Mutate().MarkValid(blockID)
+	if err != nil {
+		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
+	}
+
+	return nil
 }

@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) flow.Address {
@@ -467,6 +467,7 @@ func TestAddAccountKey(t *testing.T) {
 
 			for i, expectedKey := range expectedKeys {
 				actualKey := after.Keys[i]
+				assert.Equal(t, i, actualKey.Index)
 				assert.Equal(t, expectedKey.PublicKey, actualKey.PublicKey)
 				assert.Equal(t, expectedKey.SignAlgo, actualKey.SignAlgo)
 				assert.Equal(t, expectedKey.HashAlgo, actualKey.HashAlgo)

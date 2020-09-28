@@ -1,7 +1,7 @@
 package flow
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // Attestation confirms correctness of a chunk of an exec result

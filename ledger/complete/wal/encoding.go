@@ -3,9 +3,9 @@ package wal
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/encoding"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 type WALOperation uint8

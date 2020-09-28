@@ -3,7 +3,7 @@
 package cluster
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func Genesis() *Block {

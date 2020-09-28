@@ -3,7 +3,7 @@ package fvm
 import (
 	"github.com/onflow/cadence"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.

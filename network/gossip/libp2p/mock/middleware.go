@@ -3,9 +3,9 @@
 package mock
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
-	message "github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
-	middleware "github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	flow "github.com/onflow/flow-go/model/flow"
+	message "github.com/onflow/flow-go/network/gossip/libp2p/message"
+	middleware "github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 
 	mock "github.com/stretchr/testify/mock"
 

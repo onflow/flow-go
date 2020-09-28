@@ -3,7 +3,7 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // State allows, in addition to ReadOnlyState,  mutating the protocol state in a consistent manner.

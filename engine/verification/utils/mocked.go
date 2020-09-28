@@ -3,8 +3,8 @@ package utils
 import (
 	"fmt"
 
-	chmodel "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
+	chmodel "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // MockAssigner ...

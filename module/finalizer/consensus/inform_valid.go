@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // InformValidFunc is called by the MakeValid callback to allow components to

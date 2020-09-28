@@ -14,14 +14,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/fvm"
-	fvmmock "github.com/dapperlabs/flow-go/fvm/mock"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/fvm"
+	fvmmock "github.com/onflow/flow-go/fvm/mock"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func vmTest(
@@ -558,9 +558,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		require.Len(t, tx.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
 			float64(block1.Header.Timestamp.Unix())), tx.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), tx.Logs[1])
 	})
 
@@ -585,9 +585,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, script.Err)
 
 		require.Len(t, script.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
 			float64(block1.Header.Timestamp.Unix())), script.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), script.Logs[1])
 	})
 

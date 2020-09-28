@@ -3,7 +3,7 @@
 package flow
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // AggregatedSignature contains all approvers attenstation signature and verifier IDs per chunk

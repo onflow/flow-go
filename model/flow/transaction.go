@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/fingerprint"
 )
 
 // TransactionBody includes the main contents of a transaction

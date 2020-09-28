@@ -1,6 +1,6 @@
 package leader
 
-import "github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+import "github.com/onflow/flow-go/consensus/hotstuff/committee"
 
 // NewBootstrapLeaderSelection creates a leader selection for bootstrapping process to create
 // genesis QC.

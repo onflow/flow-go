@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // NetworkPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the

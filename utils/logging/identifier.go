@@ -5,7 +5,7 @@ package logging
 import (
 	"encoding/hex"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func Entity(entity flow.Entity) []byte {

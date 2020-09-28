@@ -7,12 +7,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	hotmodel "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // RootQCVoter is responsible for generating and submitting votes for the

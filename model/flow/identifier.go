@@ -8,10 +8,10 @@ import (
 	"math/rand"
 	"reflect"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/fingerprint"
-	"github.com/dapperlabs/flow-go/storage/merkle"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/storage/merkle"
 )
 
 // Identifier represents a 32-byte unique identifier for an entity.
