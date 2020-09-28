@@ -21,6 +21,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+const DefaultRecipientCount uint = 3
+
 // Engine is the collection pusher engine, which provides access to resources
 // held by the collection node.
 type Engine struct {
@@ -28,32 +30,35 @@ type Engine struct {
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
 	colMetrics   module.CollectionMetrics
-	push         network.Conduit
+	conduit      network.Conduit
 	me           module.Local
 	state        protocol.State
 	pool         mempool.Transactions
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	recipientCount uint // number of consensus nodes to push to
 }
 
 func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
-		unit:         engine.NewUnit(),
-		log:          log.With().Str("engine", "pusher").Logger(),
-		engMetrics:   engMetrics,
-		colMetrics:   colMetrics,
-		me:           me,
-		state:        state,
-		pool:         pool,
-		collections:  collections,
-		transactions: transactions,
+		unit:           engine.NewUnit(),
+		log:            log.With().Str("engine", "pusher").Logger(),
+		engMetrics:     engMetrics,
+		colMetrics:     colMetrics,
+		me:             me,
+		state:          state,
+		pool:           pool,
+		collections:    collections,
+		transactions:   transactions,
+		recipientCount: DefaultRecipientCount,
 	}
 
-	push, err := net.Register(engine.PushGuarantees, e)
+	conduit, err := net.Register(engine.PushGuarantees, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for push protocol: %w", err)
 	}
-	e.push = push
+	e.conduit = conduit
 
 	return e, nil
 }
@@ -135,7 +140,7 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 	// network usage significantly by implementing a simple retry mechanism here and
 	// only sending to a single consensus node.
 	// => https://github.com/dapperlabs/flow-go/issues/4358
-	err = e.push.Submit(guarantee, consensusNodes.NodeIDs()...)
+	err = e.conduit.Multicast(guarantee, e.recipientCount, consensusNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}

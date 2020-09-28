@@ -17,6 +17,9 @@ func NewNoopCollector() *NoopCollector {
 func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)            {}
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
 func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string)              {}
+func (nc *NoopCollector) MessageAdded(priority int)                                 {}
+func (nc *NoopCollector) MessageRemoved(priority int)                               {}
+func (nc *NoopCollector) QueueDuration(duration time.Duration, priority int)        {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)              {}
@@ -101,5 +104,7 @@ func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)              
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)  {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time) {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)  {}
+func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                   {}
+func (nc *NoopCollector) TransactionSubmissionFailed()                              {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                   {}
 func (ec *NoopCollector) ExecutionSync(syncing bool)                                {}

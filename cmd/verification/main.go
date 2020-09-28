@@ -63,7 +63,8 @@ func main() {
 		processedResultsIDs *stdmap.Identifiers        // used in finder engine
 		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
 		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
-		pendingResults      *stdmap.PendingResults     // used in match engine
+		chunkIDsByResult    *stdmap.IdentifierMap      // used in match engine
+		pendingResults      *stdmap.ResultDataPacks    // used in match engine
 		pendingChunks       *match.Chunks              // used in match engine
 		headerStorage       *storage.Headers           // used in match and finder engines
 		syncCore            *synchronization.Core      // used in follower engine
@@ -152,6 +153,20 @@ func main() {
 
 			return nil
 		}).
+		Module("chunk ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
+			chunkIDsByResult, err = stdmap.NewIdentifierMap(chunkLimit)
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkIDsByResult, chunkIDsByResult.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
+			return nil
+		}).
 		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)
 			if err != nil {
@@ -167,7 +182,7 @@ func main() {
 			return nil
 		}).
 		Module("pending results mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingResults = stdmap.NewPendingResults()
+			pendingResults = stdmap.NewResultDataPacks(receiptLimit)
 
 			// registers size method of backend for metrics
 			err = node.Metrics.Mempool.Register(metrics.ResourcePendingResult, pendingResults.Size)
@@ -244,6 +259,7 @@ func main() {
 				node.Network,
 				node.Me,
 				pendingResults,
+				chunkIDsByResult,
 				verifierEng,
 				assigner,
 				node.State,
@@ -300,7 +316,7 @@ func main() {
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

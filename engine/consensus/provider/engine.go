@@ -157,7 +157,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// submit the blocks to the targets
-	err = e.con.Submit(proposal, identities.NodeIDs()...)
+	err = e.con.Publish(proposal, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not broadcast block: %w", err)
 	}

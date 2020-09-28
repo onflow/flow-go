@@ -2,8 +2,9 @@ package bootstrap
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/dkg"
+	"github.com/dapperlabs/flow-go/model/encodable"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
 
 // DKGData represents all the output data from the DKG process, including private information.
@@ -17,57 +18,21 @@ type DKGData struct {
 // bootstrap.DKGParticipantPriv is the canonical structure for encoding private node DKG information.
 type DKGParticipantPriv struct {
 	NodeID              flow.Identifier
-	RandomBeaconPrivKey EncodableRandomBeaconPrivKey
+	RandomBeaconPrivKey encodable.RandomBeaconPrivKey
 	GroupIndex          int
 }
 
-// DKGParticipantPub is the canonical structure for encoding public node DKG information.
-type EncodableDKGParticipantPub struct {
-	NodeID             flow.Identifier
-	RandomBeaconPubKey EncodableRandomBeaconPubKey
-	GroupIndex         int
-}
+func ToDKGLookup(dkg DKGData, identities flow.IdentityList) map[flow.Identifier]flow.DKGParticipant {
 
-// DKGDataPub is canonical structure for encoding public DKG data.
-type EncodableDKGDataPub struct {
-	PubGroupKey  EncodableRandomBeaconPubKey
-	Participants []EncodableDKGParticipantPub
-}
-
-// Public returns the canonical public structure.
-func (dd *DKGData) Public(nodes []NodeInfo) EncodableDKGDataPub {
-
-	pub := EncodableDKGDataPub{
-		PubGroupKey:  EncodableRandomBeaconPubKey{PublicKey: dd.PubGroupKey},
-		Participants: make([]EncodableDKGParticipantPub, 0, len(dd.PubKeyShares)),
-	}
-
-	for i, pk := range dd.PubKeyShares {
-		nodeID := nodes[i].NodeID
-		encPk := EncodableRandomBeaconPubKey{pk}
-		pub.Participants = append(pub.Participants, EncodableDKGParticipantPub{
-			NodeID:             nodeID,
-			RandomBeaconPubKey: encPk,
-			GroupIndex:         i,
-		})
-	}
-
-	return pub
-}
-
-// ForHotStuff converts DKG data for use in HotStuff.
-func (pub *EncodableDKGDataPub) ForHotStuff() *dkg.PublicData {
-
-	participantLookup := make(map[flow.Identifier]*dkg.Participant)
-	for _, participant := range pub.Participants {
-		participantLookup[participant.NodeID] = &dkg.Participant{
-			PublicKeyShare: participant.RandomBeaconPubKey,
-			Index:          uint(participant.GroupIndex),
+	lookup := make(map[flow.Identifier]flow.DKGParticipant)
+	participants := identities.Filter(filter.HasRole(flow.RoleConsensus))
+	for i, keyShare := range dkg.PubKeyShares {
+		identity := participants[i]
+		lookup[identity.NodeID] = flow.DKGParticipant{
+			Index:    uint(i),
+			KeyShare: keyShare,
 		}
 	}
 
-	return &dkg.PublicData{
-		GroupPubKey:     pub.PubGroupKey,
-		IDToParticipant: participantLookup,
-	}
+	return lookup
 }

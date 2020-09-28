@@ -9,14 +9,14 @@ import (
 
 // Voter produces votes for the given block
 type Voter struct {
-	signer        hotstuff.Signer
+	signer        hotstuff.SignerVerifier
 	forks         hotstuff.ForksReader
 	persist       hotstuff.Persister
 	lastVotedView uint64 // need to keep track of the last view we voted for so we don't double vote accidentally
 }
 
 // New creates a new Voter instance
-func New(signer hotstuff.Signer, forks hotstuff.ForksReader, persist hotstuff.Persister, lastVotedView uint64) *Voter {
+func New(signer hotstuff.SignerVerifier, forks hotstuff.ForksReader, persist hotstuff.Persister, lastVotedView uint64) *Voter {
 	return &Voter{
 		signer:        signer,
 		forks:         forks,

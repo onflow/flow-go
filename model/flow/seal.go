@@ -17,8 +17,11 @@ type Seal struct {
 	ResultID               Identifier
 	FinalState             StateCommitment
 	AggregatedApprovalSigs []AggregatedSignature
+	ServiceEvents          []ServiceEvent
 }
 
+// TODO need to include service events in hash, omitted for now as they are not
+// encodable with RLP
 func (s Seal) Body() interface{} {
 	return struct {
 		BlockID    Identifier

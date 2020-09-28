@@ -39,15 +39,15 @@ func (_m *Signer) CreateProposal(block *model.Block) (*model.Proposal, error) {
 }
 
 // CreateQC provides a mock function with given fields: votes
-func (_m *Signer) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, error) {
+func (_m *Signer) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 	ret := _m.Called(votes)
 
-	var r0 *model.QuorumCertificate
-	if rf, ok := ret.Get(0).(func([]*model.Vote) *model.QuorumCertificate); ok {
+	var r0 *flow.QuorumCertificate
+	if rf, ok := ret.Get(0).(func([]*model.Vote) *flow.QuorumCertificate); ok {
 		r0 = rf(votes)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.QuorumCertificate)
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
 		}
 	}
 
@@ -77,48 +77,6 @@ func (_m *Signer) CreateVote(block *model.Block) (*model.Vote, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(*model.Block) error); ok {
 		r1 = rf(block)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// VerifyQC provides a mock function with given fields: voterIDs, sigData, block
-func (_m *Signer) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
-	ret := _m.Called(voterIDs, sigData, block)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func([]flow.Identifier, []byte, *model.Block) bool); ok {
-		r0 = rf(voterIDs, sigData, block)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func([]flow.Identifier, []byte, *model.Block) error); ok {
-		r1 = rf(voterIDs, sigData, block)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// VerifyVote provides a mock function with given fields: voterID, sigData, block
-func (_m *Signer) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
-	ret := _m.Called(voterID, sigData, block)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []byte, *model.Block) bool); ok {
-		r0 = rf(voterID, sigData, block)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, []byte, *model.Block) error); ok {
-		r1 = rf(voterID, sigData, block)
 	} else {
 		r1 = ret.Error(1)
 	}

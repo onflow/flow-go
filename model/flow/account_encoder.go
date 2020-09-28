@@ -16,6 +16,7 @@ type accountPublicKeyWrapper struct {
 	HashAlgo  uint
 	Weight    uint
 	SeqNumber uint64
+	Revoked   bool
 }
 
 // runtimeAccountPublicKeyWrapper must match format used in Transaction
@@ -43,6 +44,7 @@ func EncodeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
 		HashAlgo:  uint(a.HashAlgo),
 		Weight:    uint(a.Weight),
 		SeqNumber: a.SeqNumber,
+		Revoked:   a.Revoked,
 	}
 
 	return rlp.EncodeToBytes(&w)
@@ -83,6 +85,7 @@ func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
 		HashAlgo:  hashAlgo,
 		Weight:    int(w.Weight),
 		SeqNumber: w.SeqNumber,
+		Revoked:   w.Revoked,
 	}, nil
 }
 

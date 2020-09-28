@@ -184,14 +184,15 @@ func (cs *ComplianceSuite) SetupTest() {
 
 	// set up network conduit mock
 	cs.con = &network.Conduit{}
-	cs.con.On("Submit", mock.Anything, mock.Anything).Return(nil)
-	cs.con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	cs.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	cs.con.On("Publish", mock.Anything, mock.Anything).Return(nil)
+	cs.con.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	cs.con.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
 	// set up network module mock
 	cs.net = &module.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(code uint8, engine netint.Engine) netint.Conduit {
+		func(code string, engine netint.Engine) netint.Conduit {
 			return cs.con
 		},
 		nil,
@@ -276,7 +277,7 @@ func (cs *ComplianceSuite) TestSendVote() {
 		View:    view,
 		SigData: sig,
 	}
-	cs.con.AssertCalled(cs.T(), "Submit", &vote, recipientID)
+	cs.con.AssertCalled(cs.T(), "Unicast", &vote, recipientID)
 }
 
 func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
@@ -317,7 +318,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 
 	<-time.After(10 * time.Millisecond)
 	<-cs.e.Done()
-	cs.con.AssertCalled(cs.T(), "Submit", msg, cs.participants[1].NodeID, cs.participants[2].NodeID)
+	cs.con.AssertCalled(cs.T(), "Publish", msg, cs.participants[1].NodeID, cs.participants[2].NodeID)
 
 	// should fail with wrong proposer
 	header.ProposerID = unittest.IdentifierFixture()

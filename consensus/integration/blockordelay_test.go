@@ -14,24 +14,6 @@ import (
 // The network conditions are simulated by defining whether a message sent to a receiver should be
 // blocked or delayed.
 
-// block all messages sent by or received by a list of denied nodes
-func blockNodes(denyList ...*Node) BlockOrDelayFunc {
-	denyDict := make(map[flow.Identifier]*Node, len(denyList))
-	for _, n := range denyList {
-		denyDict[n.id.ID()] = n
-	}
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
-		block, notBlock := true, false
-		if _, ok := denyDict[sender.id.ID()]; ok {
-			return block, 0
-		}
-		if _, ok := denyDict[receiver.id.ID()]; ok {
-			return block, 0
-		}
-		return notBlock, 0
-	}
-}
-
 // block all messages sent by or received by a list of denied nodes for the first N messages
 func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
 	denyDict := make(map[flow.Identifier]*Node, len(denyList))
@@ -41,7 +23,7 @@ func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
 
 	sent, received := 0, 0
 
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
 
 		switch m := event.(type) {
@@ -79,7 +61,7 @@ func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
 
 func blockReceiverMessagesByPercentage(percent int) BlockOrDelayFunc {
 	rand.Seed(time.Now().UnixNano())
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block := rand.Intn(100) <= percent
 		return block, 0
 	}
@@ -87,7 +69,7 @@ func blockReceiverMessagesByPercentage(percent int) BlockOrDelayFunc {
 
 func delayReceiverMessagesByRange(low time.Duration, high time.Duration) BlockOrDelayFunc {
 	rand.Seed(time.Now().UnixNano())
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		rng := high - low
 		delay := int64(low) + rand.Int63n(int64(rng))
 		return false, time.Duration(delay)

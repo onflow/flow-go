@@ -30,11 +30,11 @@ func (_m *Forks) AddBlock(block *model.Block) error {
 }
 
 // AddQC provides a mock function with given fields: qc
-func (_m *Forks) AddQC(qc *model.QuorumCertificate) error {
+func (_m *Forks) AddQC(qc *flow.QuorumCertificate) error {
 	ret := _m.Called(qc)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*model.QuorumCertificate) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) error); ok {
 		r0 = rf(qc)
 	} else {
 		r0 = ret.Error(0)
@@ -127,15 +127,15 @@ func (_m *Forks) IsSafeBlock(block *model.Block) bool {
 }
 
 // MakeForkChoice provides a mock function with given fields: curView
-func (_m *Forks) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error) {
+func (_m *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
 	ret := _m.Called(curView)
 
-	var r0 *model.QuorumCertificate
-	if rf, ok := ret.Get(0).(func(uint64) *model.QuorumCertificate); ok {
+	var r0 *flow.QuorumCertificate
+	if rf, ok := ret.Get(0).(func(uint64) *flow.QuorumCertificate); ok {
 		r0 = rf(curView)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.QuorumCertificate)
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
 		}
 	}
 

@@ -26,7 +26,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -50,7 +49,7 @@ type Instance struct {
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	persist      *mocks.Persister
-	signer       *mocks.Signer
+	signer       *mocks.SignerVerifier
 	verifier     *mocks.Verifier
 	communicator *mocks.Communicator
 
@@ -120,7 +119,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		committee:    &mocks.Committee{},
 		builder:      &module.Builder{},
 		persist:      &mocks.Persister{},
-		signer:       &mocks.Signer{},
+		signer:       &mocks.SignerVerifier{},
 		verifier:     &mocks.Verifier{},
 		communicator: &mocks.Communicator{},
 		finalizer:    &module.Finalizer{},
@@ -201,12 +200,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		nil,
 	)
 	in.signer.On("CreateQC", mock.Anything).Return(
-		func(votes []*model.Vote) *model.QuorumCertificate {
+		func(votes []*model.Vote) *flow.QuorumCertificate {
 			voterIDs := make([]flow.Identifier, 0, len(votes))
 			for _, vote := range votes {
 				voterIDs = append(voterIDs, vote.SignerID)
 			}
-			qc := &model.QuorumCertificate{
+			qc := &flow.QuorumCertificate{
 				View:      votes[0].View,
 				BlockID:   votes[0].BlockID,
 				SignerIDs: voterIDs,
@@ -297,7 +296,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
-	rootQC := &model.QuorumCertificate{
+	rootQC := &flow.QuorumCertificate{
 		View:      rootBlock.View,
 		BlockID:   rootBlock.BlockID,
 		SignerIDs: in.participants.NodeIDs(),
@@ -323,7 +322,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, trace.NewNoopTracer(), in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
 
 	return &in

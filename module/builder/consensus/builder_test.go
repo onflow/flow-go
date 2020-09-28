@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storerr "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -53,11 +54,11 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
+	state    *protocol.State
+	mutator  *protocol.Mutator
 	headerDB *storage.Headers
 	sealDB   *storage.Seals
 	indexDB  *storage.Index
-	blockDB  *storage.Blocks
-
 	guarPool *mempool.Guarantees
 	sealPool *mempool.Seals
 	recPool  *mempool.Receipts
@@ -198,6 +199,15 @@ func (bs *BuilderSuite) SetupTest() {
 		return nil
 	}
 
+	bs.state = &protocol.State{}
+	bs.mutator = &protocol.Mutator{}
+	bs.state.On("Mutate").Return(bs.mutator)
+	bs.mutator.On("Extend", mock.Anything).Run(func(args mock.Arguments) {
+		block := args.Get(0).(*flow.Block)
+		bs.Assert().Equal(bs.sentinel, block.Header.View)
+		bs.assembled = block.Payload
+	}).Return(nil)
+
 	// set up storage mocks for tests
 	bs.sealDB = &storage.Seals{}
 	bs.sealDB.On("ByBlockID", mock.Anything).Return(
@@ -253,13 +263,6 @@ func (bs *BuilderSuite) SetupTest() {
 		},
 	)
 
-	bs.blockDB = &storage.Blocks{}
-	bs.blockDB.On("Store", mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(0).(*flow.Block)
-		bs.Assert().Equal(bs.sentinel, block.Header.View)
-		bs.assembled = block.Payload
-	}).Return(nil)
-
 	// set up memory pool mocks for tests
 	bs.guarPool = &mempool.Guarantees{}
 	bs.guarPool.On("Size").Return(uint(0)) // only used by metrics
@@ -301,10 +304,10 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.build = NewBuilder(
 		noop,
 		bs.db,
+		bs.state,
 		bs.headerDB,
 		bs.sealDB,
 		bs.indexDB,
-		bs.blockDB,
 		bs.guarPool,
 		bs.sealPool,
 		bs.recPool,

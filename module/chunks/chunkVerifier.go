@@ -108,11 +108,13 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[string]bool)
 	regMap := chunkDataPack.GetRegisterValues()
-	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
+	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
-		val, ok := regMap[string(key)]
+		k := state.RegisterID(owner, controller, key)
+
+		val, ok := regMap[string(k)]
 		if !ok {
-			unknownRegTouch[string(key)] = true
+			unknownRegTouch[string(k)] = true
 			return nil, fmt.Errorf("missing register")
 		}
 		return val, nil

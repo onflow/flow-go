@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/engine/collection/ingest"
+	"github.com/dapperlabs/flow-go/access"
 	"github.com/dapperlabs/flow-go/integration/convert"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -37,8 +37,8 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 			tx.SetReferenceBlockID(sdk.EmptyID)
 		})
 
-		expected := ingest.IncompleteTransactionError{
-			Missing: []string{flow.TransactionFieldRefBlockID.String()},
+		expected := access.IncompleteTransactionError{
+			MissingFields: []string{flow.TransactionFieldRefBlockID.String()},
 		}
 
 		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
@@ -52,8 +52,8 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 			tx.SetScript(nil)
 		})
 
-		expected := ingest.IncompleteTransactionError{
-			Missing: []string{flow.TransactionFieldScript.String()},
+		expected := access.IncompleteTransactionError{
+			MissingFields: []string{flow.TransactionFieldScript.String()},
 		}
 
 		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
@@ -177,7 +177,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	}
 
 	// ensure the transaction IS NOT included in other cluster collections
-	for _, cluster := range clusters.All() {
+	for _, cluster := range clusters {
 		// skip the target cluster
 		if cluster.Fingerprint() == targetCluster.Fingerprint() {
 			continue
@@ -265,7 +265,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
 	}
 
 	// ensure the transaction IS NOT included in other cluster collections
-	for _, cluster := range clusters.All() {
+	for _, cluster := range clusters {
 		// skip the target cluster
 		if cluster.Fingerprint() == targetCluster.Fingerprint() {
 			continue

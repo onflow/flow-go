@@ -77,7 +77,7 @@ func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	// assert that stream creation failed
 	assert.Error(h.T(), err)
 	// assert that it failed with the expected error
-	assert.Regexp(h.T(), ".*failed to negotiate security protocol: connected to wrong peer.*", err)
+	assert.Regexp(h.T(), ".*failed to negotiate security protocol.*", err)
 }
 
 // TestProtocolChangeAfterHardSpoon tests that a node from the old chain cannot talk to a node in the new chain if

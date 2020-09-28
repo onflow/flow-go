@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func (r *RcvCacheTestSuite) SetupTest() {
 // TestSingleElementAdd adds a single element to the cache and verifies its existence
 func (r *RcvCacheTestSuite) TestSingleElementAdd() {
 	eventID := []byte("event-1")
-	channelID := uint32(0)
+	channelID := "0"
 	assert.False(r.Suite.T(), r.c.Add(eventID, channelID))
 
 	assert.True(r.Suite.T(), r.c.Add(eventID, channelID))
@@ -42,7 +43,7 @@ func (r *RcvCacheTestSuite) TestSingleElementAdd() {
 // TestNoneExistence evaluates the correctness of cache operation against non-existing element
 func (r *RcvCacheTestSuite) TestNoneExistence() {
 	eventID := []byte("non-existing event")
-	channelID := uint32(1)
+	channelID := "1"
 	assert.False(r.Suite.T(), r.c.Add(eventID, channelID))
 }
 
@@ -57,11 +58,11 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 
 	// adds all events to the cache
 	for i := range events {
-		assert.False(r.Suite.T(), r.c.Add(events[i], uint32(i)))
+		assert.False(r.Suite.T(), r.c.Add(events[i], strconv.Itoa(i)))
 	}
 
 	// checks for the existence of the added events
 	for i := range events {
-		assert.True(r.Suite.T(), r.c.Add(events[i], uint32(i)))
+		assert.True(r.Suite.T(), r.c.Add(events[i], strconv.Itoa(i)))
 	}
 }

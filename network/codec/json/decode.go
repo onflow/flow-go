@@ -80,7 +80,7 @@ func decode(env Envelope) (interface{}, error) {
 
 	// testing
 	case CodeEcho:
-		v = &message.Echo{}
+		v = &message.TestMessage{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

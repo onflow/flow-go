@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	synccore "github.com/dapperlabs/flow-go/module/synchronization"
 	netint "github.com/dapperlabs/flow-go/network"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocolint "github.com/dapperlabs/flow-go/state/protocol"
@@ -54,7 +55,7 @@ func (ss *SyncSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	// generate own ID
-	ss.participants = unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
+	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
 	ss.myID = ss.participants[0].NodeID
 
 	// generate a header for the final state
@@ -68,7 +69,7 @@ func (ss *SyncSuite) SetupTest() {
 	// set up the network module mock
 	ss.net = &module.Network{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(code uint8, engine netint.Engine) netint.Conduit {
+		func(code string, engine netint.Engine) netint.Conduit {
 			return ss.con
 		},
 		nil,
@@ -165,7 +166,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(true)
 	err := ss.e.onSyncRequest(originID, req)
 	ss.Assert().NoError(err, "same height sync request should pass")
-	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
+	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
 	// if request height is higher than local finalized, we should not respond
 	req.Height = ss.head.Height + 1
@@ -173,13 +174,13 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
 	err = ss.e.onSyncRequest(originID, req)
 	ss.Assert().NoError(err, "same height sync request should pass")
-	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
+	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
 	// if the request height is lower than head and outside tolerance, we should submit correct response
 	req.Height = ss.head.Height - 1
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.SyncResponse)
 			assert.Equal(ss.T(), ss.head.Height, res.Height, "response should contain head height")
@@ -233,19 +234,19 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref - 1
 	err := ss.e.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "empty range request should pass")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
+	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
 	// range with only unknown block should be a no-op
 	req.FromHeight = ref + 1
 	req.ToHeight = ref + 3
 	err = ss.e.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "unknown range request should pass")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
+	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
 	// a request for same from and to should send single block
 	req.FromHeight = ref - 1
 	req.ToHeight = ref - 1
-	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.BlockResponse)
 			expected := []*flow.Block{ss.heights[ref-1]}
@@ -261,7 +262,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	// a request for a range that we partially have should send partial response
 	req.FromHeight = ref - 2
 	req.ToHeight = ref + 2
-	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.BlockResponse)
 			expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
@@ -277,7 +278,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	// a request for a range we entirely have should send all blocks
 	req.FromHeight = ref - 2
 	req.ToHeight = ref
-	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.BlockResponse)
 			expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
@@ -304,20 +305,20 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	req.BlockIDs = []flow.Identifier{}
 	err := ss.e.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass empty request")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
+	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
 	// a non-empty request for missing block ID should be a no-op
 	req.BlockIDs = unittest.IdentifierListFixture(1)
 	err = ss.e.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request for missing block")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
+	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
 	// a non-empty request for existing block IDs should send right response
 	block := unittest.BlockFixture()
 	block.Header.Height = ss.head.Height - 1
 	req.BlockIDs = []flow.Identifier{block.ID()}
 	ss.blockIDs[block.ID()] = &block
-	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.BlockResponse)
 			assert.ElementsMatch(ss.T(), []*flow.Block{&block}, res.Blocks, "response should contain right block")
@@ -365,18 +366,16 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 func (ss *SyncSuite) TestPollHeight() {
 
 	// check that we send to three nodes from our total list
-	consensus := ss.participants.Filter(filter.HasNodeID(ss.participants[1:].NodeIDs()...))
-	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
+	others := ss.participants.Filter(filter.HasNodeID(ss.participants[1:].NodeIDs()...))
+	ss.con.On("Multicast", mock.Anything, synccore.DefaultPollNodes, others[0].NodeID, others[1].NodeID).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.SyncRequest)
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
-			targetID := args.Get(1).(flow.Identifier)
-			require.Contains(ss.T(), consensus.NodeIDs(), targetID, "target should be in participants")
 		},
 	)
-	errs := ss.e.pollHeight()
-	require.NoError(ss.T(), errs.ErrorOrNil(), "should pass poll height")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
+	err := ss.e.pollHeight()
+	ss.Require().Nil(err)
+	ss.con.AssertExpectations(ss.T())
 }
 
 func (ss *SyncSuite) TestSendRequests() {
@@ -385,7 +384,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	batches := unittest.BatchListFixture(1)
 
 	// should submit and mark requested all ranges
-	ss.con.On("Submit", mock.AnythingOfType("*messages.RangeRequest"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+	ss.con.On("Multicast", mock.AnythingOfType("*messages.RangeRequest"), synccore.DefaultBlockRequestNodes, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.RangeRequest)
 			ss.Assert().Equal(ranges[0].From, req.FromHeight)
@@ -395,7 +394,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.core.On("RangeRequested", ranges[0])
 
 	// should submit and mark requested all batches
-	ss.con.On("Submit", mock.AnythingOfType("*messages.BatchRequest"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+	ss.con.On("Multicast", mock.AnythingOfType("*messages.BatchRequest"), synccore.DefaultBlockRequestNodes, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.BatchRequest)
 			ss.Assert().Equal(batches[0].BlockIDs, req.BlockIDs)

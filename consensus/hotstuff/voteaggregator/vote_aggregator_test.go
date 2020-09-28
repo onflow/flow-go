@@ -33,14 +33,15 @@ func TestAggregator(t *testing.T) {
 type AggregatorSuite struct {
 	suite.Suite
 	participants flow.IdentityList
-	qcs          map[flow.Identifier]*model.QuorumCertificate
 	protocol     *protomock.State
 	snapshot     *protomock.Snapshot
-	signer       *mocks.Signer
+	signer       *mocks.SignerVerifier
 	forks        *mocks.Forks
 	committee    hotstuff.Committee
 	validator    hotstuff.Validator
-	aggregator   *VoteAggregator
+	notifier     *mocks.Consumer
+
+	aggregator *VoteAggregator
 }
 
 func (as *AggregatorSuite) SetupTest() {
@@ -49,7 +50,6 @@ func (as *AggregatorSuite) SetupTest() {
 
 	// generate the validator set with qualified majority threshold of 5
 	as.participants = unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))
-	as.qcs = make(map[flow.Identifier]*model.QuorumCertificate)
 
 	// create a mocked snapshot
 	as.snapshot = &protomock.Snapshot{}
@@ -81,7 +81,7 @@ func (as *AggregatorSuite) SetupTest() {
 	combined, err := c.Join(sig1, sig2)
 	require.NoError(as.T(), err)
 
-	rootQC := &model.QuorumCertificate{
+	rootQC := &flow.QuorumCertificate{
 		View:      rootHeader.View,
 		BlockID:   rootHeader.ID(),
 		SignerIDs: nil,
@@ -98,28 +98,36 @@ func (as *AggregatorSuite) SetupTest() {
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
-	as.signer = &mocks.Signer{}
+	as.signer = &mocks.SignerVerifier{}
 	as.signer.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("CreateQC", mock.AnythingOfType("[]*model.Vote")).Return(
-		func(votes []*model.Vote) *model.QuorumCertificate {
-			qc, _ := as.qcs[votes[0].BlockID]
+		func(votes []*model.Vote) *flow.QuorumCertificate {
+			if len(votes) < 1 {
+				return nil
+			}
+			qc := &flow.QuorumCertificate{
+				View:    votes[0].View,
+				BlockID: votes[0].BlockID,
+				SigData: []byte{},
+			}
+			for _, v := range votes {
+				qc.SignerIDs = append(qc.SignerIDs, v.SignerID)
+			}
 			return qc
 		},
 		func(votes []*model.Vote) error {
-			_, ok := as.qcs[votes[0].BlockID]
-			if !ok {
-				return fmt.Errorf("no votes for block registered")
+			if len(votes) < 1 {
+				return fmt.Errorf("no votes for block")
 			}
 			return nil
 		},
 	)
 
-	// create a real validator
-	as.validator = validator.New(as.committee, as.forks, as.signer)
-
+	as.validator = validator.New(as.committee, as.forks, as.signer) // create a real validator
+	as.notifier = &mocks.Consumer{}                                 // create a mock notification Consumer
 	// create the aggregator
-	as.aggregator = New(&mocks.Consumer{}, 0, as.committee, as.validator, as.signer)
+	as.aggregator = New(as.notifier, 0, as.committee, as.validator, as.signer)
 }
 
 func (as *AggregatorSuite) MockProtocolByBlockID(id flow.Identifier) {
@@ -132,19 +140,6 @@ func (as *AggregatorSuite) RegisterProposal(proposal *model.Proposal) {
 	as.protocol.On("AtBlockID", proposal.Block.BlockID).Return(as.snapshot)
 	as.forks.On("GetBlock", proposal.Block.BlockID).Return(proposal.Block, true)
 	as.signer.On("VerifyProposal", proposal.Block.BlockID).Return(true, nil)
-}
-
-func (as *AggregatorSuite) RegisterVote(vote *model.Vote) {
-	qc, ok := as.qcs[vote.BlockID]
-	if !ok {
-		qc = &model.QuorumCertificate{
-			View:    vote.View,
-			BlockID: vote.BlockID,
-			SigData: []byte{},
-		}
-		as.qcs[vote.BlockID] = qc
-	}
-	qc.SignerIDs = append(qc.SignerIDs, vote.SignerID)
 }
 
 // HAPPY PATH (votes are valid and the block always arrives before votes)
@@ -162,6 +157,8 @@ func (as *AggregatorSuite) TestOnlyReceiveBlock() {
 
 // HAPPY PATH (votes are valid and the block always arrives before votes)
 // assume there are 7 nodes, meaning that the threshold is 5
+//  * one vote from the proposer (implicitly contained in block)
+//  * 3 additional votes from other nodes
 // a QC should not be built when receiving insufficient votes
 func (as *AggregatorSuite) TestReceiveBlockBeforeInsufficientVotes() {
 	testView := uint64(5)
@@ -169,7 +166,7 @@ func (as *AggregatorSuite) TestReceiveBlockBeforeInsufficientVotes() {
 	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	for i := 0; i < 3; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 		require.False(as.T(), built)
 		require.Nil(as.T(), qc)
@@ -178,22 +175,36 @@ func (as *AggregatorSuite) TestReceiveBlockBeforeInsufficientVotes() {
 }
 
 // HAPPY PATH (votes are valid and the block always arrives before votes)
-// assume there are 7 nodes, meaning that the threshold is 5
+// assume there are 7 nodes, meaning that the threshold is 5 required votes:
+//  * one vote from the proposer (implicitly contained in block)
+//  * 4 additional votes from other nodes
 // a QC should be built when receiving the block and the 4th vote (the block is counted as one vote)
 func (as *AggregatorSuite) TestReceiveBlockBeforeSufficientVotes() {
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
-	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
-	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	for i := 0; i < 4; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+	expectedVoters := newExpectedQcContributors()
+
+	proposerVote := bp.ProposerVote()
+	expectedVoters.AddVote(proposerVote)
+	_ = as.aggregator.StoreProposerVote(proposerVote)
+	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block) // includes proposer's vote
+	for i := 0; i < 3; i++ {                                         // adding
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
+		expectedVoters.AddVote(vote)
 		qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
-		if i == 3 {
-			require.NoError(as.T(), err)
-			require.True(as.T(), built)
-			require.NotNil(as.T(), qc)
-		}
+		require.False(as.T(), built)
+		require.Nil(as.T(), qc)
+		require.NoError(as.T(), err)
 	}
+
+	vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[3].NodeID)
+	expectedVoters.AddVote(vote)
+	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
+	qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
+	require.NoError(as.T(), err)
+	require.True(as.T(), built)
+	require.NotNil(as.T(), qc)
+	as.notifier.AssertExpectations(as.T())
 }
 
 // HAPPY PATH (votes are valid and the block always arrives before votes)
@@ -202,14 +213,25 @@ func (as *AggregatorSuite) TestReceiveBlockBeforeSufficientVotes() {
 func (as *AggregatorSuite) TestReceiveVoteAfterQCBuilt() {
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
-	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
+	expectedVoters := newExpectedQcContributors()
+
+	proposerVote := bp.ProposerVote()
+	expectedVoters.AddVote(proposerVote)
+	_ = as.aggregator.StoreProposerVote(proposerVote)
 	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	var qc *model.QuorumCertificate
+	var qc *flow.QuorumCertificate
 	for i := 0; i < 4; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
+		expectedVoters.AddVote(vote)
+		if i == 3 {
+			as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
+		}
 		qc, _, _ = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 	}
-	finalVote := newMockVote(as, testView, bp.Block.BlockID, as.participants[4].NodeID)
+	as.notifier.AssertExpectations(as.T())
+
+	// adding more votes should only return previously built and cached QC
+	finalVote := as.newMockVote(testView, bp.Block.BlockID, as.participants[4].NodeID)
 	finalQC, built, err := as.aggregator.StoreVoteAndBuildQC(finalVote, bp.Block)
 	require.NoError(as.T(), err)
 	require.NotNil(as.T(), finalQC)
@@ -225,13 +247,13 @@ func (as *AggregatorSuite) TestReceiveVoteForDifferentBlock() {
 	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
 	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	for i := 0; i < 3; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		_, _, _ = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 	}
 	bp2 := newMockBlock(as, testView, as.participants[len(as.participants)-2].NodeID)
 	_ = as.aggregator.StoreProposerVote(bp2.ProposerVote())
 	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp2.Block)
-	voteForDifferentBlock := newMockVote(as, testView, bp2.Block.BlockID, as.participants[4].NodeID)
+	voteForDifferentBlock := as.newMockVote(testView, bp2.Block.BlockID, as.participants[4].NodeID)
 	qc, built, err := as.aggregator.StoreVoteAndBuildQC(voteForDifferentBlock, bp2.Block)
 	require.Nil(as.T(), qc)
 	require.False(as.T(), built)
@@ -244,7 +266,7 @@ func (as *AggregatorSuite) TestReceiveInsufficientVotesBeforeBlock() {
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	for i := 0; i < 3; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		ok, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
 		require.True(as.T(), ok)
@@ -264,31 +286,46 @@ func (as *AggregatorSuite) TestReceiveInsufficientVotesBeforeBlock() {
 }
 
 // PENDING PATH (votes are valid and the block arrives after votes)
-// receive 6 votes first, a QC should be built when receiving the block
+// Assume there are 7 nodes, meaning that the threshold is 5.
+// Receive 6 votes first from nodes _other_ than the proposer;
+// a QC should be built when receiving the block.
+//
+// The proposer's vote should always be given priority when constructing the QC
+// Hence, the 5th and last required vote will be the proposer's.
 func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeBlock() {
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
+	expectedVoters := newExpectedQcContributors()
+
+	proposerVote := bp.ProposerVote()
+	expectedVoters.AddVote(proposerVote)
 	_, _, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	for i := 0; i < 6; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
+		if i < 4 { // only the first 4 votes from nodes _other_ than proposer should be included in QC
+			expectedVoters.AddVote(vote)
+		}
 		ok, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
 		require.True(as.T(), ok)
 	}
-	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
+	_ = as.aggregator.StoreProposerVote(proposerVote)
+	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	require.NoError(as.T(), err)
-	require.NotNil(as.T(), qc)
 	require.True(as.T(), built)
+	require.NotNil(as.T(), qc)
+	as.notifier.AssertExpectations(as.T())
 
 	// and can be called again
-	qc, built, err = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
+	qc2, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	require.NoError(as.T(), err)
-	require.NotNil(as.T(), qc)
 	require.True(as.T(), built)
+	require.NotNil(as.T(), qc2)
+	require.Equal(as.T(), qc, qc2) // we expect the vote aggregator to cache the qc
 }
 
-// PENDING PATH votes are valid and block arrives after votes)
+// PENDING PATH (votes are valid and block arrives after votes)
 // receive 3 votes first, a QC should be built when receiving the proposal with my own vote
 // 5 total votes for the QC are from: 3 pending votes, 1 proposer vote, and my own vote
 func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeProposal() {
@@ -296,24 +333,31 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeProposal() {
 
 	// the proposal is from the last node
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
+	expectedVoters := newExpectedQcContributors()
 
 	// create 3 pending votes from the first 3 nodes, which are different from the last node
 	for i := 0; i < 3; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
+		expectedVoters.AddVote(vote)
 		ok, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
 		require.True(as.T(), ok)
 	}
 
 	// when receiving the block, the proposer vote from the proposal will be received and stored
-	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
+	proposerVote := bp.ProposerVote()
+	expectedVoters.AddVote(proposerVote)
+	_ = as.aggregator.StoreProposerVote(proposerVote)
 
 	// now we have 4 votes in total, the last vote is our own vote
-	ownVote := newMockVote(as, testView, bp.Block.BlockID, as.participants[4].NodeID)
+	ownVote := as.newMockVote(testView, bp.Block.BlockID, as.participants[4].NodeID)
+	expectedVoters.AddVote(ownVote)
+	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err := as.aggregator.StoreVoteAndBuildQC(ownVote, bp.Block)
 	require.NoError(as.T(), err)
 	require.NotNil(as.T(), qc)
 	require.True(as.T(), built)
+	as.notifier.AssertExpectations(as.T())
 }
 
 // PENDING PATH. This tests that when the the proposer is myself and there isn't enough
@@ -326,7 +370,7 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeProposalTheProposerIs
 
 	// create 3 pending votes from the first 3 nodes, which are different from the last node
 	for i := 0; i < 3; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		ok, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
 		require.True(as.T(), ok)
@@ -338,7 +382,7 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeProposalTheProposerIs
 	// now we have 4 votes in total, the last vote is our own vote, which is
 	// also the proposer's vote, this happens when we have weighted random leader selection, and
 	// the same leader happens to be selected in a row.
-	ownVote := newMockVote(as, testView, bp.Block.BlockID, as.participants[len(as.participants)-1].NodeID)
+	ownVote := as.newMockVote(testView, bp.Block.BlockID, as.participants[len(as.participants)-1].NodeID)
 	qc, built, err := as.aggregator.StoreVoteAndBuildQC(ownVote, bp.Block)
 	require.NoError(as.T(), err)
 	require.Nil(as.T(), qc)
@@ -351,7 +395,7 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeProposalTheProposerIs
 func (as *AggregatorSuite) TestStaleVoteWithoutBlock() {
 	as.aggregator.PruneByView(10)
 	testView := uint64(5)
-	vote := newMockVote(as, testView, unittest.IdentifierFixture(), as.participants[0].NodeID)
+	vote := as.newMockVote(testView, unittest.IdentifierFixture(), as.participants[0].NodeID)
 	ok, err := as.aggregator.StorePendingVote(vote)
 	require.NoError(as.T(), err)
 	require.False(as.T(), ok)
@@ -388,16 +432,14 @@ func (as *AggregatorSuite) TestStaleProposerVote() {
 // should trigger notifier
 func (as *AggregatorSuite) TestDoubleVote() {
 	testview := uint64(5)
-	notifier := &mocks.Consumer{}
 	// mock two proposals at the same view
 	bp1 := newMockBlock(as, testview, as.participants[0].NodeID)
 	bp2 := newMockBlock(as, testview, as.participants[1].NodeID)
 	// mock double voting
-	vote1 := newMockVote(as, testview, bp1.Block.BlockID, as.participants[2].NodeID)
-	vote2 := newMockVote(as, testview, bp2.Block.BlockID, as.participants[2].NodeID)
+	vote1 := as.newMockVote(testview, bp1.Block.BlockID, as.participants[2].NodeID)
+	vote2 := as.newMockVote(testview, bp2.Block.BlockID, as.participants[2].NodeID)
 	// set notifier
-	notifier.On("OnDoubleVotingDetected", vote1, vote2).Return().Once()
-	as.aggregator.notifier = notifier
+	as.notifier.On("OnDoubleVotingDetected", vote1, vote2).Return().Once()
 
 	as.aggregator.StoreProposerVote(bp1.ProposerVote())
 	as.aggregator.StoreProposerVote(bp2.ProposerVote())
@@ -408,7 +450,7 @@ func (as *AggregatorSuite) TestDoubleVote() {
 	require.False(as.T(), built)
 	require.NoError(as.T(), err)
 	qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote2, bp2.Block)
-	notifier.AssertExpectations(as.T())
+	as.notifier.AssertExpectations(as.T())
 	require.Nil(as.T(), qc)
 	require.False(as.T(), built)
 	require.NoError(as.T(), err)
@@ -418,15 +460,13 @@ func (as *AggregatorSuite) TestDoubleVote() {
 // receive 4 invalid votes, and then the block, no QC should be built
 // should trigger the notifier when converting pending votes
 func (as *AggregatorSuite) TestInvalidVotesOnly() {
-	notifier := &mocks.Consumer{}
-	as.aggregator.notifier = notifier
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	// testing invalid pending votes
 	for i := 0; i < 4; i++ {
 		// vote view is invalid
-		vote := newMockVote(as, testView-1, bp.Block.BlockID, as.participants[i].NodeID)
-		notifier.On("OnInvalidVoteDetected", vote)
+		vote := as.newMockVote(testView-1, bp.Block.BlockID, as.participants[i].NodeID)
+		as.notifier.On("OnInvalidVoteDetected", vote)
 		_, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
 	}
@@ -435,43 +475,49 @@ func (as *AggregatorSuite) TestInvalidVotesOnly() {
 	require.Nil(as.T(), qc)
 	require.False(as.T(), built)
 	require.NoError(as.T(), err)
-	notifier.AssertExpectations(as.T())
+	as.notifier.AssertExpectations(as.T())
 }
 
 // INVALID VOTES
 // receive 1 invalid vote, and 4 valid votes, and then the block, a QC should be built
 func (as *AggregatorSuite) TestVoteMixtureBeforeBlock() {
 	testView := uint64(5)
-	notifier := &mocks.Consumer{}
-	as.aggregator.notifier = notifier
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
+	expectedVoters := newExpectedQcContributors()
+
 	// testing invalid pending votes
 	for i := 0; i < 5; i++ {
 		var vote *model.Vote
 		if i == 0 {
 			// vote view is invalid
-			vote = newMockVote(as, testView-1, bp.Block.BlockID, as.participants[i].NodeID)
-			notifier.On("OnInvalidVoteDetected", vote)
+			vote = as.newMockVote(testView-1, bp.Block.BlockID, as.participants[i].NodeID)
+			as.notifier.On("OnInvalidVoteDetected", vote)
 		} else {
-			vote = newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+			vote = as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
+			expectedVoters.AddVote(vote)
 		}
 		_, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
 	}
-	as.aggregator.StoreProposerVote(bp.ProposerVote())
+
+	// the block contains the proposer's vote, which is the last needed vote:
+	proposerVote := bp.ProposerVote()
+	expectedVoters.AddVote(proposerVote)
+	as.aggregator.StoreProposerVote(proposerVote)
+	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
+	as.notifier.On("OnQcConstructedFromVotes", mock.Anything).Return().Once()
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	require.NotNil(as.T(), qc)
 	require.True(as.T(), built)
 	require.NoError(as.T(), err)
-	notifier.AssertExpectations(as.T())
+	require.Equal(as.T(), qc.View, testView)
+	// as.notifier.AssertExpectations(as.T())
 }
 
 // INVALID VOTES
 // receive the block, and 3 valid vote, and 1 invalid vote, no QC should be built
 func (as *AggregatorSuite) TestVoteMixtureAfterBlock() {
 	testView := uint64(5)
-	notifier := &mocks.Consumer{}
-	as.aggregator.notifier = notifier
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
 	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
@@ -479,17 +525,17 @@ func (as *AggregatorSuite) TestVoteMixtureAfterBlock() {
 	for i := 0; i < 4; i++ {
 		var vote *model.Vote
 		if i < 3 {
-			vote = newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+			vote = as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		} else {
 			// vote view is invalid
-			vote = newMockVote(as, testView-1, bp.Block.BlockID, as.participants[i].NodeID)
-			notifier.On("OnInvalidVoteDetected", vote)
+			vote = as.newMockVote(testView-1, bp.Block.BlockID, as.participants[i].NodeID)
+			as.notifier.On("OnInvalidVoteDetected", vote)
 		}
 		qc, built, err := as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 		require.Nil(as.T(), qc)
 		require.False(as.T(), built)
 		require.NoError(as.T(), err)
-		notifier.AssertExpectations(as.T())
+		as.notifier.AssertExpectations(as.T())
 	}
 }
 
@@ -500,7 +546,7 @@ func (as *AggregatorSuite) TestDuplicateVotesAfterBlock() {
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
 	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[1].NodeID)
+	vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[1].NodeID)
 	for i := 0; i < 4; i++ {
 		qc, built, err := as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 		require.Nil(as.T(), qc)
@@ -517,7 +563,7 @@ func (as *AggregatorSuite) TestDuplicateVotesBeforeBlock() {
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
-	vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[1].NodeID)
+	vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[1].NodeID)
 	for i := 0; i < 4; i++ {
 		_, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
@@ -534,31 +580,32 @@ func (as *AggregatorSuite) TestDuplicateVotesBeforeBlock() {
 func (as *AggregatorSuite) TestVoteOrderAfterBlock() {
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
-	var voteList []*model.Vote
-	voteList = append(voteList, bp.ProposerVote())
-	for i := 0; i < 5; i++ {
-		vote := newMockVote(as, testView, bp.Block.BlockID, as.participants[i].NodeID)
+	expectedVoters := newExpectedQcContributors()
+
+	// the first 4 votes should make it into the QC
+	for i := 0; i < 4; i++ {
+		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
+		expectedVoters.AddVote(vote)
 		_, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
-		voteList = append(voteList, vote)
 	}
-	as.aggregator.StoreProposerVote(bp.ProposerVote())
+	// The proposer's vote should always be given priority when constructing the QC
+	// Hence, the 5th and last required vote will be the proposer's.
+	// VoteAggregator should not include this following vote
+	vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[4].NodeID)
+	_, err := as.aggregator.StorePendingVote(vote)
+	require.NoError(as.T(), err)
+
+	// new we pretend we received the (previously missing) block, which contains the last missing vote
+	proposerVote := bp.ProposerVote()
+	expectedVoters.AddVote(proposerVote)
+	as.aggregator.StoreProposerVote(proposerVote)
+	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	_, exists := as.aggregator.blockIDToVotingStatus[bp.Block.BlockID].votes[bp.ProposerVote().ID()]
 	require.NotNil(as.T(), qc)
 	require.True(as.T(), built)
 	require.NoError(as.T(), err)
-	require.True(as.T(), exists)
-	// first five votes including proposer vote should be stored in voting status
-	// while the 6th vote shouldn't
-	for i := 0; i < 6; i++ {
-		_, exists := as.aggregator.blockIDToVotingStatus[bp.Block.BlockID].votes[voteList[i].ID()]
-		if i < 5 {
-			require.True(as.T(), exists)
-		} else {
-			require.False(as.T(), exists)
-		}
-	}
+	as.notifier.AssertExpectations(as.T())
 }
 
 // PRUNE
@@ -571,7 +618,7 @@ func (as *AggregatorSuite) TestPartialPruneBeforeBlock() {
 	for i := 2; i <= 5; i++ {
 		view := uint64(i)
 		bp := newMockBlock(as, view, unittest.IdentifierFixture())
-		vote := newMockVote(as, view, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(view, bp.Block.BlockID, as.participants[i].NodeID)
 		as.aggregator.StorePendingVote(vote)
 		voteList = append(voteList, vote)
 		blockList = append(blockList, bp.Block)
@@ -611,7 +658,7 @@ func (as *AggregatorSuite) TestPartialPruneAfterBlock() {
 		bp := newMockBlock(as, view, as.participants[i].NodeID)
 		as.aggregator.StoreProposerVote(bp.ProposerVote())
 		_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-		vote := newMockVote(as, view, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(view, bp.Block.BlockID, as.participants[i].NodeID)
 		_, _, _ = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 		voteList = append(voteList, vote)
 		blockList = append(blockList, bp.Block)
@@ -646,7 +693,7 @@ func (as *AggregatorSuite) TestFullPruneBeforeBlock() {
 	pruneView := uint64(6)
 	for i := 2; i <= 5; i++ {
 		view := uint64(i)
-		vote := newMockVote(as, view, unittest.IdentifierFixture(), as.participants[i].NodeID)
+		vote := as.newMockVote(view, unittest.IdentifierFixture(), as.participants[i].NodeID)
 		_, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
 	}
@@ -668,7 +715,7 @@ func (as *AggregatorSuite) TestFullPruneAfterBlock() {
 		bp := newMockBlock(as, view, as.participants[i].NodeID)
 		as.aggregator.StoreProposerVote(bp.ProposerVote())
 		_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-		vote := newMockVote(as, view, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(view, bp.Block.BlockID, as.participants[i].NodeID)
 		_, _, _ = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 	}
 	_, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(as.aggregator)
@@ -691,7 +738,7 @@ func (as *AggregatorSuite) TestNonePruneBeforeBlock() {
 	pruneView := uint64(2)
 	for i := 3; i <= 5; i++ {
 		view := uint64(i)
-		vote := newMockVote(as, view, unittest.IdentifierFixture(), as.participants[i].NodeID)
+		vote := as.newMockVote(view, unittest.IdentifierFixture(), as.participants[i].NodeID)
 		_, err := as.aggregator.StorePendingVote(vote)
 		require.NoError(as.T(), err)
 	}
@@ -725,7 +772,7 @@ func (as *AggregatorSuite) TestNonePruneAfterBlock() {
 		bp := newMockBlock(as, view, as.participants[i].NodeID)
 		as.aggregator.StoreProposerVote(bp.ProposerVote())
 		_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-		vote := newMockVote(as, view, bp.Block.BlockID, as.participants[i].NodeID)
+		vote := as.newMockVote(view, bp.Block.BlockID, as.participants[i].NodeID)
 		_, _, _ = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 	}
 	_, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(as.aggregator)
@@ -777,7 +824,7 @@ func (as *AggregatorSuite) TestInSufficientRBSig() {
 	bp := newMockBlock(as, testView, as.participants[0].NodeID)
 	as.aggregator.StoreProposerVote(bp.ProposerVote())
 	_, _, _ = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	vote1 := newMockVote(as, testView, bp.Block.BlockID, as.participants[1].NodeID)
+	vote1 := as.newMockVote(testView, bp.Block.BlockID, as.participants[1].NodeID)
 	qc, built, err := as.aggregator.StoreVoteAndBuildQC(vote1, bp.Block)
 	require.Nil(as.T(), qc)
 	require.False(as.T(), built)
@@ -802,22 +849,34 @@ func (as *AggregatorSuite) TestSufficientRBSig() {
 
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[0].NodeID)
-	as.aggregator.StoreProposerVote(bp.ProposerVote())
+	expectedVoters := newExpectedQcContributors()
+
+	proposerVote := bp.ProposerVote()
+	expectedVoters.AddVote(proposerVote)
+	as.aggregator.StoreProposerVote(proposerVote)
 	_, built, _ := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	require.False(as.T(), built)
-	vote1 := newMockVote(as, testView, bp.Block.BlockID, as.participants[1].NodeID)
+
+	vote1 := as.newMockVote(testView, bp.Block.BlockID, as.participants[1].NodeID)
+	expectedVoters.AddVote(vote1)
 	_, built, _ = as.aggregator.StoreVoteAndBuildQC(vote1, bp.Block)
 	require.False(as.T(), built)
-	vote2 := newMockVote(as, testView, bp.Block.BlockID, as.participants[2].NodeID)
+
+	vote2 := as.newMockVote(testView, bp.Block.BlockID, as.participants[2].NodeID)
+	expectedVoters.AddVote(vote2)
 	qc, built, err := as.aggregator.StoreVoteAndBuildQC(vote2, bp.Block)
 	require.NoError(as.T(), err)
 	require.False(as.T(), built)
 	require.Nil(as.T(), qc)
-	vote3 := newMockVote(as, testView, bp.Block.BlockID, as.participants[3].NodeID)
+
+	vote3 := as.newMockVote(testView, bp.Block.BlockID, as.participants[3].NodeID)
+	expectedVoters.AddVote(vote3)
+	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote3, bp.Block)
 	require.NoError(as.T(), err)
 	require.True(as.T(), built)
 	require.NotNil(as.T(), qc)
+	as.notifier.AssertExpectations(as.T())
 }
 
 func newMockBlock(as *AggregatorSuite, view uint64, proposerID flow.Identifier) *model.Proposal {
@@ -837,17 +896,62 @@ func newMockBlock(as *AggregatorSuite, view uint64, proposerID flow.Identifier) 
 	return bp
 }
 
-func newMockVote(as *AggregatorSuite, view uint64, blockID flow.Identifier, signerID flow.Identifier) *model.Vote {
-	vote := &model.Vote{
+func (as *AggregatorSuite) newMockVote(view uint64, blockID flow.Identifier, signerID flow.Identifier) *model.Vote {
+	return &model.Vote{
 		View:     view,
 		BlockID:  blockID,
 		SignerID: signerID,
 		SigData:  []byte{},
 	}
-	as.RegisterVote(vote)
-	return vote
 }
 
 func getStateLength(aggregator *VoteAggregator) (uint64, int, int, int, int) {
 	return aggregator.highestPrunedView, len(aggregator.viewToBlockIDSet), len(aggregator.viewToVoteID), len(aggregator.pendingVotes.votes), len(aggregator.blockIDToVotingStatus)
+}
+
+func (as *AggregatorSuite) qcForBlock(proposal *model.Proposal, expectedQcContributors *expectedQcContributors) interface{} {
+	return mock.MatchedBy(
+		func(qc *flow.QuorumCertificate) bool {
+			return (qc.View == proposal.Block.View) && (qc.BlockID == proposal.Block.BlockID) && expectedQcContributors.HasExpectedVoters(qc)
+		},
+	)
+}
+
+type expectedQcContributors struct {
+	blockVotes map[flow.Identifier](map[flow.Identifier]struct{})
+}
+
+func newExpectedQcContributors() *expectedQcContributors {
+	return &expectedQcContributors{
+		blockVotes: make(map[flow.Identifier](map[flow.Identifier]struct{})),
+	}
+}
+
+func (c *expectedQcContributors) AddVote(vote *model.Vote) {
+	voters, ok := c.blockVotes[vote.BlockID]
+	if !ok {
+		voters = make(map[flow.Identifier]struct{})
+		c.blockVotes[vote.BlockID] = voters
+	}
+	voters[vote.SignerID] = struct{}{}
+}
+
+func (c *expectedQcContributors) HasExpectedVoters(qc *flow.QuorumCertificate) bool {
+	voters, ok := c.blockVotes[qc.BlockID]
+	if !ok {
+		return false
+	}
+
+	// check set equivalence
+	if len(voters) != len(qc.SignerIDs) {
+		return false
+	}
+	for _, signer := range qc.SignerIDs {
+		_, ok := voters[signer]
+		if !ok {
+			return false
+		}
+	}
+
+	return true
 }

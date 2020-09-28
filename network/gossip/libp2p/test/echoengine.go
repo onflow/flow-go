@@ -15,11 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 )
 
-// ConduitSendWrapperFunc is a wrapper around the set of methods offered by the
-// Conduit (e.g., Publish). This data type is solely introduced at the test level.
-// Its primary purpose is to make the same test reusable on different Conduit methods.
-type ConduitSendWrapperFunc func(msg interface{}, conduit network.Conduit, targetID flow.Identifier) error
-
 // EchoEngine is a simple engine that is used for testing the correctness of
 // driving the engines with libp2p, in addition to receiving and storing incoming messages
 // it also echos them back
@@ -36,7 +31,7 @@ type EchoEngine struct {
 	send     ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
 }
 
-func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
+func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID string, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
 	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",
@@ -89,8 +84,8 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 	te.received <- struct{}{}
 
 	// asserting event as string
-	lip2pEvent, ok := (event).(*message.Echo)
-	require.True(te.t, ok, "could not assert event as Echo")
+	lip2pEvent, ok := (event).(*message.TestMessage)
+	require.True(te.t, ok, "could not assert event as TestMessage")
 
 	// checks for duplication
 	strEvent := lip2pEvent.Text
@@ -109,7 +104,7 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 	}
 
 	// sends a echo back
-	msg := &message.Echo{
+	msg := &message.TestMessage{
 		Text: fmt.Sprintf("%s: %s", te.echomsg, strEvent),
 	}
 

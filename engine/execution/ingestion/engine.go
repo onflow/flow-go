@@ -696,7 +696,7 @@ func (e *Engine) saveExecutionResults(
 	originalState := startState
 
 	err := e.execState.PersistStateInteractions(childCtx, executableBlock.ID(), stateInteractions)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return nil, err
 	}
 
@@ -753,11 +753,6 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
 
-	err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, executableBlock.Block.Header)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update highest executed block: %w", err)
-	}
-
 	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
@@ -768,24 +763,38 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
+	// not update the highest executed until the result and receipts are saved.
+	// TODO: better to save result, receipt and the latest height in one transaction
+	err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, executableBlock.Block.Header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update highest executed block: %w", err)
+	}
+
 	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
+		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionEvents)
 		defer span.Finish()
 
+		blockID := executableBlock.ID()
 		if len(events) > 0 {
-			err = e.events.Store(executableBlock.ID(), events)
+			err = e.events.Store(blockID, events)
 			if err != nil {
 				return fmt.Errorf("failed to store events: %w", err)
 			}
 		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
 
-		for _, te := range txResults {
-			err = e.transactionResults.Store(executableBlock.ID(), &te)
-			if err != nil {
-				return fmt.Errorf("failed to store transaction error: %w", err)
-			}
+	err = func() error {
+		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
+		defer span.Finish()
+		blockID := executableBlock.ID()
+		err = e.transactionResults.BatchStore(blockID, txResults)
+		if err != nil {
+			return fmt.Errorf("failed to store transaction result error: %w", err)
 		}
-
 		return nil
 	}()
 	if err != nil {
@@ -911,7 +920,7 @@ func (e *Engine) generateExecutionReceipt(
 	receipt.ExecutorSignature = sig
 
 	err = e.execState.PersistExecutionReceipt(ctx, receipt)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return nil, fmt.Errorf("could not persist execution result: %w", err)
 	}
 
@@ -1036,43 +1045,67 @@ func (e *Engine) handleExecutionStateDelta(
 	originID flow.Identifier,
 ) error {
 
+	// sync queues contains the fetched state deltas stored the orphan deltas
+	// in a fork-aware tree
+	// when receive a state delta, we check whether this delta can be used so
+	// that we don't need to execute the block.
+	// if yes, we apply the delta
+	// if not, we add the delta the sync queues as orphan deltas.
 	return e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
 		log := e.log.With().
 			Hex("block_id", logging.Entity(executionStateDelta.Block)).
 			Uint64("block_height", executionStateDelta.Block.Header.Height).
 			Logger()
 
-		// try enqueue
+		// check if the delta is an extension of any orphan deltas
+		// if yes, then add it to the orphan deltas.
+		// since an extension of orphan can't be used, we return here
 		if queue, added := tryEnqueue(executionStateDelta, backdata); added {
 			log.Debug().
 				Msg("added block to existing orphan queue")
 
+			// before we return, we double check if the delta could fill the gap of another orphan
+			// which could merge two orphans into one.
 			e.tryRequeueOrphans(executionStateDelta, queue, backdata)
 			return nil
 		}
 
+		// since the delta is not an extension of the delta queue, then adding it,
+		// if it doesn't exist before, then add it as a delta orphan
+		// if it exists, then still execute it again.
+		// TODO: maybe we could return nil when !added
+		newQueue := queue.NewQueue(executionStateDelta)
+		added := backdata.Add(newQueue)
+		if added {
+			// add the new branch as a new orphan
+			e.tryRequeueOrphans(executionStateDelta, newQueue, backdata)
+		}
+
+		// since the delta is not an extension of the delta queue
+		// check if the parent state (StateCommitment) exists in the storage, which would
+		// mean the parent has been executed by ourselves already
 		stateCommitment, getStateCommitmentErr := e.execState.StateCommitmentByBlockID(ctx, executionStateDelta.ParentID())
 		if getStateCommitmentErr != nil && !errors.Is(getStateCommitmentErr, storage.ErrNotFound) {
 			log.Fatal().Msgf("unexpected error while accessing storage for sync deltas, shutting down: %v", getStateCommitmentErr)
 		}
 
-		newQueue, added := enqueue(executionStateDelta, backdata)
-		if !added {
-			log.Fatal().Msgf("cannot enqueue sync delta: %s", getStateCommitmentErr)
-		}
-
-		e.tryRequeueOrphans(executionStateDelta, newQueue, backdata)
-
+		// if the parent state for the orphan deltas doesn't exist,
+		// it means this delta is really an orphan, so we stop here, waiting for either
+		// the delta for the parent to come or the parent block to be executed.
 		if errors.Is(getStateCommitmentErr, storage.ErrNotFound) {
-			// if state commitment doesn't exist and there are no known deltas which will produce
-			// it soon (sync queue) then we save it as orphaned
 			return nil
 		}
 
+		// sanity check that if the state for the parent block already exists,
+		// then the delta's start state must be equal to that.
 		if !bytes.Equal(stateCommitment, executionStateDelta.StartState) {
-			return fmt.Errorf("internal inconsistency with delta - state commitment for parent retrieved from DB different from start state in delta! ")
+			return fmt.Errorf("internal inconsistency with delta for block (%v) - state commitment for parent retrieved from DB (%x) different from start state in delta! (%x)",
+				executionStateDelta.ParentID(),
+				stateCommitment,
+				executionStateDelta.StartState)
 		}
 
+		// if the parent state exists for the orphan delta, we could apply this delta.
 		e.syncWg.Add(1)
 		go e.saveDelta(ctx, executionStateDelta)
 
@@ -1117,6 +1150,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 		executionStateDelta.TransactionResults,
 		executionStateDelta.StartState,
 	)
+
 	if err != nil {
 		log.Fatal().Err(err).Msg("fatal error while processing sync message")
 	}
@@ -1129,7 +1163,14 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 			Err(err).Msg("processing sync message produced unexpected state commitment")
 	}
 
-	targetBlockID := e.syncTargetBlockID.Load().(flow.Identifier)
+	targetBlockIDValue := e.syncTargetBlockID.Load()
+
+	// if we received a delta but we never synced, abort
+	if targetBlockIDValue == nil {
+		return
+	}
+
+	targetBlockID := targetBlockIDValue.(flow.Identifier)
 
 	// last block was saved
 	if targetBlockID == executionStateDelta.Block.ID() {

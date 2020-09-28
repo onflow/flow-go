@@ -62,6 +62,7 @@ func TestHappyPath(t *testing.T) {
 // are submitted to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
 	chainID := flow.Testnet
+	chunkNum := 1
 
 	// finder and match engine parameters
 	// set based on following issue (3443)
@@ -79,7 +80,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
 
 	// complete ER counter example
-	completeER := utils.CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain())
+	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, flow.Testnet.Chain())
 	result := &completeER.Receipt.ExecutionResult
 
 	// assigner and assignment
@@ -107,6 +108,8 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		requestInterval,
 		processInterval,
 		failureThreshold,
+		uint(10),
+		uint(10*chunkNum),
 		chainID,
 		collector,
 		collector)

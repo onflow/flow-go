@@ -79,9 +79,9 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 }
 
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
-func registerConduits(net module.Network, eng network.Engine) (map[uint8]network.Conduit, error) {
+func registerConduits(net module.Network, eng network.Engine) (map[string]network.Conduit, error) {
 
-	allEngineIDs := []uint8{
+	allEngineIDs := []string{
 		engine.ConsensusCommittee,
 		engine.ConsensusCluster,
 		engine.SyncCommittee,
@@ -96,7 +96,7 @@ func registerConduits(net module.Network, eng network.Engine) (map[uint8]network
 		engine.RequestChunks,
 	}
 
-	conduitMap := make(map[uint8]network.Conduit, len(allEngineIDs))
+	conduitMap := make(map[string]network.Conduit, len(allEngineIDs))
 
 	// Register for ALL channels here and return a map of conduits
 	for _, e := range allEngineIDs {

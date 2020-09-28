@@ -49,7 +49,6 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err != nil {
 			return fmt.Errorf("could not store data: %w", err)
 		}
-
 		return nil
 	}
 }
@@ -347,5 +346,12 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 		}
 
 		return nil
+	}
+}
+
+// Fail returns a DB operation function that always fails with the given error.
+func Fail(err error) func(*badger.Txn) error {
+	return func(_ *badger.Txn) error {
+		return err
 	}
 }

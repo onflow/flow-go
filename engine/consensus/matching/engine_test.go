@@ -886,7 +886,7 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 
 	orderedBlocks := []flow.Block{}
 	for i := 0; i < n; i++ {
-		payload := unittest.PayloadFixture(unittest.WithoutIdentities, unittest.WithoutSeals)
+		payload := unittest.PayloadFixture()
 		header := headers[i]
 		header.PayloadHash = payload.Hash()
 		block := flow.Block{

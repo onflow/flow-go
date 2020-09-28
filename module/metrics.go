@@ -8,17 +8,26 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
+// Network Metrics
 type NetworkMetrics interface {
-	// Network Metrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string)
 
-	// Network Metrics
 	// NetworkMessageReceived size in bytes and count of the network message received
 	NetworkMessageReceived(sizeBytes int, topic string)
 
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
 	NetworkDuplicateMessagesDropped(topic string)
+
+	// Message receive queue metrics
+	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
+	MessageAdded(priority int)
+
+	// MessageRemoved decrements the metric tracking the number of messages in the queue with the given priority
+	MessageRemoved(priority int)
+
+	// QueueDuration tracks the time spent by a message with the given priority in the queue
+	QueueDuration(duration time.Duration, priority int)
 }
 
 type EngineMetrics interface {
@@ -286,6 +295,12 @@ type TransactionMetrics interface {
 	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
 	// works if the transaction was earlier added as received.
 	TransactionExecuted(txID flow.Identifier, when time.Time)
+
+	// TransactionExpired tracks number of expired transactions
+	TransactionExpired(txID flow.Identifier)
+
+	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
+	TransactionSubmissionFailed()
 }
 
 type PingMetrics interface {

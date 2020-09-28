@@ -39,11 +39,11 @@ func (_m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
 }
 
 // Publish provides a mock function with given fields: msg, channelID
-func (_m *Middleware) Publish(msg *message.Message, channelID uint8) error {
+func (_m *Middleware) Publish(msg *message.Message, channelID string) error {
 	ret := _m.Called(msg, channelID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message, uint8) error); ok {
+	if rf, ok := ret.Get(0).(func(*message.Message, string) error); ok {
 		r0 = rf(msg, channelID)
 	} else {
 		r0 = ret.Error(0)
@@ -53,7 +53,7 @@ func (_m *Middleware) Publish(msg *message.Message, channelID uint8) error {
 }
 
 // Send provides a mock function with given fields: channelID, msg, targetIDs
-func (_m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error {
+func (_m *Middleware) Send(channelID string, msg *message.Message, targetIDs ...flow.Identifier) error {
 	_va := make([]interface{}, len(targetIDs))
 	for _i := range targetIDs {
 		_va[_i] = targetIDs[_i]
@@ -64,7 +64,7 @@ func (_m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...f
 	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint8, *message.Message, ...flow.Identifier) error); ok {
+	if rf, ok := ret.Get(0).(func(string, *message.Message, ...flow.Identifier) error); ok {
 		r0 = rf(channelID, msg, targetIDs...)
 	} else {
 		r0 = ret.Error(0)
@@ -107,11 +107,25 @@ func (_m *Middleware) Stop() {
 }
 
 // Subscribe provides a mock function with given fields: channelID
-func (_m *Middleware) Subscribe(channelID uint8) error {
+func (_m *Middleware) Subscribe(channelID string) error {
 	ret := _m.Called(channelID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint8) error); ok {
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(channelID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Unsubscribe provides a mock function with given fields: channelID
+func (_m *Middleware) Unsubscribe(channelID string) error {
+	ret := _m.Called(channelID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(channelID)
 	} else {
 		r0 = ret.Error(0)

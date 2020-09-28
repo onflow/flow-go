@@ -133,6 +133,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 		assignment,
 		requestInterval,
 		processInterval,
+		uint(erCount),
+		uint(erCount*chunksNum),
 		failureThreshold,
 		chainID,
 		collector,

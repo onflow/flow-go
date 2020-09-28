@@ -35,7 +35,13 @@ const (
 	OneToK
 )
 
-const DefaultMaxPubSubMsgSize = 1 << 21 //2mb
+const (
+	// defines maximum message size in publish and multicast modes
+	DefaultMaxPubSubMsgSize = 1 << 21 // 2 mb
+
+	// defines maximum message size in unicast mode
+	DefaultMaxUnicastMsgSize = 5 * DefaultMaxPubSubMsgSize // 10 mb
+)
 
 // the inbound message queue size for One to One and One to K messages (each)
 const InboundMessageQueueSize = 100
@@ -44,28 +50,29 @@ const InboundMessageQueueSize = 100
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx              context.Context
-	cancel           context.CancelFunc
-	log              zerolog.Logger
-	codec            network.Codec
-	ov               middleware.Overlay
-	wg               *sync.WaitGroup
-	libP2PNode       *P2PNode
-	stop             chan struct{}
-	me               flow.Identifier
-	host             string
-	port             string
-	key              crypto.PrivateKey
-	metrics          module.NetworkMetrics
-	maxPubSubMsgSize int
-	rootBlockID      string
-	validators       []validators.MessageValidator
+	ctx               context.Context
+	cancel            context.CancelFunc
+	log               zerolog.Logger
+	codec             network.Codec
+	ov                middleware.Overlay
+	wg                *sync.WaitGroup
+	libP2PNode        *P2PNode
+	stop              chan struct{}
+	me                flow.Identifier
+	host              string
+	port              string
+	key               crypto.PrivateKey
+	metrics           module.NetworkMetrics
+	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
+	maxUnicastMsgSize int // used to define maximum message size in unicast mode
+	rootBlockID       string
+	validators        []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, metrics module.NetworkMetrics, maxPubSubMsgSize int,
+	key crypto.PrivateKey, metrics module.NetworkMetrics, maxUnicastMsgSize int, maxPubSubMsgSize int,
 	rootBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
@@ -84,23 +91,28 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		maxPubSubMsgSize = DefaultMaxPubSubMsgSize
 	}
 
+	if maxUnicastMsgSize <= 0 {
+		maxUnicastMsgSize = DefaultMaxUnicastMsgSize
+	}
+
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
-		ctx:              ctx,
-		cancel:           cancel,
-		log:              log,
-		codec:            codec,
-		libP2PNode:       p2p,
-		wg:               &sync.WaitGroup{},
-		stop:             make(chan struct{}),
-		me:               flowID,
-		host:             ip,
-		port:             port,
-		key:              key,
-		metrics:          metrics,
-		maxPubSubMsgSize: maxPubSubMsgSize,
-		rootBlockID:      rootBlockID,
-		validators:       validators,
+		ctx:               ctx,
+		cancel:            cancel,
+		log:               log,
+		codec:             codec,
+		libP2PNode:        p2p,
+		wg:                &sync.WaitGroup{},
+		stop:              make(chan struct{}),
+		me:                flowID,
+		host:              ip,
+		port:              port,
+		key:               key,
+		metrics:           metrics,
+		maxPubSubMsgSize:  maxPubSubMsgSize,
+		maxUnicastMsgSize: maxUnicastMsgSize,
+		rootBlockID:       rootBlockID,
+		validators:        validators,
 	}
 
 	return m, err
@@ -204,7 +216,7 @@ func (m *Middleware) Stop() {
 	// cancel the context (this also signals any lingering libp2p go routines to exit)
 	m.cancel()
 
-	// wait for the go routines spawned by middleware to stop
+	// wait for the readConnection and readSubscription routines to stop
 	m.wg.Wait()
 }
 
@@ -215,7 +227,7 @@ func (m *Middleware) Stop() {
 // Deprecated: Send exists for historical compatibility, and should not be used on new
 // developments. It is planned to be cleaned up in near future. Proper utilization of Dispatch or
 // Publish are recommended instead.
-func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error {
+func (m *Middleware) Send(channelID string, msg *message.Message, targetIDs ...flow.Identifier) error {
 	var err error
 	mode := m.chooseMode(channelID, msg, targetIDs...)
 	// decide what mode of communication to use
@@ -246,7 +258,7 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 }
 
 // chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
-func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
+func (m *Middleware) chooseMode(_ string, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
 	switch len(targetIDs) {
 	case 0:
 		return NoOp
@@ -264,10 +276,16 @@ func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.I
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-
 	targetAddress, err := m.nodeAddressFromID(targetID)
 	if err != nil {
 		return err
+	}
+
+	if msg.Size() > m.maxUnicastMsgSize {
+		// message size goes beyond maximum size that the serializer can handle.
+		// proceeding with this message results in closing the connection by the target side, and
+		// delivery failure.
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), m.maxUnicastMsgSize)
 	}
 
 	// create new stream
@@ -307,7 +325,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	go helpers.FullClose(stream)
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	go m.reportOutboundMsgSize(byteCount, metrics.ChannelOneToOne)
+	m.metrics.NetworkMessageSent(byteCount, metrics.ChannelOneToOne)
 
 	return nil
 }
@@ -365,95 +383,49 @@ func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
-// this is a blocking call, so that the deferred resource cleanup happens after
-// we are done handling the connection
+// it is a callback that gets called for each incoming stream by libp2p with a new stream object
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
-	m.wg.Add(1)
-	defer m.wg.Done()
 
+	// qualify the logger with local and remote address
 	log := m.log.With().
 		Str("local_addr", s.Conn().LocalMultiaddr().String()).
 		Str("remote_addr", s.Conn().RemoteMultiaddr().String()).
 		Logger()
 
-	// initialize the encoder/decoder and create the connection handler
-	conn := NewReadConnection(log, s)
-
-	// make sure we close the connection when we are done handling the peer
-	defer conn.stop()
-
 	log.Info().Msg("incoming connection established")
 
-	// start processing messages in the background
-	go conn.ReceiveLoop()
+	//create a new readConnection with the context of the middleware
+	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
 
-	// process incoming messages for as long as the peer is running
-ProcessLoop:
-	for {
-		select {
-		case <-m.stop:
-			m.log.Info().Msg("exiting process loop: middleware stops")
-			break ProcessLoop
-		case msg, ok := <-conn.inbound:
-			if !ok {
-				m.log.Info().Msg("exiting process loop: read connection closed")
-				break ProcessLoop
-			}
-
-			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, metrics.ChannelOneToOne)
-			m.processMessage(msg)
-			continue ProcessLoop
-		}
-	}
-
-	log.Info().Msg("middleware closed the connection")
+	// kick off the receive loop to continuously receive messages
+	m.wg.Add(1)
+	go conn.receiveLoop(m.wg)
 }
 
 // Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
-func (m *Middleware) Subscribe(channelID uint8) error {
+func (m *Middleware) Subscribe(channelID string) error {
 
 	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe for channel %d: %w", channelID, err)
+		return fmt.Errorf("failed to subscribe for channel %s: %w", channelID, err)
 	}
-	rs := NewReadSubscription(m.log, s)
-	go rs.ReceiveLoop()
 
-	// add to waitgroup to wait for the inbound subscription go routine during stop
+	// create a new readSubscription with the context of the middleware
+	rs := newReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
 	m.wg.Add(1)
-	go m.handleInboundSubscription(rs)
+
+	// kick off the receive loop to continuously receive messages
+	go rs.receiveLoop(m.wg)
+
 	return nil
 }
 
-// handleInboundSubscription reads the messages from the channel written to by readsSubscription and processes them
-func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
-	defer m.wg.Done()
-	defer rs.stop()
-	// process incoming messages for as long as the peer is running
-SubscriptionLoop:
-	for {
-		select {
-		case <-m.stop:
-			// middleware stops
-			m.log.Info().Msg("exiting subscription loop: middleware stops")
-			break SubscriptionLoop
-		case msg, ok := <-rs.inbound:
-			if !ok {
-				m.log.Info().Msg("exiting subscription loop: connection stops")
-				break SubscriptionLoop
-			}
-
-			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, rs.sub.Topic())
-
-			m.processMessage(msg)
-
-			continue SubscriptionLoop
-		}
-	}
+// Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
+func (m *Middleware) Unsubscribe(channelID string) error {
+	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
+	return m.libP2PNode.UnSubscribe(topic)
 }
 
 // processMessage processes a message and eventually passes it to the overlay
@@ -477,7 +449,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 // Publish publishes msg on the channel. It models a distributed broadcast where the message is meant for all or
 // a many nodes subscribing to the channel ID. It does not guarantee the delivery though, and operates on a best
 // effort.
-func (m *Middleware) Publish(msg *message.Message, channelID uint8) error {
+func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 
 	// convert the message to bytes to be put on the wire.
 	data, err := msg.Marshal()
@@ -500,17 +472,9 @@ func (m *Middleware) Publish(msg *message.Message, channelID uint8) error {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	m.reportOutboundMsgSize(len(data), engine.ChannelName(channelID)) // use the shorter channel name to report metrics
+	m.metrics.NetworkMessageSent(len(data), channelID)
 
 	return nil
-}
-
-func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
-	m.metrics.NetworkMessageSent(size, channel)
-}
-
-func (m *Middleware) reportInboundMsgSize(size int, channel string) {
-	m.metrics.NetworkMessageReceived(size, channel)
 }
 
 // Ping pings the target node and returns the ping RTT or an error
