@@ -30,38 +30,42 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	}
 
 	// check consensus committee Byzantine threshold
-	partnerCount := partners.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	internalCount := internals.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	if internalCount <= partnerCount*2 {
+	partnerCONCount := partners.Filter(filter.HasRole(flow.RoleConsensus)).Count()
+	internalCONCount := internals.Filter(filter.HasRole(flow.RoleConsensus)).Count()
+	if internalCONCount <= partnerCONCount*2 {
 		log.Fatal().Msgf(
 			"will not bootstrap configuration without Byzantine majority of consensus nodes: "+
 				"(partners=%d, internals=%d, min_internals=%d)",
-			partnerCount, internalCount, partnerCount*2+1)
+			partnerCONCount, internalCONCount, partnerCONCount*2+1)
 	}
 
 	// check collection committee Byzantine threshold for each cluster
 	_, clusters := constructClusterAssignment(partnerNodes, internalNodes)
+	partnerCOLCount := uint(0)
+	internalCOLCount := uint(0)
 	for _, cluster := range clusters {
-		partnerCount = 0
-		internalCount = 0
+		clusterPartnerCount := uint(0)
+		clusterInternalCount := uint(0)
 		for _, node := range cluster {
 			if _, exists := partners.ByNodeID(node.NodeID); exists {
-				partnerCount++
+				clusterPartnerCount++
 			}
 			if _, exists := internals.ByNodeID(node.NodeID); exists {
-				internalCount++
+				clusterInternalCount++
 			}
-			if internalCount <= partnerCount*2 {
+			if clusterInternalCount <= clusterPartnerCount*2 {
 				log.Fatal().Msgf(
 					"will not bootstrap configuration without Byzantine majority of cluster: "+
 						"(partners=%d, internals=%d, min_internals=%d)",
-					partnerCount, internalCount, partnerCount*2+1)
+					clusterPartnerCount, clusterInternalCount, clusterPartnerCount*2+1)
 			}
 		}
+		partnerCOLCount += clusterPartnerCount
+		internalCOLCount += clusterInternalCount
 	}
 
 	// ensure we have enough total collectors
-	totalCollectors := partnerCount + internalCount
+	totalCollectors := partnerCOLCount + internalCOLCount
 	if totalCollectors < flagCollectionClusters*minNodesPerCluster {
 		log.Fatal().Msgf(
 			"will not bootstrap configuration with insufficient # of collectors for cluster count: "+
