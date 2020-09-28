@@ -4,11 +4,11 @@ package committee
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Committee accounts for the fact that we might have multiple HotStuff instances
@@ -111,6 +111,12 @@ func (c *Committee) LeaderForView(view uint64) (flow.Identifier, error) {
 //       This would require some refactoring of EventHandler (postponed to later)
 func (c *Committee) Self() flow.Identifier {
 	return c.myID
+}
+
+// DKG returns the DKG info for the given block.
+func (c *Committee) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+	dkg, err := c.protocolState.AtBlockID(blockID).Epochs().Current().DKG()
+	return dkg, err
 }
 
 // New creates HotStuff committee. This is the generic constructor covering all potential cases.

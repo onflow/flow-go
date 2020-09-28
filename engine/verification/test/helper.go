@@ -13,22 +13,22 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	mock2 "github.com/dapperlabs/flow-go/engine/testutil/mock"
-	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	chmodel "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mock"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/utils/logging"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/testutil"
+	mock2 "github.com/onflow/flow-go/engine/testutil/mock"
+	"github.com/onflow/flow-go/engine/verification"
+	"github.com/onflow/flow-go/engine/verification/utils"
+	chmodel "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mock"
+	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // VerificationHappyPath runs `verNodeCount`-many verification nodes
@@ -108,6 +108,8 @@ func VerificationHappyPath(t *testing.T,
 			requestInterval,
 			processInterval,
 			failureThreshold,
+			uint(10),          // limits size of receipt related mempools to 10
+			uint(10*chunkNum), // limits size of chunks related mempools to 10 * chunkNum
 			chainID,
 			verCollector,
 			mempoolCollector)
@@ -192,6 +194,19 @@ func VerificationHappyPath(t *testing.T,
 
 	conNode.Done()
 	exeNode.Done()
+
+	// asserts that all processing pipeline of verification node is fully
+	// cleaned up.
+	for _, verNode := range verNodes {
+		assert.Equal(t, verNode.ChunkIDsByResult.Size(), uint(0))
+		assert.Equal(t, verNode.CachedReceipts.Size(), uint(0))
+		assert.Equal(t, verNode.ReadyReceipts.Size(), uint(0))
+		assert.Equal(t, verNode.PendingChunks.Size(), uint(0))
+		assert.Equal(t, verNode.PendingReceiptIDsByBlock.Size(), uint(0))
+		assert.Equal(t, verNode.PendingReceipts.Size(), uint(0))
+		assert.Equal(t, verNode.PendingResults.Size(), uint(0))
+		assert.Equal(t, verNode.ReceiptIDsByResult.Size(), uint(0))
+	}
 
 	// to demarcate the debug logs
 	log.Debug().

@@ -11,18 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/verification/finder"
-	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/verification"
-	realModule "github.com/dapperlabs/flow-go/module"
-	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/trace"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/verification/finder"
+	"github.com/onflow/flow-go/engine/verification/utils"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
+	realModule "github.com/onflow/flow-go/module"
+	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
+	network "github.com/onflow/flow-go/network/mock"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // FinderEngineTestSuite contains the unit tests of Finder engine.
@@ -112,7 +112,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.assertTimeOut = 5 * suite.processInterval
 
 	// mocking the network registration of the engine
-	suite.net.On("Register", uint8(engine.ReceiveReceipts), testifymock.Anything).
+	suite.net.On("Register", engine.ReceiveReceipts, testifymock.Anything).
 		Return(suite.receiptsConduit, nil).
 		Once()
 
@@ -219,11 +219,11 @@ func (suite *FinderEngineTestSuite) TestCachedToPending() {
 
 	// mocks adding receipt id to mapping mempool based on its result
 	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).
-		Return(true, nil).Once()
+		Return(nil).Once()
 
 	// mocks adding receipt pending for block ID
 	suite.receiptIDsByBlock.On("Append", suite.receipt.ExecutionResult.BlockID, suite.receipt.ID()).
-		Return(true, nil).Once()
+		Return(nil).Once()
 
 	// mocks moving from cached to pending
 	moveWG := sync.WaitGroup{}

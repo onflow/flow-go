@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer/forest"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer/forest"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // Finalizer implements HotStuff finalization logic
@@ -61,11 +61,11 @@ func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, noti
 	return &fnlzr, nil
 }
 
-func (r *Finalizer) LockedBlock() *model.Block                  { return r.lastLocked.Block }
-func (r *Finalizer) LockedBlockQC() *model.QuorumCertificate    { return r.lastLocked.QC }
-func (r *Finalizer) FinalizedBlock() *model.Block               { return r.lastFinalized.Block }
-func (r *Finalizer) FinalizedView() uint64                      { return r.lastFinalized.Block.View }
-func (r *Finalizer) FinalizedBlockQC() *model.QuorumCertificate { return r.lastFinalized.QC }
+func (r *Finalizer) LockedBlock() *model.Block                 { return r.lastLocked.Block }
+func (r *Finalizer) LockedBlockQC() *flow.QuorumCertificate    { return r.lastLocked.QC }
+func (r *Finalizer) FinalizedBlock() *model.Block              { return r.lastFinalized.Block }
+func (r *Finalizer) FinalizedView() uint64                     { return r.lastFinalized.Block.View }
+func (r *Finalizer) FinalizedBlockQC() *flow.QuorumCertificate { return r.lastFinalized.QC }
 
 // GetBlock returns block for given ID
 func (r *Finalizer) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
@@ -164,7 +164,7 @@ func (r *Finalizer) AddBlock(block *model.Block) error {
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
 // conflicting QCs can exists if and onluy of the Byzantine threshold is exceeded.
-func (r *Finalizer) checkForConflictingQCs(qc *model.QuorumCertificate) error {
+func (r *Finalizer) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 	it := r.forest.GetVerticesAtLevel(qc.View)
 	for it.HasNext() {
 		otherBlock := it.NextVertex() // by construction, must have same view as qc.View
@@ -321,7 +321,7 @@ func (r *Finalizer) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 // finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `blockQC`.
 // Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock on the newly finalized blocks in the respective order
-func (r *Finalizer) finalizeUpToBlock(qc *model.QuorumCertificate) error {
+func (r *Finalizer) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	if qc.View < r.lastFinalized.Block.View {
 		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 			"finalizing blocks with view %d which is lower than previously finalized block at view %d",

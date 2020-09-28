@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
@@ -36,13 +36,10 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	address, err := accounts.Create(nil)
 	require.NoError(t, err)
 
-	countRegister := state.RegisterID(
+	ledger.Delete(
 		string(address.Bytes()),
 		string(address.Bytes()),
-		"public_key_count",
-	)
-
-	ledger.Delete(countRegister)
+		"public_key_count")
 
 	require.NotPanics(t, func() {
 		_, _ = accounts.Get(address)

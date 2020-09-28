@@ -8,9 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/libp2p/message"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 func encode(v interface{}) (*Envelope, error) {
@@ -78,7 +78,7 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeEntityResponse
 
 	// testing
-	case *message.Echo:
+	case *message.TestMessage:
 		code = CodeEcho
 
 	default:

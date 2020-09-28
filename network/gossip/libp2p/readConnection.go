@@ -1,49 +1,75 @@
 package libp2p
 
 import (
+	"context"
 	"io"
+	"sync"
 
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 )
 
-type ReadConnection struct {
-	*Connection
-	inbound chan *message.Message
+// readConnection reads the incoming stream and calls the callback until the remote closes the stream or the context is
+// cancelled
+type readConnection struct {
+	ctx        context.Context
+	stream     libp2pnetwork.Stream
+	log        zerolog.Logger
+	metrics    module.NetworkMetrics
+	maxMsgSize int
+	callback   func(msg *message.Message)
 }
 
-// NewConnection creates a new connection to a peer on the flow network, using
-// the provided encoder and decoder to read and write messages.
-func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *ReadConnection {
-	connection := NewConnection(log, stream)
-	c := ReadConnection{
-		Connection: connection,
-		inbound:    make(chan *message.Message, InboundMessageQueueSize),
+// newReadConnection creates a new readConnection
+func newReadConnection(ctx context.Context,
+	stream libp2pnetwork.Stream,
+	callback func(msg *message.Message),
+	log zerolog.Logger,
+	metrics module.NetworkMetrics,
+	maxMsgSize int) *readConnection {
+
+	if maxMsgSize <= 0 {
+		maxMsgSize = DefaultMaxUnicastMsgSize
+	}
+
+	c := readConnection{
+		ctx:        ctx,
+		stream:     stream,
+		callback:   callback,
+		log:        log,
+		metrics:    metrics,
+		maxMsgSize: maxMsgSize,
 	}
 	return &c
 }
 
-// recv must be run in a goroutine and takes care of continuously receiving
-// messages from the peer connection until the connection fails.
-func (rc *ReadConnection) ReceiveLoop() {
-	// close and drain the inbound channel
-	defer close(rc.inbound)
-	r := ggio.NewDelimitedReader(rc.stream, 1<<20)
-RecvLoop:
+// receiveLoop must be run in a goroutine and it continuously reads messages from the peer until
+// either the remote closes the stream or the context is cancelled
+func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
+
+	defer wg.Done()
+	defer rc.log.Debug().Msg("exiting receive routine")
+
+	// create the reader
+	r := ggio.NewDelimitedReader(rc.stream, rc.maxMsgSize)
+
 	for {
 		// check if we should stop
 		select {
-		case <-rc.done:
-			rc.log.Debug().Msg("exiting receive routine")
-			break RecvLoop
+		case <-rc.ctx.Done():
+			return
 		default:
 		}
 
 		var msg message.Message
+		// read the nex message (blocking call)
 		err := r.ReadMsg(&msg)
+
 		// error handling done similar to comm.go in pubsub (as suggested by libp2p folks)
 		if err != nil {
 			// if the sender closes the connection an EOF is received otherwise an actual error is received
@@ -59,11 +85,13 @@ RecvLoop:
 					rc.log.Error().Err(err)
 				}
 			}
-
 			return
 		}
 
-		// stash the received message into the inbound queue for handling
-		rc.inbound <- &msg
+		// log metrics with the channel name as OneToOne
+		rc.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne)
+
+		// call the callback
+		rc.callback(&msg)
 	}
 }

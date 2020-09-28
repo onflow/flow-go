@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network/codec/json"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TopologyTestSuite tests the bare minimum requirements of a randomized
@@ -53,12 +53,19 @@ func (n *TopologyTestSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	// creates a middleware instance
-	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID, key, metrics,
-		libp2p.DefaultMaxPubSubMsgSize, unittest.IdentifierFixture().String())
+	mw, err := libp2p.NewMiddleware(logger,
+		json.NewCodec(),
+		"0.0.0.0:0",
+		me.NodeID,
+		key,
+		metrics,
+		libp2p.DefaultMaxUnicastMsgSize,
+		libp2p.DefaultMaxPubSubMsgSize,
+		unittest.IdentifierFixture().String())
 	require.NoError(n.Suite.T(), err)
 
 	// creates and mocks a network instance
-	nets, err := CreateNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
+	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
 	require.NoError(n.Suite.T(), err)
 	require.Len(n.Suite.T(), nets, 1)
 	n.nets = nets[0]

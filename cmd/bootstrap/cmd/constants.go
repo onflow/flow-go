@@ -1,7 +1,7 @@
 package cmd
 
 const (
-	randomSeedBytes           = 48
-	minSeedBytes              = 48
-	minNodesPerCluster uint16 = 3
+	randomSeedBytes    = 48
+	minSeedBytes       = 48
+	minNodesPerCluster = 3
 )

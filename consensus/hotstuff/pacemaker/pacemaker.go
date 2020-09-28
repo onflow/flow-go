@@ -6,9 +6,10 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // NitroPaceMaker implements the hotstuff.PaceMaker
@@ -51,9 +52,6 @@ func (p *NitroPaceMaker) gotoView(newView uint64) *model.NewViewEvent {
 		// STRICTLY monotonously increasing view numbers.
 		panic(fmt.Sprintf("cannot move from view %d to %d: currentView must be strictly monotonously increasing", p.currentView, newView))
 	}
-	if newView > p.currentView+1 {
-		p.notifier.OnSkippedAhead(newView)
-	}
 	p.currentView = newView
 	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
@@ -75,7 +73,7 @@ func (p *NitroPaceMaker) TimeoutChannel() <-chan time.Time {
 
 // UpdateCurViewWithQC notifies the pacemaker with a new QC, which might allow pacemaker to
 // fast forward its view.
-func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool) {
+func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	if qc.View < p.currentView {
 		return nil, false
 	}
@@ -84,7 +82,10 @@ func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*mode
 	// => 2/3 of replicas are at least in view qc.view + 1.
 	// => replica can skip ahead to view qc.view + 1
 	p.timeoutControl.OnProgressBeforeTimeout()
-	return p.gotoView(qc.View + 1), true
+
+	newView := qc.View + 1
+	p.notifier.OnQcTriggeredViewChange(qc, newView)
+	return p.gotoView(newView), true
 }
 
 // UpdateCurViewWithBlock indicates the pacermaker that the block for the current view has received.

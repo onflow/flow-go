@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	chmodels "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/verification"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
+	chmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/ledger"
+	"github.com/onflow/flow-go/storage/ledger/ptrie"
 )
 
 type VirtualMachine interface {
@@ -108,11 +108,13 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[string]bool)
 	regMap := chunkDataPack.GetRegisterValues()
-	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
+	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
-		val, ok := regMap[string(key)]
+		k := state.RegisterID(owner, controller, key)
+
+		val, ok := regMap[string(k)]
 		if !ok {
-			unknownRegTouch[string(key)] = true
+			unknownRegTouch[string(k)] = true
 			return nil, fmt.Errorf("missing register")
 		}
 		return val, nil

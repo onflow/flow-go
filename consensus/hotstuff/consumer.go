@@ -1,7 +1,8 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // FinalizationConsumer consumes outbound notifications produced by the finalization logic.
@@ -49,17 +50,58 @@ type FinalizationConsumer interface {
 type Consumer interface {
 	FinalizationConsumer
 
+	// OnEventProcessed notifications are produced by the EventHandler when it is done processing
+	// and hands control back to the EventLoop to wait for the next event.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnEventProcessed()
+
+	// OnReceiveVote notifications are produced by the EventHandler when it starts processing a vote.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnReceiveVote(currentView uint64, vote *model.Vote)
+
+	// OnReceiveProposal notifications are produced by the EventHandler when it starts processing a block.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnReceiveProposal(currentView uint64, proposal *model.Proposal)
+
 	// OnEnteringView notifications are produced by the EventHandler when it enters a new view.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnEnteringView(viewNumber uint64)
+	OnEnteringView(viewNumber uint64, leader flow.Identifier)
 
-	// OnSkippedAhead notifications are produced by PaceMaker when it decides to skip over one or more view numbers.
+	// OnQcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
+	// based on processing a QC. The arguments specify the qc (first argument), which triggered
+	// the view change, and the newView to which the PaceMaker transitioned (second argument).
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnSkippedAhead(viewNumber uint64)
+	OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64)
+
+	// OnProposingBlock notifications are produced by the EventHandler when the replica, as
+	// leader for the respective view, proposing a block.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnProposingBlock(proposal *model.Proposal)
+
+	// OnVoting notifications are produced by the EventHandler when the replica votes for a block.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnVoting(vote *model.Vote)
+
+	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
+	// component, whenever it constructs a QC from votes.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnQcConstructedFromVotes(*flow.QuorumCertificate)
 
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.
@@ -70,19 +112,18 @@ type Consumer interface {
 	OnStartingTimeout(*model.TimerInfo)
 
 	// OnReachedTimeout notifications are produced by PaceMaker. Such a notification indicates that the
-	// PaceMaker's timeout was processed by the system.
-	// The specific timeout type is contained in the TimerInfo.
+	// PaceMaker's timeout was processed by the system. The specific timeout type is contained in the TimerInfo.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnReachedTimeout(*model.TimerInfo)
+	OnReachedTimeout(timeout *model.TimerInfo)
 
-	// OnQcIncorporated consumes the notifications are produced by ForkChoice
+	// OnQcIncorporated notifications are produced by ForkChoice
 	// whenever a quorum certificate is incorporated into the consensus state.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcIncorporated(*model.QuorumCertificate)
+	OnQcIncorporated(*flow.QuorumCertificate)
 
 	// OnForkChoiceGenerated notifications are produced by ForkChoice whenever a fork choice is generated.
 	// The arguments specify the view (first argument) of the block which is to be built and the
@@ -90,7 +131,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnForkChoiceGenerated(uint64, *model.QuorumCertificate)
+	OnForkChoiceGenerated(uint64, *flow.QuorumCertificate)
 
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.

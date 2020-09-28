@@ -8,13 +8,12 @@
 
 # Add all the sub coverages to the cover file
 tail -n +2 crypto/$COVER_PROFILE >> $COVER_PROFILE
-tail -n +2 language/$COVER_PROFILE >> $COVER_PROFILE
 gocov convert $COVER_PROFILE > cover.json
 
 # The summary lines are indicated by a long running set of `-`s, therefore to get the summary lines, we grep the lines with a set of dashes
-# To remove noise, we remove the root project path `github.com/dapperlabs/flow-go` and all the dashes using `sed`
+# To remove noise, we remove the root project path `github.com/onflow/flow-go` and all the dashes using `sed`
 # Then we print out the lines in a way that teamcity understands, e.g. `##teamcity[buildStatisticValue key='package' value='100.00]'`
-gocov report cover.json | grep -e '--------' | sed -e "s/^github.com\/dapperlabs\/flow-go\///" -e "s/-//g" > cover-summary
+gocov report cover.json | grep -e '--------' | sed -e "s/^github.com\/onflow\/flow-go\///" -e "s/-//g" > cover-summary
 while read line; do
     tcLine="##teamcity[buildStatisticValue"
     eval 'arr=($line)'

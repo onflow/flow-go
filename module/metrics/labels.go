@@ -8,6 +8,7 @@ const (
 	LabelMessage  = "message"
 	LabelNodeID   = "nodeid"
 	LabelNodeRole = "noderole"
+	LabelPriority = "priority"
 )
 
 const (
@@ -52,10 +53,14 @@ const (
 	ResourceReceiptIDsByResult       = "receipt_ids_by_result"        // verification node, finder engine
 	ResourcePendingReceiptIDsByBlock = "pending_receipt_ids_by_block" // verification node, finder engine
 	ResourcePendingResult            = "pending_result"               // verification node, match engine
+	ResourceChunkIDsByResult         = "chunk_ids_by_result"          // verification node, match engine
 	ResourcePendingChunk             = "pending_chunk"                // verification node, match engine
 	ResourcePendingBlock             = "pending_block"                // verification node, match engine
 	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
 	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
+	ResourceEpochSetup               = "epoch_setup"
+	ResourceEpochCommit              = "epoch_commit"
+	ResourceEpochStatus              = "epoch_status"
 )
 
 const (

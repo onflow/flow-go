@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/engine"
-	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	execTestutil "github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSyncFlow(t *testing.T) {
@@ -216,7 +216,7 @@ func TestSyncFlow(t *testing.T) {
 	exeNode2.IngestionEngine.Submit(conID.NodeID, proposal2)
 
 	// wait for block2 to be executed on execNode2
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		ebMutex.RLock()
 		defer ebMutex.RUnlock()
 
@@ -235,7 +235,7 @@ func TestSyncFlow(t *testing.T) {
 	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal4)
 
 	// wait for block3/4 to be executed on execNode1
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		ebMutex.RLock()
 		defer ebMutex.RUnlock()
 
@@ -279,7 +279,7 @@ func TestSyncFlow(t *testing.T) {
 
 	// submit block5, to make sure we're still processing any incoming blocks after sync is complete
 	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal5)
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		ebMutex.RLock()
 		defer ebMutex.RUnlock()
 

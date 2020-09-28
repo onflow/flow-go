@@ -5,14 +5,16 @@ package flow
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/fingerprint"
 )
 
-// List of built-in account event types.
+// List of built-in event types.
 const (
 	EventAccountCreated EventType = "flow.AccountCreated"
 	EventAccountUpdated EventType = "flow.AccountUpdated"
+	EventEpochSetup     EventType = "flow.EpochSetup"
+	EventEpochCommit    EventType = "flow.EpochCommit"
 )
 
 type EventType string

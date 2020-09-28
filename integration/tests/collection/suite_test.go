@@ -11,18 +11,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	ghostclient "github.com/dapperlabs/flow-go/engine/ghost/client"
-	"github.com/dapperlabs/flow-go/integration/convert"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/integration/tests/common"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/metrics"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
+	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
+	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -120,9 +121,14 @@ func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
 	return client
 }
 
-func (suite *CollectorSuite) Clusters() *flow.ClusterList {
-	identities := suite.net.Identities()
-	clusters := protocol.Clusters(suite.nClusters, identities)
+func (suite *CollectorSuite) Clusters() flow.ClusterList {
+	seal := suite.net.Seal()
+	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	suite.Require().True(ok)
+
+	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
+	clusters, err := flow.NewClusterList(setup.Assignments, collectors)
+	suite.Require().Nil(err)
 	return clusters
 }
 
@@ -208,13 +214,11 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	var (
 		// for quickly looking up tx IDs
 		lookup = make(map[flow.Identifier]struct{}, len(txIDs))
-		// for keeping track of which transactions have been included in
-		// a finalized collection
+		// for keeping track of which transactions have been included in a finalized collection
 		finalized = make(map[flow.Identifier]struct{}, len(txIDs))
-		// for keeping track of proposals we've seen, and which transactions
-		// they contain
+		// for keeping track of proposals we've seen, and which transactions they contain
 		proposals = make(map[flow.Identifier][]flow.Identifier)
-		// incase we see a guarantee first
+		// in case we see a guarantee first
 		guarantees = make(map[flow.Identifier]bool)
 	)
 	for _, txID := range txIDs {
@@ -288,7 +292,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Container {
 
 	clusters := suite.Clusters()
-	require.True(suite.T(), clusterIdx < uint(clusters.Size()), "invalid cluster index")
+	require.True(suite.T(), clusterIdx < uint(len(clusters)), "invalid cluster index")
 
 	cluster, ok := clusters.ByIndex(clusterIdx)
 	require.True(suite.T(), ok)
@@ -300,12 +304,14 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 
 // ClusterStateFor returns a cluster state instance for the collector node
 // with the given ID.
-func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.State {
+func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateimpl.State {
 
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
-	chainID := protocol.ChainIDForCluster(myCluster)
+	setup, ok := suite.net.Seal().ServiceEvents[0].Event.(*flow.EpochSetup)
+	suite.Require().True(ok, "could not get root seal setup")
+	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
 
 	db, err := node.DB()
@@ -316,7 +322,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	headers := storage.NewHeaders(metrics, db)
 	payloads := storage.NewClusterPayloads(metrics, db)
 
-	state, err := clusterstate.NewState(db, chainID, headers, payloads)
+	state, err := clusterstateimpl.NewState(db, rootBlock.Header.ChainID, headers, payloads)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state

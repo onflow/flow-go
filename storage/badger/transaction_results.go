@@ -5,8 +5,8 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type TransactionResults struct {
@@ -24,6 +24,23 @@ func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *
 	err := operation.RetryOnConflict(tr.db.Update, operation.InsertTransactionResult(blockID, transactionResult))
 	if err != nil {
 		return fmt.Errorf("could not insert transaction result: %w", err)
+	}
+	return nil
+}
+
+// BatchStore will store the transaction results for the given block ID
+func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
+	err := operation.RetryOnConflict(tr.db.Update, func(tx *badger.Txn) error {
+		for _, txResult := range transactionResults {
+			err := operation.InsertTransactionResult(blockID, &txResult)(tx)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not batch insert transaction results: %w", err)
 	}
 	return nil
 }

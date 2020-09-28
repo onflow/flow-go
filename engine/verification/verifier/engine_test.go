@@ -12,21 +12,21 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
-	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	"github.com/dapperlabs/flow-go/engine/verification/verifier"
-	chmodel "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
-	realModule "github.com/dapperlabs/flow-go/module"
-	mockmodule "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/trace"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/testutil/mocklocal"
+	"github.com/onflow/flow-go/engine/verification"
+	"github.com/onflow/flow-go/engine/verification/utils"
+	"github.com/onflow/flow-go/engine/verification/verifier"
+	chmodel "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
+	realModule "github.com/onflow/flow-go/module"
+	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
+	network "github.com/onflow/flow-go/network/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type VerifierEngineTestSuite struct {
@@ -39,7 +39,7 @@ type VerifierEngineTestSuite struct {
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
 	chain   flow.Chain
-	conduit *network.Conduit                // mocks conduit for submitting result approvals
+	con     *network.Conduit                // mocks con for submitting result approvals
 	metrics *mockmodule.VerificationMetrics // mocks performance monitoring metrics
 }
 
@@ -53,12 +53,12 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = &protocol.Snapshot{}
-	suite.conduit = &network.Conduit{}
+	suite.con = &network.Conduit{}
 	suite.metrics = &mockmodule.VerificationMetrics{}
 	suite.chain = flow.Testnet.Chain()
 
-	suite.net.On("Register", uint8(engine.PushApprovals), testifymock.Anything).
-		Return(suite.conduit, nil).
+	suite.net.On("Register", engine.PushApprovals, testifymock.Anything).
+		Return(suite.con, nil).
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
@@ -135,8 +135,8 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	// emission of result approval
 	suite.metrics.On("OnResultApproval").Return()
 
-	suite.conduit.
-		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
+	suite.con.
+		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
 			// check that the approval matches the input execution result
@@ -158,7 +158,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	err := eng.Process(myID, vChunk)
 	suite.Assert().NoError(err)
 	suite.ss.AssertExpectations(suite.T())
-	suite.conduit.AssertExpectations(suite.T())
+	suite.con.AssertExpectations(suite.T())
 
 }
 
@@ -176,8 +176,8 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	suite.metrics.On("OnVerifiableChunkReceived").Return()
 
 	// we shouldn't receive any result approval
-	suite.conduit.
-		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
+	suite.con.
+		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
 			// TODO change this to check challeneges

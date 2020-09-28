@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -30,7 +30,7 @@ func New(committee hotstuff.Committee, forks hotstuff.ForksReader, verifier hots
 // ValidateQC validates the QC
 // qc - the qc to be validated
 // block - the block that the qc is pointing to
-func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) error {
+func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
 	if qc.BlockID != block.BlockID {
 		// Sanity check! Failing indicates a bug in the higher-level logic
 		return fmt.Errorf("qc.BlockID %s doesn't match block's ID %s", qc.BlockID, block.BlockID)

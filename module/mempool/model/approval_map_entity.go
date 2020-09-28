@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ApprovalMapEntity is an internal data structure for the approval mempool.

@@ -3,16 +3,16 @@ package state
 import (
 	"strings"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // A Ledger is the storage interface used by the virtual machine to read and write register values.
 type Ledger interface {
-	Set(key flow.RegisterID, value flow.RegisterValue)
-	Get(key flow.RegisterID) (flow.RegisterValue, error)
-	Touch(key flow.RegisterID)
-	Delete(key flow.RegisterID)
+	Set(owner, controller, key string, value flow.RegisterValue)
+	Get(owner, controller, key string) (flow.RegisterValue, error)
+	Touch(owner, controller, key string)
+	Delete(owner, controller, key string)
 }
 
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
@@ -30,22 +30,24 @@ func NewMapLedger() *MapLedger {
 	}
 }
 
-func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
-	m.RegisterTouches[string(key)] = true
-	m.Registers[string(key)] = value
+func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) {
+	k := RegisterID(owner, controller, key)
+	m.RegisterTouches[string(k)] = true
+	m.Registers[string(k)] = value
 }
 
-func (m MapLedger) Get(key flow.RegisterID) (flow.RegisterValue, error) {
-	m.RegisterTouches[string(key)] = true
-	return m.Registers[string(key)], nil
+func (m MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error) {
+	k := RegisterID(owner, controller, key)
+	m.RegisterTouches[string(k)] = true
+	return m.Registers[string(k)], nil
 }
 
-func (m MapLedger) Touch(key flow.RegisterID) {
-	m.RegisterTouches[string(key)] = true
+func (m MapLedger) Touch(owner, controller, key string) {
+	m.RegisterTouches[string(RegisterID(owner, controller, key))] = true
 }
 
-func (m MapLedger) Delete(key flow.RegisterID) {
-	delete(m.Registers, string(key))
+func (m MapLedger) Delete(owner, controller, key string) {
+	delete(m.Registers, string(RegisterID(owner, controller, key)))
 }
 
 func RegisterID(owner, controller, key string) flow.RegisterID {
@@ -59,5 +61,5 @@ func fullKey(owner, controller, key string) string {
 
 func fullKeyHash(owner, controller, key string) flow.RegisterID {
 	hasher := hash.NewSHA2_256()
-	return hasher.ComputeHash([]byte(fullKey(owner, controller, key)))
+	return flow.RegisterID(hasher.ComputeHash([]byte(fullKey(owner, controller, key))))
 }

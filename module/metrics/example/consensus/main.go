@@ -7,12 +7,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/metrics/example"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics/example"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func main() {
@@ -62,8 +62,8 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collProvider := engine.ChannelName(engine.TestNetwork)
-			collIngest := engine.ChannelName(engine.TestMetrics)
+			collProvider := engine.TestNetwork
+			collIngest := engine.TestMetrics
 
 			collector.NetworkMessageSent(rand.Intn(1000), collProvider)
 			collector.NetworkMessageSent(rand.Intn(1000), collIngest)

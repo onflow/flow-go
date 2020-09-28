@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/cluster"
 )
 
 // Mutator represents an interface to modify the persistent cluster state in a

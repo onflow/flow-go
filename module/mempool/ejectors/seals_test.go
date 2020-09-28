@@ -7,12 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/ejectors"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/ejectors"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestLatestSealEjector(t *testing.T) {
@@ -36,7 +36,7 @@ func TestLatestSealEjector(t *testing.T) {
 			err := headers.Store(&header)
 			require.Nil(t, err)
 
-			seal := unittest.BlockSealFixture()
+			seal := unittest.SealFixture()
 			seal.BlockID = header.ID()
 			ok := pool.Add(seal)
 			assert.True(t, ok)

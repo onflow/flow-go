@@ -3,23 +3,23 @@ package verification
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
-// SignerMetricsWrapper implements the hotstuff.Signer interface.
-// It wraps a hotstuff.Signer instance and measures the time which the HotStuff's core logic
-// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
+// SignerMetricsWrapper implements the hotstuff.SignerVerifier interface.
+// It wraps a hotstuff.SignerVerifier instance and measures the time which the HotStuff's core logic
+// spends in the hotstuff.SignerVerifier component, i.e. the with crypto-related operations.
 // The measured time durations are reported as values for the
 // SignerProcessingDuration metric.
 type SignerMetricsWrapper struct {
-	signer  hotstuff.Signer
+	signer  hotstuff.SignerVerifier
 	metrics module.HotstuffMetrics
 }
 
-func NewMetricsWrapper(signer hotstuff.Signer, metrics module.HotstuffMetrics) *SignerMetricsWrapper {
+func NewMetricsWrapper(signer hotstuff.SignerVerifier, metrics module.HotstuffMetrics) *SignerMetricsWrapper {
 	return &SignerMetricsWrapper{
 		signer:  signer,
 		metrics: metrics,
@@ -54,7 +54,7 @@ func (w SignerMetricsWrapper) CreateVote(block *model.Block) (*model.Vote, error
 	return vote, err
 }
 
-func (w SignerMetricsWrapper) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, error) {
+func (w SignerMetricsWrapper) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 	processStart := time.Now()
 	qc, err := w.signer.CreateQC(votes)
 	w.metrics.SignerProcessingDuration(time.Since(processStart))

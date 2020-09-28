@@ -1,7 +1,7 @@
 package state
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const keyAddressState = "account_address_state"
@@ -23,7 +23,7 @@ func (a *addresses) InitAddressGeneratorState() {
 }
 
 func (a *addresses) GetAddressGeneratorState() (flow.AddressGenerator, error) {
-	stateBytes, err := a.ledger.Get(RegisterID("", "", keyAddressState))
+	stateBytes, err := a.ledger.Get("", "", keyAddressState)
 	if err != nil {
 		return nil, err
 	}
@@ -33,5 +33,5 @@ func (a *addresses) GetAddressGeneratorState() (flow.AddressGenerator, error) {
 
 func (a *addresses) SetAddressGeneratorState(state flow.AddressGenerator) {
 	stateBytes := state.Bytes()
-	a.ledger.Set(RegisterID("", "", keyAddressState), stateBytes)
+	a.ledger.Set("", "", keyAddressState, stateBytes)
 }

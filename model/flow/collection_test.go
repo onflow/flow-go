@@ -5,10 +5,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/model/encoding/rlp"
-	"github.com/dapperlabs/flow-go/model/fingerprint"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/encoding/rlp"
+	"github.com/onflow/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestLightCollectionFingerprint(t *testing.T) {

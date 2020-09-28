@@ -3,10 +3,10 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	"github.com/dapperlabs/flow-go/crypto"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/crypto"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
@@ -48,18 +48,6 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 
 		writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	}
-
-	log.Debug().Msgf("will generate additionally needed collector nodes to have majority in each cluster")
-	addNodeInfos := generateAdditionalInternalCollectors(
-		int(flagCollectionClusters),
-		int(minNodesPerCluster),
-		model.FilterByRole(internalNodes, flow.RoleCollection),
-		model.FilterByRole(partnerNodes, flow.RoleCollection),
-	)
-
-	// add additional internal collectors
-	internalNodes = append(internalNodes, addNodeInfos...)
-	log.Info().Msgf("generated %v additional internal nodes for collection clusters", len(addNodeInfos))
 
 	for _, nodeInfo := range internalNodes {
 		// retrieve private representation of the node

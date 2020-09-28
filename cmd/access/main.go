@@ -10,31 +10,31 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/access/ingestion"
-	pingeng "github.com/dapperlabs/flow-go/engine/access/ping"
-	"github.com/dapperlabs/flow-go/engine/access/rpc"
-	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/requester"
-	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/buffer"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/module/synchronization"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/ingestion"
+	pingeng "github.com/onflow/flow-go/engine/access/ping"
+	"github.com/onflow/flow-go/engine/access/rpc"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/requester"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/buffer"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/synchronization"
+	storage "github.com/onflow/flow-go/storage/badger"
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 func main() {
@@ -64,6 +64,7 @@ func main() {
 		logTxTimeToFinalized         bool
 		logTxTimeToExecuted          bool
 		logTxTimeToFinalizedExecuted bool
+		retryEnabled                 bool
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -80,6 +81,7 @@ func main() {
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
+			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
@@ -160,7 +162,9 @@ func main() {
 				node.Storage.Transactions,
 				node.RootChainID,
 				transactionMetrics,
-				collectionGRPCPort)
+				collectionGRPCPort,
+				retryEnabled,
+			)
 			return rpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -217,7 +221,7 @@ func main() {
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

@@ -10,42 +10,42 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine"
-	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/collection/pusher"
-	"github.com/dapperlabs/flow-go/engine/common/provider"
-	"github.com/dapperlabs/flow-go/engine/common/requester"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
-	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
-	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	bootstrapexec "github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/engine/execution/sync"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
-	"github.com/dapperlabs/flow-go/engine/verification/finder"
-	"github.com/dapperlabs/flow-go/engine/verification/match"
-	"github.com/dapperlabs/flow-go/engine/verification/verifier"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/chunks"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/stub"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
+	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
+	"github.com/onflow/flow-go/engine/collection/pusher"
+	"github.com/onflow/flow-go/engine/common/provider"
+	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/common/synchronization"
+	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion"
+	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/engine/execution/state"
+	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/sync"
+	"github.com/onflow/flow-go/engine/testutil/mock"
+	"github.com/onflow/flow-go/engine/verification/finder"
+	"github.com/onflow/flow-go/engine/verification/match"
+	"github.com/onflow/flow-go/engine/verification/verifier"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/stub"
+	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/events"
+	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/ledger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) mock.GenericNode {
@@ -65,21 +65,22 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 
 	metrics := metrics.NewNoopCollector()
 
-	identities := storage.NewIdentities(metrics, db)
 	guarantees := storage.NewGuarantees(metrics, db)
 	seals := storage.NewSeals(metrics, db)
 	headers := storage.NewHeaders(metrics, db)
 	index := storage.NewIndex(metrics, db)
-	payloads := storage.NewPayloads(db, index, identities, guarantees, seals)
+	payloads := storage.NewPayloads(db, index, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
+	setups := storage.NewEpochSetups(metrics, db)
+	commits := storage.NewEpochCommits(metrics, db)
+	consumer := events.NewNoop()
+	statuses := storage.NewEpochStatuses(metrics, db)
 
-	state, err := protocol.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
+	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
 	require.NoError(t, err)
 
-	genesis := flow.Genesis(participants, chainID)
-	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
-	err = state.Mutate().Bootstrap(genesis, result, seal)
+	root, result, seal := unittest.BootstrapFixture(participants)
+	err = state.Mutate().Bootstrap(root, result, seal)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -113,7 +114,6 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Tracer:     tracer,
 		DB:         db,
 		Headers:    headers,
-		Identities: identities,
 		Guarantees: guarantees,
 		Seals:      seals,
 		Payloads:   payloads,
@@ -389,6 +389,8 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	requestInterval time.Duration,
 	processInterval time.Duration,
+	receiptsLimit uint,
+	chunksLimit uint,
 	failureThreshold uint,
 	chainID flow.ChainID,
 	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
@@ -405,7 +407,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.CachedReceipts == nil {
-		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
 		require.Nil(t, err)
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourceCachedReceipt, node.CachedReceipts.Size)
@@ -413,7 +415,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
@@ -422,7 +424,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ReadyReceipts == nil {
-		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
 		require.Nil(t, err)
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourceReceipt, node.ReadyReceipts.Size)
@@ -430,7 +432,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingResults == nil {
-		node.PendingResults = stdmap.NewPendingResults()
+		node.PendingResults = stdmap.NewResultDataPacks(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
@@ -443,7 +445,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingChunks == nil {
-		node.PendingChunks = match.NewChunks(1000)
+		node.PendingChunks = match.NewChunks(chunksLimit)
 
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.PendingChunks.Size)
@@ -451,7 +453,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedResultIDs == nil {
-		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
+		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
@@ -469,7 +471,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingReceiptIDsByBlock == nil {
-		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
+		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
@@ -478,11 +480,20 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ReceiptIDsByResult == nil {
-		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
+		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(receiptsLimit)
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, node.ReceiptIDsByResult.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ChunkIDsByResult == nil {
+		node.ChunkIDsByResult, err = stdmap.NewIdentifierMap(chunksLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceChunkIDsByResult, node.ChunkIDsByResult.Size)
 		require.Nil(t, err)
 	}
 
@@ -515,6 +526,7 @@ func VerificationNode(t testing.TB,
 			node.Net,
 			node.Me,
 			node.PendingResults,
+			node.ChunkIDsByResult,
 			node.VerifierEngine,
 			assigner,
 			node.State,

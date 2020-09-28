@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBlockHashByHeight(t *testing.T) {
@@ -115,7 +115,7 @@ func storeAndIndexHeader(t *testing.T, db *badger.DB, headers *bstorage.Headers,
 }
 
 func storeAndIndexSealFor(t *testing.T, db *badger.DB, seals *bstorage.Seals, h *flow.Header) {
-	seal := unittest.BlockSealFixture()
+	seal := unittest.SealFixture()
 	seal.BlockID = h.ID()
 
 	err := seals.Store(seal)

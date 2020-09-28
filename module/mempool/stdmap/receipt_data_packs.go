@@ -3,22 +3,24 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/verification"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 )
 
-// ReceiptDataPacks implements the ReceiptsDataPack mempool.
+// ReceiptDataPacks implements the ReceiptDataPack mempool.
+// ReceiptDataPacks has an LRU ejector, i.e., it evicts the oldest entity if
+// it gets full.
 type ReceiptDataPacks struct {
 	*Backend
-	qe *QueueEjector
+	ejector *LRUEjector
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
 func NewReceiptDataPacks(limit uint) (*ReceiptDataPacks, error) {
 	// create the receipts memory pool with the lookup maps
-	qe := NewQueueEjector(limit + 1)
+	qe := NewLRUEjector()
 	r := &ReceiptDataPacks{
-		qe:      qe,
+		ejector: qe,
 		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
 	}
 
@@ -30,7 +32,9 @@ func NewReceiptDataPacks(limit uint) (*ReceiptDataPacks, error) {
 func (r *ReceiptDataPacks) Add(rdp *verification.ReceiptDataPack) bool {
 	ok := r.Backend.Add(rdp)
 	if ok {
-		r.qe.Push(rdp.ID())
+		// adds successfully stored receipt data pack id to the ejector
+		// The ejector externally keeps track of ids added to the mempool.
+		r.ejector.Track(rdp.ID())
 	}
 	return ok
 }
@@ -54,6 +58,11 @@ func (r *ReceiptDataPacks) Get(rdpID flow.Identifier) (*verification.ReceiptData
 // Rem removes a ReceiptDataPack by ID.
 func (r *ReceiptDataPacks) Rem(rdpID flow.Identifier) bool {
 	ok := r.Backend.Rem(rdpID)
+	if ok {
+		// untracks the successfully removed entity from the ejector
+		r.ejector.Untrack(rdpID)
+	}
+
 	return ok
 }
 

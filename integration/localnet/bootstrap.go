@@ -11,9 +11,9 @@ import (
 	"github.com/plus3it/gorecurcopy"
 	"gopkg.in/yaml.v2"
 
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
@@ -257,7 +257,6 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
-			fmt.Sprintf("--nclusters=%d", nClusters),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),

@@ -4,9 +4,9 @@ package committee
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // CommitteeMetricsWrapper implements the hotstuff.Committee interface.
@@ -52,4 +52,11 @@ func (w CommitteeMetricsWrapper) Self() flow.Identifier {
 	id := w.committee.Self()
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return id
+}
+
+func (w CommitteeMetricsWrapper) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+	processStart := time.Now()
+	dkg, err := w.committee.DKG(blockID)
+	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
+	return dkg, err
 }

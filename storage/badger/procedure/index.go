@@ -5,17 +5,13 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		err := operation.IndexPayloadIdentities(blockID, index.NodeIDs)(tx)
-		if err != nil {
-			return fmt.Errorf("could not store identity index: %w", err)
-		}
-		err = operation.IndexPayloadGuarantees(blockID, index.CollectionIDs)(tx)
+		err := operation.IndexPayloadGuarantees(blockID, index.CollectionIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store guarantee index: %w", err)
 		}
@@ -29,13 +25,8 @@ func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn
 
 func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		var nodeIDs []flow.Identifier
-		err := operation.LookupPayloadIdentities(blockID, &nodeIDs)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve identity index: %w", err)
-		}
 		var collIDs []flow.Identifier
-		err = operation.LookupPayloadGuarantees(blockID, &collIDs)(tx)
+		err := operation.LookupPayloadGuarantees(blockID, &collIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve guarantee index: %w", err)
 		}
@@ -46,7 +37,6 @@ func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.T
 		}
 
 		*index = flow.Index{
-			NodeIDs:       nodeIDs,
 			CollectionIDs: collIDs,
 			SealIDs:       sealIDs,
 		}

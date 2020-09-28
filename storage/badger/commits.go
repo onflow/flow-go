@@ -3,10 +3,10 @@ package badger
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type Commits struct {
@@ -16,12 +16,14 @@ type Commits struct {
 
 func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
-	store := func(blockID flow.Identifier, v interface{}) func(tx *badger.Txn) error {
-		commit := v.(flow.StateCommitment)
+	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		blockID := key.(flow.Identifier)
+		commit := val.(flow.StateCommitment)
 		return operation.SkipDuplicates(operation.IndexStateCommitment(blockID, commit))
 	}
 
-	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		blockID := key.(flow.Identifier)
 		var commit flow.StateCommitment
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := db.View(operation.LookupStateCommitment(blockID, &commit))
@@ -48,11 +50,11 @@ func (c *Commits) storeTx(blockID flow.Identifier, commit flow.StateCommitment) 
 
 func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (flow.StateCommitment, error) {
 	return func(tx *badger.Txn) (flow.StateCommitment, error) {
-		v, err := c.cache.Get(blockID)(tx)
+		val, err := c.cache.Get(blockID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return v.(flow.StateCommitment), nil
+		return val.(flow.StateCommitment), nil
 	}
 }
 

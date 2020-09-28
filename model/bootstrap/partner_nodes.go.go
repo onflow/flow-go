@@ -1,7 +1,8 @@
 package bootstrap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // PartnerNodeInfoPub represents public information about a partner/external
@@ -11,6 +12,6 @@ type PartnerNodeInfoPub struct {
 	Role          flow.Role
 	Address       string
 	NodeID        flow.Identifier
-	NetworkPubKey EncodableNetworkPubKey
-	StakingPubKey EncodableStakingPubKey
+	NetworkPubKey encodable.NetworkPubKey
+	StakingPubKey encodable.StakingPubKey
 }

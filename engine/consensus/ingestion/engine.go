@@ -8,17 +8,17 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Engine represents the ingestion engine, used to funnel collections from a
@@ -185,7 +185,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	}
 
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
-	clusters, err := e.state.Final().Clusters()
+	clusters, err := e.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return fmt.Errorf("could not get clusters: %w", err)
 	}
@@ -246,7 +246,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	}
 
 	// send the collection guarantee to all consensus committee
-	err = e.con.Submit(guarantee, committee.NodeIDs()...)
+	err = e.con.Publish(guarantee, committee.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send guarantee: %w", err)
 	}

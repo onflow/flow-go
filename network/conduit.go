@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Conduit represents the interface for engines to communicate over the
@@ -21,28 +21,32 @@ type Conduit interface {
 	// nodes. It's possible that the event traverses other nodes than the target
 	// nodes on its path across the network. The network codec needs to be aware
 	// of how to encode the given event type, otherwise the send will fail.
+	//
+	// Note: Submit method is planned for deprecation soon.
+	// Alternative methods are recommended, e.g., Publish, Unicast, and Multicast.
 	Submit(event interface{}, targetIDs ...flow.Identifier) error
 
 	// Publish submits an event to the network layer for unreliable delivery
 	// to subscribers of the given event on the network layer. It uses a
 	// publish-subscribe layer and can thus not guarantee that the specified
 	// recipients received the event.
-	// By default, the event is published on the channel ID of this Conduit.
-	// However, the set of targeted nodes can be regulated using selector.
-	Publish(event interface{}, selector flow.IdentityFilter) error
+	// The event is published on the channel ID of this Conduit and will be received
+	// by the nodes specified as part of the targetIDs
+	Publish(event interface{}, targetIDs ...flow.Identifier) error
 
-	// Unicast sends the event in a reliable way to the given recipients.
+	// Unicast sends the event in a reliable way to the given recipient.
 	// It uses 1-1 direct messaging over the underlying network to deliver the event.
-	// It returns an error if unicasting to any of the target IDs fails.
-	Unicast(event interface{}, targetIDs ...flow.Identifier) error
+	// It returns an error if the unicast fails.
+	Unicast(event interface{}, targetID flow.Identifier) error
 
-	// Multicast reliably sends the specified event over the channelID to the specified number of recipients selected
-	//from
-	// the specified subset.
-	// The recipients are selected randomly from the set of identities defined by selectors.
-	// In this context, reliable means that the event is sent across the network over a 1-1 direct messaging.
-	// It returns an error if it cannot send the event to the specified number of nodes.
-	Multicast(event interface{}, num uint, selector flow.IdentityFilter) error
+	// Multicast unreliably sends the specified event over the channelID
+	// to the specified number of recipients selected from the specified subset.
+	// The recipients are selected randomly from the targetIDs.
+	Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error
+
+	// Close unsubscribes from the channel ID of this conduit. After calling close,
+	// the conduit can no longer be used to send a message.
+	Close() error
 }
 
 // PeerUnreachableError is the error when submitting events to target fails due to the

@@ -8,15 +8,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	mockmempool "github.com/dapperlabs/flow-go/module/mempool/mock"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	mockmodule "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/trace"
-	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
-	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	mockstorage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	mockmempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/metrics"
+	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestIngestion(t *testing.T) {
@@ -34,6 +34,8 @@ type IngestionSuite struct {
 	head   *flow.Header
 
 	final   *mockprotocol.Snapshot
+	query   *mockprotocol.EpochQuery
+	epoch   *mockprotocol.Epoch
 	headers *mockstorage.Headers
 	pool    *mockmempool.Guarantees
 	con     *mocknetwork.Conduit
@@ -58,8 +60,7 @@ func (is *IngestionSuite) SetupTest() {
 	is.collID = coll.NodeID
 	is.execID = exec.NodeID
 
-	clusters := flow.NewClusterList(1)
-	clusters.Add(0, coll)
+	clusters := flow.ClusterList{flow.IdentityList{coll}}
 
 	identities := flow.IdentityList{con1, con2, con3, coll, exec}
 	lookup := make(map[flow.Identifier]*flow.Identity)
@@ -71,6 +72,8 @@ func (is *IngestionSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
+	is.query = &mockprotocol.EpochQuery{}
+	is.epoch = &mockprotocol.Epoch{}
 	headers := &mockstorage.Headers{}
 	me := &mockmodule.Local{}
 	pool := &mockmempool.Guarantees{}
@@ -93,7 +96,9 @@ func (is *IngestionSuite) SetupTest() {
 		},
 		nil,
 	)
-	final.On("Clusters").Return(clusters, nil)
+	final.On("Epochs").Return(is.query)
+	is.query.On("Current").Return(is.epoch)
+	is.epoch.On("Clustering").Return(clusters, nil)
 
 	// we use the first consensus node as our local identity
 	me.On("NodeID").Return(is.con1ID)
@@ -137,7 +142,7 @@ func (is *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 	is.pool.On("Add", guarantee).Return(true)
 
 	// check that we call the submit with the correct consensus node IDs
-	is.con.On("Submit", guarantee, mock.Anything, mock.Anything).Run(
+	is.con.On("Publish", guarantee, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			nodeID1 := args.Get(1).(flow.Identifier)
 			nodeID2 := args.Get(2).(flow.Identifier)

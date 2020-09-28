@@ -8,32 +8,32 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/common/synchronization"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/common/provider"
-	"github.com/dapperlabs/flow-go/engine/common/requester"
-	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	exeprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
-	"github.com/dapperlabs/flow-go/engine/execution/rpc"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/engine/execution/sync"
-	"github.com/dapperlabs/flow-go/fvm"
-	bootstrapFilenames "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/provider"
+	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion"
+	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/engine/execution/rpc"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/sync"
+	"github.com/onflow/flow-go/fvm"
+	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	chainsync "github.com/onflow/flow-go/module/synchronization"
+	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/ledger"
+	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 func main() {
@@ -73,7 +73,7 @@ func main() {
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
-			flags.BoolVar(&syncByBlocks, "sync-by-blocks", false, "sync by blocks instead of execution state deltas")
+			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "sync by blocks instead of execution state deltas")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()

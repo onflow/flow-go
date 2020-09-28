@@ -1,7 +1,7 @@
 package chunks
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Assignment is assignment map of the chunks to the list of the verifier nodes

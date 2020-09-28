@@ -3,36 +3,34 @@
 package ingest
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/parser2"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Engine is the transaction ingestion engine, which ensures that new
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit       *engine.Unit
-	log        zerolog.Logger
-	engMetrics module.EngineMetrics
-	colMetrics module.CollectionMetrics
-	con        network.Conduit
-	me         module.Local
-	state      protocol.State
-	pool       mempool.Transactions
+	unit                 *engine.Unit
+	log                  zerolog.Logger
+	engMetrics           module.EngineMetrics
+	colMetrics           module.CollectionMetrics
+	conduit              network.Conduit
+	me                   module.Local
+	state                protocol.State
+	pool                 mempool.Transactions
+	transactionValidator *access.TransactionValidator
 
 	config Config
 }
@@ -51,23 +49,35 @@ func New(
 
 	logger := log.With().Str("engine", "ingest").Logger()
 
+	transactionValidator := access.NewTransactionValidator(
+		access.NewProtocolStateBlocks(state),
+		access.TransactionValidationOptions{
+			Expiry:                       flow.DefaultTransactionExpiry,
+			ExpiryBuffer:                 config.ExpiryBuffer,
+			AllowUnknownReferenceBlockID: config.AllowUnknownReference,
+			MaxGasLimit:                  flow.DefaultMaxGasLimit,
+			CheckScriptsParse:            config.CheckScriptsParse,
+		},
+	)
+
 	e := &Engine{
-		unit:       engine.NewUnit(),
-		log:        logger,
-		engMetrics: engMetrics,
-		colMetrics: colMetrics,
-		me:         me,
-		state:      state,
-		pool:       pool,
-		config:     config,
+		unit:                 engine.NewUnit(),
+		log:                  logger,
+		engMetrics:           engMetrics,
+		colMetrics:           colMetrics,
+		me:                   me,
+		state:                state,
+		pool:                 pool,
+		config:               config,
+		transactionValidator: transactionValidator,
 	}
 
-	con, err := net.Register(engine.PushTransactions, e)
+	conduit, err := net.Register(engine.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
-	e.con = con
+	e.conduit = conduit
 
 	return e, nil
 }
@@ -160,13 +170,14 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// first, we check if the transaction is valid
-	err := e.validateTransaction(tx)
+	err := e.transactionValidator.Validate(tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
 	}
 
 	// retrieve the set of collector clusters
-	clusters, err := e.state.Final().Clusters()
+	// TODO needs to be per-epoch
+	clusters, err := e.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
@@ -199,17 +210,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// propagate it to all members of the responsible cluster
 	if originID == localID {
 
-		// always send the transaction to one node in the responsible cluster
-		// send to additional nodes based on configuration
-		targetIDs := txCluster.
-			Filter(filter.Not(filter.HasNodeID(localID))).
-			Sample(e.config.PropagationRedundancy + 1)
+		log.Debug().Msg("propagating transaction to cluster")
 
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
-			Msg("propagating transaction to cluster")
-
-		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
+		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
 		}
@@ -218,82 +221,6 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	log.Info().Msg("transaction processed")
-
-	return nil
-}
-
-// validateTransaction validates the transaction in order to determine whether
-// the transaction should be included in a collection.
-func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
-
-	// ensure all required fields are set
-	missingFields := tx.MissingFields()
-	if len(missingFields) > 0 {
-		return IncompleteTransactionError{Missing: missingFields}
-	}
-
-	// ensure the gas limit is not over the maximum
-	if tx.GasLimit > e.config.MaxGasLimit {
-		return GasLimitExceededError{Actual: tx.GasLimit, Maximum: e.config.MaxGasLimit}
-	}
-
-	// ensure the reference block is valid
-	err := e.checkTransactionExpiry(tx)
-	if err != nil {
-		return err
-	}
-
-	if e.config.CheckScriptsParse {
-		// ensure the script is at least parse-able
-		_, err = parser2.ParseProgram(string(tx.Script))
-		if err != nil {
-			return InvalidScriptError{ParserErr: err}
-		}
-	}
-
-	// TODO check account/payer signatures
-
-	return nil
-}
-
-// checkTransactionExpiry checks whether a transaction's reference block ID is
-// valid. Returns nil if the reference is valid, returns an error if the
-// reference is invalid or we failed to check it.
-func (e *Engine) checkTransactionExpiry(tx *flow.TransactionBody) error {
-
-	// look up the reference block
-	ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
-	if errors.Is(err, storage.ErrNotFound) {
-		// the transaction references an unknown block - at this point we decide
-		// whether to consider it expired based on configuration
-		if e.config.AllowUnknownReference {
-			return nil
-		}
-		return ErrUnknownReferenceBlock
-	}
-	if err != nil {
-		return fmt.Errorf("could not get reference block: %w", err)
-	}
-
-	// get the latest finalized block we know about
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get finalized header: %w", err)
-	}
-
-	diff := final.Height - ref.Height
-	// check for overflow
-	if ref.Height > final.Height {
-		diff = 0
-	}
-	// discard transactions that are expired, or that will expire sooner than
-	// our configured buffer allows
-	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {
-		return ExpiredTransactionError{
-			RefHeight:   ref.Height,
-			FinalHeight: final.Height,
-		}
-	}
 
 	return nil
 }

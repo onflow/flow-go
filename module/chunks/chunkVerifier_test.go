@@ -10,15 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	chunksmodels "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/chunks"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/verification"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
+	chunksmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/ledger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type ChunkVerifierTestSuite struct {
@@ -155,7 +155,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	// Block setup
 	payload := flow.Payload{
-		Identities: unittest.IdentityListFixture(32),
 		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
 	header := unittest.BlockHeaderFixture()
@@ -166,11 +165,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	}
 
 	// registerTouch and State setup
-	id1 := make([]byte, 32)
+	id1 := state.RegisterID(string(make([]byte, 32)), "", "")
 	value1 := []byte{'a'}
 
-	id2 := make([]byte, 32)
-	id2[0] = byte(5)
+	id2Bytes := make([]byte, 32)
+	id2Bytes[0] = byte(5)
+	id2 := state.RegisterID(string(id2Bytes), "", "")
 	value2 := []byte{'b'}
 	UpdatedValue2 := []byte{'B'}
 
@@ -239,26 +239,26 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, ledger state.Ledger) 
 
 	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
-		id1 := make([]byte, 32)
+		id1 := string(make([]byte, 32))
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
-		ledger.Set(id1, UpdatedValue1)
+		ledger.Set(id1, "", "", UpdatedValue1)
 
 		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
-		id1 := make([]byte, 32)
+		id1 := string(make([]byte, 32))
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
-		ledger.Set(id1, UpdatedValue1)
+		ledger.Set(id1, "", "", UpdatedValue1)
 
 		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
 	default:
-		id1 := make([]byte, 32)
+		id1 := string(make([]byte, 32))
 		id2 := make([]byte, 32)
 		id2[0] = byte(5)
 		UpdatedValue2 := []byte{'B'}
-		_, _ = ledger.Get(id1)
-		ledger.Set(id2, UpdatedValue2)
+		_, _ = ledger.Get(id1, "", "")
+		ledger.Set(string(id2), "", "", UpdatedValue2)
 
 		tx.Logs = []string{"log1", "log2"}
 	}

@@ -8,18 +8,18 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/ledger"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // CompleteExecutionResult represents an execution result that is ready to
@@ -133,7 +133,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 	})
 	payload := flow.Payload{
-		Identities: unittest.IdentityListFixture(32),
 		Guarantees: guarantees,
 	}
 	header := unittest.BlockHeaderFixture()
@@ -201,7 +200,6 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 	}
 
 	payload := flow.Payload{
-		Identities: nil,
 		Guarantees: guarantees,
 	}
 

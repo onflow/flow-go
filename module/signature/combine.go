@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // lengthSize is how many bytes we use to encode the length of each signature.

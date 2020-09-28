@@ -12,14 +12,14 @@ import (
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/engine/verification/utils"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestConcurrency evaluates behavior of finder engine against:
@@ -133,6 +133,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 		assignment,
 		requestInterval,
 		processInterval,
+		uint(erCount),
+		uint(erCount*chunksNum),
 		failureThreshold,
 		chainID,
 		collector,

@@ -12,17 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	model "github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
-	"github.com/dapperlabs/flow-go/storage/util"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	model "github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/cluster"
+	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/events"
+	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type MutatorSuite struct {
@@ -55,14 +55,15 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
-	headers, identities, _, seals, index, conPayloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
+	consumer := events.NewNoop()
 
-	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, index, conPayloads, blocks)
+	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
 	require.NoError(suite.T(), err)
 }
 
@@ -79,12 +80,13 @@ func (suite *MutatorSuite) TearDownTest() {
 func (suite *MutatorSuite) Bootstrap() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
-	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
-	err := suite.protoState.Mutate().Bootstrap(genesis, result, seal)
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	root, result, seal := unittest.BootstrapFixture(participants)
+	// ensure we don't enter a new epoch for tests that build many blocks
+	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+	err := suite.protoState.Mutate().Bootstrap(root, result, seal)
 	suite.Require().Nil(err)
-	suite.protoGenesis = genesis.Header
+	suite.protoGenesis = root.Header
 
 	// bootstrap cluster chain
 	err = suite.mutator.Bootstrap(suite.genesis)

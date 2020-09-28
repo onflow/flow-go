@@ -10,10 +10,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/ledger/mtrie"
 )
 
 var cmd = &cobra.Command{
@@ -69,8 +69,8 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ledger := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-		values, err := mForest.Read(stateCommitment, [][]byte{key})
+	ledger := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		values, err := mForest.Read(stateCommitment, [][]byte{state.RegisterID(owner, controller, key)})
 		if err != nil {
 			return nil, err
 		}

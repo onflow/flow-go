@@ -3,8 +3,8 @@ package forks
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Forks implements the hotstuff.Reactor API
@@ -72,11 +72,11 @@ func (f *Forks) AddBlock(block *model.Block) error {
 
 // MakeForkChoice returns the block to build new block proposal from for the current view.
 // the QC is the QC that points to that block.
-func (f *Forks) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error) {
+func (f *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
 	return f.forkchoice.MakeForkChoice(curView)
 }
 
 // AddQC gives the QC to the forkchoice for updating the preferred parent block
-func (f *Forks) AddQC(qc *model.QuorumCertificate) error {
+func (f *Forks) AddQC(qc *flow.QuorumCertificate) error {
 	return f.forkchoice.AddQC(qc) // forkchoice ensures that block referenced by qc is known
 }

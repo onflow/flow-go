@@ -10,11 +10,11 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realstorage "github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	realstorage "github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestTransactionRetry tests that the retry mechanism will send retries at specific times
@@ -41,8 +41,8 @@ func (suite *Suite) TestTransactionRetry() {
 	// blockID := block.ID()
 	// Setup Handler + Retry
 	backend := New(suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
-		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil)
-	retry := newRetry().SetBackend(backend)
+		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil, false)
+	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
 	retry.RegisterTransaction(block.Header.Height, transactionBody)
@@ -99,8 +99,8 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 
 	// Setup Handler + Retry
 	backend := New(suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
-		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil)
-	retry := newRetry().SetBackend(backend)
+		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil, false)
+	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
 	retry.RegisterTransaction(block.Header.Height, transactionBody)

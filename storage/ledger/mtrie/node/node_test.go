@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/node"
 )
 
 const (

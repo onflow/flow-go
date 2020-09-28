@@ -1,8 +1,8 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Forks encapsulated Finalization Logic and ForkChoice rule in one component.
@@ -32,7 +32,7 @@ type Forks interface {
 	// Will error in case the block referenced by the qc is unknown.
 	// Might error with ByzantineThresholdExceededError (e.g. if two conflicting QCs for the
 	// same view are found)
-	AddQC(qc *model.QuorumCertificate) error
+	AddQC(qc *flow.QuorumCertificate) error
 
 	// MakeForkChoice prompts the ForkChoice to generate a fork choice for the
 	// current view `curView`. The fork choice is a qc that should be used for
@@ -50,7 +50,7 @@ type Forks interface {
 	// is smaller than the view of any qc ForkChoice has seen.
 	// Note that tracking the view of the newest qc is for safety purposes
 	// and _independent_ of the fork-choice rule.
-	MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error)
+	MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error)
 }
 
 // ForksReader only reads the forks' state

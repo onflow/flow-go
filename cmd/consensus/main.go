@@ -10,40 +10,40 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
-	committeeImpl "github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/common/requester"
-	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
-	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
-	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/consensus/provider"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/buffer"
-	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
-	chmodule "github.com/dapperlabs/flow-go/module/chunks"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/mempool/ejectors"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/module/synchronization"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/io"
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
+	committeeImpl "github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/requester"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/consensus/compliance"
+	"github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/consensus/provider"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/buffer"
+	builder "github.com/onflow/flow-go/module/builder/consensus"
+	chmodule "github.com/onflow/flow-go/module/chunks"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/ejectors"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/synchronization"
+	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 func main() {
@@ -248,10 +248,10 @@ func main() {
 			build = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
+				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
-				node.Storage.Blocks,
 				guarantees,
 				seals,
 				receipts,
@@ -298,10 +298,9 @@ func main() {
 			committee = committeeImpl.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
 			// initialize the combined signer for hotstuff
-			var signer hotstuff.Signer
+			var signer hotstuff.SignerVerifier
 			signer = verification.NewCombinedSigner(
 				committee,
-				node.DKGState,
 				staking,
 				beacon,
 				merger,
@@ -310,9 +309,9 @@ func main() {
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index)
+			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index, node.RootChainID)
 			// initialize the persister
-			persist := persister.New(node.DB)
+			persist := persister.New(node.DB, node.RootChainID)
 
 			// query the last finalized block and pending blocks for recovery
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
@@ -323,7 +322,6 @@ func main() {
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
-				node.Tracer,
 				notifier,
 				mainMetrics,
 				node.Storage.Headers,

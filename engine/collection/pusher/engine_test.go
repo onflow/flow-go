@@ -1,63 +1,82 @@
 package pusher_test
 
 import (
+	"io/ioutil"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/network"
-	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/collection/pusher"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	metrics "github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	network "github.com/onflow/flow-go/network/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
 	suite.Suite
 
-	hub        *stub.Hub
-	identities flow.IdentityList
+	identities   flow.IdentityList
+	state        *protocol.State
+	snapshot     *protocol.Snapshot
+	conduit      *network.Conduit
+	me           *module.Local
+	pool         *mempool.Transactions
+	collections  *storage.Collections
+	transactions *storage.Transactions
 
-	colNode     mock.CollectionNode // the node we are testing
-	conNode     mock.ConsensusNode  // used for checking collection guarantee transmission
-	reqNode     mock.GenericNode    // used for request/response flows
-	reqEngine   *mocknetwork.Engine
-	pushConduit network.Conduit
-	chainID     flow.ChainID
+	engine *pusher.Engine
 }
 
 func (suite *Suite) SetupTest() {
 	var err error
 
-	suite.hub = stub.NewNetworkHub()
-	suite.chainID = flow.Mainnet
-
 	// add some dummy identities so we have one of each role
 	suite.identities = unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	colIdentity := suite.identities.Filter(filter.HasRole(flow.RoleCollection))[0]
-	conIdentity := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0]
-	reqIdentity := suite.identities.Filter(filter.HasRole(flow.RoleExecution))[0]
+	me := suite.identities.Filter(filter.HasRole(flow.RoleCollection))[0]
 
-	suite.colNode = testutil.CollectionNode(suite.T(), suite.hub, colIdentity, suite.identities, suite.chainID)
-	suite.conNode = testutil.ConsensusNode(suite.T(), suite.hub, conIdentity, suite.identities, suite.chainID)
-	suite.reqNode = testutil.GenericNode(suite.T(), suite.hub, reqIdentity, suite.identities, suite.chainID)
+	suite.state = new(protocol.State)
+	suite.snapshot = new(protocol.Snapshot)
+	suite.snapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter) flow.IdentityList {
+		return suite.identities.Filter(filter)
+	}, func(filter flow.IdentityFilter) error {
+		return nil
+	})
+	suite.state.On("Final").Return(suite.snapshot)
 
-	suite.reqEngine = new(mocknetwork.Engine)
-	suite.pushConduit, err = suite.reqNode.Net.Register(engine.PushGuarantees, suite.reqEngine)
+	metrics := metrics.NewNoopCollector()
+
+	net := new(module.Network)
+	suite.conduit = new(network.Conduit)
+	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
+
+	suite.me = new(module.Local)
+	suite.me.On("NodeID").Return(me.NodeID)
+
+	suite.pool = new(mempool.Transactions)
+	suite.collections = new(storage.Collections)
+	suite.transactions = new(storage.Transactions)
+
+	suite.engine, err = pusher.New(
+		zerolog.New(ioutil.Discard),
+		net,
+		suite.state,
+		metrics,
+		metrics,
+		suite.me,
+		suite.pool,
+		suite.collections,
+		suite.transactions,
+	)
 	suite.Require().Nil(err)
-}
-
-func (suite *Suite) TearDownTest() {
-	suite.reqNode.Done()
-	suite.colNode.Done()
-	suite.conNode.Done()
 }
 
 func TestPusherEngine(t *testing.T) {
@@ -66,25 +85,35 @@ func TestPusherEngine(t *testing.T) {
 
 // should be able to submit collection guarantees to consensus nodes
 func (suite *Suite) TestSubmitCollectionGuarantee() {
-	t := suite.T()
 
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.colNode.Me.NodeID()}
-	guarantee.Signature = unittest.SignatureFixture()
-	genesis, err := suite.conNode.State.Final().Head()
-	assert.NoError(t, err)
-	guarantee.ReferenceBlockID = genesis.ID()
 
-	err = suite.colNode.PusherEngine.SubmitCollectionGuarantee(guarantee)
-	assert.NoError(t, err)
+	// should submit the collection to consensus nodes
+	consensus := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))
+	suite.conduit.On("Multicast", guarantee, pusher.DefaultRecipientCount, consensus[0].NodeID).Return(nil)
 
-	// flush messages from the collection node
-	net, ok := suite.hub.GetNetwork(suite.colNode.Me.NodeID())
-	require.True(t, ok)
-	net.DeliverAll(false)
+	msg := &messages.SubmitCollectionGuarantee{
+		Guarantee: *guarantee,
+	}
+	err := suite.engine.ProcessLocal(msg)
+	suite.Require().Nil(err)
 
-	assert.Eventually(t, func() bool {
-		has := suite.conNode.Guarantees.Has(guarantee.ID())
-		return has
-	}, time.Millisecond*15, time.Millisecond)
+	suite.conduit.AssertExpectations(suite.T())
+}
+
+// should be able to submit collection guarantees to consensus nodes
+func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
+
+	guarantee := unittest.CollectionGuaranteeFixture()
+
+	// send from a non-allowed role
+	sender := suite.identities.Filter(filter.HasRole(flow.RoleVerification))[0]
+
+	msg := &messages.SubmitCollectionGuarantee{
+		Guarantee: *guarantee,
+	}
+	err := suite.engine.Process(sender.NodeID, msg)
+	suite.Require().Error(err)
+
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 }

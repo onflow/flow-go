@@ -8,9 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/libp2p/message"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 // decode will decode the envelope into an entity.
@@ -80,7 +80,7 @@ func decode(env Envelope) (interface{}, error) {
 
 	// testing
 	case CodeEcho:
-		v = &message.Echo{}
+		v = &message.TestMessage{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

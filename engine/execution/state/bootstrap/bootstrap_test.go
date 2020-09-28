@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/ledger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBootstrapLedger(t *testing.T) {
@@ -31,14 +31,21 @@ func TestBootstrapLedger(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		if !assert.Equal(t, unittest.GenesisStateCommitment, stateCommitment) {
-			t.Logf("Actual state commitment: %s", hex.EncodeToString(stateCommitment))
+		expectedStateCommitment := unittest.GenesisStateCommitment
+
+		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
+			t.Logf(
+				"Incorrect state commitment: got %s, expected %s",
+				hex.EncodeToString(stateCommitment),
+				hex.EncodeToString(expectedStateCommitment),
+			)
 		}
 	})
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("c9d4c845c0e159c1f3b3bc7c4dc570abd77d83870e5b2312be44e476f6715664")
+	var expectedStateCommitment, _ = hex.DecodeString("2495f31c3ef7eb5755e936d6befd9680a711944256e29c533a6853dbed95f72f")
+
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
@@ -56,7 +63,11 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 		require.NoError(t, err)
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
-			t.Logf("Actual state commitment: %s", hex.EncodeToString(stateCommitment))
+			t.Logf(
+				"Incorrect state commitment: got %s, expected %s",
+				hex.EncodeToString(stateCommitment),
+				hex.EncodeToString(expectedStateCommitment),
+			)
 		}
 	})
 }

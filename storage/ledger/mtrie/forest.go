@@ -10,10 +10,10 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
-	"github.com/dapperlabs/flow-go/utils/io"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/proof"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/trie"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 // MForest is a a forest of in-memory tries. As MForest is a storage-abstraction layer,
@@ -395,6 +395,15 @@ func (f *MForest) StoreTrie(rootHash []byte, path string) error {
 		return err
 	}
 	return trie.Store(path)
+}
+
+// DumpTrieAsJSON dumps a trie into a json file
+func (f *MForest) DumpTrieAsJSON(rootHash []byte, path string) error {
+	trie, err := f.GetTrie(rootHash)
+	if err != nil {
+		return err
+	}
+	return trie.DumpAsJSON(path)
 }
 
 // LoadTrie loads a trie from the disk

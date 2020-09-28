@@ -8,11 +8,11 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 
-	"github.com/dapperlabs/flow-go/access"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")

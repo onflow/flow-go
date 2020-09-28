@@ -7,11 +7,11 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 // Headers implements a simple read-only header storage around a badger DB.
@@ -22,12 +22,14 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
-	store := func(blockID flow.Identifier, v interface{}) func(tx *badger.Txn) error {
-		header := v.(*flow.Header)
+	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		blockID := key.(flow.Identifier)
+		header := val.(*flow.Header)
 		return operation.InsertHeader(blockID, header)
 	}
 
-	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		blockID := key.(flow.Identifier)
 		var header flow.Header
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := db.View(operation.RetrieveHeader(blockID, &header))
@@ -53,11 +55,11 @@ func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
 	return func(tx *badger.Txn) (*flow.Header, error) {
-		v, err := h.cache.Get(blockID)(tx)
+		val, err := h.cache.Get(blockID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return v.(*flow.Header), nil
+		return val.(*flow.Header), nil
 	}
 }
 

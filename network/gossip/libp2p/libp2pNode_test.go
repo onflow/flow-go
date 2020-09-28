@@ -43,7 +43,7 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 func (l *LibP2PNodeTestSuite) SetupTest() {
 	l.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	l.ctx, l.cancel = context.WithCancel(context.Background())
-	golog.SetAllLoggers(golog.LevelDebug)
+	golog.SetAllLoggers(golog.LevelWarn)
 }
 
 // TestMultiAddress evaluates correct translations from
@@ -133,20 +133,19 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 func (l *LibP2PNodeTestSuite) TestAddPeers() {
 	defer l.cancel()
 
-	// count value of 10 runs into issue (96) on localhost
-	// since localhost connection have short deadlines
 	count := 3
 
-	// Creates nodes
+	// create nodes
 	nodes, addrs := l.CreateNodes(count, nil, false)
 	defer l.StopNodes(nodes)
 
-	// Adds the remaining nodes to the first node as its set of peers
-	require.NoError(l.Suite.T(), nodes[0].AddPeers(l.ctx, addrs[1:]...))
-	actual := nodes[0].libP2PHost.Peerstore().Peers().Len()
+	// add the remaining nodes to the first node as its set of peers
+	for _, p := range addrs[1:] {
+		require.NoError(l.Suite.T(), nodes[0].AddPeer(l.ctx, p))
+	}
 
-	// Checks if all 9 nodes have been added as peers to the first node
-	assert.True(l.Suite.T(), count == actual, "inconsistent peers number expected: %d, found: %d", count, actual)
+	// Checks if all 3 nodes have been added as peers to the first node
+	assert.Len(l.Suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
 
 	// Checks whether the first node is connected to the rest
 	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
@@ -156,7 +155,45 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 		}
 		assert.Eventuallyf(l.Suite.T(), func() bool {
 			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
-		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
+		}, 2*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
+	}
+}
+
+// TestAddPeers checks if nodes can be added as peers to a given node
+func (l *LibP2PNodeTestSuite) TestRemovePeers() {
+	defer l.cancel()
+
+	count := 3
+
+	// create nodes
+	nodes, addrs := l.CreateNodes(count, nil, false)
+	defer l.StopNodes(nodes)
+
+	// add nodes two and three to the first node as its peers
+	for _, p := range addrs[1:] {
+		require.NoError(l.Suite.T(), nodes[0].AddPeer(l.ctx, p))
+	}
+
+	// check if all 3 nodes have been added as peers to the first node
+	assert.Len(l.Suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
+
+	// check whether the first node is connected to the rest
+	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
+		// A node is also a peer to itself but not marked as connected, hence skip checking that.
+		if nodes[0].libP2PHost.ID().String() == peer.String() {
+			continue
+		}
+		assert.Eventually(l.Suite.T(), func() bool {
+			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
+		}, 2*time.Second, tickForAssertEventually)
+	}
+
+	// disconnect from each peer and assert that the connection no longer exists
+	for _, p := range addrs[1:] {
+		require.NoError(l.Suite.T(), nodes[0].RemovePeer(l.ctx, p))
+		pInfo, err := GetPeerInfo(p)
+		assert.NoError(l.Suite.T(), err)
+		assert.Equal(l.Suite.T(), network.NotConnected, nodes[0].libP2PHost.Network().Connectedness(pInfo.ID))
 	}
 }
 

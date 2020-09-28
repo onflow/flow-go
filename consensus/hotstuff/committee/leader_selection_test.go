@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/crypto/random"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,10 +68,10 @@ func bruteSearch(value uint64, arr []uint64) (int, error) {
 // Test given the same seed, the leader selection will produce the same selection
 func TestDeterminstic(t *testing.T) {
 	identities := []*flow.Identity{
-		&flow.Identity{Stake: 1},
-		&flow.Identity{Stake: 2},
-		&flow.Identity{Stake: 3},
-		&flow.Identity{Stake: 4},
+		{Stake: 1},
+		{Stake: 2},
+		{Stake: 3},
+		{Stake: 4},
 	}
 
 	count := 100
@@ -95,10 +95,10 @@ func TestDeterminstic(t *testing.T) {
 
 func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 	identities := []*flow.Identity{
-		&flow.Identity{Stake: 1},
-		&flow.Identity{Stake: 2},
-		&flow.Identity{Stake: 3},
-		&flow.Identity{Stake: 4},
+		{Stake: 1},
+		{Stake: 2},
+		{Stake: 3},
+		{Stake: 4},
 	}
 
 	count := 100
@@ -137,10 +137,10 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 func TestLeaderSelectionAreWeighted(t *testing.T) {
 	count := 100000
 	identities := []*flow.Identity{
-		&flow.Identity{Stake: 1},
-		&flow.Identity{Stake: 2},
-		&flow.Identity{Stake: 3},
-		&flow.Identity{Stake: 4},
+		{Stake: 1},
+		{Stake: 2},
+		{Stake: 3},
+		{Stake: 4},
 	}
 
 	leaders, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
@@ -190,10 +190,10 @@ func BenchmarkLeaderSelection(b *testing.B) {
 
 func TestInvalidTotalWeight(t *testing.T) {
 	identities := []*flow.Identity{
-		&flow.Identity{Stake: 0},
-		&flow.Identity{Stake: 0},
-		&flow.Identity{Stake: 0},
-		&flow.Identity{Stake: 0},
+		{Stake: 0},
+		{Stake: 0},
+		{Stake: 0},
+		{Stake: 0},
 	}
 	_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 10, identities)
 	require.Error(t, err)
@@ -205,16 +205,16 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 	// with no zero staked nodes.
 	t.Run("small dataset", func(t *testing.T) {
 		identities := []*flow.Identity{
-			&flow.Identity{Stake: 0},
-			&flow.Identity{Stake: 0},
-			&flow.Identity{Stake: 1},
-			&flow.Identity{Stake: 0},
-			&flow.Identity{Stake: 0},
-			&flow.Identity{Stake: 2},
-			&flow.Identity{Stake: 3},
-			&flow.Identity{Stake: 4},
-			&flow.Identity{Stake: 0},
-			&flow.Identity{Stake: 0},
+			{Stake: 0},
+			{Stake: 0},
+			{Stake: 1},
+			{Stake: 0},
+			{Stake: 0},
+			{Stake: 2},
+			{Stake: 3},
+			{Stake: 4},
+			{Stake: 0},
+			{Stake: 0},
 		}
 
 		// different identity with the same stake are different

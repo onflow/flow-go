@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestTransactionTimingsPool(t *testing.T) {
@@ -62,5 +62,14 @@ func TestTransactionTimingsPool(t *testing.T) {
 		items := pool.All()
 		assert.Len(t, items, 1)
 		assert.Equal(t, item1, items[0])
+	})
+
+	t.Run("should not panic if item does not exist yet", func(t *testing.T) {
+		entity, updated := pool.Adjust(unittest.IdentifierFixture(), func(tt *flow.TransactionTiming) *flow.TransactionTiming {
+			assert.Fail(t, "should not have found this item")
+			return tt
+		})
+		assert.False(t, updated)
+		assert.Nil(t, entity)
 	})
 }

@@ -5,10 +5,10 @@ package mock
 import (
 	context "context"
 
-	delta "github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	entity "github.com/dapperlabs/flow-go/module/mempool/entity"
+	delta "github.com/onflow/flow-go/engine/execution/state/delta"
+	entity "github.com/onflow/flow-go/module/mempool/entity"
 
-	execution "github.com/dapperlabs/flow-go/engine/execution"
+	execution "github.com/onflow/flow-go/engine/execution"
 
 	mock "github.com/stretchr/testify/mock"
 )

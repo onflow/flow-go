@@ -5,14 +5,14 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 // Finalizer is a simple wrapper around our temporary state to clean up after a
@@ -24,7 +24,6 @@ type Finalizer struct {
 	transactions mempool.Transactions
 	prov         network.Engine
 	metrics      module.CollectionMetrics
-	chainID      flow.ChainID // aka cluster ID
 }
 
 // NewFinalizer creates a new finalizer for collection nodes.
@@ -33,14 +32,12 @@ func NewFinalizer(
 	transactions mempool.Transactions,
 	prov network.Engine,
 	metrics module.CollectionMetrics,
-	chainID flow.ChainID,
 ) *Finalizer {
 	f := &Finalizer{
 		db:           db,
 		transactions: transactions,
 		prov:         prov,
 		metrics:      metrics,
-		chainID:      chainID,
 	}
 	return f
 }
@@ -67,14 +64,14 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 		// retrieve the current finalized cluster state boundary
 		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(f.chainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(header.ChainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		// retrieve the ID of the last finalized block as marker for stopping
 		var headID flow.Identifier
-		err = operation.LookupClusterBlockHeight(f.chainID, boundary, &headID)(tx)
+		err = operation.LookupClusterBlockHeight(header.ChainID, boundary, &headID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}

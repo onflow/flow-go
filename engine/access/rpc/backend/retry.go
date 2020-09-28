@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // retryFrequency has to be less than TransactionExpiry or else this module does nothing
@@ -16,12 +16,22 @@ type Retry struct {
 	// pending transactions
 	transactionByReferencBlockHeight map[uint64]map[flow.Identifier]*flow.TransactionBody
 	backend                          *Backend
+	active                           bool
 }
 
 func newRetry() *Retry {
 	return &Retry{
 		transactionByReferencBlockHeight: map[uint64]map[flow.Identifier]*flow.TransactionBody{},
 	}
+}
+
+func (r *Retry) Activate() *Retry {
+	r.active = true
+	return r
+}
+
+func (r *Retry) IsActive() bool {
+	return r.active
 }
 
 func (r *Retry) SetBackend(b *Backend) *Retry {

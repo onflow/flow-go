@@ -1,56 +1,43 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	hotstuffmodel "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/consensus/recovery/cluster"
-	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/collection/proposal"
-	"github.com/dapperlabs/flow-go/engine/collection/pusher"
-	colsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
-	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/provider"
-	consync "github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/buffer"
-	builder "github.com/dapperlabs/flow-go/module/builder/collection"
-	colfinalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
-	confinalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
-	"github.com/dapperlabs/flow-go/module/ingress"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/module/synchronization"
-	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	storage "github.com/dapperlabs/flow-go/storage"
-	storagekv "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/io"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
+	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
+	"github.com/onflow/flow-go/engine/collection/ingest"
+	"github.com/onflow/flow-go/engine/collection/pusher"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/provider"
+	consync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/buffer"
+	builder "github.com/onflow/flow-go/module/builder/collection"
+	"github.com/onflow/flow-go/module/epochs"
+	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/ingress"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	storagekv "github.com/onflow/flow-go/storage/badger"
 )
 
 func main() {
@@ -69,30 +56,14 @@ func main() {
 		ingestConf  ingest.Config
 		ingressConf ingress.Config
 
-		pool        mempool.Transactions
-		colHeaders  *storagekv.Headers
-		colPayloads *storagekv.ClusterPayloads
-		colBlocks   *storagekv.ClusterBlocks
-
-		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
-		conCache *buffer.PendingBlocks        // pending block cache for follower
-
-		myCluster    flow.IdentityList // cluster identity list
-		clusterID    flow.ChainID      // chain ID for the cluster
-		clusterState *clusterkv.State  // chain state for the cluster
-
-		// from bootstrap files
-		clusterBlock *clustermodel.Block              // root block for the cluster
-		clusterQC    *hotstuffmodel.QuorumCertificate // root QC for the cluster
+		pool           mempool.Transactions  // shared tx pool
+		followerBuffer *buffer.PendingBlocks // pending block cache for follower
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
-		clusterSyncCore   *synchronization.Core
 		mainChainSyncCore *synchronization.Core
 		followerEng       *followereng.Engine
-		proposalEng       *proposal.Engine
 		colMetrics        module.CollectionMetrics
-		clusterMetrics    module.HotstuffMetrics
 		err               error
 	)
 
@@ -136,88 +107,16 @@ func main() {
 			pool, err = stdmap.NewTransactions(txLimit)
 			return err
 		}).
-		Module("collection cluster ID", func(node *cmd.FlowNodeBuilder) error {
-			myCluster, _, err = protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
-			if err != nil {
-				return fmt.Errorf("could not get my cluster: %w", err)
-			}
-			clusterID = protocol.ChainIDForCluster(myCluster)
-			return nil
-		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			colHeaders = storagekv.NewHeaders(node.Metrics.Cache, node.DB)
-			colPayloads = storagekv.NewClusterPayloads(node.Metrics.Cache, node.DB)
-			colBlocks = storagekv.NewClusterBlocks(node.DB, clusterID, colHeaders, colPayloads)
-			return nil
-		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
-			colCache = buffer.NewPendingClusterBlocks() // for cluster consensus
-			conCache = buffer.NewPendingBlocks()        // for following main chain consensus
+			followerBuffer = buffer.NewPendingBlocks()
 			return nil
 		}).
 		Module("metrics", func(node *cmd.FlowNodeBuilder) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
-			clusterMetrics = metrics.NewHotstuffCollector(clusterID)
-			return nil
-		}).
-		// regardless of whether we are starting from scratch or from an
-		// existing state, we load the root files
-		Module("cluster consensus bootstrapping", func(node *cmd.FlowNodeBuilder) error {
-
-			// read cluster bootstrapping files from standard bootstrap directory
-			clusterBlock, err = loadClusterBlock(node.BaseConfig.BootstrapDir, clusterID)
-			if err != nil {
-				return fmt.Errorf("could not load cluster block: %w", err)
-			}
-
-			clusterQC, err = loadClusterQC(node.BaseConfig.BootstrapDir, clusterID)
-			if err != nil {
-				return fmt.Errorf("could not load cluster qc: %w", err)
-			}
-
-			return nil
-		}).
-		// if a root cluster block already exists in the database, discard
-		// the loaded bootstrap files and use the existing cluster state
-		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
-
-			// initialize cluster state
-			clusterState, err = clusterkv.NewState(node.DB, clusterID, colHeaders, colPayloads)
-			if err != nil {
-				return fmt.Errorf("could not create cluster state: %w", err)
-			}
-
-			_, err = clusterState.Final().Head()
-			// storage layer error while checking state - fail fast
-			if err != nil && !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("could not check cluster state db: %w", err)
-			}
-
-			// no existing cluster state, bootstrap with block specified in
-			// bootstrapping files
-			if errors.Is(err, storage.ErrNotFound) {
-				err = clusterState.Mutate().Bootstrap(clusterBlock)
-				if err != nil {
-					return fmt.Errorf("could not bootstrap cluster state: %w", err)
-				}
-
-				node.Logger.Info().
-					Hex("root_id", logging.ID(clusterBlock.ID())).
-					Str("cluster_id", clusterID.String()).
-					Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
-					Msg("bootstrapped cluster state")
-			}
-
-			// otherwise, we already have cluster state on-disk, no bootstrapping needed
-
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.FlowNodeBuilder) error {
 			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
-			return err
-		}).
-		Module("cluster chain sync core", func(node *cmd.FlowNodeBuilder) error {
-			clusterSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -249,7 +148,7 @@ func main() {
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
 			// use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()
@@ -286,7 +185,7 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				node.State,
-				conCache,
+				followerBuffer,
 				followerCore,
 				mainChainSyncCore,
 			)
@@ -357,14 +256,29 @@ func main() {
 			)
 			return push, err
 		}).
-		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			builder := builder.NewBuilder(node.DB, node.Storage.Headers, colHeaders, colPayloads, pool, node.Tracer,
+		// Epoch manager encapsulates and manages epoch-dependent engines as we
+		// transition between epochs
+		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache)
+			if err != nil {
+				return nil, err
+			}
+
+			builderFactory, err := factories.NewBuilderFactory(
+				node.DB,
+				node.Storage.Headers,
+				node.Tracer,
+				colMetrics,
+				push,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
-			finalizer := colfinalizer.NewFinalizer(node.DB, pool, push, colMetrics, clusterID)
+			if err != nil {
+				return nil, err
+			}
 
-			proposalEng, err = proposal.New(
+			proposalFactory, err := factories.NewProposalEngineFactory(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -372,54 +286,29 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.State,
-				clusterState,
 				pool,
 				node.Storage.Transactions,
-				colHeaders,
-				colPayloads,
-				colCache,
-				clusterSyncCore,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize engine: %w", err)
+				return nil, err
 			}
 
-			// collector cluster's HotStuff committee state
-			committee, err := initClusterCommittee(node, colPayloads, clusterState, clusterBlock.Header)
-			if err != nil {
-				return nil, fmt.Errorf("creating HotStuff committee state failed: %w", err)
-			}
-
-			// create a signing provider for signing HotStuff messages (within cluster)
-			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
-			signer := verification.NewSingleSigner(committee, staking, node.Me.NodeID())
-
-			// initialize logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, clusterMetrics)
-
-			persist := persister.New(node.DB)
-
-			finalized, pending, err := cluster.FindLatest(clusterState, colHeaders)
-			if err != nil {
-				return nil, fmt.Errorf("could not retrieve finalized/pending headers: %w", err)
-			}
-
-			hot, err := consensus.NewParticipant(
+			syncFactory, err := factories.NewSyncEngineFactory(
 				node.Logger,
-				node.Tracer,
-				notifier,
-				clusterMetrics,
-				colHeaders,
-				committee,
-				builder,
-				finalizer,
-				persist,
-				signer,
-				proposalEng,
-				clusterBlock.Header,
-				clusterQC,
-				finalized,
-				pending,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				synchronization.DefaultConfig(),
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			hotstuffFactory, err := factories.NewHotStuffFactory(
+				node.Logger,
+				node.Me,
+				node.DB,
+				node.State,
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
@@ -428,80 +317,48 @@ func main() {
 				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 			)
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize hotstuff participant: %w", err)
+				return nil, err
 			}
 
-			proposalEng = proposalEng.WithConsensus(hot)
-			return proposalEng, nil
-		}).
-		Component("cluster sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			sync, err := colsync.New(
+			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
+			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
 				node.Me,
-				myCluster,
-				clusterState,
-				colBlocks,
-				proposalEng,
-				clusterSyncCore,
+				signer,
+				node.State,
+				nil, // TODO
+			)
+
+			factory := factories.NewEpochComponentsFactory(
+				node.Me,
+				pool,
+				builderFactory,
+				clusterStateFactory,
+				hotstuffFactory,
+				proposalFactory,
+				syncFactory,
+			)
+
+			heightEvents := gadgets.NewHeights()
+			node.ProtocolEvents.AddConsumer(heightEvents)
+
+			manager, err := epochmgr.New(
+				node.Logger,
+				node.Me,
+				node.State,
+				rootQCVoter,
+				factory,
+				heightEvents,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("could not create cluster sync engine: %w", err)
+				return nil, fmt.Errorf("could not create epoch manager: %w", err)
 			}
-			return sync, nil
+
+			// register the manager for protocol events
+			node.ProtocolEvents.AddConsumer(manager)
+
+			return manager, err
 		}).
 		Run()
-}
-
-// initClusterCommittee initializes the collector cluster's HotStuff committee state
-func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.ClusterPayloads, clusterState *clusterkv.State, clusterGenesisHeader *flow.Header) (hotstuff.Committee, error) {
-
-	// create a filter for consensus members for our cluster
-	// TODO: the cluster index from the latest finalized state. For now, it's identical to the one from the genesis state.
-	// we need to double check if this assumption still holds when implementing epoch switchover.
-	cluster, clusterIndex, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
-	if err != nil {
-		return nil, fmt.Errorf("could not get cluster members for node %x: %w", node.Me.NodeID(), err)
-	}
-	selector := filter.And(filter.In(cluster), filter.HasStake(true))
-
-	translator := clusterkv.NewTranslator(colPayloads)
-
-	selection, err := leader.NewSelectionForCollection(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State, clusterGenesisHeader, clusterState, clusterIndex)
-	if err != nil {
-		return nil, fmt.Errorf("could not create leader selection for collection cluster: %w", err)
-	}
-
-	return committee.New(node.State, translator, node.Me.NodeID(), selector, cluster.NodeIDs(), selection), nil
-}
-
-func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block, error) {
-	filename := fmt.Sprintf(bootstrap.PathRootClusterBlock, clusterID)
-	data, err := io.ReadFile(filepath.Join(path, filename))
-	if err != nil {
-		return nil, err
-	}
-
-	var block clustermodel.Block
-	err = json.Unmarshal(data, &block)
-	if err != nil {
-		return nil, err
-	}
-	return &block, nil
-}
-
-func loadClusterQC(path string, clusterID flow.ChainID) (*hotstuffmodel.QuorumCertificate, error) {
-	filename := fmt.Sprintf(bootstrap.PathRootClusterQC, clusterID)
-	data, err := io.ReadFile(filepath.Join(path, filename))
-	if err != nil {
-		return nil, err
-	}
-
-	var qc hotstuffmodel.QuorumCertificate
-	err = json.Unmarshal(data, &qc)
-	if err != nil {
-		return nil, err
-	}
-	return &qc, nil
 }

@@ -7,29 +7,29 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/engine/verification/finder"
-	"github.com/dapperlabs/flow-go/engine/verification/match"
-	"github.com/dapperlabs/flow-go/engine/verification/verifier"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/buffer"
-	"github.com/dapperlabs/flow-go/module/chunks"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/module/synchronization"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/verification/finder"
+	"github.com/onflow/flow-go/engine/verification/match"
+	"github.com/onflow/flow-go/engine/verification/verifier"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/chunks"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/synchronization"
+	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 const (
@@ -63,7 +63,8 @@ func main() {
 		processedResultsIDs *stdmap.Identifiers        // used in finder engine
 		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
 		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
-		pendingResults      *stdmap.PendingResults     // used in match engine
+		chunkIDsByResult    *stdmap.IdentifierMap      // used in match engine
+		pendingResults      *stdmap.ResultDataPacks    // used in match engine
 		pendingChunks       *match.Chunks              // used in match engine
 		headerStorage       *storage.Headers           // used in match and finder engines
 		syncCore            *synchronization.Core      // used in follower engine
@@ -152,6 +153,20 @@ func main() {
 
 			return nil
 		}).
+		Module("chunk ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
+			chunkIDsByResult, err = stdmap.NewIdentifierMap(chunkLimit)
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkIDsByResult, chunkIDsByResult.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
+			return nil
+		}).
 		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)
 			if err != nil {
@@ -167,7 +182,7 @@ func main() {
 			return nil
 		}).
 		Module("pending results mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingResults = stdmap.NewPendingResults()
+			pendingResults = stdmap.NewResultDataPacks(receiptLimit)
 
 			// registers size method of backend for metrics
 			err = node.Metrics.Mempool.Register(metrics.ResourcePendingResult, pendingResults.Size)
@@ -244,6 +259,7 @@ func main() {
 				node.Network,
 				node.Me,
 				pendingResults,
+				chunkIDsByResult,
 				verifierEng,
 				assigner,
 				node.State,
@@ -300,7 +316,7 @@ func main() {
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

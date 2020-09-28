@@ -7,8 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 type TransactionCollector struct {
@@ -20,6 +20,7 @@ type TransactionCollector struct {
 	timeToFinalized            prometheus.Summary
 	timeToExecuted             prometheus.Summary
 	timeToFinalizedExecuted    prometheus.Summary
+	transactionSubmission      *prometheus.CounterVec
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -74,6 +75,12 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			AgeBuckets: 5,
 			BufCap:     500,
 		}),
+		transactionSubmission: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "transaction_submission",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "counter for the success/failure of transaction submissions",
+		}, []string{"result"}),
 	}
 
 	return tc
@@ -81,16 +88,29 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 
 func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when time.Time) {
 	// we don't need to check whether the transaction timing already exists, it will not be overwritten by the mempool
-	tc.transactionTimings.Add(&flow.TransactionTiming{TransactionID: txID, Received: when})
+	added := tc.transactionTimings.Add(&flow.TransactionTiming{TransactionID: txID, Received: when})
+	if !added {
+		tc.log.Warn().
+			Str("transaction_id", txID.String()).
+			Msg("failed to add TransactionReceived metric")
+	}
 }
 
 func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when time.Time) {
+	// Count as submitted as long as it's finalized
+	tc.transactionSubmission.WithLabelValues("success").Inc()
+
 	t, updated := tc.transactionTimings.Adjust(txID, func(t *flow.TransactionTiming) *flow.TransactionTiming {
 		t.Finalized = when
 		return t
 	})
 
+	// the AN may not have received the original transaction sent by the client in which case the finalized metric
+	// is not updated
 	if !updated {
+		tc.log.Debug().
+			Str("transaction_id", txID.String()).
+			Msg("failed to update TransactionFinalized metric")
 		return
 	}
 
@@ -110,6 +130,9 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 	})
 
 	if !updated {
+		tc.log.Debug().
+			Str("transaction_id", txID.String()).
+			Msg("failed to update TransactionExecuted metric")
 		return
 	}
 
@@ -168,4 +191,19 @@ func (tc *TransactionCollector) trackTTFE(t *flow.TransactionTiming, log bool) {
 		tc.log.Info().Str("transaction_id", t.TransactionID.String()).Float64("duration", duration).
 			Msg("transaction time to finalized and executed")
 	}
+}
+
+func (tc *TransactionCollector) TransactionSubmissionFailed() {
+	tc.transactionSubmission.WithLabelValues("failed").Inc()
+}
+
+func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
+	_, exist := tc.transactionTimings.ByID(txID)
+
+	if !exist {
+		// likely previously removed, either executed or expired
+		return
+	}
+	tc.transactionSubmission.WithLabelValues("expired").Inc()
+	tc.transactionTimings.Rem(txID)
 }

@@ -3,10 +3,10 @@ package badger
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type Transactions struct {
@@ -16,12 +16,14 @@ type Transactions struct {
 
 func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transactions {
 
-	store := func(txID flow.Identifier, v interface{}) func(tx *badger.Txn) error {
-		flowTx := v.(*flow.TransactionBody)
+	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		txID := key.(flow.Identifier)
+		flowTx := val.(*flow.TransactionBody)
 		return operation.SkipDuplicates(operation.InsertTransaction(txID, flowTx))
 	}
 
-	retrieve := func(txID flow.Identifier) func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		txID := key.(flow.Identifier)
 		var flowTx flow.TransactionBody
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := db.View(operation.RetrieveTransaction(txID, &flowTx))
@@ -47,11 +49,11 @@ func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*badger.Txn) e
 
 func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow.TransactionBody, error) {
 	return func(tx *badger.Txn) (*flow.TransactionBody, error) {
-		v, err := t.cache.Get(txID)(tx)
+		val, err := t.cache.Get(txID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return v.(*flow.TransactionBody), err
+		return val.(*flow.TransactionBody), err
 	}
 }
 

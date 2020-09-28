@@ -6,15 +6,16 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/module/trace"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	state2 "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/trace"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -113,9 +114,10 @@ func NewExecutionState(
 }
 
 func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
-	return func(key flow.RegisterID) ([]byte, error) {
+	return func(owner, controller, key string) (flow.RegisterValue, error) {
+
 		values, err := ledger.GetRegisters(
-			[]flow.RegisterID{key},
+			[]flow.RegisterID{state2.RegisterID(owner, controller, key)},
 			commitment,
 		)
 		if err != nil {

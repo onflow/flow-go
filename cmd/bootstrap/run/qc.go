@@ -2,29 +2,19 @@ package run
 
 import (
 	"fmt"
-	"io/ioutil"
 
-	"github.com/dgraph-io/badger/v2"
-
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/dkg"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 type Participant struct {
@@ -33,34 +23,31 @@ type Participant struct {
 }
 
 type ParticipantData struct {
-	DKGState     dkg.State
 	Participants []Participant
+	Lookup       map[flow.Identifier]flow.DKGParticipant
+	GroupKey     crypto.PublicKey
 }
 
-func GenerateRootQC(participantData ParticipantData, block *flow.Block) (*model.QuorumCertificate, error) {
-	state, db, err := NewProtocolState(block)
+func (pd *ParticipantData) Identities() flow.IdentityList {
+	nodes := make([]bootstrap.NodeInfo, 0, len(pd.Participants))
+	for _, participant := range pd.Participants {
+		nodes = append(nodes, participant.NodeInfo)
+	}
+	return bootstrap.ToIdentityList(nodes)
+}
+
+func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
+
+	validators, signers, err := createValidators(participantData)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
 
-	validators, signers, err := createValidators(state, participantData, block)
-	if err != nil {
-		return nil, err
-	}
-
-	hotBlock := model.Block{
-		BlockID:     block.ID(),
-		View:        block.Header.View,
-		ProposerID:  block.Header.ProposerID,
-		QC:          nil,
-		PayloadHash: block.Header.PayloadHash,
-		Timestamp:   block.Header.Timestamp,
-	}
+	hotBlock := model.GenesisBlockFromFlow(block.Header)
 
 	votes := make([]*model.Vote, 0, len(signers))
 	for _, signer := range signers {
-		vote, err := signer.CreateVote(&hotBlock)
+		vote, err := signer.CreateVote(hotBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -74,23 +61,21 @@ func GenerateRootQC(participantData ParticipantData, block *flow.Block) (*model.
 	}
 
 	// validate QC
-	err = validators[0].ValidateQC(qc, &hotBlock)
+	err = validators[0].ValidateQC(qc, hotBlock)
 
 	return qc, err
 }
 
-func createValidators(ps protocol.State, participantData ParticipantData, block *flow.Block) ([]hotstuff.Validator, []hotstuff.Signer, error) {
+func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 	n := len(participantData.Participants)
+	identities := participantData.Identities()
 
-	groupSize, err := participantData.DKGState.GroupSize()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get DKG group size: %w", err)
-	}
+	groupSize := uint(len(participantData.Participants))
 	if groupSize < uint(n) {
 		return nil, nil, fmt.Errorf("need at least as many signers as DKG participants, got %v and %v", groupSize, n)
 	}
 
-	signers := make([]hotstuff.Signer, n)
+	signers := make([]hotstuff.SignerVerifier, n)
 	validators := make([]hotstuff.Validator, n)
 
 	forks := &mocks.ForksReader{}
@@ -107,10 +92,8 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 			return nil, nil, err
 		}
 
-		selection := leader.NewSelectionForBootstrap()
-
 		// create consensus committee's state
-		committee, err := committee.NewMainConsensusCommitteeState(ps, participant.NodeID, selection)
+		committee, err := committee.NewStaticCommittee(identities, local.NodeID(), participantData.Lookup, participantData.GroupKey)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -119,7 +102,7 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
 		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner()
-		signer := verification.NewCombinedSigner(committee, participantData.DKGState, stakingSigner, beaconSigner, merger, participant.NodeID)
+		signer := verification.NewCombinedSigner(committee, stakingSigner, beaconSigner, merger, participant.NodeID)
 		signers[i] = signer
 
 		// create validator
@@ -130,48 +113,55 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 	return validators, signers, nil
 }
 
-func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error) {
+func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData bootstrap.DKGData) (*ParticipantData, error) {
 
-	dir, err := tempDBDir()
-	if err != nil {
-		return nil, nil, err
+	// stakingNodes can include external validators, so it can be longer than internalNodes
+	if len(allNodes) < len(internalNodes) {
+		return nil, fmt.Errorf("need at least as many staking public keys as private keys (pub=%d, priv=%d)", len(allNodes), len(internalNodes))
 	}
 
-	opts := badger.
-		DefaultOptions(dir).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, nil, err
+	// length of DKG participants needs to match stakingNodes, since we run DKG for external and internal validators
+	if len(allNodes) != len(dkgData.PrivKeyShares) {
+		return nil, fmt.Errorf("need exactly the same number of staking public keys as DKG private participants")
 	}
 
-	metrics := metrics.NewNoopCollector()
+	qcData := &ParticipantData{}
 
-	headers := storeBadger.NewHeaders(metrics, db)
-	identities := storeBadger.NewIdentities(metrics, db)
-	guarantees := storeBadger.NewGuarantees(metrics, db)
-	seals := storeBadger.NewSeals(metrics, db)
-	index := storeBadger.NewIndex(metrics, db)
-	payloads := storeBadger.NewPayloads(db, index, identities, guarantees, seals)
-	blocks := storeBadger.NewBlocks(db, headers, payloads)
+	participantLookup := make(map[flow.Identifier]flow.DKGParticipant)
 
-	state, err := protoBadger.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
-	if err != nil {
-		return nil, nil, err
+	// the QC will be signed by everyone in internalNodes
+	for i, node := range internalNodes {
+		// assign a node to a DGKdata entry, using the canonical ordering
+		participantLookup[node.NodeID] = flow.DKGParticipant{
+			KeyShare: dkgData.PubKeyShares[i],
+			Index:    uint(i),
+		}
+
+		if node.NodeID == flow.ZeroID {
+			return nil, fmt.Errorf("node id cannot be zero")
+		}
+
+		if node.Stake == 0 {
+			return nil, fmt.Errorf("node (id=%s) cannot have 0 stake", node.NodeID)
+		}
+
+		qcData.Participants = append(qcData.Participants, Participant{
+			NodeInfo:            node,
+			RandomBeaconPrivKey: dkgData.PrivKeyShares[i],
+		})
 	}
 
-	result := bootstrap.Result(block, unittest.GenesisStateCommitment)
-	seal := bootstrap.Seal(result)
-	err = state.Mutate().Bootstrap(block, result, seal)
-	if err != nil {
-		return nil, nil, err
+	for i := len(internalNodes); i < len(allNodes); i++ {
+		// assign a node to a DGKdata entry, using the canonical ordering
+		node := allNodes[i]
+		participantLookup[node.NodeID] = flow.DKGParticipant{
+			KeyShare: dkgData.PubKeyShares[i],
+			Index:    uint(i),
+		}
 	}
 
-	return state, db, err
-}
+	qcData.Lookup = participantLookup
+	qcData.GroupKey = dkgData.PubGroupKey
 
-func tempDBDir() (string, error) {
-	return ioutil.TempDir("", "flow-bootstrap-db")
+	return qcData, nil
 }

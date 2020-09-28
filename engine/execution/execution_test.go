@@ -12,14 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/engine"
-	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	execTestutil "github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionFlow(t *testing.T) {
@@ -217,12 +217,12 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal1b)
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2) // block 2 cannot be executed if parent (block1 is missing)
 
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 2
 	})
 
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal1)
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 6
 	}) // now block 3 and 2 can be executed
 
@@ -360,7 +360,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe1Node.IngestionEngine.Submit(conID.NodeID, proposal1)
 
 	// ensure block 1 has been executed
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return receiptsReceived == 1
 	})
 	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
@@ -384,7 +384,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	assert.NoError(t, err)
 
 	// ensure block 1, 2 and 3 have been executed
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return receiptsReceived == 3
 	})
 
@@ -541,7 +541,7 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 	exeNode.IngestionEngine.Submit(conID.NodeID, proposal2)
 
 	// ensure block 1 has been executed
-	hub.EventuallyUntil(t, func() bool {
+	hub.DeliverAllEventuallyUntil(t, func() bool {
 		return receiptsReceived == 2
 	}, 30*time.Second, 500*time.Millisecond)
 
@@ -603,9 +603,43 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	exeNode.IngestionEngine.SubmitLocal(proposal)
 
-	hub.Eventually(t, func() bool {
+	hub.DeliverAllEventually(t, func() bool {
 		return actualCalls == 2
 	})
 
 	verificationEngine.AssertExpectations(t)
+}
+
+func TestReceiveTheSameDeltaMultipleTimes(t *testing.T) {
+	hub := stub.NewNetworkHub()
+
+	chainID := flow.Mainnet
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	ver1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	ver2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+
+	identities := unittest.CompleteIdentitySet(colID, exeID, ver1ID, ver2ID)
+
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
+	defer exeNode.Done()
+
+	genesis, err := exeNode.State.AtHeight(0).Head()
+	require.NoError(t, err)
+
+	delta := unittest.StateDeltaWithParentFixture(genesis)
+	delta.ExecutableBlock.StartState = unittest.GenesisStateCommitment
+	delta.EndState = unittest.GenesisStateCommitment
+
+	fmt.Printf("block id: %v, delta for block (%v)'s parent id: %v\n", genesis.ID(), delta.Block.ID(), delta.ParentID())
+	exeNode.IngestionEngine.SubmitLocal(delta)
+	time.Sleep(time.Second)
+
+	exeNode.IngestionEngine.SubmitLocal(delta)
+	// handling the same delta again to verify the DB calls in saveExecutionResults
+	// are idempotent, if they weren't, it will hit log.Fatal and crash before
+	// sleep is done
+	time.Sleep(time.Second)
+
 }

@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	computermock "github.com/dapperlabs/flow-go/engine/execution/computation/computer/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
@@ -38,7 +38,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -65,7 +65,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Once() // just system chunk
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -107,7 +107,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(totalTransactionCount)
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 

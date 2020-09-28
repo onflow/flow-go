@@ -3,7 +3,7 @@ package state
 import (
 	"encoding/binary"
 
-	"github.com/dapperlabs/flow-go/utils/slices"
+	"github.com/onflow/flow-go/utils/slices"
 )
 
 const keyUUID = "uuid"
@@ -19,7 +19,7 @@ func NewUUIDs(ledger Ledger) *UUIDs {
 }
 
 func (u *UUIDs) GetUUID() (uint64, error) {
-	stateBytes, err := u.ledger.Get(RegisterID("", "", keyUUID))
+	stateBytes, err := u.ledger.Get("", "", keyUUID)
 	if err != nil {
 		return 0, err
 	}
@@ -31,5 +31,5 @@ func (u *UUIDs) GetUUID() (uint64, error) {
 func (u *UUIDs) SetUUID(uuid uint64) {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	u.ledger.Set(RegisterID("", "", keyUUID), bytes)
+	u.ledger.Set("", "", keyUUID, bytes)
 }

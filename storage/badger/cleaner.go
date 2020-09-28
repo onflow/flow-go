@@ -9,7 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/module"
 )
 
 type Cleaner struct {
