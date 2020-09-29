@@ -16,9 +16,9 @@ type Approvals interface {
 	// Rem will attempt to remove all the approvals associated with a chunk.
 	Rem(resultID flow.Identifier, chunkIndex uint64) bool
 
-	// ByChunk returns will return all the approvals associated with a chunk.
-	// It will return false if it was not found in the mempool.
-	ByChunk(resultID flow.Identifier, chunkIndex uint64) (map[flow.Identifier]*flow.ResultApproval, bool)
+	// ByChunk returns all the approvals associated with a chunk. It returns an
+	// empty map if there is nothing.
+	ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flow.Identifier]*flow.ResultApproval
 
 	// All will return a list of all approvals in the memory pool.
 	All() []*flow.ResultApproval

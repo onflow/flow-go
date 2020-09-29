@@ -51,7 +51,7 @@ func (_m *Approvals) All() []*flow.ResultApproval {
 }
 
 // ByChunk provides a mock function with given fields: resultID, chunkIndex
-func (_m *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (map[flow.Identifier]*flow.ResultApproval, bool) {
+func (_m *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flow.Identifier]*flow.ResultApproval {
 	ret := _m.Called(resultID, chunkIndex)
 
 	var r0 map[flow.Identifier]*flow.ResultApproval
@@ -63,14 +63,7 @@ func (_m *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (map[f
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64) bool); ok {
-		r1 = rf(resultID, chunkIndex)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // Rem provides a mock function with given fields: resultID, chunkIndex
