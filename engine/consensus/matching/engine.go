@@ -549,7 +549,10 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 		// check that each chunk collects enough approvals
 		for _, chunk := range result.Chunks {
-			matched := e.matchChunk(result.ID(), chunk, assignment)
+			matched, err := e.matchChunk(result, chunk, assignment)
+			if err != nil {
+				// TODO: what to do here?
+			}
 			if !matched {
 				allChunksMatched = false
 				break
@@ -568,27 +571,71 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
-func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
+func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
 
-	// get all the chunk approvals from mempool
-	approvals, ok := e.approvals.ByChunk(resultID, chunk.Index)
-	if !ok {
-		return false
+	// get all verifier identities
+	snapshot := e.state.AtBlockID(result.BlockID)
+	verifierIdentities, err := snapshot.Identities(filter.HasRole(flow.RoleVerification))
+	if err != nil {
+		return false, fmt.Errorf("could not get verifier identities: %w", err)
+	}
+	execIdentities, err := snapshot.Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return false, fmt.Errorf("could not get execution identities: %w", err)
 	}
 
-	// only keep approvals from assigned verifiers
+	// get all the chunk approvals from mempool
+	approvals, ok := e.approvals.ByChunk(result.ID(), chunk.Index)
+	if !ok {
+		return false, fmt.Errorf("could get verifier identities: %w", err)
+	}
+
+	// only keep approvals from assigned verifiers and if spocks match
 	var validApprovers flow.IdentifierList
-	for approverID := range approvals {
+	for approverID, approval := range approvals {
+		// check if chunk is assigned
 		ok := chmodule.IsValidVerifer(assignment, chunk, approverID)
-		if ok {
-			validApprovers = append(validApprovers, approverID)
+		if !ok {
+			continue
 		}
+
+		// find receipt matching approval result id
+		var receipt *flow.ExecutionReceipt
+		for _, receipt := range e.receipts.All() {
+			if receipt.ExecutionResult.ID() == approval.Body.ExecutionResultID {
+				receipt = receipt
+			}
+		}
+
+		// find identities
+		approver, ok := verifierIdentities.ByNodeID(approverID)
+		if !ok {
+			return false, fmt.Errorf("could not find approver id in snapshot identities")
+		}
+		executor, ok := execIdentities.ByNodeID(receipt.ExecutorID)
+
+		// get spocks
+		approverSpock := approval.Body.Spock
+		executorSpock := receipt.Spocks[chunk.Index]
+
+		// verify spock
+		verified, err := crypto.SPOCKVerify(approver.NetworkPubKey, approverSpock, executor.NetworkPubKey, executorSpock)
+		if err != nil {
+			return false, fmt.Errorf("could not verify spocks: %w", err)
+		}
+		if !verified {
+			// TODO: add log statement
+			return false, nil
+		}
+
+		// add approver to valid approvers list
+		validApprovers = append(validApprovers, approverID)
 	}
 
 	// TODO:
 	//  * This is the happy path (requires just one approval per chunk). Should
 	//    be +2/3 of all currently staked verifiers.
-	return len(validApprovers) > 0
+	return len(validApprovers) > 0, nil
 }
 
 // sealResult records a matched result in the result database, creates a seal
