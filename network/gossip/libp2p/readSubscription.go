@@ -85,7 +85,7 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 		}
 
 		// log metrics
-		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID)
+		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
 
 		// call the callback
 		r.callback(&msg)
