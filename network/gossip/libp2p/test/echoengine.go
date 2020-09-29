@@ -8,11 +8,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/libp2p/message"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/gossip/libp2p/errors"
 )
 
 // EchoEngine is a simple engine that is used for testing the correctness of

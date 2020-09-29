@@ -8,15 +8,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	chmodel "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/engine/verification/utils"
+	chmodel "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestHappyPath considers the happy path of Finder-Match-Verify engines.
@@ -86,9 +86,9 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// assigner and assignment
 	assigner := &mock.ChunkAssigner{}
 	assignment := chmodel.NewAssignment()
-	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+	for _, chunk := range result.Chunks {
 		assignees := make([]flow.Identifier, 0)
-		if IsAssigned(chunk.Index, len(completeER.Receipt.ExecutionResult.Chunks)) {
+		if IsAssigned(chunk.Index, len(result.Chunks)) {
 			assignees = append(assignees, verIdentity.NodeID)
 		}
 		assignment.Add(chunk, assignees)

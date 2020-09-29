@@ -1,7 +1,7 @@
 package events
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Noop is a no-op implementation of protocol.Events.
@@ -12,6 +12,9 @@ func NewNoop() *Noop {
 }
 
 func (n Noop) BlockFinalized(block *flow.Header) {
+}
+
+func (n Noop) BlockProcessable(block *flow.Header) {
 }
 
 func (n Noop) EpochTransition(newEpoch uint64, first *flow.Header) {

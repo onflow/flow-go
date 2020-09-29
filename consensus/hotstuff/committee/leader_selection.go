@@ -3,8 +3,8 @@ package committee
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/random"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // LeaderSelection caches the pre-generated leader selections for a certain number of

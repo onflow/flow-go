@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/common"
 )
 
 // Node of a RamSafe MTrie.

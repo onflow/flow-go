@@ -1,7 +1,7 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // FollowerLogic runs a state machine to process proposals

@@ -19,9 +19,9 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
-	utilsio "github.com/dapperlabs/flow-go/utils/io"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 var (

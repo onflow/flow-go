@@ -3,7 +3,7 @@ package run
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 func GenerateNetworkingKey(seed []byte) (crypto.PrivateKey, error) {

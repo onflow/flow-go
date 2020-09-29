@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/cadence"
 	encoding "github.com/onflow/cadence/encoding/json"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type Events struct {
