@@ -872,7 +872,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 	return ops, nil
 }
 
-// MakeValid marks the block as valid in protocol state, and triggers
+// MarkValid marks the block as valid in protocol state, and triggers
 // `BlockProcessable` event to notify that its parent block is processable.
 // why the parent block is processable, not the block itself?
 // because a block having a child block means it has been verified
