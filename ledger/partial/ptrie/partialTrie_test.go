@@ -59,7 +59,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		rootHash, err = f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(paths, payloads)
+		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -73,7 +73,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		rootHash, err = f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(paths, payloads)
+		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -118,7 +118,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(paths, payloads)
+		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -162,7 +162,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(paths, payloads)
+		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -174,7 +174,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(paths, payloads)
+		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -215,7 +215,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
-		pRootHash, _, err := psmt.Update(paths, payloads)
+		pRootHash, err := psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 		if !bytes.Equal(rootHash, pRootHash) {
 			t.Fatal("rootNode hash doesn't match [after update]")
@@ -226,7 +226,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
-		pRootHash, _, err = psmt.Update(paths, payloads)
+		pRootHash, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 		if !bytes.Equal(rootHash, pRootHash) {
 			t.Fatal("rootNode hash doesn't match [after second update]")
@@ -273,7 +273,7 @@ func TestMixProof(t *testing.T) {
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
-		pRootHash, _, err := psmt.Update(paths, payloads)
+		pRootHash, err := psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating partial trie")
 
 		if !bytes.Equal(rootHash, pRootHash) {
@@ -333,7 +333,7 @@ func TestRandomProofs(t *testing.T) {
 			rootHash2, err := f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: updatePaths, Payloads: updatePayloads})
 			require.NoError(t, err, "error updating trie")
 
-			pRootHash2, _, err := psmt.Update(updatePaths, updatePayloads)
+			pRootHash2, err := psmt.Update(updatePaths, updatePayloads)
 			require.NoError(t, err, "error updating partial trie")
 
 			if !bytes.Equal(rootHash2, pRootHash2) {
