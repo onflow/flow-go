@@ -24,6 +24,11 @@ func (er ExecutionResult) Checksum() Identifier {
 }
 
 // FinalStateCommit gets the final state of the result
+// if the number of chunks are 0 returns empty statecommit
 func (er ExecutionResult) FinalStateCommit() StateCommitment {
+	if er.Chunks.Len() == 0 {
+		return StateCommitment{}
+	}
+
 	return er.Chunks[er.Chunks.Len()-1].EndState
 }

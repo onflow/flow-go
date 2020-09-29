@@ -11,6 +11,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -124,6 +125,10 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func StateInteractionsFixture() *delta.Snapshot {
+	return delta.NewView(nil).Interactions()
+}
+
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
 	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)
@@ -132,10 +137,15 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 		Header:  &header,
 		Payload: payload,
 	}
+
+	var stateInteractions []*delta.Snapshot
+	stateInteractions = append(stateInteractions, StateInteractionsFixture())
+
 	return &messages.ExecutionStateDelta{
 		ExecutableBlock: entity.ExecutableBlock{
 			Block: &block,
 		},
+		StateInteractions: stateInteractions,
 	}
 }
 

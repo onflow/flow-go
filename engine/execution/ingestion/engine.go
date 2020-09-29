@@ -678,6 +678,10 @@ func (e *Engine) handleComputationResult(
 		return nil, fmt.Errorf("could not send broadcast order: %w", err)
 	}
 
+	if receipt.ExecutionResult.Chunks.Len() == 0 {
+		return startState, nil
+	}
+
 	return receipt.ExecutionResult.FinalStateCommit(), nil
 }
 
