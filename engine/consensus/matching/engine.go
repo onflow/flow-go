@@ -84,11 +84,7 @@ func New(
 		state:                   state,
 		me:                      me,
 		requester:               requester,
-<<<<<<< HEAD
-		resultsDB:               sealedResultsDB,
-=======
 		resultsDB:               resultsDB,
->>>>>>> martin/4749-use-appropriate-state-for-identities
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
 		results:                 results,
@@ -600,41 +596,8 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 // further processing.
 func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
-<<<<<<< HEAD
 	// store the result to make it persistent for later checks
 	err := e.resultsDB.Store(result)
-=======
-	// we create one chunk per collection (at least for now), so we can check if
-	// the chunk number matches with the number of guarantees; this will ensure
-	// the execution receipt can not lie about having less chunks and having the
-	// remaining ones approved
-	index, err := e.indexDB.ByBlockID(result.BlockID)
-	if errors.Is(err, storage.ErrNotFound) {
-		// if we have not received the block yet, we will just keep
-		// rechecking until the block has been received or the result has
-		// been purged
-		return errUnknownBlock
-	}
-	if err != nil {
-		return fmt.Errorf("could not retrieve payload index: %w", err)
-	}
-
-	// ER contains c + 1 chunks where c is number of collections in a block
-	// the extra chunk is the SystemChunk
-	if len(result.Chunks) != len(index.CollectionIDs) {
-		return errInvalidChunks
-	}
-
-	// ensure that previous result is known and sealed.
-	previousID := result.PreviousResultID
-	_, err = e.resultsDB.ByID(previousID)
-	if err != nil {
-		return errUnsealedPrevious
-	}
-
-	// store the result to make it persistent for later checks
-	err = e.resultsDB.Store(result)
->>>>>>> martin/4749-use-appropriate-state-for-identities
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
 	}
