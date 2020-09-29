@@ -71,8 +71,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO deal with failedPaths
-	payloads, _, err := l.ptrie.Get(paths)
+	payloads, err := l.ptrie.Get(paths)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +96,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return nil, err
 	}
 
-	// TODO handle failed paths
-	newRootHash, _, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
+	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
 	if err != nil {
 		return nil, err
 	}
