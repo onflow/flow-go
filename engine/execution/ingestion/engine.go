@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -60,9 +61,9 @@ type Engine struct {
 	extensiveLogging   bool
 	spockHasher        hash.Hasher
 	root               *flow.Header
-	// checkingSyncing    mutex.Lock
+	// TODO: move all state syncing related logic to a separate module
+	syncingHeight atomic.Uint64
 	syncThreshold int
-	syncHeight    uint64
 	syncFilter    flow.IdentityFilter
 	syncConduit   network.Conduit
 	syncDeltas    mempool.Deltas
@@ -112,6 +113,7 @@ func New(
 		extensiveLogging:   extLog,
 		root:               root,
 		syncFilter:         syncFilter,
+		syncLock:           sync.Mutex{},
 	}
 
 	// move to state syncing engine
@@ -244,26 +246,24 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			blockByCollection *stdmap.BlockByCollectionBackdata,
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
-			// check if this block is a new block by checking if the execution queue has this block already
+			// adding the block to the queue,
 			queue, added := enqueue(executableBlock, executionQueues)
 
-			// if it's not a new block, then bail
+			// if it's not added, it means the block is not a new block, it already
+			// exists in the queue, then bail
 			if !added {
 				e.log.Debug().
 					Hex("block_id", logging.Entity(executableBlock)).
-					Msg("added block to existing execution queue")
+					Msg("block already exists in the execution queue")
 				return nil
 			}
 
 			// whenever the queue grows, we need to check whether the state sync should be
 			// triggered.
-			// TODO: run in a different goroutine
-			// use unit.Launch
-			go e.checkStateSyncStart(queue)
-
-			// check if this block has been executed already
-
-			// check if we need to trigger state sync
+			firstUnexecutedHeight := queue.Head.Item.Height()
+			e.unit.Launch(func() {
+				e.checkStateSyncStart(firstUnexecutedHeight)
+			})
 
 			// check if a block is executable.
 			// a block is executable if the following conditions are all true
@@ -290,7 +290,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 				return fmt.Errorf("cannot send collection requests: %w", err)
 			}
 
-			// If the block was empty
+			// execute the block if the block is ready to be executed
 			e.executeBlockIfComplete(executableBlock)
 
 			return nil
@@ -371,7 +371,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 func (e *Engine) onBlockExecuted(executedBlock *entity.ExecutableBlock, finalState flow.StateCommitment) error {
 
-	e.checkStateSyncStop(executedBlock)
+	e.checkStateSyncStop(executedBlock.Block.Header.Height)
 
 	err := e.mempool.Run(
 		func(
@@ -436,7 +436,9 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	// note the block ID is the delta's ID
 	delta, found := e.syncDeltas.ByID(eb.Block.ID())
 	if found {
-		go e.applyStateDelta(delta)
+		e.unit.Launch(func() {
+			e.applyStateDelta(delta)
+		})
 		return true
 	}
 
@@ -452,7 +454,9 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 		}
 
 		e.wg.Add(1)
-		go e.executeBlock(context.Background(), eb)
+		e.unit.Launch(func() {
+			e.executeBlock(context.Background(), eb)
+		})
 		return true
 	}
 	return false
@@ -532,7 +536,8 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 	return q, queues.Add(q)
 }
 
-// enqueue adds a block to the queues
+// enqueue adds a block to the queues, return the queue that includes the block and a bool
+// indicating whether the block was a new block.
 // queues are chained blocks. Since a block can't be executable until its parent has been
 // executed, the chained structure allows us to only check the head of each queue to see if
 // any block becomes executable.
@@ -952,29 +957,28 @@ func (e *Engine) generateExecutionReceipt(
 }
 
 // check whether we need to trigger state sync
-// queue - the queue contains all the unexecuted blocks along the same fork.
+// firstUnexecutedHeight - the height that is unexecuted
 // we will check the state sync if the number of sealed and unexecuted blocks
 // has passed a certain threshold.
 // we will sync state only for sealed blocks, since that guarantees
 // the consensus nodes have seen the result, and the statecommitment
 // has been approved by the consensus nodes.
-func (e *Engine) checkStateSyncStart(queue *queue.Queue) {
-	if e.syncingState.Load() {
-		// state sync is already triggered, it won't trigger again.
+func (e *Engine) checkStateSyncStart(firstUnexecutedHeight uint64) {
+	if e.syncingHeight.Load() > 0 {
+		// state sync is already triggered, no need to check
 		return
 	}
 
 	// getting the blocks for determining whether to trigger.
 	// the queue head has the lowest height, which is also the first unexecuted block
-	firstUnexecuted := queue.Head.Item
 	lastSealed, err := e.state.Sealed().Head()
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("failed to query last sealed")
 	}
 
-	startHeight, endHeight := firstUnexecuted.Height(), lastSealed.Height
+	startHeight, endHeight := firstUnexecutedHeight, lastSealed.Height
 
-	// check whether we should trigger
+	// check whether we should trigger state sync
 	if !shouldTriggerStateSync(startHeight, endHeight, e.syncThreshold) {
 		return
 	}
@@ -990,13 +994,14 @@ func (e *Engine) checkStateSyncStart(queue *queue.Queue) {
 
 // if the state sync is on, check whether it can be turned off by checking
 // whether the executed block has passed the target height.
-func (e *Engine) checkStateSyncStop(executedBlock *entity.ExecutableBlock) {
-	if !e.syncingState.Load() {
+func (e *Engine) checkStateSyncStop(executedHeight uint64) {
+	syncHeight := e.syncingHeight.Load()
+	if syncHeight == 0 {
 		// state sync was not started
 		return
 	}
 
-	reachedSyncTarget := executedBlock.Block.Header.Height >= e.syncHeight
+	reachedSyncTarget := executedHeight >= syncHeight
 
 	if !reachedSyncTarget {
 		// have not reached sync target
@@ -1004,10 +1009,15 @@ func (e *Engine) checkStateSyncStop(executedBlock *entity.ExecutableBlock) {
 	}
 
 	// reached the sync target, we should turn off the syncing
-	turnedOff := e.syncingState.CAS(true, false)
+	turnedOff := e.syncingHeight.CAS(syncHeight, 0)
 	if turnedOff {
 		e.metrics.ExecutionSync(false)
 	}
+
+	// if there is race condition that the syncState was
+	// changed to a different value, this will be a noop,
+	// and we will wait for the next time to call checkStateSyncStop
+	// and check again.
 }
 
 // check whether state sync should be triggered by taking
@@ -1018,14 +1028,12 @@ func shouldTriggerStateSync(startHeight, endHeight uint64, threshold int) bool {
 }
 
 func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
-	if !e.syncingState.CAS(false, true) {
+	if !e.syncingHeight.CAS(0, toHeight) {
 		// some other process has already entered the startStateSync
 		return nil
 	}
 
 	e.metrics.ExecutionSync(true)
-
-	e.syncHeight = toHeight
 
 	otherNodes, err := e.state.Final().Identities(
 		filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter(), e.syncFilter))
@@ -1036,7 +1044,7 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 
 	if len(otherNodes) == 0 {
 		e.log.Error().Msg("no available execution node to sync state from")
-		e.syncingState.CAS(true, false)
+		e.syncingHeight.Store(0)
 		return nil
 	}
 
@@ -1054,6 +1062,8 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 		Msg("requesting execution state sync")
 
 	// TODO: running periodically
+	// if the random execution node doesn't have the state, we
+	// will choose another execution node to sync state from.
 	err = e.syncConduit.Submit(&exeStateReq, randomExecutionNode.NodeID)
 
 	if err != nil {
@@ -1131,6 +1141,9 @@ func (e *Engine) handleStateSyncRequest(
 	return nil
 }
 
+// deltaRange querys it's local execution state to find deltas for a height
+// range between the fromHeight to the toHeight. If delta is found, then
+// pass it to the onDelta callback.
 func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uint64,
 	onDelta func(*messages.ExecutionStateDelta)) error {
 
@@ -1153,8 +1166,10 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 			onDelta(delta)
 
 		} else if !errors.Is(err, storage.ErrNotFound) {
-			// this block has not been executed, continue
-			continue
+			// this block has not been executed,
+			// it parent block hasn't been executed, the higher block won't be
+			// executed either, so we stop iterating through the heights
+			break
 		} else {
 			return fmt.Errorf("could not query statecommitment for height: %v", height)
 		}
