@@ -192,7 +192,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		e.log.Error().
 			Err(err).
 			Hex("sender", originID[:]).
-			Msgf("could not process (%T) message")
+			Msgf("could not process (%T) message", event)
 	}
 	return nil
 }
