@@ -549,11 +549,10 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 		// check that each chunk collects enough approvals
 		for _, chunk := range result.Chunks {
-			matched, _ := e.matchChunk(result, chunk, assignment)
-			// if err != nil {
-
-			// 	// TODO: what to do here?
-			// }
+			matched, err := e.matchChunk(result, chunk, assignment)
+			if err != nil {
+				return nil, fmt.Errorf("could not match chunk: %w", err)
+			}
 			if !matched {
 				allChunksMatched = false
 				break
@@ -582,7 +581,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 	}
 	execIdentities, err := snapshot.Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
-		return false, fmt.Errorf("could not get execution identities: %w", err)
+		return false, fmt.Errorf("could not get executor identities: %w", err)
 	}
 
 	// get all the chunk approvals from mempool
@@ -601,7 +600,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 		}
 
 		// check if spocks match
-		valid, err := e.validSpocks(verifierIdentities, execIdentities, approval, chunk.Index)
+		valid, err := e.validateSpocks(verifierIdentities, execIdentities, approval, chunk.Index)
 		if err != nil {
 			return false, fmt.Errorf("could get validate spocks: %w", err)
 		}
@@ -619,7 +618,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 	return len(validApprovers) > 0, nil
 }
 
-func (e *Engine) validSpocks(verifiers flow.IdentityList, executors flow.IdentityList, approval *flow.ResultApproval, chunkIndex uint64) (bool, error) {
+func (e *Engine) validateSpocks(verifiers flow.IdentityList, executors flow.IdentityList, approval *flow.ResultApproval, chunkIndex uint64) (bool, error) {
 	// find receipt matching approval result id
 	var receipt *flow.ExecutionReceipt
 	for _, r := range e.receipts.All() {
@@ -648,7 +647,6 @@ func (e *Engine) validSpocks(verifiers flow.IdentityList, executors flow.Identit
 		return false, fmt.Errorf("could not verify spocks: %w", err)
 	}
 	if !verified {
-		// TODO: add log statement
 		return false, nil
 	}
 
