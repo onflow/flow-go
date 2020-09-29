@@ -52,7 +52,7 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 		payloads = append(payloads, node.payload)
 	}
 	if len(failedKeys) > 0 {
-		return nil, &ledger.ErrMissingKeys{failedKeys}
+		return nil, &ledger.ErrMissingKeys{Keys: failedKeys}
 	}
 	// after updating all the nodes, compute the value recursively only once
 	return payloads, nil
@@ -73,7 +73,7 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, 
 		node.hashValue = common.ComputeCompactValue(path, payload, node.height)
 	}
 	if len(failedKeys) > 0 {
-		return nil, &ledger.ErrMissingKeys{failedKeys}
+		return nil, &ledger.ErrMissingKeys{Keys: failedKeys}
 	}
 	// after updating all the nodes, compute the value recursively only once
 	return p.root.HashValue(), nil
