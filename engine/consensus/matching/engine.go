@@ -46,7 +46,7 @@ type Engine struct {
 	state                   protocol.State           // used to access the  protocol state
 	me                      module.Local             // used to access local node information
 	requester               module.Requester         // used to request missing execution receipts by block ID
-	sealedResultsDB         storage.ExecutionResults // used to permanently store sealed results
+	resultsDB               storage.ExecutionResults // used to check previous results are known
 	headersDB               storage.Headers          // used to check sealed headers
 	indexDB                 storage.Index            // used to check payloads for results
 	results                 mempool.Results          // holds execution results in memory
@@ -70,7 +70,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	requester module.Requester,
-	sealedResultsDB storage.ExecutionResults,
+	resultsDB storage.ExecutionResults,
 	headersDB storage.Headers,
 	indexDB storage.Index,
 	results mempool.Results,
@@ -90,7 +90,7 @@ func New(
 		state:                   state,
 		me:                      me,
 		requester:               requester,
-		sealedResultsDB:         sealedResultsDB,
+		resultsDB:               resultsDB,
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
 		results:                 results,
@@ -222,9 +222,17 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
 	}
 
+	// if the receipt is for an unknown block, cache it. It will be picked up
+	// later when the finalizer processes new blocks.
+	_, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
+	if err != nil {
+		_ = e.receipts.Add(receipt)
+		return nil
+	}
+
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a execution receipt (usually execution nodes)
-	identity, err := e.state.Final().Identity(originID)
+	identity, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
 			return engine.NewInvalidInputErrorf("could not get executor identity: %w", err)
@@ -246,7 +254,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// check if the result of this receipt is already sealed.
 	result := &receipt.ExecutionResult
-	_, err = e.sealedResultsDB.ByID(result.ID())
+	_, err = e.resultsDB.ByID(result.ID())
 	if err == nil {
 		log.Debug().Msg("discarding receipt for sealed result")
 		return nil
@@ -298,16 +306,24 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
 	}
 
+	// if the approval is for an unknown block, cache it. It will be picked up
+	// later when the finalizer processes new blocks.
+	_, err := e.state.AtBlockID(approval.Body.BlockID).Head()
+	if err != nil {
+		_, _ = e.approvals.Add(approval)
+		return nil
+	}
+
 	// get the identity of the origin node, so we can check if it's a valid
-	// source for a result approval (usually verification node)
-	identity, err := e.state.Final().Identity(originID)
+	// source for an approval (usually verification nodes)
+	identity, err := e.state.AtBlockID(approval.Body.BlockID).Identity(originID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
-			return engine.NewInvalidInputErrorf("could not get approval identity: %w", err)
+			return engine.NewInvalidInputErrorf("could not get approver identity: %w", err)
 		}
 
 		// unknown exception
-		return fmt.Errorf("could not get executor identity: %w", err)
+		return fmt.Errorf("could not get approver identity: %w", err)
 	}
 
 	// check that the origin is a verification node
@@ -321,7 +337,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	}
 
 	// check if the result of this approval is already sealed
-	_, err = e.sealedResultsDB.ByID(approval.Body.ExecutionResultID)
+	_, err = e.resultsDB.ByID(approval.Body.ExecutionResultID)
 	if err == nil {
 		log.Debug().Msg("discarding approval for sealed result")
 		return nil
@@ -574,17 +590,17 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
 	// ensure that previous result is known and sealed.
 	previousID := result.PreviousResultID
-	_, err = e.sealedResultsDB.ByID(previousID)
+	_, err = e.resultsDB.ByID(previousID)
 	if err != nil {
 		return errUnsealedPrevious
 	}
 
 	// store the result to make it persistent for later checks
-	err = e.sealedResultsDB.Store(result)
+	err = e.resultsDB.Store(result)
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
 	}
-	err = e.sealedResultsDB.Index(result.BlockID, result.ID())
+	err = e.resultsDB.Index(result.BlockID, result.ID())
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not index sealing result: %w", err)
 	}
@@ -760,7 +776,7 @@ func (e *Engine) requestPending() error {
 		blockID := header.ID()
 
 		// check if we have an execution result for the block at this height
-		_, err = e.sealedResultsDB.ByBlockID(blockID)
+		_, err = e.resultsDB.ByBlockID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
 			continue

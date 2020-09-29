@@ -132,6 +132,12 @@ func (ms *MatchingSuite) SetupTest() {
 		},
 		nil,
 	)
+	ms.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) realproto.Snapshot {
+			return ms.finalSnapshot
+		},
+		nil,
+	)
 
 	ms.finalSnapshot = &protocol.Snapshot{}
 	ms.finalSnapshot.On("Identity", mock.Anything).Return(
@@ -154,6 +160,12 @@ func (ms *MatchingSuite) SetupTest() {
 		func(selector flow.IdentityFilter) error {
 			return nil
 		},
+	)
+	ms.finalSnapshot.On("Head").Return(
+		func() *flow.Header {
+			return &flow.Header{} // we don't care
+		},
+		nil,
 	)
 
 	ms.sealedSnapshot = &protocol.Snapshot{}
@@ -296,7 +308,7 @@ func (ms *MatchingSuite) SetupTest() {
 		mempool:                 metrics,
 		state:                   ms.state,
 		requester:               ms.requester,
-		sealedResultsDB:         ms.sealedResultsDB,
+		resultsDB:               ms.sealedResultsDB,
 		headersDB:               ms.headersDB,
 		indexDB:                 ms.indexDB,
 		results:                 ms.resultsPL,
@@ -321,6 +333,41 @@ func (ms *MatchingSuite) TestOnReceiptInvalidOrigin() {
 
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
+func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
+	// try ot submit a receipt from a consensus node
+	originID := ms.conID
+	receipt := unittest.ExecutionReceiptFixture()
+	receipt.ExecutorID = originID
+
+	// force state to not find the receipt's corresponding block
+	ms.state = &protocol.State{}
+	ms.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) realproto.Snapshot {
+			snapshot := &protocol.Snapshot{}
+			snapshot.On("Head").Return(nil, fmt.Errorf("forced error"))
+			return snapshot
+		},
+		nil,
+	)
+	ms.matching.state = ms.state
+
+	// make sure the receipt is added to the cache for future processing
+	ms.receiptsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ExecutionReceipt)
+			ms.Assert().Equal(receipt, added)
+		},
+	).Return(false)
+
+	// onReceipt should not throw an error
+	err := ms.matching.onReceipt(originID, receipt)
+	ms.Require().NoError(err, "should ignore receipt for unknown block")
+
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -462,6 +509,42 @@ func (ms *MatchingSuite) TestOnApprovalInvalidOrigin() {
 	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
 
 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
+func (ms *MatchingSuite) TestOnApprovalUnknownBlock() {
+	// try to submit an approval for an unknown block
+	originID := ms.verID
+	approval := unittest.ResultApprovalFixture()
+	approval.Body.ApproverID = originID
+
+	// force state to not find the receipt's corresponding block
+	ms.state = &protocol.State{}
+	ms.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) realproto.Snapshot {
+			snapshot := &protocol.Snapshot{}
+			snapshot.On("Head").Return(nil, fmt.Errorf("forced error"))
+			return snapshot
+		},
+		nil,
+	)
+	ms.matching.state = ms.state
+
+	// make sure the approval is added to the cache for future processing
+	// check calls have the correct parameters
+	ms.approvalsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ResultApproval)
+			ms.Assert().Equal(approval, added)
+		},
+	).Return(false, nil)
+
+	// onApproval should not throw an error
+	err := ms.matching.onApproval(originID, approval)
+	ms.Require().NoError(err, "should ignore receipt for unknown block")
+
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -837,19 +920,37 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 		orderedBlocks = append(orderedBlocks, block)
 	}
 
-	ms.finalSnapshot.On("Head").Return(
-		func() *flow.Header {
-			return orderedBlocks[n-1].Header
+	ms.state = &protocol.State{}
+
+	ms.state.On("Final").Return(
+		func() realproto.Snapshot {
+			snapshot := &protocol.Snapshot{}
+			snapshot.On("Head").Return(
+				func() *flow.Header {
+					return orderedBlocks[n-1].Header
+				},
+				nil,
+			)
+			return snapshot
 		},
 		nil,
 	)
 
-	ms.sealedSnapshot.On("Head").Return(
-		func() *flow.Header {
-			return orderedBlocks[0].Header
+	ms.state.On("Sealed").Return(
+		func() realproto.Snapshot {
+			snapshot := &protocol.Snapshot{}
+			snapshot.On("Head").Return(
+				func() *flow.Header {
+					return orderedBlocks[0].Header
+				},
+				nil,
+			)
+			return snapshot
 		},
 		nil,
 	)
+
+	ms.matching.state = ms.state
 
 	// the results are not in the DB, which will trigger request
 	ms.sealedResultsDB.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
