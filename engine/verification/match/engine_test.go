@@ -831,15 +831,3 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 		ChunkID: chunkID,
 	}
 }
-
-func hashResult(res *flow.ExecutionResult) []byte {
-	h := hash.NewSHA3_384()
-
-	// encodes result approval body to byte slice
-	b, _ := encoding.DefaultEncoder.Encode(res.ExecutionResultBody)
-
-	// takes hash of result approval body
-	hash := h.ComputeHash(b)
-
-	return hash
-}
