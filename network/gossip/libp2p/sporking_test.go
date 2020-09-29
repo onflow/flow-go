@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // SporkingTestSuite tests that the network layer behaves as expected after a spork.

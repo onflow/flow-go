@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 )
 
 // TODO replace this type with `network/stub/hub.go`

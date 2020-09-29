@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // This tests generates a checkpoint file to be used by the execution node when booting.

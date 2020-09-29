@@ -3,7 +3,7 @@
 package mock
 
 import (
-	metrics "github.com/dapperlabs/flow-go/module/metrics"
+	metrics "github.com/onflow/flow-go/module/metrics"
 	mock "github.com/stretchr/testify/mock"
 )
 

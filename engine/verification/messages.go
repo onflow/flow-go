@@ -1,7 +1,7 @@
 package verification
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // VerifiableChunkData represents a ready-to-verify chunk

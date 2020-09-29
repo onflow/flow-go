@@ -7,9 +7,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusWAL "github.com/prometheus/tsdb/wal"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 )
 
 const SegmentSize = 32 * 1024 * 1024

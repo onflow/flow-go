@@ -5,8 +5,8 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 )
 
 func SkipDuplicates(op func(*badger.Txn) error) func(tx *badger.Txn) error {

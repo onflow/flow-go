@@ -3,10 +3,10 @@ package main
 import (
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/ghost/engine"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/engine/ghost/engine"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/gossip/libp2p/validators"
 )
 
 func main() {

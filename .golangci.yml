@@ -7,7 +7,7 @@ linters-settings:
   goimports:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
-    local-prefixes: github.com/dapperlabs/flow-go
+    local-prefixes: github.com/onflow/flow-go
 
 linters:
   enable:

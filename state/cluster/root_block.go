@@ -3,8 +3,8 @@ package cluster
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // CanonicalClusterID returns the canonical chain ID for the given cluster in

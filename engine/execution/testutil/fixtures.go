@@ -12,13 +12,13 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution/utils"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func CreateContractDeploymentTransaction(contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {

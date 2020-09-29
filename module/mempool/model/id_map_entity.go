@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // IdMapEntity is an internal data structure for mempool

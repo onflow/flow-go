@@ -1,19 +1,28 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Consumer defines a set of events that occur within the protocol state, that
 // can be propagated to other components via an implementation of this interface.
 // Consumer implementations must be non-blocking.
 //
-// NOTE: These methods are only called once the fork containing the relevant
-// event has been finalized.
+// NOTE: the epoch-related callbacks are only called once the fork containing
+// the relevant event has been finalized.
 type Consumer interface {
 
 	// BlockFinalized is called when a block is finalized.
+	// Formally, this callback is informationally idempotent. I.e. the consumer
+	// of this callback must handle repeated calls for the same block.
 	BlockFinalized(block *flow.Header)
+
+	// BlockProcessable is called when a correct block is encountered
+	// that is ready to be processed (i.e. it is connected to the finalized
+	// chain and its source of randomness is available).
+	// Formally, this callback is informationally idempotent. I.e. the consumer
+	// of this callback must handle repeated calls for the same block.
+	BlockProcessable(block *flow.Header)
 
 	// EpochTransition is called when we transition to a new epoch. This is
 	// equivalent to the beginning of the new epoch's staking phase and the end

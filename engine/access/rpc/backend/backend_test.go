@@ -15,14 +15,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	access "github.com/dapperlabs/flow-go/engine/access/mock"
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	"github.com/dapperlabs/flow-go/storage"
-	storagemock "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	access "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -439,7 +439,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	for i := 0; i < len(blockHeaders); i++ {
 		exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
 			BlockId:     convert.IdentifierToMessage(blockHeaders[i].ID()),
-			BlockHeight: uint64(i),
+			BlockHeight: blockHeaders[i].Height,
 			Events:      convert.EventsToMessages(events),
 		}
 	}
@@ -448,7 +448,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	for i := 0; i < len(blockHeaders); i++ {
 		expected[i] = flow.BlockEvents{
 			BlockID:        blockHeaders[i].ID(),
-			BlockHeight:    uint64(i),
+			BlockHeight:    blockHeaders[i].Height,
 			BlockTimestamp: blockHeaders[i].Timestamp,
 			Events:         events,
 		}
@@ -542,7 +542,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		for i, header := range blockHeaders {
 			events := getEvents(1)
-			height := uint64(5) // an arbitrary height
+			height := header.Height
 
 			results[i] = flow.BlockEvents{
 				BlockID:        header.ID(),
@@ -553,7 +553,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 			exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
 				BlockId:     convert.IdentifierToMessage(header.ID()),
-				BlockHeight: height,
+				BlockHeight: header.Height,
 				Events:      convert.EventsToMessages(events),
 			}
 		}

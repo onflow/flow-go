@@ -8,8 +8,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 )
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
@@ -85,7 +85,7 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 		}
 
 		// log metrics
-		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID)
+		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
 
 		// call the callback
 		r.callback(&msg)

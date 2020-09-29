@@ -1,6 +1,7 @@
 package test
 
 import (
+	"math"
 	"os"
 	"sort"
 	"testing"
@@ -10,11 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network/codec/json"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TopologyTestSuite tests the bare minimum requirements of a randomized
@@ -37,9 +39,10 @@ func TestNetworkTestSuit(t *testing.T) {
 func (n *TopologyTestSuite) SetupTest() {
 	n.count = 100
 	n.ids = CreateIDs(n.count)
-	rndSubsetSize := n.count / 2
+	rndSubsetSize := int(math.Ceil(float64(n.count+1) / 2))
 	oneOfEachNodetype := 0 // there is only one node type in this test
-	halfOfRemainingNodes := (n.count - rndSubsetSize - oneOfEachNodetype) / 2
+	remaining := n.count - rndSubsetSize - oneOfEachNodetype
+	halfOfRemainingNodes := int(math.Ceil(float64(remaining+1) / 2))
 	n.expectedSize = rndSubsetSize + oneOfEachNodetype + halfOfRemainingNodes
 
 	// takes firs id as the current nodes id
@@ -48,7 +51,7 @@ func (n *TopologyTestSuite) SetupTest() {
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	key, err := GenerateNetworkingKey(me.NodeID)
-	require.NoError(n.Suite.T(), err)
+	require.NoError(n.T(), err)
 
 	metrics := metrics.NewNoopCollector()
 
@@ -62,47 +65,48 @@ func (n *TopologyTestSuite) SetupTest() {
 		libp2p.DefaultMaxUnicastMsgSize,
 		libp2p.DefaultMaxPubSubMsgSize,
 		unittest.IdentifierFixture().String())
-	require.NoError(n.Suite.T(), err)
+	require.NoError(n.T(), err)
 
 	// creates and mocks a network instance
 	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
-	require.NoError(n.Suite.T(), err)
-	require.Len(n.Suite.T(), nets, 1)
+	require.NoError(n.T(), err)
+	require.Len(n.T(), nets, 1)
 	n.nets = nets[0]
 }
 
 func (n *TopologyTestSuite) TestTopologySize() {
 	// topology of size the entire network
 	top, err := n.nets.Topology()
-	require.NoError(n.Suite.T(), err)
-	require.Len(n.Suite.T(), top, n.expectedSize)
+	require.NoError(n.T(), err)
+	require.Len(n.T(), top, n.expectedSize)
 }
 
 // TestMembership evaluates every id in topology to be a protocol id
 func (n *TopologyTestSuite) TestMembership() {
 	top, err := n.nets.Topology()
-	require.NoError(n.Suite.T(), err)
-	require.Len(n.Suite.T(), top, n.expectedSize)
+	require.NoError(n.T(), err)
+	require.Len(n.T(), top, n.expectedSize)
 
 	// every id in topology should be an id of the protocol
 	for id := range top {
-		require.Contains(n.Suite.T(), n.ids.NodeIDs(), id)
+		require.Contains(n.T(), n.ids.NodeIDs(), id)
 	}
 }
 
 // TestDeteministicity verifies that the same seed generates the same topology
 func (n *TopologyTestSuite) TestDeteministicity() {
-	top := libp2p.NewRandPermTopology(flow.RoleCollection)
+	top, err := topology.NewRandPermTopology(flow.RoleCollection, unittest.IdentifierFixture())
+	require.NoError(n.T(), err)
 	// topology of size count/2
-	topSize := n.count / 2
+	topSize := uint(n.count / 2)
 	var previous, current []string
 
 	for i := 0; i < n.count; i++ {
 		previous = current
 		current = nil
 		// generate a new topology with a the same ids, size and seed
-		idMap, err := top.Subset(n.ids, topSize, "sameseed")
-		require.NoError(n.Suite.T(), err)
+		idMap, err := top.Subset(n.ids, topSize)
+		require.NoError(n.T(), err)
 
 		for _, v := range idMap {
 			current = append(current, v.NodeID.String())
@@ -115,15 +119,15 @@ func (n *TopologyTestSuite) TestDeteministicity() {
 		}
 
 		// assert that a different seed generates a different topology
-		require.Equal(n.Suite.T(), previous, current)
+		require.Equal(n.T(), previous, current)
 	}
 }
 
 // TestUniqueness verifies that different seeds generates different topologies
 func (n *TopologyTestSuite) TestUniqueness() {
-	top := libp2p.NewRandPermTopology(flow.RoleCollection)
+
 	// topology of size count/2
-	topSize := n.count / 2
+	topSize := uint(n.count / 2)
 	var previous, current []string
 
 	for i := 0; i < n.count; i++ {
@@ -131,8 +135,10 @@ func (n *TopologyTestSuite) TestUniqueness() {
 		current = nil
 		// generate a new topology with a the same ids, size but a different seed for each iteration
 		identity, _ := n.ids.ByIndex(uint(i))
-		idMap, err := top.Subset(n.ids, topSize, identity.NodeID.String())
-		require.NoError(n.Suite.T(), err)
+		top, err := topology.NewRandPermTopology(flow.RoleCollection, identity.NodeID)
+		require.NoError(n.T(), err)
+		idMap, err := top.Subset(n.ids, topSize)
+		require.NoError(n.T(), err)
 
 		for _, v := range idMap {
 			current = append(current, v.NodeID.String())
@@ -144,6 +150,6 @@ func (n *TopologyTestSuite) TestUniqueness() {
 		}
 
 		// assert that a different seed generates a different topology
-		require.NotEqual(n.Suite.T(), previous, current)
+		require.NotEqual(n.T(), previous, current)
 	}
 }

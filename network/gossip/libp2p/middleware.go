@@ -16,15 +16,15 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/gossip/libp2p/message"
+	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
+	"github.com/onflow/flow-go/network/gossip/libp2p/validators"
 )
 
 type communicationMode int
@@ -325,7 +325,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	go helpers.FullClose(stream)
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	m.metrics.NetworkMessageSent(byteCount, metrics.ChannelOneToOne)
+	m.metrics.NetworkMessageSent(byteCount, metrics.ChannelOneToOne, msg.Type)
 
 	return nil
 }
@@ -472,7 +472,7 @@ func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	m.metrics.NetworkMessageSent(len(data), channelID)
+	m.metrics.NetworkMessageSent(len(data), channelID, msg.Type)
 
 	return nil
 }
