@@ -11,5 +11,6 @@ message Message {
     bytes OriginID = 3;
     repeated bytes TargetIDs = 4;
     bytes Payload = 5;
+    string Type = 6;
 }
 
