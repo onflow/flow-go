@@ -14,10 +14,12 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/ledger"
+	completeLedger "github.com/dapperlabs/flow-go/ledger/complete"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -65,7 +67,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
 	unittest.RunWithTempDir(t, func(dir string) {
-		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
+		led, err := completeLedger.NewLedger(dir, 100, metricsCollector, zerolog.Nop(), nil)
 		require.NoError(t, err)
 		defer led.Done()
 
@@ -252,7 +254,7 @@ func executeCollection(
 	startStateCommitment flow.StateCommitment,
 	view *delta.View,
 	bc computer.BlockComputer,
-	led *ledger.MTrieStorage) (*flow.Chunk, *flow.ChunkDataPack, flow.StateCommitment, []byte) {
+	led *completeLedger.Ledger) (*flow.Chunk, *flow.ChunkDataPack, flow.StateCommitment, []byte) {
 
 	completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 	completeColls[guarantee.ID()] = &entity.CompleteCollection{
@@ -282,8 +284,16 @@ func executeCollection(
 
 	ids, values := view.Delta().RegisterUpdates()
 
+	keys := state.RegisterIDSToKeys(ids)
+	flowValues := state.RegisterValuesToValues(values)
+
+	update, err := ledger.NewUpdate(startStateCommitment, keys, flowValues)
+	require.NoError(t, err)
+
+	led.Set(update)
+
 	// TODO: update CommitDelta to also return proofs
-	endStateCommitment, err := led.UpdateRegisters(ids, values, startStateCommitment)
+	endStateCommitment, err := led.Set(update)
 	require.NoError(t, err, "error updating registers")
 
 	chunk := &flow.Chunk{
@@ -303,21 +313,21 @@ func executeCollection(
 
 	// chunkDataPack
 	allRegisters := view.Interactions().AllRegisters()
-	values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
+
+	allKeys := state.RegisterIDSToKeys(allRegisters)
+
+	query, err := ledger.NewQuery(chunk.StartState, allKeys)
+	require.NoError(t, err)
+
+	//values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
+	proof, err := led.Prove(query)
 	require.NoError(t, err, "error reading registers with proofs from ledger")
 
-	regTs := make([]flow.RegisterTouch, len(allRegisters))
-	for i, reg := range allRegisters {
-		regTs[i] = flow.RegisterTouch{RegisterID: reg,
-			Value: values[i],
-			Proof: proofs[i],
-		}
-	}
 	chunkDataPack := &flow.ChunkDataPack{
-		ChunkID:         chunk.ID(),
-		StartState:      chunk.StartState,
-		RegisterTouches: regTs,
-		CollectionID:    collection.ID(),
+		ChunkID:      chunk.ID(),
+		StartState:   chunk.StartState,
+		Proof:        proof,
+		CollectionID: collection.ID(),
 	}
 
 	return chunk, chunkDataPack, endStateCommitment, spock

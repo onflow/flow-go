@@ -36,7 +36,7 @@ func LightPayload8(key uint8, value uint8) *ledger.Payload {
 }
 
 // KeyPartFixture returns a key part fixture
-func KeyPartFixture(typ uint16, val string) *ledger.KeyPart {
+func KeyPartFixture(typ uint16, val string) ledger.KeyPart {
 	kp1t := uint16(typ)
 	kp1v := []byte(val)
 	return ledger.NewKeyPart(kp1t, kp1v)
@@ -47,13 +47,13 @@ func QueryFixture() *ledger.Query {
 	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
 	k1p1 := ledger.NewKeyPart(uint16(1), []byte("1"))
 	k1p2 := ledger.NewKeyPart(uint16(22), []byte("2"))
-	k1 := ledger.NewKey([]ledger.KeyPart{*k1p1, *k1p2})
+	k1 := ledger.NewKey([]ledger.KeyPart{k1p1, k1p2})
 
 	k2p1 := ledger.NewKeyPart(uint16(1), []byte("3"))
 	k2p2 := ledger.NewKeyPart(uint16(22), []byte("4"))
-	k2 := ledger.NewKey([]ledger.KeyPart{*k2p1, *k2p2})
+	k2 := ledger.NewKey([]ledger.KeyPart{k2p1, k2p2})
 
-	u, _ := ledger.NewQuery(sc, []ledger.Key{*k1, *k2})
+	u, _ := ledger.NewQuery(sc, []ledger.Key{k1, k2})
 	return u
 }
 
@@ -62,15 +62,15 @@ func UpdateFixture() *ledger.Update {
 	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
 	k1p1 := ledger.NewKeyPart(uint16(1), []byte("1"))
 	k1p2 := ledger.NewKeyPart(uint16(22), []byte("2"))
-	k1 := ledger.NewKey([]ledger.KeyPart{*k1p1, *k1p2})
+	k1 := ledger.NewKey([]ledger.KeyPart{k1p1, k1p2})
 	v1 := ledger.Value([]byte{'A'})
 
 	k2p1 := ledger.NewKeyPart(uint16(1), []byte("3"))
 	k2p2 := ledger.NewKeyPart(uint16(22), []byte("4"))
-	k2 := ledger.NewKey([]ledger.KeyPart{*k2p1, *k2p2})
+	k2 := ledger.NewKey([]ledger.KeyPart{k2p1, k2p2})
 	v2 := ledger.Value([]byte{'B'})
 
-	u, _ := ledger.NewUpdate(sc, []ledger.Key{*k1, *k2}, []ledger.Value{v1, v2})
+	u, _ := ledger.NewUpdate(sc, []ledger.Key{k1, k2}, []ledger.Value{v1, v2})
 	return u
 }
 
@@ -213,13 +213,13 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []ledger.Key {
 			}
 			keyPartData := make([]byte, byteSize)
 			rand.Read(keyPartData)
-			keyParts = append(keyParts, *ledger.NewKeyPart(uint16(j), keyPartData))
+			keyParts = append(keyParts, ledger.NewKeyPart(uint16(j), keyPartData))
 		}
 		key := ledger.NewKey(keyParts)
 
 		// deduplicate
 		if _, found := alreadySelectKeys[key.String()]; !found {
-			keys = append(keys, *key)
+			keys = append(keys, key)
 			alreadySelectKeys[key.String()] = true
 			i++
 		} else {

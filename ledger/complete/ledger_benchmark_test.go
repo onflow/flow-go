@@ -52,7 +52,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	totalProofSize := 0
 	totalPTrieConstTimeMS := 0
 
-	state := led.InitState()
+	state := led.InitialState()
 	for i := 0; i < steps; i++ {
 
 		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)

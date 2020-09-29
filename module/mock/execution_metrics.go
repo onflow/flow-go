@@ -19,6 +19,11 @@ func (_m *ExecutionMetrics) ChunkDataPackRequested() {
 	_m.Called()
 }
 
+// DiskSize provides a mock function with given fields: _a0
+func (_m *ExecutionMetrics) DiskSize(_a0 uint64) {
+	_m.Called(_a0)
+}
+
 // ExecutionCollectionRequestRetried provides a mock function with given fields:
 func (_m *ExecutionMetrics) ExecutionCollectionRequestRetried() {
 	_m.Called()
@@ -42,11 +47,6 @@ func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
 // ExecutionStateReadsPerBlock provides a mock function with given fields: reads
 func (_m *ExecutionMetrics) ExecutionStateReadsPerBlock(reads uint64) {
 	_m.Called(reads)
-}
-
-// ExecutionStateStorageDiskTotal provides a mock function with given fields: bytes
-func (_m *ExecutionMetrics) ExecutionStateStorageDiskTotal(bytes int64) {
-	_m.Called(bytes)
 }
 
 // ExecutionStorageStateCommitment provides a mock function with given fields: bytes

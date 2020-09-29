@@ -368,12 +368,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	diskTotal, err := e.execState.DiskSize()
-	if err != nil {
-		e.log.Err(err).Msg("could not get execution state disk size")
-	}
-
-	e.metrics.ExecutionStateStorageDiskTotal(diskTotal)
+	// e.metrics.ExecutionStateStorageDiskTotal(diskTotal)
 	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
 
 	err = e.mempool.Run(
@@ -729,14 +724,15 @@ func (e *Engine) saveExecutionResults(
 		// chunkDataPack
 		allRegisters := view.AllRegisters()
 
-		values, proofs, err := e.execState.GetRegistersWithProofs(childCtx, chunk.StartState, allRegisters)
+		proof, err := e.execState.GetProof(childCtx, chunk.StartState, allRegisters)
+
 		if err != nil {
 			return nil, fmt.Errorf(
 				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, executableBlock.ID(),
 			)
 		}
 
-		chdp := generateChunkDataPack(chunk, collectionID, allRegisters, values, proofs)
+		chdp := generateChunkDataPack(chunk, collectionID, proof)
 
 		err = e.execState.PersistChunkDataPack(childCtx, chdp)
 		if err != nil {
@@ -1271,21 +1267,22 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 func generateChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,
-	registers []flow.RegisterID,
-	values []flow.RegisterValue,
-	proofs []flow.StorageProof,
+	proof flow.StorageProof,
+	//registers []flow.RegisterID,
+	//values []flow.RegisterValue,
+	//proofs []flow.StorageProof,
 ) *flow.ChunkDataPack {
-	regTs := make([]flow.RegisterTouch, len(registers))
-	for i, reg := range registers {
-		regTs[i] = flow.RegisterTouch{RegisterID: reg,
-			Value: values[i],
-			Proof: proofs[i],
-		}
-	}
+	//regTs := make([]flow.RegisterTouch, len(registers))
+	//for i, reg := range registers {
+	//	regTs[i] = flow.RegisterTouch{RegisterID: reg,
+	//		Value: values[i],
+	//		Proof: proofs[i],
+	//	}
+	//}
 	return &flow.ChunkDataPack{
-		ChunkID:         chunk.ID(),
-		StartState:      chunk.StartState,
-		RegisterTouches: regTs,
-		CollectionID:    collectionID,
+		ChunkID:      chunk.ID(),
+		StartState:   chunk.StartState,
+		Proof:        proof,
+		CollectionID: collectionID,
 	}
 }

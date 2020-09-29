@@ -3,15 +3,16 @@ package chunks
 import (
 	"bytes"
 	"fmt"
+	executionState "github.com/dapperlabs/flow-go/engine/execution/state"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/fvm/state"
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/partial"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 type VirtualMachine interface {
@@ -91,12 +92,8 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	}
 
 	// constructing a partial trie given chunk data package
-	psmt, err := ptrie.NewPSMT(chunkDataPack.StartState,
-		ledger.RegisterKeySize,
-		chunkDataPack.Registers(),
-		chunkDataPack.Values(),
-		chunkDataPack.Proofs(),
-	)
+	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunkDataPack.StartState)
+
 	if err != nil {
 		// TODO provide more details based on the error type
 		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", err, chIndex, execResID),
@@ -106,18 +103,25 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
-	unknownRegTouch := make(map[string]bool)
-	regMap := chunkDataPack.GetRegisterValues()
+
 	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
-		k := state.RegisterID(owner, controller, key)
+		registerID := flow.NewRegisterKey(owner, controller, key)
 
-		val, ok := regMap[string(k)]
-		if !ok {
-			unknownRegTouch[string(k)] = true
-			return nil, fmt.Errorf("missing register")
+		registerKey := executionState.RegisterIDToKey(registerID)
+
+		query, err := ledger.NewQuery(chunkDataPack.StartState, []ledger.Key{registerKey})
+
+		if err != nil {
+			return nil, fmt.Errorf("cannot create query: %w", err)
 		}
-		return val, nil
+
+		values, err := psmt.Get(query)
+		if err != nil {
+			return nil, fmt.Errorf("cannot query register: %w", err)
+		}
+
+		return values[0], nil
 	}
 
 	chunkView := delta.NewView(getRegister)
@@ -142,21 +146,35 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	}
 
 	// check read access to unknown registers
-	if len(unknownRegTouch) > 0 {
-		var missingRegs []string
-		for key := range unknownRegTouch {
-			missingRegs = append(missingRegs, key)
-		}
-		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
-	}
+
+	// TODO - in new ledger version and associated chunk data pack we don't track values
+	// separately, they are part of the proof. Hence handling of missing registers must
+	// come from Partial Ledger and should be handled here for compatibility.
+	// Code left below for reference
+	//if len(unknownRegTouch) > 0 {
+	//	var missingRegs []string
+	//	for key := range unknownRegTouch {
+	//		missingRegs = append(missingRegs, key)
+	//	}
+	//	return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
+	//}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
 	// this returns the expected end state commitment after updates and the list of
 	// register keys that was not provided by the chunk data package (err).
 	regs, values := chunkView.Delta().RegisterUpdates()
-	expEndStateComm, failedKeys, err := psmt.Update(regs, values)
+
+	update, err := ledger.NewUpdate(
+		chunkDataPack.StartState,
+		executionState.RegisterIDSToKeys(regs),
+		executionState.RegisterValuesToValues(values),
+	)
+
+	expEndStateComm, err := psmt.Set(update)
+
 	if err != nil {
-		return nil, chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
+		// TODO - Should failed keys be added here somehow?
+		//return nil, chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)

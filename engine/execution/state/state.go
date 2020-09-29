@@ -7,12 +7,12 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	state2 "github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/trace"
 
+	ledger "github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -29,11 +29,11 @@ type ReadOnlyExecutionState interface {
 		[]flow.RegisterID,
 	) ([]flow.RegisterValue, error)
 
-	GetRegistersWithProofs(
+	GetProof(
 		context.Context,
 		flow.StateCommitment,
 		[]flow.RegisterID,
-	) ([]flow.RegisterValue, []flow.StorageProof, error)
+	) (flow.StorageProof, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
@@ -48,8 +48,6 @@ type ReadOnlyExecutionState interface {
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
 	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
-
-	DiskSize() (int64, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -76,9 +74,15 @@ type ExecutionState interface {
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 }
 
+const (
+	KeyPartOwner      = uint16(0)
+	KeyPartController = uint16(1)
+	KeyPartKey        = uint16(2)
+)
+
 type state struct {
 	tracer         module.Tracer
-	ls             storage.Ledger
+	ls             ledger.Ledger
 	commits        storage.Commits
 	blocks         storage.Blocks
 	collections    storage.Collections
@@ -88,9 +92,17 @@ type state struct {
 	db             *badger.DB
 }
 
+func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
+	return ledger.NewKey([]ledger.KeyPart{
+		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
+		ledger.NewKeyPart(KeyPartController, []byte(reg.Controller)),
+		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
+	})
+}
+
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
 func NewExecutionState(
-	ls storage.Ledger,
+	ls ledger.Ledger,
 	commits storage.Commits,
 	blocks storage.Blocks,
 	collections storage.Collections,
@@ -111,15 +123,53 @@ func NewExecutionState(
 		receipts:       receipts,
 		db:             db,
 	}
+
 }
 
-func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
+func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.Query, error) {
+	return ledger.NewQuery(commitment,
+		[]ledger.Key{
+			RegisterIDToKey(flow.NewRegisterKey(owner, controller, key)),
+		})
+}
+
+func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
+
+	keys := make([]ledger.Key, len(ids))
+	for i, id := range ids {
+		keys[i] = RegisterIDToKey(id)
+	}
+
+	return ledger.NewQuery(commitment, keys)
+}
+
+func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
+	keys := make([]ledger.Key, len(ids))
+	for i, id := range ids {
+		keys[i] = RegisterIDToKey(id)
+	}
+	return keys
+}
+
+func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
+	vals := make([]ledger.Value, len(values))
+	for i, value := range values {
+		vals[i] = value
+	}
+	return vals
+}
+
+func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
 	return func(owner, controller, key string) (flow.RegisterValue, error) {
 
-		values, err := ledger.GetRegisters(
-			[]flow.RegisterID{state2.RegisterID(owner, controller, key)},
-			commitment,
-		)
+		query, err := makeSingleValueQuery(commitment, owner, controller, key)
+
+		if err != nil {
+			return nil, fmt.Errorf("cannot create ledger query: %w", err)
+		}
+
+		values, err := ldg.Get(query)
+
 		if err != nil {
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
@@ -136,11 +186,20 @@ func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
 	return delta.NewView(LedgerGetRegister(s.ls, commitment))
 }
 
-func CommitDelta(ledger storage.Ledger, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+func CommitDelta(ldg ledger.Ledger, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
 
-	// TODO: update CommitDelta to also return proofs
-	commit, _, err := ledger.UpdateRegistersWithProof(ids, values, baseState)
+	update, err := ledger.NewUpdate(
+		baseState,
+		RegisterIDSToKeys(ids),
+		RegisterValuesToValues(values),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("cannot create ledger update: %w", err)
+	}
+
+	commit, err := ldg.Set(update)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +216,22 @@ func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState fl
 	return CommitDelta(s.ls, delta, baseState)
 }
 
+func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
+
+	query, err := makeQuery(commit, registerIDs)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot create ledger query: %w", err)
+	}
+
+	values, err := s.ls.Get(query)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot query ledger: %w", err)
+	}
+
+	return query, values, err
+}
+
 func (s *state) GetRegisters(
 	ctx context.Context,
 	commit flow.StateCommitment,
@@ -167,20 +242,36 @@ func (s *state) GetRegisters(
 		defer span.Finish()
 	}
 
-	return s.ls.GetRegisters(registerIDs, commit)
+	_, values, err := s.getRegisters(commit, registerIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	registerValues := make([]flow.RegisterValue, len(values))
+	for i, v := range values {
+		registerValues[i] = v
+	}
+
+	return registerValues, nil
 }
 
-func (s *state) GetRegistersWithProofs(
+func (s *state) GetProof(
 	ctx context.Context,
 	commit flow.StateCommitment,
 	registerIDs []flow.RegisterID,
-) ([]flow.RegisterValue, []flow.StorageProof, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
-		defer span.Finish()
+) (flow.StorageProof, error) {
+
+	query, err := makeQuery(commit, registerIDs)
+
+	if err != nil {
+		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
-	return s.ls.GetRegistersWithProof(registerIDs, commit)
+	proof, err := s.ls.Prove(query)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get proof: %w", err)
+	}
+	return proof, nil
 }
 
 func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
@@ -381,8 +472,4 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	}
 
 	return highest.Height, blockID, nil
-}
-
-func (s *state) DiskSize() (int64, error) {
-	return s.ls.DiskSize()
 }

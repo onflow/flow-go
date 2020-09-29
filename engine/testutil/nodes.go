@@ -30,6 +30,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/fvm"
+	completeLedger "github.com/dapperlabs/flow-go/ledger/complete"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -44,7 +45,6 @@ import (
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/state/protocol/events"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -256,7 +256,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	dbDir := unittest.TempDir(t)
 
 	metricsCollector := &metrics.NoopCollector{}
-	ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+	ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), nil)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()

@@ -426,6 +426,6 @@ func (f *MForest) Size() int {
 }
 
 // DiskSize returns the disk size of the directory used by the forest (in bytes)
-func (f *MForest) DiskSize() (int64, error) {
+func (f *MForest) DiskSize() (uint64, error) {
 	return io.DirSize(f.dir)
 }

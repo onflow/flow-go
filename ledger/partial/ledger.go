@@ -58,8 +58,8 @@ func (l *Ledger) Done() <-chan struct{} {
 	return done
 }
 
-// InitState returns the initial state of the ledger
-func (l *Ledger) InitState() ledger.State {
+// InitialState returns the initial state of the ledger
+func (l *Ledger) InitialState() ledger.State {
 	return l.state
 }
 

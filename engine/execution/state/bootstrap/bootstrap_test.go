@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	completeLedger "github.com/dapperlabs/flow-go/ledger/complete"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -20,7 +20,7 @@ func TestBootstrapLedger(t *testing.T) {
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
 		require.NoError(t, err)
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
@@ -44,13 +44,14 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("aa80c4fa382987114fcd1db9ea8f483d25919e981f88b999f57ab24a9fb012de")
+	var expectedStateCommitment, _ = hex.DecodeString("fd500c6dee8dece781934bce098084db6743d089c01bb8dbbc512af38c6e04ee")
+
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
 		require.NoError(t, err)
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(

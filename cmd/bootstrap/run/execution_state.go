@@ -7,9 +7,9 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	ledger "github.com/dapperlabs/flow-go/ledger/complete"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 // NOTE: this is now unused and should become part of another tool.
@@ -35,7 +35,7 @@ func GenerateExecutionState(
 ) (flow.StateCommitment, error) {
 	metricsCollector := &metrics.NoopCollector{}
 
-	ledgerStorage, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+	ledgerStorage, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
 	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err

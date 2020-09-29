@@ -17,8 +17,8 @@ type Ledger interface {
 	// ledger implements methods needed to be ReadyDone aware
 	module.ReadyDoneAware
 
-	// InitState returns the initial state of the ledger
-	InitState() State
+	// InitialState returns the initial state of the ledger
+	InitialState() State
 
 	// Get returns values for the given slice of keys at specific state
 	Get(query *Query) (values []Value, err error)
@@ -148,8 +148,8 @@ type Key struct {
 }
 
 // NewKey construct a new key
-func NewKey(kp []KeyPart) *Key {
-	return &Key{KeyParts: kp}
+func NewKey(kp []KeyPart) Key {
+	return Key{KeyParts: kp}
 }
 
 // Size returns the byte size needed to encode the key
@@ -205,8 +205,8 @@ type KeyPart struct {
 }
 
 // NewKeyPart construct a new key part
-func NewKeyPart(typ uint16, val []byte) *KeyPart {
-	return &KeyPart{Type: typ, Value: val}
+func NewKeyPart(typ uint16, val []byte) KeyPart {
+	return KeyPart{Type: typ, Value: val}
 }
 
 // Equals compares this key part to another key part

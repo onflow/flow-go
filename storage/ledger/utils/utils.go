@@ -1,6 +1,10 @@
 package utils
 
-import "math/rand"
+import (
+	"math/rand"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 // IsBitSet returns if the bit at position i in the byte array b is set to 1
 func IsBitSet(b []byte, i int) bool {
@@ -39,6 +43,29 @@ func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
 		}
 	}
 	return keys
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func RandomString(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func GetRandomRegisterIDs(n int) []flow.RegisterID {
+
+	registers := make([]flow.RegisterID, n)
+
+	for i := 0; i < n; i++ {
+		registers[i].Controller = RandomString(10)
+		registers[i].Owner = RandomString(10)
+		registers[i].Key = RandomString(10)
+	}
+
+	return registers
 }
 
 func GetRandomValues(n int, minByteSize, maxByteSize int) [][]byte {

@@ -688,11 +688,16 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 }
 
 func ChunkDataPackFixture(identifier flow.Identifier) *flow.ChunkDataPack {
+
+	//ids := utils.GetRandomRegisterIDs(1)
+	//values := utils.GetRandomValues(1, 1, 32)
+
 	return &flow.ChunkDataPack{
-		ChunkID:         identifier,
-		StartState:      StateCommitmentFixture(),
-		RegisterTouches: []flow.RegisterTouch{{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
-		CollectionID:    IdentifierFixture(),
+		ChunkID:    identifier,
+		StartState: StateCommitmentFixture(),
+		//RegisterTouches: []flow.RegisterTouch{{RegisterID: ids[0], Value: values[0], Proof: []byte{'p'}}},
+		Proof:        []byte{'p'},
+		CollectionID: IdentifierFixture(),
 	}
 }
 

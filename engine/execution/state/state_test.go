@@ -6,13 +6,14 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/mock/gomock"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	ledger "github.com/dapperlabs/flow-go/ledger/complete"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -23,7 +24,8 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			unittest.RunWithTempDir(t, func(dbDir string) {
 				metricsCollector := &metrics.NoopCollector{}
-				ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+				ls, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
+				//ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 				require.NoError(t, err)
 
 				ctrl := gomock.NewController(t)
@@ -32,7 +34,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 				blocks := mocks.NewMockBlocks(ctrl)
 				collections := mocks.NewMockCollections(ctrl)
 
-				stateCommitment := ls.EmptyStateCommitment()
+				stateCommitment := ls.InitialState()
 
 				stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(stateCommitment, nil)
 

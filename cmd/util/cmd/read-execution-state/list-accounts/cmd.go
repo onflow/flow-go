@@ -10,10 +10,13 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	executionState "github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/fvm/state"
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/common/pathfinder"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 )
 
 var cmd = &cobra.Command{
@@ -22,11 +25,11 @@ var cmd = &cobra.Command{
 	Run:   run,
 }
 
-var stateLoader func() *mtrie.MForest = nil
+var stateLoader func() *mtrie.Forest = nil
 var flagStateCommitment string
 var flagChain string
 
-func Init(f func() *mtrie.MForest) *cobra.Command {
+func Init(f func() *mtrie.Forest) *cobra.Command {
 	stateLoader = f
 
 	cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
@@ -53,7 +56,7 @@ func getChain(chainName string) (chain flow.Chain, err error) {
 func run(*cobra.Command, []string) {
 	startTime := time.Now()
 
-	mForest := stateLoader()
+	forest := stateLoader()
 
 	stateCommitment, err := hex.DecodeString(flagStateCommitment)
 	if err != nil {
@@ -69,15 +72,27 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ledger := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		values, err := mForest.Read(stateCommitment, [][]byte{state.RegisterID(owner, controller, key)})
+	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+
+		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterKey(owner, controller, key))
+		path, err := pathfinder.KeyToPath(ledgerKey, 0)
+
+		read := &ledger.TrieRead{
+			RootHash: stateCommitment,
+			Paths: []ledger.Path{
+				path,
+			},
+		}
+
+		payload, err := forest.Read(read)
 		if err != nil {
 			return nil, err
 		}
-		return values[0], nil
+
+		return payload[0].Value, nil
 	})
 
-	accounts := state.NewAccounts(ledger, chain)
+	accounts := state.NewAccounts(ldg, chain)
 
 	finalGenerator, err := accounts.GetAddressGeneratorState()
 	if err != nil {

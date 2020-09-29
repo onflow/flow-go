@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -96,7 +97,7 @@ type ExecutionNode struct {
 	BadgerDB        *badger.DB
 	VM              *fvm.VirtualMachine
 	ExecutionState  state.ExecutionState
-	Ledger          storage.Ledger
+	Ledger          ledger.Ledger
 	LevelDbDir      string
 	Collections     storage.Collections
 }

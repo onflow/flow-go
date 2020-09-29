@@ -41,27 +41,6 @@ func (_m *ReadOnlyExecutionState) ChunkDataPackByChunkID(_a0 context.Context, _a
 	return r0, r1
 }
 
-// DiskSize provides a mock function with given fields:
-func (_m *ReadOnlyExecutionState) DiskSize() (int64, error) {
-	ret := _m.Called()
-
-	var r0 int64
-	if rf, ok := ret.Get(0).(func() int64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(int64)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetCollection provides a mock function with given fields: identifier
 func (_m *ReadOnlyExecutionState) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
 	ret := _m.Called(identifier)
@@ -138,21 +117,21 @@ func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID(_a0 context.Context)
 	return r0, r1, r2
 }
 
-// GetRegisters provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ReadOnlyExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, error) {
+// GetProof provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ReadOnlyExecutionState) GetProof(_a0 context.Context, _a1 []byte, _a2 []flow.RegisterID) ([]byte, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, []flow.RegisterID) []byte); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]byte)
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, []flow.RegisterID) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
@@ -161,12 +140,12 @@ func (_m *ReadOnlyExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, 
 	return r0, r1
 }
 
-// GetRegistersWithProofs provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, [][]byte, error) {
+// GetRegisters provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ReadOnlyExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 []flow.RegisterID) ([][]byte, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, []flow.RegisterID) [][]byte); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
@@ -174,23 +153,14 @@ func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 context.Context, _a
 		}
 	}
 
-	var r1 [][]byte
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, []flow.RegisterID) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([][]byte)
-		}
+		r1 = ret.Error(1)
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte) error); ok {
-		r2 = rf(_a0, _a1, _a2)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // NewView provides a mock function with given fields: _a0
