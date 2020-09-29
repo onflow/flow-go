@@ -53,3 +53,31 @@ func (_m *Mutator) Finalize(blockID flow.Identifier) error {
 
 	return r0
 }
+
+// HeaderExtend provides a mock function with given fields: block
+func (_m *Mutator) HeaderExtend(block *flow.Block) error {
+	ret := _m.Called(block)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
+		r0 = rf(block)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MarkValid provides a mock function with given fields: blockID
+func (_m *Mutator) MarkValid(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

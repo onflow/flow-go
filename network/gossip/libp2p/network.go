@@ -3,6 +3,7 @@ package libp2p
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 
@@ -193,7 +194,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 			Str("channel", message.ChannelID).
 			Msg("dropping message due to duplication")
 
-		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID)
+		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID, message.Type)
 
 		return nil
 	}
@@ -249,9 +250,12 @@ func (n *Network) genNetworkMessage(channelID string, event interface{}, targetI
 		emTargets = append(emTargets, tempID[:])
 	}
 
-	// get origin ID (inplace slicing n.me.NodeID()[:] doesn't work)
+	// get origin ID
 	selfID := n.me.NodeID()
 	originID := selfID[:]
+
+	// get message type from event type and remove the asterisk prefix if present
+	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
 
 	// cast event to a libp2p.Message
 	msg := &message.Message{
@@ -260,6 +264,7 @@ func (n *Network) genNetworkMessage(channelID string, event interface{}, targetI
 		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,
+		Type:      msgType,
 	}
 
 	return msg, nil

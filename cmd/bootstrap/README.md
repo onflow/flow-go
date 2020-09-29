@@ -97,7 +97,7 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap finalize
+go run -tags relic ./cmd/bootstrap finalize \
  --fast-kg \
   --root-chain main \
   --root-height 0 \
@@ -106,6 +106,7 @@ go run -tags relic ./cmd/bootstrap finalize
   --config ./cmd/bootstrap/example_files/node-config.json \
   --partner-dir ./cmd/bootstrap/example_files/partner-node-infos \
   --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json \
+  --epoch-counter 1 \
   -o ./bootstrap/root-infos
 ```
 

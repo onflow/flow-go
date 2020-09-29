@@ -17,6 +17,11 @@ func (_m *Consumer) BlockFinalized(block *flow.Header) {
 	_m.Called(block)
 }
 
+// BlockProcessable provides a mock function with given fields: block
+func (_m *Consumer) BlockProcessable(block *flow.Header) {
+	_m.Called(block)
+}
+
 // EpochCommittedPhaseStarted provides a mock function with given fields: epoch, first
 func (_m *Consumer) EpochCommittedPhaseStarted(epoch uint64, first *flow.Header) {
 	_m.Called(epoch, first)
