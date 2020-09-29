@@ -268,6 +268,12 @@ func (il IdentityList) Sample(size uint) IdentityList {
 	return dup[:size]
 }
 
+// DeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
+func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
+	rand.Seed(seed)
+	return il.Sample(size)
+}
+
 // SamplePct returns a random sample from the receiver identity list. The
 // sample contains `pct` percentage of the list. The sample is rounded up
 // if `pct>0`, so this will always select at least one identity.
