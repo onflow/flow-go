@@ -258,7 +258,7 @@ func SealFromResult(result *flow.ExecutionResult) func(*flow.Seal) {
 	return func(seal *flow.Seal) {
 		seal.ResultID = result.ID()
 		seal.BlockID = result.BlockID
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = result.FinalStateCommit()
 	}
 }
 
@@ -358,7 +358,6 @@ func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          block.Header.ID(),
-			FinalStateCommit: StateCommitmentFixture(),
 			Chunks:           ChunksFixture(uint(chunks)),
 		},
 		Signatures: SignaturesFixture(6),
@@ -379,7 +378,6 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          IdentifierFixture(),
-			FinalStateCommit: StateCommitmentFixture(),
 			Chunks: flow.ChunkList{
 				ChunkFixture(),
 				ChunkFixture(),
@@ -705,7 +703,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 	var endState flow.StateCommitment
 	if int(index) == len(result.Chunks)-1 {
 		// last chunk in receipt takes final state commitment
-		endState = result.FinalStateCommit
+		endState = StateCommitmentFixture()
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
 		endState = result.Chunks[index+1].StartState
@@ -813,12 +811,18 @@ func BatchListFixture(n int) []flow.Batch {
 }
 
 func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
+	chunks := flow.ChunkList{}
+	chunk := &flow.Chunk{
+		Index:    0,
+		EndState: commit,
+	}
+	chunks.Insert(chunk)
+
 	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID:          block.ID(),
 			PreviousResultID: flow.ZeroID,
-			FinalStateCommit: commit,
-			Chunks:           nil,
+			Chunks:           chunks,
 		},
 		Signatures: nil,
 	}

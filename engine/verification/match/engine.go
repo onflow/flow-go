@@ -476,7 +476,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	if int(status.Chunk.Index) == len(result.ExecutionResult.Chunks)-1 {
 		// last chunk in a result is the system chunk and takes final state commitment
 		isSystemChunk = true
-		endState = result.ExecutionResult.FinalStateCommit
+		endState = result.ExecutionResult.FinalStateCommit()
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
 		isSystemChunk = false

@@ -70,7 +70,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	b1, ok := bs.HighestFinalized()
 	if ok {
 		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())
-		initialFinalizedSC = r1.ExecutionResult.FinalStateCommit
+		initialFinalizedSC = r1.ExecutionResult.FinalStateCommit()
 	}
 
 	currentHeight := b1.Header.Height + 1
@@ -85,7 +85,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		}
 		currentID = b2.Header.ID()
 		r2 = rs.WaitForReceiptFromAny(t, b2.Header.ID())
-		if bytes.Compare(initialFinalizedSC, r2.ExecutionResult.FinalStateCommit) == 0 {
+		if bytes.Compare(initialFinalizedSC, r2.ExecutionResult.FinalStateCommit()) == 0 {
 			// received a new execution result for the next finalized block, but it has the same final state commitment
 			// check the next finalized block
 			currentHeight++

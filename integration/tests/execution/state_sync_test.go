@@ -31,7 +31,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockA from execution node 1
 	erExe1BlockA := s.ReceiptState.WaitForReceiptFrom(s.T(), blockA.Header.ID(), s.exe1ID)
-	s.T().Logf("got erExe1BlockA with SC %x", erExe1BlockA.ExecutionResult.FinalStateCommit)
+	s.T().Logf("got erExe1BlockA with SC %x", erExe1BlockA.ExecutionResult.FinalStateCommit())
 
 	// send transaction
 	err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), common.CounterContract)
@@ -43,11 +43,11 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockB from execution node 1
 	erExe1BlockB := s.ReceiptState.WaitForReceiptFrom(s.T(), blockB.Header.ID(), s.exe1ID)
-	s.T().Logf("got erExe1BlockB with SC %x", erExe1BlockB.ExecutionResult.FinalStateCommit)
+	s.T().Logf("got erExe1BlockB with SC %x", erExe1BlockB.ExecutionResult.FinalStateCommit())
 
 	// require that state between blockA and blockB has changed
-	require.NotEqual(s.T(), erExe1BlockA.ExecutionResult.FinalStateCommit,
-		erExe1BlockB.ExecutionResult.FinalStateCommit)
+	require.NotEqual(s.T(), erExe1BlockA.ExecutionResult.FinalStateCommit(),
+		erExe1BlockB.ExecutionResult.FinalStateCommit())
 
 	// wait until the next proposed block is finalized, called blockC
 	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T())
@@ -55,10 +55,10 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockC from execution node 1
 	erExe1BlockC := s.ReceiptState.WaitForReceiptFrom(s.T(), blockC.Header.ID(), s.exe1ID)
-	s.T().Logf("got erExe1BlockC with SC %x", erExe1BlockC.ExecutionResult.FinalStateCommit)
+	s.T().Logf("got erExe1BlockC with SC %x", erExe1BlockC.ExecutionResult.FinalStateCommit())
 
 	// require that state between blockB and blockC has not changed
-	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe1BlockC.ExecutionResult.FinalStateCommit)
+	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit(), erExe1BlockC.ExecutionResult.FinalStateCommit())
 
 	// send a ExecutionStateSyncRequest from Ghost node
 	err = s.Ghost().Send(context.Background(), engine.SyncExecution,
@@ -69,5 +69,5 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	// wait for ExecutionStateDelta
 	msg2 := s.MsgState.WaitForMsgFrom(s.T(), common.MsgIsExecutionStateDeltaWithChanges, s.exe1ID)
 	executionStateDelta := msg2.(*messages.ExecutionStateDelta)
-	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, executionStateDelta.EndState)
+	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit(), executionStateDelta.EndState)
 }

@@ -92,7 +92,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					sender,
 					m.ExecutionResult.BlockID,
 					m.ExecutorID,
-					m.ExecutionResult.FinalStateCommit,
+					m.ExecutionResult.FinalStateCommit(),
 					m.ExecutionResult.ID())
 			default:
 				t.Logf("other msg received from %s: %#v", sender, msg)

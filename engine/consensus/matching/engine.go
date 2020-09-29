@@ -206,7 +206,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("previous_id", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
-		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
+		Hex("final_state", receipt.ExecutionResult.FinalStateCommit()).
 		Logger()
 
 	log.Info().Msg("execution receipt received")
@@ -597,7 +597,7 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	seal := &flow.Seal{
 		BlockID:                result.BlockID,
 		ResultID:               result.ID(),
-		FinalState:             result.FinalStateCommit,
+		FinalState:             result.FinalStateCommit(),
 		AggregatedApprovalSigs: aggregatedSigs,
 	}
 

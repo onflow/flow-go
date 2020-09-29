@@ -5,9 +5,8 @@ import (
 )
 
 type ExecutionResultBody struct {
-	PreviousResultID Identifier      // commit of the previous ER
-	BlockID          Identifier      // commit of the current block
-	FinalStateCommit StateCommitment // final state commitment
+	PreviousResultID Identifier // commit of the previous ER
+	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
 }
 
@@ -22,4 +21,9 @@ func (er ExecutionResult) ID() Identifier {
 
 func (er ExecutionResult) Checksum() Identifier {
 	return MakeID(er)
+}
+
+// FinalStateCommit gets the final state of the result
+func (er ExecutionResult) FinalStateCommit() StateCommitment {
+	return er.Chunks[er.Chunks.Len()-1].EndState
 }

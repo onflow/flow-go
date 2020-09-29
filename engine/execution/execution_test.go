@@ -351,7 +351,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			consensusNode.Log.Debug().
 				Hex("origin", originID[:]).
 				Hex("block", receipt.ExecutionResult.BlockID[:]).
-				Hex("commit", receipt.ExecutionResult.FinalStateCommit).
+				Hex("commit", receipt.ExecutionResult.FinalStateCommit()).
 				Msg("execution receipt delivered")
 
 		}).Return(nil)
@@ -532,7 +532,7 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 			consensusNode.Log.Debug().
 				Hex("origin", originID[:]).
 				Hex("block", receipt.ExecutionResult.BlockID[:]).
-				Hex("commit", receipt.ExecutionResult.FinalStateCommit).
+				Hex("commit", receipt.ExecutionResult.FinalStateCommit()).
 				Msg("execution receipt delivered")
 
 		}).Return(nil)
