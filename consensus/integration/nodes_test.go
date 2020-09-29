@@ -182,16 +182,14 @@ func createNode(
 	// add a network for this node to the hub
 	net := hub.AddNetwork(localID, node)
 
-	guaranteeLimit, sealLimit, receiptLimit := uint(1000), uint(1000), uint(1000)
+	guaranteeLimit, sealLimit := uint(1000), uint(1000)
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
 	seals, err := stdmap.NewSeals(sealLimit)
 	require.NoError(t, err)
-	receipts, err := stdmap.NewReceipts(receiptLimit)
-	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals, receipts)
+	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals)
 
 	signer := &Signer{identity.ID()}
 
