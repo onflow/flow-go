@@ -12,6 +12,10 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -22,12 +26,13 @@ import (
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/sync"
 	"github.com/onflow/flow-go/fvm"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/metrics"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -193,7 +198,6 @@ func main() {
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
@@ -237,6 +241,8 @@ func main() {
 			// TODO: we should solve these mutual dependencies better
 			// => https://github.com/dapperlabs/flow-go/issues/4360
 			collectionRequester = collectionRequester.WithHandle(ingestionEng.OnCollection)
+
+			node.ProtocolEvents.AddConsumer(ingestionEng)
 
 			return ingestionEng, err
 		}).

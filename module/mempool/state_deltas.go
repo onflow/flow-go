@@ -3,8 +3,8 @@
 package mempool
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 // Deltas represents a concurrency-safe memory pool for block deltas.

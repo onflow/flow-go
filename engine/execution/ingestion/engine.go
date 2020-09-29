@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
@@ -18,25 +19,27 @@ import (
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
-	executionSync "github.com/onflow/flow-go/engine/execution/sync"
 	"github.com/onflow/flow-go/engine/execution/utils"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
+	psEvents.Noop // satisfy protocol events consumer interface
+
 	unit               *engine.Unit
 	log                zerolog.Logger
 	me                 module.Local
@@ -57,12 +60,12 @@ type Engine struct {
 	extensiveLogging   bool
 	spockHasher        hash.Hasher
 	root               *flow.Header
-	checkingSyncing    mutex.Lock
-	syncThreshold      int
-	syncHeight         uint64
-	syncFilter         flow.IdentityFilter
-	syncConduit        network.Conduit
-	syncDeltas         mempool.Deltas
+	// checkingSyncing    mutex.Lock
+	syncThreshold int
+	syncHeight    uint64
+	syncFilter    flow.IdentityFilter
+	syncConduit   network.Conduit
+	syncDeltas    mempool.Deltas
 }
 
 func New(
@@ -189,9 +192,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-// OnBlockIncorporated handles the new incorporated blocks (blocks that
+// OnBlockProcessable handles the new verified blocks (blocks that
 // have passed consensus validation) received from the consensus nodes
-func (e *Engine) OnBlockIncorporated(b *model.Block) {
+// Note: OnBlockProcessable might be called multiple times for the same block.
+func (e *Engine) OnBlockProcessable(b *model.Block) {
 	newBlock, err := e.blocks.ByID(b.BlockID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", b.BlockID, err)
@@ -210,24 +214,29 @@ func (e *Engine) OnBlockIncorporated(b *model.Block) {
 	}
 }
 
-// required to provide implementation as a consensus follwer engine
-func (e *Engine) OnFinalizedBlock(block *model.Block)                {}
-func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
-
 // Main handling
 
 // handle block will process the incoming block.
 // the block has passed the consensus validation.
 func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 
+	_, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ID())
+	if err == nil {
+		// block has been executed
+		return nil
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not query state commitment for block: %w", err)
+	}
+
+	// unexecuted block
 	e.metrics.StartBlockReceivedToExecuted(block.ID())
 
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
-
-	parentCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
 
 	// acquiring the lock so that there is one process modifying the queue
 	return e.mempool.Run(
@@ -236,7 +245,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
 			// check if this block is a new block by checking if the execution queue has this block already
-			queue, added := tryEnqueue(executableBlock, executionQueues)
+			queue, added := enqueue(executableBlock, executionQueues)
 
 			// if it's not a new block, then bail
 			if !added {
@@ -249,6 +258,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			// whenever the queue grows, we need to check whether the state sync should be
 			// triggered.
 			// TODO: run in a different goroutine
+			// use unit.Launch
 			go e.checkStateSyncStart(queue)
 
 			// check if this block has been executed already
@@ -517,22 +527,27 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	)
 }
 
-// tryEnqueue checks if a block fits somewhere into the already existing queues, and puts it there is so
-func tryEnqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
-	for _, queue := range queues.All() {
-		if queue.TryAdd(blockify) {
-			return queue, true
-		}
-	}
-	return nil, false
-}
-
 func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	q := queue.NewQueue(blockify)
 	return q, queues.Add(q)
 }
 
-// enqueue inserts block into matching queue or creates a new one
+// enqueue adds a block to the queues
+// queues are chained blocks. Since a block can't be executable until its parent has been
+// executed, the chained structure allows us to only check the head of each queue to see if
+// any block becomes executable.
+// for instance we have one queue whose head is A:
+// A <- B <- C
+//   ^- D <- E
+// If we receive E <- F, then we will add it to the queue:
+// A <- B <- C
+//   ^- D <- E <- F
+// Even through there are 6 blocks, we only need to check if block A becomes executable.
+// when the parent block isn't in the queue, we add it as a new queue. for instace, if
+// we receive H <- G, then the queues will become:
+// A <- B <- C
+//   ^- D <- E
+// G
 func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
 		if queue.TryAdd(blockify) {
