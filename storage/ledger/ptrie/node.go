@@ -3,7 +3,7 @@ package ptrie
 import (
 	"encoding/hex"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/common"
 )
 
 type Root []byte

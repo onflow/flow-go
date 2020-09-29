@@ -5,10 +5,10 @@ package mock
 import (
 	context "context"
 
-	delta "github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	delta "github.com/onflow/flow-go/engine/execution/state/delta"
+	flow "github.com/onflow/flow-go/model/flow"
 
-	messages "github.com/dapperlabs/flow-go/model/messages"
+	messages "github.com/onflow/flow-go/model/messages"
 
 	mock "github.com/stretchr/testify/mock"
 )

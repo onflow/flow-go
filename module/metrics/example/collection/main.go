@@ -6,12 +6,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/metrics/example"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/queue"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics/example"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func main() {
@@ -32,6 +32,8 @@ func main() {
 
 		topic1 := engine.TestNetwork
 		topic2 := engine.TestMetrics
+		message1 := "CollectionRequest"
+		message2 := "ClusterBlockProposal"
 
 		for i := 0; i < 100; i++ {
 			collector.TransactionIngested(unittest.IdentifierFixture())
@@ -41,11 +43,11 @@ func main() {
 			collector.SetCurView(uint64(i))
 			collector.SetQCView(uint64(i))
 
-			collector.NetworkMessageSent(rand.Intn(1000), topic1)
-			collector.NetworkMessageSent(rand.Intn(1000), topic2)
+			collector.NetworkMessageSent(rand.Intn(1000), topic1, message1)
+			collector.NetworkMessageSent(rand.Intn(1000), topic2, message2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), topic1)
-			collector.NetworkMessageReceived(rand.Intn(1000), topic2)
+			collector.NetworkMessageReceived(rand.Intn(1000), topic1, message1)
+			collector.NetworkMessageReceived(rand.Intn(1000), topic2, message2)
 
 			priority1 := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
 			collector.MessageRemoved(priority1)

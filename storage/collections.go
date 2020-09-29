@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Collections represents persistent storage for collections.

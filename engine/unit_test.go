@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine"
+	"github.com/onflow/flow-go/engine"
 )
 
 func TestReadyDone(t *testing.T) {

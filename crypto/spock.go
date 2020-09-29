@@ -13,7 +13,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // This is only a temporary implementation of the SPoCK API. The purpose

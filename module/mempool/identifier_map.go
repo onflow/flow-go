@@ -1,7 +1,7 @@
 package mempool
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // IdentifierMap represents a concurrency-safe memory pool for mapping an identifier to a list of identifiers

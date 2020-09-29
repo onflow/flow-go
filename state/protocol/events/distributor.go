@@ -3,8 +3,8 @@ package events
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Distributor distributes events to a list of subscribers.
@@ -29,6 +29,14 @@ func (d *Distributor) BlockFinalized(block *flow.Header) {
 	defer d.mu.RLock()
 	for _, sub := range d.subscribers {
 		sub.BlockFinalized(block)
+	}
+}
+
+func (d *Distributor) BlockProcessable(block *flow.Header) {
+	d.mu.RLock()
+	defer d.mu.RLock()
+	for _, sub := range d.subscribers {
+		sub.BlockProcessable(block)
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // rxid is the regex for parsing node identity entries.
@@ -266,6 +266,12 @@ func (il IdentityList) Sample(size uint) IdentityList {
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
 	return dup[:size]
+}
+
+// DeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
+func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
+	rand.Seed(seed)
+	return il.Sample(size)
 }
 
 // SamplePct returns a random sample from the receiver identity list. The

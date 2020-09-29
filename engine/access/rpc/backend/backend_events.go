@@ -10,10 +10,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 type backendEvents struct {
@@ -133,10 +133,15 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 		if !expected {
 			return nil, fmt.Errorf("unexpected blockID from exe node %x", result.GetBlockId())
 		}
+		if result.GetBlockHeight() != header.Height {
+			return nil, fmt.Errorf("unexpected block height %d for block %x from exe node",
+				result.GetBlockHeight(),
+				result.GetBlockId())
+		}
 
 		results[i] = flow.BlockEvents{
-			BlockID:        convert.MessageToIdentifier(result.GetBlockId()),
-			BlockHeight:    result.GetBlockHeight(),
+			BlockID:        header.ID(),
+			BlockHeight:    header.Height,
 			BlockTimestamp: header.Timestamp,
 			Events:         convert.MessagesToEvents(result.GetEvents()),
 		}
