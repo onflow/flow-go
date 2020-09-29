@@ -417,28 +417,40 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 }
 
 func (suite *Suite) TestGetEventsForBlockIDs() {
-
-	blockIDs := getIDs(5)
 	events := getEvents(10)
 
-	// create the expected results from execution node and access node
-	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockIDs))
+	setupStorage := func(n int) []*flow.Header {
+		headers := make([]*flow.Header, n)
+		for i := 0; i < n; i++ {
+			b := unittest.BlockFixture()
+			suite.blocks.
+				On("ByID", b.ID()).
+				Return(&b, nil).Once()
 
-	for i := 0; i < len(blockIDs); i++ {
+			headers[i] = b.Header
+		}
+		return headers
+	}
+	blockHeaders := setupStorage(5)
+
+	// create the expected results from execution node and access node
+	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
+
+	for i := 0; i < len(blockHeaders); i++ {
 		exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
-			BlockId:     convert.IdentifierToMessage(blockIDs[i]),
-			BlockHeight: uint64(i),
+			BlockId:     convert.IdentifierToMessage(blockHeaders[i].ID()),
+			BlockHeight: blockHeaders[i].Height,
 			Events:      convert.EventsToMessages(events),
 		}
 	}
 
-	expected := make([]flow.BlockEvents, len(blockIDs))
-
-	for i := 0; i < len(blockIDs); i++ {
+	expected := make([]flow.BlockEvents, len(blockHeaders))
+	for i := 0; i < len(blockHeaders); i++ {
 		expected[i] = flow.BlockEvents{
-			BlockID:     blockIDs[i],
-			BlockHeight: uint64(i),
-			Events:      events,
+			BlockID:        blockHeaders[i].ID(),
+			BlockHeight:    blockHeaders[i].Height,
+			BlockTimestamp: blockHeaders[i].Timestamp,
+			Events:         events,
 		}
 	}
 
@@ -449,6 +461,10 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	ctx := context.Background()
 
+	blockIDs := make([]flow.Identifier, len(blockHeaders))
+	for i, header := range blockHeaders {
+		blockIDs[i] = header.ID()
+	}
 	exeReq := &execproto.GetEventsForBlockIDsRequest{
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 		Type:     string(flow.EventAccountCreated),
@@ -464,7 +480,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	backend := New(
 		suite.state,
 		suite.execClient,
-		nil, nil, nil, nil, nil,
+		nil,
+		suite.blocks,
+		nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		0,
@@ -485,7 +503,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	var minHeight uint64 = 5
 	var maxHeight uint64 = 10
 	var headHeight uint64
-	var expBlockIDs []flow.Identifier
+	var blockHeaders []*flow.Header
 
 	setupHeadHeight := func(height uint64) {
 		header := unittest.BlockHeaderFixture() // create a mock header
@@ -493,8 +511,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.snapshot.On("Head").Return(&header, nil).Once()
 	}
 
-	setupStorage := func(min uint64, max uint64) []flow.Identifier {
-		ids := make([]flow.Identifier, 0)
+	setupStorage := func(min uint64, max uint64) []*flow.Header {
+		headers := make([]*flow.Header, 0)
 
 		for i := min; i <= max; i++ {
 			b := unittest.BlockFixture()
@@ -503,34 +521,39 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 				On("ByHeight", i).
 				Return(&b, nil).Once()
 
-			ids = append(ids, b.ID())
+			headers = append(headers, b.Header)
 		}
 
-		return ids
+		return headers
 	}
 
 	setupExecClient := func() []flow.BlockEvents {
+		blockIDs := make([]flow.Identifier, len(blockHeaders))
+		for i, header := range blockHeaders {
+			blockIDs[i] = header.ID()
+		}
 		execReq := &execproto.GetEventsForBlockIDsRequest{
-			BlockIds: convert.IdentifiersToMessages(expBlockIDs),
+			BlockIds: convert.IdentifiersToMessages(blockIDs),
 			Type:     string(flow.EventAccountCreated),
 		}
 
-		results := make([]flow.BlockEvents, len(expBlockIDs))
-		exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(expBlockIDs))
+		results := make([]flow.BlockEvents, len(blockHeaders))
+		exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
 
-		for i, id := range expBlockIDs {
+		for i, header := range blockHeaders {
 			events := getEvents(1)
-			height := uint64(5) // an arbitrary height
+			height := header.Height
 
 			results[i] = flow.BlockEvents{
-				BlockID:     id,
-				BlockHeight: height,
-				Events:      events,
+				BlockID:        header.ID(),
+				BlockHeight:    height,
+				BlockTimestamp: header.Timestamp,
+				Events:         events,
 			}
 
 			exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
-				BlockId:     convert.IdentifierToMessage(id),
-				BlockHeight: height,
+				BlockId:     convert.IdentifierToMessage(header.ID()),
+				BlockHeight: header.Height,
 				Events:      convert.EventsToMessages(events),
 			}
 		}
@@ -570,7 +593,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		// setup mocks
 		setupHeadHeight(headHeight)
-		expBlockIDs = setupStorage(minHeight, maxHeight)
+		blockHeaders = setupStorage(minHeight, maxHeight)
 		expectedResp := setupExecClient()
 
 		// create handler
@@ -600,7 +623,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("valid request with max_height > last_sealed_block_height", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
-		expBlockIDs = setupStorage(minHeight, headHeight)
+		blockHeaders = setupStorage(minHeight, headHeight)
 		expectedResp := setupExecClient()
 
 		backend := New(
@@ -777,14 +800,6 @@ func (suite *Suite) assertAllExpectations() {
 func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
-}
-
-func getIDs(n int) []flow.Identifier {
-	ids := make([]flow.Identifier, n)
-	for i := range ids {
-		ids[i] = unittest.IdentifierFixture()
-	}
-	return ids
 }
 
 func getEvents(n int) []flow.Event {
