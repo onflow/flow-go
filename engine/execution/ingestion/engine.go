@@ -12,6 +12,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
@@ -39,7 +40,8 @@ import (
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
-	psEvents.Noop // satisfy protocol events consumer interface
+	psEvents.Noop              // satisfy protocol events consumer interface
+	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
 
 	unit               *engine.Unit
 	log                zerolog.Logger
@@ -113,7 +115,6 @@ func New(
 		extensiveLogging:   extLog,
 		root:               root,
 		syncFilter:         syncFilter,
-		syncLock:           sync.Mutex{},
 	}
 
 	// move to state syncing engine
@@ -1225,9 +1226,7 @@ func (e *Engine) handleStateDeltaResponse(originID flow.Identifier, delta *messa
 	}
 
 	// TODO: validate the delta with the child block's statecommitment
-	// TODO: execute the block if executable
 	// TODO: add collection
-	// TODO: acquire lock
 
 	e.syncDeltas.Add(delta)
 
