@@ -3,7 +3,7 @@ package utils
 import (
 	"math/rand"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // IsBitSet returns if the bit at position i in the byte array b is set to 1
