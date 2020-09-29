@@ -28,10 +28,12 @@ CONTAINER_REGISTRY=gcr.io/dl-flow
 
 export DOCKER_BUILDKIT := 1
 
+.PHONY: crypto/relic
 crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive
 
+.PHONY: crypto/relic/build
 crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
@@ -46,7 +48,7 @@ cmd/util/util:
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.29.0; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -107,6 +109,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="state/protocol" -case=underscore -output="state/protocol/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir="state/protocol/events" -case=underscore -output="./state/protocol/events/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/sync -case=underscore -output="./engine/execution/sync/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
@@ -133,15 +136,13 @@ lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
-# Runs linter, unit tests, SKIP FOR NOW coverage
+# Runs unit tests, SKIP FOR NOW linter, coverage
 .PHONY: ci
-ci: install-tools tidy lint test # coverage
+ci: install-tools tidy test # lint coverage
 
 # Runs integration tests
-# NOTE: we do not need `docker-build-flow` as this is run as a separate step
-# on Teamcity
 .PHONY: ci-integration
-ci-integration: install-tools
+ci-integration: crypto/relic/build
 	$(MAKE) -C integration ci-integration-test
 
 # Runs benchmark tests
