@@ -64,11 +64,11 @@ type Engine struct {
 	spockHasher        hash.Hasher
 	root               *flow.Header
 	// TODO: move all state syncing related logic to a separate module
-	syncingHeight atomic.Uint64
-	syncThreshold int
-	syncFilter    flow.IdentityFilter
-	syncConduit   network.Conduit
-	syncDeltas    mempool.Deltas
+	syncingHeight atomic.Uint64       // syncingHeight == 0 means not syncing, otherwise it's the target height to sync to
+	syncThreshold int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
+	syncFilter    flow.IdentityFilter // specify the filter to sync state from
+	syncConduit   network.Conduit     // sending state syncing requests
+	syncDeltas    mempool.Deltas      // storing the synced state deltas
 }
 
 func New(
@@ -189,9 +189,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 
 	if err != nil {
-		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+		e.log.Error().
+			Err(err).
+			Hex("sender", originID[:]).
+			Msgf("could not process (%T) message")
 	}
-
 	return nil
 }
 
@@ -211,9 +213,11 @@ func (e *Engine) OnBlockProcessable(b *model.Block) {
 		return
 	}
 
+	e.log.Debug().Hex("block_id", b.BlockID[:]).Msg("handling block")
+
 	err = e.handleBlock(context.Background(), newBlock)
 	if err != nil {
-		e.log.Error().Err(err).Hex("block_id", logging.ID(b.BlockID)).Msg("failed to handle block proposal")
+		e.log.Error().Err(err).Hex("block_id", logging.ID(b.BlockID)).Msg("failed to handle block")
 	}
 }
 
@@ -222,10 +226,11 @@ func (e *Engine) OnBlockProcessable(b *model.Block) {
 // handle block will process the incoming block.
 // the block has passed the consensus validation.
 func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
+	log := e.log.With().Hex("block_id", logging.Entity(block)).Logger()
 
 	_, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ID())
 	if err == nil {
-		// block has been executed
+		log.Debug().Msg("block has been executed already")
 		return nil
 	}
 
@@ -253,9 +258,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			// if it's not added, it means the block is not a new block, it already
 			// exists in the queue, then bail
 			if !added {
-				e.log.Debug().
-					Hex("block_id", logging.Entity(executableBlock)).
-					Msg("block already exists in the execution queue")
+				log.Debug().Msg("block already exists in the execution queue")
 				return nil
 			}
 
@@ -282,7 +285,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 				executableBlock.StartState = parentCommitment
 			} else if !errors.Is(err, storage.ErrNotFound) {
 				// if there is exception, then crash
-				e.log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
+				log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
 			}
 
 			// check if we have all the collections for the block, and request them if there is missing.
@@ -292,7 +295,13 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			}
 
 			// execute the block if the block is ready to be executed
-			e.executeBlockIfComplete(executableBlock)
+			executed := e.executeBlockIfComplete(executableBlock)
+
+			if executed {
+				log.Info().Msg("block has been executed")
+			} else {
+				log.Debug().Msg("block is not ready to be executed")
+			}
 
 			return nil
 		},
@@ -379,7 +388,6 @@ func (e *Engine) onBlockExecuted(executedBlock *entity.ExecutableBlock, finalSta
 			blockByCollection *stdmap.BlockByCollectionBackdata,
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
-
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executedBlock.ID())
 			if !exists {
@@ -463,6 +471,8 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	return false
 }
 
+// OnCollection is a callback for handling the collections requested by the
+// collection requester.
 func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 	// convert entity to strongly typed collection
 	collection, ok := entity.(*flow.Collection)
@@ -470,10 +480,12 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 		e.log.Error().Msgf("invalid entity type (%T)", entity)
 	}
 
+	// no need to validate the origin ID, since the collection requester has
+	// checked the origin must be a collection node.
+
 	err := e.handleCollection(originID, collection)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not handle collection")
-		return
 	}
 }
 
@@ -524,7 +536,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				e.executeBlockIfComplete(executableBlock)
 			}
 
-			// since we've received this collection, remove it from the colle
+			// since we've received this collection, remove it from the index
 			backdata.Rem(collID)
 
 			return nil
@@ -1106,13 +1118,16 @@ func (e *Engine) handleStateSyncRequest(
 
 	sealedHeight := lastSealed.Height
 
+	log := e.log.With().
+		Hex("sender", originID[:]).
+		Uint64("sealed", sealedHeight).
+		Uint64("from", req.FromHeight).
+		Uint64("to", req.ToHeight).
+		Logger()
+
 	// ignore requests for unsealed height
 	if req.FromHeight > sealedHeight {
-		e.log.Info().
-			Uint64("sealed", sealedHeight).
-			Uint64("from", req.FromHeight).
-			Uint64("to", req.ToHeight).
-			Msg("requesting unsealed height")
+		log.Info().Msg("receives state sync requests for unsealed height, ignore")
 		return nil
 	}
 
@@ -1138,6 +1153,8 @@ func (e *Engine) handleStateSyncRequest(
 	if err != nil {
 		return fmt.Errorf("could not send deltas: %w", err)
 	}
+
+	log.Info().Msg("responded state deltas")
 
 	return nil
 }
@@ -1179,16 +1196,16 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 	return nil
 }
 
-func (e *Engine) handleStateDeltaResponse(originID flow.Identifier, delta *messages.ExecutionStateDelta) error {
+func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta *messages.ExecutionStateDelta) error {
 
 	// the request must be from an execution node
-	id, err := e.state.Final().Identity(originID)
+	id, err := e.state.Final().Identity(executionNodeID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
 	}
 
 	if id.Role != flow.RoleExecution {
-		return fmt.Errorf("invalid role for sending state deltas: %v, %s", originID, id.Role)
+		return fmt.Errorf("invalid role for sending state deltas: %v, %s", executionNodeID, id.Role)
 	}
 
 	// check if the block has been executed already
@@ -1225,10 +1242,23 @@ func (e *Engine) handleStateDeltaResponse(originID flow.Identifier, delta *messa
 		return fmt.Errorf("failed to validate the state delta: %w", err)
 	}
 
-	// TODO: validate the delta with the child block's statecommitment
-	// TODO: add collection
-
 	e.syncDeltas.Add(delta)
+
+	// since the delta includes collections, we could just trigger the
+	// handleCollection for those collections, which will check if the
+	// block is executable and apply deltas to them.
+	//
+	// calling handleCollection could also ensures the collection are
+	// stored in storage before applying the delta.
+	for _, cc := range delta.ExecutableBlock.CompleteCollections {
+		col := cc.Collection()
+		// note, we will be passing execution node id to handleCollection
+		err = e.handleCollection(executionNodeID, &col)
+		if err != nil {
+			return fmt.Errorf("failed to handle collection of the deltas: %w",
+				err)
+		}
+	}
 
 	return nil
 }
@@ -1252,11 +1282,13 @@ func (e *Engine) validateStateDelta(delta *messages.ExecutionStateDelta) error {
 			delta.StartState)
 	}
 
+	// TODO: validate the delta with the child block's statecommitment
+
 	return nil
 }
 
 func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
-	// TODO - validate state sync, reject invalid messages
+	// TODO - validate state delta, reject invalid messages
 	executionReceipt, err := e.saveExecutionResults(
 		context.Background(),
 		&delta.ExecutableBlock,
@@ -1266,16 +1298,27 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 		delta.StartState,
 	)
 
+	blockID := delta.ID()
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("fatal error while processing sync message")
+		e.log.Fatal().
+			Hex("block_id", blockID[:]).
+			Err(err).Msg("fatal error while processing sync message")
 	}
 
 	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, delta.EndState) {
 		e.log.Fatal().
+			Hex("block_id", blockID[:]).
 			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit).
 			Hex("delta_end_state", delta.EndState).
 			Hex("delta_start_state", delta.StartState).
 			Err(err).Msg("processing sync message produced unexpected state commitment")
+	}
+
+	err = e.onBlockExecuted(&delta.ExecutableBlock, delta.EndState)
+	if err != nil {
+		e.log.Error().
+			Hex("block_id", blockID[:]).
+			Err(err).Msg("onBlockExecuted failed")
 	}
 }
 
