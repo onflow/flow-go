@@ -2,6 +2,7 @@ package timeout
 
 import (
 	"math"
+	"sync"
 	"time"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
@@ -16,6 +17,8 @@ type Controller struct {
 	timer          *time.Timer
 	timerInfo      *model.TimerInfo
 	timeoutChannel <-chan time.Time
+	replicaTimeout float64
+	mux            sync.Mutex
 }
 
 // timeoutCap this is an internal cap on the timeout to avoid numerical overflows.
@@ -35,6 +38,8 @@ func NewController(timeoutConfig Config) *Controller {
 	tc := Controller{
 		cfg:            timeoutConfig,
 		timeoutChannel: startChannel,
+		replicaTimeout: timeoutConfig.ReplicaTimeout,
+		mux:            sync.Mutex{},
 	}
 	return &tc
 }
@@ -89,24 +94,28 @@ func (t *Controller) computeTimeoutDuration(mode model.TimeoutMode) time.Duratio
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
-	return time.Duration(float64(uint64(t.cfg.ReplicaTimeout)/sensitivity*sensitivity) * 1e6)
+	return time.Duration(float64(uint64(t.replicaTimeout)/sensitivity*sensitivity) * 1e6)
 }
 
 // VoteCollectionTimeout returns the duration of Vote aggregation _after_ receiving a block
 // during which the primary tries to aggregate votes for the view where it is leader
 func (t *Controller) VoteCollectionTimeout() time.Duration {
 	// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
-	return time.Duration(float64(uint64(t.cfg.ReplicaTimeout)/sensitivity*sensitivity) * 1e6 * t.cfg.VoteAggregationTimeoutFraction)
+	return time.Duration(float64(uint64(t.replicaTimeout)/sensitivity*sensitivity) * 1e6 * t.cfg.VoteAggregationTimeoutFraction)
 }
 
 // OnTimeout indicates to the Controller that the timeout was reached
 func (t *Controller) OnTimeout() {
-	t.cfg.ReplicaTimeout = math.Min(t.cfg.ReplicaTimeout*t.cfg.TimeoutIncrease, timeoutCap)
+	t.mux.Lock()
+	t.replicaTimeout = math.Min(t.replicaTimeout*t.cfg.TimeoutIncrease, timeoutCap)
+	t.mux.Unlock()
 }
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached
 func (t *Controller) OnProgressBeforeTimeout() {
-	t.cfg.ReplicaTimeout = math.Max(t.cfg.ReplicaTimeout*t.cfg.TimeoutDecrease, t.cfg.MinReplicaTimeout)
+	t.mux.Lock()
+	t.replicaTimeout = math.Max(t.replicaTimeout*t.cfg.TimeoutDecrease, t.cfg.MinReplicaTimeout)
+	t.mux.Unlock()
 }
 
 // BlockRateDelay is a delay to broadcast the proposal in order to control block production rate
