@@ -3,11 +3,11 @@ package leader
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/indices"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/indices"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months

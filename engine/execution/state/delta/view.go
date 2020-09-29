@@ -3,8 +3,8 @@ package delta
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // GetRegisterFunc is a function that returns the value for a register.

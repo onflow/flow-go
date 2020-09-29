@@ -9,8 +9,8 @@ import (
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	lcrypto_pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	fcrypto "github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
+	fcrypto "github.com/onflow/flow-go/crypto"
 )
 
 // assigns a big.Int input to a Go ecdsa private key

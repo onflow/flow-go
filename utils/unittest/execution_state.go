@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Used below with random service key

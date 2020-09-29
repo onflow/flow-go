@@ -7,12 +7,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/metrics/example"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics/example"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func main() {
@@ -64,12 +64,14 @@ func main() {
 
 			collProvider := engine.TestNetwork
 			collIngest := engine.TestMetrics
+			message1 := "CollectionRequest"
+			message2 := "ClusterBlockProposal"
 
-			collector.NetworkMessageSent(rand.Intn(1000), collProvider)
-			collector.NetworkMessageSent(rand.Intn(1000), collIngest)
+			collector.NetworkMessageSent(rand.Intn(1000), collProvider, message1)
+			collector.NetworkMessageSent(rand.Intn(1000), collIngest, message2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), collProvider)
-			collector.NetworkMessageReceived(rand.Intn(1000), collIngest)
+			collector.NetworkMessageReceived(rand.Intn(1000), collProvider, message1)
+			collector.NetworkMessageReceived(rand.Intn(1000), collIngest, message2)
 
 			time.Sleep(1 * time.Second)
 		}

@@ -3,9 +3,9 @@ package protocol
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 // FindLatest retrieves the latest finalized header and all of its pending

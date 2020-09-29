@@ -10,19 +10,19 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/events"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Engine is the consensus engine, responsible for handling communication for
@@ -173,7 +173,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	}
 
 	// send the vote the desired recipient
-	err := e.con.Submit(vote, recipientID)
+	err := e.con.Unicast(vote, recipientID)
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
@@ -254,7 +254,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		// broadcast the proposal to consensus nodes
-		err = e.con.Submit(proposal, recipients.NodeIDs()...)
+		err = e.con.Publish(proposal, recipients.NodeIDs()...)
 		if err != nil {
 			log.Error().Err(err).Msg("could not send proposal message")
 		}

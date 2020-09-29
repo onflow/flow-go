@@ -3,7 +3,7 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // BlockRequester enables components to request particular blocks by ID from

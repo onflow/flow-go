@@ -7,8 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // Account represents an account on the Flow network.
@@ -31,6 +31,7 @@ type AccountPublicKey struct {
 	HashAlgo  hash.HashingAlgorithm
 	SeqNumber uint64
 	Weight    int
+	Revoked   bool
 }
 
 func (a AccountPublicKey) MarshalJSON() ([]byte, error) {

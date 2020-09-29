@@ -8,13 +8,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/encoding"
-	"github.com/dapperlabs/flow-go/ledger/common/pathfinder"
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
-	"github.com/dapperlabs/flow-go/ledger/complete/wal"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/module"
 )
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
@@ -71,7 +71,7 @@ func NewLedger(dbDir string,
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
 
-	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
+	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)
 
 	return storage, nil
@@ -158,7 +158,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
 
-	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
+	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	l.metrics.ForestApproxMemorySize(0)
 
 	elapsed := time.Since(start)

@@ -8,15 +8,16 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/utils/dsl"
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/verification"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/utils/dsl"
 )
 
 func AddressFixture() flow.Address {
@@ -825,6 +826,15 @@ func QuorumCertificateFixture() *flow.QuorumCertificate {
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
 		SigData:   SeedFixture(32 * 3),
+	}
+}
+
+func VoteFixture() *hotstuff.Vote {
+	return &hotstuff.Vote{
+		View:     uint64(rand.Uint32()),
+		BlockID:  IdentifierFixture(),
+		SignerID: IdentifierFixture(),
+		SigData:  RandomBytes(128),
 	}
 }
 

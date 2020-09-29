@@ -2,7 +2,7 @@
 package network
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Engine represents an isolated process running across the peer-to-peer network

@@ -10,8 +10,8 @@ functionality required by the Flow protocol.
 ```go
 import (
     "github.com/onflow/cadence/runtime"
-    "github.com/dapperlabs/flow-go/fvm"
-    "github.com/dapperlabs/flow-go/model/flow"
+    "github.com/onflow/flow-go/fvm"
+    "github.com/onflow/flow-go/model/flow"
 )
 
 vm := fvm.New(runtime.NewInterpreterRuntime())

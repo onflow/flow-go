@@ -1,8 +1,8 @@
 package ledger
 
 // import (
-// 	"github.com/dapperlabs/flow-go/model/flow"
-// 	proofs "github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+// 	"github.com/onflow/flow-go/model/flow"
+// 	proofs "github.com/onflow/flow-go/storage/ledger/mtrie/proof"
 // )
 
 // type TrieVerifier struct {

@@ -4,15 +4,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // VotingStatus keeps track of incorporated votes for the same block
 type VotingStatus struct {
-	signer           hotstuff.Signer
+	signer           hotstuff.SignerVerifier
 	block            *model.Block
 	stakeThreshold   uint64
 	accumulatedStake uint64
@@ -21,7 +21,7 @@ type VotingStatus struct {
 }
 
 // NewVotingStatus creates a new Voting Status instance
-func NewVotingStatus(block *model.Block, stakeThreshold uint64, signer hotstuff.Signer) *VotingStatus {
+func NewVotingStatus(block *model.Block, stakeThreshold uint64, signer hotstuff.SignerVerifier) *VotingStatus {
 	return &VotingStatus{
 		signer:           signer,
 		block:            block,

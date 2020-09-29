@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // A Delta is a record of ledger mutations.

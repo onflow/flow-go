@@ -3,10 +3,10 @@ package cmd
 import (
 	"encoding/hex"
 
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func constructRootResultAndSeal(

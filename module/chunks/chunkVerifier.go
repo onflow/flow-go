@@ -5,14 +5,14 @@ import (
 	"fmt"
 	executionState "github.com/dapperlabs/flow-go/engine/execution/state"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/partial"
-	chmodels "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/verification"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/partial"
+	chmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type VirtualMachine interface {

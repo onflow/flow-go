@@ -5,8 +5,8 @@ import (
 
 	"github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 func validSetup(setup *flow.EpochSetup) error {

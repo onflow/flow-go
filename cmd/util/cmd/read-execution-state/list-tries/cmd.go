@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
 )
 
 var cmd = &cobra.Command{

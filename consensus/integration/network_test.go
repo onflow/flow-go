@@ -1,11 +1,12 @@
 package integration_test
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 )
 
 // TODO replace this type with `network/stub/hub.go`
@@ -36,6 +37,7 @@ func (h *Hub) WithFilter(filter BlockOrDelayFunc) *Hub {
 // other networks to send events directly.
 func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 	net := &Network{
+		ctx:      context.Background(),
 		hub:      h,
 		originID: originID,
 		conduits: make(map[string]*Conduit),
@@ -53,6 +55,7 @@ func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 // When an engine is attached on a Network instance, the mocked Network delivers
 // all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
+	ctx      context.Context
 	hub      *Hub
 	node     *Node
 	originID flow.Identifier
@@ -62,7 +65,10 @@ type Network struct {
 // Register registers an Engine of the attached node to the channel ID via a Conduit, and returns the
 // Conduit instance.
 func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
+	ctx, cancel := context.WithCancel(n.ctx)
 	con := &Conduit{
+		ctx:       ctx,
+		cancel:    cancel,
 		net:       n,
 		channelID: channelID,
 		queue:     make(chan message, 1024),
@@ -74,6 +80,14 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 	}()
 	n.conduits[channelID] = con
 	return con, nil
+}
+
+// unregister unregisters the engine associated with the given Channel ID and closes the conduit queue.
+func (n *Network) unregister(channelID string) error {
+	con := n.conduits[channelID]
+	close(con.queue)
+	delete(n.conduits, channelID)
+	return nil
 }
 
 // submit is called when the attached Engine to the channel ID is sending an event to an
@@ -139,25 +153,47 @@ func (n *Network) multicast(event interface{}, channelID string, num uint, targe
 }
 
 type Conduit struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
 	net       *Network
 	channelID string
 	queue     chan message
 }
 
 func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
+	if c.ctx.Err() != nil {
+		return fmt.Errorf("conduit closed")
+	}
 	return c.net.submit(event, c.channelID, targetIDs...)
 }
 
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+	if c.ctx.Err() != nil {
+		return fmt.Errorf("conduit closed")
+	}
 	return c.net.publish(event, c.channelID, targetIDs...)
 }
 
 func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
+	if c.ctx.Err() != nil {
+		return fmt.Errorf("conduit closed")
+	}
 	return c.net.unicast(event, c.channelID, targetID)
 }
 
 func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
+	if c.ctx.Err() != nil {
+		return fmt.Errorf("conduit closed")
+	}
 	return c.net.multicast(event, c.channelID, num, targetIDs...)
+}
+
+func (c *Conduit) Close() error {
+	if c.ctx.Err() != nil {
+		return fmt.Errorf("conduit closed")
+	}
+	c.cancel()
+	return c.net.unregister(c.channelID)
 }
 
 type message struct {

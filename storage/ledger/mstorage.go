@@ -6,12 +6,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
-	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/storage/ledger/mtrie"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/proof"
+	"github.com/onflow/flow-go/storage/ledger/mtrie/trie"
+	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 const (
@@ -63,7 +63,7 @@ func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, r
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
 
-	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
+	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)
 
 	return storage, nil
@@ -154,7 +154,7 @@ func (f *MTrieStorage) UpdateRegisters(
 	}
 	newStateCommitment = newTrie.RootHash()
 
-	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
+	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	f.metrics.ForestApproxMemorySize(0)
 
 	elapsed := time.Since(start)

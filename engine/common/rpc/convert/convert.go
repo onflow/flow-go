@@ -7,9 +7,9 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
@@ -289,6 +289,7 @@ func MessageToAccountKey(m *entities.AccountKey) (*flow.AccountPublicKey, error)
 		HashAlgo:  hashAlgo,
 		Weight:    int(m.GetWeight()),
 		SeqNumber: uint64(m.GetSequenceNumber()),
+		Revoked:   m.GetRevoked(),
 	}, nil
 }
 
@@ -301,6 +302,7 @@ func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) 
 		HashAlgo:       uint32(a.HashAlgo),
 		Weight:         uint32(a.Weight),
 		SequenceNumber: uint32(a.SeqNumber),
+		Revoked:        a.Revoked,
 	}, nil
 }
 

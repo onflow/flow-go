@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/common/synchronization"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
