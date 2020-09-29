@@ -295,13 +295,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			}
 
 			// execute the block if the block is ready to be executed
-			executed := e.executeBlockIfComplete(executableBlock)
-
-			if executed {
-				log.Info().Msg("block has been executed")
-			} else {
-				log.Debug().Msg("block is not ready to be executed")
-			}
+			e.executeBlockIfComplete(executableBlock)
 
 			return nil
 		},
@@ -313,13 +307,14 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.ExecutableBlock) {
 	defer e.wg.Done()
 
+	e.log.Info().
+		Hex("block_id", logging.Entity(executableBlock)).
+		Msg("executing block")
+
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.Finish()
 
 	view := e.execState.NewView(executableBlock.StartState)
-	e.log.Info().
-		Hex("block_id", logging.Entity(executableBlock)).
-		Msg("executing block")
 
 	computationResult, err := e.computationManager.ComputeBlock(ctx, executableBlock, view)
 	if err != nil {
@@ -445,18 +440,26 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	// note the block ID is the delta's ID
 	delta, found := e.syncDeltas.ByID(eb.Block.ID())
 	if found {
-		e.unit.Launch(func() {
-			e.applyStateDelta(delta)
-		})
-		return true
+		// double check before applying the state delta
+		if bytes.Equal(eb.StartState, delta.ExecutableBlock.StartState) {
+			e.unit.Launch(func() {
+				e.applyStateDelta(delta)
+			})
+			return true
+		}
+
+		// if state delta is invalid, remove the delta and log error
+		e.log.Error().
+			Hex("block_start_state", eb.StartState).
+			Hex("delta_start_state", delta.ExecutableBlock.StartState).
+			Msg("can not apply the state delta, the start state does not match")
+
+		e.syncDeltas.Rem(eb.Block.ID())
 	}
 
 	// if don't have the delta, then check if everything is ready for executing
 	// the block
 	if eb.IsComplete() {
-		e.log.Debug().
-			Hex("block_id", logging.Entity(eb)).
-			Msg("block complete, starting execution")
 
 		if e.extensiveLogging {
 			e.logExecutableBlock(eb)
@@ -1068,15 +1071,15 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 		ToHeight:   toHeight,
 	}
 
-	e.log.Debug().
+	e.log.Info().
 		Hex("target_node", logging.Entity(randomExecutionNode)).
 		Uint64("from", fromHeight).
 		Uint64("to", toHeight).
 		Msg("requesting execution state sync")
 
-	// TODO: running periodically
-	// if the random execution node doesn't have the state, we
-	// will choose another execution node to sync state from.
+	// TODO: there is a chance the randomly picked execution node is also behind,
+	// retry state syncing request with another node if we haven't
+	// reached the targeted height after a while.
 	err = e.syncConduit.Submit(&exeStateReq, randomExecutionNode.NodeID)
 
 	if err != nil {
@@ -1084,6 +1087,7 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 			randomExecutionNode,
 			err)
 	}
+
 	return nil
 }
 
@@ -1288,7 +1292,13 @@ func (e *Engine) validateStateDelta(delta *messages.ExecutionStateDelta) error {
 }
 
 func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
+	blockID := delta.ID()
+	log := e.log.With().Hex("block_id", blockID[:]).Logger()
+
+	log.Debug().Msg("applying delta for block")
+
 	// TODO - validate state delta, reject invalid messages
+
 	executionReceipt, err := e.saveExecutionResults(
 		context.Background(),
 		&delta.ExecutableBlock,
@@ -1298,16 +1308,12 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 		delta.StartState,
 	)
 
-	blockID := delta.ID()
 	if err != nil {
-		e.log.Fatal().
-			Hex("block_id", blockID[:]).
-			Err(err).Msg("fatal error while processing sync message")
+		log.Fatal().Err(err).Msg("fatal error while processing sync message")
 	}
 
 	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, delta.EndState) {
-		e.log.Fatal().
-			Hex("block_id", blockID[:]).
+		log.Fatal().
 			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit).
 			Hex("delta_end_state", delta.EndState).
 			Hex("delta_start_state", delta.StartState).
@@ -1316,10 +1322,10 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 
 	err = e.onBlockExecuted(&delta.ExecutableBlock, delta.EndState)
 	if err != nil {
-		e.log.Error().
-			Hex("block_id", blockID[:]).
-			Err(err).Msg("onBlockExecuted failed")
+		log.Error().Err(err).Msg("onBlockExecuted failed")
 	}
+
+	log.Info().Msg("block has been executed successfully from applying state deltas")
 }
 
 // generateChunkDataPack creates a chunk data pack
