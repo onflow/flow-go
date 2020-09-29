@@ -16,21 +16,19 @@ import (
 // Finalizer is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
 type Finalizer struct {
-	db          *badger.DB
-	headers     storage.Headers
-	state       protocol.State
-	cleanup     CleanupFunc
-	informValid InformValidFunc
+	db      *badger.DB
+	headers storage.Headers
+	state   protocol.State
+	cleanup CleanupFunc
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
 func NewFinalizer(db *badger.DB, headers storage.Headers, state protocol.State, options ...func(*Finalizer)) *Finalizer {
 	f := &Finalizer{
-		db:          db,
-		state:       state,
-		headers:     headers,
-		cleanup:     CleanupNothing(),
-		informValid: InformNothing(),
+		db:      db,
+		state:   state,
+		headers: headers,
+		cleanup: CleanupNothing(),
 	}
 	for _, option := range options {
 		option(f)
@@ -119,14 +117,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 // MakeValid marks a block as having passed HotStuff validation.
 func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
-	// XXX create aggregate error?
-
-	err := f.informValid(blockID)
-	if err != nil {
-		return err
-	}
-
-	err = f.state.Mutate().MarkValid(blockID)
+	err := f.state.Mutate().MarkValid(blockID)
 	if err != nil {
 		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
 	}

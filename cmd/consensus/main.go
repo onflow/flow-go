@@ -273,9 +273,6 @@ func main() {
 					guarantees,
 					seals,
 				)),
-				finalizer.WithInformValid(
-					match.OnMakeValid,
-				),
 			)
 
 			// initialize the aggregating signature module for staking signatures

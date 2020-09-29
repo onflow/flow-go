@@ -5,9 +5,3 @@ func WithCleanup(cleanup CleanupFunc) func(*Finalizer) {
 		f.cleanup = cleanup
 	}
 }
-
-func WithInformValid(informValid InformValidFunc) func(*Finalizer) {
-	return func(f *Finalizer) {
-		f.informValid = informValid
-	}
-}

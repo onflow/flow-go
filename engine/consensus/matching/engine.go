@@ -175,19 +175,6 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	}
 }
 
-// OnMakeValid is called by the finalizer when a block is marked as having
-// passed consensus validation.
-func (e *Engine) OnMakeValid(blockID flow.Identifier) error {
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
-	fmt.Printf("XXX Consensus Matching Engine / OnMakeValid(%s)\n", blockID)
-
-	go e.checkSealing()
-
-	return nil
-}
-
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
@@ -230,10 +217,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	}
 
 	// if the receipt is for an unknow block, cache it. It will be processed
-	// later with OnMakeValid
+	// later when the finalizer processes new blocks.
 	_, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
 	if err != nil {
-		// XXX
 		_ = e.receipts.Add(receipt)
 		return nil
 	}
@@ -313,10 +299,9 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	}
 
 	// if the approval is for an unknow block, cache it. It will be processed
-	// later with OnMakeValid
+	// later when the finalizer processes new blocks
 	_, err := e.state.AtBlockID(approval.Body.BlockID).Head()
 	if err != nil {
-		// XXX
 		_, _ = e.approvals.Add(approval)
 		return nil
 	}
