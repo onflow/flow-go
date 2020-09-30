@@ -157,7 +157,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// create a discovery object to help libp2p discover peers
-	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
+	d := NewDiscovery(m.log, m.ov, m.me, m.libP2PNode)
 
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{

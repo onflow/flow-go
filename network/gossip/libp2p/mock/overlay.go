@@ -52,7 +52,7 @@ func (_m *Overlay) Receive(nodeID flow.Identifier, msg *message.Message) error {
 }
 
 // Topology provides a mock function with given fields:
-func (_m *Overlay) Topology() (map[flow.Identifier]flow.Identity, error) {
+func (_m *Overlay) Topology() (flow.IdentityList, error) {
 	ret := _m.Called()
 
 	var r0 map[flow.Identifier]flow.Identity

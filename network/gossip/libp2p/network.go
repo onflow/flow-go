@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/state/protocol/events"
 )
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
@@ -23,12 +24,13 @@ type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
+	events.Noop     // network consumes some of the protocol events
 	logger          zerolog.Logger
 	codec           network.Codec
 	ids             flow.IdentityList
 	me              module.Local
 	mw              middleware.Middleware
-	top             topology.Topology
+	top             topology.TopologyCache
 	metrics         module.NetworkMetrics
 	rcache          *cache.RcvCache // used to deduplicate incoming messages
 	queue           queue.MessageQueue
@@ -57,13 +59,15 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
 
+	topologyCache := topology.NewTopologyCacheImpl(top)
+
 	o := &Network{
 		logger:          log,
 		codec:           codec,
 		me:              me,
 		mw:              mw,
 		rcache:          rcache,
-		top:             top,
+		top:             topologyCache,
 		metrics:         metrics,
 		subscriptionMgr: newSubscriptionManager(mw),
 	}
@@ -156,18 +160,18 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 }
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
-func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
+func (n *Network) Topology() (flow.IdentityList, error) {
 	subset, err := n.top.Subset(n.ids, n.fanout())
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
 	}
-
+	return subset, nil
 	// creates a map of all the selected ids
-	topMap := make(map[flow.Identifier]flow.Identity)
-	for _, id := range subset {
-		topMap[id.NodeID] = *id
-	}
-	return topMap, nil
+	//topMap := make(map[flow.Identifier]flow.Identity)
+	//for _, id := range subset {
+	//	topMap[id.NodeID] = *id
+	//}
+	//return topMap, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
@@ -449,4 +453,21 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 			Str("sender_id", qm.SenderID.String()).
 			Msg("failed to process message")
 	}
+}
+
+func (n *Network) EpochTransition(newEpoch uint64, first *flow.Header) {
+	// TODO: update the collection topology if this is a collection node
+	oldList, err := n.Topology()
+	if err != nil {
+		n.logger.Err(err).Msg("failed to process EpochTransition event")
+	}
+
+	// invalidate the old topology since an epoch transition has occured
+	n.top.Invalidate()
+
+	// get the new list of nodes to connect to
+	newList, err := n.Topology()
+
+	extraConnectons
+
 }
