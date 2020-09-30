@@ -17,11 +17,11 @@ const (
 
 	// Channels for consensus protocols
 	ConsensusCommittee     = "consensus-committee"
-	consensusClusterPrefix = "consensus-cluster" // use ChannelConsensusCluster
+	consensusClusterPrefix = "consensus-cluster" // dynamic channel, use ChannelConsensusCluster function
 
 	// Channels for protocols actively synchronizing state across nodes
 	SyncCommittee     = "sync-committee"
-	syncClusterPrefix = "sync-cluster" // use ChannelSyncCluster
+	syncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
 	SyncExecution     = "sync-execution"
 
 	// Channels for actively pushing entities to subscribers
@@ -57,11 +57,11 @@ func FullyQualifiedChannelName(channelID string, rootBlockID string) string {
 // ChannelConsensusCluster returns a dynamic cluster consensus channel based on
 // the chain ID of the cluster in question.
 func ChannelConsensusCluster(clusterID flow.ChainID) string {
-	return fmt.Sprint("%s-%s", consensusClusterPrefix, clusterID)
+	return fmt.Sprintf("%s-%s", consensusClusterPrefix, clusterID)
 }
 
 // ChannelSyncCluster returns a dynamic cluster sync channel based on the chain
 // ID of the cluster in question.
 func ChannelSyncCluster(clusterID flow.ChainID) string {
-	return fmt.Sprint("%s-%s", syncClusterPrefix, clusterID)
+	return fmt.Sprintf("%s-%s", syncClusterPrefix, clusterID)
 }
