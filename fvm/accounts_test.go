@@ -467,6 +467,7 @@ func TestAddAccountKey(t *testing.T) {
 
 			for i, expectedKey := range expectedKeys {
 				actualKey := after.Keys[i]
+				assert.Equal(t, i, actualKey.Index)
 				assert.Equal(t, expectedKey.PublicKey, actualKey.PublicKey)
 				assert.Equal(t, expectedKey.SignAlgo, actualKey.SignAlgo)
 				assert.Equal(t, expectedKey.HashAlgo, actualKey.HashAlgo)

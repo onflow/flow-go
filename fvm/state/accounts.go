@@ -125,7 +125,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 		return flow.AccountPublicKey{}, ErrAccountPublicKeyNotFound
 	}
 
-	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
+	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey, keyIndex)
 	if err != nil {
 		return flow.AccountPublicKey{}, fmt.Errorf("failed to decode public key: %w", err)
 	}
