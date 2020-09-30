@@ -113,8 +113,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 
 	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
-	executionState.On("PersistExecutionReceipt", mock.Anything, mock.Anything).Return(nil)
-	executionState.On("PersistStateInteractions", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
@@ -229,6 +227,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		).
 		Return(nil)
 
+	ctx.executionState.On("PersistStateInteractions", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	ctx.providerEngine.
 		On(
 			"BroadcastExecutionReceipt",
@@ -270,6 +270,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 
 		}).
 		Return(nil)
+}
+
+func (ctx *testingContext) stateCommitmentExist(blockID flow.Identifier, commit flow.StateCommitment) {
+	ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blockID).Return(commit, nil)
 }
 
 func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]flow.StateCommitment, onPersisted func(flow.Identifier, flow.StateCommitment)) {
@@ -463,28 +467,28 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		scriptResult := []byte{1}
 
 		// Ensure block we're about to query against is executable
-		executableBlock := unittest.ExecutableBlockFixture(nil)
-		executableBlock.StartState = unittest.StateCommitmentFixture()
+		blockA := unittest.ExecutableBlockFixture(nil)
+		blockA.StartState = unittest.StateCommitmentFixture()
 
 		snapshot := new(protocol.Snapshot)
-		snapshot.On("Head").Return(executableBlock.Block.Header, nil)
+		snapshot.On("Head").Return(blockA.Block.Header, nil)
 
-		// Add all data needed for execution of script
-		ctx.executionState.
-			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.ID()).
-			Return(executableBlock.StartState, nil)
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blockA.ID()] = blockA.StartState
 
-		ctx.state.On("AtBlockID", executableBlock.Block.ID()).Return(snapshot)
+		ctx.stateCommitmentExist(blockA.ID(), blockA.StartState)
+
+		ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
 		view := new(delta.View)
-		ctx.executionState.On("NewView", executableBlock.StartState).Return(view)
+		ctx.executionState.On("NewView", blockA.StartState).Return(view)
 
 		// Successful call to computation manager
 		ctx.computationManager.
-			On("ExecuteScript", script, [][]byte(nil), executableBlock.Block.Header, view).
+			On("ExecuteScript", script, [][]byte(nil), blockA.Block.Header, view).
 			Return(scriptResult, nil)
 
 		// Execute our script and expect no error
-		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, executableBlock.Block.ID())
+		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
 		assert.NoError(t, err)
 		assert.Equal(t, scriptResult, res)
 
@@ -512,6 +516,8 @@ func Test_SPOCKGeneration(t *testing.T) {
 				SpockSecret: unittest.RandomBytes(100),
 			},
 		}
+
+		ctx.executionState.On("PersistExecutionReceipt", mock.Anything, mock.Anything).Return(nil)
 
 		executionReceipt, err := ctx.engine.generateExecutionReceipt(
 			context.Background(),
