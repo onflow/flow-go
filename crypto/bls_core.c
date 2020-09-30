@@ -174,14 +174,14 @@ static node* new_node(const ep2_st* pk, const ep_st* sig){
     return t;
 }
 
-// builds a binary tree of aggregation of signatures and public keys recursivley.
+// builds a binary tree of aggregation of signatures and public keys recursively.
 static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
-    // check if a leave is reached
+    // check if a leaf is reached
     if (len == 1) {
         return new_node(pks, sigs);  // use the first element of the arrays
     }
 
-    // a leave is not reached yet, 
+    // a leaf is not reached yet, 
     int right_len = len/2;
     int left_len = len - right_len;
 
@@ -206,7 +206,7 @@ static void free_tree(node* root) {
         // only free non-leaves, leaves are allocated as an entire array
         free(root->sig);
         free(root->pk);
-        // free the children
+        // free the children nodes
         free_tree(root->left);
         free_tree(root->right);
     }
