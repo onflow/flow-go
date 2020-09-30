@@ -41,7 +41,7 @@ func NewLedger(proof ledger.Proof, s ledger.State) (*Ledger, error) {
 		return nil, ledger.NewErrLedgerConstruction(err)
 	}
 
-	return &Ledger{ptrie: psmt, proof: proof}, nil
+	return &Ledger{ptrie: psmt, proof: proof, state: s}, nil
 }
 
 // Ready implements interface module.ReadyDoneAware
