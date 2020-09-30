@@ -1,7 +1,6 @@
 package partial
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
@@ -74,9 +73,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	}
 	payloads, err := l.ptrie.Get(paths)
 	if err != nil {
-		if errors.Is(err, ptrie.ErrMissingPath{}) {
-			pErr := err.(ptrie.ErrMissingPath)
-
+		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
 			//store mappings and restore keys from missing paths
 			pathToKey := make(map[string]ledger.Key)
 
