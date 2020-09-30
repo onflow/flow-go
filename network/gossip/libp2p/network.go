@@ -456,18 +456,6 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 }
 
 func (n *Network) EpochTransition(newEpoch uint64, first *flow.Header) {
-	// TODO: update the collection topology if this is a collection node
-	oldList, err := n.Topology()
-	if err != nil {
-		n.logger.Err(err).Msg("failed to process EpochTransition event")
-	}
-
-	// invalidate the old topology since an epoch transition has occured
+	// invalidate the old topology since an epoch transition has occurred
 	n.top.Invalidate()
-
-	// get the new list of nodes to connect to
-	newList, err := n.Topology()
-
-	extraConnectons
-
 }

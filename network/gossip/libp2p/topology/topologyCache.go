@@ -33,7 +33,7 @@ func (cache *TopologyCacheImpl) Subset(idList flow.IdentityList, fanout uint) (f
 	defer cache.Unlock()
 
 	// if previous result was cached, return it
-	if cache.cachedList != nil {
+	if cache.cachedList.Count() > 0 {
 		return cache.cachedList, nil
 	}
 	// else derive new subset
