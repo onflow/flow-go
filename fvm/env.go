@@ -150,7 +150,7 @@ func (e *hostEnv) ResolveLocation(identifiers []runtime.Identifier, location run
 			return blankLocation
 		}
 
-		identifiers = make([]ast.Identifier,len(allContracts))
+		identifiers = make([]ast.Identifier, len(allContracts))
 		for i := range identifiers {
 			identifiers[i] = runtime.Identifier{
 				Identifier: allContracts[i],

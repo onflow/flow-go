@@ -141,7 +141,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract,"FlowServiceAccount"),
+		deployContractTransaction(service, contract, "FlowServiceAccount"),
 		b.ledger,
 	)
 	if err != nil {
