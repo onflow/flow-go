@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"sync"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -57,7 +56,6 @@ type Engine struct {
 	providerEngine     provider.ProviderEngine
 	mempool            *Mempool
 	execState          state.ExecutionState
-	wg                 sync.WaitGroup
 	metrics            module.ExecutionMetrics
 	tracer             module.Tracer
 	extensiveLogging   bool
@@ -89,6 +87,7 @@ func New(
 	extLog bool,
 	root *flow.Header,
 	syncFilter flow.IdentityFilter,
+	syncDeltas mempool.Deltas,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -115,6 +114,7 @@ func New(
 		extensiveLogging:   extLog,
 		root:               root,
 		syncFilter:         syncFilter,
+		syncDeltas:         syncDeltas,
 	}
 
 	// move to state syncing engine
@@ -137,15 +137,7 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a channel that will close when the engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		e.Wait()
-	})
-}
-
-// Wait will wait until all the blocks that are currently being executing
-// finish being executed.
-func (e *Engine) Wait() {
-	e.wg.Wait() // wait for block execution
+	return e.unit.Done()
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -226,10 +218,13 @@ func (e *Engine) OnBlockProcessable(b *model.Block) {
 // handle block will process the incoming block.
 // the block has passed the consensus validation.
 func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
-	log := e.log.With().Hex("block_id", logging.Entity(block)).Logger()
+	blockID := block.ID()
+	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
-	_, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ID())
+	_, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err == nil {
+		// a statecommitment being stored indicates the block
+		// has been executed
 		log.Debug().Msg("block has been executed already")
 		return nil
 	}
@@ -239,14 +234,14 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	}
 
 	// unexecuted block
-	e.metrics.StartBlockReceivedToExecuted(block.ID())
+	e.metrics.StartBlockReceivedToExecuted(blockID)
 
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
 
-	// acquiring the lock so that there is one process modifying the queue
+	// acquiring the lock so that there is only one process modifying the queue
 	return e.mempool.Run(
 		func(
 			blockByCollection *stdmap.BlockByCollectionBackdata,
@@ -305,7 +300,6 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 // executeBlock will execute the block.
 // When finish executing, it will check if the children becomes executable and execute them if yes.
 func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.ExecutableBlock) {
-	defer e.wg.Done()
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
@@ -430,6 +424,7 @@ func (e *Engine) onBlockExecuted(executedBlock *entity.ExecutableBlock, finalSta
 
 // executeBlockIfComplete checks whether the block is ready to be executed.
 // if yes, execute the block
+// return a bool indicates whether the block was completed
 func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	if !eb.HasStartState() {
 		return false
@@ -465,7 +460,6 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 			e.logExecutableBlock(eb)
 		}
 
-		e.wg.Add(1)
 		e.unit.Launch(func() {
 			e.executeBlock(context.Background(), eb)
 		})
@@ -592,6 +586,8 @@ func (e *Engine) matchOrRequestCollections(
 	// make sure that the requests are dispatched immediately by the requester
 	defer e.request.Force()
 
+	actualRequested := 0
+
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
 		coll := &entity.CompleteCollection{
 			Guarantee: guarantee,
@@ -652,7 +648,14 @@ func (e *Engine) matchOrRequestCollections(
 
 		// queue the collection to be requested from one of the guarantors
 		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+		actualRequested++
 	}
+
+	e.log.Debug().
+		Hex("block_id", logging.Entity(executableBlock)).
+		Int("num_col", len(executableBlock.Block.Payload.Guarantees)).
+		Int("actual_req", actualRequested).
+		Msg("requested all collections")
 
 	return nil
 }

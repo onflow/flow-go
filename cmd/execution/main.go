@@ -55,6 +55,7 @@ func main() {
 		providerEngine        *exeprovider.Engine
 		syncCore              *chainsync.Core
 		pendingBlocks         *buffer.PendingBlocks // used in follower engine
+		deltas                *ingestion.Deltas
 		syncEngine            *synchronization.Engine
 		followerEng           *followereng.Engine // to sync blocks from consensus nodes
 		computationManager    *computation.Manager
@@ -67,6 +68,7 @@ func main() {
 		collector             module.ExecutionMetrics
 		mTrieCacheSize        uint32
 		checkpointDistance    uint
+		stateDeltasLimit      uint
 		requestInterval       time.Duration
 		preferredExeNodeIDStr string
 		syncByBlocks          bool
@@ -81,6 +83,7 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
+			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "sync by blocks instead of execution state deltas")
@@ -124,6 +127,10 @@ func main() {
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
+		}).
+		Module("state deltas mempoo", func(node *cmd.FlowNodeBuilder) error {
+			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
+			return err
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 

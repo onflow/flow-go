@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+	engineCommon "github.com/onflow/flow-go/engine"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -27,9 +27,12 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	network "github.com/onflow/flow-go/network/mocks"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+var debugging = true
 
 var (
 	collection1Identity = unittest.IdentityFixture()
@@ -70,7 +73,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
 	collectionConduit := network.NewMockConduit(ctrl)
-	// syncConduit := network.NewMockConduit(ctrl)
+	syncConduit := network.NewMockConduit(ctrl)
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -108,6 +111,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 
 	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
+	executionState.On("PersistExecutionReceipt", mock.Anything, mock.Anything).Return(nil)
+	executionState.On("PersistStateInteractions", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
@@ -122,7 +127,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	txResults.EXPECT().BatchStore(gomock.Any(), gomock.Any()).AnyTimes()
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
-	log := zerolog.Logger{}
+	log := unittest.Logger(debugging)
 	metrics := metrics.NewNoopCollector()
 
 	tracer, err := trace.NewTracer(log, "test")
@@ -130,7 +135,10 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	request.EXPECT().Force().Return().AnyTimes()
 
-	// net.EXPECT().Register(gomock.Eq(uint8(engineCommon.SyncExecution)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+
+	deltas, err := NewDeltas(1000)
+	require.NoError(t, err)
 
 	engine, err = New(
 		log,
@@ -150,6 +158,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		false,
 		&flow.Header{},
 		filter.Any,
+		deltas,
 	)
 	require.NoError(t, err)
 
@@ -177,15 +186,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	if len(computationResult.StateSnapshots) == 0 { // if block was empty, no new state commitment is produced
 		newStateCommitment = executableBlock.StartState
 	}
-	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
 
 	ctx.computationManager.
 		On("ComputeBlock", mock.Anything, executableBlock, mock.Anything).
 		Return(computationResult, nil).Once()
-
-	ctx.executionState.
-		On("PersistStateInteractions", mock.Anything, executableBlock.Block.ID(), mock.Anything).
-		Return(nil)
 
 	for _, view := range computationResult.StateSnapshots {
 		ctx.executionState.
@@ -202,6 +206,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			})).
 			Return(nil)
 	}
+
+	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
 
 	ctx.executionState.
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
@@ -268,6 +274,43 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		Return(nil)
 }
 
+func (ctx *testingContext) stateCommitmentNotExistForBlockID(blockID flow.Identifier) {
+	ctx.executionState.
+		On("StateCommitmentByBlockID", context.Background(), blockID).
+		Return(flow.StateCommitment{}, storageerr.ErrNotFound)
+}
+func (ctx *testingContext) stateCommitmentExistForBlockID(blockID flow.Identifier, commit flow.StateCommitment) {
+	ctx.executionState.
+		On("StateCommitmentByBlockID", context.Background(), blockID).
+		Return(commit, nil)
+}
+
+func TestExecuteOneBlock(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+		// A <- B
+		executableBlockA := unittest.ExecutableBlockFixture(nil)
+		executableBlockA.StartState = unittest.StateCommitmentFixture()
+
+		// no statecommiment for blockA, since not executed yet
+		ctx.stateCommitmentNotExistForBlockID(executableBlockA.ID())
+
+		// blockA's start state is its parent's state commitment,
+		// and blockA's parent has been executed.
+		ctx.stateCommitmentExistForBlockID(executableBlockA.Block.Header.ParentID, executableBlockA.StartState)
+
+		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.snapshot.On("Head").Return(executableBlockA.Block.Header, nil)
+
+		ctx.assertSuccessfulBlockComputation(executableBlockA, unittest.IdentifierFixture())
+
+		err := ctx.engine.handleBlock(context.Background(), executableBlockA.Block)
+		require.NoError(t, err)
+
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		assert.False(t, more)
+	})
+}
+
 func TestExecuteBlockInOrder(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -289,7 +332,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 			On("StateCommitmentByBlockID", mock.Anything, mock.Anything).
 			Return(executableBlockA.StartState, nil)
 
-		ctx.executionState.On("PersistExecutionReceipt", mock.Anything, mock.Anything).Return(nil)
+		ctx.state.On("Sealed").Return(ctx.snapshot)
 
 		err := ctx.engine.handleBlock(context.Background(), executableBlockA.Block)
 		require.NoError(t, err)
@@ -395,8 +438,6 @@ func Test_SPOCKGeneration(t *testing.T) {
 				SpockSecret: unittest.RandomBytes(100),
 			},
 		}
-
-		ctx.executionState.On("PersistExecutionReceipt", mock.Anything, mock.Anything).Return(nil)
 
 		executionReceipt, err := ctx.engine.generateExecutionReceipt(
 			context.Background(),
