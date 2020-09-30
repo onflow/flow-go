@@ -231,7 +231,7 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	for i, pk := range pks {
 		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
 		if !ok {
-			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
+			return verifBool, fmt.Errorf("key at index %d is not a BLS key", i)
 		}
 		pkPoints = append(pkPoints, pkBLS.point)
 	}
