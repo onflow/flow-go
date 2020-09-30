@@ -2,6 +2,7 @@ package chunks
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 
@@ -103,7 +104,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
-
+	unknownRegTouch := make(map[string]*ledger.Key)
 	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
 		registerID := flow.NewRegisterKey(owner, controller, key)
@@ -118,6 +119,12 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 		values, err := psmt.Get(query)
 		if err != nil {
+			if errors.Is(err, ledger.ErrMissingKeys{}) {
+				unknownRegTouch[registerID.String()] = &registerKey
+				return nil, fmt.Errorf("missing register")
+			}
+			// append to missing keys if error is ErrMissingKeys
+
 			return nil, fmt.Errorf("cannot query register: %w", err)
 		}
 
@@ -146,18 +153,13 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	}
 
 	// check read access to unknown registers
-
-	// TODO - in new ledger version and associated chunk data pack we don't track values
-	// separately, they are part of the proof. Hence handling of missing registers must
-	// come from Partial Ledger and should be handled here for compatibility.
-	// Code left below for reference
-	//if len(unknownRegTouch) > 0 {
-	//	var missingRegs []string
-	//	for key := range unknownRegTouch {
-	//		missingRegs = append(missingRegs, key)
-	//	}
-	//	return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
-	//}
+	if len(unknownRegTouch) > 0 {
+		var missingRegs []string
+		for _, key := range unknownRegTouch {
+			missingRegs = append(missingRegs, key.String())
+		}
+		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
+	}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
 	// this returns the expected end state commitment after updates and the list of
@@ -173,8 +175,15 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	expEndStateComm, err := psmt.Set(update)
 
 	if err != nil {
-		// TODO - Should failed keys be added here somehow?
-		//return nil, chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
+		if errors.Is(err, ledger.ErrMissingKeys{}) {
+			keys := err.(*ledger.ErrMissingKeys).Keys
+			stringKeys := make([]string, len(keys))
+			for i, key := range keys {
+				stringKeys[i] = key.String()
+			}
+			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID), nil
+		}
+		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID), nil
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)

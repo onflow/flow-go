@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -37,7 +36,7 @@ func (p *PSMT) RootHash() []byte {
 
 // Get returns an slice of payloads (same order), an slice of failed paths and errors (if any)
 // TODO return list of indecies instead of paths
-func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, []ledger.Path, error) {
+func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 	var failedPaths []ledger.Path
 	payloads := make([]*ledger.Payload, 0)
 	for _, path := range paths {
@@ -51,32 +50,31 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, []ledger.Path, error
 		payloads = append(payloads, node.payload)
 	}
 	if len(failedPaths) > 0 {
-		return payloads, failedPaths, fmt.Errorf("path(s) doesn't exist")
+		return nil, &ErrMissingPath{Paths: failedPaths}
 	}
-
 	// after updating all the nodes, compute the value recursively only once
-	return payloads, failedPaths, nil
+	return payloads, nil
 }
 
 // Update updates registers and returns rootValue after updates
 // in case of error, it returns a list of paths for which update failed
-func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, []string, error) {
-	var failedPaths []string
+func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, error) {
+	var failedKeys []ledger.Key
 	for i, path := range paths {
 		payload := payloads[i]
 		// lookup the path and update the value
 		node, found := p.pathLookUp[string(path)]
 		if !found {
-			failedPaths = append(failedPaths, string(path))
+			failedKeys = append(failedKeys, payload.Key)
 			continue
 		}
 		node.hashValue = common.ComputeCompactValue(path, payload, node.height)
 	}
-	if len(failedPaths) > 0 {
-		return nil, failedPaths, fmt.Errorf("path(s) doesn't exist")
+	if len(failedKeys) > 0 {
+		return nil, &ledger.ErrMissingKeys{Keys: failedKeys}
 	}
 	// after updating all the nodes, compute the value recursively only once
-	return p.root.HashValue(), failedPaths, nil
+	return p.root.HashValue(), nil
 }
 
 // NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches

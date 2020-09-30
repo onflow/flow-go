@@ -15,7 +15,7 @@ type RegisterID struct {
 }
 
 func (r *RegisterID) String() string {
-	return fmt.Sprintf("%s/%s/%s", r.Owner, r.Controller, r.Key)
+	return fmt.Sprintf("%x/%x/%x", r.Owner, r.Controller, r.Key)
 }
 
 func NewRegisterKey(owner, controller, key string) RegisterID {

@@ -1,6 +1,7 @@
 package partial
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
@@ -71,9 +72,25 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO deal with failedPaths
-	payloads, _, err := l.ptrie.Get(paths)
+	payloads, err := l.ptrie.Get(paths)
 	if err != nil {
+		if errors.Is(err, ptrie.ErrMissingPath{}) {
+			pErr := err.(ptrie.ErrMissingPath)
+
+			//store mappings and restore keys from missing paths
+			pathToKey := make(map[string]ledger.Key)
+
+			for i, key := range query.Keys() {
+				path := paths[i]
+				pathToKey[string(path)] = key
+			}
+
+			keys := make([]ledger.Key, len(pErr.Paths))
+			for _, path := range pErr.Paths {
+				keys = append(keys, pathToKey[string(path)])
+			}
+			return nil, &ledger.ErrMissingKeys{Keys: keys}
+		}
 		return nil, err
 	}
 	values, err = pathfinder.PayloadsToValues(payloads)
@@ -97,8 +114,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return nil, err
 	}
 
-	// TODO handle failed paths
-	newRootHash, _, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
+	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
 	if err != nil {
 		return nil, err
 	}

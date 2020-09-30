@@ -1,5 +1,5 @@
 [Unit]
-Description=Flow Access Node running with Docker
+Description=Flow Verification Node running with Docker
 Requires=docker.service
 After=network-online.target docker.service
 
