@@ -63,7 +63,6 @@ github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuy
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
-github.com/antlr/antlr4 v0.0.0-20191217191749-ff67971f8580 h1:RlYuC6X3a1rMDn8p5S9YTlBws4aUxqiw/PBjPsD8bLk=
 github.com/antlr/antlr4 v0.0.0-20191217191749-ff67971f8580/go.mod h1:T7PbCXFs94rrTttyxjbyT5+/1V8T2TYDejxUfHJjw1Y=
 github.com/antlr/antlr4 v0.0.0-20200503195918-621b933c7a7f h1:0cEys61Sr2hUBEXfNV8eyQP01oZuBgoMeHunebPirK8=
 github.com/antlr/antlr4 v0.0.0-20200503195918-621b933c7a7f/go.mod h1:T7PbCXFs94rrTttyxjbyT5+/1V8T2TYDejxUfHJjw1Y=
@@ -141,7 +140,6 @@ github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/davecgh/go-xdr v0.0.0-20161123171359-e6a2ba005892 h1:qg9VbHo1TlL0KDM0vYvBG9EY0X0Yku5WYIPoFWt8f6o=
 github.com/davecgh/go-xdr v0.0.0-20161123171359-e6a2ba005892/go.mod h1:CTDl0pzVzE5DEzZhPfvhY/9sPFMQIxaJ9VAMs9AagrE=
 github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018 h1:6xT9KW8zLC5IlbaIF5Q7JNieBoACT7iW0YTxQHR0in0=
 github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018/go.mod h1:rQYf4tfk5sSwFsnDg3qYaBxSjsD9S8+59vW0dKUgme4=
@@ -741,15 +739,13 @@ github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1
 github.com/onflow/cadence v0.4.0-beta1/go.mod h1:gaPtSctdMzT5NAoJgzsRuwUkdgRswVHsRXFNNmCTn3I=
 github.com/onflow/cadence v0.4.0/go.mod h1:gaPtSctdMzT5NAoJgzsRuwUkdgRswVHsRXFNNmCTn3I=
 github.com/onflow/cadence v0.6.0/go.mod h1:VCZ/aqMjf84JQDkCOGqGRQslVwFjx/7PJrH/zpAh/Qo=
-github.com/onflow/cadence v0.8.1-0.20200828231923-934b2d95ccda h1:ITzNDmS4FBBOYTIxs/IfThsWTL9h4Eu5pQv+i4mzuQ4=
-github.com/onflow/cadence v0.8.1-0.20200828231923-934b2d95ccda/go.mod h1:R43uGnqQsTcnFf1fMPCcMjDPplBIzbR5XkFZRF2OH3Y=
-github.com/onflow/cadence v0.9.0 h1:PWfpVVDdVhfq0FxCobTbFM0WN/ebexD6nr67YkVdNRc=
-github.com/onflow/cadence v0.9.0/go.mod h1:R43uGnqQsTcnFf1fMPCcMjDPplBIzbR5XkFZRF2OH3Y=
-github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0 h1:MUivqc0+0WY2TsDhggcKAiHD6sR24xOscpcd5m3CLIQ=
-github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0/go.mod h1:4oPXY+JffxZhnl7B23J2ttjAWJeVqdL6ZU2yhzgQLqU=
+github.com/onflow/cadence v0.8.1-0.20200930165225-79a92f2bff94 h1:ZXpaUJ2aSKWOzqrr1IVjCN1uDt++gbAwUH7MxbnVguI=
+github.com/onflow/cadence v0.8.1-0.20200930165225-79a92f2bff94/go.mod h1:ORAnWydDsrefAUazeD1g+l7vjNwEuJAcZ7bMz1KnSbg=
+github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20200930172952-d132d90166f9 h1:eIImzPQ0E/tJjIpHwSIvlYJgDm5UBWktg/tprwI0Ejo=
+github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20200930172952-d132d90166f9/go.mod h1:TfMHdNjuIj1IFPPoebN2nwza3X58ZDGWL0Q5VOscV94=
 github.com/onflow/flow-ft/contracts v0.1.3/go.mod h1:IKe3yEurEKpg/J15q5WBlHkuMmt1iRECSHgnIa1gvRw=
-github.com/onflow/flow-ft/lib/go/contracts v0.2.0 h1:qI463Xil2cmZKnLBNb5o/BoiYYg3d8Jgbi5kOEs0/+g=
-github.com/onflow/flow-ft/lib/go/contracts v0.2.0/go.mod h1:Mf//HSOJUSzr4Z7QmW4BZGSweoqlrJJJ92KvKnqGGQk=
+github.com/onflow/flow-ft/lib/go/contracts v0.2.1-0.20200930171159-48598966c1be h1:EwZuos3ORyJuO2rU6QtiA1zz936PI5Cfwpbt6nXKqfo=
+github.com/onflow/flow-ft/lib/go/contracts v0.2.1-0.20200930171159-48598966c1be/go.mod h1:Mf//HSOJUSzr4Z7QmW4BZGSweoqlrJJJ92KvKnqGGQk=
 github.com/onflow/flow-go-sdk v0.4.0/go.mod h1:MHn8oQCkBNcl2rXdYSm9VYYK4ogwEpyrdM/XK/czdlM=
 github.com/onflow/flow-go-sdk v0.8.0 h1:jJZaf07R41dk6UqsZW6IQ024jIYocFtma8peTS0u50I=
 github.com/onflow/flow-go-sdk v0.8.0/go.mod h1:9I3N0v59yuOQqlGej5AgZ20Q9UbMaJWrGqM9B0HUVrE=

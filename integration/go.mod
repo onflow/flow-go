@@ -9,7 +9,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.8.1-0.20200828231923-934b2d95ccda
+	github.com/onflow/cadence v0.8.1-0.20200930165225-79a92f2bff94
 	github.com/onflow/flow-go v0.4.1-0.20200715183900-b337e998d486
 	github.com/onflow/flow-go-sdk v0.8.0
 	github.com/onflow/flow-go/crypto v0.9.1
@@ -20,6 +20,8 @@ require (
 	google.golang.org/grpc v1.28.0
 	gopkg.in/yaml.v2 v2.2.8
 )
+
+replace github.com/fxamacker/cbor/v2 => github.com/turbolent/cbor/v2 v2.2.1-0.20200911003300-cac23af49154
 
 replace github.com/onflow/flow-go => ../
 

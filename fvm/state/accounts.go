@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/model/encoding/rlp"
 	"math/big"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -12,6 +13,7 @@ import (
 const (
 	keyExists         = "exists"
 	keyCode           = "code"
+	keyContracts      = "contracts"
 	keyPublicKeyCount = "public_key_count"
 )
 
@@ -27,6 +29,34 @@ func keyPublicKey(index uint64) string {
 type Accounts struct {
 	ledger Ledger
 	*addresses
+}
+
+type ContractsSet map[string]struct{}
+
+func contractSetFromArray(contracts []string) ContractsSet {
+	contractMap := make(map[string]struct{}, len(contracts))
+	for _, contract := range contracts {
+		contractMap[contract] = struct{}{}
+	}
+	return contractMap
+}
+
+func (s ContractsSet) Has(contract string) bool {
+	_, ok := s[contract]
+	return ok
+}
+func (s ContractsSet) add(contract string) {
+	s[contract] = struct{}{}
+}
+func (s ContractsSet) remove(contract string) {
+	delete(s, contract)
+}
+func (s ContractsSet) ToArray() []string {
+	keys := make([]string, 0, len(s))
+	for k := range s {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func NewAccounts(ledger Ledger, chain flow.Chain) *Accounts {
@@ -53,7 +83,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 
 	var code []byte
 	// TODO: check this
-	code, err = a.GetCode(string(address.Bytes()), address)
+	code, err = a.GetContract(string(address.Bytes()), address)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +288,7 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 	return nil
 }
 
-func (a *Accounts) GetCode(name string, address flow.Address) ([]byte, error) {
+func (a *Accounts) getCode(name string, address flow.Address) ([]byte, error) {
 
 	code, err := a.ledger.Get(name,
 		string(address.Bytes()),
@@ -270,14 +300,7 @@ func (a *Accounts) GetCode(name string, address flow.Address) ([]byte, error) {
 	return code, nil
 }
 
-func (a *Accounts) TouchCode(address flow.Address) {
-
-	a.ledger.Touch(string(address.Bytes()),
-		string(address.Bytes()),
-		keyCode)
-}
-
-func (a *Accounts) SetCode(name string, address flow.Address, code []byte) error {
+func (a *Accounts) setCode(name string, address flow.Address, code []byte) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -305,4 +328,110 @@ func (a *Accounts) SetCode(name string, address flow.Address, code []byte) error
 
 func newLedgerGetError(key string, address flow.Address, err error) error {
 	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
+}
+
+func (a *Accounts) setContracts(contracts ContractsSet, address flow.Address) error {
+	ok, err := a.Exists(address)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return fmt.Errorf("account with address %s does not exist", address)
+	}
+
+	newContracts, err := rlp.NewEncoder().Encode(contracts.ToArray())
+	if err != nil {
+		return fmt.Errorf("cannot serialize contract list")
+	}
+
+	var prevContracts []byte
+	prevContracts, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContracts)
+	if err != nil {
+		return fmt.Errorf("cannot retreive current contracts: %w", err)
+	}
+
+	// skip updating if the new contracts equal the old
+	if bytes.Equal(prevContracts, newContracts) {
+		return nil
+	}
+
+	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), keyContracts, newContracts)
+
+	return nil
+}
+
+func (a *Accounts) TouchContract(name string, address flow.Address) {
+	contracts, err := a.GetContracts(address)
+	if err != nil {
+		panic(err)
+	}
+	if !contracts.Has(name) {
+		a.ledger.Touch(string(address.Bytes()),
+			string(address.Bytes()),
+			keyCode)
+	}
+	a.ledger.Touch(name,
+		string(address.Bytes()),
+		keyCode)
+}
+
+func (a *Accounts) GetContracts(address flow.Address) (ContractsSet, error) {
+	encContractList, err := a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContracts)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get deployed contract list: %w", err)
+	}
+	identifiers := make([]string, 0)
+	if len(encContractList) > 0 {
+		err = rlp.NewEncoder().Decode(encContractList, &identifiers)
+		if err != nil {
+			return nil, fmt.Errorf("cannot decode deployed contract list %x: %w", encContractList, err)
+		}
+	}
+	return contractSetFromArray(identifiers), nil
+}
+
+func (a *Accounts) GetContract(name string, address flow.Address) ([]byte, error) {
+	contracts, err := a.GetContracts(address)
+	if err != nil {
+		return nil, err
+	}
+	if !contracts.Has(name) {
+		// this contract wasn't deployed the new way. Try getting it the old way
+		return a.getCode(string(address.Bytes()), address)
+	}
+	return a.getCode(name, address)
+}
+
+func (a *Accounts) SetContract(name string, address flow.Address, code []byte) error {
+	contracts, err := a.GetContracts(address)
+	if err != nil {
+		return err
+	}
+	err = a.setCode(name, address, code)
+	if err != nil {
+		return err
+	}
+	if !contracts.Has(name) {
+		contracts.add(name)
+		return a.setContracts(contracts, address)
+	}
+	return nil
+}
+
+func (a *Accounts) DeleteContract(name string, address flow.Address) error {
+	contracts, err := a.GetContracts(address)
+	if err != nil {
+		return err
+	}
+	if !contracts.Has(name) {
+		// this contract wasn't deployed the new way. Try deleting teh old contract
+		return a.setCode(string(address.Bytes()), address, nil)
+	}
+	err = a.setCode(name, address, nil)
+	if err != nil {
+		return err
+	}
+	contracts.remove(name)
+	return a.setContracts(contracts, address)
 }

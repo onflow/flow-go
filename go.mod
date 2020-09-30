@@ -28,8 +28,8 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.8.1-0.20200828231923-934b2d95ccda
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0
+	github.com/onflow/cadence v0.8.1-0.20200930165225-79a92f2bff94
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20200930172952-d132d90166f9
 	github.com/onflow/flow-go-sdk v0.8.0
 	github.com/onflow/flow-go/crypto v0.9.1
 	github.com/onflow/flow/protobuf/go/flow v0.1.7
@@ -55,6 +55,8 @@ require (
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
+
+replace github.com/fxamacker/cbor/v2 => github.com/turbolent/cbor/v2 v2.2.1-0.20200911003300-cac23af49154
 
 replace github.com/onflow/flow-go => ./
 

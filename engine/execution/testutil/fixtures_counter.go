@@ -24,34 +24,12 @@ access(all) contract Container {
 }
 `
 
-const ImportCounterContract = `
-import Container from %s
-
-access(all) contract Container2 {
-}
-`
-
 func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
-	return CreateContractDeploymentTransaction(CounterContract, authorizer, chain)
-}
-
-func AddCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
-	return CreateContractAddCodeTransaction("Container", CounterContract, authorizer, chain)
-}
-
-func AddCounterImportContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
-	return CreateContractAddCodeTransaction(
-		"Container2",
-		fmt.Sprintf(ImportCounterContract, authorizer.HexWithPrefix()),
-		authorizer, chain)
+	return CreateContractDeploymentTransaction("Container", CounterContract, authorizer, chain)
 }
 
 func DeployUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
-	return CreateUnauthorizedContractDeploymentTransaction(CounterContract, authorizer)
-}
-
-func AddUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
-	return CreateUnauthorizedContractAddCodeTransaction("Container", CounterContract, authorizer)
+	return CreateUnauthorizedContractDeploymentTransaction("Container", CounterContract, authorizer)
 }
 
 func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {

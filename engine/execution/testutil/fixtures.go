@@ -21,21 +21,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
-	encoded := hex.EncodeToString([]byte(contract))
-
-	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
-                signer.setCode("%s".decodeHex())
-              }
-            }`, encoded)),
-		).
-		AddAuthorizer(authorizer).
-		AddAuthorizer(chain.ServiceAddress())
-}
-
-func CreateContractAddCodeTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBody().
@@ -49,20 +35,7 @@ func CreateContractAddCodeTransaction(contractName string, contract string, auth
 		AddAuthorizer(chain.ServiceAddress())
 }
 
-func CreateUnauthorizedContractDeploymentTransaction(contract string, authorizer flow.Address) *flow.TransactionBody {
-	encoded := hex.EncodeToString([]byte(contract))
-
-	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
-                signer.setCode("%s".decodeHex())
-              }
-            }`, encoded)),
-		).
-		AddAuthorizer(authorizer)
-}
-
-func CreateUnauthorizedContractAddCodeTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
+func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBody().

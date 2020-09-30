@@ -127,11 +127,35 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 }
 
 func (e *hostEnv) ResolveLocation(identifiers []runtime.Identifier, location runtime.Location) []runtime.ResolvedLocation {
-	if len(identifiers) == 0 {
-		return []runtime.ResolvedLocation{{
-			Location:    location,
-			Identifiers: []ast.Identifier{},
-		}}
+	addressLocation, isAddress := location.(runtime.AddressLocation)
+	blankLocation := []runtime.ResolvedLocation{{
+		Location:    location,
+		Identifiers: []ast.Identifier{},
+	}}
+
+	// in case it is not an address location just return blank location (e.g.: import Crypto)
+	if len(identifiers) == 0 && !isAddress {
+		return blankLocation
+	}
+
+	// in case it is an address location fetch all identifiers at this address
+	if len(identifiers) == 0 && isAddress {
+		allContractsMap, err := e.accounts.GetContracts(flow.Address(addressLocation.ToAddress()))
+		if err != nil {
+			panic(err)
+		}
+		allContracts := allContractsMap.ToArray()
+		// if there are none, return blank resolved location
+		if len(allContracts) == 0 {
+			return blankLocation
+		}
+
+		identifiers = make([]ast.Identifier,len(allContracts))
+		for i := range identifiers {
+			identifiers[i] = runtime.Identifier{
+				Identifier: allContracts[i],
+			}
+		}
 	}
 
 	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
@@ -158,32 +182,17 @@ func (e *hostEnv) resolveLocation(identifier runtime.Identifier, location runtim
 	}
 }
 
-func (e *hostEnv) legacyGetCode(location runtime.Location) ([]byte, error) {
-	addressLocation, ok := location.(runtime.AddressLocation)
-	if !ok {
-		return nil, nil
-	}
-
-	address := flow.Address(addressLocation.ToAddress())
-	// code name used to be tha same as the address
-	code, err := e.accounts.GetCode(string(address.Bytes()), address)
-	return code, err
-}
-
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 	contractLocation, ok := location.(runtime.AddressContractLocation)
 	if !ok {
-		return e.legacyGetCode(location)
+		return nil, fmt.Errorf("can only get code with AddressContractLocation")
 	}
 
-	code, err := e.accounts.GetCode(contractLocation.Name, flow.Address(contractLocation.AddressLocation.ToAddress()))
+	code, err := e.accounts.GetContract(contractLocation.Name, flow.Address(contractLocation.AddressLocation.ToAddress()))
 	if err != nil {
 		return nil, err
 	}
 
-	if len(code) == 0 {
-		return e.legacyGetCode(contractLocation.AddressLocation)
-	}
 	return code, nil
 }
 
@@ -196,9 +205,8 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 	if program != nil {
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(runtime.AddressLocation); ok {
-			address := flow.BytesToAddress(addressLocation)
-			e.accounts.TouchCode(address)
+		if addressLocation, ok := location.(runtime.AddressContractLocation); ok {
+			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.AddressLocation))
 		}
 	}
 
@@ -371,15 +379,6 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 	return e.transactionEnv.RemoveAccountKey(address, index)
 }
 
-func (e *hostEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
-	if e.transactionEnv == nil {
-		panic("UpdateAccountCode is not supported by this environment")
-	}
-
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.UpdateAccountCode(address, code)
-}
-
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	if e.transactionEnv == nil {
 		panic("UpdateAccountContractCode is not supported by this environment")
@@ -397,19 +396,12 @@ func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (
 }
 
 func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
-	return e.UpdateAccountContractCode(address, name, []byte{})
-}
-
-func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
-	accountAddress := flow.Address(address)
-
-	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("code deployment requires authorization from the service account")
+	if e.transactionEnv == nil {
+		panic("UpdateAccountContractCode is not supported by this environment")
 	}
 
-	return e.accounts.SetCode(string(accountAddress.Bytes()), accountAddress, code)
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.transactionEnv.RemoveAccountContractCode(address, name)
 }
 
 func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
@@ -421,7 +413,19 @@ func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 
-	return e.accounts.SetCode(name, accountAddress, code)
+	return e.accounts.SetContract(name, accountAddress, code)
+}
+
+func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+	accountAddress := flow.Address(address)
+
+	// must be signed by the service account
+	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return fmt.Errorf("code deployment requires authorization from the service account")
+	}
+
+	return e.accounts.DeleteContract(name, accountAddress)
 }
 
 func (e *hostEnv) GetSigningAccounts() []runtime.Address {
