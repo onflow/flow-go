@@ -262,12 +262,11 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 
 	// fill the 2 maps
 	for i, pk := range pks {
-		if pk.Algorithm() != BLSBLS12381 {
+		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
+		if !ok {
 			return false, fmt.Errorf("public key at index %d is not BLS key, it is a %s key",
 				i, pk.Algorithm())
 		}
-		// assertion is guaranteed to be correct after the algorithm check
-		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
 
 		mapPerHash[string(hashes[i])] = append(mapPerHash[string(hashes[i])], pkBLS.point)
 		mapPerPk[pkBLS.point] = append(mapPerPk[pkBLS.point], hashes[i])
