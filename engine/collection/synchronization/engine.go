@@ -96,7 +96,12 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		err := e.conduit.Close()
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not close conduit")
+		}
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.
