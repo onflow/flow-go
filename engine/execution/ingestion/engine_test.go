@@ -35,7 +35,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var debugging = true
+var debugging = false
 
 var (
 	collection1Identity = unittest.IdentityFixture()
