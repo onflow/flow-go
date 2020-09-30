@@ -100,7 +100,7 @@ func registerConduits(net module.Network, state protocol.State, eng network.Engi
 	// TODO need to update to register dynamic channels that are created on later epoch transitions
 	epoch := state.Final().Epochs().Current()
 
-	clusters, err := state.Final().Epochs().Current().Clustering()
+	clusters, err := epoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters: %w", err)
 	}
