@@ -368,9 +368,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 //   13
 //   14 <- 15 <- 16
 
-func (e *Engine) onBlockExecuted(executedBlock *entity.ExecutableBlock, finalState flow.StateCommitment) error {
+func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState flow.StateCommitment) error {
 
-	e.checkStateSyncStop(executedBlock.Block.Header.Height)
+	e.checkStateSyncStop(executed.Block.Header.Height)
 
 	err := e.mempool.Run(
 		func(
@@ -378,7 +378,7 @@ func (e *Engine) onBlockExecuted(executedBlock *entity.ExecutableBlock, finalSta
 			executionQueues *stdmap.QueuesBackdata,
 		) error {
 			// find the block that was just executed
-			executionQueue, exists := executionQueues.ByID(executedBlock.ID())
+			executionQueue, exists := executionQueues.ByID(executed.ID())
 			if !exists {
 				return fmt.Errorf("fatal error - executed block not present in execution queue")
 			}
@@ -396,26 +396,37 @@ func (e *Engine) onBlockExecuted(executedBlock *entity.ExecutableBlock, finalSta
 
 				// the parent block has been executed, update the StartState of
 				// each child block.
-				childBlock := queue.Head.Item.(*entity.ExecutableBlock)
-				childBlock.StartState = finalState
+				child := queue.Head.Item.(*entity.ExecutableBlock)
+				child.StartState = finalState
 
-				err := e.matchOrRequestCollections(childBlock, blockByCollection)
+				err := e.matchOrRequestCollections(child, blockByCollection)
 				if err != nil {
 					return fmt.Errorf("cannot send collection requests: %w", err)
 				}
 
-				e.executeBlockIfComplete(childBlock)
+				completed := e.executeBlockIfComplete(child)
+				if !completed {
+					e.log.Debug().
+						Hex("executed_block", logging.Entity(executed)).
+						Hex("child_block", logging.Entity(child)).
+						Msg("child block is not ready to be executed yet")
+				} else {
+					e.log.Debug().
+						Hex("executed_block", logging.Entity(executed)).
+						Hex("child_block", logging.Entity(child)).
+						Msg("child block is ready to be executed")
+				}
 			}
 
 			// remove the executed block
-			executionQueues.Rem(executedBlock.ID())
+			executionQueues.Rem(executed.ID())
 
 			return nil
 		})
 
 	if err != nil {
 		e.log.Err(err).
-			Hex("block_id", logging.Entity(executedBlock)).
+			Hex("block", logging.Entity(executed)).
 			Msg("error while requeueing blocks after execution")
 	}
 
@@ -642,7 +653,7 @@ func (e *Engine) matchOrRequestCollections(
 		}
 
 		e.log.Debug().
-			Hex("block_id", logging.Entity(executableBlock)).
+			Hex("block", logging.Entity(executableBlock)).
 			Hex("collection_id", logging.ID(guarantee.ID())).
 			Msg("requesting collection")
 
@@ -652,7 +663,7 @@ func (e *Engine) matchOrRequestCollections(
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(executableBlock)).
+		Hex("block", logging.Entity(executableBlock)).
 		Int("num_col", len(executableBlock.Block.Payload.Guarantees)).
 		Int("actual_req", actualRequested).
 		Msg("requested all collections")
@@ -861,7 +872,7 @@ func (e *Engine) saveExecutionResults(
 // over time we should skip this
 func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	// log block
-	e.log.Info().
+	e.log.Debug().
 		Hex("block_id", logging.Entity(eb)).
 		Hex("prev_block_id", logging.ID(eb.Block.Header.ParentID)).
 		Uint64("block_height", eb.Block.Header.Height).
@@ -872,7 +883,7 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	// logs transactions
 	for i, col := range eb.Collections() {
 		for j, tx := range col.Transactions {
-			e.log.Info().
+			e.log.Debug().
 				Hex("block_id", logging.Entity(eb)).
 				Int("block_height", int(eb.Block.Header.Height)).
 				Hex("prev_block_id", logging.ID(eb.Block.Header.ParentID)).
@@ -1296,7 +1307,7 @@ func (e *Engine) validateStateDelta(delta *messages.ExecutionStateDelta) error {
 
 func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 	blockID := delta.ID()
-	log := e.log.With().Hex("block_id", blockID[:]).Logger()
+	log := e.log.With().Hex("block", blockID[:]).Logger()
 
 	log.Debug().Msg("applying delta for block")
 

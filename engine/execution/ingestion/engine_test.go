@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -61,6 +64,7 @@ type testingContext struct {
 	executionState     *state.ExecutionState
 	snapshot           *protocol.Snapshot
 	identity           *flow.Identity
+	log                zerolog.Logger
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -227,10 +231,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		).
 		Return(nil)
 
-	ctx.executionState.
-		On("PersistStateCommitment", mock.Anything, executableBlock.Block.ID(), newStateCommitment).
-		Return(nil)
-
 	ctx.providerEngine.
 		On(
 			"BroadcastExecutionReceipt",
@@ -274,87 +274,163 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		Return(nil)
 }
 
-func (ctx *testingContext) stateCommitmentNotExistForBlockID(blockID flow.Identifier) {
-	ctx.executionState.
-		On("StateCommitmentByBlockID", context.Background(), blockID).
-		Return(flow.StateCommitment{}, storageerr.ErrNotFound)
-}
-func (ctx *testingContext) stateCommitmentExistForBlockID(blockID flow.Identifier, commit flow.StateCommitment) {
-	ctx.executionState.
-		On("StateCommitmentByBlockID", context.Background(), blockID).
-		Return(commit, nil)
+func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]flow.StateCommitment, onPersisted func(flow.Identifier, flow.StateCommitment)) {
+	lock := sync.Mutex{}
+
+	{
+		mocked := ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything)
+		// https://github.com/stretchr/testify/issues/350#issuecomment-570478958
+		mocked.RunFn = func(args mock.Arguments) {
+			// prevent concurrency issue
+			lock.Lock()
+			defer lock.Unlock()
+
+			blockID := args[1].(flow.Identifier)
+			commit, ok := commits[blockID]
+			if ok {
+				mocked.ReturnArguments = mock.Arguments{commit, nil}
+				return
+			}
+
+			mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
+		}
+	}
+
+	{
+		mocked := ctx.executionState.
+			On("PersistStateCommitment", mock.Anything, mock.Anything, mock.Anything)
+		mocked.RunFn =
+			func(args mock.Arguments) {
+				lock.Lock()
+				defer lock.Unlock()
+
+				blockID := args[1].(flow.Identifier)
+				commit := args[2].(flow.StateCommitment)
+				commits[blockID] = commit
+				onPersisted(blockID, commit)
+			}
+
+		mocked.ReturnArguments = mock.Arguments{nil}
+	}
+
+	return
 }
 
 func TestExecuteOneBlock(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 		// A <- B
-		executableBlockA := unittest.ExecutableBlockFixture(nil)
-		executableBlockA.StartState = unittest.StateCommitmentFixture()
-
-		// no statecommiment for blockA, since not executed yet
-		ctx.stateCommitmentNotExistForBlockID(executableBlockA.ID())
+		blockA := unittest.ExecutableBlockFixture(nil)
+		blockA.StartState = unittest.StateCommitmentFixture()
 
 		// blockA's start state is its parent's state commitment,
 		// and blockA's parent has been executed.
-		ctx.stateCommitmentExistForBlockID(executableBlockA.Block.Header.ParentID, executableBlockA.StartState)
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blockA.Block.Header.ParentID] = blockA.StartState
+		wg := sync.WaitGroup{}
+		ctx.mockStateCommitsWithMap(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
+			wg.Done()
+		})
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(executableBlockA.Block.Header, nil)
+		ctx.snapshot.On("Head").Return(blockA.Block.Header, nil)
 
-		ctx.assertSuccessfulBlockComputation(executableBlockA, unittest.IdentifierFixture())
+		ctx.assertSuccessfulBlockComputation(blockA, unittest.IdentifierFixture())
 
-		err := ctx.engine.handleBlock(context.Background(), executableBlockA.Block)
+		wg.Add(1) // wait for block A to be executed
+		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
 		require.NoError(t, err)
 
+		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
-		assert.False(t, more)
+		require.False(t, more)
+
+		_, ok := commits[blockA.ID()]
+		require.True(t, ok)
 	})
+}
+
+func logBlocks(blocks map[string]*entity.ExecutableBlock) {
+	log := unittest.Logger(debugging)
+	for name, b := range blocks {
+		log.Debug().Msgf("creating blocks for testing, block %v's ID:%v", name, b.ID())
+	}
 }
 
 func TestExecuteBlockInOrder(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
+		// create blocks with the following relations
 		// A <- B
 		// A <- C <- D
-		executableBlockA := unittest.ExecutableBlockFixture(nil)
-		executableBlockB := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
-		executableBlockC := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
-		executableBlockD := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockC.Block.Header)
-		executableBlockA.StartState = unittest.StateCommitmentFixture()
+		blocks := make(map[string]*entity.ExecutableBlock)
+		blocks["A"] = unittest.ExecutableBlockFixture(nil)
+		blocks["A"].StartState = unittest.StateCommitmentFixture()
 
-		// blocks has no collections, so state is essentially the same
-		executableBlockC.StartState = executableBlockA.StartState
-		executableBlockB.StartState = executableBlockA.StartState
-		executableBlockD.StartState = executableBlockC.StartState
+		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
+		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
+		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
-		// since no block has any collection, the statecommitment for any block is the same
-		ctx.executionState.
-			On("StateCommitmentByBlockID", mock.Anything, mock.Anything).
-			Return(executableBlockA.StartState, nil)
+		// log the blocks, so that we can link the block ID in the log with the blocks in tests
+		logBlocks(blocks)
 
+		// none of the blocks has any collection, so state is essentially the same
+		blocks["C"].StartState = blocks["A"].StartState
+		blocks["B"].StartState = blocks["A"].StartState
+		blocks["D"].StartState = blocks["C"].StartState
+
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blocks["A"].Block.Header.ParentID] = blocks["A"].StartState
+
+		wg := sync.WaitGroup{}
+		ctx.mockStateCommitsWithMap(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
+			wg.Done()
+		})
+
+		// make sure the seal height won't trigger state syncing, so that all blocks
+		// will be executed.
 		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.snapshot.On("Head").Return(blocks["A"].Block.Header, nil)
 
-		err := ctx.engine.handleBlock(context.Background(), executableBlockA.Block)
-		require.NoError(t, err)
-
-		err = ctx.engine.handleBlock(context.Background(), executableBlockB.Block)
-		require.NoError(t, err)
-
-		err = ctx.engine.handleBlock(context.Background(), executableBlockC.Block)
-		require.NoError(t, err)
-
-		err = ctx.engine.handleBlock(context.Background(), executableBlockD.Block)
-		require.NoError(t, err)
-
-		// once block A is computed, it should trigger B and C being sent to compute, which in turn should trigger D
+		// once block A is computed, it should trigger B and C being sent to compute,
+		// which in turn should trigger D
 		blockAExecutionResultID := unittest.IdentifierFixture()
-		ctx.assertSuccessfulBlockComputation(executableBlockA, unittest.IdentifierFixture())
-		ctx.assertSuccessfulBlockComputation(executableBlockB, blockAExecutionResultID)
-		ctx.assertSuccessfulBlockComputation(executableBlockC, blockAExecutionResultID)
-		ctx.assertSuccessfulBlockComputation(executableBlockD, unittest.IdentifierFixture())
+		ctx.assertSuccessfulBlockComputation(blocks["A"], unittest.IdentifierFixture())
+		ctx.assertSuccessfulBlockComputation(blocks["B"], blockAExecutionResultID)
+		ctx.assertSuccessfulBlockComputation(blocks["C"], blockAExecutionResultID)
+		ctx.assertSuccessfulBlockComputation(blocks["D"], unittest.IdentifierFixture())
+
+		wg.Add(1)
+		err := ctx.engine.handleBlock(context.Background(), blocks["A"].Block)
+		require.NoError(t, err)
+
+		wg.Add(1)
+		err = ctx.engine.handleBlock(context.Background(), blocks["B"].Block)
+		require.NoError(t, err)
+
+		wg.Add(1)
+		err = ctx.engine.handleBlock(context.Background(), blocks["C"].Block)
+		require.NoError(t, err)
+
+		wg.Add(1)
+		err = ctx.engine.handleBlock(context.Background(), blocks["D"].Block)
+		require.NoError(t, err)
+
+		// wait until all 4 blocks have been executed
+		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		assert.False(t, more)
+
+		var ok bool
+		_, ok = commits[blocks["A"].ID()]
+		require.True(t, ok)
+		_, ok = commits[blocks["B"].ID()]
+		require.True(t, ok)
+		_, ok = commits[blocks["C"].ID()]
+		require.True(t, ok)
+		_, ok = commits[blocks["D"].ID()]
+		require.True(t, ok)
 	})
 }
 
