@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"github.com/onflow/flow-go/ledger"
 	"math/rand"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -68,11 +69,11 @@ func GetRandomRegisterIDs(n int) []flow.RegisterID {
 	return registers
 }
 
-func GetRandomValues(n int, minByteSize, maxByteSize int) [][]byte {
+func GetRandomValues(n int, minByteSize, maxByteSize int) []ledger.Value {
 	if minByteSize > maxByteSize {
 		panic("minByteSize cannot be smaller then maxByteSize")
 	}
-	values := make([][]byte, 0)
+	values := make([]ledger.Value, 0)
 	for i := 0; i < n; i++ {
 		var byteSize = maxByteSize
 		if minByteSize < maxByteSize {
@@ -81,6 +82,15 @@ func GetRandomValues(n int, minByteSize, maxByteSize int) [][]byte {
 		value := make([]byte, byteSize)
 		rand.Read(value)
 		values = append(values, value)
+	}
+	return values
+}
+
+func GetRandomLegacyValues(n int, minByteSize, maxByteSize int) [][]byte {
+	ledgerValues := GetRandomValues(n, minByteSize, maxByteSize)
+	values := make([][]byte, len(ledgerValues))
+	for ii, v := range ledgerValues {
+		values[ii] = v
 	}
 	return values
 }

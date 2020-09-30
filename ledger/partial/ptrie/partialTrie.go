@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -38,21 +37,20 @@ func (p *PSMT) RootHash() []byte {
 // Get returns an slice of payloads (same order), an slice of failed paths and errors (if any)
 // TODO return list of indecies instead of paths
 func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
-	var failedKeys []ledger.Key
+	var failedPaths []ledger.Path
 	payloads := make([]*ledger.Payload, 0)
-	for i, path := range paths {
-		payload := payloads[i]
+	for _, path := range paths {
 		// lookup the path for the payload
 		node, found := p.pathLookUp[string(path)]
 		if !found {
 			payloads = append(payloads, nil)
-			failedKeys = append(failedKeys, payload.Key)
+			failedPaths = append(failedPaths, path)
 			continue
 		}
 		payloads = append(payloads, node.payload)
 	}
-	if len(failedKeys) > 0 {
-		return nil, &ledger.ErrMissingKeys{Keys: failedKeys}
+	if len(failedPaths) > 0 {
+		return nil, &ErrMissingPath{Paths: failedPaths}
 	}
 	// after updating all the nodes, compute the value recursively only once
 	return payloads, nil
