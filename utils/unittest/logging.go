@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"flag"
 	"io/ioutil"
 	"os"
 	"time"
@@ -8,15 +9,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var enable = false
+var verbose = flag.Bool("vv", false, "print debugging logs")
 
 // Logger returns a zerolog
-// if go test is ran with `-v`, then the logger will print all logs,
-// otherwise, the log will be hidden
+// use -vv flag to print debugging logs for tests
 func Logger() zerolog.Logger {
 	writer := ioutil.Discard
 
-	if enable {
+	if *verbose {
 		writer = os.Stderr
 	}
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
