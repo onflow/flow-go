@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/flow-go/model/chunks"
+
 	sdk "github.com/onflow/flow-go-sdk"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -266,9 +268,10 @@ func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarante
 
 func SealFromResult(result *flow.ExecutionResult) func(*flow.Seal) {
 	return func(seal *flow.Seal) {
+		finalState, _ := result.FinalStateCommitment()
 		seal.ResultID = result.ID()
 		seal.BlockID = result.BlockID
-		seal.FinalState = result.FinalStateCommit()
+		seal.FinalState = finalState
 	}
 }
 
@@ -821,18 +824,11 @@ func BatchListFixture(n int) []flow.Batch {
 }
 
 func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
-	chunks := flow.ChunkList{}
-	chunk := &flow.Chunk{
-		Index:    0,
-		EndState: commit,
-	}
-	chunks.Insert(chunk)
-
 	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID:          block.ID(),
 			PreviousResultID: flow.ZeroID,
-			Chunks:           chunks,
+			Chunks:           chunks.ChunkListFromCommit(commit),
 		},
 		Signatures: nil,
 	}

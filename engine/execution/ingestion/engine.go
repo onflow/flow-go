@@ -678,11 +678,12 @@ func (e *Engine) handleComputationResult(
 		return nil, fmt.Errorf("could not send broadcast order: %w", err)
 	}
 
-	if receipt.ExecutionResult.Chunks.Len() == 0 {
-		return startState, nil
+	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		finalState = startState
 	}
 
-	return receipt.ExecutionResult.FinalStateCommit(), nil
+	return finalState, nil
 }
 
 func (e *Engine) saveExecutionResults(
@@ -1158,9 +1159,14 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 		log.Fatal().Err(err).Msg("fatal error while processing sync message")
 	}
 
-	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit(), executionStateDelta.EndState) {
+	finalState, ok := executionReceipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		log.Error().Msg("could not get final state: no chunks found")
+	}
+
+	if !bytes.Equal(finalState, executionStateDelta.EndState) {
 		log.Fatal().
-			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit()).
+			Hex("saved_state", finalState).
 			Hex("delta_end_state", executionStateDelta.EndState).
 			Hex("delta_start_state", executionStateDelta.StartState).
 			Err(err).Msg("processing sync message produced unexpected state commitment")
@@ -1246,7 +1252,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 		for _, queue := range newQueues {
 			if !bytes.Equal(
 				queue.Head.Item.(*messages.ExecutionStateDelta).StartState,
-				executionReceipt.ExecutionResult.FinalStateCommit(),
+				finalState,
 			) {
 				return fmt.Errorf("internal incosistency with delta - state commitment for after applying delta different from start state of next one! ")
 			}

@@ -224,10 +224,13 @@ func TestBootstrapWithSeal(t *testing.T) {
 		result := unittest.ExecutionResultFixture()
 		result.BlockID = block.ID()
 
+		finalState, ok := result.FinalStateCommitment()
+		require.True(t, ok)
+
 		seal := unittest.SealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit()
+		seal.FinalState = finalState
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.Error(t, err)
