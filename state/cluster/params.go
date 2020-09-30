@@ -7,6 +7,6 @@ import (
 // Params contains constant information about this cluster state.
 type Params interface {
 
-	// ChainID returns the chain ID for this cluster ID.
+	// ChainID returns the chain ID for this cluster.
 	ChainID() (flow.ChainID, error)
 }

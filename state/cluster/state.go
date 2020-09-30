@@ -12,7 +12,7 @@ import (
 // NOTE: This is modelled after, and is a simpler version of, protocol.State.
 type State interface {
 
-	// Params returns constant information about the clsuter state.
+	// Params returns constant information about the cluster state.
 	Params() Params
 
 	// Final returns the snapshot of the cluster state at the latest finalized
