@@ -83,9 +83,9 @@ func registerConduits(net module.Network, eng network.Engine) (map[string]networ
 
 	allEngineIDs := []string{
 		engine.ConsensusCommittee,
-		engine.ConsensusCluster,
+		engine.consensusClusterPrefix,
 		engine.SyncCommittee,
-		engine.SyncCluster,
+		engine.syncClusterPrefix,
 		engine.SyncExecution,
 		engine.PushTransactions,
 		engine.PushGuarantees,

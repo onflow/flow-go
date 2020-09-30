@@ -96,8 +96,13 @@ func New(
 		sync:           nil, // must use WithSync
 	}
 
+	chainID, err := clusterState.Params().ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain ID: %w", err)
+	}
+
 	// register network conduit
-	conduit, err := net.Register(engine.ConsensusCluster, e)
+	conduit, err := net.Register(engine.ChannelConsensusCluster(chainID), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

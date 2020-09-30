@@ -70,8 +70,13 @@ func New(
 		scanInterval: 2 * time.Second,
 	}
 
+	chainID, err := state.Params().ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain ID: %w", err)
+	}
+
 	// register the engine with the network layer and store the conduit
-	conduit, err := net.Register(engine.SyncCluster, e)
+	conduit, err := net.Register(engine.ChannelSyncCluster(chainID), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
