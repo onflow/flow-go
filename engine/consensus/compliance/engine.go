@@ -188,7 +188,8 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 // BroadcastProposalWithDelay will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
-
+	
+	start := time.Now()
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -241,6 +242,12 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
 
+	elapsed := time.Since(start)
+	if elapsed > delay {
+		delay = 0
+	} else {
+		delay = delay - elapsed
+	}
 	e.unit.LaunchAfter(delay, func() {
 
 		go e.hotstuff.SubmitProposal(header, parent.View)

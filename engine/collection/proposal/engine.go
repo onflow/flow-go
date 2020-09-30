@@ -202,7 +202,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 // BroadcastProposalWithDelay submits a cluster block proposal (effectively a proposal
 // for the next collection) to all the collection nodes in our cluster.
 func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
-
+        start := time.Now()
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
@@ -244,6 +244,12 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}
 
+	elapsed := time.Since(start)
+	if elapsed > delay {
+	    delay = 0
+        } else {
+	    delay = delay - elapsed
+        }
 	e.unit.LaunchAfter(delay, func() {
 
 		go e.hotstuff.SubmitProposal(header, parent.View)

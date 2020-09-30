@@ -26,7 +26,7 @@ type Controller struct {
 // We use 1E9 milliseconds which is about 11 days for a single timout (i.e. more than a full epoch)
 const timeoutCap float64 = 1e9
 
-const sensitivity uint64 = 1000
+const sensitivity uint64 = 2000
 
 // NewController creates a new Controller.
 func NewController(timeoutConfig Config) *Controller {
