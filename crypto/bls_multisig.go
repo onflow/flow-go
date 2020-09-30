@@ -229,11 +229,10 @@ func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 
 	pkPoints := make([]pointG2, 0, len(pks))
 	for i, pk := range pks {
-		if pk.Algorithm() != BLSBLS12381 {
-			return verifBool, fmt.Errorf("all keys must be BLS keys, key at index %d is %s", i, pk.Algorithm())
+		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
+		if !ok {
+			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
 		}
-		// assertion is guaranteed to be correct after the algorithm check
-		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
 		pkPoints = append(pkPoints, pkBLS.point)
 	}
 
