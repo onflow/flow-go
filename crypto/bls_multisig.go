@@ -102,12 +102,11 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 	_ = newBLSBLS12381()
 	points := make([]pointG2, 0, len(keys))
-	for _, pk := range keys {
-		if pk.Algorithm() != BLSBLS12381 {
-			return nil, fmt.Errorf("all keys must be BLS keys")
+	for i, pk := range keys {
+		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
+		if !ok {
+			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
 		}
-		// assertion is guaranteed to be correct after the algorithm check
-		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
 		points = append(points, pkBLS.point)
 	}
 
@@ -142,12 +141,11 @@ func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, er
 	aggPKBLS, _ := aggKey.(*PubKeyBLSBLS12381)
 
 	pointsToSubtract := make([]pointG2, 0, len(keysToRemove))
-	for _, pk := range keysToRemove {
-		if pk.Algorithm() != BLSBLS12381 {
-			return nil, fmt.Errorf("all keys must be BLS keys")
+	for i, pk := range keysToRemove {
+		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
+		if !ok {
+			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
 		}
-		// assertion is guaranteed to be correct after the algorithm check
-		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
 		pointsToSubtract = append(pointsToSubtract, pkBLS.point)
 	}
 
