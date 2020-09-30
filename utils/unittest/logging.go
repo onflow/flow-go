@@ -8,12 +8,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var enable = false
+
 // Logger returns a zerolog
-// enable - specify whether the log will printed out, useful for debugging
-//          test cases. usually set false by default to disable logging,
-//          and set true when debugging.
-func Logger(enable bool) zerolog.Logger {
+// if go test is ran with `-v`, then the logger will print all logs,
+// otherwise, the log will be hidden
+func Logger() zerolog.Logger {
 	writer := ioutil.Discard
+
 	if enable {
 		writer = os.Stderr
 	}

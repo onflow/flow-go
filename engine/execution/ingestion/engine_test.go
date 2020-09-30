@@ -35,8 +35,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var debugging = false
-
 var (
 	collection1Identity = unittest.IdentityFixture()
 	collection2Identity = unittest.IdentityFixture()
@@ -131,7 +129,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	txResults.EXPECT().BatchStore(gomock.Any(), gomock.Any()).AnyTimes()
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
-	log := unittest.Logger(debugging)
+	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 
 	tracer, err := trace.NewTracer(log, "test")
@@ -351,7 +349,7 @@ func TestExecuteOneBlock(t *testing.T) {
 }
 
 func logBlocks(blocks map[string]*entity.ExecutableBlock) {
-	log := unittest.Logger(debugging)
+	log := unittest.Logger()
 	for name, b := range blocks {
 		log.Debug().Msgf("creating blocks for testing, block %v's ID:%v", name, b.ID())
 	}
