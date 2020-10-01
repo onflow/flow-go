@@ -29,40 +29,28 @@ void Zr_polynomialImage(bn_t image, ep2_t y, const bn_st *a, const int a_size, c
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
-
-    // powers of x
-    bn_t bn_x;         // maximum is |n|+|r| --> 264 bits
-    ep_new(bn_x);
-    bn_new_size(bn_x, BITS_TO_DIGITS(Fr_BITS+N_bits_max));
-    bn_set_dig(bn_x, 1);
     
     // temp variables
-    bn_t mult, acc;
-    bn_new(mult);         // maximum --> 256+256 = 512 bits
-    bn_new_size(mult, BITS_TO_DIGITS(2*Fr_BITS));
-    bn_new(acc);         // maximum --> 512+1 = 513 bits
-    bn_new_size(acc, BITS_TO_DIGITS(2*Fr_BITS+1));
+    bn_t acc;
+    bn_new(acc); 
+    bn_new_size(acc, BITS_TO_DIGITS(Fr_BITS+8+1));
     bn_set_dig(acc, 0);
 
-    for (int i=0; i<a_size; i++) {
-        bn_mul(mult, &a[i], bn_x);
-        bn_add(acc, acc, mult);
+    for (int i=a_size-1; i >= 0; i--) {
+        bn_mul_dig(acc, acc, x);
+        // Use basic reduction as it's an 9-bits reduction 
+        // in the worst case (|acc|<|r|+9 )
         bn_mod_basic(acc, acc, r);
-        // Use basic reduction as it's an 8-bits reduction 
-        // in the worst case (|bn_x|<|r|+8 )
-        bn_mul_dig(bn_x, bn_x, x);
-        bn_mod_basic(bn_x, bn_x, r);
+        bn_add(acc, acc, &a[i]);
     }
-    // copy the result
-    bn_copy(image, acc); 
+    // export the result
+    bn_mod_basic(image, acc, r);
 
     // compute y = P(x).g2
     if (y) g2_mul_gen(y, acc);
 
     bn_free(acc)
-    bn_free(mult);
     bn_free(r);
-    bn_free(bn_x);
 }
 
 // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
