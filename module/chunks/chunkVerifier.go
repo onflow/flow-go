@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -120,6 +121,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 		values, err := psmt.Get(query)
 		if err != nil {
 			if errors.Is(err, ledger.ErrMissingKeys{}) {
+
 				unknownRegTouch[registerID.String()] = &registerKey
 				return nil, fmt.Errorf("missing register")
 			}

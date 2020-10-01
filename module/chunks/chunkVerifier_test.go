@@ -2,11 +2,12 @@ package chunks_test
 
 import (
 	"fmt"
-	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/rs/zerolog"
 	"math/rand"
 	"testing"
 	"time"
+
+	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/rs/zerolog"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -216,11 +217,10 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 		keys = executionState.RegisterIDSToKeys(ids)
 		update, err = ledger.NewUpdate(
-			f.InitialState(),
+			startState,
 			keys,
 			executionState.RegisterValuesToValues(values),
 		)
-
 		require.NoError(t, err)
 
 		endState, err := f.Set(update)
@@ -265,7 +265,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 type vmMock struct{}
 
-func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, ledger state.Ledger) error {
+func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Ledger) error {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
@@ -273,27 +273,17 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, ledger state.Ledger) 
 
 	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
-		id1 := string(make([]byte, 32))
-		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
-		ledger.Set(id1, "", "", UpdatedValue1)
-
+		led.Set("00", "", "", []byte{'F'})
 		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
-		id1 := string(make([]byte, 32))
-		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
-		ledger.Set(id1, "", "", UpdatedValue1)
-
+		led.Set("00", "", "", []byte{'F'})
 		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
 	default:
-		id1 := string(make([]byte, 32))
-		id2 := make([]byte, 32)
-		id2[0] = byte(5)
-		UpdatedValue2 := []byte{'B'}
-		_, _ = ledger.Get(id1, "", "")
-		ledger.Set(string(id2), "", "", UpdatedValue2)
-
+		_, _ = led.Get("00", "", "")
+		_, _ = led.Get("05", "", "")
+		led.Set("05", "", "", []byte{'B'})
 		tx.Logs = []string{"log1", "log2"}
 	}
 
