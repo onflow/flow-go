@@ -526,6 +526,10 @@ func (p *P2PNode) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
 	return nil
 }
 
+func (p *P2PNode) IsConnected(address NodeAddress) bool {
+
+}
+
 func generateProtocolID(rootBlockID string) protocol.ID {
 	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
 }
