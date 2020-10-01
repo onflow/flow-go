@@ -205,7 +205,7 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 		return
 	}
 
-	e.log.Debug().Hex("block_id", blockID[:]).Msg("handling block")
+	e.log.Debug().Hex("block_id", blockID[:]).Msg("handling new block")
 
 	err = e.handleBlock(context.Background(), newBlock)
 	if err != nil {

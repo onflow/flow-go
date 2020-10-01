@@ -2,11 +2,9 @@ package execution_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -175,7 +173,7 @@ func TestExecutionFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	// submit the child block from consensus node, which trigger the parent block
-	// to be passed to OnBlockProcessable
+	// to be passed to BlockProcessable
 	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
 	require.NoError(t, err)
 
@@ -306,12 +304,14 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	chain := exe1Node.ChainID.Chain()
 
 	// transaction that will change state and succeed, used to test that state commitment changes
-	// genesis <- block1 [tx1] <- block2 [tx2] <- block3 [tx3]
+	// genesis <- block1 [tx1] <- block2 [tx2] <- block3 [tx3] <- child
 	_, col1, block1, proposal1, seq := deployContractBlock(t, chain, seq, genesis, genesis)
 
 	_, col2, block2, proposal2, seq := makePanicBlock(t, chain, seq, block1.Header, genesis)
 
-	_, col3, block3, proposal3, _ := makeSuccessBlock(t, chain, seq, block2.Header, genesis)
+	_, col3, block3, proposal3, seq := makeSuccessBlock(t, chain, seq, block2.Header, genesis)
+
+	_, _, _, proposal4, _ := makeSuccessBlock(t, chain, seq, block3.Header, genesis)
 	// seq++
 
 	// setup mocks and assertions
@@ -342,6 +342,9 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	err = sendBlock(&exe1Node, conID.NodeID, proposal1)
 	require.NoError(t, err)
 
+	err = sendBlock(&exe1Node, conID.NodeID, proposal2)
+	assert.NoError(t, err)
+
 	// ensure block 1 has been executed
 	hub.DeliverAllEventually(t, func() bool {
 		return receiptsReceived == 1
@@ -355,17 +358,11 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEqual(t, scExe1Genesis, scExe1Block1)
 
-	// start execution node 2 with sync threshold 0 so it starts state sync right away
-	// exe2Node := testutil.ExecutionNode(t, hub, exe2ID, identities, 0, chainID)
-	// exe2Node.Ready()
-	// defer exe2Node.Done()
-	// exe2Node.AssertHighestExecutedBlock(t, genesis)
-
-	// submit block2 and block 3 from consensus node to execution node 1 (who have block1),
-	err = sendBlock(&exe1Node, conID.NodeID, proposal2)
+	// submit block 3 and block 4 from consensus node to execution node 1 (who have block1),
+	err = sendBlock(&exe1Node, conID.NodeID, proposal3)
 	assert.NoError(t, err)
 
-	err = sendBlock(&exe1Node, conID.NodeID, proposal3)
+	err = sendBlock(&exe1Node, conID.NodeID, proposal4)
 	assert.NoError(t, err)
 
 	// ensure block 1, 2 and 3 have been executed
@@ -413,162 +410,6 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 	return collectionEngine
 }
 
-// Test that when ingestion engine receives a block whose parent is missing,
-// it will request the missing parent from consensus node.
-// We prepare 3 blocks: genesis <- block1 <- block2
-// We mock a consensus node that stores the 3 blocks and mock the consensus node's
-// sync engine, which will respond to missing block requests. And then send
-// block2 to the ingestion engine, and verify it should fetch the missing block1
-// from the consensus node and eventually have both block1 and block2 executed.
-func TestExecutionQueryMissingBlocks(t *testing.T) {
-	hub := stub.NewNetworkHub()
-
-	chainID := flow.Testnet
-
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-
-	identities := unittest.CompleteIdentitySet(colID, conID, exeID)
-
-	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
-	defer consensusNode.Done()
-
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 0, chainID)
-	exeNode.Ready()
-	defer exeNode.Done()
-
-	genesis, err := exeNode.State.AtHeight(0).Head()
-	require.NoError(t, err)
-
-	fmt.Println("genesis block ID", genesis.ID())
-	exeNode.AssertHighestExecutedBlock(t, genesis)
-
-	block1 := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID)
-	block1.SetPayload(flow.Payload{})
-
-	block2 := unittest.BlockWithParentAndProposerFixture(block1.Header, conID.NodeID)
-	block2.SetPayload(flow.Payload{})
-	proposal2 := unittest.ProposalFromBlock(&block2)
-
-	// register sync engine
-	syncEngine := new(network.Engine)
-	syncConduit, _ := consensusNode.Net.Register(engine.SyncCommittee, syncEngine)
-	syncEngine.On("Submit", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			originID := args[0].(flow.Identifier)
-			switch msg := args[1].(type) {
-			case *messages.SyncRequest:
-				consensusNode.Log.Debug().Hex("origin", originID[:]).Uint64("height", msg.Height).
-					Uint64("nonce", msg.Nonce).Msg("protocol sync request received")
-
-				res := &messages.SyncResponse{
-					Height: block2.Header.Height,
-					Nonce:  msg.Nonce,
-				}
-
-				err := syncConduit.Submit(res, originID)
-				assert.NoError(t, err)
-			case *messages.BatchRequest:
-				ids := zerolog.Arr()
-				for _, b := range msg.BlockIDs {
-					ids.Hex(b[:])
-				}
-
-				consensusNode.Log.Debug().Hex("origin", originID[:]).Array("blockIDs", ids).
-					Uint64("nonce", msg.Nonce).Msg("protocol batch request received")
-
-				blocks := make([]*flow.Block, 0)
-				for _, id := range msg.BlockIDs {
-					if id == block1.ID() {
-						blocks = append(blocks, &block1)
-					} else if id == block2.ID() {
-						blocks = append(blocks, &block2)
-					} else {
-						require.FailNow(t, "unknown block requested: %v", id)
-					}
-				}
-
-				// send the response
-				res := &messages.BlockResponse{
-					Nonce:  msg.Nonce,
-					Blocks: blocks,
-				}
-
-				err := syncConduit.Submit(res, originID)
-				assert.NoError(t, err)
-			case *messages.RangeRequest:
-
-				consensusNode.Log.Debug().
-					Hex("origin", originID[:]).
-					Uint64("from_height", msg.FromHeight).
-					Uint64("to_height", msg.ToHeight).
-					Uint64("nonce", msg.Nonce).
-					Msg("protocol range request received")
-
-				blocks := make([]*flow.Block, 0)
-				for height := msg.FromHeight; height <= msg.ToHeight; height++ {
-					if height == block1.Header.Height {
-						blocks = append(blocks, &block1)
-					} else if height == block2.Header.Height {
-						blocks = append(blocks, &block2)
-					} else {
-						require.FailNow(t, "unknown block requested: %v", height)
-					}
-				}
-
-				// send the response
-				res := &messages.BlockResponse{
-					Nonce:  msg.Nonce,
-					Blocks: blocks,
-				}
-
-				err := syncConduit.Submit(res, originID)
-				assert.NoError(t, err)
-			default:
-				t.Errorf("unexpected msg to sync engine: %T, %v", args[1], args[1])
-			}
-		}).Return(nil)
-
-	receiptsReceived := 0
-
-	// register consensus engine to track receipts
-	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Submit", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			receiptsReceived++
-			originID := args[0].(flow.Identifier)
-			receipt := args[1].(*flow.ExecutionReceipt)
-			consensusNode.Log.Debug().
-				Hex("origin", originID[:]).
-				Hex("block", receipt.ExecutionResult.BlockID[:]).
-				Hex("commit", receipt.ExecutionResult.FinalStateCommit).
-				Msg("execution receipt delivered")
-
-		}).Return(nil)
-
-	// submit block2 from consensus node to execution node
-	err = sendBlock(&exeNode, conID.NodeID, proposal2)
-	require.NoError(t, err)
-
-	// ensure block 1 has been executed
-	hub.DeliverAllEventuallyUntil(t, func() bool {
-		return receiptsReceived == 2
-	}, 30*time.Second, 500*time.Millisecond)
-
-	// ensure blocks have been executed
-	exeNode.AssertHighestExecutedBlock(t, block2.Header)
-
-	scExeGenesis, err := exeNode.ExecutionState.StateCommitmentByBlockID(context.Background(), genesis.ID())
-	assert.NoError(t, err)
-	scExeBlock2, err := exeNode.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
-	assert.NoError(t, err)
-	assert.Equal(t, scExeGenesis, scExeBlock2)
-
-	syncEngine.AssertExpectations(t)
-}
-
 // Test the receipt will be sent to multiple verification nodes
 func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
@@ -600,6 +441,8 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	block.SetPayload(flow.Payload{})
 	proposal := unittest.ProposalFromBlock(&block)
 
+	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID)
+
 	actualCalls := 0
 
 	var receipt *flow.ExecutionReceipt
@@ -617,6 +460,9 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		Return(nil)
 
 	err = sendBlock(&exeNode, exeID.NodeID, proposal)
+	require.NoError(t, err)
+
+	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {
