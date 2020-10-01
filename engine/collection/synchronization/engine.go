@@ -70,8 +70,13 @@ func New(
 		scanInterval: 2 * time.Second,
 	}
 
+	chainID, err := state.Params().ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain ID: %w", err)
+	}
+
 	// register the engine with the network layer and store the conduit
-	conduit, err := net.Register(engine.SyncCluster, e)
+	conduit, err := net.Register(engine.ChannelSyncCluster(chainID), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -91,7 +96,12 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		err := e.conduit.Close()
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not close conduit")
+		}
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.

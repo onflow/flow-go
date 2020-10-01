@@ -4,6 +4,8 @@ package engine
 
 import (
 	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // channel IDs
@@ -14,13 +16,13 @@ const (
 	TestMetrics = "test-metrics"
 
 	// Channels for consensus protocols
-	ConsensusCommittee = "consensus-committee"
-	ConsensusCluster   = "consensus-cluster"
+	ConsensusCommittee     = "consensus-committee"
+	consensusClusterPrefix = "consensus-cluster" // dynamic channel, use ChannelConsensusCluster function
 
 	// Channels for protocols actively synchronizing state across nodes
-	SyncCommittee = "sync-committee"
-	SyncCluster   = "sync-cluster"
-	SyncExecution = "sync-execution"
+	SyncCommittee     = "sync-committee"
+	syncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
+	SyncExecution     = "sync-execution"
 
 	// Channels for actively pushing entities to subscribers
 	PushTransactions = "push-transactions"
@@ -50,4 +52,16 @@ const (
 // The root block id is used to prevent cross talks between nodes on different sporks
 func FullyQualifiedChannelName(channelID string, rootBlockID string) string {
 	return fmt.Sprintf("%s/%s", channelID, rootBlockID)
+}
+
+// ChannelConsensusCluster returns a dynamic cluster consensus channel based on
+// the chain ID of the cluster in question.
+func ChannelConsensusCluster(clusterID flow.ChainID) string {
+	return fmt.Sprintf("%s-%s", consensusClusterPrefix, clusterID)
+}
+
+// ChannelSyncCluster returns a dynamic cluster sync channel based on the chain
+// ID of the cluster in question.
+func ChannelSyncCluster(clusterID flow.ChainID) string {
+	return fmt.Sprintf("%s-%s", syncClusterPrefix, clusterID)
 }
