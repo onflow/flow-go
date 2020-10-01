@@ -53,8 +53,6 @@ type Middleware struct {
 	ctx               context.Context
 	cancel            context.CancelFunc
 	log               zerolog.Logger
-	codec             network.Codec
-	ov                middleware.Overlay
 	wg                *sync.WaitGroup
 	libP2PNode        *P2PNode
 	stop              chan struct{}
@@ -67,13 +65,19 @@ type Middleware struct {
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
 	rootBlockID       string
 	validators        []validators.MessageValidator
+	nodeAddressMap    map[flow.Identifier]NodeAddress
 }
 
-// NewMiddleware creates a new middleware instance with the given config and using the
-// given codec to encode/decode messages to our peers.
-func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, metrics module.NetworkMetrics, maxUnicastMsgSize int, maxPubSubMsgSize int,
-	rootBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
+// NewMiddleware creates a new middleware instance
+func NewMiddleware(log zerolog.Logger,
+	address string,
+	flowID flow.Identifier,
+	key crypto.PrivateKey,
+	metrics module.NetworkMetrics,
+	maxUnicastMsgSize int,
+	maxPubSubMsgSize int,
+	rootBlockID string,
+	validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -100,7 +104,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		ctx:               ctx,
 		cancel:            cancel,
 		log:               log,
-		codec:             codec,
 		libP2PNode:        p2p,
 		wg:                &sync.WaitGroup{},
 		stop:              make(chan struct{}),
@@ -140,9 +143,7 @@ func (m *Middleware) PublicKey() crypto.PublicKey {
 }
 
 // Start will start the middleware.
-func (m *Middleware) Start(ov middleware.Overlay) error {
-
-	m.ov = ov
+func (m *Middleware) Start() error {
 
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
@@ -487,25 +488,34 @@ func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
 	return m.libP2PNode.Ping(m.ctx, nodeAddress)
 }
 
-// UpdateAllowList fetches the most recent identity of the nodes from overlay
-// and updates the underlying libp2p node.
-func (m *Middleware) UpdateAllowList() error {
-	// get the node identity map from the overlay
-	idsMap, err := m.ov.Identity()
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
+// SetIDs updates the middleware id list and the libp2pNode allow list
+func (m *Middleware) SetIDs(ids flow.IdentityList) error {
+	idMap := make(map[flow.Identifier]NodeAddress)
+	var nodeAddrs []NodeAddress
+	for _, id := range ids {
+		nodeAddress, err := nodeAddressFromIdentity(*id)
+		if err != nil {
+			return fmt.Errorf("failed to update middelware identity list: %w", err)
+		}
+		idMap[id.NodeID] = nodeAddress
+		nodeAddrs = append(nodeAddrs, nodeAddress)
 	}
 
-	// derive all node addresses from flow identities
-	nodeAddrsAllowList, err := nodeAddresses(idsMap)
-	if err != nil {
-		return fmt.Errorf("could not derive list of approved peer list: %w", err)
-	}
+	m.Lock()
 
-	err = m.libP2PNode.UpdateAllowlist(nodeAddrsAllowList...)
+	// replace the old flow.Identity -> NodeAddress map with the new map
+	m.nodeAddressMap = idMap
+
+	defer m.Unlock()
+
+	// update the allow list
+	err := m.libP2PNode.UpdateAllowlist(nodeAddrs...)
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
 	}
-
 	return nil
+}
+
+func (m *Middleware) getIDMap() map[flow.Identifier]NodeAddress {
+	return m.nodeAddressMap
 }

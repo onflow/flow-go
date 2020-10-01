@@ -54,8 +54,8 @@ func (d *Discovery) FindPeers(ctx context.Context, _ string, _ ...discovery.Opti
 		close(emptyCh)
 		return emptyCh, err
 	}
-
-	// query the overlay to get all the other nodes that should be directly connected to this node for 1-k messaging
+	
+	// call the callback to get all the other nodes that should be directly connected to this node for 1-k messaging
 	ids, err := d.overlay.Topology()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ids: %w", err)
