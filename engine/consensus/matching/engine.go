@@ -626,6 +626,9 @@ func (e *Engine) validateSpocks(verifiers flow.IdentityList, executors flow.Iden
 			receipt = r
 		}
 	}
+	if receipt == nil {
+		return false, fmt.Errorf("could not find matching receipt for result in mempool")
+	}
 
 	// find identities
 	approver, ok := verifiers.ByNodeID(approval.Body.ApproverID)
