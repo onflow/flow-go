@@ -1,7 +1,9 @@
 package stdmap
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,4 +146,42 @@ func TestIdentiferMap(t *testing.T) {
 		// it however should not affect any other keys
 		require.True(t, idMap.Has(key2))
 	})
+}
+
+// TestRaceCondition is meant for running with `-race` flag.
+// It performs Append, Has, Get, and RemIdFromKey methods of IdentifierMap concurrently
+// each in a different goroutine.
+// Running this test with `-race` flag detects and reports the existence of race condition if
+// it is the case.
+func TestRaceCondition(t *testing.T) {
+	idMap, err := NewIdentifierMap(10)
+	require.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+
+	key := unittest.IdentifierFixture()
+	id := unittest.IdentifierFixture()
+	wg.Add(4)
+
+	go func() {
+		defer wg.Done()
+		require.NoError(t, idMap.Append(key, id))
+	}()
+
+	go func() {
+		defer wg.Done()
+		idMap.Has(key)
+	}()
+
+	go func() {
+		defer wg.Done()
+		idMap.Get(key)
+	}()
+
+	go func() {
+		defer wg.Done()
+		require.NoError(t, idMap.RemIdFromKey(key, id))
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
 }

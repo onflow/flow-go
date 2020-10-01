@@ -64,12 +64,14 @@ func main() {
 
 			collProvider := engine.TestNetwork
 			collIngest := engine.TestMetrics
+			message1 := "CollectionRequest"
+			message2 := "ClusterBlockProposal"
 
-			collector.NetworkMessageSent(rand.Intn(1000), collProvider)
-			collector.NetworkMessageSent(rand.Intn(1000), collIngest)
+			collector.NetworkMessageSent(rand.Intn(1000), collProvider, message1)
+			collector.NetworkMessageSent(rand.Intn(1000), collIngest, message2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), collProvider)
-			collector.NetworkMessageReceived(rand.Intn(1000), collIngest)
+			collector.NetworkMessageReceived(rand.Intn(1000), collProvider, message1)
+			collector.NetworkMessageReceived(rand.Intn(1000), collIngest, message2)
 
 			time.Sleep(1 * time.Second)
 		}
