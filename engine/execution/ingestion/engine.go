@@ -66,6 +66,7 @@ type Engine struct {
 	syncFilter    flow.IdentityFilter // specify the filter to sync state from
 	syncConduit   network.Conduit     // sending state syncing requests
 	syncDeltas    mempool.Deltas      // storing the synced state deltas
+	syncFast      bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 }
 
 func New(
@@ -87,6 +88,7 @@ func New(
 	root *flow.Header,
 	syncFilter flow.IdentityFilter,
 	syncDeltas mempool.Deltas,
+	syncFast bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -113,7 +115,9 @@ func New(
 		extensiveLogging:   extLog,
 		root:               root,
 		syncFilter:         syncFilter,
+		syncThreshold:      100,
 		syncDeltas:         syncDeltas,
+		syncFast:           syncFast,
 	}
 
 	// move to state syncing engine
@@ -593,6 +597,22 @@ func (e *Engine) matchOrRequestCollections(
 	executableBlock *entity.ExecutableBlock,
 	collectionsBackdata *stdmap.BlockByCollectionBackdata,
 ) error {
+	// if the state syncing is on, it will fetch deltas for sealed and
+	// unexecuted blocks. However, for any new blocks, we are still fetching
+	// collections for them, which is not necessary, because the state deltas
+	// will include the collection.
+	// Fetching those collections will introduce load to collection nodes,
+	// and handling them would increase memory usage and network bandwidth.
+	// Therefore, we introduced this "sync-fast" mode.
+	// The sync-fast mode can be turned on by the `sync-fast=true` flag.
+	// When it's turned on, it will skip fetching collections, and will
+	// rely on the state syncing to catch up.
+	if e.syncFast {
+		isSyncing, _ := e.isSyncingState()
+		if isSyncing {
+			return nil
+		}
+	}
 
 	// make sure that the requests are dispatched immediately by the requester
 	defer e.request.Force()
@@ -986,6 +1006,20 @@ func (e *Engine) generateExecutionReceipt(
 	return receipt, nil
 }
 
+func (e *Engine) isSyncingState() (bool, uint64) {
+	syncHeight := e.syncingHeight.Load()
+	return syncHeight > 0, syncHeight
+}
+
+func (e *Engine) stopSyncing(syncingHeight uint64) bool {
+	stopped := e.syncingHeight.CAS(syncingHeight, 0)
+	return stopped
+}
+
+func (e *Engine) startSyncing(syncHeight uint64) bool {
+	return e.syncingHeight.CAS(syncHeight, 0)
+}
+
 // check whether we need to trigger state sync
 // firstUnexecutedHeight - the height that is unexecuted
 // we will check the state sync if the number of sealed and unexecuted blocks
@@ -994,7 +1028,8 @@ func (e *Engine) generateExecutionReceipt(
 // the consensus nodes have seen the result, and the statecommitment
 // has been approved by the consensus nodes.
 func (e *Engine) checkStateSyncStart(firstUnexecutedHeight uint64) {
-	if e.syncingHeight.Load() > 0 {
+	isSyncing, _ := e.isSyncingState()
+	if isSyncing {
 		// state sync is already triggered, no need to check
 		return
 	}
@@ -1039,8 +1074,8 @@ func (e *Engine) checkStateSyncStop(executedHeight uint64) {
 	}
 
 	// reached the sync target, we should turn off the syncing
-	turnedOff := e.syncingHeight.CAS(syncHeight, 0)
-	if turnedOff {
+	stopped := e.stopSyncing(syncHeight)
+	if stopped {
 		e.metrics.ExecutionSync(false)
 	}
 
@@ -1058,7 +1093,8 @@ func shouldTriggerStateSync(startHeight, endHeight uint64, threshold int) bool {
 }
 
 func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
-	if !e.syncingHeight.CAS(0, toHeight) {
+	started := e.startSyncing(toHeight)
+	if !started {
 		// some other process has already entered the startStateSync
 		return nil
 	}
@@ -1074,10 +1110,12 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 
 	if len(otherNodes) == 0 {
 		e.log.Error().Msg("no available execution node to sync state from")
-		e.syncingHeight.Store(0)
+		e.stopSyncing(toHeight)
 		return nil
 	}
 
+	// randomly choose an execution node to sync state from,
+	// use syncFilter to sync from a specific execution node
 	randomExecutionNode := otherNodes[rand.Intn(len(otherNodes))]
 
 	exeStateReq := messages.ExecutionStateSyncRequest{
@@ -1092,8 +1130,10 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 		Msg("requesting execution state sync")
 
 	// TODO: there is a chance the randomly picked execution node is also behind,
-	// retry state syncing request with another node if we haven't
+	// better to retry state syncing request with another node if we haven't
 	// reached the targeted height after a while.
+	// for now, we could also rely on the syncFilter to force syncing from a
+	// specific node.
 	err = e.syncConduit.Submit(&exeStateReq, randomExecutionNode.NodeID)
 
 	if err != nil {
