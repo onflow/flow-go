@@ -573,6 +573,9 @@ void ep2_sum_vector(ep2_t jointy, ep2_st* y, int len){
     for (int i=0; i<len; i++){
         ep2_add_projc(jointy, jointy, &y[i]);
     }
+    ep2_norm(jointy, jointy); // not necessary but left here to optimize the 
+                            // the multiple pairing computations with the same 
+                            // public key
 }
 
 // Subtracts the sum of a G2 array elements y from an element x and writes the 

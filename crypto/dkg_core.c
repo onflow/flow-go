@@ -70,32 +70,18 @@ void Zr_polynomialImage(bn_t image, ep2_t y, const bn_st *a, const int a_size, c
 // r is the order of G2
 static void G2_polynomialImage(ep2_t y, const ep2_st* A, const int len_A,
          const byte x, const bn_t r){
-    // powers of x
-    bn_t bn_x;         // maximum is |n|+|r| --> 264 bits
-    bn_new(bn_x);
-    bn_new_size(bn_x, BITS_TO_DIGITS(Fr_BITS+N_bits_max));
-    bn_set_dig(bn_x, 1);
     
-    // temp variables
-    ep2_t mult, acc;
-    ep2_new(mult);         
-    ep2_new(acc);
-    ep2_set_infty(acc);
-
-    for (int i=0; i < len_A; i++) {
-        ep2_mul_lwnaf(mult, (ep2_st*)&A[i], bn_x);
-        ep2_add_projc(acc, acc, mult);
-        bn_mul_dig(bn_x, bn_x, x);
-        // Use basic reduction as it's an 8-bits reduction 
-        // in the worst case (|bn_x|<|r|+8 )
-        bn_mod_basic(bn_x, bn_x, r);
+    bn_t bn_x;        
+    bn_new(bn_x);    
+    ep2_set_infty(y);
+    bn_set_dig(bn_x, x);
+    for (int i = len_A-1; i >= 0 ; i--) {
+        ep2_mul_lwnaf(y, y, bn_x);
+        ep2_add_projc(y, y, (ep2_st*)&A[i]);
     }
-    // export the result
-    ep2_copy(y, acc);
-    ep2_norm(y, y);
 
-    ep2_free(acc)
-    ep2_free(mult);
+    ep2_norm(y, y); // not necessary but left here to optimize the 
+                    // the multiple pairing computations with the same public key
     bn_free(bn_x);
 }
 
