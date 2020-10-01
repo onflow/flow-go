@@ -65,7 +65,8 @@ func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flo
 func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState) (*messages.BlockProposal,
 	*flow.ExecutionReceipt) {
 
-	r1finalState, _ := r1.ExecutionResult.FinalStateCommitment()
+	r1finalState, ok := r1.ExecutionResult.FinalStateCommitment()
+	require.True(t, ok)
 
 	// get the state commitment for the highest finalized block
 	initialFinalizedSC := unittest.GenesisStateCommitment
@@ -87,7 +88,8 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		}
 		currentID = b2.Header.ID()
 		r2 = rs.WaitForReceiptFromAny(t, b2.Header.ID())
-		r2finalState, _ := r2.ExecutionResult.FinalStateCommitment()
+		r2finalState, ok := r2.ExecutionResult.FinalStateCommitment()
+		require.True(t, ok)
 		if bytes.Compare(initialFinalizedSC, r2finalState) == 0 {
 			// received a new execution result for the next finalized block, but it has the same final state commitment
 			// check the next finalized block

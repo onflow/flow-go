@@ -34,7 +34,8 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// wait for execution receipt for blockA from execution node 1
 	erExe1BlockA := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockA.Header.ID(), gs.exe1ID)
-	finalStateErExec1BlockA, _ := erExe1BlockA.ExecutionResult.FinalStateCommitment()
+	finalStateErExec1BlockA, ok := erExe1BlockA.ExecutionResult.FinalStateCommitment()
+	require.True(gs.T(), ok)
 	gs.T().Logf("got erExe1BlockA with SC %x", finalStateErExec1BlockA)
 
 	// assert there were no ChunkDataRequests from the verification node yet
@@ -51,7 +52,8 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// wait for execution receipt for blockB from execution node 1
 	erExe1BlockB := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockB.Header.ID(), gs.exe1ID)
-	finalStateErExec1BlockB, _ := erExe1BlockB.ExecutionResult.FinalStateCommitment()
+	finalStateErExec1BlockB, ok := erExe1BlockB.ExecutionResult.FinalStateCommitment()
+	require.True(gs.T(), ok)
 	gs.T().Logf("got erExe1BlockB with SC %x", finalStateErExec1BlockB)
 
 	// extract chunk ID from execution receipt

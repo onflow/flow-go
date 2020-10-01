@@ -1161,7 +1161,8 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 
 	finalState, ok := executionReceipt.ExecutionResult.FinalStateCommitment()
 	if !ok {
-		log.Error().Msg("could not get final state: no chunks found")
+		// set to start state next line will fail anyways
+		finalState = executionStateDelta.StartState
 	}
 
 	if !bytes.Equal(finalState, executionStateDelta.EndState) {

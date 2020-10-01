@@ -63,8 +63,10 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	s.T().Logf("got blockC height %v ID %v", blockC.Header.Height, blockC.Header.ID())
 
 	// final states
-	finalStateBlockB, _ := erBlockB.ExecutionResult.FinalStateCommitment()
-	finalStateBlockC, _ := erBlockC.ExecutionResult.FinalStateCommitment()
+	finalStateBlockB, ok := erBlockB.ExecutionResult.FinalStateCommitment()
+	require.True(s.T(), ok)
+	finalStateBlockC, ok := erBlockC.ExecutionResult.FinalStateCommitment()
+	require.True(s.T(), ok)
 
 	// wait for execution receipt for blockC from execution node 1
 	erBlockC := s.ReceiptState.WaitForReceiptFrom(s.T(), blockC.Header.ID(), s.exe1ID)
