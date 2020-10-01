@@ -153,8 +153,7 @@ func createNode(
 	}
 
 	// log with node index an ID
-	debugging := false
-	log := unittest.Logger(debugging).With().
+	log := unittest.Logger().With().
 		Int("index", index).
 		Hex("node_id", localID[:]).
 		Logger()

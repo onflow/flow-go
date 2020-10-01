@@ -250,6 +250,7 @@ func main() {
 				node.RootBlock.Header,
 				preferredExeFilter,
 				deltas,
+				syncFast,
 			)
 
 			// TODO: we should solve these mutual dependencies better

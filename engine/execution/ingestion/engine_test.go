@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -62,7 +61,6 @@ type testingContext struct {
 	executionState     *state.ExecutionState
 	snapshot           *protocol.Snapshot
 	identity           *flow.Identity
-	log                zerolog.Logger
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -159,6 +157,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		&flow.Header{},
 		filter.Any,
 		deltas,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -315,7 +314,6 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 		mocked.ReturnArguments = mock.Arguments{nil}
 	}
 
-	return
 }
 
 func TestExecuteOneBlock(t *testing.T) {
