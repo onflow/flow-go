@@ -130,7 +130,7 @@ func main() {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
 		}).
-		Module("state deltas mempoo", func(node *cmd.FlowNodeBuilder) error {
+		Module("state deltas mempool", func(node *cmd.FlowNodeBuilder) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
 		}).
