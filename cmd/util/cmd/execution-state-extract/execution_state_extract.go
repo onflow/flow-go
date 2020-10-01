@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"path"
 	"time"
 
@@ -14,9 +16,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/ledger"
 	"github.com/onflow/flow-go/storage/ledger/mtrie"
-	"github.com/onflow/flow-go/storage/ledger/mtrie/flattener"
+	oldFlattener "github.com/onflow/flow-go/storage/ledger/mtrie/flattener"
 	"github.com/onflow/flow-go/storage/ledger/mtrie/trie"
-	"github.com/onflow/flow-go/storage/ledger/wal"
+	oldWal "github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
@@ -25,7 +27,7 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, ledger.RegisterKeySize, wal.SegmentSize)
+	w, err := oldWal.NewWAL(nil, nil, dir, ledger.CacheSize, ledger.RegisterKeySize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -49,8 +51,8 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	FoundHashError := fmt.Errorf("found hash %s", targetHash)
 
 	err = w.ReplayLogsOnly(
-		func(forestSequencing *flattener.FlattenedForest) error {
-			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
+		func(forestSequencing *oldFlattener.FlattenedForest) error {
+			rebuiltTries, err := oldFlattener.RebuildTries(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
 			}
@@ -105,9 +107,28 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 
 	startTime = time.Now()
 
-	flattenForest, err := flattener.FlattenForest(mForest)
+	oldFlattenForest, err := oldFlattener.FlattenForest(mForest)
 	if err != nil {
 		return fmt.Errorf("cannot flatten forest: %w", err)
+	}
+
+	//Migrate old flattenForest to new format
+	newNodes := make([]*flattener.StorableNode, len(oldFlattenForest.Nodes))
+
+	for ii, oldNode := range oldFlattenForest.Nodes {
+		path := oldNode.Key
+		payload := oldNode.Value
+
+		newNodes[ii] = &flattener.StorableNode{
+			LIndex:     oldNode.LIndex,
+			RIndex:     oldNode.RIndex,
+			Height:     oldNode.Height,
+			Path:       path,
+			EncPayload: payload,
+			HashValue:  oldNode.HashValue,
+			MaxDepth:   oldNode.MaxDepth,
+			RegCount:   oldNode.RegCount,
+		}
 	}
 
 	checkpointWriter, err := wal.CreateCheckpointWriterForFile(path.Join(outputDir, wal.RootCheckpointFilename))
@@ -121,7 +142,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		}
 	}()
 
-	err = wal.StoreCheckpoint(flattenForest, checkpointWriter)
+	err = wal.StoreCheckpoint(oldFlattenForest, checkpointWriter)
 	if err != nil {
 		return fmt.Errorf("cannot store checkpoint: %w", err)
 	}
