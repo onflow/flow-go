@@ -54,7 +54,7 @@ const (
 func FullyQualifiedChannelName(channelID string, rootBlockID string) string {
 	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
 	// unique for each epoch
-	if strings.HasPrefix(channelID, syncClusterPrefix) {
+	if strings.HasPrefix(channelID, syncClusterPrefix) || strings.HasPrefix(channelID, consensusClusterPrefix)  {
 		return channelID
 	}
 	return fmt.Sprintf("%s/%s", channelID, rootBlockID)
