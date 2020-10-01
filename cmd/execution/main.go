@@ -247,6 +247,7 @@ func main() {
 				true,
 				node.RootBlock.Header,
 				preferredExeFilter,
+				deltas,
 			)
 
 			// TODO: we should solve these mutual dependencies better

@@ -31,27 +31,29 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 )
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log        zerolog.Logger
-	Metrics    *metrics.NoopCollector
-	Tracer     module.Tracer
-	DB         *badger.DB
-	Headers    storage.Headers
-	Identities storage.Identities
-	Guarantees storage.Guarantees
-	Seals      storage.Seals
-	Payloads   storage.Payloads
-	Blocks     storage.Blocks
-	State      protocol.State
-	Index      storage.Index
-	Me         module.Local
-	Net        *stub.Network
-	DBDir      string
-	ChainID    flow.ChainID
+	Log            zerolog.Logger
+	Metrics        *metrics.NoopCollector
+	Tracer         module.Tracer
+	DB             *badger.DB
+	Headers        storage.Headers
+	Identities     storage.Identities
+	Guarantees     storage.Guarantees
+	Seals          storage.Seals
+	Payloads       storage.Payloads
+	Blocks         storage.Blocks
+	State          protocol.State
+	Index          storage.Index
+	Me             module.Local
+	Net            *stub.Network
+	DBDir          string
+	ChainID        flow.ChainID
+	ProtocolEvents *events.Distributor
 }
 
 func (g *GenericNode) Done() {

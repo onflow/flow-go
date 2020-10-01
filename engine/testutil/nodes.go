@@ -3,12 +3,10 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -65,7 +63,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		}
 	}
 
-	log := zerolog.New(os.Stderr).With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
+	log := unittest.Logger().With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
 
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
@@ -80,10 +78,10 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	blocks := storage.NewBlocks(db, headers, payloads)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
-	consumer := events.NewNoop()
+	distributor := events.NewDistributor()
 	statuses := storage.NewEpochStatuses(metrics, db)
 
-	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
+	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
 	require.NoError(t, err)
 
 	root, result, seal := unittest.BootstrapFixture(participants)
@@ -116,21 +114,22 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	return testmock.GenericNode{
-		Log:        log,
-		Metrics:    metrics,
-		Tracer:     tracer,
-		DB:         db,
-		Headers:    headers,
-		Guarantees: guarantees,
-		Seals:      seals,
-		Payloads:   payloads,
-		Blocks:     blocks,
-		Index:      index,
-		State:      state,
-		Me:         me,
-		Net:        stubnet,
-		DBDir:      dbDir,
-		ChainID:    chainID,
+		Log:            log,
+		Metrics:        metrics,
+		Tracer:         tracer,
+		DB:             db,
+		Headers:        headers,
+		Guarantees:     guarantees,
+		Seals:          seals,
+		Payloads:       payloads,
+		Blocks:         blocks,
+		Index:          index,
+		State:          state,
+		Me:             me,
+		Net:            stubnet,
+		DBDir:          dbDir,
+		ChainID:        chainID,
+		ProtocolEvents: distributor,
 	}
 }
 
@@ -209,12 +208,15 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
+	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
 	require.Nil(t, err)
 
+	// request receipts from execution nodes
 	requesterEng, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
+	// match approvals and results
 	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
@@ -319,6 +321,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
 	require.NoError(t, err)
 
+	deltas, err := ingestion.NewDeltas(1000)
+	require.NoError(t, err)
+
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		node.Log,
@@ -338,9 +343,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		rootHead,
 		filter.Any,
+		deltas,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
+
+	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
 	followerCore := createFollowerCore(t, &node, ingestionEngine, rootHead, rootQC)
 

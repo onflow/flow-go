@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -189,13 +188,14 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-// OnBlockProcessable handles the new verified blocks (blocks that
+// BlockProcessable handles the new verified blocks (blocks that
 // have passed consensus validation) received from the consensus nodes
-// Note: OnBlockProcessable might be called multiple times for the same block.
-func (e *Engine) OnBlockProcessable(b *model.Block) {
-	newBlock, err := e.blocks.ByID(b.BlockID)
+// Note: BlockProcessable might be called multiple times for the same block.
+func (e *Engine) BlockProcessable(b *flow.Header) {
+	blockID := b.ID()
+	newBlock, err := e.blocks.ByID(blockID)
 	if err != nil {
-		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", b.BlockID, err)
+		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", blockID, err)
 	}
 
 	if newBlock.Header.View <= e.root.View {
@@ -205,11 +205,11 @@ func (e *Engine) OnBlockProcessable(b *model.Block) {
 		return
 	}
 
-	e.log.Debug().Hex("block_id", b.BlockID[:]).Msg("handling block")
+	e.log.Debug().Hex("block_id", blockID[:]).Msg("handling block")
 
 	err = e.handleBlock(context.Background(), newBlock)
 	if err != nil {
-		e.log.Error().Err(err).Hex("block_id", logging.ID(b.BlockID)).Msg("failed to handle block")
+		e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
 	}
 }
 

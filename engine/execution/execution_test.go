@@ -32,6 +32,8 @@ func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *
 // verification node and consensus node.
 // create a block that has two collections: col1 and col2;
 // col1 has tx1 and tx2, col2 has tx3 and tx4.
+// create another child block which will trigger the parent
+// block to valid and be passed to the ingestion engine
 func TestExecutionFlow(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
@@ -91,6 +93,8 @@ func TestExecutionFlow(t *testing.T) {
 			},
 		},
 	})
+
+	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID)
 
 	collectionNode := testutil.GenericNode(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
@@ -168,6 +172,11 @@ func TestExecutionFlow(t *testing.T) {
 
 	// submit block from consensus node
 	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&block))
+	require.NoError(t, err)
+
+	// submit the child block from consensus node, which trigger the parent block
+	// to be passed to OnBlockProcessable
+	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
