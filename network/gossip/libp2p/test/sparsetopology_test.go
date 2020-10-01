@@ -89,7 +89,7 @@ func (stt *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Condui
 
 	tops := createSparseTopology(count, subsets)
 
-	stt.nets, err = createNetworks(logger, stt.mws, stt.ids, 100, false, tops...)
+	stt.nets, err = createNetworks(logger, stt.mws, stt.ids, 100, false, tops, nil)
 	require.NoError(stt.Suite.T(), err)
 
 	// create engines
@@ -167,7 +167,7 @@ func (stt *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSendWr
 
 	tops := createDisjointedTopology(count, subsets)
 
-	stt.nets, err = createNetworks(logger, stt.mws, stt.ids, 100, false, tops...)
+	stt.nets, err = createNetworks(logger, stt.mws, stt.ids, 100, false, tops, nil)
 	require.NoError(stt.Suite.T(), err)
 
 	// create engines

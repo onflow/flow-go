@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/gossip/libp2p/cache"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
@@ -28,6 +30,7 @@ type Network struct {
 	logger          zerolog.Logger
 	codec           network.Codec
 	ids             flow.IdentityList
+	state           protocol.ReadOnlyState
 	me              module.Local
 	mw              middleware.Middleware
 	top             topology.TopologyCache
@@ -46,7 +49,7 @@ type Network struct {
 func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
-	ids flow.IdentityList,
+	state protocol.ReadOnlyState,
 	me module.Local,
 	mw middleware.Middleware,
 	csize int,
@@ -70,9 +73,16 @@ func NewNetwork(
 		top:             topologyCache,
 		metrics:         metrics,
 		subscriptionMgr: newSubscriptionManager(mw),
+		state:           state,
 	}
 
-	o.SetIDs(ids)
+	// seed the network with the current ids from the state
+	ids, err := state.Final().Identities(filter.Any)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive ids: %w", err)
+	}
+
+	o.ids = ids
 
 	ctx, cancel := context.WithCancel(context.Background())
 	o.cancel = cancel
@@ -184,10 +194,17 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 	return nil
 }
 
-func (n *Network) SetIDs(ids flow.IdentityList) {
+func (n *Network) SetIDs(ids flow.IdentityList) error {
 	// remove this node id from the list of fanout target ids to avoid self-dial
 	idsMinusMe := ids.Filter(n.me.NotMeFilter())
 	n.ids = idsMinusMe
+
+	// update the allow list
+	err := n.mw.UpdateAllowList()
+	if err != nil {
+		return fmt.Errorf("failed to update network ids: %w", err)
+	}
+	return nil
 }
 
 // fanout returns the node fanout derived from the identity list
@@ -456,18 +473,13 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 }
 
 func (n *Network) EpochTransition(newEpoch uint64, first *flow.Header) {
-	// TODO: update the collection topology if this is a collection node
-	oldList, err := n.Topology()
+	ids, err := n.state.Final().Identities(filter.Any)
 	if err != nil {
-		n.logger.Err(err).Msg("failed to process EpochTransition event")
+		n.logger.Err(err).Uint64("epoch", newEpoch).Msg("failed to update ids on epoch transition")
+		return
 	}
-
-	// invalidate the old topology since an epoch transition has occured
-	n.top.Invalidate()
-
-	// get the new list of nodes to connect to
-	newList, err := n.Topology()
-
-	extraConnectons
-
+	err = n.SetIDs(ids)
+	if err != nil {
+		n.logger.Err(err).Uint64("epoch", newEpoch).Msg("failed to update ids on epoch transition")
+	}
 }
