@@ -323,6 +323,7 @@ func (ms *MatchingSuite) SetupTest() {
 		requestReceiptThreshold: 10,
 		maxUnsealedResults:      200,
 		assigner:                ms.assigner,
+		requireApprovals:        true,
 	}
 }
 
@@ -784,11 +785,23 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 			resultID := args.Get(0).(flow.Identifier)
 			ms.Assert().Equal(result.ID(), resultID)
 		},
-	).Return(make(map[flow.Identifier]*flow.ResultApproval), true)
+	).Return(nil)
 
+	// with requireApprovals = true ( default test case ), it should not collect
+	// any results because we haven't added any approvals to the mempool
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "should not select result with insufficient approvals")
+
+	// with requireApprovals = false,  it should collect the result even if
+	// there are no corresponding approvals
+	ms.matching.requireApprovals = false
+	results, err = ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	if ms.Assert().Len(results, 1, "should select result when requireApprovals flag is false") {
+		sealable := results[0]
+		ms.Assert().Equal(result, sealable)
+	}
 }
 
 func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {

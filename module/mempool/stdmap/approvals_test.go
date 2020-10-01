@@ -24,8 +24,7 @@ func TestApprovals(t *testing.T) {
 		require.NoError(t, err)
 
 		// checks the existence of approval for key
-		approvals, ok := approvalPL.ByChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
-		require.True(t, ok)
+		approvals := approvalPL.ByChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
 		require.Contains(t, approvals, approval1.Body.ApproverID)
 	})
 
@@ -40,8 +39,7 @@ func TestApprovals(t *testing.T) {
 		require.NoError(t, err)
 
 		// checks the existence of approvals for key
-		approvals, ok := approvalPL.ByChunk(approval2.Body.ExecutionResultID, approval2.Body.ChunkIndex)
-		require.True(t, ok)
+		approvals := approvalPL.ByChunk(approval2.Body.ExecutionResultID, approval2.Body.ChunkIndex)
 		require.Contains(t, approvals, approval1.Body.ApproverID)
 		require.Contains(t, approvals, approval2.Body.ApproverID)
 	})
@@ -53,8 +51,7 @@ func TestApprovals(t *testing.T) {
 		require.NoError(t, err)
 
 		// checks the existence of approval for key
-		approvals, ok := approvalPL.ByChunk(approval3.Body.ExecutionResultID, approval3.Body.ChunkIndex)
-		require.True(t, ok)
+		approvals := approvalPL.ByChunk(approval3.Body.ExecutionResultID, approval3.Body.ChunkIndex)
 		require.Contains(t, approvals, approval3.Body.ApproverID)
 		require.Equal(t, 1, len(approvals))
 	})
@@ -73,10 +70,9 @@ func TestApprovals(t *testing.T) {
 		ok := approvalPL.Rem(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
 		require.True(t, ok)
 
-		// getting chunk should return false
-		approvals, ok := approvalPL.ByChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
-		require.False(t, ok)
-		require.Nil(t, approvals)
+		// getting chunk should return empty map
+		approvals := approvalPL.ByChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
+		require.Empty(t, approvals)
 
 		// All method should only return approval3
 		all := approvalPL.All()

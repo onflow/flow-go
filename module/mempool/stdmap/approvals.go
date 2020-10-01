@@ -133,21 +133,21 @@ func (a *Approvals) Rem(resultID flow.Identifier, chunkIndex uint64) bool {
 }
 
 // Get fetches approvals for a specific chunk
-func (a *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (map[flow.Identifier]*flow.ResultApproval, bool) {
+func (a *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flow.Identifier]*flow.ResultApproval {
 	// determine the lookup key for the corresponding chunk
 	chunkKey := key(resultID, chunkIndex)
 
 	entity, exists := a.Backend.ByID(chunkKey)
 	if !exists {
-		return nil, false
+		return nil
 	}
 
 	approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
 	if !ok {
-		return nil, false
+		return nil
 	}
 
-	return approvalMapEntity.Approvals, true
+	return approvalMapEntity.Approvals
 }
 
 // All will return all approvals in the memory pool.

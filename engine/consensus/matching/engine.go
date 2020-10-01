@@ -52,6 +52,7 @@ type Engine struct {
 	checkingSealing         *atomic.Bool             // used to rate limit the checksealing call
 	requestReceiptThreshold uint                     // how many blocks between sealed/finalized before we request execution receipts
 	maxUnsealedResults      int                      // how many unsealed results to check when check sealing
+	requireApprovals        bool                     // flag to disable verifying chunk approvals
 }
 
 // New creates a new collection propagation engine.
@@ -72,6 +73,7 @@ func New(
 	approvals mempool.Approvals,
 	seals mempool.Seals,
 	assigner module.ChunkAssigner,
+	requireApprovals bool,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -96,6 +98,7 @@ func New(
 		requestReceiptThreshold: 10,
 		maxUnsealedResults:      200,
 		assigner:                assigner,
+		requireApprovals:        requireApprovals,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
@@ -585,10 +588,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 	}
 
 	// get all the chunk approvals from mempool
-	approvals, ok := e.approvals.ByChunk(result.ID(), chunk.Index)
-	if !ok {
-		return false, fmt.Errorf("could get verifier identities: %w", err)
-	}
+	approvals := e.approvals.ByChunk(resultID, chunk.Index)
 
 	// only keep approvals from assigned verifiers and if spocks match
 	var validApprovers flow.IdentifierList
@@ -612,6 +612,13 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 		validApprovers = append(validApprovers, approverID)
 	}
 
+	//   * this is only here temporarily to ease the migration to new chunk
+	//     based sealing.
+	if !e.requireApprovals {
+		return true, nil
+	}
+
+	// skip counting approvals
 	// TODO:
 	//  * This is the happy path (requires just one approval per chunk). Should
 	//    be +2/3 of all currently staked verifiers.
@@ -695,7 +702,10 @@ func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow
 
 	for _, chunk := range result.Chunks {
 		// get approvals for result with chunk index
-		approvals, _ := e.approvals.ByChunk(resultID, chunk.Index)
+		approvals := e.approvals.ByChunk(resultID, chunk.Index)
+		if approvals == nil {
+			continue
+		}
 
 		// temp slices to store signatures and ids
 		sigs := make([]crypto.Signature, 0, len(approvals))
