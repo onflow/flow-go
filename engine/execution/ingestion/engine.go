@@ -1139,9 +1139,10 @@ func (e *Engine) handleStateSyncRequest(
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
 	}
 
-	if id.Role != flow.RoleExecution {
-		return fmt.Errorf("invalid role for requesting state synchronization: %v, %s", originID, id.Role)
-	}
+	// TODO: restrict the sender has to be an execution node.
+	// if id.Role != flow.RoleExecution {
+	// 	return fmt.Errorf("invalid role for requesting state synchronization: %v, %s", originID, id.Role)
+	// }
 
 	// validate that from height must be smaller than to height
 	if req.FromHeight >= req.ToHeight {

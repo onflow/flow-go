@@ -62,7 +62,9 @@ func (bs *BlockState) Add(b *messages.BlockProposal) {
 					if !ok {
 						continue
 					}
-					if sealed.Header.Height > bs.highestSealed.Header.Height {
+
+					if bs.highestSealed == nil ||
+						sealed.Header.Height > bs.highestSealed.Header.Height {
 						bs.highestSealed = sealed
 					}
 				}
@@ -143,7 +145,10 @@ func (bs *BlockState) HighestFinalized() (*messages.BlockProposal, bool) {
 // WaitForSealed returns the sealed block after a certain height has been sealed.
 func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.BlockProposal {
 	require.Eventually(t, func() bool {
-		return bs.highestSealed.Header.Height > height
+		if bs.highestSealed != nil {
+			fmt.Println("waiting for sealed", bs.highestSealed.Header.Height, height)
+		}
+		return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
 	}, blockStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive sealed block for height (%v) within %v seconds", height,
 			blockStateTimeout))
