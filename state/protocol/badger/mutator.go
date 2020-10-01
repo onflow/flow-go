@@ -277,7 +277,15 @@ func (m *Mutator) headerExtend(candidate *flow.Block) error {
 			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
 		if ancestor.Height < finalizedHeight {
-			return state.NewOutdatedExtensionErrorf("candidate block connects to a finalized block (%d), which is below the last finalized block (%d)",
+			// this happens when the candidate block is on a fork that does not include all the
+			// finalized blocks.
+			// for instance:
+			// A (Finalized) <- B (Finalized) <- C (Finalized) <- D <- E <- F
+			//                  ^- G             ^- H             ^- I
+			// block G is not a valid block, because it does not include C which has been finalized.
+			// block H and I are a valid, because its their includes C.
+			return state.NewOutdatedExtensionErrorf(
+				"candidate block conflicts with finalized state (ancestor: %d final: %d)",
 				ancestor.Height, finalizedHeight)
 		}
 		ancestorID = ancestor.ParentID

@@ -25,8 +25,8 @@ func (s *Deltas) Add(delta *messages.ExecutionStateDelta) bool {
 }
 
 // Rem will remove a deltas by ID.
-func (s *Deltas) Rem(deltasID flow.Identifier) bool {
-	removed := s.Backend.Rem(deltasID)
+func (s *Deltas) Rem(deltaID flow.Identifier) bool {
+	removed := s.Backend.Rem(deltaID)
 	return removed
 }
 

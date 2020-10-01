@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -118,21 +119,26 @@ type ExecutionNode struct {
 }
 
 func (en ExecutionNode) Ready() {
-	<-en.Ledger.Ready()
-	<-en.ReceiptsEngine.Ready()
-	<-en.IngestionEngine.Ready()
-	<-en.FollowerEngine.Ready()
-	<-en.RequestEngine.Ready()
-	<-en.SyncEngine.Ready()
+	lifecycle.AllReady(
+		en.Ledger,
+		en.ReceiptsEngine,
+		en.IngestionEngine,
+		en.FollowerEngine,
+		en.RequestEngine,
+		en.SyncEngine,
+	)
 }
 
 func (en ExecutionNode) Done() {
-	<-en.IngestionEngine.Done()
-	<-en.ReceiptsEngine.Done()
-	<-en.Ledger.Done()
-	<-en.FollowerEngine.Done()
-	<-en.RequestEngine.Done()
-	<-en.SyncEngine.Done()
+	lifecycle.AllReady(
+		en.IngestionEngine,
+		en.IngestionEngine,
+		en.ReceiptsEngine,
+		en.Ledger,
+		en.FollowerEngine,
+		en.RequestEngine,
+		en.SyncEngine,
+	)
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()
 }
