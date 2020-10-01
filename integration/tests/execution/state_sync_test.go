@@ -62,7 +62,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// send a ExecutionStateSyncRequest from Ghost node
 	err = s.Ghost().Send(context.Background(), engine.SyncExecution,
-		&messages.ExecutionStateSyncRequest{CurrentBlockID: blockA.Header.ID(), TargetBlockID: blockB.Header.ID()},
+		&messages.ExecutionStateSyncRequest{FromHeight: blockA.Header.Height, ToHeight: blockC.Header.Height},
 		[]flow.Identifier{s.exe1ID}...)
 	require.NoError(s.T(), err)
 
