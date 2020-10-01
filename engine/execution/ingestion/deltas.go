@@ -21,19 +21,19 @@ func NewDeltas(limit uint, opts ...stdmap.OptionFunc) (*Deltas, error) {
 
 // Add adds an state deltas to the mempool.
 func (s *Deltas) Add(delta *messages.ExecutionStateDelta) bool {
+	// delta's ID is block's ID
 	return s.Backend.Add(delta)
 }
 
-// Rem will remove a deltas by ID.
-func (s *Deltas) Rem(deltaID flow.Identifier) bool {
-	removed := s.Backend.Rem(deltaID)
+// Rem will remove a deltas by block ID.
+func (s *Deltas) Rem(blockID flow.Identifier) bool {
+	removed := s.Backend.Rem(blockID)
 	return removed
 }
 
-// ByID returns the state deltas with the given ID from the mempool.
-// delta's ID is also blockID
-func (s *Deltas) ByID(deltaID flow.Identifier) (*messages.ExecutionStateDelta, bool) {
-	entity, exists := s.Backend.ByID(deltaID)
+// ByBlockID returns the state deltas for a block from the mempool.
+func (s *Deltas) ByBlockID(blockID flow.Identifier) (*messages.ExecutionStateDelta, bool) {
+	entity, exists := s.Backend.ByID(blockID)
 	if !exists {
 		return nil, false
 	}

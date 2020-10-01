@@ -247,7 +247,6 @@ func main() {
 				collector,
 				node.Tracer,
 				true,
-				node.RootBlock.Header,
 				preferredExeFilter,
 				deltas,
 				syncFast,

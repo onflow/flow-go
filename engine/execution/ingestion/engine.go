@@ -59,7 +59,6 @@ type Engine struct {
 	tracer             module.Tracer
 	extensiveLogging   bool
 	spockHasher        hash.Hasher
-	root               *flow.Header
 	// TODO: move all state syncing related logic to a separate module
 	syncingHeight atomic.Uint64       // syncingHeight == 0 means not syncing, otherwise it's the target height to sync to
 	syncThreshold int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
@@ -85,7 +84,6 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
-	root *flow.Header,
 	syncFilter flow.IdentityFilter,
 	syncDeltas mempool.Deltas,
 	syncFast bool,
@@ -113,7 +111,6 @@ func New(
 		metrics:            metrics,
 		tracer:             tracer,
 		extensiveLogging:   extLog,
-		root:               root,
 		syncFilter:         syncFilter,
 		syncThreshold:      100,
 		syncDeltas:         syncDeltas,
@@ -172,24 +169,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	var err error
-
 	switch resource := event.(type) {
 	case *messages.ExecutionStateSyncRequest:
-		err = e.handleStateSyncRequest(originID, resource)
+		return e.handleStateSyncRequest(originID, resource)
 	case *messages.ExecutionStateDelta:
-		err = e.handleStateDeltaResponse(originID, resource)
+		return e.handleStateDeltaResponse(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-
-	if err != nil {
-		e.log.Error().
-			Err(err).
-			Hex("sender", originID[:]).
-			Msgf("could not process (%T) message", event)
-	}
-	return nil
 }
 
 // BlockProcessable handles the new verified blocks (blocks that
@@ -202,16 +189,9 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", blockID, err)
 	}
 
-	if newBlock.Header.View <= e.root.View {
-		// 	ignore root block since it's different from other blocks:
-		//  1) root block doesn't have parent execution result
-		//  2) root block's result has been persistent already
-		return
-	}
-
 	e.log.Debug().Hex("block_id", blockID[:]).Msg("handling new block")
 
-	err = e.handleBlock(context.Background(), newBlock)
+	err = e.handleBlock(e.unit.Ctx(), newBlock)
 	if err != nil {
 		e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
 	}
@@ -272,7 +252,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			// a block is executable if the following conditions are all true
 			// 1) the parent state commitment is ready
 			// 2) the collections for the block payload are ready
-			// 3) TODO: the child block is ready for querying the randomness
+			// 3) the child block is ready for querying the randomness
 
 			// check if the block's parent has been executed. (we can't execute the block if the parent has
 			// not been executed yet)
@@ -448,7 +428,7 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	// if the eb has parent statecommitment, and we have the delta for this block
 	// then apply the delta
 	// note the block ID is the delta's ID
-	delta, found := e.syncDeltas.ByID(eb.Block.ID())
+	delta, found := e.syncDeltas.ByBlockID(eb.Block.ID())
 	if found {
 		// double check before applying the state delta
 		if bytes.Equal(eb.StartState, delta.ExecutableBlock.StartState) {
@@ -476,7 +456,7 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 		}
 
 		e.unit.Launch(func() {
-			e.executeBlock(context.Background(), eb)
+			e.executeBlock(e.unit.Ctx(), eb)
 		})
 		return true
 	}
@@ -1199,7 +1179,7 @@ func (e *Engine) handleStateSyncRequest(
 	// query the statecommitment, and if exists, send the
 	// state delta
 	// TOOD: add context
-	ctx := context.Background()
+	ctx := e.unit.Ctx()
 	err = e.deltaRange(ctx, fromHeight, toHeight,
 		func(delta *messages.ExecutionStateDelta) {
 			err := e.syncConduit.Submit(delta, originID)
@@ -1269,7 +1249,7 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 	// check if the block has been executed already
 	// delta ID is block ID
 	blockID := delta.ID()
-	_, err = e.execState.StateCommitmentByBlockID(context.Background(), blockID)
+	_, err = e.execState.StateCommitmentByBlockID(e.unit.Ctx(), blockID)
 
 	if err == nil {
 		// the block has been executed, ignore
@@ -1323,7 +1303,7 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 
 func (e *Engine) validateStateDelta(delta *messages.ExecutionStateDelta) error {
 	// must match the statecommitment for parent block
-	parentCommitment, err := e.execState.StateCommitmentByBlockID(context.Background(), delta.ParentID())
+	parentCommitment, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), delta.ParentID())
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not get parent sttecommitment: %w", err)
 	}
@@ -1354,7 +1334,7 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 	// TODO - validate state delta, reject invalid messages
 
 	executionReceipt, err := e.saveExecutionResults(
-		context.Background(),
+		e.unit.Ctx(),
 		&delta.ExecutableBlock,
 		delta.StateInteractions,
 		delta.Events,

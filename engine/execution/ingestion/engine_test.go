@@ -154,7 +154,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		metrics,
 		tracer,
 		false,
-		&flow.Header{},
 		filter.Any,
 		deltas,
 		false,
