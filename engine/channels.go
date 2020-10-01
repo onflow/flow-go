@@ -4,6 +4,7 @@ package engine
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -51,6 +52,11 @@ const (
 // FullyQualifiedChannelName returns the unique channel name made up of channel name string suffixed with root block id
 // The root block id is used to prevent cross talks between nodes on different sporks
 func FullyQualifiedChannelName(channelID string, rootBlockID string) string {
+	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
+	// unique for each epoch
+	if strings.HasPrefix(channelID, syncClusterPrefix) {
+		return channelID
+	}
 	return fmt.Sprintf("%s/%s", channelID, rootBlockID)
 }
 
