@@ -60,6 +60,10 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	// require that state between blockB and blockC has not changed
 	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe1BlockC.ExecutionResult.FinalStateCommit)
 
+	// wait for block C has been sealed
+	sealed := s.BlockState.WaitForSealed(s.T(), blockC.Header.Height)
+	s.T().Logf("block C has been sealed: %v", sealed.Header.ID())
+
 	// send a ExecutionStateSyncRequest from Ghost node
 	err = s.Ghost().Send(context.Background(), engine.SyncExecution,
 		&messages.ExecutionStateSyncRequest{FromHeight: blockA.Header.Height, ToHeight: blockC.Header.Height},
