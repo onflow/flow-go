@@ -86,6 +86,7 @@ func New(
 	extLog bool,
 	syncFilter flow.IdentityFilter,
 	syncDeltas mempool.Deltas,
+	syncThreshold int,
 	syncFast bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
@@ -112,7 +113,7 @@ func New(
 		tracer:             tracer,
 		extensiveLogging:   extLog,
 		syncFilter:         syncFilter,
-		syncThreshold:      100,
+		syncThreshold:      syncThreshold,
 		syncDeltas:         syncDeltas,
 		syncFast:           syncFast,
 	}

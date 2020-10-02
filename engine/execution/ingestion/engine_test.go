@@ -156,6 +156,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		false,
 		filter.Any,
 		deltas,
+		10,
 		false,
 	)
 	require.NoError(t, err)

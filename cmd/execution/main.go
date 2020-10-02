@@ -73,6 +73,7 @@ func main() {
 		preferredExeNodeIDStr string
 		syncByBlocks          bool
 		syncFast              bool
+		syncThreshold         int
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -89,6 +90,7 @@ func main() {
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
+			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -249,6 +251,7 @@ func main() {
 				true,
 				preferredExeFilter,
 				deltas,
+				syncThreshold,
 				syncFast,
 			)
 

@@ -343,6 +343,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		filter.Any,
 		deltas,
+		100,
 		false,
 	)
 	require.NoError(t, err)
