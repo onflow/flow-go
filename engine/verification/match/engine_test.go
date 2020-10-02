@@ -808,7 +808,8 @@ func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment
 
 func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 	chunk := &flow.Chunk{
-		Index: uint64(index),
+		BlockID: blockID,
+		Index:   uint64(index),
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(index),
 			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
