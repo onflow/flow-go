@@ -201,7 +201,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -209,8 +208,14 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("previous_id", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
-		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Logger()
+
+	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		return fmt.Errorf("could not get final state: no chunks found")
+	}
+
+	log = log.With().Hex("final_state", resultFinalState).Logger()
 
 	log.Info().Msg("execution receipt received")
 
@@ -617,11 +622,17 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	// collect aggregate signatures
 	aggregatedSigs := e.collectAggregateSignatures(result)
 
+	// get finalS state of execution result
+	finalState, ok := result.FinalStateCommitment()
+	if !ok {
+		return fmt.Errorf("could not get final state: no chunks found")
+	}
+
 	// generate & store seal
 	seal := &flow.Seal{
 		BlockID:                result.BlockID,
 		ResultID:               result.ID(),
-		FinalState:             result.FinalStateCommit,
+		FinalState:             finalState,
 		AggregatedApprovalSigs: aggregatedSigs,
 	}
 
