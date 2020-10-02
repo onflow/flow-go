@@ -42,7 +42,7 @@ func (st *SystemChunkTestSuite) TestSystemChunkIDsShouldBeDifferent() {
 	stateB := receiptB.ExecutionResult.FinalStateCommit
 	require.Equal(st.T(), stateA, stateB)
 
-	// computes id of system chunk in block A and B
+	// computes ids of system chunk for result A and B
 	systemChunkAId := receiptA.ExecutionResult.Chunks[0].ID()
 	systemChunkBId := receiptB.ExecutionResult.Chunks[0].ID()
 
