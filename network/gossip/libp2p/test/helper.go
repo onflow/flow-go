@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
 	mock2 "github.com/stretchr/testify/mock"
 

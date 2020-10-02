@@ -129,3 +129,37 @@ func generateNetworks(log zerolog.Logger,
 	}
 	return nets, nil
 }
+
+func generateIDsAndMiddlewares(n int, log zerolog.Logger) ([]*flow.Identity, []*libp2p.Middleware, error) {
+	ids, keys, err := generateIDs(n)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mws, err := generateMiddlewares(log, ids, keys)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ids, mws, err
+}
+
+func generateIDsMiddlewaresNetworks(n int,
+	log zerolog.Logger,
+	csize int,
+	tops []topology.Topology,
+	states []*protocol.ReadOnlyState,
+	dryrun bool) ([]*flow.Identity, []*libp2p.Middleware, []*libp2p.Network, error){
+
+	ids, mws, err := generateIDsAndMiddlewares(n, log)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	networks, err := generateNetworks(log, ids, mws, csize, tops, states, dryrun)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return ids, mws, networks, nil
+}
