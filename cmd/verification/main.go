@@ -33,12 +33,6 @@ import (
 )
 
 const (
-	// following lists the operational parameters of verification node
-	//
-	// chunkAssignmentAlpha represents number of verification
-	// DISCLAIMER: alpha down there is not a production-level value
-	chunkAssignmentAlpha = 1
-
 	// requestInterval represents the time interval in milliseconds that the
 	// match engine retries sending resource requests to the network
 	// this value is set following this issue (3443)
@@ -59,8 +53,8 @@ const (
 func main() {
 	var (
 		err                 error
-		alpha               uint
 		receiptLimit        uint                       // size of execution-receipt/result related mempools
+		chunkAlpha          uint                       // number of verifiers assigned per chunk
 		chunkLimit          uint                       // size of chunk-related mempools
 		cachedReceipts      *stdmap.ReceiptDataPacks   // used in finder engine
 		pendingReceipts     *stdmap.ReceiptDataPacks   // used in finder engine
@@ -86,7 +80,7 @@ func main() {
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
-			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
+			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		}).
 		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
@@ -255,7 +249,7 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
+			assigner, err := chunks.NewPublicAssignment(int(chunkAlpha), node.State)
 			if err != nil {
 				return nil, err
 			}
