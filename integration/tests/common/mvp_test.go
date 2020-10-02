@@ -23,7 +23,7 @@ func TestMVP_Network(t *testing.T) {
 	consensusConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	colNode := testnet.NewNodeConfig(flow.RoleCollection, consensusConfigs...)

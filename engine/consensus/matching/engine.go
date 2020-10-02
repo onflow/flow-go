@@ -270,7 +270,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	e.log.Info().Msg("execution result added to mempool")
 
 	// kick off a check for potential seal formation
-	go e.checkSealing()
+	e.unit.Launch(e.checkSealing)
 
 	return nil
 }
@@ -344,7 +344,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
 	// kick off a check for potential seal formation
-	go e.checkSealing()
+	e.unit.Launch(e.checkSealing)
 
 	return nil
 }
@@ -509,7 +509,10 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// check sub-graph
 		if block.ParentID != previous.BlockID {
 			_ = e.results.Rem(result.ID())
-			log.Warn().Msg("removing result with invalid sub-graph")
+			log.Warn().
+				Str("block_parent_id", block.ParentID.String()).
+				Str("previous_result_block_id", previous.BlockID.String()).
+				Msg("removing result with invalid sub-graph")
 			continue
 		}
 
@@ -531,18 +534,23 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 		if len(result.Chunks) != requiredChunks {
 			_ = e.results.Rem(result.ID())
-			log.Warn().Msg("removing result with invalid number of chunks")
+			log.Warn().
+				Int("result_chunks", len(result.Chunks)).
+				Int("required_chunks", requiredChunks).
+				Msg("removing result with invalid number of chunks")
 			continue
 		}
 
 		// check that each chunk collected enough approvals
 		allChunksMatched := true
 
-		// TODO: As a temporary shortcut, we can just use the block the
-		// Execution receipt is for, i.e. blockID = result.BlockID. However, in
-		// the full protocol, blockID is the first block in its fork, which
-		// references an Execution Receipt with an Execution Result identical to
-		// result. (were blockID != result.BlockID)
+		// TODO: the randomness of chunk assignment for a result is determined
+		// by the result and a block ID.
+		// As a temporary shortcut, we can just use the ID of the executed
+		// block, i.e. blockID = result.BlockID. However, in the full protocol,
+		// blockID is the first block in its fork, which references an Execution
+		// Receipt with an Execution Result identical to result.
+		// (where blockID != result.BlockID)
 		assignment, err := e.assigner.Assign(result, result.BlockID)
 		if state.IsNoValidChildBlockError(err) {
 			continue
@@ -806,6 +814,7 @@ func (e *Engine) requestPending() error {
 		requestedCount := 0
 		for _, blockID := range missingBlocksOrderedByHeight {
 			e.requester.EntityByID(blockID, filter.Any)
+			requestedCount++
 		}
 		e.log.Info().
 			Int("count", requestedCount).
