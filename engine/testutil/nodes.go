@@ -190,8 +190,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node := GenericNode(t, hub, identity, identities, chainID)
 
-	resultsDB := storage.NewExecutionResults(node.DB)
-	sealsDB := storage.NewSeals(node.Metrics, node.DB)
+	sealedResultsDB := storage.NewExecutionResults(node.DB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -216,8 +215,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	requesterEng, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
+	assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, node.State)
+	require.Nil(t, err)
+
+	requireApprovals := true
+
 	// match approvals and results
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, sealedResultsDB, node.Headers, node.Index, results, receipts, approvals, seals, assigner, requireApprovals)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{

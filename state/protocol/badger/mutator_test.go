@@ -390,10 +390,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 		first.SetPayload(flow.Payload{})
 
 		extend := &flow.Seal{
-			BlockID:      first.ID(),
-			ResultID:     flow.ZeroID,
-			InitialState: seal.FinalState,
-			FinalState:   unittest.StateCommitmentFixture(),
+			BlockID:    first.ID(),
+			ResultID:   flow.ZeroID,
+			FinalState: unittest.StateCommitmentFixture(),
 		}
 
 		second := unittest.BlockWithParentFixture(first.Header)
@@ -560,9 +559,8 @@ func TestExtendSealNotConnected(t *testing.T) {
 
 		// create seal for the block
 		second := &flow.Seal{
-			BlockID:      extend.ID(),
-			InitialState: unittest.StateCommitmentFixture(), // not root state
-			FinalState:   unittest.StateCommitmentFixture(),
+			BlockID:    extend.ID(),
+			FinalState: unittest.StateCommitmentFixture(),
 		}
 
 		sealing := unittest.BlockFixture()
@@ -645,11 +643,9 @@ func TestExtendHighestSeal(t *testing.T) {
 		// create seals for block2 and block3
 		seal2 := unittest.SealFixture(
 			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithInitalState(seal.FinalState),
 		)
 		seal3 := unittest.SealFixture(
 			unittest.SealWithBlockID(block3.ID()),
-			unittest.WithInitalState(seal2.FinalState),
 		)
 
 		// include the seals in block4
@@ -723,7 +719,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// create the seal referencing block1 and including the setup event
 		seal1 := unittest.SealFixture(
 			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
@@ -771,7 +766,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		seal2 := unittest.SealFixture(
 			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithInitalState(seal1.FinalState),
 			unittest.WithServiceEvents(epoch2Commit.ServiceEvent()),
 		)
 
@@ -898,14 +892,12 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// create one seal containing the first setup event
 		seal1 := unittest.SealFixture(
 			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(nextEpochSetup1.ServiceEvent()),
 		)
 
 		// create another seal containing the second setup event
 		seal2 := unittest.SealFixture(
 			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(nextEpochSetup2.ServiceEvent()),
 		)
 
@@ -969,7 +961,6 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			)
 			seal := unittest.SealFixture(
 				unittest.SealWithBlockID(block1.ID()),
-				unittest.WithInitalState(rootSeal.FinalState),
 				unittest.WithServiceEvents(setup.ServiceEvent()),
 			)
 			return setup, seal
@@ -1052,7 +1043,6 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			)
 			seal := unittest.SealFixture(
 				unittest.SealWithBlockID(block1.ID()),
-				unittest.WithInitalState(rootSeal.FinalState),
 				unittest.WithServiceEvents(setup.ServiceEvent()),
 			)
 			return setup, seal
@@ -1066,7 +1056,6 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 			seal := unittest.SealFixture(
 				unittest.SealWithBlockID(refBlockID),
-				unittest.WithInitalState(initState),
 				unittest.WithServiceEvents(commit.ServiceEvent()),
 			)
 			return commit, seal
@@ -1188,7 +1177,6 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		// create the seal referencing block1 and including the setup event
 		seal1 := unittest.SealFixture(
 			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
@@ -1377,11 +1365,9 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		// create seals for block2 and block3
 		seal2 := unittest.SealFixture(
 			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithInitalState(seal.FinalState),
 		)
 		seal3 := unittest.SealFixture(
 			unittest.SealWithBlockID(block3.ID()),
-			unittest.WithInitalState(seal2.FinalState),
 		)
 
 		// include the seals in block4
