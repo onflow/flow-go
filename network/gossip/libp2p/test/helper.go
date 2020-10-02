@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
 	mock2 "github.com/stretchr/testify/mock"
 
@@ -45,6 +46,7 @@ func CreateIDs(count int) []*flow.Identity {
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
+// TODO: refactor this function to make it simpler
 func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool,
 	tops []topology.Topology, states []*protocol.ReadOnlyState) ([]*libp2p.Network, error) {
 	count := len(mws)
@@ -73,7 +75,7 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
 		var state *protocol.ReadOnlyState
 		// if states are passed, use those else create one
-		if (len(states) == 0){
+		if len(states) == 0 {
 			state = createStateSnapshot(identities)
 		} else {
 			state = states[i]
@@ -82,7 +84,9 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		if err != nil {
 			return nil, fmt.Errorf("could not create network: %w", err)
 		}
-
+		// TODO: remove the need for this
+		// force the ids to an empty list for now to prevent discovery till actual ip:ports are assigned
+		net.SetIDs(identities)
 		nets = append(nets, net)
 	}
 
@@ -93,9 +97,11 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		}
 	}
 
-	identities = make(flow.IdentityList, len(ids))
+	// at this point, all middlewares should have started and received a valid ip, port
+
 	// set the identities to appropriate ip and port
 	for i := range ids {
+		id := ids[i]
 		// retrieves IP and port of the middleware
 		var ip, port string
 		var err error
@@ -109,30 +115,16 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 			key = m.PublicKey()
 		}
 
-		// mocks an identity for the middleware
-		id := flow.Identity{
-			NodeID:        ids[i].NodeID,
-			Address:       fmt.Sprintf("%s:%s", ip, port),
-			Role:          flow.RoleCollection,
-			Stake:         0,
-			NetworkPubKey: key,
-		}
-		identities[i] = &id
+		id.Address = fmt.Sprintf("%s:%s", ip, port)
+		// TODO: simplify this by creating ids with key
+		id.NetworkPubKey = key
 	}
 
-	// now that the network has started, address within the identity will have the actual port number
-	// update the network with the new ids
-	for _, net := range nets {
-		net.SetIDs(identities)
-	}
-
-	// update whitelist of each of the middleware after the network ids have been updated
 	if !dryrun {
-		for _, m := range mws {
-			err := m.UpdateAllowList()
-			if err != nil {
-				return nil, err
-			}
+		// now that the network has started, address within the identity will have the actual port number
+		// update the network with the new ids
+		for _, net := range nets {
+			net.SetIDs(ids)
 		}
 	}
 

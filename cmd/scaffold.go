@@ -194,6 +194,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
 
+
 		fnb.Network = net
 		return net, err
 	})

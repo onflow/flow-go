@@ -33,7 +33,7 @@ type Network struct {
 	state           protocol.ReadOnlyState
 	me              module.Local
 	mw              middleware.Middleware
-	top             topology.TopologyCache
+	top             topology.Topology
 	metrics         module.NetworkMetrics
 	rcache          *cache.RcvCache // used to deduplicate incoming messages
 	queue           queue.MessageQueue
@@ -62,15 +62,13 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
 
-	topologyCache := topology.NewTopologyCacheImpl(top)
-
 	o := &Network{
 		logger:          log,
 		codec:           codec,
 		me:              me,
 		mw:              mw,
 		rcache:          rcache,
-		top:             topologyCache,
+		top:             top,
 		metrics:         metrics,
 		subscriptionMgr: newSubscriptionManager(mw),
 		state:           state,
@@ -81,7 +79,6 @@ func NewNetwork(
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive ids: %w", err)
 	}
-
 	o.ids = ids
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -176,12 +173,6 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
 	}
 	return subset, nil
-	// creates a map of all the selected ids
-	//topMap := make(map[flow.Identifier]flow.Identity)
-	//for _, id := range subset {
-	//	topMap[id.NodeID] = *id
-	//}
-	//return topMap, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
@@ -198,12 +189,6 @@ func (n *Network) SetIDs(ids flow.IdentityList) error {
 	// remove this node id from the list of fanout target ids to avoid self-dial
 	idsMinusMe := ids.Filter(n.me.NotMeFilter())
 	n.ids = idsMinusMe
-
-	// update the allow list
-	err := n.mw.UpdateAllowList()
-	if err != nil {
-		return fmt.Errorf("failed to update network ids: %w", err)
-	}
 	return nil
 }
 
@@ -473,13 +458,20 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 }
 
 func (n *Network) EpochTransition(newEpoch uint64, first *flow.Header) {
+	log := n.logger.With().Uint64("epoch", newEpoch).Logger()
 	ids, err := n.state.Final().Identities(filter.Any)
 	if err != nil {
-		n.logger.Err(err).Uint64("epoch", newEpoch).Msg("failed to update ids on epoch transition")
+		log.Err(err).Msg("failed to update ids on epoch transition")
 		return
 	}
 	err = n.SetIDs(ids)
 	if err != nil {
-		n.logger.Err(err).Uint64("epoch", newEpoch).Msg("failed to update ids on epoch transition")
+		log.Err(err).Msg("failed to update ids on epoch transition")
+	}
+
+	// update the allow list
+	err = n.mw.UpdateAllowList()
+	if err != nil {
+		log.Err(err).Msg("failed to update ids on epoch transition")
 	}
 }

@@ -526,8 +526,15 @@ func (p *P2PNode) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
 	return nil
 }
 
-func (p *P2PNode) IsConnected(address NodeAddress) bool {
-
+// IsConnected returns true is address is a direct peer of this node else false
+func (p *P2PNode) IsConnected(address NodeAddress) (bool, error) {
+	pInfo, err := GetPeerInfo(address)
+	if err != nil {
+		return false, err
+	}
+	// query libp2p for connectedness status of this peer
+	connectedness := p.libP2PHost.Network().Connectedness(pInfo.ID)
+	return network.Connected == connectedness, nil
 }
 
 func generateProtocolID(rootBlockID string) protocol.ID {

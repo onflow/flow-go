@@ -68,7 +68,7 @@ func (n *TopologyTestSuite) SetupTest() {
 	require.NoError(n.T(), err)
 
 	// creates and mocks a network instance
-	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
+	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true, nil, nil)
 	require.NoError(n.T(), err)
 	require.Len(n.T(), nets, 1)
 	n.nets = nets[0]

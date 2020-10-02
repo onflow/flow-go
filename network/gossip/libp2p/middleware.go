@@ -43,9 +43,6 @@ const (
 	DefaultMaxUnicastMsgSize = 5 * DefaultMaxPubSubMsgSize // 10 mb
 )
 
-// the inbound message queue size for One to One and One to K messages (each)
-const InboundMessageQueueSize = 100
-
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -508,4 +505,12 @@ func (m *Middleware) UpdateAllowList() error {
 	}
 
 	return nil
+}
+
+func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
+	nodeAddress, err := m.nodeAddressFromID(nodeID)
+	if err != nil {
+		return false, err
+	}
+	return m.libP2PNode.IsConnected(nodeAddress)
 }
