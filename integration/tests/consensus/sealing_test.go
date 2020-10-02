@@ -180,10 +180,10 @@ SearchLoop:
 			CollectionIndex:      0,           // irrelevant for consensus node
 			StartState:           nil,         // irrelevant for consensus node
 			EventCollection:      flow.ZeroID, // irrelevant for consensus node
-			TotalComputationUsed: 0,           // irrelevant for consensus node
-			NumberOfTransactions: 0,           // irrelevant for consensus node
+			BlockID:              targetID,
+			TotalComputationUsed: 0, // irrelevant for consensus node
+			NumberOfTransactions: 0, // irrelevant for consensus node
 		},
-		BlockID:  targetID,
 		Index:    0,                                 // should start at zero
 		EndState: unittest.StateCommitmentFixture(), // random end execution state
 	}

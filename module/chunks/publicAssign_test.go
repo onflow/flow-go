@@ -336,11 +336,14 @@ func (a *PublicAssignmentTestSuite) CreateChunks(num int, t *testing.T) flow.Chu
 		_, err := rand.Read(state)
 		require.NoError(t, err)
 
+		blockID := unittest.IdentifierFixture()
+
 		// creates chunk
 		c := &flow.Chunk{
 			Index: uint64(i),
 			ChunkBody: flow.ChunkBody{
 				StartState: state,
+				BlockID:    blockID,
 			},
 		}
 		list.Insert(c)
