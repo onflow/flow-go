@@ -873,6 +873,9 @@ func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 	// mock assigner
 	ms.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
+	// mock receipts mempool
+	ms.receiptsPL.On("All", mock.Anything).Return([]*flow.ExecutionReceipt{})
+
 	realApprovalPool, err := stdmap.NewApprovals(1000)
 	ms.Require().NoError(err)
 	ms.matching.approvals = realApprovalPool

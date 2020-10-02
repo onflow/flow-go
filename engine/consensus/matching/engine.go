@@ -53,6 +53,7 @@ type Engine struct {
 	requestReceiptThreshold uint                     // how many blocks between sealed/finalized before we request execution receipts
 	maxUnsealedResults      int                      // how many unsealed results to check when check sealing
 	requireApprovals        bool                     // flag to disable verifying chunk approvals
+	spocksByResult          map[flow.Identifier][]*flow.ExecutionReceipt
 }
 
 // New creates a new collection propagation engine.
@@ -99,6 +100,7 @@ func New(
 		maxUnsealedResults:      200,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
+		spocksByResult:          make(map[flow.Identifier][]*flow.ExecutionReceipt),
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
@@ -281,6 +283,20 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
 
 	e.log.Info().Msg("execution result added to mempool")
+
+	// check if result id exists in spockByResult else add empty array
+	spockSets, ok := e.spocksByResult[result.ID()]
+	if ok {
+		// try and match spocks if match don't include
+		for _, spockSet := range spockSets {
+			// verify spock
+			// if it doesnt match append to array
+		}
+	} else {
+		receipts := make([]*flow.ExecutionReceipt, 0)
+		receipts = append(receipts, receipt)
+		e.spocksByResult[result.ID()] = receipts
+	}
 
 	// kick off a check for potential seal formation
 	go e.checkSealing()
@@ -588,7 +604,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 	}
 
 	// get all the chunk approvals from mempool
-	approvals := e.approvals.ByChunk(resultID, chunk.Index)
+	approvals := e.approvals.ByChunk(result.ID(), chunk.Index)
 
 	// only keep approvals from assigned verifiers and if spocks match
 	var validApprovers flow.IdentifierList
@@ -605,6 +621,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 			return false, fmt.Errorf("could get validate spocks: %w", err)
 		}
 		if !valid {
+			e.log.Error().Msg("spock validation failed: spocks do not match")
 			continue
 		}
 
@@ -625,39 +642,33 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 	return len(validApprovers) > 0, nil
 }
 
+// validateSpocks checks if the spock from an approval matches the corresponding one in the receipt
+// TODO: needs testing
 func (e *Engine) validateSpocks(verifiers flow.IdentityList, executors flow.IdentityList, approval *flow.ResultApproval, chunkIndex uint64) (bool, error) {
-	// find receipt matching approval result id
-	var receipt *flow.ExecutionReceipt
-	for _, r := range e.receipts.All() {
-		if r.ExecutionResult.ID() == approval.Body.ExecutionResultID {
-			receipt = r
-		}
-	}
-	if receipt == nil {
-		return false, fmt.Errorf("could not find matching receipt for result in mempool")
-	}
-
 	// find identities
 	approver, ok := verifiers.ByNodeID(approval.Body.ApproverID)
 	if !ok {
 		return false, fmt.Errorf("could not find approver id in snapshot identities")
 	}
-	executor, ok := executors.ByNodeID(receipt.ExecutorID)
-	if !ok {
-		return false, fmt.Errorf("could not find executor id in snapshot identities")
-	}
 
-	// get spocks
-	approverSpock := approval.Body.Spock
-	executorSpock := receipt.Spocks[chunkIndex]
+	spocksByResult := make(map[flow.Identifier][]*flow.ExecutionReceipt)
 
-	// verify spock
-	verified, err := crypto.SPOCKVerify(approver.NetworkPubKey, approverSpock, executor.NetworkPubKey, executorSpock)
-	if err != nil {
-		return false, fmt.Errorf("could not verify spocks: %w", err)
-	}
-	if !verified {
-		return false, nil
+	spockSet := spocksByResult[approval.Body.ExecutionResultID]
+
+	for _, receipt := range spockSet {
+		executor, ok := executors.ByNodeID(receipt.ExecutorID)
+		if !ok {
+			return false, fmt.Errorf("could not find executor id in snapshot identities")
+		}
+
+		// verify spock
+		verified, err := crypto.SPOCKVerify(approver.NetworkPubKey, approval.Body.Spock, executor.NetworkPubKey, receipt.Spocks[chunkIndex])
+		if err != nil {
+			return false, fmt.Errorf("could not verify spocks: %w", err)
+		}
+		if !verified {
+			return false, nil
+		}
 	}
 
 	return true, nil
