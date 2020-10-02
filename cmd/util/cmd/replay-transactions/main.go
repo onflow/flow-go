@@ -154,18 +154,21 @@ func main() {
 
 	totalTx := 0
 
-	totalTx += candidate1()
-	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate1")
-	totalTx += candidate4()
-	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate4")
-	totalTx += candidate5()
-	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate5")
-
-	totalTx += candidate6()
-	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate6")
-
-	totalTx += candidate7()
-	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate7")
+	//totalTx += candidate1()
+	//log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate1")
+	//totalTx += candidate4()
+	//log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate4")
+	//totalTx += candidate5()
+	//log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate5")
+	//
+	//totalTx += candidate6()
+	//log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate6")
+	//
+	//totalTx += candidate7()
+	//log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate7")
+	//
+	totalTx += candidate8()
+	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidate8")
 
 	log.Info().Int("total_transactions", totalTx).Msg("Finished processing candidates")
 
@@ -326,6 +329,37 @@ func candidate7() int {
 	last := 4_972_987
 
 	megaMapping := readMegamappings("/home/m4ks/candidate7-execution/execution/root.checkpoint.mapping.json")
+	totalTx := 0
+	for i := first; i <= last; i += step {
+		end := i + step - 1
+		if end > last {
+			end = last
+		}
+		txs := 0
+		megaMapping, txs = loader.ProcessBlocks(uint64(i), uint64(end), megaMapping)
+
+		totalTx += txs
+
+		runtime.GC()
+
+	}
+
+	return totalTx
+}
+
+func candidate8() int {
+
+	initialRT := cadenceRuntime.NewInterpreterRuntime()
+	vm := fvm.New(initialRT)
+
+	loader := newLoader("/home/m4ks/candidate8-execution/protocol", "/home/m4ks/candidate8-execution/execution", "data8", "block-ids", "blocks", vm, true, flow.Mainnet, true)
+	defer loader.Close()
+
+	step := 10_000
+	first := 4_972_988
+	last := 6_483_246
+
+	megaMapping := readMegamappings("/home/m4ks/candidate8-execution/execution/root.checkpoint.mapping.json")
 	totalTx := 0
 	for i := first; i <= last; i += step {
 		end := i + step - 1
@@ -628,42 +662,42 @@ func (l *Loader) addToList(header *flow.Header, m map[uint64][]*ComputedBlock) i
 
 	updates := make([]Update, chunksCount)
 
-	// delta, err := l.executionState.RetrieveStateDelta(context.Background(), header.ID())
-	// if err != nil {
-	// 	log.Warn().Err(err).Str("block_id", header.ID().String()).Uint64("height", header.Height).Msg("cannot load delta")
-	// 	return 0
-	// }
+	delta, err := l.executionState.RetrieveStateDelta(context.Background(), header.ID())
+	if err != nil {
+		log.Warn().Err(err).Str("block_id", header.ID().String()).Uint64("height", header.Height).Msg("cannot load delta")
+		return 0
+	}
 
-	// executionResult, err := l.executionResults.ByBlockID(header.ID())
-	// if err != nil {
-	// 	log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("cannot load execution results")
-	// }
-	// if executionResult.BlockID != header.ID() {
-	// 	spew.Dump(header)
-	// 	spew.Dump(payload)
-	// 	log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("execution result ID different from asked")
-	// }
+	executionResult, err := l.executionResults.ByBlockID(header.ID())
+	if err != nil {
+		log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("cannot load execution results")
+	}
+	if executionResult.BlockID != header.ID() {
+		spew.Dump(header)
+		spew.Dump(payload)
+		log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("execution result ID different from asked")
+	}
 
-	// lastIndex := len(executionResult.Chunks)
+	lastIndex := len(executionResult.Chunks)
 
-	// for i := 0; i < lastIndex; i++ {
-	// 	chunk := executionResult.Chunks[i]
+	for i := 0; i < lastIndex; i++ {
+		chunk := executionResult.Chunks[i]
 
-	// 	chunkDataPack, err := l.chunkDataPacks.ByChunkID(chunk.ID())
-	// 	if err != nil {
-	// 		log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("cannot load chunk data pack")
-	// 	}
-	// 	if chunkDataPack.ID() != chunk.ID() {
-	// 		spew.Dump(header)
-	// 		spew.Dump(payload)
-	// 		log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("chunk data pack ID different from asked")
-	// 	}
+		chunkDataPack, err := l.chunkDataPacks.ByChunkID(chunk.ID())
+		if err != nil {
+			log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("cannot load chunk data pack")
+		}
+		if chunkDataPack.ID() != chunk.ID() {
+			spew.Dump(header)
+			spew.Dump(payload)
+			log.Fatal().Err(err).Str("block_id", header.ID().String()).Msg("chunk data pack ID different from asked")
+		}
 
-	// 	updates[i] = Update{
-	// 		StateCommitment: chunkDataPack.StartState,
-	// 		Snapshot:        delta.StateInteractions[i],
-	// 	}
-	// }
+		updates[i] = Update{
+			StateCommitment: chunkDataPack.StartState,
+			Snapshot:        delta.StateInteractions[i],
+		}
+	}
 
 	computerBlock := &ComputedBlock{
 		ExecutableBlock: entity.ExecutableBlock{
@@ -674,9 +708,9 @@ func (l *Loader) addToList(header *flow.Header, m map[uint64][]*ComputedBlock) i
 			CompleteCollections: completeCollections,
 			StartState:          stateCommitment,
 		},
-		//EndState: delta.EndState,
-		Updates: updates,
-		//Results:  delta.TransactionResults,
+		EndState: delta.EndState,
+		Updates:  updates,
+		Results:  delta.TransactionResults,
 	}
 
 	m[header.Height] = append(m[header.Height], computerBlock)
@@ -780,6 +814,10 @@ func (l *Loader) findUpdates(blocks map[uint64][]*ComputedBlock) map[string]*tri
 
 			hashes[string(newHash)] = mTrie
 
+			if string(newHash) == "" {
+				log.Info().Msg("empty hash?")
+			}
+
 			delete(toFind, string(newHash))
 
 			if len(toFind) == 0 {
@@ -812,8 +850,7 @@ func (l *Loader) findUpdates(blocks map[uint64][]*ComputedBlock) map[string]*tri
 	}
 
 	if hasMissing {
-		log.Fatal().Msg("Could not load all tries")
-
+		log.Warn().Msg("Could not load all tries")
 	}
 
 	log.Info().Msgf("Finished loading %d tries", len(hashes))
@@ -933,7 +970,7 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 
 	}
 
-	return nil, totalTx
+	//return nil, totalTx
 	////save to file
 	//dataFile, err := os.Create(blocksFilename)
 	//if err != nil {
@@ -1081,8 +1118,14 @@ func (l *Loader) ProcessBlocks(start uint64, end uint64, prevMapping map[string]
 	for _, computedBlock := range blockData[end] {
 		allMappingsFound := true
 
-		lastTrie := updates[string(computedBlock.EndState)]
+		lastTrie, has := updates[string(computedBlock.EndState)]
 
+		if !has || lastTrie == nil {
+			log.Warn().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("No trie after :(")
+			continue
+		}
+
+		//spew.Dump(lastTrie)
 		iterator := flattener.NewNodeIterator(lastTrie)
 
 		for iterator.Next() {
@@ -1151,9 +1194,20 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 
 	writtenMappings := make(map[string]delta.Mapping, 0)
 
+	for _, update := range computedBlock.Updates {
+		if update.Snapshot == nil {
+			return writtenMappings
+		}
+	}
+
 	startState := computedBlock.ExecutableBlock.StartState
 
-	mTrie := updates[string(startState)]
+	mTrie, has := updates[string(startState)]
+
+	if !has {
+		log.Warn().Uint64("block_heights", computedBlock.ExecutableBlock.Block.Header.Height).Msg("No trie :(")
+		return writtenMappings
+	}
 
 	blockView := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 		read, err := mTrie.UnsafeRead([][]byte{state2.RegisterID(owner, controller, key)})
@@ -1265,8 +1319,9 @@ func (l *Loader) executeBlock(computedBlock *ComputedBlock, updates map[string]*
 		originalSnapshot := computedBlock.Updates[i].Snapshot
 
 		if originalSnapshot == nil {
-			log.Fatal().Msgf("Original snapshot %d does not exist", i)
-			spew.Dump(computedBlock)
+			log.Warn().Str("block_id", computedBlock.ExecutableBlock.Block.ID().String()).Msgf("Original snapshot %d does not exist", i)
+			//spew.Dump(computedBlock)
+			continue
 		}
 		if calculatedSnapshot == nil {
 			log.Fatal().Msgf("Calculated snapshot %d does not exist", i)
