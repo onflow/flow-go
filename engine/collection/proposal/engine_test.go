@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/proposal"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,6 +41,7 @@ type Suite struct {
 		state    *clusterstate.State
 		snapshot *clusterstate.Snapshot
 		mutator  *clusterstate.Mutator
+		params   *clusterstate.Params
 	}
 
 	me           *module.Local
@@ -80,24 +82,29 @@ func (suite *Suite) SetupTest() {
 	suite.proto.snapshot.On("Epochs").Return(suite.proto.query)
 	suite.proto.query.On("Current").Return(suite.proto.epoch)
 
+	// create a fake cluster
+	clusters := flow.ClusterList{flow.IdentityList{me}}
+	suite.proto.epoch.On("Clustering").Return(clusters, nil)
+	clusterID := flow.ChainID("cluster-id")
+
 	// mock out cluster state
 	suite.cluster.state = new(clusterstate.State)
 	suite.cluster.snapshot = new(clusterstate.Snapshot)
 	suite.cluster.mutator = new(clusterstate.Mutator)
+	suite.cluster.params = new(clusterstate.Params)
 	suite.cluster.state.On("Final").Return(suite.cluster.snapshot)
 	suite.cluster.state.On("Mutate").Return(suite.cluster.mutator)
 	suite.cluster.snapshot.On("Head").Return(&flow.Header{}, nil)
-
-	// create a fake cluster
-	clusters := flow.ClusterList{flow.IdentityList{me}}
-	suite.proto.epoch.On("Clustering").Return(clusters, nil)
+	suite.cluster.state.On("Params").Return(suite.cluster.params)
+	suite.cluster.params.On("ChainID").Return(clusterID, nil)
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.net = new(module.Network)
 	suite.conduit = new(network.Conduit)
-	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
+	suite.net.On("Register", engine.ChannelConsensusCluster(clusterID), mock.Anything).Return(suite.conduit, nil)
+	suite.conduit.On("Close").Return(nil).Maybe()
 
 	suite.pool = new(mempool.Transactions)
 	suite.pool.On("Size").Return(uint(0))

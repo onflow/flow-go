@@ -28,6 +28,13 @@ func NewState(db *badger.DB, clusterID flow.ChainID, headers storage.Headers, pa
 	return state, nil
 }
 
+func (s *State) Params() cluster.Params {
+	params := &Params{
+		state: s,
+	}
+	return params
+}
+
 func (s *State) Final() cluster.Snapshot {
 
 	// get the finalized block ID
