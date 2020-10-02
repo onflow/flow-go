@@ -283,14 +283,11 @@ func executeCollection(
 	spock := computationResult.StateSnapshots[0].SpockSecret
 
 	ids, values := view.Delta().RegisterUpdates()
-
 	keys := state.RegisterIDSToKeys(ids)
 	flowValues := state.RegisterValuesToValues(values)
 
 	update, err := ledger.NewUpdate(startStateCommitment, keys, flowValues)
 	require.NoError(t, err)
-
-	led.Set(update)
 
 	// TODO: update CommitDelta to also return proofs
 	endStateCommitment, err := led.Set(update)
@@ -313,7 +310,6 @@ func executeCollection(
 
 	// chunkDataPack
 	allRegisters := view.Interactions().AllRegisters()
-
 	allKeys := state.RegisterIDSToKeys(allRegisters)
 
 	query, err := ledger.NewQuery(chunk.StartState, allKeys)
