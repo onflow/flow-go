@@ -130,7 +130,7 @@ func (en ExecutionNode) Ready() {
 }
 
 func (en ExecutionNode) Done() {
-	lifecycle.AllReady(
+	lifecycle.AllDone(
 		en.IngestionEngine,
 		en.IngestionEngine,
 		en.ReceiptsEngine,
