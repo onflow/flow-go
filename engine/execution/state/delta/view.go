@@ -72,16 +72,16 @@ func (v *View) Interactions() *Snapshot {
 
 // AllRegisters returns all the register IDs either in read or delta
 func (r *Snapshot) AllRegisters() []flow.RegisterID {
-	set := make(map[string]*flow.RegisterID, len(r.Reads)+len(r.Delta.Data))
+	set := make(map[string]flow.RegisterID, len(r.Reads)+len(r.Delta.Data))
 	for _, reg := range r.Reads {
-		set[reg.String()] = &reg
+		set[reg.String()] = reg
 	}
 	for _, reg := range r.Delta.RegisterIDs() {
-		set[reg.String()] = &reg
+		set[reg.String()] = reg
 	}
 	ret := make([]flow.RegisterID, 0, len(set))
 	for _, r := range set {
-		ret = append(ret, *r)
+		ret = append(ret, r)
 	}
 	return ret
 }
