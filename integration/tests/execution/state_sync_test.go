@@ -71,7 +71,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	require.NoError(s.T(), err)
 
 	// wait for ExecutionStateDelta
-	msg2 := s.MsgState.WaitForMsgFrom(s.T(), common.MsgIsExecutionStateDeltaWithChanges, s.exe1ID)
+	msg2 := s.MsgState.WaitForMsgFrom(s.T(), common.MsgIsExecutionStateDeltaWithChanges, s.exe1ID, "state delta from execution node")
 	executionStateDelta := msg2.(*messages.ExecutionStateDelta)
 	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, executionStateDelta.EndState)
 }
