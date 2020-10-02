@@ -1,20 +1,28 @@
 package test
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/assert"
 	mock2 "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // total number of epochs to simulate
@@ -66,6 +74,8 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	nets, err := generateNetworks(ts.logger, ids, mws, 100, nil, states, false)
 	require.NoError(ts.T(), err)
 	ts.nets = nets
+
+	ts.sendMessagesAndVerify(nil, nil, ts.Publish)
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -84,92 +94,94 @@ func (ts *EpochTransitionTestSuite) TearDownTest() {
 func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 
-	ids, _, _, err := generateIDsMiddlewaresNetworks(1, ts.logger, 100, nil, []*protocol.ReadOnlyState{ts.state}, false)
+	ids, mws, _, err := generateIDsMiddlewaresNetworks(1, ts.logger, 100, nil, []*protocol.ReadOnlyState{ts.state}, false)
 	require.NoError(ts.T(), err)
 	newID := ids[0]
-
+	mw := mws[0]
 
 	ts.ids = append(ts.ids, newID)
 	for _, n := range ts.nets {
 		n.EpochTransition(uint64(1), nil)
 	}
 
-	time.Sleep(5 * time.Second)
+	threshold := nodeCount / 2
+	assert.Eventually(ts.T(), func() bool{
+		connections := 0
+		for _, id := range ts.ids {
+			if id == newID {
+				continue
+			}
+			connected, err := mw.IsConnected(id.NodeID)
+			require.NoError(ts.T(),err)
+
+			if connected {
+				connections++
+			}
+		}
+		// check if the new node has at least threshold connections
+		if connections >= threshold {
+			// the node has been inducted in the network ok
+			return true
+		}
+		return false
+	}, 5 * time.Second, time.Millisecond)
 }
 
-// sendMessageAndVerify creates MeshEngine for each of the ids and then sends a message from each.
+// sendMessagesAndVerify creates MeshEngines for each of the ids and then sends a message from each.
 // It then verifies that all the engines at member indices received the message while those at nonmember indices
 // didn't.
-//func (ts *EpochTransitionTestSuite) sendMessageAndVerify(member []int, nonmember []int, send ConduitSendWrapperFunc) {
-//
-//	// creating engines
-//	count := len(ts.nets)
-//	engs := make([]*MeshEngine, 0)
-//	wg := sync.WaitGroup{}
-//
-//	// logs[i][j] keeps the message that node i sends to node j
-//	logs := make(map[int][]string)
-//	for i := range ts.nets {
-//		eng := NewMeshEngine(ts.Suite.T(), ts.nets[i], count-1, engine.TestNetwork)
-//		engs = append(engs, eng)
-//		logs[i] = make([]string, 0)
-//	}
-//
-//	// allows nodes to find each other in case of Mulitcast and Publish
-//	optionalSleep(send)
-//
-//	// Each node broadcasting a message to all others
-//	for i := range ts.nets {
-//		event := &message.TestMessage{
-//			Text: fmt.Sprintf("hello from node %v", i),
-//		}
-//
-//		// others keeps the identifier of all nodes except ith node
-//		others := ts.ids.Filter(filter.Not(filter.HasNodeID(ts.ids[i].NodeID))).NodeIDs()
-//		require.NoError(ts.Suite.T(), send(event, engs[i].con, others...))
-//	}
-//
-//	ctx, cancel := context.WithCancel(context.Background())
-//	// fires a goroutine for each engine that listens to incoming messages
-//	for i := range ts.nets {
-//		wg.Add(1)
-//		go func(e *MeshEngine) {
-//			for x := 0; x < count-1; x++ {
-//				select {
-//				<-ctx.done:
-//					return
-//					<-e.received:
-//
-//				<-e.received
-//			}
-//			wg.Done()
-//		}(engs[i])
-//	}
-//
-//	unittest.AssertReturnsBefore(ts.Suite.T(), wg.Wait, 30*time.Second)
-//
-//	// evaluates that all messages are received
-//	for index, e := range engs {
-//		// confirms the number of received messages at each node
-//		if len(e.event) != (count - 1) {
-//			assert.Fail(ts.Suite.T(),
-//				fmt.Sprintf("Message reception mismatch at node %v. Expected: %v, Got: %v", index, count-1, len(e.event)))
-//		}
-//
-//		// extracts failed messages
-//		receivedIndices, err := extractSenderID(count, e.event, "hello from node")
-//		require.NoError(ts.Suite.T(), err)
-//
-//		for j := 0; j < count; j++ {
-//			// evaluates self-gossip
-//			if j == index {
-//				assert.False(ts.Suite.T(), (receivedIndices)[index], fmt.Sprintf("self gossiped for node %v detected", index))
-//			}
-//			// evaluates content
-//			if !(receivedIndices)[j] {
-//				assert.False(ts.Suite.T(), (receivedIndices)[index],
-//					fmt.Sprintf("Message not found in node #%v's messages. Expected: Message from node %v. Got: No message", index, j))
-//			}
-//		}
-//	}
-//}
+func (ts *EpochTransitionTestSuite) sendMessagesAndVerify(member []int, nonmember []int, send ConduitSendWrapperFunc) {
+
+	// creating engines
+	count := len(ts.nets)
+	engs := make([]*MeshEngine, 0)
+	wg := sync.WaitGroup{}
+
+	// logs[i][j] keeps the message that node i sends to node j
+	logs := make(map[int][]string)
+	for i := range ts.nets {
+		eng := NewMeshEngine(ts.Suite.T(), ts.nets[i], count-1, engine.TestNetwork)
+		engs = append(engs, eng)
+		logs[i] = make([]string, 0)
+	}
+
+	// allows nodes to find each other in case of Mulitcast and Publish
+	optionalSleep(send)
+
+	// each node broadcasting a message to all others
+	for i := range ts.nets {
+		event := &message.TestMessage{
+			Text: fmt.Sprintf("hello from node %v", i),
+		}
+
+		// others keeps the identifier of all nodes except ith node
+		others := ts.ids.Filter(filter.Not(filter.HasNodeID(ts.ids[i].NodeID))).NodeIDs()
+		require.NoError(ts.Suite.T(), send(event, engs[i].con, others...))
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	msgCnt := count - 1
+	// fires a goroutine for each engine that listens to incoming messages
+	for i := range ts.nets {
+		wg.Add(msgCnt)
+		go func(e *MeshEngine) {
+			for x := 0; x < msgCnt; x++ {
+				select {
+				case <-ctx.Done():
+					return
+				case <-e.received:
+					wg.Done()
+				}
+			}
+		}(engs[i])
+	}
+
+	unittest.AssertReturnsBefore(ts.Suite.T(), wg.Wait, 30*time.Second)
+	cancel()
+
+	// evaluates that all messages are received
+	for _, e := range engs {
+		// confirms the number of received messages at each node
+		assert.Len(ts.T(), e.event, msgCnt)
+	}
+}

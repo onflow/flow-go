@@ -186,9 +186,18 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 }
 
 func (n *Network) SetIDs(ids flow.IdentityList) error {
+
 	// remove this node id from the list of fanout target ids to avoid self-dial
 	idsMinusMe := ids.Filter(n.me.NotMeFilter())
 	n.ids = idsMinusMe
+
+
+	// update the allow list
+	err := n.mw.UpdateAllowList()
+	if err != nil {
+		return fmt.Errorf("failed to update middleware allow list: %w", err)
+	}
+
 	return nil
 }
 
@@ -465,12 +474,6 @@ func (n *Network) EpochTransition(newEpoch uint64, first *flow.Header) {
 		return
 	}
 	err = n.SetIDs(ids)
-	if err != nil {
-		log.Err(err).Msg("failed to update ids on epoch transition")
-	}
-
-	// update the allow list
-	err = n.mw.UpdateAllowList()
 	if err != nil {
 		log.Err(err).Msg("failed to update ids on epoch transition")
 	}
