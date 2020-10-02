@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
@@ -31,32 +32,30 @@ type Accounts struct {
 	*addresses
 }
 
-type ContractsSet map[string]struct{}
+// ContractsList should always be sorted. To ensure this, don't sort while reading it from storage, but sort it while adding elements
+type ContractsList []string
 
-func contractSetFromArray(contracts []string) ContractsSet {
-	contractMap := make(map[string]struct{}, len(contracts))
-	for _, contract := range contracts {
-		contractMap[contract] = struct{}{}
+func (l ContractsList) Has(contract string) bool {
+	i := sort.SearchStrings(l, contract)
+	return i != len(l) && l[i] == contract
+}
+func (l *ContractsList) add(contract string) {
+	i := sort.SearchStrings(*l, contract)
+	if i != len(*l) && (*l)[i] == contract {
+		// list already contains element
+		return
 	}
-	return contractMap
+	*l = append(*l, "")
+	copy((*l)[i+1:], (*l)[i:])
+	(*l)[i] = contract
 }
-
-func (s ContractsSet) Has(contract string) bool {
-	_, ok := s[contract]
-	return ok
-}
-func (s ContractsSet) add(contract string) {
-	s[contract] = struct{}{}
-}
-func (s ContractsSet) remove(contract string) {
-	delete(s, contract)
-}
-func (s ContractsSet) ToArray() []string {
-	keys := make([]string, 0, len(s))
-	for k := range s {
-		keys = append(keys, k)
+func (l *ContractsList) remove(contract string) {
+	i := sort.SearchStrings(*l, contract)
+	if i == len(*l) || (*l)[i] != contract {
+		// list doesnt contain the element element
+		return
 	}
-	return keys
+	*l = append((*l)[:i], (*l)[i+1:]...)
 }
 
 func NewAccounts(ledger Ledger, chain flow.Chain) *Accounts {
@@ -330,7 +329,7 @@ func newLedgerGetError(key string, address flow.Address, err error) error {
 	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
 }
 
-func (a *Accounts) setContracts(contracts ContractsSet, address flow.Address) error {
+func (a *Accounts) setContracts(contracts ContractsList, address flow.Address) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -340,7 +339,7 @@ func (a *Accounts) setContracts(contracts ContractsSet, address flow.Address) er
 		return fmt.Errorf("account with address %s does not exist", address)
 	}
 
-	newContracts, err := rlp.NewEncoder().Encode(contracts.ToArray())
+	newContracts, err := rlp.NewEncoder().Encode(contracts)
 	if err != nil {
 		return fmt.Errorf("cannot serialize contract list")
 	}
@@ -376,7 +375,7 @@ func (a *Accounts) TouchContract(name string, address flow.Address) {
 		keyCode)
 }
 
-func (a *Accounts) GetContracts(address flow.Address) (ContractsSet, error) {
+func (a *Accounts) GetContracts(address flow.Address) (ContractsList, error) {
 	encContractList, err := a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContracts)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract list: %w", err)
@@ -388,7 +387,7 @@ func (a *Accounts) GetContracts(address flow.Address) (ContractsSet, error) {
 			return nil, fmt.Errorf("cannot decode deployed contract list %x: %w", encContractList, err)
 		}
 	}
-	return contractSetFromArray(identifiers), nil
+	return identifiers, nil
 }
 
 func (a *Accounts) GetContract(name string, address flow.Address) ([]byte, error) {

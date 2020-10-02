@@ -140,20 +140,19 @@ func (e *hostEnv) ResolveLocation(identifiers []runtime.Identifier, location run
 
 	// in case it is an address location fetch all identifiers at this address
 	if len(identifiers) == 0 && isAddress {
-		allContractsMap, err := e.accounts.GetContracts(flow.Address(addressLocation.ToAddress()))
+		contractsList, err := e.accounts.GetContracts(flow.Address(addressLocation.ToAddress()))
 		if err != nil {
 			panic(err)
 		}
-		allContracts := allContractsMap.ToArray()
 		// if there are none, return blank resolved location
-		if len(allContracts) == 0 {
+		if len(contractsList) == 0 {
 			return blankLocation
 		}
 
-		identifiers = make([]ast.Identifier, len(allContracts))
+		identifiers = make([]ast.Identifier, len(contractsList))
 		for i := range identifiers {
 			identifiers[i] = runtime.Identifier{
-				Identifier: allContracts[i],
+				Identifier: contractsList[i],
 			}
 		}
 	}
