@@ -1,9 +1,5 @@
 package flow
 
-import (
-	"github.com/onflow/flow-go-sdk"
-)
-
 type ChunkBody struct {
 	CollectionIndex uint
 
@@ -19,7 +15,7 @@ type ChunkBody struct {
 type Chunk struct {
 	ChunkBody
 
-	BlockID flow.Identifier
+	BlockID Identifier
 	Index   uint64 // chunk index inside the ER (starts from zero)
 	// EndState inferred from next chunk or from the ER
 	EndState StateCommitment
