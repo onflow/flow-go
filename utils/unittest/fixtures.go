@@ -274,18 +274,11 @@ func WithServiceEvents(events ...flow.ServiceEvent) func(*flow.Seal) {
 	}
 }
 
-func WithInitalState(initial flow.StateCommitment) func(*flow.Seal) {
-	return func(seal *flow.Seal) {
-		seal.InitialState = initial
-	}
-}
-
 func SealFixture(opts ...func(*flow.Seal)) *flow.Seal {
 	seal := &flow.Seal{
-		BlockID:      IdentifierFixture(),
-		ResultID:     IdentifierFixture(),
-		InitialState: StateCommitmentFixture(),
-		FinalState:   StateCommitmentFixture(),
+		BlockID:    IdentifierFixture(),
+		ResultID:   IdentifierFixture(),
+		FinalState: StateCommitmentFixture(),
 	}
 	for _, apply := range opts {
 		apply(seal)
@@ -297,9 +290,6 @@ func BlockSealsFixture(n int) []*flow.Seal {
 	seals := make([]*flow.Seal, 0, n)
 	for i := 0; i < n; i++ {
 		seal := SealFixture()
-		if i > 0 {
-			seal.InitialState = seals[i-1].FinalState
-		}
 		seals = append(seals, seal)
 	}
 	return seals
@@ -314,15 +304,6 @@ func CollectionFixture(n int) flow.Collection {
 	}
 
 	return flow.Collection{Transactions: transactions}
-}
-
-func ExecutionReceiptFixture() *flow.ExecutionReceipt {
-	return &flow.ExecutionReceipt{
-		ExecutorID:        IdentifierFixture(),
-		ExecutionResult:   *ExecutionResultFixture(),
-		Spocks:            nil,
-		ExecutorSignature: SignatureFixture(),
-	}
 }
 
 func CompleteCollectionFixture() *entity.CompleteCollection {
@@ -364,6 +345,48 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	// Preload the id
 	executableBlock.ID()
 	return executableBlock
+}
+
+func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
+	chunks := 0
+	if block.Payload != nil {
+		// +1 for system chunk
+		chunks = len(block.Payload.Guarantees) + 1
+	}
+
+	return &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: IdentifierFixture(),
+			BlockID:          block.Header.ID(),
+			FinalStateCommit: StateCommitmentFixture(),
+			Chunks:           ChunksFixture(uint(chunks)),
+		},
+		Signatures: SignaturesFixture(6),
+	}
+}
+
+func ExecutionReceiptFixture() *flow.ExecutionReceipt {
+	return &flow.ExecutionReceipt{
+		ExecutorID:        IdentifierFixture(),
+		ExecutionResult:   *ExecutionResultFixture(),
+		Spocks:            nil,
+		ExecutorSignature: SignatureFixture(),
+	}
+}
+
+func ExecutionResultFixture() *flow.ExecutionResult {
+	return &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: IdentifierFixture(),
+			BlockID:          IdentifierFixture(),
+			FinalStateCommit: StateCommitmentFixture(),
+			Chunks: flow.ChunkList{
+				ChunkFixture(),
+				ChunkFixture(),
+			},
+		},
+		Signatures: SignaturesFixture(6),
+	}
 }
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
@@ -553,6 +576,16 @@ func ChunkFixture() *flow.Chunk {
 		Index:    0,
 		EndState: StateCommitmentFixture(),
 	}
+}
+
+func ChunksFixture(n uint) []*flow.Chunk {
+	chunks := make([]*flow.Chunk, 0, n)
+	for i := uint64(0); i < uint64(n); i++ {
+		chunk := ChunkFixture()
+		chunk.Index = i
+		chunks = append(chunks, chunk)
+	}
+	return chunks
 }
 
 func SignatureFixture() crypto.Signature {
@@ -777,21 +810,6 @@ func BatchListFixture(n int) []flow.Batch {
 		batches[i] = BatchFixture()
 	}
 	return batches
-}
-
-func ExecutionResultFixture() *flow.ExecutionResult {
-	return &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: IdentifierFixture(),
-			BlockID:          IdentifierFixture(),
-			FinalStateCommit: StateCommitmentFixture(),
-			Chunks: flow.ChunkList{
-				ChunkFixture(),
-				ChunkFixture(),
-			},
-		},
-		Signatures: SignaturesFixture(6),
-	}
 }
 
 func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
