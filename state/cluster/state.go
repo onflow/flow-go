@@ -12,6 +12,9 @@ import (
 // NOTE: This is modelled after, and is a simpler version of, protocol.State.
 type State interface {
 
+	// Params returns constant information about the cluster state.
+	Params() Params
+
 	// Final returns the snapshot of the cluster state at the latest finalized
 	// block. The returned snapshot is therefore immutable over time.
 	Final() Snapshot
