@@ -61,3 +61,19 @@ func (_m *State) Mutate() cluster.Mutator {
 
 	return r0
 }
+
+// Params provides a mock function with given fields:
+func (_m *State) Params() cluster.Params {
+	ret := _m.Called()
+
+	var r0 cluster.Params
+	if rf, ok := ret.Get(0).(func() cluster.Params); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(cluster.Params)
+		}
+	}
+
+	return r0
+}

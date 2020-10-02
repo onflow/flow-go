@@ -3,7 +3,6 @@
 package consensus
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -249,9 +248,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			unchained = true
 			break
 		}
-		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect in finalized")
-		}
+
 		seals = append(seals, next)
 		sealCount++
 		delete(byBlock, blockID)
@@ -290,9 +287,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if !found {
 			break
 		}
-		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect in pending")
-		}
+
 		seals = append(seals, next)
 		delete(byBlock, pendingID)
 		last = next
