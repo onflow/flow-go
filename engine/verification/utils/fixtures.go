@@ -203,10 +203,10 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 		chunk := &flow.Chunk{
 			ChunkBody: flow.ChunkBody{
 				CollectionIndex: uint(i),
+				BlockID:         blockID,
 				EventCollection: unittest.IdentifierFixture(),
 			},
-			Index:   uint64(i),
-			BlockID: blockID,
+			Index: uint64(i),
 		}
 		chunks = append(chunks, chunk)
 
@@ -297,6 +297,7 @@ func executeCollection(
 			StartState:      startStateCommitment,
 			// TODO: include event collection hash
 			EventCollection: flow.ZeroID,
+			BlockID:         executableBlock.ID(),
 			// TODO: record gas used
 			TotalComputationUsed: 0,
 			// TODO: record number of txs

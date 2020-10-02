@@ -852,13 +852,13 @@ func generateChunk(colIndex int,
 			// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
 			// startState stays the same if blocks are empty
 			EventCollection: colID,
+			BlockID:         blockID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
 			// TODO: record number of txs
 			NumberOfTransactions: 0,
 		},
 		Index:    0,
-		BlockID:  blockID,
 		EndState: endState,
 	}
 }
