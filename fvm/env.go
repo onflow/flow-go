@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -126,29 +127,47 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	return len(v) > 0, nil
 }
 
-func (e *hostEnv) ResolveLocation(identifiers []runtime.Identifier, location runtime.Location) []runtime.ResolvedLocation {
-	addressLocation, isAddress := location.(runtime.AddressLocation)
-	blankLocation := []runtime.ResolvedLocation{{
-		Location:    location,
-		Identifiers: []ast.Identifier{},
-	}}
+func (e *hostEnv) ResolveLocation(
+	identifiers []runtime.Identifier,
+	location runtime.Location,
+) []runtime.ResolvedLocation {
 
-	// in case it is not an address location just return blank location (e.g.: import Crypto)
-	if len(identifiers) == 0 && !isAddress {
-		return blankLocation
+	addressLocation, isAddress := location.(runtime.AddressLocation)
+
+	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
+	// then return a single resolved location which declares all identifiers.
+
+	if !isAddress {
+		return []runtime.ResolvedLocation{
+			{
+				Location:    location,
+				Identifiers: identifiers,
+			},
+		}
 	}
 
-	// in case it is an address location fetch all identifiers at this address
-	if len(identifiers) == 0 && isAddress {
-		allContractsMap, err := e.accounts.GetContracts(flow.Address(addressLocation.ToAddress()))
+	// if the location is an address,
+	// and no specific identifiers where requested in the import statement,
+	// then fetch all identifiers at this address
+
+	if len(identifiers) == 0 {
+		address := flow.Address(addressLocation.ToAddress())
+		allContractsMap, err := e.accounts.GetContracts(address)
 		if err != nil {
 			panic(err)
 		}
+
 		allContracts := allContractsMap.ToArray()
-		// if there are none, return blank resolved location
+
+		// if there are no contracts deployed,
+		// then return no resolved locations
+
 		if len(allContracts) == 0 {
-			return blankLocation
+			return nil
 		}
+
+		// Important: ensure identifiers are deterministic
+		sort.Strings(allContracts)
 
 		identifiers = make([]ast.Identifier, len(allContracts))
 		for i := range identifiers {
@@ -158,16 +177,13 @@ func (e *hostEnv) ResolveLocation(identifiers []runtime.Identifier, location run
 		}
 	}
 
+	// return one resolved location per identifier.
+	// each resolved location is an address contract location
+
 	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
 	for i := range resolvedLocations {
-		resolvedLocations[i] = e.resolveLocation(identifiers[i], location)
-	}
-	return resolvedLocations
-}
-
-func (e *hostEnv) resolveLocation(identifier runtime.Identifier, location runtime.Location) runtime.ResolvedLocation {
-	if addressLocation, ok := location.(runtime.AddressLocation); ok {
-		return runtime.ResolvedLocation{
+		identifier := identifiers[i]
+		resolvedLocations[i] = runtime.ResolvedLocation{
 			Location: runtime.AddressContractLocation{
 				AddressLocation: addressLocation,
 				Name:            identifier.Identifier,
@@ -176,19 +192,18 @@ func (e *hostEnv) resolveLocation(identifier runtime.Identifier, location runtim
 		}
 	}
 
-	return runtime.ResolvedLocation{
-		Location:    location,
-		Identifiers: []runtime.Identifier{identifier},
-	}
+	return resolvedLocations
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 	contractLocation, ok := location.(runtime.AddressContractLocation)
 	if !ok {
-		return nil, fmt.Errorf("can only get code with AddressContractLocation")
+		return nil, fmt.Errorf("can only get code for an account contract (an AddressContractLocation)")
 	}
 
-	code, err := e.accounts.GetContract(contractLocation.Name, flow.Address(contractLocation.AddressLocation.ToAddress()))
+	address := flow.Address(contractLocation.AddressLocation.ToAddress())
+
+	code, err := e.accounts.GetContract(contractLocation.Name, address)
 	if err != nil {
 		return nil, err
 	}
