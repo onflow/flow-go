@@ -2,11 +2,13 @@ package test
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/metrics"
@@ -18,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// generateIDs generate flow Identities with a valid port and networking key
 func generateIDs(n int) ([]*flow.Identity, []crypto.PrivateKey, error) {
 	identities := make([]*flow.Identity, n)
 	privateKeys := make([]crypto.PrivateKey, n)
@@ -74,6 +77,7 @@ func generateMiddlewares(log zerolog.Logger, identities []*flow.Identity, keys [
 	return mws, nil
 }
 
+// generateNetworks generates the network for the given middlewares
 func generateNetworks(log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []*libp2p.Middleware,
@@ -162,4 +166,15 @@ func generateIDsMiddlewaresNetworks(n int,
 	}
 
 	return ids, mws, networks, nil
+}
+
+// generateEngines generates MeshEngines for the given networks
+func generateEngines(t *testing.T, nets []*libp2p.Network) []*MeshEngine {
+	count := len(nets)
+	engs := make([]*MeshEngine, count)
+	for i, n := range nets {
+		eng := NewMeshEngine(t, n, 100, engine.TestNetwork)
+		engs[i] = eng
+	}
+	return engs
 }

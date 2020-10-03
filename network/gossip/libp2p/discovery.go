@@ -16,6 +16,7 @@ import (
 
 // Discovery implements the discovery.Discovery interface to provide libp2p a way to discover other nodes
 type Discovery struct {
+	ctx          context.Context
 	log          zerolog.Logger
 	overlay      middleware.Overlay
 	me           flow.Identifier
@@ -23,12 +24,13 @@ type Discovery struct {
 	libp2pNode   *P2PNode
 }
 
-func NewDiscovery(log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier, libp2pNode *P2PNode) *Discovery {
+func NewDiscovery(ctx context.Context, log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier, libp2pNode *P2PNode) *Discovery {
 	d := &Discovery{
-		overlay:    overlay,
-		log:        log,
-		me:         me,
-		libp2pNode: libp2pNode,
+		ctx:          ctx,
+		overlay:      overlay,
+		log:          log,
+		me:           me,
+		libp2pNode:   libp2pNode,
 		currentPeers: make(flow.IdentityList, 0),
 	}
 	return d
@@ -46,7 +48,9 @@ func (d *Discovery) Advertise(ctx context.Context, _ string, _ ...discovery.Opti
 
 // FindPeers returns a channel providing all peers of the node. No parameters are needed as of now since the overlay.Identity
 // provides all the information about the other nodes.
-func (d *Discovery) FindPeers(ctx context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
+func (d *Discovery) FindPeers(ctx context.Context, topic string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
+
+	d.log.Debug().Str("topic", topic).Msg("initiating peer discovery")
 
 	err := ctx.Err()
 	if err != nil {
@@ -54,7 +58,6 @@ func (d *Discovery) FindPeers(ctx context.Context, _ string, _ ...discovery.Opti
 		close(emptyCh)
 		return emptyCh, err
 	}
-	
 	// call the callback to get all the other nodes that should be directly connected to this node for 1-k messaging
 	ids, err := d.overlay.Topology()
 	if err != nil {
@@ -87,12 +90,12 @@ func (d *Discovery) FindPeers(ctx context.Context, _ string, _ ...discovery.Opti
 	// close the channel as nothing else is going to be written to it
 	close(ch)
 
-	// before returning, kick off a routine to disconnect peers
-	unwantedPeers := d.currentPeers.Filter(filter.Not(filter.In(ids)))
-	cnt := unwantedPeers.Count()
+	// before returning, kick off a routine to disconnect peers no longer part of the node's identity list
+	extraPeers := d.currentPeers.Filter(filter.Not(filter.In(ids)))
+	cnt := extraPeers.Count()
 	if cnt > 0 {
-		d.log.Debug().Uint("peer_count", cnt).Msg("disconnecting from unwanted peers")
-		go d.disconnect(ctx, unwantedPeers)
+		d.log.Debug().Uint("extra_peer_count", cnt).Msg("disconnecting from extra peers")
+		go d.disconnect(extraPeers)
 	}
 
 	// remember the new peers for next run
@@ -101,10 +104,12 @@ func (d *Discovery) FindPeers(ctx context.Context, _ string, _ ...discovery.Opti
 	return ch, nil
 }
 
-func (d *Discovery) disconnect(ctx context.Context, ids flow.IdentityList) {
+// disconnect disconnects the node from the extra peers
+func (d *Discovery) disconnect(ids flow.IdentityList) {
 	for _, id := range ids {
 
-		if ctx.Err() != nil {
+		// check if the middleware context is still valid
+		if d.ctx.Err() != nil {
 			return
 		}
 
@@ -116,7 +121,7 @@ func (d *Discovery) disconnect(ctx context.Context, ids flow.IdentityList) {
 			continue
 		}
 
-		err = d.libp2pNode.RemovePeer(ctx, nodeAddress)
+		err = d.libp2pNode.RemovePeer(d.ctx, nodeAddress)
 		if err != nil {
 			d.log.Err(err).Str("peer", id.String()).Msg("failed to disconnect")
 		}

@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"sync"
 	"testing"
@@ -16,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -25,23 +25,18 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// total number of epochs to simulate
-const epochs = 3
-
-// total nodes
-const nodeCount = 10
-
 type EpochTransitionTestSuite struct {
 	suite.Suite
-	ConduitWrapper                      // used as a wrapper around conduit methods
-	nets           []*libp2p.Network    // used to keep track of the networks
-	mws            []*libp2p.Middleware // used to keep track of the middlewares associated with networks
-	state          *protocol.ReadOnlyState
-	snapshot       *protocol.Snapshot
-	ids            flow.IdentityList
-	currentEpoch   int // index of the current epoch
-	epochIDs       []flow.IdentityList
-	logger         zerolog.Logger
+	ConduitWrapper
+	nets         []*libp2p.Network
+	mws          []*libp2p.Middleware
+	engines      []*MeshEngine
+	state        *protocol.ReadOnlyState
+	snapshot     *protocol.Snapshot
+	ids          flow.IdentityList
+	currentEpoch int //counter to track the current epoch
+	logger       zerolog.Logger
+	cancel       context.CancelFunc
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
@@ -49,6 +44,7 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 }
 
 func (ts *EpochTransitionTestSuite) SetupTest() {
+	nodeCount := 5
 	golog.SetAllLoggers(golog.LevelDebug)
 	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
@@ -62,7 +58,9 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	ts.state = new(protocol.ReadOnlyState)
 	ts.snapshot = new(protocol.Snapshot)
 	ts.state.On("Final").Return(ts.snapshot, nil)
-	ts.snapshot.On("Identities", mock2.Anything).Return(ts.ids, nil)
+
+	ts.currentEpoch = 0
+	ts.updateSnapshot(0, ts.ids)
 
 	// all nodes use the same state mock
 	states := make([]*protocol.ReadOnlyState, nodeCount)
@@ -75,7 +73,11 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	require.NoError(ts.T(), err)
 	ts.nets = nets
 
-	ts.sendMessagesAndVerify(nil, nil, ts.Publish)
+	// generate the engines
+	ts.engines = generateEngines(ts.T(), nets)
+
+	// ensure that nodes can communicate with each other
+	sendMessagesAndVerify(ts.T(), ts.ids, ts.engines, ts.Publish)
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -91,97 +93,127 @@ func (ts *EpochTransitionTestSuite) TearDownTest() {
 	}
 }
 
+// TestNewNodeAdded tests that an additional node in a new epoch get connected to other nodes and can exchange messages
 func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
-
-	ids, mws, _, err := generateIDsMiddlewaresNetworks(1, ts.logger, 100, nil, []*protocol.ReadOnlyState{ts.state}, false)
+	// create the id, middleware and network for a new node
+	ids, mws, nets, err := generateIDsMiddlewaresNetworks(1, ts.logger, 100, nil, []*protocol.ReadOnlyState{ts.state}, false)
 	require.NoError(ts.T(), err)
-	newID := ids[0]
-	mw := mws[0]
+	newMiddleware := mws[0]
 
-	ts.ids = append(ts.ids, newID)
-	for _, n := range ts.nets {
-		n.EpochTransition(uint64(1), nil)
+	newIDs := append(ts.ids, ids...)
+	newNetworks := append(ts.nets, nets...)
+
+	// increment epoch
+	ts.currentEpoch = ts.currentEpoch + 1
+
+	// update snapshot mock to return the new ids
+	ts.updateSnapshot(ts.currentEpoch, newIDs)
+
+	// create the engine for the new node
+	newEngine := generateEngines(ts.T(), nets)
+	newEngines := append(ts.engines, newEngine...)
+
+	// trigger an epoch transition for all networks
+	for _, n := range newNetworks {
+		n.EpochTransition(uint64(ts.currentEpoch), nil)
 	}
 
-	threshold := nodeCount / 2
-	assert.Eventually(ts.T(), func() bool{
+	threshold := len(ts.ids) / 2
+
+	// check if the new node has at least threshold connections with the existing nodes
+	// if it does, then it has been inducted successfully in the network
+	assert.Eventually(ts.T(), func() bool {
 		connections := 0
 		for _, id := range ts.ids {
-			if id == newID {
-				continue
-			}
-			connected, err := mw.IsConnected(id.NodeID)
-			require.NoError(ts.T(),err)
-
+			connected, err := newMiddleware.IsConnected(id.NodeID)
+			require.NoError(ts.T(), err)
 			if connected {
 				connections++
 			}
 		}
-		// check if the new node has at least threshold connections
-		if connections >= threshold {
-			// the node has been inducted in the network ok
-			return true
-		}
-		return false
-	}, 5 * time.Second, time.Millisecond)
+		return connections >= threshold
+	}, 5*time.Second, time.Millisecond)
+
+	// check that all the engines on this new epoch can talk to each other
+	sendMessagesAndVerify(ts.T(), newIDs, newEngines, ts.Publish)
 }
 
-// sendMessagesAndVerify creates MeshEngines for each of the ids and then sends a message from each.
-// It then verifies that all the engines at member indices received the message while those at nonmember indices
-// didn't.
-func (ts *EpochTransitionTestSuite) sendMessagesAndVerify(member []int, nonmember []int, send ConduitSendWrapperFunc) {
+// TestNodeRemoved tests that a node that is removed in a new epoch gets disconnected from other nodes
+func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
+	// choose a random index
+	removeIndex := rand.Intn(len(ts.ids))
+	fmt.Printf("\nREmoving %s\n", ts.ids[removeIndex].Address)
 
-	// creating engines
-	count := len(ts.nets)
-	engs := make([]*MeshEngine, 0)
-	wg := sync.WaitGroup{}
+	// remove the identity at that index from the ids
+	newIDs := ts.ids.Filter(filter.Not(filter.HasNodeID(ts.ids[removeIndex].NodeID)))
 
-	// logs[i][j] keeps the message that node i sends to node j
-	logs := make(map[int][]string)
-	for i := range ts.nets {
-		eng := NewMeshEngine(ts.Suite.T(), ts.nets[i], count-1, engine.TestNetwork)
-		engs = append(engs, eng)
-		logs[i] = make([]string, 0)
+	// increment epoch
+	ts.currentEpoch = ts.currentEpoch + 1
+
+	// update snapshot mock to return the new ids
+	ts.updateSnapshot(ts.currentEpoch, newIDs)
+
+	// trigger an epoch transition for all nodes except the evicted one
+	for i, n := range ts.nets {
+		if i == removeIndex {
+			continue
+		}
+		n.EpochTransition(uint64(ts.currentEpoch), nil)
 	}
+
+	// check that the evicted node has no connections
+	assert.Eventually(ts.T(), func() bool {
+		for _, id := range newIDs {
+			connected, err := ts.mws[removeIndex].IsConnected(id.NodeID)
+			require.NoError(ts.T(), err)
+			if connected {
+				return false
+			}
+		}
+		return true
+	}, 5*time.Second, 10*time.Millisecond)
+}
+
+// sendMessagesAndVerify sends a message from each engine to the other engines and verifies that all the messages are
+// delivered
+func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngine, send ConduitSendWrapperFunc) {
 
 	// allows nodes to find each other in case of Mulitcast and Publish
 	optionalSleep(send)
 
-	// each node broadcasting a message to all others
-	for i := range ts.nets {
-		event := &message.TestMessage{
-			Text: fmt.Sprintf("hello from node %v", i),
-		}
+	count := len(engs)
+	expectedMsgCnt := count - 1
 
-		// others keeps the identifier of all nodes except ith node
-		others := ts.ids.Filter(filter.Not(filter.HasNodeID(ts.ids[i].NodeID))).NodeIDs()
-		require.NoError(ts.Suite.T(), send(event, engs[i].con, others...))
+	// each node broadcasting a message to all others
+	for i, eng := range engs {
+		event := &message.TestMessage{
+			Text: fmt.Sprintf("hello from node %d to %d other nodes", i, count),
+		}
+		others := ids.Filter(filter.Not(filter.HasNodeID(ids[i].NodeID))).NodeIDs()
+		require.NoError(t, send(event, eng.con, others...))
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	msgCnt := count - 1
-	// fires a goroutine for each engine that listens to incoming messages
-	for i := range ts.nets {
-		wg.Add(msgCnt)
+	wg := sync.WaitGroup{}
+	// fires a goroutine for each engine to listen to incoming messages
+	for i := range engs {
+		wg.Add(expectedMsgCnt)
 		go func(e *MeshEngine) {
-			for x := 0; x < msgCnt; x++ {
-				select {
-				case <-ctx.Done():
-					return
-				case <-e.received:
-					wg.Done()
-				}
+			for x := 0; x < expectedMsgCnt; x++ {
+				<-e.received
+				wg.Done()
 			}
 		}(engs[i])
 	}
 
-	unittest.AssertReturnsBefore(ts.Suite.T(), wg.Wait, 30*time.Second)
-	cancel()
+	unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+}
 
-	// evaluates that all messages are received
-	for _, e := range engs {
-		// confirms the number of received messages at each node
-		assert.Len(ts.T(), e.event, msgCnt)
-	}
+// updateSnapshot sets up the snapshot mock to return ids corresponding to epochs
+func (ts *EpochTransitionTestSuite) updateSnapshot(epoch int, ids flow.IdentityList) {
+	ts.snapshot.On("Identities",
+		mock2.MatchedBy(func(_ flow.IdentityFilter) bool { return ts.currentEpoch == epoch })).
+		Return(ids, nil).Run(func(args mock2.Arguments) {
+		fmt.Printf("\ngot called %d\n", ts.currentEpoch)
+	})
 }

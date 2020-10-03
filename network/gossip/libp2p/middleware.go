@@ -154,7 +154,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// create a discovery object to help libp2p discover peers
-	d := NewDiscovery(m.log, m.ov, m.me, m.libP2PNode)
+	d := NewDiscovery(m.ctx, m.log, m.ov, m.me, m.libP2PNode)
 
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
@@ -507,6 +507,7 @@ func (m *Middleware) UpdateAllowList() error {
 	return nil
 }
 
+// IsConnected returns true if this node is connected to the node with id nodeID
 func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 	nodeAddress, err := m.nodeAddressFromID(nodeID)
 	if err != nil {

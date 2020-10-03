@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -26,6 +27,7 @@ type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
+	sync.Mutex
 	events.Noop     // network consumes some of the protocol events
 	logger          zerolog.Logger
 	codec           network.Codec
@@ -159,6 +161,8 @@ func (n *Network) unregister(channelID string) error {
 
 // Identity returns a map of all flow.Identifier to flow identity by querying the flow state
 func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
+	n.Lock()
+	defer n.Unlock()
 	identifierToID := make(map[flow.Identifier]flow.Identity)
 	for _, id := range n.ids {
 		identifierToID[id.NodeID] = *id
@@ -168,7 +172,10 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (flow.IdentityList, error) {
-	subset, err := n.top.Subset(n.ids, n.fanout())
+	fanout := n.fanout()
+	n.Lock()
+	defer n.Unlock()
+	subset, err := n.top.Subset(n.ids, fanout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
 	}
@@ -187,10 +194,12 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 
 func (n *Network) SetIDs(ids flow.IdentityList) error {
 
-	// remove this node id from the list of fanout target ids to avoid self-dial
-	idsMinusMe := ids.Filter(n.me.NotMeFilter())
-	n.ids = idsMinusMe
+	// remove self from id
+	ids = ids.Filter(n.me.NotMeFilter())
 
+	n.Lock()
+	n.ids = ids
+	n.Unlock()
 
 	// update the allow list
 	err := n.mw.UpdateAllowList()
@@ -203,6 +212,8 @@ func (n *Network) SetIDs(ids flow.IdentityList) error {
 
 // fanout returns the node fanout derived from the identity list
 func (n *Network) fanout() uint {
+	n.Lock()
+	defer n.Unlock()
 	// fanout is currently set to half of the system size for connectivity assurance
 	return uint(len(n.ids)+1) / 2
 }

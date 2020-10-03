@@ -55,12 +55,12 @@ func (_m *Overlay) Receive(nodeID flow.Identifier, msg *message.Message) error {
 func (_m *Overlay) Topology() (flow.IdentityList, error) {
 	ret := _m.Called()
 
-	var r0 map[flow.Identifier]flow.Identity
-	if rf, ok := ret.Get(0).(func() map[flow.Identifier]flow.Identity); ok {
+	var r0 flow.IdentityList
+	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identifier]flow.Identity)
+			r0 = ret.Get(0).(flow.IdentityList)
 		}
 	}
 
