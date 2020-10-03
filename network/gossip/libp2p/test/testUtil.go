@@ -6,6 +6,7 @@ import (
 
 	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
+	mock2 "github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
@@ -105,7 +106,7 @@ func generateNetworks(log zerolog.Logger,
 	if states == nil {
 		states = make([]*protocol.ReadOnlyState, count)
 		for i := range states {
-			states[i] = createStateSnapshot(ids)
+			states[i] = generateStateSnapshot(ids)
 		}
 	}
 
@@ -153,7 +154,7 @@ func generateIDsMiddlewaresNetworks(n int,
 	csize int,
 	tops []topology.Topology,
 	states []*protocol.ReadOnlyState,
-	dryrun bool) ([]*flow.Identity, []*libp2p.Middleware, []*libp2p.Network, error){
+	dryrun bool) ([]*flow.Identity, []*libp2p.Middleware, []*libp2p.Network, error) {
 
 	ids, mws, err := generateIDsAndMiddlewares(n, log)
 	if err != nil {
@@ -177,4 +178,13 @@ func generateEngines(t *testing.T, nets []*libp2p.Network) []*MeshEngine {
 		engs[i] = eng
 	}
 	return engs
+}
+
+// generateStateSnapshot generates a state and snapshot mock to return the given ids
+func generateStateSnapshot(ids flow.IdentityList) *protocol.ReadOnlyState {
+	state := new(protocol.ReadOnlyState)
+	snapshot := new(protocol.Snapshot)
+	state.On("Final").Return(snapshot, nil)
+	snapshot.On("Identities", mock2.Anything).Return(ids, nil)
+	return state
 }

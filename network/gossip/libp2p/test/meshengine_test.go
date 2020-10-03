@@ -55,7 +55,7 @@ func (m *MeshEngineTestSuite) SetupTest() {
 	require.NoError(m.Suite.T(), err)
 	m.mws = mws
 
-	nets, err := createNetworks(logger, m.mws, m.ids, cacheSize, false, nil, nil)
+	nets, err := createNetworks(logger, m.mws, m.ids, cacheSize, false)
 	require.NoError(m.Suite.T(), err)
 	m.nets = nets
 }

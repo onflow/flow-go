@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -36,7 +35,6 @@ type EpochTransitionTestSuite struct {
 	ids          flow.IdentityList
 	currentEpoch int //counter to track the current epoch
 	logger       zerolog.Logger
-	cancel       context.CancelFunc
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
@@ -212,8 +210,5 @@ func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngi
 // updateSnapshot sets up the snapshot mock to return ids corresponding to epochs
 func (ts *EpochTransitionTestSuite) updateSnapshot(epoch int, ids flow.IdentityList) {
 	ts.snapshot.On("Identities",
-		mock2.MatchedBy(func(_ flow.IdentityFilter) bool { return ts.currentEpoch == epoch })).
-		Return(ids, nil).Run(func(args mock2.Arguments) {
-		fmt.Printf("\ngot called %d\n", ts.currentEpoch)
-	})
+		mock2.MatchedBy(func(_ flow.IdentityFilter) bool { return ts.currentEpoch == epoch })).Return(ids, nil)
 }

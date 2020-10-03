@@ -50,7 +50,7 @@ func (s *EchoEngineTestSuite) SetupTest() {
 	require.NoError(s.Suite.T(), err)
 	s.mws = mws
 
-	nets, err := createNetworks(logger, s.mws, s.ids, 100, false, nil, nil)
+	nets, err := createNetworks(logger, s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
 	s.nets = nets
 }
