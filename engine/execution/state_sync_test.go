@@ -9,9 +9,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -41,6 +43,11 @@ func TestStateSyncFlow(t *testing.T) {
 	withNodes(t, func(EN1, EN2 *testmock.ExecutionNode) {
 		log := unittest.Logger()
 		log.Debug().Msg("nodes created")
+
+		EN2.ExecutionEngine.OnComputeBlock = func(ctx context.Context, block *entity.ExecutableBlock, view *delta.View) {
+			log.Info().Msgf("EN2 is about to compute block: %v, let it be slow...", block.ID())
+			time.Sleep(time.Second * 5)
+		}
 
 		genesis, err := EN1.State.AtHeight(0).Head()
 		require.NoError(t, err, "could not get genesis")
