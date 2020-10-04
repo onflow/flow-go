@@ -359,7 +359,7 @@ func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          block.Header.ID(),
 			FinalStateCommit: StateCommitmentFixture(),
-			Chunks:           ChunksFixture(uint(chunks)),
+			Chunks:           ChunksFixture(uint(chunks), block.ID()),
 		},
 		Signatures: SignaturesFixture(6),
 	}
@@ -375,14 +375,15 @@ func ExecutionReceiptFixture() *flow.ExecutionReceipt {
 }
 
 func ExecutionResultFixture() *flow.ExecutionResult {
+	blockID := IdentifierFixture()
 	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
-			BlockID:          IdentifierFixture(),
+			BlockID:          blockID,
 			FinalStateCommit: StateCommitmentFixture(),
 			Chunks: flow.ChunkList{
-				ChunkFixture(),
-				ChunkFixture(),
+				ChunkFixture(blockID),
+				ChunkFixture(blockID),
 			},
 		},
 		Signatures: SignaturesFixture(6),
@@ -564,7 +565,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return identities
 }
 
-func ChunkFixture() *flow.Chunk {
+func ChunkFixture(blockID flow.Identifier) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      42,
@@ -572,16 +573,17 @@ func ChunkFixture() *flow.Chunk {
 			EventCollection:      IdentifierFixture(),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
+			BlockID:              blockID,
 		},
 		Index:    0,
 		EndState: StateCommitmentFixture(),
 	}
 }
 
-func ChunksFixture(n uint) []*flow.Chunk {
+func ChunksFixture(n uint, blockID flow.Identifier) []*flow.Chunk {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture()
+		chunk := ChunkFixture(blockID)
 		chunk.Index = i
 		chunks = append(chunks, chunk)
 	}
@@ -687,6 +689,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 			ChunkBody: flow.ChunkBody{
 				CollectionIndex: uint(i),
 				StartState:      StateCommitmentFixture(),
+				BlockID:         block.ID(),
 			},
 			Index: uint64(i),
 		}
