@@ -133,6 +133,25 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 	return block
 }
 
+func BlockWithParentAndSeal(
+	parent *flow.Header, sealed *flow.Header) *flow.Block {
+	block := BlockWithParentFixture(parent)
+	payload := flow.Payload{
+		Guarantees: nil,
+	}
+
+	if sealed != nil {
+		payload.Seals = []*flow.Seal{
+			SealFixture(
+				SealWithBlockID(sealed.ID()),
+			),
+		}
+	}
+
+	block.SetPayload(payload)
+	return &block
+}
+
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
 	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)

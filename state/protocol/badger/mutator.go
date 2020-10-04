@@ -120,6 +120,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 
 		// 3) insert the root block seal into the database and index it
+		fmt.Println("seal.ID:", seal.BlockID)
 		err = operation.InsertSeal(seal.ID(), seal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root seal: %w", err)
@@ -887,6 +888,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 // processing the parent block.
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
+// NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
 func (m *Mutator) MarkValid(blockID flow.Identifier) error {
 	header, err := m.state.headers.ByBlockID(blockID)
 	if err != nil {
