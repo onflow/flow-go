@@ -1000,7 +1000,7 @@ func (e *Engine) stopSyncing(syncingHeight uint64) bool {
 }
 
 func (e *Engine) startSyncing(syncHeight uint64) bool {
-	return e.syncingHeight.CAS(syncHeight, 0)
+	return e.syncingHeight.CAS(0, syncHeight)
 }
 
 // check whether we need to trigger state sync
@@ -1027,7 +1027,8 @@ func (e *Engine) checkStateSyncStart(firstUnexecutedHeight uint64) {
 	startHeight, endHeight := firstUnexecutedHeight, lastSealed.Height
 
 	// check whether we should trigger state sync
-	if !shouldTriggerStateSync(startHeight, endHeight, e.syncThreshold) {
+	trigger := shouldTriggerStateSync(startHeight, endHeight, e.syncThreshold)
+	if !trigger {
 		return
 	}
 
@@ -1071,8 +1072,13 @@ func (e *Engine) checkStateSyncStop(executedHeight uint64) {
 // check whether state sync should be triggered by taking
 // the start and end heights for sealed and unexecuted blocks,
 // as well as a threshold
+// if the threshold is 10, it means if there are 10 sealed but unexecuted blocks,
+// the state sync will be trigger. So for instance, if the first sealed and unexecuted
+// block's height is 20, then the state sync will not trigger until the last sealed and
+// unexecuted block's height is higher than or equal to than 29.
+
 func shouldTriggerStateSync(startHeight, endHeight uint64, threshold int) bool {
-	return int64(endHeight)-int64(startHeight) > int64(threshold)
+	return (int64(endHeight) - int64(startHeight) + 1) >= int64(threshold)
 }
 
 func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
@@ -1110,7 +1116,7 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 		Hex("target_node", logging.Entity(randomExecutionNode)).
 		Uint64("from", fromHeight).
 		Uint64("to", toHeight).
-		Msg("requesting execution state sync")
+		Msg("state sync triggered, requesting execution state deltas")
 
 	// TODO: there is a chance the randomly picked execution node is also behind,
 	// better to retry state syncing request with another node if we haven't
@@ -1196,7 +1202,7 @@ func (e *Engine) handleStateSyncRequest(
 		return fmt.Errorf("could not send deltas: %w", err)
 	}
 
-	log.Info().Msg("responded state deltas")
+	log.Info().Msg("responded state deltas for a height range")
 
 	return nil
 }
@@ -1225,13 +1231,13 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 
 			onDelta(delta)
 
-		} else if !errors.Is(err, storage.ErrNotFound) {
+		} else if errors.Is(err, storage.ErrNotFound) {
 			// this block has not been executed,
 			// it parent block hasn't been executed, the higher block won't be
 			// executed either, so we stop iterating through the heights
 			break
 		} else {
-			return fmt.Errorf("could not query statecommitment for height: %v", height)
+			return fmt.Errorf("could not query statecommitment for height %v, %w", height, err)
 		}
 	}
 

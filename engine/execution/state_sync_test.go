@@ -40,9 +40,10 @@ func TestStateSyncFlow(t *testing.T) {
 	// EN1 is able to execute blocks fast,
 	// EN2 is slow to execute any block, it has to rely on state syncing
 	// to catch up.
-	withNodes(t, func(EN1, EN2 *testmock.ExecutionNode) {
+	withNodes(t, func(hub *stub.Hub, EN1, EN2 *testmock.ExecutionNode) {
 		log := unittest.Logger()
-		log.Debug().Msg("nodes created")
+		log.Debug().Msgf("EN1's ID: %v", EN1.GenericNode.Me.NodeID())
+		log.Debug().Msgf("EN2's ID: %v", EN2.GenericNode.Me.NodeID())
 
 		EN2.ExecutionEngine.OnComputeBlock = func(ctx context.Context, block *entity.ExecutableBlock, view *delta.View) {
 			log.Info().Msgf("EN2 is about to compute block: %v, let it be slow...", block.ID())
@@ -76,6 +77,12 @@ func TestStateSyncFlow(t *testing.T) {
 		waitTimeout := 5 * time.Second
 		waitUntilBlockSealed(t, blockB, EN1, waitTimeout)
 
+		stC, err := EN1.ExecutionState.StateCommitmentByBlockID(context.Background(), blockA.Header.ID())
+		require.NoError(t, err)
+		require.NotNil(t, stC)
+
+		log.Debug().Msg("block B has been sealed")
+
 		// send all the blocks except G to EN2, which will not trigger
 		// state syncing yet. That's because there is only 1 sealed and unexecuted block,
 		// which is A, and the threshold for triggering state syncing is 2.
@@ -90,16 +97,17 @@ func TestStateSyncFlow(t *testing.T) {
 		//
 		// send G to EN2 to trigger state syncing
 		sendBlockToEN(t, blockG, blockD, EN2)
+
 		//
 		// verify the state delta is called.
 		// wait for a short period of time for the statecommitment for G is ready from syncing state.
 		// it will timeout if state syncing didn't happen, because the block execution is too long to
 		// wait for.
-		waitUntilBlockIsExecuted(t, blockG, EN2, waitTimeout)
+		waitUntilBlockIsExecuted(t, hub, blockG, EN2, waitTimeout)
 	})
 }
 
-func withNodes(t *testing.T, f func(en1, en2 *testmock.ExecutionNode)) {
+func withNodes(t *testing.T, f func(hub *stub.Hub, en1, en2 *testmock.ExecutionNode)) {
 	hub := stub.NewNetworkHub()
 
 	chainID := flow.Mainnet
@@ -126,7 +134,7 @@ func withNodes(t *testing.T, f func(en1, en2 *testmock.ExecutionNode)) {
 	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 
-	f(&exeNode1, &exeNode2)
+	f(hub, &exeNode1, &exeNode2)
 }
 
 func makeBlockWithParentAndSeal(
@@ -152,8 +160,9 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func logBlocks(log zerolog.Logger, blocks ...*flow.Block) {
 	for i, b := range blocks {
+		// support up to 26 blocks
 		name := string(alphabet[i])
-		log.Debug().Msgf("creating blocks for testing, block %v's ID:%v", name, b.ID())
+		log.Debug().Msgf("creating blocks for testing, block %v's ID:%v, height:%v", name, b.ID(), b.Header.Height)
 	}
 }
 
@@ -174,7 +183,6 @@ func waitUntilBlockSealed(
 	t *testing.T, block *flow.Block, en *testmock.ExecutionNode, timeout time.Duration) {
 	require.Eventually(t, func() bool {
 		sealed, err := en.GenericNode.State.Sealed().Head()
-		fmt.Println("===============> sealed", sealed.Height)
 		require.NoError(t, err)
 		return sealed.Height >= block.Header.Height
 	}, timeout, time.Millisecond*500,
@@ -182,9 +190,10 @@ func waitUntilBlockSealed(
 }
 
 func waitUntilBlockIsExecuted(
-	t *testing.T, block *flow.Block, en *testmock.ExecutionNode, timeout time.Duration) {
+	t *testing.T, hub *stub.Hub, block *flow.Block, en *testmock.ExecutionNode, timeout time.Duration) {
 	blockID := block.ID()
 	require.Eventually(t, func() bool {
+		hub.DeliverAll()
 		_, err := en.ExecutionState.StateCommitmentByBlockID(context.Background(), blockID)
 		return err == nil
 	}, timeout, time.Millisecond*500,
