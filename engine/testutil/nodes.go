@@ -254,7 +254,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainI
 	return nodes
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64, chainID flow.ChainID) testmock.ExecutionNode {
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities, chainID)
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
@@ -355,7 +355,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
-	followerCore := createFollowerCore(t, &node, ingestionEngine, rootHead, rootQC)
+	followerCore, finalizer := createFollowerCore(t, &node, ingestionEngine, rootHead, rootQC)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
@@ -391,6 +391,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Ledger:          ls,
 		LevelDbDir:      dbDir,
 		Collections:     collectionsStorage,
+		Finalizer:       finalizer,
 	}
 }
 
@@ -442,7 +443,7 @@ func (s *RoundRobinLeaderSelection) DKG(blockID flow.Identifier) (hotstuff.DKG, 
 	return nil, fmt.Errorf("error")
 }
 
-func createFollowerCore(t *testing.T, node *testmock.GenericNode, notifier hotstuff.FinalizationConsumer, rootHead *flow.Header, rootQC *flow.QuorumCertificate) module.HotStuffFollower {
+func createFollowerCore(t *testing.T, node *testmock.GenericNode, notifier hotstuff.FinalizationConsumer, rootHead *flow.Header, rootQC *flow.QuorumCertificate) (module.HotStuffFollower, *confinalizer.Finalizer) {
 
 	identities, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
@@ -475,7 +476,7 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, notifier hotst
 		pending,
 	)
 	require.NoError(t, err)
-	return followerCore
+	return followerCore, finalizer
 }
 
 type VerificationOpt func(*testmock.VerificationNode)

@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
@@ -116,6 +117,7 @@ type ExecutionNode struct {
 	Ledger          storage.Ledger
 	LevelDbDir      string
 	Collections     storage.Collections
+	Finalizer       *consensus.Finalizer
 }
 
 func (en ExecutionNode) Ready() {
