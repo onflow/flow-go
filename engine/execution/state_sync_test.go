@@ -1,4 +1,4 @@
-package ingestion
+package execution_test
 
 import (
 	"context"
@@ -6,9 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/testutil"
+	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -34,11 +38,11 @@ func TestStateSyncFlow(t *testing.T) {
 	// EN1 is able to execute blocks fast,
 	// EN2 is slow to execute any block, it has to rely on state syncing
 	// to catch up.
-	withNodes(t, func(EN1, EN2 *testingContext) {
+	withNodes(t, func(EN1, EN2 *testmock.ExecutionNode) {
 		log := unittest.Logger()
 		log.Debug().Msg("nodes created")
 
-		genesis, err := EN1.state.AtHeight(0).Head()
+		genesis, err := EN1.State.AtHeight(0).Head()
 		require.NoError(t, err, "could not get genesis")
 
 		// create all the blocks needed for this tests:
@@ -51,7 +55,7 @@ func TestStateSyncFlow(t *testing.T) {
 		blockF := makeBlockWithParentAndSeal(blockE.Header, nil)
 		blockG := makeBlockWithParentAndSeal(blockF.Header, nil)
 
-		// logBlocks(log, blockA, blockB, blockC, blockD, blockE, blockF, blockG)
+		logBlocks(log, blockA, blockB, blockC, blockD, blockE, blockF, blockG)
 
 		// EN1 receives all the blocks and we wait until EN1 has considered
 		// blockB is sealed.
@@ -88,12 +92,34 @@ func TestStateSyncFlow(t *testing.T) {
 	})
 }
 
-func withNodes(t *testing.T, f func(en1, en2 *testingContext)) {
-	runWithEngine(t, func(en1 testingContext) {
-		runWithEngine(t, func(en2 testingContext) {
-			f(&en1, &en2)
-		})
-	})
+func withNodes(t *testing.T, f func(en1, en2 *testmock.ExecutionNode)) {
+	hub := stub.NewNetworkHub()
+
+	chainID := flow.Mainnet
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	exe1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	exe2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID, exe2ID, verID)
+
+	syncThreshold := 2
+	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities, syncThreshold, chainID)
+	exeNode1.Ready()
+	defer exeNode1.Done()
+	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, syncThreshold, chainID)
+	exeNode2.Ready()
+	defer exeNode2.Done()
+
+	collectionNode := testutil.GenericNode(t, hub, colID, identities, chainID)
+	defer collectionNode.Done()
+	verificationNode := testutil.GenericNode(t, hub, verID, identities, chainID)
+	defer verificationNode.Done()
+	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
+	defer consensusNode.Done()
+
+	f(&exeNode1, &exeNode2)
 }
 
 func makeBlockWithParentAndSeal(
@@ -117,30 +143,30 @@ func makeBlockWithParentAndSeal(
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-// func logBlocks(log zerolog.Logger, blocks ...*flow.Block) {
-// 	for i, b := range blocks {
-// 		name := string(alphabet[i])
-// 		log.Debug().Msgf("creating blocks for testing, block %v's ID:%v", name, b.ID())
-// 	}
-// }
+func logBlocks(log zerolog.Logger, blocks ...*flow.Block) {
+	for i, b := range blocks {
+		name := string(alphabet[i])
+		log.Debug().Msgf("creating blocks for testing, block %v's ID:%v", name, b.ID())
+	}
+}
 
-func sendBlockToEN(t *testing.T, block *flow.Block, finalizes *flow.Block, en *testingContext) {
+func sendBlockToEN(t *testing.T, block *flow.Block, finalizes *flow.Block, en *testmock.ExecutionNode) {
 	// simulating block finalization
-	err := en.state.Mutate().HeaderExtend(block)
+	err := en.State.Mutate().HeaderExtend(block)
 	require.NoError(t, err)
 
 	if finalizes != nil {
-		err = en.state.Mutate().Finalize(finalizes.ID())
+		err = en.State.Mutate().Finalize(finalizes.ID())
 		require.NoError(t, err)
 	}
 
-	en.engine.BlockProcessable(block.Header)
+	en.IngestionEngine.BlockProcessable(block.Header)
 }
 
 func waitUntilBlockSealed(
-	t *testing.T, block *flow.Block, en *testingContext, timeout time.Duration) {
+	t *testing.T, block *flow.Block, en *testmock.ExecutionNode, timeout time.Duration) {
 	require.Eventually(t, func() bool {
-		sealed, err := en.state.Sealed().Head()
+		sealed, err := en.GenericNode.State.Sealed().Head()
 		fmt.Println("===============> sealed", sealed.Height)
 		require.NoError(t, err)
 		return sealed.Height >= block.Header.Height
@@ -149,10 +175,10 @@ func waitUntilBlockSealed(
 }
 
 func waitUntilBlockIsExecuted(
-	t *testing.T, block *flow.Block, en *testingContext, timeout time.Duration) {
+	t *testing.T, block *flow.Block, en *testmock.ExecutionNode, timeout time.Duration) {
 	blockID := block.ID()
 	require.Eventually(t, func() bool {
-		_, err := en.executionState.StateCommitmentByBlockID(context.Background(), blockID)
+		_, err := en.ExecutionState.StateCommitmentByBlockID(context.Background(), blockID)
 		return err == nil
 	}, timeout, time.Millisecond*500,
 		fmt.Sprintf("expect block %v to be executed, but timeout", block.ID()))

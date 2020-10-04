@@ -255,6 +255,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainI
 }
 
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
+
 	node := GenericNode(t, hub, identity, identities, chainID)
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
@@ -322,6 +323,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
+	computation := &testmock.ComputerWrap{
+		Manager: computationEngine,
+	}
+
 	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
 	require.NoError(t, err)
 
@@ -339,7 +344,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		collectionsStorage,
 		eventsStorage,
 		txResultStorage,
-		computationEngine,
+		computation,
 		pusherEngine,
 		execState,
 		node.Metrics,
@@ -382,7 +387,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		IngestionEngine: ingestionEngine,
 		FollowerEngine:  followerEng,
 		SyncEngine:      syncEngine,
-		ExecutionEngine: computationEngine,
+		ExecutionEngine: computation,
 		RequestEngine:   requestEngine,
 		ReceiptsEngine:  pusherEngine,
 		BadgerDB:        node.DB,

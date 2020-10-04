@@ -17,10 +17,12 @@ import (
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/fvm"
@@ -29,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
@@ -102,11 +105,27 @@ func (cn ConsensusNode) Done() {
 	<-cn.MatchingEngine.Done()
 }
 
+type ComputerWrap struct {
+	*computation.Manager
+	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view *delta.View)
+}
+
+func (c *ComputerWrap) ComputeBlock(
+	ctx context.Context,
+	block *entity.ExecutableBlock,
+	view *delta.View,
+) (*execution.ComputationResult, error) {
+	if c.OnComputeBlock != nil {
+		c.OnComputeBlock(ctx, block, view)
+	}
+	return c.Manager.ComputeBlock(ctx, block, view)
+}
+
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
 	IngestionEngine *ingestion.Engine
-	ExecutionEngine *computation.Manager
+	ExecutionEngine *ComputerWrap
 	RequestEngine   *requester.Engine
 	ReceiptsEngine  *executionprovider.Engine
 	FollowerEngine  *followereng.Engine
