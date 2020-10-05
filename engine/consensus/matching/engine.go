@@ -53,7 +53,7 @@ type Engine struct {
 	requestReceiptThreshold uint                                         // how many blocks between sealed/finalized before we request execution receipts
 	maxUnsealedResults      int                                          // how many unsealed results to check when check sealing
 	requireApprovals        bool                                         // flag to disable verifying chunk approvals
-	matchingSpockReceipts   map[flow.Identifier][]*flow.ExecutionReceipt // map of result id to array of receipts with matching spocks
+	unmatchedSpockReceipts  map[flow.Identifier][]*flow.ExecutionReceipt // map of result id to array of receipts with matching spocks
 }
 
 // New creates a new collection propagation engine.
@@ -99,7 +99,7 @@ func New(
 		maxUnsealedResults:      200,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
-		matchingSpockReceipts:   make(map[flow.Identifier][]*flow.ExecutionReceipt),
+		unmatchedSpockReceipts:  make(map[flow.Identifier][]*flow.ExecutionReceipt),
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
@@ -276,39 +276,49 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.log.Info().Msg("execution result added to mempool")
 
-	// check if result id exists in spockByResult else add empty array
-	matchingReceipts, ok := e.matchingSpockReceipts[result.ID()]
+	// check if result id exists in matchingSpockReceipts else add empty array
+	unmatchedReceipts, ok := e.unmatchedSpockReceipts[result.ID()]
 	if ok {
-	MatchingReceiptsLoop:
-		for _, m := range matchingReceipts {
-			for index, spock := range m.Spocks {
-				// get `m` receipt identity
-				mIdentity, err := e.state.AtBlockID(m.ExecutionResult.BlockID).Identity(originID)
-				if err != nil {
-					if protocol.IsIdentityNotFound(err) {
-						return engine.NewInvalidInputErrorf("could not get executor identity: %w", err)
-					}
-					// unknown exception
-					return fmt.Errorf("could not get executor identity: %w", err)
-				}
+		matchedReceipt := false
 
+	MatchingReceiptsLoop:
+		for _, u := range unmatchedReceipts {
+			// get `m` receipt identity
+			mIdentity, err := e.state.AtBlockID(u.ExecutionResult.BlockID).Identity(originID)
+			if err != nil {
+				if protocol.IsIdentityNotFound(err) {
+					return engine.NewInvalidInputErrorf("could not get executor identity: %w", err)
+				}
+				// unknown exception
+				return fmt.Errorf("could not get executor identity: %w", err)
+			}
+
+			for index, spock := range u.Spocks {
 				// check if spocks match
 				verified, err := crypto.SPOCKVerify(identity.NetworkPubKey, receipt.Spocks[index], mIdentity.NetworkPubKey, spock)
 				if err != nil {
 					return fmt.Errorf("could not verify spocks: %w", err)
 				}
 				if !verified {
-					// spocks do not match so must be different, append to array
-					e.matchingSpockReceipts[result.ID()] = append(e.matchingSpockReceipts[result.ID()], receipt)
 					continue MatchingReceiptsLoop
 				}
 			}
+
+			// all spocks matched so we should exit for loop
+			// since all spocks match we dont need to add this into an array
+			matchedReceipt = true
+			break
 		}
+
+		if !matchedReceipt {
+			e.unmatchedSpockReceipts[result.ID()] = append(e.unmatchedSpockReceipts[result.ID()], receipt)
+		}
+
 	} else {
 		// if resultID does not exist create
 		receipts := make([]*flow.ExecutionReceipt, 0)
 		receipts = append(receipts, receipt)
-		e.matchingSpockReceipts[result.ID()] = receipts
+		e.unmatchedSpockReceipts[result.ID()] = receipts
 	}
 
 	// kick off a check for potential seal formation
@@ -687,7 +697,8 @@ func (e *Engine) validateSpocks(verifiers flow.IdentityList, executors flow.Iden
 	}
 
 	// TODO: this needs to be reworked to check against all receipts
-	spockSet := e.matchingSpockReceipts[approval.Body.ExecutionResultID]
+	spockMatched := false
+	spockSet := e.unmatchedSpockReceipts[approval.Body.ExecutionResultID]
 	for _, receipt := range spockSet {
 		executor, ok := executors.ByNodeID(receipt.ExecutorID)
 		if !ok {
@@ -699,12 +710,13 @@ func (e *Engine) validateSpocks(verifiers flow.IdentityList, executors flow.Iden
 		if err != nil {
 			return false, fmt.Errorf("could not verify spocks: %w", err)
 		}
-		if !verified {
-			return false, nil
+		if verified {
+			spockMatched = true
+			break
 		}
 	}
 
-	return true, nil
+	return spockMatched, nil
 }
 
 // sealResult records a matched result in the result database, creates a seal
