@@ -6,11 +6,14 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/flow-go/model/chunks"
+
 	sdk "github.com/onflow/flow-go-sdk"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -124,6 +127,10 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func StateInteractionsFixture() *delta.Snapshot {
+	return delta.NewView(nil).Interactions()
+}
+
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
 	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)
@@ -132,10 +139,15 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 		Header:  &header,
 		Payload: payload,
 	}
+
+	var stateInteractions []*delta.Snapshot
+	stateInteractions = append(stateInteractions, StateInteractionsFixture())
+
 	return &messages.ExecutionStateDelta{
 		ExecutableBlock: entity.ExecutableBlock{
 			Block: &block,
 		},
+		StateInteractions: stateInteractions,
 	}
 }
 
@@ -256,9 +268,10 @@ func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarante
 
 func SealFromResult(result *flow.ExecutionResult) func(*flow.Seal) {
 	return func(seal *flow.Seal) {
+		finalState, _ := result.FinalStateCommitment()
 		seal.ResultID = result.ID()
 		seal.BlockID = result.BlockID
-		seal.FinalState = result.FinalStateCommit
+		seal.FinalState = finalState
 	}
 }
 
@@ -357,8 +370,7 @@ func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
 	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
-			BlockID:          block.Header.ID(),
-			FinalStateCommit: StateCommitmentFixture(),
+			BlockID:          block.ID(),
 			Chunks:           ChunksFixture(uint(chunks), block.ID()),
 		},
 		Signatures: SignaturesFixture(6),
@@ -379,8 +391,7 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
-			BlockID:          blockID,
-			FinalStateCommit: StateCommitmentFixture(),
+			BlockID:          IdentifierFixture(),
 			Chunks: flow.ChunkList{
 				ChunkFixture(blockID),
 				ChunkFixture(blockID),
@@ -708,7 +719,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 	var endState flow.StateCommitment
 	if int(index) == len(result.Chunks)-1 {
 		// last chunk in receipt takes final state commitment
-		endState = result.FinalStateCommit
+		endState = StateCommitmentFixture()
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
 		endState = result.Chunks[index+1].StartState
@@ -820,8 +831,7 @@ func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitm
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID:          block.ID(),
 			PreviousResultID: flow.ZeroID,
-			FinalStateCommit: commit,
-			Chunks:           nil,
+			Chunks:           chunks.ChunkListFromCommit(commit),
 		},
 		Signatures: nil,
 	}

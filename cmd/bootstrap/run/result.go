@@ -1,6 +1,7 @@
 package run
 
 import (
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -9,8 +10,7 @@ func GenerateRootResult(block *flow.Block, commit flow.StateCommitment) *flow.Ex
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: flow.ZeroID,
 			BlockID:          block.ID(),
-			FinalStateCommit: commit,
-			Chunks:           nil,
+			Chunks:           chunks.ChunkListFromCommit(commit),
 		},
 		Signatures: nil,
 	}
