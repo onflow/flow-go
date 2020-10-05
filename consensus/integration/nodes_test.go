@@ -189,7 +189,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals)
+	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals, tracer)
 
 	signer := &Signer{identity.ID()}
 

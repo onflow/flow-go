@@ -3,6 +3,7 @@ package trace
 // Span names
 const (
 	// Consensus Node
+	//
 
 	CONProcessCollection SpanName = "con.processCollection"
 	// children of CONProcessCollection
@@ -18,8 +19,20 @@ const (
 	// children of CONProcessBlock
 	CONHotFinalizeBlock SpanName = "con.hotstuff.finalizeBlock"
 
-	// Collection Node
+	// Builder
+	CONBuildOn                        = "con.builder"
+	CONBuildOnSetup                   = "con.builder.setup"
+	CONBuildOnUnfinalizedLookup       = "con.builder.unfinalizedLookup"
+	CONBuildOnFinalizedLookup         = "con.builder.finalizedLookup"
+	CONBuildOnCreatePayloadGuarantees = "con.builder.createPayload.guarantees"
+	CONBuildOnCreatePayloadSeals      = "con.builder.createPayload.seals"
+	CONBuildOnCreateHeader            = "con.builder.createHeader"
+	CONBuildOnDBInsert                = "con.builder.dbInsert"
 
+	// Collection Node
+	//
+
+	// Builder
 	COLBuildOn                  = "col.builder"
 	COLBuildOnSetup             = "col.builder.setup"
 	COLBuildOnUnfinalizedLookup = "col.builder.unfinalizedLookup"
