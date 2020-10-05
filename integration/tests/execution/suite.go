@@ -86,7 +86,9 @@ func (s *Suite) SetupTest() {
 
 	// add the ghost (verification) node config
 	s.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.ghostID), testnet.AsGhost(),
+	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification,
+		testnet.WithID(s.ghostID),
+		testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 

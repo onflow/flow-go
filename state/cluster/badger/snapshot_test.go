@@ -285,3 +285,10 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 		parents[header.ID()] = struct{}{}
 	}
 }
+
+func (suite *SnapshotSuite) TestParams_ChainID() {
+
+	chainID, err := suite.state.Params().ChainID()
+	suite.Require().Nil(err)
+	suite.Assert().Equal(suite.genesis.Header.ChainID, chainID)
+}
