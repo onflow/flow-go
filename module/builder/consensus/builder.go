@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -22,6 +23,7 @@ import (
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
 	metrics  module.MempoolMetrics
+	tracer   module.Tracer
 	db       *badger.DB
 	state    protocol.State
 	seals    storage.Seals
@@ -42,6 +44,7 @@ func NewBuilder(
 	index storage.Index,
 	guarPool mempool.Guarantees,
 	sealPool mempool.Seals,
+	tracer module.Tracer,
 	options ...func(*Config),
 ) *Builder {
 
@@ -61,6 +64,7 @@ func NewBuilder(
 	b := &Builder{
 		metrics:  metrics,
 		db:       db,
+		tracer:   tracer,
 		state:    state,
 		headers:  headers,
 		seals:    seals,
@@ -76,9 +80,15 @@ func NewBuilder(
 // custom setter function to allow the caller to make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 
+	b.tracer.StartSpan(parentID, trace.CONBuildOn)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
+
 	// STEP ONE: Create a lookup of all previously used guarantees on the part
 	// of the chain that we are building on. We do this separately for pending
 	// and finalized ancestors, so we can differentiate what to do about it.
+
+	b.tracer.StartSpan(parentID, trace.CONBuildOnSetup)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnSetup)
 
 	var finalized uint64
 	err := b.db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -90,6 +100,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnSetup)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
 
 	ancestorID := parentID
 	pendingLookup := make(map[flow.Identifier]struct{})
@@ -110,6 +124,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 		ancestorID = ancestor.ParentID
 	}
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnFinalizedLookup)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnFinalizedLookup)
 
 	// we look back only as far as the expiry limit for the current height we
 	// are building for; any guarantee with a reference block before that can
@@ -155,6 +173,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		ancestorID = ancestor.ParentID
 	}
 
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnFinalizedLookup)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+
 	// STEP TWO: Go through the guarantees in our memory pool.
 	// 1) If it was already included on the finalized part of the chain, remove
 	// it from the memory pool and skip.
@@ -192,6 +214,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
 
 	// STEP FOUR: We try to get all ancestors from last sealed block all the way
 	// to the parent. Then we try to get seals for each of them until we don't
@@ -293,6 +319,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		last = next
 	}
 
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
+
 	// STEP FOUR: We now have guarantees and seals we can validly include
 	// in the payload built on top of the given parent. Now we need to build
 	// and store the block header, as well as index the payload contents.
@@ -345,6 +375,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		Header:  header,
 		Payload: payload,
 	}
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
 
 	err = b.state.Mutate().Extend(proposal)
 	if err != nil {
