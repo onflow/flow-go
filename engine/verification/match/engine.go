@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -206,6 +207,12 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	//    ^-- G (er_A_2)
 
 	chunks, err := e.myChunkAssignments(ctx, result)
+	if state.IsNoValidChildBlockError(err) {
+		// This is a special sentinel error that just means we need to wait for
+		// the child block
+		log.Debug().Msg(fmt.Sprintf("could not calculate chunk assignment: %v", err))
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
@@ -255,7 +262,7 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 	// Execution Receipt with an Execution Result identical to result. (were blockID != result.BlockID)
 	assignment, err := e.assigner.Assign(result, result.BlockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not create assignment: %w", err)
+		return nil, err
 	}
 
 	mine, err := myChunks(e.me.NodeID(), assignment, result.Chunks)
