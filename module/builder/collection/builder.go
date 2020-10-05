@@ -51,21 +51,21 @@ func WithExpiryBuffer(buf uint) Opt {
 
 func NewBuilder(
 	db *badger.DB,
+	tracer module.Tracer,
 	mainHeaders storage.Headers,
 	clusterHeaders storage.Headers,
 	payloads storage.ClusterPayloads,
 	transactions mempool.Transactions,
-	tracer module.Tracer,
 	opts ...Opt,
 ) *Builder {
 
 	b := Builder{
 		db:                db,
+		tracer:            tracer,
 		mainHeaders:       mainHeaders,
 		clusterHeaders:    clusterHeaders,
 		payloads:          payloads,
 		transactions:      transactions,
-		tracer:            tracer,
 		maxCollectionSize: 100,
 		expiryBuffer:      15,
 	}
