@@ -42,8 +42,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
 	if err != nil {
 		panic(fmt.Errorf("cannot create hasher: %w", err))
 	}
-	hash := hasher.ComputeHash(data)
-	return hash
+	return hasher.ComputeHash(data)
 }
 
 func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
@@ -396,7 +395,7 @@ func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (
 
 func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
 	if e.transactionEnv == nil {
-		panic("UpdateAccountContractCode is not supported by this environment")
+		panic("RemoveAccountContractCode is not supported by this environment")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
