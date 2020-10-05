@@ -55,7 +55,9 @@ func (suite *AccessSuite) SetupTest() {
 	// need three consensus nodes (unused ghost)
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(conID), testnet.AsGhost())
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
+			testnet.WithID(conID),
+			testnet.AsGhost(),
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 	}
 

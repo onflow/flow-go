@@ -3,6 +3,7 @@ package libp2p
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
+	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 )
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
@@ -26,7 +28,7 @@ type Network struct {
 	ids             flow.IdentityList
 	me              module.Local
 	mw              middleware.Middleware
-	top             middleware.Topology
+	top             topology.Topology
 	metrics         module.NetworkMetrics
 	rcache          *cache.RcvCache // used to deduplicate incoming messages
 	queue           queue.MessageQueue
@@ -46,7 +48,7 @@ func NewNetwork(
 	me module.Local,
 	mw middleware.Middleware,
 	csize int,
-	top middleware.Topology,
+	top topology.Topology,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
 
@@ -155,7 +157,17 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	return n.top.Subset(n.ids, n.fanout(), n.me.NodeID().String())
+	subset, err := n.top.Subset(n.ids, n.fanout())
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
+	}
+
+	// creates a map of all the selected ids
+	topMap := make(map[flow.Identifier]flow.Identity)
+	for _, id := range subset {
+		topMap[id.NodeID] = *id
+	}
+	return topMap, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
@@ -175,9 +187,9 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 }
 
 // fanout returns the node fanout derived from the identity list
-func (n *Network) fanout() int {
+func (n *Network) fanout() uint {
 	// fanout is currently set to half of the system size for connectivity assurance
-	return (len(n.ids) + 1) / 2
+	return uint(len(n.ids)+1) / 2
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
@@ -193,7 +205,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 			Str("channel", message.ChannelID).
 			Msg("dropping message due to duplication")
 
-		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID)
+		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID, message.Type)
 
 		return nil
 	}
@@ -249,9 +261,12 @@ func (n *Network) genNetworkMessage(channelID string, event interface{}, targetI
 		emTargets = append(emTargets, tempID[:])
 	}
 
-	// get origin ID (inplace slicing n.me.NodeID()[:] doesn't work)
+	// get origin ID
 	selfID := n.me.NodeID()
 	originID := selfID[:]
+
+	// get message type from event type and remove the asterisk prefix if present
+	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
 
 	// cast event to a libp2p.Message
 	msg := &message.Message{
@@ -260,6 +275,7 @@ func (n *Network) genNetworkMessage(channelID string, event interface{}, targetI
 		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,
+		Type:      msgType,
 	}
 
 	return msg, nil

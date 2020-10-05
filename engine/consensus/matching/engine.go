@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -44,7 +45,6 @@ type Engine struct {
 	headersDB               storage.Headers                              // used to check sealed headers
 	indexDB                 storage.Index                                // used to check payloads for results
 	results                 mempool.Results                              // holds execution results in memory
-	receipts                mempool.Receipts                             // holds execution receipts in memory
 	approvals               mempool.Approvals                            // holds result approvals in memory
 	seals                   mempool.Seals                                // holds block seals in memory
 	missing                 map[flow.Identifier]uint                     // track how often a block was missing
@@ -91,7 +91,6 @@ func New(
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
 		results:                 results,
-		receipts:                receipts,
 		approvals:               approvals,
 		seals:                   seals,
 		missing:                 make(map[flow.Identifier]uint),
@@ -104,7 +103,6 @@ func New(
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
@@ -203,7 +201,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -211,8 +208,14 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("previous_id", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
-		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Logger()
+
+	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		return fmt.Errorf("could not get final state: no chunks found")
+	}
+
+	log = log.With().Hex("final_state", resultFinalState).Logger()
 
 	log.Info().Msg("execution receipt received")
 
@@ -221,11 +224,11 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
 	}
 
-	// if the receipt is for an unknown block, cache it. It will be picked up
-	// later when the finalizer processes new blocks.
+	// if the receipt is for an unknown block, skip it. It will be re-requested
+	// later.
 	_, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
 	if err != nil {
-		_ = e.receipts.Add(receipt)
+		log.Debug().Msg("discarding receipt for unknown block")
 		return nil
 	}
 
@@ -262,19 +265,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("could not check result: %w", err)
 	}
 
-	// store the receipt in the memory pool
-	added := e.receipts.Add(receipt)
-	if !added {
-		log.Debug().Msg("skipping receipt already in mempool")
-		return nil
-	}
-
-	log.Info().Msg("execution receipt added to mempool")
-
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
-
 	// store the result belonging to the receipt in the memory pool
-	added = e.results.Add(result)
+	added := e.results.Add(result)
 	if !added {
 		e.log.Debug().Msg("skipping result already in mempool")
 		return nil
@@ -320,7 +312,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	}
 
 	// kick off a check for potential seal formation
-	go e.checkSealing()
+	e.unit.Launch(e.checkSealing)
 
 	return nil
 }
@@ -394,7 +386,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
 	// kick off a check for potential seal formation
-	go e.checkSealing()
+	e.unit.Launch(e.checkSealing)
 
 	return nil
 }
@@ -538,17 +530,31 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		}
 
 		// ensure that previous result is known.
+		// get the previous result from our mempool or storage
+
 		previousID := result.PreviousResultID
-		previous, err := e.resultsDB.ByID(previousID)
-		if err != nil {
-			log.Debug().Msg("skipping sealable result with unknown previous result")
-			continue
+
+		// look for previous in mempool and storage
+		previous, found := e.results.ByID(previousID)
+		if !found {
+			var err error
+			previous, err = e.resultsDB.ByID(previousID)
+			if errors.Is(err, storage.ErrNotFound) {
+				log.Debug().Msg("skipping result with unknown previous result")
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("could not get previous result: %w", err)
+			}
 		}
 
 		// check sub-graph
 		if block.ParentID != previous.BlockID {
 			_ = e.results.Rem(result.ID())
-			log.Warn().Msg("removing result with invalid sub-graph")
+			log.Warn().
+				Str("block_parent_id", block.ParentID.String()).
+				Str("previous_result_block_id", previous.BlockID.String()).
+				Msg("removing result with invalid sub-graph")
 			continue
 		}
 
@@ -570,19 +576,27 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 		if len(result.Chunks) != requiredChunks {
 			_ = e.results.Rem(result.ID())
-			log.Warn().Msg("removing result with invalid number of chunks")
+			log.Warn().
+				Int("result_chunks", len(result.Chunks)).
+				Int("required_chunks", requiredChunks).
+				Msg("removing result with invalid number of chunks")
 			continue
 		}
 
 		// check that each chunk collected enough approvals
 		allChunksMatched := true
 
-		// TODO: As a temporary shortcut, we can just use the block the
-		// Execution receipt is for, i.e. blockID = result.BlockID. However, in
-		// the full protocol, blockID is the first block in its fork, which
-		// references an Execution Receipt with an Execution Result identical to
-		// result. (were blockID != result.BlockID)
+		// TODO: the randomness of chunk assignment for a result is determined
+		// by the result and a block ID.
+		// As a temporary shortcut, we can just use the ID of the executed
+		// block, i.e. blockID = result.BlockID. However, in the full protocol,
+		// blockID is the first block in its fork, which references an Execution
+		// Receipt with an Execution Result identical to result.
+		// (where blockID != result.BlockID)
 		assignment, err := e.assigner.Assign(result, result.BlockID)
+		if state.IsNoValidChildBlockError(err) {
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("could not assign verifiers: %w", err)
 		}
@@ -711,11 +725,17 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	// collect aggregate signatures
 	aggregatedSigs := e.collectAggregateSignatures(result)
 
+	// get finalS state of execution result
+	finalState, ok := result.FinalStateCommitment()
+	if !ok {
+		return fmt.Errorf("could not get final state: no chunks found")
+	}
+
 	// generate & store seal
 	seal := &flow.Seal{
 		BlockID:                result.BlockID,
 		ResultID:               result.ID(),
-		FinalState:             result.FinalStateCommit,
+		FinalState:             finalState,
 		AggregatedApprovalSigs: aggregatedSigs,
 	}
 
@@ -804,11 +824,6 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 			_ = e.results.Rem(result.ID())
 		}
 	}
-	for _, receipt := range e.receipts.All() {
-		if clear[receipt.ExecutionResult.ID()] || shouldClear(receipt.ExecutionResult.BlockID) {
-			_ = e.receipts.Rem(receipt.ID())
-		}
-	}
 	for _, approval := range e.approvals.All() {
 		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
 			// delete all the approvals for the corresponding chunk
@@ -835,7 +850,6 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 }
@@ -903,6 +917,7 @@ func (e *Engine) requestPending() error {
 		requestedCount := 0
 		for _, blockID := range missingBlocksOrderedByHeight {
 			e.requester.EntityByID(blockID, filter.Any)
+			requestedCount++
 		}
 		e.log.Info().
 			Int("count", requestedCount).

@@ -76,7 +76,7 @@ func (p *PublicAssignment) Assign(result *flow.ExecutionResult, blockID flow.Ide
 	// create RNG for assignment
 	rng, err := p.rngByBlockID(snapshot)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
+		return nil, err
 	}
 
 	// otherwise, it computes the assignment and caches it for future calls
@@ -96,7 +96,7 @@ func (p *PublicAssignment) rngByBlockID(stateSnapshot protocol.Snapshot) (random
 
 	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate seed: %v", err)
+		return nil, err
 	}
 
 	rng, err := random.NewRand(seed)
