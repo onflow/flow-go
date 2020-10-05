@@ -579,6 +579,8 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
+	// flatten out the error tree before returning
+	result = multierror.Flatten(result).(*multierror.Error)
 	return result.ErrorOrNil()
 }
 

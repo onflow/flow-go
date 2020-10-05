@@ -544,6 +544,8 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	// remove children from cache
 	e.pending.DropForParent(blockID)
 
+	// flatten out the error tree before returning
+	result = multierror.Flatten(result).(*multierror.Error)
 	return result.ErrorOrNil()
 }
 
