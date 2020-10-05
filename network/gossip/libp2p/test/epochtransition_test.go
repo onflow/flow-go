@@ -163,11 +163,10 @@ func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
 	removedID := ts.ids[removeIndex]
 	// check that the evicted node has no connections
 	assert.Eventually(ts.T(), func() bool {
-		for i, id := range newIDs {
+		for i, _ := range newIDs {
 			connected, err := ts.mws[i].IsConnected(*removedID)
 			require.NoError(ts.T(), err)
 			if connected {
-				fmt.Printf("\n\n >>>>>>> still connected with %s\n\n", id.Address)
 				return false
 			}
 		}
