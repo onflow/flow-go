@@ -1337,6 +1337,9 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 
 				return nil
 			})
+		if err != nil {
+			return fmt.Errorf("failed to handle state delta: %w", err)
+		}
 	}
 
 	log.Info().Msg("stored state delta")
