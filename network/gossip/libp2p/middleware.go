@@ -64,6 +64,7 @@ type Middleware struct {
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
 	rootBlockID       string
 	validators        []validators.MessageValidator
+	discovery         *Discovery
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -154,12 +155,12 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// create a discovery object to help libp2p discover peers
-	d := NewDiscovery(m.ctx, m.log, m.ov, m.me, m.libP2PNode)
+	m.discovery = NewDiscovery(m.ctx, m.log, m.ov, m.me, m.libP2PNode)
 
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
 		// set the discovery object
-		pubsub.WithDiscovery(d),
+		pubsub.WithDiscovery(m.discovery),
 		// skip message signing
 		pubsub.WithMessageSigning(false),
 		// skip message signature
@@ -499,19 +500,32 @@ func (m *Middleware) UpdateAllowList() error {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
 	}
 
+	// update libp2pNode's approve lists
 	err = m.libP2PNode.UpdateAllowlist(nodeAddrsAllowList...)
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
+	}
+
+	// initiate peer discovery and pruning
+	err = m.triggerDiscovery()
+	if err != nil {
+		return fmt.Errorf("failed to initiate discovery: %w", err)
 	}
 
 	return nil
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID
-func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
-	nodeAddress, err := m.nodeAddressFromID(nodeID)
+func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
+	nodeAddress, err := nodeAddressFromIdentity(identity)
 	if err != nil {
 		return false, err
 	}
 	return m.libP2PNode.IsConnected(nodeAddress)
+}
+
+// triggerDiscovery kicks the Discovery loop to start looking for peers and disconnect from extra peers
+// It subscribes to a dummy topic to initiate the pubsub.Discovery loop
+func (m *Middleware) triggerDiscovery() error {
+	return m.Subscribe(refreshTopic)
 }

@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 )
 
+const refreshTopic = "refresh"
+
 // Discovery implements the discovery.Discovery interface to provide libp2p a way to discover other nodes
 type Discovery struct {
 	ctx          context.Context
@@ -106,6 +108,15 @@ func (d *Discovery) FindPeers(ctx context.Context, topic string, _ ...discovery.
 
 // disconnect disconnects the node from the extra peers
 func (d *Discovery) disconnect(ids flow.IdentityList) {
+
+	// unsubscribe from dummy topic used to initiate discovery
+	defer func() {
+		err := d.libp2pNode.UnSubscribe(refreshTopic)
+		if err != nil {
+			d.log.Err(err).Msg("failed to unsubscribe from discovery trigger topic")
+		}
+	}()
+
 	for _, id := range ids {
 
 		// check if the middleware context is still valid

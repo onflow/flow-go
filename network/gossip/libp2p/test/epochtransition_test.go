@@ -42,7 +42,7 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 }
 
 func (ts *EpochTransitionTestSuite) SetupTest() {
-	nodeCount := 5
+	nodeCount := 10
 	golog.SetAllLoggers(golog.LevelDebug)
 	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
@@ -124,7 +124,7 @@ func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 	assert.Eventually(ts.T(), func() bool {
 		connections := 0
 		for _, id := range ts.ids {
-			connected, err := newMiddleware.IsConnected(id.NodeID)
+			connected, err := newMiddleware.IsConnected(*id)
 			require.NoError(ts.T(), err)
 			if connected {
 				connections++
@@ -160,17 +160,19 @@ func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
 		n.EpochTransition(uint64(ts.currentEpoch), nil)
 	}
 
+	removedID := ts.ids[removeIndex]
 	// check that the evicted node has no connections
 	assert.Eventually(ts.T(), func() bool {
-		for _, id := range newIDs {
-			connected, err := ts.mws[removeIndex].IsConnected(id.NodeID)
+		for i, id := range newIDs {
+			connected, err := ts.mws[i].IsConnected(*removedID)
 			require.NoError(ts.T(), err)
 			if connected {
+				fmt.Printf("\n\n >>>>>>> still connected with %s\n\n", id.Address)
 				return false
 			}
 		}
 		return true
-	}, 5*time.Second, 10*time.Millisecond)
+	}, 30*time.Second, 10*time.Millisecond)
 }
 
 // sendMessagesAndVerify sends a message from each engine to the other engines and verifies that all the messages are

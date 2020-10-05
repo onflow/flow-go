@@ -116,6 +116,7 @@ func generateNetworks(log zerolog.Logger,
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
 		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
+		me.On("Address").Return(ids[i].Address)
 
 		// create the network
 		net, err := libp2p.NewNetwork(log, json.NewCodec(), states[i], me, mws[i], csize, tops[i], metrics)

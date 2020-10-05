@@ -192,6 +192,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 	return nil
 }
 
+// SetIDs updates the identity list cached by the network layer
 func (n *Network) SetIDs(ids flow.IdentityList) error {
 
 	// remove self from id

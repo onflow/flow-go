@@ -68,7 +68,7 @@ func (n *TopologyTestSuite) SetupTest() {
 	require.NoError(n.T(), err)
 
 	// creates and mocks a network instance
-	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true, nil, nil)
+	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
 	require.NoError(n.T(), err)
 	require.Len(n.T(), nets, 1)
 	n.nets = nets[0]
@@ -88,8 +88,8 @@ func (n *TopologyTestSuite) TestMembership() {
 	require.Len(n.T(), top, n.expectedSize)
 
 	// every id in topology should be an id of the protocol
-	for id := range top {
-		require.Contains(n.T(), n.ids.NodeIDs(), id)
+	for _, id := range top {
+		require.Contains(n.T(), n.ids.NodeIDs(), id.NodeID)
 	}
 }
 
