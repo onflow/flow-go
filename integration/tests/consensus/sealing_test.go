@@ -194,7 +194,6 @@ SearchLoop:
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: resultID,               // need genesis result
 			BlockID:          targetID,               // refer the target block
-			FinalStateCommit: chunk.EndState,         // end state of only chunk
 			Chunks:           flow.ChunkList{&chunk}, // include only chunk
 		},
 		Signatures: nil,

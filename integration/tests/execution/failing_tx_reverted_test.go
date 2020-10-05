@@ -62,10 +62,16 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T())
 	s.T().Logf("got blockC height %v ID %v", blockC.Header.Height, blockC.Header.ID())
 
+	// final states
+	finalStateBlockB, ok := erBlockB.ExecutionResult.FinalStateCommitment()
+	require.True(s.T(), ok)
+	finalStateBlockC, ok := erBlockC.ExecutionResult.FinalStateCommitment()
+	require.True(s.T(), ok)
+
 	// wait for execution receipt for blockC from execution node 1
 	erBlockC := s.ReceiptState.WaitForReceiptFrom(s.T(), blockC.Header.ID(), s.exe1ID)
-	s.T().Logf("got erBlockC with SC %x", erBlockC.ExecutionResult.FinalStateCommit)
+	s.T().Logf("got erBlockC with SC %x", finalStateBlockC)
 
 	// assert that state did not change between blockB and blockC
-	require.Equal(s.T(), erBlockB.ExecutionResult.FinalStateCommit, erBlockC.ExecutionResult.FinalStateCommit)
+	require.Equal(s.T(), finalStateBlockB, finalStateBlockC)
 }
