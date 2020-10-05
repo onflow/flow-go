@@ -137,7 +137,7 @@ func createNode(
 	statusesDB := storage.NewEpochStatuses(metrics, db)
 	consumer := events.NewNoop()
 
-	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
+	state, err := protocol.NewState(metrics, tracer, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(root, result, seal)

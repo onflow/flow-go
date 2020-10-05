@@ -14,6 +14,7 @@ import (
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -52,6 +53,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
 
 	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
@@ -62,7 +64,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	consumer := events.NewNoop()
 
 	// just bootstrap with a genesis block, we'll use this as reference
-	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
+	suite.protoState, err = protocol.NewState(metrics, tracer, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
 	suite.Assert().Nil(err)
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	genesis, result, seal := unittest.BootstrapFixture(participants)

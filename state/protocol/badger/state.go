@@ -51,6 +51,7 @@ func NewState(
 
 	s := &State{
 		metrics:  metrics,
+		tracer:   tracer,
 		db:       db,
 		headers:  headers,
 		seals:    seals,
