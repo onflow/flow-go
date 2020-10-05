@@ -95,6 +95,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 	err := m.state.db.View(func(tx *badger.Txn) error {
 
 		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendSetup)
+		defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendSetup)
 
 		header := block.Header
 		payload := block.Payload
@@ -132,6 +133,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 
 		m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendSetup)
 		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendCheckAncestry)
+		defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckAncestry)
 
 		// start with the extending block's parent
 		parentID := header.ParentID
@@ -155,6 +157,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 
 		m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckAncestry)
 		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
+		defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 
 		// check that all transactions within the collection are valid
 		minRefID := flow.ZeroID
