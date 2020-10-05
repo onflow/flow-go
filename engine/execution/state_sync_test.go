@@ -20,21 +20,22 @@ import (
 
 // Test execution node can sync execution state from another EN node.
 //
-// It creates 2 ENs, and 5 blocks:
+// It creates 2 ENs, and 7 blocks:
 // A <- B
 //      ^- C (seal_A)
 //         ^- D (seal_B, finalized)
-//      		  ^- E <- F <- G (finalizes D, seals B) <- H (G won't be executed, until G has a child)
+//      		  ^- E <- F <- G (finalizes D, seals B)
 //
 // set the sync threshold as 2, meaning requires 2 sealed and unexecuted
 // blocks to trigger state syncing
 // set the block execution for EN1 to be fast
 // set the block execution for EN2 to be slow
 //
-// EN1 will have A,B,C,D,E,F,G,H
-// EN2 will receive A,B,C,D,E,F,G and verify no state syncing is triggered.
-// Once EN2 has received G, state syncing will be triggered. verify that
-// EN2 has the statecommitment for D
+// EN1 will have A,B,C,D,E,F,G
+// EN2 will receive A,B,C,D,E,F and verify no state syncing is triggered.
+// Once EN2 has received G, state syncing will be triggered.
+// verify that EN2 has the synced state up to B
+// verify that EN2 has executed block up to F
 func TestStateSyncFlow(t *testing.T) {
 	// create two EN nodes,
 	// EN1 is able to execute blocks fast,
@@ -46,8 +47,11 @@ func TestStateSyncFlow(t *testing.T) {
 		log.Debug().Msgf("EN2's ID: %v", EN2.GenericNode.Me.NodeID())
 
 		EN2.ExecutionEngine.OnComputeBlock = func(ctx context.Context, block *entity.ExecutableBlock, view *delta.View) {
-			log.Info().Msgf("EN2 is about to compute block: %v, let it be slow...", block.ID())
-			time.Sleep(time.Second * 200)
+			if block.Block.Header.Height <= 2 {
+				// A and B will take a long time to execute for EN2
+				log.Info().Msgf("EN2 is about to compute block: %v, let it be slow...", block.ID())
+				time.Sleep(time.Second * 200)
+			}
 		}
 
 		genesis, err := EN1.State.AtHeight(0).Head()
@@ -110,6 +114,9 @@ func TestStateSyncFlow(t *testing.T) {
 		// block B will be executed, because it has been sealed, and the state delta is available
 		// for it
 		waitUntilBlockIsExecuted(t, hub, blockB, EN2, waitTimeout)
+		log.Info().Msgf("EN2 has synced block B")
+
+		waitUntilBlockIsExecuted(t, hub, blockF, EN2, waitTimeout)
 	})
 }
 
