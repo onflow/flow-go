@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -85,7 +86,15 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 }
 
 func (m *Mutator) Extend(block *cluster.Block) error {
+
+	blockID := block.ID()
+
+	m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtend)
+	defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtend)
+
 	err := m.state.db.View(func(tx *badger.Txn) error {
+
+		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendSetup)
 
 		header := block.Header
 		payload := block.Payload
@@ -121,6 +130,9 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		// do this by tracing back until we see a parent block that is the
 		// latest finalized block, or reach height below the finalized boundary
 
+		m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendSetup)
+		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendCheckAncestry)
+
 		// start with the extending block's parent
 		parentID := header.ParentID
 		for parentID != final.ID() {
@@ -140,6 +152,9 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 
 			parentID = ancestor.ParentID
 		}
+
+		m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckAncestry)
+		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 
 		// check that all transactions within the collection are valid
 		minRefID := flow.ZeroID
@@ -179,6 +194,10 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not check reference block: %w", err)
 		}
+
+		m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
+		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsDupes)
+		defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsDupes)
 
 		// TODO ensure the reference block is part of the main chain
 		_ = refBlock
@@ -234,6 +253,9 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not validate extending block: %w", err)
 	}
+
+	m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendDBInsert)
+	defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendDBInsert)
 
 	// insert the new block
 	err = m.state.db.Update(procedure.InsertClusterBlock(block))

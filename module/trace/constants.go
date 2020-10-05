@@ -60,6 +60,14 @@ const (
 	COLBuildOnCreateHeader      = "col.builder.createHeader"
 	COLBuildOnDBInsert          = "col.builder.dbInsert"
 
+	// Cluster State
+	COLClusterStateMutatorExtend                       = "col.state.mutator.extend"
+	COLClusterStateMutatorExtendSetup                  = "col.state.mutator.extend.setup"
+	COLClusterStateMutatorExtendCheckAncestry          = "col.state.mutator.extend.ancestry"
+	COLClusterStateMutatorExtendCheckTransactionsValid = "col.state.mutator.extend.transactions.validity"
+	COLClusterStateMutatorExtendCheckTransactionsDupes = "col.state.mutator.extend.transactions.dupes"
+	COLClusterStateMutatorExtendDBInsert               = "col.state.mutator.extend.dbInsert"
+
 	// Execution Node
 	//
 

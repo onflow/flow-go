@@ -58,7 +58,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
+	suite.state, err = NewState(suite.db, tracer, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 	consumer := events.NewNoop()

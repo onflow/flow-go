@@ -12,15 +12,18 @@ import (
 type ClusterStateFactory struct {
 	db      *badger.DB
 	metrics module.CacheMetrics
+	tracer  module.Tracer
 }
 
 func NewClusterStateFactory(
 	db *badger.DB,
 	metrics module.CacheMetrics,
+	tracer module.Tracer,
 ) (*ClusterStateFactory, error) {
 	factory := &ClusterStateFactory{
 		db:      db,
 		metrics: metrics,
+		tracer:  tracer,
 	}
 	return factory, nil
 }
@@ -39,6 +42,7 @@ func (f *ClusterStateFactory) Create(clusterID flow.ChainID) (
 
 	clusterState, err := clusterkv.NewState(
 		f.db,
+		f.tracer,
 		clusterID,
 		headers,
 		payloads,
