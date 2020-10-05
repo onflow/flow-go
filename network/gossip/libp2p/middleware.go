@@ -306,12 +306,6 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
 	}
 
-	// flush the stream
-	err = bufw.Flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
-	}
-
 	// track the number of bytes that will be written to the wire for metrics
 	byteCount := bufw.Buffered()
 
