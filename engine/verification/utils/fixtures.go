@@ -171,32 +171,16 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 // everything is wired properly, but with the minimum viable content provided. This version is basically used
 // for profiling.
 func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
-	chunks := make([]*flow.Chunk, 0)
 	collections := make([]*flow.Collection, 0, chunkCount)
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
 
+	// creates collections and guarantees
 	for i := 0; i < chunkCount; i++ {
-		// creates one guaranteed collection per chunk
 		coll := unittest.CollectionFixture(1)
 		guarantee := coll.Guarantee()
 		collections = append(collections, &coll)
 		guarantees = append(guarantees, &guarantee)
-
-		chunk := &flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(i),
-				EventCollection: unittest.IdentifierFixture(),
-			},
-			Index: uint64(i),
-		}
-		chunks = append(chunks, chunk)
-
-		// creates a chunk data pack for the chunk
-		chunkDataPack := flow.ChunkDataPack{
-			ChunkID: chunk.ID(),
-		}
-		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
 	}
 
 	payload := flow.Payload{
@@ -211,10 +195,31 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 		Header:  &header,
 		Payload: &payload,
 	}
+	blockID := block.ID()
+
+	// creates chunks
+	chunks := make([]*flow.Chunk, 0)
+	for i := 0; i < chunkCount; i++ {
+		chunk := &flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: uint(i),
+				BlockID:         blockID,
+				EventCollection: unittest.IdentifierFixture(),
+			},
+			Index: uint64(i),
+		}
+		chunks = append(chunks, chunk)
+
+		// creates a light (quite empty) chunk data pack for the chunk at bare minimum
+		chunkDataPack := flow.ChunkDataPack{
+			ChunkID: chunk.ID(),
+		}
+		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
+	}
 
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
+			BlockID: blockID,
 			Chunks:  chunks,
 		},
 	}
@@ -292,6 +297,7 @@ func executeCollection(
 			StartState:      startStateCommitment,
 			// TODO: include event collection hash
 			EventCollection: flow.ZeroID,
+			BlockID:         executableBlock.ID(),
 			// TODO: record gas used
 			TotalComputationUsed: 0,
 			// TODO: record number of txs

@@ -651,7 +651,7 @@ func (ms *MatchingSuite) TestSealResultInvalidChunks() {
 	ms.sealedResults[previous.ID()] = previous
 
 	// add an extra chunk
-	chunk := unittest.ChunkFixture()
+	chunk := unittest.ChunkFixture(block.ID())
 	chunk.Index = uint64(len(block.Payload.Guarantees))
 	result.Chunks = append(result.Chunks, chunk)
 
