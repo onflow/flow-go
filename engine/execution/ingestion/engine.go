@@ -1000,7 +1000,7 @@ func (e *Engine) stopSyncing(syncingHeight uint64) bool {
 }
 
 func (e *Engine) startSyncing(syncHeight uint64) bool {
-	return e.syncingHeight.CAS(0, syncHeight)
+	return e.syncingHeight.CAS(syncHeight, 0)
 }
 
 // check whether we need to trigger state sync
@@ -1076,9 +1076,8 @@ func (e *Engine) checkStateSyncStop(executedHeight uint64) {
 // the state sync will be trigger. So for instance, if the first sealed and unexecuted
 // block's height is 20, then the state sync will not trigger until the last sealed and
 // unexecuted block's height is higher than or equal to than 29.
-
 func shouldTriggerStateSync(startHeight, endHeight uint64, threshold int) bool {
-	return (int64(endHeight) - int64(startHeight) + 1) >= int64(threshold)
+	return int64(endHeight)-int64(startHeight)+1 >= int64(threshold)
 }
 
 func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
@@ -1237,7 +1236,7 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 			// executed either, so we stop iterating through the heights
 			break
 		} else {
-			return fmt.Errorf("could not query statecommitment for height %v, %w", height, err)
+			return fmt.Errorf("could not query statecommitment for height %v: %w", height, err)
 		}
 	}
 
@@ -1245,6 +1244,11 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 }
 
 func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta *messages.ExecutionStateDelta) error {
+	e.log.Info().
+		Hex("sender", executionNodeID[:]).
+		Hex("block_id", logging.Entity(delta)).
+		Uint64("height", delta.ExecutableBlock.Block.Header.Height).
+		Msg("received state delta")
 
 	// the request must be from an execution node
 	id, err := e.state.Final().Identity(executionNodeID)
