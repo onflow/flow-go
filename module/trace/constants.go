@@ -2,7 +2,27 @@ package trace
 
 // Span names
 const (
+
+	// Common
+	//
+
+	// State
+	// mutator.Extend - full payload check
+	ProtoStateMutatorExtend                = "common.state.proto.mutator.extend"
+	ProtoStateMutatorExtendCheckHeader     = "common.state.proto.mutator.extend.checkHeader"
+	ProtoStateMutatorExtendCheckGuarantees = "common.state.proto.mutator.extend.checkGuarantees"
+	ProtoStateMutatorExtendCheckSeals      = "common.state.proto.mutator.extend.checkSeals"
+	ProtoStateMutatorExtendDBInsert        = "common.state.proto.mutator.extend.dbInsert"
+
+	// mutator.HeaderExtend - header-only check
+	ProtoStateMutatorHeaderExtend              = "common.state.proto.mutator.headerExtend"
+	ProtoStateMutatorHeaderExtendGetLastSealed = "common.state.proto.mutator.headerExtend.lastSealed"
+
+	// mutator.Finalize
+	ProtoStateMutatorFinalize = "common.state.proto.mutator.finalize"
+
 	// Consensus Node
+	//
 
 	CONProcessCollection SpanName = "con.processCollection"
 	// children of CONProcessCollection
@@ -18,8 +38,20 @@ const (
 	// children of CONProcessBlock
 	CONHotFinalizeBlock SpanName = "con.hotstuff.finalizeBlock"
 
-	// Collection Node
+	// Builder
+	CONBuildOn                        = "con.builder"
+	CONBuildOnSetup                   = "con.builder.setup"
+	CONBuildOnUnfinalizedLookup       = "con.builder.unfinalizedLookup"
+	CONBuildOnFinalizedLookup         = "con.builder.finalizedLookup"
+	CONBuildOnCreatePayloadGuarantees = "con.builder.createPayload.guarantees"
+	CONBuildOnCreatePayloadSeals      = "con.builder.createPayload.seals"
+	CONBuildOnCreateHeader            = "con.builder.createHeader"
+	CONBuildOnDBInsert                = "con.builder.dbInsert"
 
+	// Collection Node
+	//
+
+	// Builder
 	COLBuildOn                  = "col.builder"
 	COLBuildOnSetup             = "col.builder.setup"
 	COLBuildOnUnfinalizedLookup = "col.builder.unfinalizedLookup"
@@ -28,7 +60,16 @@ const (
 	COLBuildOnCreateHeader      = "col.builder.createHeader"
 	COLBuildOnDBInsert          = "col.builder.dbInsert"
 
+	// Cluster State
+	COLClusterStateMutatorExtend                       = "col.state.mutator.extend"
+	COLClusterStateMutatorExtendSetup                  = "col.state.mutator.extend.setup"
+	COLClusterStateMutatorExtendCheckAncestry          = "col.state.mutator.extend.ancestry"
+	COLClusterStateMutatorExtendCheckTransactionsValid = "col.state.mutator.extend.transactions.validity"
+	COLClusterStateMutatorExtendCheckTransactionsDupes = "col.state.mutator.extend.transactions.dupes"
+	COLClusterStateMutatorExtendDBInsert               = "col.state.mutator.extend.dbInsert"
+
 	// Execution Node
+	//
 
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
 	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
@@ -55,6 +96,7 @@ const (
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
 
 	// Verification node
+	//
 
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
