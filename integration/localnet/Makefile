@@ -23,7 +23,7 @@ init:
 
 .PHONY: start
 start:
-	docker-compose -f docker-compose.metrics.yml -f docker-compose.metrics.yml up -d
+	docker-compose -f docker-compose.metrics.yml up -d
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up --build -d
 
 .PHONY: logs
