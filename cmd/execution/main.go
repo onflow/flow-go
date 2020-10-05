@@ -348,7 +348,6 @@ func main() {
 			)
 			return eng, err
 		}).
-		// TODO: currently issues with this engine on the EXE node, as there is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
 		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
@@ -360,8 +359,6 @@ func main() {
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
-				// Right now, only used to sync, so never poll
-				synchronization.WithPollInterval(time.Duration(0)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
