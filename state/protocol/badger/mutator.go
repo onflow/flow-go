@@ -178,8 +178,9 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 
 func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 
-	m.state.tracer.StartSpan(candidate.ID(), trace.ProtoStateMutatorHeaderExtend)
-	defer m.state.tracer.FinishSpan(candidate.ID(), trace.ProtoStateMutatorHeaderExtend)
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorHeaderExtend)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorHeaderExtend)
 
 	// check if he block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -204,8 +205,9 @@ func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 
 func (m *Mutator) Extend(candidate *flow.Block) error {
 
-	m.state.tracer.StartSpan(candidate.ID(), trace.ProtoStateMutatorExtend)
-	defer m.state.tracer.FinishSpan(candidate.ID(), trace.ProtoStateMutatorExtend)
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtend)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtend)
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -238,8 +240,9 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 // last finalized block.
 func (m *Mutator) headerExtend(candidate *flow.Block) error {
 
-	m.state.tracer.StartSpan(candidate.ID(), trace.ProtoStateMutatorExtendCheckHeader)
-	defer m.state.tracer.FinishSpan(candidate.ID(), trace.ProtoStateMutatorExtendCheckHeader)
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckHeader)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckHeader)
 
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
@@ -304,8 +307,9 @@ func (m *Mutator) headerExtend(candidate *flow.Block) error {
 // included in any previous payload.
 func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
 
-	m.state.tracer.StartSpan(candidate.ID(), trace.ProtoStateMutatorExtendCheckGuarantees)
-	defer m.state.tracer.FinishSpan(candidate.ID(), trace.ProtoStateMutatorExtendCheckGuarantees)
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckGuarantees)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckGuarantees)
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -384,8 +388,9 @@ func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
 // remain.
 func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 
-	m.state.tracer.StartSpan(candidate.ID(), trace.ProtoStateMutatorExtendCheckSeals)
-	defer m.state.tracer.FinishSpan(candidate.ID(), trace.ProtoStateMutatorExtendCheckSeals)
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -506,8 +511,9 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 // be the last sealed for block 101.
 func (m *Mutator) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 
-	m.state.tracer.StartSpan(candidate.ID(), trace.ProtoStateMutatorHeaderExtendGetLastSealed)
-	defer m.state.tracer.FinishSpan(candidate.ID(), trace.ProtoStateMutatorHeaderExtendGetLastSealed)
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorHeaderExtendGetLastSealed)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorHeaderExtendGetLastSealed)
 
 	header := candidate.Header
 	payload := candidate.Payload
