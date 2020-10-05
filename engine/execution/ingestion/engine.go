@@ -526,7 +526,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				completeCollection.Transactions = collection.Transactions
 
 				// check if the block becomes executable
-				e.executeBlockIfComplete(executableBlock)
+				_ = e.executeBlockIfComplete(executableBlock)
 			}
 
 			// since we've received this collection, remove it from the index
@@ -1000,7 +1000,7 @@ func (e *Engine) stopSyncing(syncingHeight uint64) bool {
 }
 
 func (e *Engine) startSyncing(syncHeight uint64) bool {
-	return e.syncingHeight.CAS(syncHeight, 0)
+	return e.syncingHeight.CAS(0, syncHeight)
 }
 
 // check whether we need to trigger state sync
@@ -1028,6 +1028,7 @@ func (e *Engine) checkStateSyncStart(firstUnexecutedHeight uint64) {
 
 	// check whether we should trigger state sync
 	trigger := shouldTriggerStateSync(startHeight, endHeight, e.syncThreshold)
+
 	if !trigger {
 		return
 	}
@@ -1244,11 +1245,13 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 }
 
 func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta *messages.ExecutionStateDelta) error {
-	e.log.Info().
+	log := e.log.With().
 		Hex("sender", executionNodeID[:]).
 		Hex("block_id", logging.Entity(delta)).
 		Uint64("height", delta.ExecutableBlock.Block.Header.Height).
-		Msg("received state delta")
+		Logger()
+
+	log.Debug().Msg("received state delta")
 
 	// the request must be from an execution node
 	id, err := e.state.Final().Identity(executionNodeID)
@@ -1267,6 +1270,7 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 
 	if err == nil {
 		// the block has been executed, ignore
+		e.log.Info().Hex("block", logging.Entity(delta)).Msg("ignore executed state delta")
 		return nil
 	}
 
@@ -1286,6 +1290,7 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 
 	if isUnsealed {
 		// we never query delta for unsealed blocks, ignore
+		log.Debug().Msg("ignore state deltas for unsealed blocks")
 		return nil
 	}
 
@@ -1312,6 +1317,29 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 		}
 	}
 
+	// if a block has no collection, then try executing the block
+	if len(delta.ExecutableBlock.CompleteCollections) == 0 {
+		err = e.mempool.Run(
+			func(
+				blockByCollection *stdmap.BlockByCollectionBackdata,
+				executionQueues *stdmap.QueuesBackdata,
+			) error {
+				// check if the delta is for the first unexecuted block
+				// in a queue. Note if the block is not the first, then
+				// we can't execute it until its parent has been executed.
+				for _, queue := range executionQueues.All() {
+					if queue.Head.Item.ID() == blockID {
+						block := queue.Head.Item.(*entity.ExecutableBlock)
+						e.executeBlockIfComplete(block)
+						break
+					}
+				}
+
+				return nil
+			})
+	}
+
+	log.Info().Msg("stored state delta")
 	return nil
 }
 

@@ -62,9 +62,8 @@ func TestStateSyncFlow(t *testing.T) {
 		blockE := unittest.BlockWithParentAndSeal(blockD.Header, blockC.Header)
 		blockF := unittest.BlockWithParentAndSeal(blockE.Header, nil)
 		blockG := unittest.BlockWithParentAndSeal(blockF.Header, nil)
-		blockH := unittest.BlockWithParentAndSeal(blockG.Header, nil)
 
-		logBlocks(log, blockA, blockB, blockC, blockD, blockE, blockF, blockG, blockH)
+		logBlocks(log, blockA, blockB, blockC, blockD, blockE, blockF, blockG)
 
 		waitTimeout := 5 * time.Second
 
@@ -104,16 +103,13 @@ func TestStateSyncFlow(t *testing.T) {
 		sendBlockToEN(t, blockG, blockD, EN2) // trigger BlockProcessable(BlockF), sealed height 2
 
 		// verify that the state syncing is not triggered
-		//
-		// send G to EN2 to trigger state syncing
-		sendBlockToEN(t, blockH, blockE, EN2)
 
-		//
-		// verify the state delta is called.
 		// wait for a short period of time for the statecommitment for G is ready from syncing state.
 		// it will timeout if state syncing didn't happen, because the block execution is too long to
 		// wait for.
-		waitUntilBlockIsExecuted(t, hub, blockF, EN2, waitTimeout)
+		// block B will be executed, because it has been sealed, and the state delta is available
+		// for it
+		waitUntilBlockIsExecuted(t, hub, blockB, EN2, waitTimeout)
 	})
 }
 
@@ -190,8 +186,7 @@ func waitUntilBlockIsExecuted(
 	blockID := block.ID()
 	require.Eventually(t, func() bool {
 		hub.DeliverAll()
-		s, err := en.ExecutionState.StateCommitmentByBlockID(context.Background(), blockID)
-		en.Log.Debug().Msgf("waiting for block %v to be executed, commit: %v, err: %v", blockID, s, err)
+		_, err := en.ExecutionState.StateCommitmentByBlockID(context.Background(), blockID)
 		return err == nil
 	}, timeout, time.Millisecond*500,
 		fmt.Sprintf("expect block %v to be executed, but timeout", block.ID()))
