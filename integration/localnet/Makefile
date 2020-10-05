@@ -23,19 +23,16 @@ init:
 
 .PHONY: start
 start:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.base.yml -f docker-compose.nodes.yml up --build -d
-
-.PHONY: nodes
-nodes:
+	docker-compose -f docker-compose.metrics.yml -f docker-compose.metrics.yml up -d
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up --build -d
 
 .PHONY: logs
 logs:
-	docker-compose -f docker-compose.base.yml -f docker-compose.nodes.yml logs -f
+	docker-compose -f docker-compose.nodes.yml logs -f
 
 .PHONY: stop
 stop:
-	docker-compose -f docker-compose.base.yml -f docker-compose.nodes.yml down -v
+	docker-compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml -f docker-compose.logs.yml down -v
 
 .PHONY: load
 load:
