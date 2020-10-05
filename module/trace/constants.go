@@ -2,6 +2,25 @@ package trace
 
 // Span names
 const (
+
+	// Common
+	//
+
+	// State
+	// mutator.Extend - full payload check
+	ProtoStateMutatorExtend                = "common.state.proto.mutator.extend"
+	ProtoStateMutatorExtendCheckHeader     = "common.state.proto.mutator.extend.checkHeader"
+	ProtoStateMutatorExtendCheckGuarantees = "common.state.proto.mutator.extend.checkGuarantees"
+	ProtoStateMutatorExtendCheckSeals      = "common.state.proto.mutator.extend.checkSeals"
+	ProtoStateMutatorExtendDBInsert        = "common.state.proto.mutator.extend.dbInsert"
+
+	// mutator.HeaderExtend - header-only check
+	ProtoStateMutatorHeaderExtend              = "common.state.proto.mutator.headerExtend"
+	ProtoStateMutatorHeaderExtendGetLastSealed = "common.state.proto.mutator.headerExtend.lastSealed"
+
+	// mutator.Finalize
+	ProtoStateMutatorFinalize = "common.state.proto.mutator.finalize"
+
 	// Consensus Node
 	//
 
@@ -42,6 +61,7 @@ const (
 	COLBuildOnDBInsert          = "col.builder.dbInsert"
 
 	// Execution Node
+	//
 
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
 	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
@@ -68,6 +88,7 @@ const (
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
 
 	// Verification node
+	//
 
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
