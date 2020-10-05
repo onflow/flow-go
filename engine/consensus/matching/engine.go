@@ -637,17 +637,6 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 // exceeds the required threshold.
 func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
 
-	// get all verifier identities
-	snapshot := e.state.AtBlockID(result.BlockID)
-	verifierIdentities, err := snapshot.Identities(filter.HasRole(flow.RoleVerification))
-	if err != nil {
-		return false, fmt.Errorf("could not get verifier identities: %w", err)
-	}
-	execIdentities, err := snapshot.Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return false, fmt.Errorf("could not get executor identities: %w", err)
-	}
-
 	// get all the chunk approvals from mempool
 	approvals := e.approvals.ByChunk(result.ID(), chunk.Index)
 
@@ -661,7 +650,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 		}
 
 		// check if spocks match
-		valid, err := e.validateSpocks(verifierIdentities, execIdentities, approval, chunk.Index)
+		valid, err := e.validateSpock(approval, chunk.Index)
 		if err != nil {
 			return false, fmt.Errorf("could get validate spocks: %w", err)
 		}
@@ -687,22 +676,22 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 	return len(validApprovers) > 0, nil
 }
 
-// validateSpocks checks if the spock from an approval matches the corresponding one in the receipt
+// validateSpockschecks if the spock from an approval matches the corresponding one in the receipts
 // TODO: needs testing
-func (e *Engine) validateSpocks(verifiers flow.IdentityList, executors flow.IdentityList, approval *flow.ResultApproval, chunkIndex uint64) (bool, error) {
+func (e *Engine) validateSpock(approval *flow.ResultApproval, chunkIndex uint64) (bool, error) {
 	// find identities
-	approver, ok := verifiers.ByNodeID(approval.Body.ApproverID)
-	if !ok {
-		return false, fmt.Errorf("could not find approver id in snapshot identities")
+	approver, err := e.state.AtBlockID(approval.Body.BlockID).Identity(approval.Body.ApproverID)
+	if err != nil {
+		return false, fmt.Errorf("could not find approver identity")
 	}
 
 	// TODO: this needs to be reworked to check against all receipts
 	spockMatched := false
 	spockSet := e.unmatchedSpockReceipts[approval.Body.ExecutionResultID]
 	for _, receipt := range spockSet {
-		executor, ok := executors.ByNodeID(receipt.ExecutorID)
-		if !ok {
-			return false, fmt.Errorf("could not find executor id in snapshot identities")
+		executor, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(receipt.ExecutorID)
+		if err != nil {
+			return false, fmt.Errorf("could not find executor identity")
 		}
 
 		// verify spock
