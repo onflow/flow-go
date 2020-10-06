@@ -136,8 +136,6 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, err
 	// mark that this account exists
 	a.ledger.Set(string(newAddress.Bytes()), "", keyExists, []byte{1})
 
-	a.ledger.Set(string(newAddress.Bytes()), string(newAddress.Bytes()), keyCode, nil)
-
 	err = a.SetAllPublicKeys(newAddress, publicKeys)
 	if err != nil {
 		return flow.EmptyAddress, err
@@ -294,11 +292,15 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 	return nil
 }
 
+func (a *Accounts) contractKey(contractName string) string {
+	return fmt.Sprintf("%s.%s", keyCode, contractName)
+}
+
 func (a *Accounts) getCode(name string, address flow.Address) ([]byte, error) {
 
-	code, err := a.ledger.Get(name,
+	code, err := a.ledger.Get(string(address.Bytes()),
 		string(address.Bytes()),
-		keyCode)
+		a.contractKey(name))
 	if err != nil {
 		return nil, newLedgerGetError(name, address, err)
 	}
@@ -317,7 +319,7 @@ func (a *Accounts) setCode(name string, address flow.Address, code []byte) error
 	}
 
 	var prevCode []byte
-	prevCode, err = a.ledger.Get(name, string(address.Bytes()), keyCode)
+	prevCode, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), a.contractKey(name))
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
@@ -327,7 +329,7 @@ func (a *Accounts) setCode(name string, address flow.Address, code []byte) error
 		return nil
 	}
 
-	a.ledger.Set(name, string(address.Bytes()), keyCode, code)
+	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), a.contractKey(name), code)
 
 	return nil
 }
@@ -375,11 +377,11 @@ func (a *Accounts) TouchContract(name string, address flow.Address) {
 	if !contracts.Has(name) {
 		a.ledger.Touch(string(address.Bytes()),
 			string(address.Bytes()),
-			keyCode)
+			a.contractKey(""))
 	}
-	a.ledger.Touch(name,
+	a.ledger.Touch(string(address.Bytes()),
 		string(address.Bytes()),
-		keyCode)
+		a.contractKey(name))
 }
 
 func (a *Accounts) GetContracts(address flow.Address) (ContractsList, error) {
@@ -404,7 +406,7 @@ func (a *Accounts) GetContract(name string, address flow.Address) ([]byte, error
 	}
 	if !contracts.Has(name) {
 		// this contract wasn't deployed the new way. Try getting it the old way
-		return a.getCode(string(address.Bytes()), address)
+		return a.getCode("", address)
 	}
 	return a.getCode(name, address)
 }
