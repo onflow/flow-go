@@ -69,6 +69,8 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	db := unittest.BadgerDB(t, dbDir)
 
 	metrics := metrics.NewNoopCollector()
+	tracer, err := trace.NewTracer(log, "test")
+	require.NoError(t, err)
 
 	guarantees := storage.NewGuarantees(metrics, db)
 	seals := storage.NewSeals(metrics, db)
@@ -81,7 +83,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	distributor := events.NewDistributor()
 	statuses := storage.NewEpochStatuses(metrics, db)
 
-	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+	state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
 	require.NoError(t, err)
 
 	root, result, seal := unittest.BootstrapFixture(participants)
@@ -110,7 +112,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 
 	stubnet := stub.NewNetwork(state, me, hub)
 
-	tracer, err := trace.NewTracer(log, "test")
+	tracer, err = trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
 	return testmock.GenericNode{

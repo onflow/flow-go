@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	st "github.com/onflow/flow-go/state"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -341,6 +342,7 @@ func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -348,7 +350,7 @@ func TestExtendValid(t *testing.T) {
 		consumer := new(mockprotocol.Consumer)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
 		require.Nil(t, err)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
@@ -673,6 +675,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -681,7 +684,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("BlockFinalized", mock.Anything)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
 		require.Nil(t, err)
 
 		// first bootstrap with the initial epoch

@@ -51,21 +51,21 @@ func WithExpiryBuffer(buf uint) Opt {
 
 func NewBuilder(
 	db *badger.DB,
+	tracer module.Tracer,
 	mainHeaders storage.Headers,
 	clusterHeaders storage.Headers,
 	payloads storage.ClusterPayloads,
 	transactions mempool.Transactions,
-	tracer module.Tracer,
 	opts ...Opt,
 ) *Builder {
 
 	b := Builder{
 		db:                db,
+		tracer:            tracer,
 		mainHeaders:       mainHeaders,
 		clusterHeaders:    clusterHeaders,
 		payloads:          payloads,
 		transactions:      transactions,
-		tracer:            tracer,
 		maxCollectionSize: 100,
 		expiryBuffer:      15,
 	}
@@ -90,6 +90,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 		// STEP ONE: Load some things we need to do our work.
 		b.tracer.StartSpan(parentID, trace.COLBuildOnSetup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
 
 		var parent flow.Header
 		err := operation.RetrieveHeader(parentID, &parent)(tx)
@@ -121,8 +122,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// part of the chain we care about. We do this separately for
 		// un-finalized and finalized sections of the chain to decide whether to
 		// remove conflicting transactions from the mempool.
+
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 
 		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
@@ -152,6 +155,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnFinalizedLookup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 
 		//TODO for now we check a fixed # of finalized ancestors - we should
 		// instead look back based on reference block ID and expiry
@@ -188,6 +192,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// time figuring out the correct reference block ID for the collection.
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
 
 		minRefHeight := uint64(math.MaxUint64)
 		// start with the finalized reference ID (longest expiry time)
@@ -251,6 +256,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// used in the payload and construct the final proposal model
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnCreateHeader)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
 		// build the payload from the transactions
 		payload := cluster.PayloadFromTransactions(minRefID, transactions...)
