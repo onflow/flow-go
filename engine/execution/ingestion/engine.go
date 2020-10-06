@@ -598,6 +598,7 @@ func (e *Engine) matchOrRequestCollections(
 	// make sure that the requests are dispatched immediately by the requester
 	if len(executableBlock.Block.Payload.Guarantees) > 0 {
 		defer e.request.Force()
+		defer e.metrics.ExecutionCollectionRequestSent()
 	}
 
 	actualRequested := 0
