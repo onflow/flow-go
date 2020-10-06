@@ -120,7 +120,7 @@ func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contr
 // SignTransaction signs the transaction using the proposer's key
 func (c *Client) SignTransaction(tx *sdk.Transaction) (*sdk.Transaction, error) {
 
-	err := tx.SignEnvelope(tx.Payer, tx.ProposalKey.KeyID, c.signer)
+	err := tx.SignEnvelope(tx.Payer, tx.ProposalKey.KeyIndex, c.signer)
 	if err != nil {
 		return nil, err
 	}
