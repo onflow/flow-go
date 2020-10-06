@@ -3,7 +3,7 @@ module github.com/onflow/flow-go
 go 1.13
 
 require (
-	cloud.google.com/go/storage v1.6.0
+	cloud.google.com/go/storage v1.10.0
 	github.com/HdrHistogram/hdrhistogram-go v0.9.0 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
@@ -12,9 +12,9 @@ require (
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/go-kit/kit v0.9.0
 	github.com/gogo/protobuf v1.3.1
-	github.com/golang/mock v1.4.3
-	github.com/golang/protobuf v1.4.0
-	github.com/google/go-cmp v0.4.0
+	github.com/golang/mock v1.4.4
+	github.com/golang/protobuf v1.4.2
+	github.com/google/go-cmp v0.5.2
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4
@@ -28,11 +28,11 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.8.1-0.20200930165225-79a92f2bff94
+	github.com/onflow/cadence v0.10.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20201002123512-35d751ebea1d
-	github.com/onflow/flow-go-sdk v0.8.0
+	github.com/onflow/flow-go-sdk v0.10.1-0.20201005211051-66bf3964f3c1
 	github.com/onflow/flow-go/crypto v0.9.4
-	github.com/onflow/flow/protobuf/go/flow v0.1.7
+	github.com/onflow/flow/protobuf/go/flow v0.1.8-0.20201002204652-a7175c92529c
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
@@ -48,10 +48,10 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.6.0
-	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
-	google.golang.org/api v0.18.0
-	google.golang.org/grpc v1.28.0
+	google.golang.org/api v0.31.0
+	google.golang.org/grpc v1.31.1
 	gotest.tools v2.2.0+incompatible
 )
 

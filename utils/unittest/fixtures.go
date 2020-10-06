@@ -29,14 +29,14 @@ func TransactionSignatureFixture() flow.TransactionSignature {
 		Address:     AddressFixture(),
 		SignerIndex: 0,
 		Signature:   []byte{1, 2, 3, 4},
-		KeyID:       1,
+		KeyIndex:    1,
 	}
 }
 
 func ProposalKeyFixture() flow.ProposalKey {
 	return flow.ProposalKey{
 		Address:        AddressFixture(),
-		KeyID:          1,
+		KeyIndex:       1,
 		SequenceNumber: 0,
 	}
 }

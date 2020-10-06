@@ -79,12 +79,18 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	if !ok {
 		return nil, ErrAccountNotFound
 	}
+	contracts := make(map[string][]byte)
+	contractNames, err := a.GetContracts(address)
 
-	var code []byte
-	// TODO: check this
-	code, err = a.GetContract(string(address.Bytes()), address)
 	if err != nil {
 		return nil, err
+	}
+	for _, name := range contractNames {
+		code, err := a.getCode(name, address)
+		if err != nil {
+			return nil, err
+		}
+		contracts[name] = code
 	}
 
 	var publicKeys []flow.AccountPublicKey
@@ -94,9 +100,10 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	}
 
 	return &flow.Account{
-		Address: address,
-		Code:    code,
-		Keys:    publicKeys,
+		Address:   address,
+		Code:      nil,
+		Keys:      publicKeys,
+		Contracts: contracts,
 	}, nil
 }
 

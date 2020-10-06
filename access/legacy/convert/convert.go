@@ -77,7 +77,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 func TransactionToMessage(tb flow.TransactionBody) *entitiesproto.Transaction {
 	proposalKeyMessage := &entitiesproto.Transaction_ProposalKey{
 		Address:        tb.ProposalKey.Address.Bytes(),
-		KeyId:          uint32(tb.ProposalKey.KeyID),
+		KeyId:          uint32(tb.ProposalKey.KeyIndex),
 		SequenceNumber: tb.ProposalKey.SequenceNumber,
 	}
 
@@ -91,7 +91,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entitiesproto.Transaction {
 	for i, sig := range tb.PayloadSignatures {
 		payloadSigMessages[i] = &entitiesproto.Transaction_Signature{
 			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyID),
+			KeyId:     uint32(sig.KeyIndex),
 			Signature: sig.Signature,
 		}
 	}
@@ -101,7 +101,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entitiesproto.Transaction {
 	for i, sig := range tb.EnvelopeSignatures {
 		envelopeSigMessages[i] = &entitiesproto.Transaction_Signature{
 			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyID),
+			KeyId:     uint32(sig.KeyIndex),
 			Signature: sig.Signature,
 		}
 	}

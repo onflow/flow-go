@@ -109,7 +109,7 @@ func (tb *TransactionBody) SetGasLimit(limit uint64) *TransactionBody {
 func (tb *TransactionBody) SetProposalKey(address Address, keyID uint64, sequenceNum uint64) *TransactionBody {
 	proposalKey := ProposalKey{
 		Address:        address,
-		KeyID:          keyID,
+		KeyIndex:       keyID,
 		SequenceNumber: sequenceNum,
 	}
 	tb.ProposalKey = proposalKey
@@ -272,7 +272,7 @@ func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []
 	return TransactionSignature{
 		Address:     address,
 		SignerIndex: signerIndex,
-		KeyID:       keyID,
+		KeyIndex:    keyID,
 		Signature:   sig,
 	}
 }
@@ -303,7 +303,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 		ReferenceBlockID:          tb.ReferenceBlockID[:],
 		GasLimit:                  tb.GasLimit,
 		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
-		ProposalKeyID:             tb.ProposalKey.KeyID,
+		ProposalKeyID:             tb.ProposalKey.KeyIndex,
 		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
 		Payer:                     tb.Payer.Bytes(),
 		Authorizers:               authorizers,
@@ -382,7 +382,7 @@ func (f TransactionField) String() string {
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
 type ProposalKey struct {
 	Address        Address
-	KeyID          uint64
+	KeyIndex       uint64
 	SequenceNumber uint64
 }
 
@@ -390,7 +390,7 @@ type ProposalKey struct {
 type TransactionSignature struct {
 	Address     Address
 	SignerIndex int
-	KeyID       uint64
+	KeyIndex    uint64
 	Signature   []byte
 }
 
@@ -405,7 +405,7 @@ func (s TransactionSignature) canonicalForm() interface{} {
 		Signature   []byte
 	}{
 		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-		KeyID:       uint(s.KeyID),       // int is not RLP-serializable
+		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
 		Signature:   s.Signature,
 	}
 }
@@ -414,7 +414,7 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 	return func(i, j int) bool {
 		sigA := signatures[i]
 		sigB := signatures[j]
-		return sigA.SignerIndex < sigB.SignerIndex || sigA.KeyID < sigB.KeyID
+		return sigA.SignerIndex < sigB.SignerIndex || sigA.KeyIndex < sigB.KeyIndex
 	}
 }
 
