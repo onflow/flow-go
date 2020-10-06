@@ -1,9 +1,9 @@
 package utils
 
 import (
-	"github.com/onflow/flow-go/ledger"
 	"math/rand"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 

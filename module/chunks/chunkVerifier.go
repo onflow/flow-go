@@ -108,7 +108,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	unknownRegTouch := make(map[string]*ledger.Key)
 	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
-		registerID := flow.NewRegisterKey(owner, controller, key)
+		registerID := flow.NewRegisterID(owner, controller, key)
 
 		registerKey := executionState.RegisterIDToKey(registerID)
 
@@ -173,6 +173,9 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 		executionState.RegisterIDSToKeys(regs),
 		executionState.RegisterValuesToValues(values),
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
+	}
 
 	expEndStateComm, err := psmt.Set(update)
 

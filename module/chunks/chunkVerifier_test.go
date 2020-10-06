@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/rs/zerolog"
+
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -173,12 +174,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	}
 
 	// registerTouch and State setup
-	id1 := flow.NewRegisterKey("00", "", "")
+	id1 := flow.NewRegisterID("00", "", "")
 	value1 := []byte{'a'}
 
 	id2Bytes := make([]byte, 32)
 	id2Bytes[0] = byte(5)
-	id2 := flow.NewRegisterKey("05", "", "")
+	id2 := flow.NewRegisterID("05", "", "")
 	value2 := []byte{'b'}
 	UpdatedValue2 := []byte{'B'}
 

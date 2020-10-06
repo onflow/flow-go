@@ -129,7 +129,7 @@ func NewExecutionState(
 func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.Query, error) {
 	return ledger.NewQuery(commitment,
 		[]ledger.Key{
-			RegisterIDToKey(flow.NewRegisterKey(owner, controller, key)),
+			RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
 		})
 }
 

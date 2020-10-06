@@ -74,8 +74,11 @@ func run(*cobra.Command, []string) {
 
 	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 
-		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterKey(owner, controller, key))
+		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, controller, key))
 		path, err := pathfinder.KeyToPath(ledgerKey, 0)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("cannot convert key to path")
+		}
 
 		read := &ledger.TrieRead{
 			RootHash: stateCommitment,

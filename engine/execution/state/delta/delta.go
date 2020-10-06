@@ -8,6 +8,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO Remove after migration
+type Mapping struct {
+	Owner      string
+	Key        string
+	Controller string
+}
+
+type LegacyDelta struct {
+	Data          map[string]flow.RegisterValue
+	ReadMappings  map[string]Mapping // kept for Ledger migration only
+	WriteMappings map[string]Mapping // kept for Ledger migration only
+}
+
+type LegacySnapshot struct {
+	Delta       LegacyDelta
+	Reads       []flow.LegacyRegisterID
+	SpockSecret []byte
+}
+
+// End of removal
+
 // A Delta is a record of ledger mutations.
 type Delta struct {
 	Data map[string]flow.RegisterEntry

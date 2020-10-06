@@ -5,7 +5,8 @@ import (
 )
 
 //LegacyRegisterID is a legacy key format (raw bytes) which is needed in the codebase
-//for the migration purposes, and will be removed afterwards
+//for the migration purposes and will be removed afterwards
+// TODO Remove after migration
 type LegacyRegisterID = []byte
 
 type RegisterID struct {
@@ -18,7 +19,7 @@ func (r *RegisterID) String() string {
 	return fmt.Sprintf("%x/%x/%x", r.Owner, r.Controller, r.Key)
 }
 
-func NewRegisterKey(owner, controller, key string) RegisterID {
+func NewRegisterID(owner, controller, key string) RegisterID {
 	return RegisterID{
 		Owner:      owner,
 		Controller: controller,
