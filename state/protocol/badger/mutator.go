@@ -121,7 +121,6 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 
 		// 3) insert the root block seal into the database and index it
-		fmt.Println("seal.ID:", seal.BlockID)
 		err = operation.InsertSeal(seal.ID(), seal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root seal: %w", err)
