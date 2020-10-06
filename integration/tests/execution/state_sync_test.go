@@ -60,14 +60,18 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	// require that state between blockB and blockC has not changed
 	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe1BlockC.ExecutionResult.FinalStateCommit)
 
+	// wait for block C has been sealed
+	sealed := s.BlockState.WaitForSealed(s.T(), blockC.Header.Height)
+	s.T().Logf("block C has been sealed: %v", sealed.Header.ID())
+
 	// send a ExecutionStateSyncRequest from Ghost node
 	err = s.Ghost().Send(context.Background(), engine.SyncExecution,
-		&messages.ExecutionStateSyncRequest{CurrentBlockID: blockA.Header.ID(), TargetBlockID: blockB.Header.ID()},
+		&messages.ExecutionStateSyncRequest{FromHeight: blockA.Header.Height, ToHeight: blockC.Header.Height},
 		[]flow.Identifier{s.exe1ID}...)
 	require.NoError(s.T(), err)
 
 	// wait for ExecutionStateDelta
-	msg2 := s.MsgState.WaitForMsgFrom(s.T(), common.MsgIsExecutionStateDeltaWithChanges, s.exe1ID)
+	msg2 := s.MsgState.WaitForMsgFrom(s.T(), common.MsgIsExecutionStateDeltaWithChanges, s.exe1ID, "state delta from execution node")
 	executionStateDelta := msg2.(*messages.ExecutionStateDelta)
 	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, executionStateDelta.EndState)
 }

@@ -124,6 +124,34 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier) flow.Block {
+	block := BlockWithParentFixture(parent)
+
+	block.Header.ProposerID = proposer
+	block.Header.ParentVoterIDs = []flow.Identifier{proposer}
+
+	return block
+}
+
+func BlockWithParentAndSeal(
+	parent *flow.Header, sealed *flow.Header) *flow.Block {
+	block := BlockWithParentFixture(parent)
+	payload := flow.Payload{
+		Guarantees: nil,
+	}
+
+	if sealed != nil {
+		payload.Seals = []*flow.Seal{
+			SealFixture(
+				SealWithBlockID(sealed.ID()),
+			),
+		}
+	}
+
+	block.SetPayload(payload)
+	return &block
+}
+
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
 	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)
@@ -168,7 +196,7 @@ func BlockHeaderFixtureOnChain(chainID flow.ChainID) flow.Header {
 
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	height := parent.Height + 1
-	view := parent.View + uint64(rand.Intn(10))
+	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	return flow.Header{
 		ChainID:        parent.ChainID,
 		ParentID:       parent.ID(),
