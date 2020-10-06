@@ -12,10 +12,11 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/tests/common"
+	ledgerCommon "github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/ptrie"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
@@ -71,18 +72,19 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataResponse
-	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID)
+	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID, "chunk data response from execution node")
 	pack2 := msg2.(*messages.ChunkDataResponse)
 	require.Equal(gs.T(), chunkID, pack2.ChunkDataPack.ChunkID)
 	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].StartState, pack2.ChunkDataPack.StartState)
 
 	// verify state proofs
-	v := ledger.NewTrieVerifier(ledger.RegisterKeySize)
-	isValid, err := v.VerifyRegistersProof(pack2.ChunkDataPack.Registers(), pack2.ChunkDataPack.Values(), pack2.ChunkDataPack.Proofs(),
-		erExe1BlockB.ExecutionResult.Chunks[0].StartState)
+	batchProof, err := encoding.DecodeTrieBatchProof(pack2.ChunkDataPack.Proof)
+	require.NoError(gs.T(), err)
+
+	isValid := ledgerCommon.VerifyTrieBatchProof(batchProof, erExe1BlockB.ExecutionResult.Chunks[0].StartState)
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 
-	_, err = ptrie.NewPSMT(pack2.ChunkDataPack.StartState, ledger.RegisterKeySize, pack2.ChunkDataPack.Registers(), pack2.ChunkDataPack.Values(), pack2.ChunkDataPack.Proofs())
+	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, pack2.ChunkDataPack.StartState)
 	require.NoError(gs.T(), err, "error building PSMT")
 }

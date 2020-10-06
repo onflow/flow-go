@@ -53,7 +53,7 @@ func (ms *MsgState) LenFrom(node flow.Identifier) int {
 }
 
 // WaitForMsgFrom waits for a msg satisfying the predicate from the given node and returns it
-func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier) interface{} {
+func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier, msg string) interface{} {
 	var m interface{}
 	i := 0
 	require.Eventually(t, func() bool {
@@ -69,7 +69,7 @@ func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{})
 
 		return false
 	}, msgStateTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive msg satisfying predicate from %x within %v seconds", node,
+		fmt.Sprintf("did not receive msg %s from %x within %v seconds", msg, node,
 			msgStateTimeout))
 	return m
 }

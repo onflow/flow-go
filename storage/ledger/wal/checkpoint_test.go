@@ -74,7 +74,7 @@ func Test_WAL(t *testing.T) {
 		for i := 0; i < size; i++ {
 
 			keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-			values := utils.GetRandomValues(len(keys), 10, valueMaxByteSize)
+			values := utils.GetRandomLegacyValues(len(keys), 10, valueMaxByteSize)
 
 			stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
 			require.NoError(t, err)
@@ -143,7 +143,7 @@ func Test_Checkpointing(t *testing.T) {
 				for i := 0; i < size; i++ {
 
 					keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-					values := utils.GetRandomValues(len(keys), valueMaxByteSize, valueMaxByteSize)
+					values := utils.GetRandomLegacyValues(len(keys), valueMaxByteSize, valueMaxByteSize)
 
 					err = wal.RecordUpdate(stateCommitment, keys, values)
 					require.NoError(t, err)
@@ -357,7 +357,7 @@ func Test_Checkpointing(t *testing.T) {
 			})
 
 			keys2 := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-			values2 := utils.GetRandomValues(len(keys2), valueMaxByteSize, valueMaxByteSize)
+			values2 := utils.GetRandomLegacyValues(len(keys2), valueMaxByteSize, valueMaxByteSize)
 
 			t.Run("create segment after checkpoint", func(t *testing.T) {
 

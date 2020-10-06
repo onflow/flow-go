@@ -6,6 +6,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
@@ -32,6 +33,8 @@ type Ledger struct {
 	wal     *wal.LedgerWAL
 	metrics module.LedgerMetrics
 	logger  zerolog.Logger
+	// disk size reading can be time consuming, so limit how often its read
+	diskUpdateLimiter *time.Ticker
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
@@ -56,10 +59,11 @@ func NewLedger(dbDir string,
 	logger := log.With().Str("ledger", "complete").Logger()
 
 	storage := &Ledger{
-		forest:  forest,
-		wal:     w,
-		metrics: metrics,
-		logger:  logger,
+		forest:            forest,
+		wal:               w,
+		metrics:           metrics,
+		logger:            logger,
+		diskUpdateLimiter: time.NewTicker(5 * time.Second),
 	}
 
 	err = w.ReplayOnForest(forest)
@@ -90,8 +94,8 @@ func (l *Ledger) Done() <-chan struct{} {
 	return done
 }
 
-// InitState returns the state of an empty ledger
-func (l *Ledger) InitState() ledger.State {
+// InitialState returns the state of an empty ledger
+func (l *Ledger) InitialState() ledger.State {
 	return ledger.State(l.forest.GetEmptyRootHash())
 }
 
@@ -165,6 +169,17 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
+	select {
+	case <-l.diskUpdateLimiter.C:
+		diskSize, err := l.forest.DiskSize()
+		if err != nil {
+			log.Warn().Err(err).Msg("error while checking forest disk size")
+		} else {
+			l.metrics.DiskSize(diskSize)
+		}
+	default: //don't block
+	}
+
 	l.logger.Info().Hex("from", update.State()).
 		Hex("to", newRootHash[:]).
 		Int("update_size", update.Size()).
@@ -207,7 +222,7 @@ func (l *Ledger) MemSize() (int64, error) {
 }
 
 // DiskSize returns the amount of disk space used by the storage (in bytes)
-func (l *Ledger) DiskSize() (int64, error) {
+func (l *Ledger) DiskSize() (uint64, error) {
 	return l.forest.DiskSize()
 }
 

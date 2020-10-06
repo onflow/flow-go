@@ -259,6 +259,7 @@ func main() {
 				node.Storage.Index,
 				guarantees,
 				seals,
+				node.Tracer,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
