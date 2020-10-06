@@ -306,9 +306,6 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
 	}
 
-	// track the number of bytes that will be written to the wire for metrics
-	byteCount := bufw.Buffered()
-
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
@@ -319,7 +316,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	go helpers.FullClose(stream)
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	m.metrics.NetworkMessageSent(byteCount, metrics.ChannelOneToOne, msg.Type)
+	m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
 
 	return nil
 }
