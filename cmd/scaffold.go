@@ -387,6 +387,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	distributor := events.NewDistributor()
 	state, err := protocol.NewState(
 		fnb.Metrics.Compliance,
+		fnb.Tracer,
 		fnb.DB,
 		fnb.Storage.Headers,
 		fnb.Storage.Seals,
