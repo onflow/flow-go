@@ -147,6 +147,7 @@ int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len)
 //
 // Each message is mapped to a set of public keys, so that the verification equation is 
 // optimized to compute one pairing per message. 
+// - sig is the signature.
 // - nb_hashes is the number of the messages (hashes) in the map
 // - hashes is pointer to all flattened hashes in order where the hash at index i has a byte length len_hashes[i],
 //   is mapped to pks_per_hash[i] public keys. 
@@ -162,7 +163,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     ep_t* elemsG1 = (ep_t*)malloc((nb_hashes + 1) * sizeof(ep_t));
     ep2_t* elemsG2 = (ep2_t*)malloc((nb_hashes + 1) * sizeof(ep2_t));
 
-    // elemsG1[0] = s
+    // elemsG1[0] = sig
     ep_new(elemsG1[0]);
     if (ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN) != RLC_OK) 
         return INVALID;
