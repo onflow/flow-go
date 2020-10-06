@@ -14,26 +14,20 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 )
 
-const refreshTopic = "refresh"
-
 // Discovery implements the discovery.Discovery interface to provide libp2p a way to discover other nodes
 type Discovery struct {
-	ctx          context.Context
-	log          zerolog.Logger
-	overlay      middleware.Overlay
-	me           flow.Identifier
-	currentPeers flow.IdentityList
-	libp2pNode   *P2PNode
+	ctx     context.Context
+	log     zerolog.Logger
+	overlay middleware.Overlay
+	me      flow.Identifier
 }
 
-func NewDiscovery(ctx context.Context, log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier, libp2pNode *P2PNode) *Discovery {
+func NewDiscovery(ctx context.Context, log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier) *Discovery {
 	d := &Discovery{
-		ctx:          ctx,
-		overlay:      overlay,
-		log:          log,
-		me:           me,
-		libp2pNode:   libp2pNode,
-		currentPeers: make(flow.IdentityList, 0),
+		ctx:     ctx,
+		overlay: overlay,
+		log:     log,
+		me:      me,
 	}
 	return d
 }
@@ -92,49 +86,5 @@ func (d *Discovery) FindPeers(ctx context.Context, topic string, _ ...discovery.
 	// close the channel as nothing else is going to be written to it
 	close(ch)
 
-	// before returning, kick off a routine to disconnect peers no longer part of the node's identity list
-	extraPeers := d.currentPeers.Filter(filter.Not(filter.In(ids)))
-	cnt := extraPeers.Count()
-	if cnt > 0 {
-		d.log.Debug().Uint("extra_peer_count", cnt).Msg("disconnecting from extra peers")
-		go d.disconnect(extraPeers)
-	}
-
-	// remember the new peers for next run
-	d.currentPeers = ids
-
 	return ch, nil
-}
-
-// disconnect disconnects the node from the extra peers
-func (d *Discovery) disconnect(ids flow.IdentityList) {
-
-	// unsubscribe from dummy topic used to initiate discovery
-	defer func() {
-		err := d.libp2pNode.UnSubscribe(refreshTopic)
-		if err != nil {
-			d.log.Err(err).Msg("failed to unsubscribe from discovery trigger topic")
-		}
-	}()
-
-	for _, id := range ids {
-
-		// check if the middleware context is still valid
-		if d.ctx.Err() != nil {
-			return
-		}
-
-		d.log.Debug().Str("peer", id.String()).Msg("disconnecting")
-
-		nodeAddress, err := nodeAddressFromIdentity(*id)
-		if err != nil {
-			d.log.Err(err).Str("peer", id.String()).Msg("failed to disconnect")
-			continue
-		}
-
-		err = d.libp2pNode.RemovePeer(d.ctx, nodeAddress)
-		if err != nil {
-			d.log.Err(err).Str("peer", id.String()).Msg("failed to disconnect")
-		}
-	}
 }

@@ -155,7 +155,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// create a discovery object to help libp2p discover peers
-	m.discovery = NewDiscovery(m.ctx, m.log, m.ov, m.me, m.libP2PNode)
+	m.discovery = NewDiscovery(m.ctx, m.log, m.ov, m.me)
 
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
@@ -505,13 +505,6 @@ func (m *Middleware) UpdateAllowList() error {
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
 	}
-
-	// initiate peer discovery and pruning
-	err = m.triggerDiscovery()
-	if err != nil {
-		return fmt.Errorf("failed to initiate discovery: %w", err)
-	}
-
 	return nil
 }
 
@@ -522,10 +515,4 @@ func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
 		return false, err
 	}
 	return m.libP2PNode.IsConnected(nodeAddress)
-}
-
-// triggerDiscovery kicks the Discovery loop to start looking for peers and disconnect from extra peers
-// It subscribes to a dummy topic to initiate the pubsub.Discovery loop
-func (m *Middleware) triggerDiscovery() error {
-	return m.Subscribe(refreshTopic)
 }
