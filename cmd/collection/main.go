@@ -260,7 +260,7 @@ func main() {
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
 			}

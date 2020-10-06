@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -318,11 +319,12 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	require.Nil(suite.T(), err, "could not get node db")
 
 	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
 
 	headers := storage.NewHeaders(metrics, db)
 	payloads := storage.NewClusterPayloads(metrics, db)
 
-	state, err := clusterstateimpl.NewState(db, rootBlock.Header.ChainID, headers, payloads)
+	state, err := clusterstateimpl.NewState(db, tracer, rootBlock.Header.ChainID, headers, payloads)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state

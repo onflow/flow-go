@@ -71,7 +71,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataResponse
-	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID)
+	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID, "chunk data response from execution node")
 	pack2 := msg2.(*messages.ChunkDataResponse)
 	require.Equal(gs.T(), chunkID, pack2.ChunkDataPack.ChunkID)
 	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].StartState, pack2.ChunkDataPack.StartState)

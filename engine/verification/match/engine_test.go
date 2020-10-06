@@ -812,6 +812,7 @@ func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(index),
 			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
+			BlockID:         blockID,
 		},
 	}
 	return chunk

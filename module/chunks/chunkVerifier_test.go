@@ -172,6 +172,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		Header:  &header,
 		Payload: &payload,
 	}
+	blockID := block.ID()
 
 	// registerTouch and State setup
 	id1 := flow.NewRegisterID("00", "", "")
@@ -232,6 +233,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 			ChunkBody: flow.ChunkBody{
 				CollectionIndex: 0,
 				StartState:      startState,
+				BlockID:         blockID,
 			},
 			Index: 0,
 		}
@@ -245,7 +247,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		// ExecutionResult setup
 		result := flow.ExecutionResult{
 			ExecutionResultBody: flow.ExecutionResultBody{
-				BlockID: block.ID(),
+				BlockID: blockID,
 				Chunks:  flow.ChunkList{&chunk},
 			},
 		}
