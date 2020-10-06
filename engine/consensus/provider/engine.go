@@ -150,14 +150,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return engine.NewInvalidInputErrorf("non-local block (nodeID: %x)", originID)
 	}
 
-	// get all non-consensus nodes in the system
-	identities, err := e.state.Final().Identities(filter.Not(filter.HasRole(flow.RoleConsensus)))
+	// determine the nodes we should send the block to
+	recipients, err := e.recipientList()
 	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
+		return fmt.Errorf("could not get recipients: %w", err)
 	}
 
-	// submit the blocks to the targets
-	err = e.con.Publish(proposal, identities.NodeIDs()...)
+	// submit the block to the targets
+	err = e.con.Publish(proposal, recipients.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not broadcast block: %w", err)
 	}
@@ -167,4 +167,40 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 
 	return nil
+}
+
+// recipientList returns a list of nodes which we should include when publishing
+// blocks. We include:
+// * all staked non-consensus nodes in the current epoch
+// * all non-consensus nodes registered for the next epoch, if known
+func (e *Engine) recipientList() (flow.IdentityList, error) {
+
+	final := e.state.Final()
+
+	// we always include non-consensus nodes from the current epoch
+	currentEpochRecipients, err := final.Identities(filter.Not(filter.HasRole(flow.RoleConsensus)))
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch recipients: %w", err)
+	}
+
+	phase, err := final.Phase()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch phase: %w", err)
+	}
+
+	// we don't know the nodes for the next epoch yet
+	if phase == flow.EpochPhaseStaking {
+		return currentEpochRecipients, nil
+	}
+
+	// once the next epoch has been set up, include those nodes
+	nextEpochIdentities, err := final.Epochs().Next().InitialIdentities()
+	if err != nil {
+		return nil, fmt.Errorf("could not get next epoch recipients: %w", err)
+	}
+
+	// filter to only include non-consensus nodes
+	nextEpochRecipients := nextEpochIdentities.Filter(filter.Not(filter.HasRole(flow.RoleConsensus)))
+
+	return currentEpochRecipients.Union(nextEpochRecipients), nil
 }
