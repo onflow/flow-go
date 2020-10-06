@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -29,12 +30,12 @@ func NewBootstrapper(logger zerolog.Logger) *Bootstrapper {
 
 // BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
 func (b *Bootstrapper) BootstrapLedger(
-	ledger storage.Ledger,
+	ledger ledger.Ledger,
 	servicePublicKey flow.AccountPublicKey,
 	initialTokenSupply cadence.UFix64,
 	chain flow.Chain,
 ) (flow.StateCommitment, error) {
-	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
+	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.InitialState()))
 
 	vm := fvm.New(runtime.NewInterpreterRuntime())
 
@@ -45,7 +46,7 @@ func (b *Bootstrapper) BootstrapLedger(
 		return nil, err
 	}
 
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
+	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.InitialState())
 	if err != nil {
 		return nil, err
 	}

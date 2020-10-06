@@ -1,8 +1,6 @@
 package extract
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -17,6 +15,7 @@ var (
 	flagOutputDir         string
 	flagBlockHash         string
 	flagDatadir           string
+	flagMappingsFile      string
 )
 
 var Cmd = &cobra.Command{
@@ -41,6 +40,10 @@ func init() {
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")
 	_ = Cmd.MarkFlagRequired("datadir")
+
+	Cmd.Flags().StringVar(&flagMappingsFile, "mappings-file", "",
+		"file containing mappings from previous Sporks")
+	_ = Cmd.MarkFlagRequired("mappings-file")
 }
 
 func run(*cobra.Command, []string) {
@@ -61,9 +64,21 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("cannot get state commitment for block")
 	}
 
-	fmt.Printf("%x\n", stateCommitment)
+	mappings, err := getMappingsFromDatabase(db)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot get mapping for a database")
+	}
 
-	err = extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
+	mappingFromFile, err := readMegamappings(flagMappingsFile)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot load mappings from a file")
+	}
+
+	for k, v := range mappingFromFile {
+		mappings[k] = v
+	}
+
+	err = extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, mappings)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate checkpoint with state commitment")
 	}

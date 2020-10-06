@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -49,7 +50,6 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/ledger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -274,7 +274,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	dbDir := unittest.TempDir(t)
 
 	metricsCollector := &metrics.NoopCollector{}
-	ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+	ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), nil)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()

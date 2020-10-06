@@ -29,6 +29,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
+	ledger "github.com/onflow/flow-go/ledger/complete"
+	wal "github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,14 +42,12 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 func main() {
 
 	var (
-		ledgerStorage         *ledger.MTrieStorage
+		ledgerStorage         *ledger.Ledger
 		events                *storage.Events
 		txResults             *storage.TransactionResults
 		results               *storage.ExecutionResults
@@ -171,7 +171,7 @@ func main() {
 				}
 			}
 
-			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
+			ledgerStorage, err = ledger.NewLedger(triedir, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), node.MetricsRegisterer)
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

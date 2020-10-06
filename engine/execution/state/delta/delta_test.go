@@ -1,14 +1,12 @@
 package delta_test
 
 import (
-	"bytes"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -139,77 +137,38 @@ func TestDelta_MergeWith(t *testing.T) {
 		b, exists := d1.Get(registerID1, "", "")
 		assert.Nil(t, b)
 		assert.True(t, exists)
-		assert.True(t, d1.HasBeenDeleted(registerID1, "", ""))
 	})
-}
-
-type key struct {
-	key    string
-	hashed flow.RegisterID
-	value  flow.RegisterValue
-}
-
-type keys []key
-
-func (s keys) Less(i, j int) bool {
-	return bytes.Compare(s[i].hashed, s[j].hashed) < 0
-}
-
-func (s keys) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s keys) Len() int {
-	return len(s)
-}
-
-func (s keys) Hashed() (r []flow.RegisterID) {
-	for _, k := range s {
-		r = append(r, k.hashed)
-	}
-	return
-}
-
-func (s keys) Value() (r []flow.RegisterValue) {
-	for _, k := range s {
-		r = append(r, k.value)
-	}
-	return
 }
 
 func TestDelta_RegisterUpdatesAreSorted(t *testing.T) {
 
 	d := delta.NewDelta()
 
-	data := make(keys, 5)
+	data := make(flow.RegisterEntries, 5)
 
-	data[0].key = string([]byte{0, 0, 11})
-	data[1].key = string([]byte{1})
-	data[2].key = string([]byte{2})
-	data[3].key = string([]byte{3})
-	data[4].key = string([]byte{11, 0, 0})
+	data[0].Key = flow.NewRegisterID("a", "a", "1")
+	data[1].Key = flow.NewRegisterID("a", "b", "1")
+	data[2].Key = flow.NewRegisterID("b", "a", "1")
+	data[3].Key = flow.NewRegisterID("b", "b", "1")
+	data[4].Key = flow.NewRegisterID("b", "b", "2")
 
-	data[0].value = flow.RegisterValue("a")
-	data[1].value = flow.RegisterValue("b")
-	data[2].value = flow.RegisterValue("c")
-	data[3].value = flow.RegisterValue("d")
-	data[4].value = flow.RegisterValue("e")
-
-	for i, k := range data {
-		data[i].hashed = state.RegisterID(k.key, "", "")
-	}
+	data[0].Value = flow.RegisterValue("a")
+	data[1].Value = flow.RegisterValue("b")
+	data[2].Value = flow.RegisterValue("c")
+	data[3].Value = flow.RegisterValue("d")
+	data[4].Value = flow.RegisterValue("e")
 
 	sort.Sort(data)
 
 	// set in random order
-	d.Set(data[2].key, "", "", data[2].value)
-	d.Set(data[1].key, "", "", data[1].value)
-	d.Set(data[3].key, "", "", data[3].value)
-	d.Set(data[0].key, "", "", data[0].value)
-	d.Set(data[4].key, "", "", data[4].value)
+	d.Set(data[2].Key.Owner, data[2].Key.Controller, data[2].Key.Key, data[2].Value)
+	d.Set(data[1].Key.Owner, data[1].Key.Controller, data[1].Key.Key, data[1].Value)
+	d.Set(data[3].Key.Owner, data[3].Key.Controller, data[3].Key.Key, data[3].Value)
+	d.Set(data[0].Key.Owner, data[0].Key.Controller, data[0].Key.Key, data[0].Value)
+	d.Set(data[4].Key.Owner, data[4].Key.Controller, data[4].Key.Key, data[4].Value)
 
 	retKeys, retValues := d.RegisterUpdates()
 
-	assert.Equal(t, data.Hashed(), retKeys)
-	assert.Equal(t, data.Value(), retValues)
+	assert.Equal(t, data.IDs(), retKeys)
+	assert.Equal(t, data.Values(), retValues)
 }

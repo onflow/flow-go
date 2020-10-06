@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/finalizer/consensus"
@@ -133,7 +134,7 @@ type ExecutionNode struct {
 	BadgerDB        *badger.DB
 	VM              *fvm.VirtualMachine
 	ExecutionState  state.ExecutionState
-	Ledger          storage.Ledger
+	Ledger          ledger.Ledger
 	LevelDbDir      string
 	Collections     storage.Collections
 	Finalizer       *consensus.Finalizer
