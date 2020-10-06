@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -22,6 +23,7 @@ func ProtocolState(t testing.TB, db *badger.DB) *pbadger.State {
 
 type createState func(
 	metrics module.ComplianceMetrics,
+	tracer module.Tracer,
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -36,9 +38,10 @@ type createState func(
 
 func WithProtocolState(t testing.TB, db *badger.DB, create createState) *pbadger.State {
 	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
 	consumer := events.NewNoop()
 	headers, _, seals, index, payloads, blocks, setups, commits, statuses := util.StorageLayer(t, db)
-	proto, err := create(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
+	proto, err := create(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
 	require.NoError(t, err)
 	return proto
 }
@@ -61,6 +64,7 @@ func RunWithProtocolStateDeps(t testing.TB, create createState, f func(*badger.D
 func RunWithProtocolStateAndConsumer(t testing.TB, consumer protocol.Consumer, f func(*badger.DB, *pbadger.State)) {
 	RunWithProtocolStateDeps(t, func(
 		metrics module.ComplianceMetrics,
+		tracer module.Tracer,
 		db *badger.DB,
 		headers storage.Headers,
 		seals storage.Seals,
@@ -72,7 +76,7 @@ func RunWithProtocolStateAndConsumer(t testing.TB, consumer protocol.Consumer, f
 		statuses storage.EpochStatuses,
 		c protocol.Consumer,
 	) (*pbadger.State, error) {
-		proto, err := pbadger.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
+		proto, err := pbadger.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
 		require.NoError(t, err)
 		return proto, nil
 	}, f)

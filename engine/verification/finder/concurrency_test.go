@@ -120,7 +120,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	processInterval := 1 * time.Second
 	failureThreshold := uint(2)
 	matchEng, matchEngWG := SetupMockMatchEng(t, exeID, results)
-	assigner := utils.NewMockAssigner(verID.NodeID, IsAssigned)
+
+	assignment := utils.NewMockAssigner(verID.NodeID, IsAssigned)
 
 	// creates a verification node with a real finder engine, and mock matching engine.
 	// no metrics is meant to be collected, hence both verification and mempool collectors are noop
@@ -129,7 +130,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 		hub,
 		verID,
 		identities,
-		assigner,
+		assignment,
 		requestInterval,
 		processInterval,
 		uint(erCount),

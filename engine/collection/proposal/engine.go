@@ -96,8 +96,13 @@ func New(
 		sync:           nil, // must use WithSync
 	}
 
+	chainID, err := clusterState.Params().ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain ID: %w", err)
+	}
+
 	// register network conduit
-	conduit, err := net.Register(engine.ConsensusCluster, e)
+	conduit, err := net.Register(engine.ChannelConsensusCluster(chainID), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -134,7 +139,12 @@ func (e *Engine) Ready() <-chan struct{} {
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		err := e.conduit.Close()
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not close conduit")
+		}
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -519,7 +529,7 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 		Msg("processing pending children")
 
 	// then try to process children only this once
-	var result *multierror.Error
+	result := new(multierror.Error)
 	for _, child := range children {
 		proposal := &messages.ClusterBlockProposal{
 			Header:  child.Header,
@@ -534,6 +544,8 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	// remove children from cache
 	e.pending.DropForParent(blockID)
 
+	// flatten out the error tree before returning the error
+	result = multierror.Flatten(result).(*multierror.Error)
 	return result.ErrorOrNil()
 }
 

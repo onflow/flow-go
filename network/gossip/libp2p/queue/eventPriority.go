@@ -82,7 +82,7 @@ func getPriorityByType(message interface{}) Priority {
 	case *messages.ExecutionStateSyncRequest:
 		return MediumPriority
 	case *messages.ExecutionStateDelta:
-		return MediumPriority
+		return HighPriority
 
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
