@@ -292,7 +292,15 @@ func (m *Mutator) headerExtend(candidate *flow.Block) error {
 			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
 		if ancestor.Height < finalizedHeight {
-			return state.NewOutdatedExtensionErrorf("candidate block conflicts with finalized state (ancestor: %d final: %d)",
+			// this happens when the candidate block is on a fork that does not include all the
+			// finalized blocks.
+			// for instance:
+			// A (Finalized) <- B (Finalized) <- C (Finalized) <- D <- E <- F
+			//                  ^- G             ^- H             ^- I
+			// block G is not a valid block, because it does not include C which has been finalized.
+			// block H and I are a valid, because its their includes C.
+			return state.NewOutdatedExtensionErrorf(
+				"candidate block conflicts with finalized state (ancestor: %d final: %d)",
 				ancestor.Height, finalizedHeight)
 		}
 		ancestorID = ancestor.ParentID
@@ -903,7 +911,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 	return ops, nil
 }
 
-// MakeValid marks the block as valid in protocol state, and triggers
+// MarkValid marks the block as valid in protocol state, and triggers
 // `BlockProcessable` event to notify that its parent block is processable.
 // why the parent block is processable, not the block itself?
 // because a block having a child block means it has been verified
@@ -917,6 +925,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 // processing the parent block.
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
+// NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
 func (m *Mutator) MarkValid(blockID flow.Identifier) error {
 	header, err := m.state.headers.ByBlockID(blockID)
 	if err != nil {
