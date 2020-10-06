@@ -30,7 +30,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.10.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20201002123512-35d751ebea1d
-	github.com/onflow/flow-go-sdk v0.10.1-0.20201005211051-66bf3964f3c1
+	github.com/onflow/flow-go-sdk v0.11.1-0.20201006150308-77c54c865cd5
 	github.com/onflow/flow-go/crypto v0.9.4
 	github.com/onflow/flow/protobuf/go/flow v0.1.8-0.20201002204652-a7175c92529c
 	github.com/opentracing/opentracing-go v1.2.0
