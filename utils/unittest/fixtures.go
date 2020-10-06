@@ -381,7 +381,7 @@ func ExecutionReceiptFixture() *flow.ExecutionReceipt {
 	return &flow.ExecutionReceipt{
 		ExecutorID:        IdentifierFixture(),
 		ExecutionResult:   *ExecutionResultFixture(),
-		Spocks:            nil,
+		Spocks:            SignaturesFixture(2),
 		ExecutorSignature: SignatureFixture(),
 	}
 }

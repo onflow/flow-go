@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -94,7 +95,8 @@ type MatchingSuite struct {
 
 	assigner *module.ChunkAssigner
 
-	matching *Engine
+	matching               *Engine
+	unmatchedSpockReceipts map[flow.Identifier][]*flow.ExecutionReceipt
 }
 
 func (ms *MatchingSuite) SetupTest() {
@@ -107,6 +109,10 @@ func (ms *MatchingSuite) SetupTest() {
 	exe := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	ver := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
+	unittest.WithRandomPublicKeys()(con)
+	unittest.WithRandomPublicKeys()(exe)
+	unittest.WithRandomPublicKeys()(ver)
+
 	ms.conID = con.NodeID
 	ms.exeID = exe.NodeID
 	ms.verID = ver.NodeID
@@ -117,6 +123,10 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.identities[ms.verID] = ver
 
 	ms.approvers = unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleVerification))
+	for _, approver := range ms.approvers {
+		unittest.WithRandomPublicKeys()(approver)
+		ms.identities[approver.NodeID] = approver
+	}
 
 	ms.state = &protocol.State{}
 	ms.state.On("Sealed").Return(
@@ -290,6 +300,8 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.requester = new(module.Requester)
 	ms.assigner = &module.ChunkAssigner{}
 
+	ms.unmatchedSpockReceipts = make(map[flow.Identifier][]*flow.ExecutionReceipt)
+
 	ms.matching = &Engine{
 		unit:                    unit,
 		log:                     log,
@@ -308,6 +320,7 @@ func (ms *MatchingSuite) SetupTest() {
 		maxUnsealedResults:      200,
 		assigner:                ms.assigner,
 		requireApprovals:        true,
+		unmatchedSpockReceipts:  ms.unmatchedSpockReceipts,
 	}
 }
 
@@ -746,7 +759,22 @@ func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 	result.PreviousResultID = previous.ID()
 	ms.sealedResults[previous.ID()] = previous
 
-	ms.pendingResults[result.ID()] = result
+	resultID := result.ID()
+	ms.pendingResults[resultID] = result
+
+	// create receipt with spocks
+	receipt := unittest.ExecutionReceiptFixture()
+	receipt.ExecutorID = ms.exeID
+	receipt.ExecutionResult = *result
+	receipt.Spocks = make([]crypto.Signature, len(result.Chunks))
+	for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
+		receipt.Spocks[index] = unittest.SignatureFixture()
+	}
+
+	// add to unmatched spock receipts map
+	receipts := make([]*flow.ExecutionReceipt, 0)
+	receipts = append(receipts, receipt)
+	ms.unmatchedSpockReceipts[resultID] = receipts
 
 	// assign each chunk to each approver
 	assignment := chunks.NewAssignment()
@@ -766,10 +794,12 @@ func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
 			approval := unittest.ResultApprovalFixture()
 			approval.Body.BlockID = block.Header.ID()
-			approval.Body.ExecutionResultID = result.ID()
+			approval.Body.ExecutionResultID = resultID
 			approval.Body.ApproverID = approver.NodeID
 			approval.Body.ChunkIndex = index
+			approval.Body.Spock = receipt.Spocks[index]
 			_, err := ms.matching.approvals.Add(approval)
+
 			ms.Require().NoError(err)
 		}
 	}

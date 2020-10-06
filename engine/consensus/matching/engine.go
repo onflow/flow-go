@@ -295,7 +295,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 			for index, spock := range u.Spocks {
 				// check if spocks match
-				verified, err := crypto.SPOCKVerify(identity.NetworkPubKey, receipt.Spocks[index], mIdentity.NetworkPubKey, spock)
+				verified, err := crypto.SPOCKVerify(identity.StakingPubKey, receipt.Spocks[index], mIdentity.StakingPubKey, spock)
 				if err != nil {
 					return fmt.Errorf("could not verify spocks: %w", err)
 				}
@@ -310,6 +310,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 			break
 		}
 
+		// if not matched add to receipt array
 		if !matchedReceipt {
 			e.unmatchedSpockReceipts[result.ID()] = append(e.unmatchedSpockReceipts[result.ID()], receipt)
 		}
@@ -650,7 +651,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 		}
 
 		// check if spocks match
-		valid, err := e.validateSpock(approval, chunk.Index)
+		valid, err := e.validateSpock(approval)
 		if err != nil {
 			return false, fmt.Errorf("could get validate spocks: %w", err)
 		}
@@ -678,24 +679,33 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 
 // validateSpockschecks if the spock from an approval matches the corresponding one in the receipts
 // TODO: needs testing
-func (e *Engine) validateSpock(approval *flow.ResultApproval, chunkIndex uint64) (bool, error) {
+func (e *Engine) validateSpock(approval *flow.ResultApproval) (bool, error) {
+
 	// find identities
 	approver, err := e.state.AtBlockID(approval.Body.BlockID).Identity(approval.Body.ApproverID)
 	if err != nil {
 		return false, fmt.Errorf("could not find approver identity")
 	}
 
-	// TODO: this needs to be reworked to check against all receipts
+	// TODO: this needs to be reworked to check against all receipts in unmatchedSpockReceipts
 	spockMatched := false
-	spockSet := e.unmatchedSpockReceipts[approval.Body.ExecutionResultID]
-	for _, receipt := range spockSet {
+	receipts := e.unmatchedSpockReceipts[approval.Body.ExecutionResultID]
+	for _, receipt := range receipts {
 		executor, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(receipt.ExecutorID)
 		if err != nil {
 			return false, fmt.Errorf("could not find executor identity")
 		}
 
+		id := receipt.ExecutionResult.ID()
+		e.log.Debug().
+			Str("approval_id", approver.NetworkPubKey.String()).
+			Str("executor_id", executor.NetworkPubKey.String()).
+			Hex("spock_approval", approval.Body.Spock).
+			Hex("spock_receipt", receipt.Spocks[approval.Body.ChunkIndex]).
+			Hex("result_id", id[:]).Msg("found receipt")
+
 		// verify spock
-		verified, err := crypto.SPOCKVerify(approver.NetworkPubKey, approval.Body.Spock, executor.NetworkPubKey, receipt.Spocks[chunkIndex])
+		verified, err := crypto.SPOCKVerify(approver.StakingPubKey, approval.Body.Spock, executor.StakingPubKey, receipt.Spocks[approval.Body.ChunkIndex])
 		if err != nil {
 			return false, fmt.Errorf("could not verify spocks: %w", err)
 		}
