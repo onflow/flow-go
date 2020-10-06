@@ -329,7 +329,6 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 				entity := create()
 				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
-					fmt.Printf("%x\n", val)
 					return fmt.Errorf("could not decode entity: %w", err)
 				}
 

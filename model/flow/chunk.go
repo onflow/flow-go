@@ -30,13 +30,6 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
-//// RegisterTouch captures the register value before an update or read
-//type RegisterTouch struct {
-//	RegisterID RegisterID
-//	Value      RegisterValue
-//	Proof      StorageProof
-//}
-
 // ChunkDataPack holds all register touches (any read, or write)
 // note that we have to capture a read proof for each write before updating the registers
 type ChunkDataPack struct {
@@ -45,45 +38,6 @@ type ChunkDataPack struct {
 	Proof        StorageProof
 	CollectionID Identifier
 }
-
-// GetRegisterEntires returns a map of register entries
-//func (cdp *ChunkDataPack) GetRegisterEntires() map[string]RegisterEntry {
-//	ret := make(map[string]RegisterEntry)
-//	//for _, rt := range cdp.RegisterTouches {
-//	//	ret[rt.RegisterID.String()] = RegisterEntry{
-//	//		Key:   rt.RegisterID,
-//	//		Value: rt.Value,
-//	//	}
-//	//}
-//	return ret
-//}
-
-//// Registers returns a list of register Ids (ordered)
-//func (cdp *ChunkDataPack) Registers() []RegisterID {
-//	registers := make([]RegisterID, 0, len(cdp.RegisterTouches))
-//	for _, rt := range cdp.RegisterTouches {
-//		registers = append(registers, rt.RegisterID)
-//	}
-//	return registers
-//}
-
-// Values returns a list of values (ordered)
-//func (cdp *ChunkDataPack) Values() []RegisterValue {
-//	values := make([]RegisterValue, 0, len(cdp.RegisterTouches))
-//	for _, rt := range cdp.RegisterTouches {
-//		values = append(values, rt.Value)
-//	}
-//	return values
-//}
-//
-//// Proofs returns a list of proofs (ordered)
-//func (cdp *ChunkDataPack) Proofs() []StorageProof {
-//	proofs := make([]StorageProof, 0, len(cdp.RegisterTouches))
-//	for _, rt := range cdp.RegisterTouches {
-//		proofs = append(proofs, rt.Proof)
-//	}
-//	return proofs
-//}
 
 // ID returns the unique identifier for the concrete view, which is the ID of
 // the chunk the view is for.
