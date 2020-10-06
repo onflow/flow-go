@@ -471,6 +471,7 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 	collection, ok := entity.(*flow.Collection)
 	if !ok {
 		e.log.Error().Msgf("invalid entity type (%T)", entity)
+		return
 	}
 
 	// no need to validate the origin ID, since the collection requester has
@@ -506,6 +507,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// or it was ejected from the mempool when it was full.
 			// either way, we will return
 			if !exists {
+				e.log.Debug().Hex("collection_id", collID[:]).
+					Msg("could not find block for collection")
 				return nil
 			}
 
@@ -589,7 +592,7 @@ func (e *Engine) matchOrRequestCollections(
 	// When it's turned on, it will skip fetching collections, and will
 	// rely on the state syncing to catch up.
 	if e.syncFast {
-		isSyncing, _ := e.isSyncingState()
+		isSyncing := e.isSyncingState()
 		if isSyncing {
 			return nil
 		}
@@ -993,9 +996,9 @@ func (e *Engine) generateExecutionReceipt(
 	return receipt, nil
 }
 
-func (e *Engine) isSyncingState() (bool, uint64) {
+func (e *Engine) isSyncingState() bool {
 	syncHeight := e.syncingHeight.Load()
-	return syncHeight > 0, syncHeight
+	return syncHeight > 0
 }
 
 func (e *Engine) stopSyncing(syncingHeight uint64) bool {
@@ -1015,7 +1018,7 @@ func (e *Engine) startSyncing(syncHeight uint64) bool {
 // the consensus nodes have seen the result, and the statecommitment
 // has been approved by the consensus nodes.
 func (e *Engine) checkStateSyncStart(firstUnexecutedHeight uint64) {
-	isSyncing, _ := e.isSyncingState()
+	isSyncing := e.isSyncingState()
 	if isSyncing {
 		// state sync is already triggered, no need to check
 		return
@@ -1396,16 +1399,18 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 	}
 
 	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, delta.EndState) {
-		log.Fatal().
+		log.Error().
 			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit).
 			Hex("delta_end_state", delta.EndState).
 			Hex("delta_start_state", delta.StartState).
 			Err(err).Msg("processing sync message produced unexpected state commitment")
+		return
 	}
 
 	err = e.onBlockExecuted(&delta.ExecutableBlock, delta.EndState)
 	if err != nil {
 		log.Error().Err(err).Msg("onBlockExecuted failed")
+		return
 	}
 
 	log.Info().Msg("block has been executed successfully from applying state deltas")

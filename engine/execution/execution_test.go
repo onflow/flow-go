@@ -192,6 +192,76 @@ func TestExecutionFlow(t *testing.T) {
 	consensusEngine.AssertExpectations(t)
 }
 
+func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
+	*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
+	// make tx
+	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
+	require.NoError(t, err)
+
+	// make collection
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
+
+	// make block
+	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
+	block.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID:     col.ID(),
+				SignerIDs:        []flow.Identifier{colID.NodeID},
+				ReferenceBlockID: ref.ID(),
+			},
+		},
+	})
+
+	// make proposal
+	proposal := unittest.ProposalFromBlock(&block)
+
+	return tx, col, block, proposal, seq + 1
+}
+
+func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
+	*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
+	// make tx
+	tx := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
+	require.NoError(t, err)
+
+	// make collection
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
+
+	// make block
+	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
+	block.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}, ReferenceBlockID: ref.ID()},
+		},
+	})
+
+	proposal := unittest.ProposalFromBlock(&block)
+
+	return tx, col, block, proposal, seq + 1
+}
+
+func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
+	*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
+	tx := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
+	require.NoError(t, err)
+
+	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
+	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
+	block.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}, ReferenceBlockID: ref.ID()},
+		},
+	})
+
+	proposal := unittest.ProposalFromBlock(&block)
+
+	return tx, col, block, proposal, seq + 1
+}
+
 // Test the following behaviors:
 // (1) ENs sync statecommitment with each other
 // (2) a failed transaction will not change statecommitment
@@ -226,76 +296,6 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe1Node.Ready()
 	defer exe1Node.Done()
 
-	deployContractBlock := func(t *testing.T, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
-		*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
-		// make tx
-		tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
-		err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
-		require.NoError(t, err)
-
-		// make collection
-		col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
-
-		// make block
-		block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
-		block.SetPayload(flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID:     col.ID(),
-					SignerIDs:        []flow.Identifier{colID.NodeID},
-					ReferenceBlockID: ref.ID(),
-				},
-			},
-		})
-
-		// make proposal
-		proposal := unittest.ProposalFromBlock(&block)
-
-		return tx, col, block, proposal, seq + 1
-	}
-
-	makePanicBlock := func(t *testing.T, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
-		*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
-		// make tx
-		tx := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-		err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
-		require.NoError(t, err)
-
-		// make collection
-		col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
-
-		// make block
-		block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
-		block.SetPayload(flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}, ReferenceBlockID: ref.ID()},
-			},
-		})
-
-		proposal := unittest.ProposalFromBlock(&block)
-
-		return tx, col, block, proposal, seq + 1
-	}
-
-	makeSuccessBlock := func(t *testing.T, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
-		*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
-		tx := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
-		err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
-		require.NoError(t, err)
-
-		col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
-		block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
-		block.SetPayload(flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}, ReferenceBlockID: ref.ID()},
-			},
-		})
-
-		proposal := unittest.ProposalFromBlock(&block)
-
-		return tx, col, block, proposal, seq + 1
-	}
-
 	genesis, err := exe1Node.State.AtHeight(0).Head()
 	require.NoError(t, err)
 
@@ -305,13 +305,13 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// transaction that will change state and succeed, used to test that state commitment changes
 	// genesis <- block1 [tx1] <- block2 [tx2] <- block3 [tx3] <- child
-	_, col1, block1, proposal1, seq := deployContractBlock(t, chain, seq, genesis, genesis)
+	_, col1, block1, proposal1, seq := deployContractBlock(t, conID, colID, chain, seq, genesis, genesis)
 
-	_, col2, block2, proposal2, seq := makePanicBlock(t, chain, seq, block1.Header, genesis)
+	_, col2, block2, proposal2, seq := makePanicBlock(t, conID, colID, chain, seq, block1.Header, genesis)
 
-	_, col3, block3, proposal3, seq := makeSuccessBlock(t, chain, seq, block2.Header, genesis)
+	_, col3, block3, proposal3, seq := makeSuccessBlock(t, conID, colID, chain, seq, block2.Header, genesis)
 
-	_, _, _, proposal4, _ := makeSuccessBlock(t, chain, seq, block3.Header, genesis)
+	_, _, _, proposal4, _ := makeSuccessBlock(t, conID, colID, chain, seq, block3.Header, genesis)
 	// seq++
 
 	// setup mocks and assertions
