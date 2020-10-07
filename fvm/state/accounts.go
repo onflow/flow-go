@@ -378,9 +378,6 @@ func (a *Accounts) TouchContract(name string, address flow.Address) {
 		a.ledger.Touch(string(address.Bytes()),
 			string(address.Bytes()),
 			a.contractKey(name))
-		a.ledger.Touch(string(address.Bytes()),
-			string(address.Bytes()),
-			keyExists)
 	}
 }
 
@@ -419,11 +416,8 @@ func (a *Accounts) SetContract(name string, address flow.Address, code []byte) e
 	if err != nil {
 		return err
 	}
-	if !contracts.Has(name) {
-		contracts.add(name)
-		return a.setContracts(contracts, address)
-	}
-	return nil
+	contracts.add(name)
+	return a.setContracts(contracts, address)
 }
 
 func (a *Accounts) DeleteContract(name string, address flow.Address) error {
