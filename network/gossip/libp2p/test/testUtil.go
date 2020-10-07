@@ -115,7 +115,7 @@ func generateNetworks(log zerolog.Logger,
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
-		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
+		me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID())))
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
