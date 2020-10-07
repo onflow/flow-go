@@ -41,6 +41,14 @@ func (s *Suite) AccessClient() *testnet.Client {
 	return client
 }
 
+func (s *Suite) ExecutionClient() *testnet.Client {
+	execNode := s.net.ContainerByID(s.exe1ID)
+	chain := s.net.Root().Header.ChainID.Chain()
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", execNode.Ports[testnet.ExeNodeAPIPort]), chain)
+	require.NoError(s.T(), err, "could not get execution client")
+	return client
+}
+
 func (s *Suite) AccessPort() string {
 	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
 }

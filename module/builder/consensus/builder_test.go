@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -160,7 +161,8 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 func (bs *BuilderSuite) SetupTest() {
 
 	// set up no-op dependencies
-	noop := metrics.NewNoopCollector()
+	noopMetrics := metrics.NewNoopCollector()
+	noopTracer := trace.NewNoopTracer()
 
 	// set up test parameters
 	numFinalizedBlocks := 4
@@ -377,7 +379,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// initialize the builder
 	bs.build = NewBuilder(
-		noop,
+		noopMetrics,
 		bs.db,
 		bs.state,
 		bs.headerDB,
@@ -385,6 +387,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.indexDB,
 		bs.guarPool,
 		bs.sealPool,
+		noopTracer,
 	)
 
 	bs.build.cfg.expiry = 11

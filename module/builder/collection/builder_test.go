@@ -8,7 +8,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -17,7 +16,7 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/collection"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
 	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
@@ -41,7 +40,6 @@ type BuilderSuite struct {
 	headers  *storage.Headers
 	payloads *storage.ClusterPayloads
 	blocks   *storage.Blocks
-	tracer   *module.Tracer
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -70,12 +68,13 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
 	headers, _, _, _, _, blocks, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
 	suite.headers = headers
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
-	suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
+	suite.state, err = clusterkv.NewState(suite.db, tracer, suite.chainID, suite.headers, suite.payloads)
 	suite.Require().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
@@ -83,11 +82,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	suite.Bootstrap()
 
-	suite.tracer = new(module.Tracer)
-	suite.tracer.On("StartSpan", mock.Anything, mock.Anything).Return(nil)
-	suite.tracer.On("FinishSpan", mock.Anything, mock.Anything).Return()
-
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.headers, suite.payloads, suite.pool, suite.tracer)
+	suite.builder = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
 }
 
 // runs after each test finishes
@@ -355,7 +350,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	// use a mempool with 2000 transactions, one per block
 	suite.pool, err = stdmap.NewTransactions(2000)
 	require.Nil(t, err)
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.headers, suite.payloads, suite.pool, suite.tracer, builder.WithMaxCollectionSize(10000))
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
@@ -429,7 +424,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	// set the max collection size to 1
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.headers, suite.payloads, suite.pool, suite.tracer, builder.WithMaxCollectionSize(1))
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(1))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -467,7 +462,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	// reset the pool and builder
 	suite.pool, err = stdmap.NewTransactions(10)
 	suite.Require().Nil(err)
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.headers, suite.payloads, suite.pool, suite.tracer)
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	// insert a transaction referring genesis (now expired)
 	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -511,7 +506,7 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 	var err error
 	suite.pool, err = stdmap.NewTransactions(1000)
 	suite.Require().Nil(err)
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.headers, suite.payloads, suite.pool, suite.tracer)
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
 	suite.Require().Nil(err)
@@ -582,12 +577,13 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}()
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 		headers, _, _, _, _, blocks, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
 		suite.headers = headers
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
-		suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
+		suite.state, err = clusterkv.NewState(suite.db, tracer, suite.chainID, suite.headers, suite.payloads)
 		assert.Nil(b, err)
 		suite.mutator = suite.state.Mutate()
 
@@ -602,7 +598,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}
 
 		// create the builder
-		suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.headers, suite.payloads, suite.pool, suite.tracer)
+		suite.builder = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
 	}
 
 	// create a block history to test performance against

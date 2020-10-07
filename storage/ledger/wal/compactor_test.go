@@ -58,7 +58,7 @@ func Test_Compactor(t *testing.T) {
 			for i := 0; i < size; i++ {
 
 				keys0 := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-				values0 := utils.GetRandomValues(len(keys0), valueMaxByteSize, valueMaxByteSize)
+				values0 := utils.GetRandomLegacyValues(len(keys0), valueMaxByteSize, valueMaxByteSize)
 				var keys, values [][]byte
 				keys = append(keys, keys0...)
 				keys = append(keys, keys0...)
@@ -208,7 +208,8 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			for i := 0; i < size; i++ {
 
 				keys0 := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-				values0 := utils.GetRandomValues(len(keys0), valueMaxByteSize, valueMaxByteSize)
+				values0 := utils.GetRandomLegacyValues(len(keys0), valueMaxByteSize, valueMaxByteSize)
+
 				var keys, values [][]byte
 				keys = append(keys, keys0...)
 				keys = append(keys, keys0...)

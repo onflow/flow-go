@@ -84,9 +84,6 @@ func TestView_Set(t *testing.T) {
 		b, err := v.Get(registerID, "", "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
-
-		delta := v.Delta()
-		assert.False(t, delta.HasBeenDeleted(registerID, "", ""))
 	})
 
 	t.Run("SpockSecret", func(t *testing.T) {
@@ -167,9 +164,6 @@ func TestView_Delete(t *testing.T) {
 		b2, err := v.Get(registerID, "", "")
 		assert.NoError(t, err)
 		assert.Nil(t, b2)
-
-		delta := v.Delta()
-		assert.True(t, delta.HasBeenDeleted(registerID, "", ""))
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
@@ -192,9 +186,6 @@ func TestView_Delete(t *testing.T) {
 		b2, err := v.Get(registerID, "", "")
 		assert.NoError(t, err)
 		assert.Nil(t, b2)
-
-		delta := v.Delta()
-		assert.True(t, delta.HasBeenDeleted(registerID, "", ""))
 	})
 }
 
@@ -371,6 +362,74 @@ func TestView_RegisterTouches(t *testing.T) {
 
 		touches := v.Interactions().RegisterTouches()
 		assert.Len(t, touches, 2)
+	})
+}
+
+func TestView_AllRegisters(t *testing.T) {
+	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		regs := v.Interactions().AllRegisters()
+		assert.Empty(t, regs)
+	})
+
+	t.Run("Set and Get", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if owner == "a" {
+				return flow.RegisterValue("a_value"), nil
+			}
+
+			if owner == "b" {
+				return flow.RegisterValue("b_value"), nil
+			}
+			return nil, nil
+		})
+
+		_, err := v.Get("a", "", "")
+		assert.NoError(t, err)
+
+		_, err = v.Get("b", "", "")
+		assert.NoError(t, err)
+
+		v.Set("c", "", "", flow.RegisterValue("c_value"))
+		v.Set("d", "", "", flow.RegisterValue("d_value"))
+
+		v.Touch("e", "", "")
+		v.Touch("f", "", "")
+
+		allRegs := v.Interactions().AllRegisters()
+		assert.Len(t, allRegs, 6)
+	})
+	t.Run("With Merge", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if owner == "a" {
+				return flow.RegisterValue("a_value"), nil
+			}
+
+			if owner == "b" {
+				return flow.RegisterValue("b_value"), nil
+			}
+			return nil, nil
+		})
+
+		vv := v.NewChild()
+		_, err := vv.Get("a", "", "")
+		assert.NoError(t, err)
+
+		_, err = vv.Get("b", "", "")
+		assert.NoError(t, err)
+
+		vv.Set("c", "", "", flow.RegisterValue("c_value"))
+		vv.Set("d", "", "", flow.RegisterValue("d_value"))
+
+		vv.Touch("e", "", "")
+		vv.Touch("f", "", "")
+
+		v.MergeView(vv)
+		allRegs := v.Interactions().AllRegisters()
+		assert.Len(t, allRegs, 6)
 	})
 }
 

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	st "github.com/onflow/flow-go/state"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -344,6 +345,7 @@ func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -351,7 +353,7 @@ func TestExtendValid(t *testing.T) {
 		consumer := new(mockprotocol.Consumer)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
 		require.Nil(t, err)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
@@ -676,6 +678,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -684,7 +687,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("BlockFinalized", mock.Anything)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
 		require.Nil(t, err)
 
 		// first bootstrap with the initial epoch
@@ -1434,4 +1437,49 @@ func TestMakeValid(t *testing.T) {
 			consumer.AssertCalled(t, "BlockProcessable", block2.Header)
 		})
 	})
+}
+
+// If block A is finalized and contains a seal to block B, then B is the last sealed block
+func TestSealed(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		genesis, result, seal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(genesis, result, seal)
+		require.NoError(t, err)
+
+		// A <- B <- C <- D <- E <- F <- G
+		blockA := unittest.BlockWithParentAndSeal(genesis.Header, nil)
+		blockB := unittest.BlockWithParentAndSeal(blockA.Header, nil)
+		blockC := unittest.BlockWithParentAndSeal(blockB.Header, blockA.Header)
+		blockD := unittest.BlockWithParentAndSeal(blockC.Header, blockB.Header)
+		blockE := unittest.BlockWithParentAndSeal(blockD.Header, nil)
+		blockF := unittest.BlockWithParentAndSeal(blockE.Header, nil)
+		blockG := unittest.BlockWithParentAndSeal(blockF.Header, nil)
+		blockH := unittest.BlockWithParentAndSeal(blockG.Header, nil)
+
+		saveBlock(t, blockA, nil, state)
+		saveBlock(t, blockB, nil, state)
+		saveBlock(t, blockC, nil, state)
+		saveBlock(t, blockD, blockA, state)
+		saveBlock(t, blockE, blockB, state)
+		saveBlock(t, blockF, blockC, state)
+		saveBlock(t, blockG, blockD, state)
+		saveBlock(t, blockH, blockE, state)
+
+		sealed, err := state.Sealed().Head()
+		require.NoError(t, err)
+		require.Equal(t, blockB.Header.Height, sealed.Height)
+	})
+}
+
+func saveBlock(t *testing.T, block *flow.Block, finalizes *flow.Block, state *protocol.State) {
+	err := state.Mutate().HeaderExtend(block)
+	require.NoError(t, err)
+
+	if finalizes != nil {
+		err = state.Mutate().Finalize(finalizes.ID())
+		require.NoError(t, err)
+	}
+
+	err = state.Mutate().MarkValid(block.Header.ID())
+	require.NoError(t, err)
 }
