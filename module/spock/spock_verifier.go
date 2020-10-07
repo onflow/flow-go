@@ -9,10 +9,17 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Verifier provides functionality to verify spocks
+// Verifier provides functionality to verify spocks (not thread safe)
 type Verifier struct {
+	// state is used to query identities at a blockId to get StakingPublicKey
 	protocolState protocol.ReadOnlyState
 
+	// map of receipts by result ID that do not have matching spocks
+	// For instance, if there are 5 receipts that has 5 SpockSets, say, Spockset1, Spockset2, Spockset3, Spockset4, and Spockset5.
+	// If Spockset1 and Spockset2 are for ER1, and they match with each other;
+	// And Spockset3, Spockset4, Spockset5 are for ER2. and they don't match with each other.
+	// Then there are 2 category, the first category has bucket: ER1_Spockset1, and the second category has buckets: ER2_Spockset3, ER3_Spockset4, and ER4_Spockset5.
+	// When we receive each approval, we will first check which category it should go, and find all the buckets to try matching against.
 	receipts map[flow.Identifier][]*flow.ExecutionReceipt
 }
 
