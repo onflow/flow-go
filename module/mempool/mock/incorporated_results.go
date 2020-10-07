@@ -14,7 +14,7 @@ type IncorporatedResults struct {
 }
 
 // Add provides a mock function with given fields: result
-func (_m *IncorporatedResults) Add(result *flow.IncorporatedResult) bool {
+func (_m *IncorporatedResults) Add(result *flow.IncorporatedResult) (bool, error) {
 	ret := _m.Called(result)
 
 	var r0 bool
@@ -24,7 +24,14 @@ func (_m *IncorporatedResults) Add(result *flow.IncorporatedResult) bool {
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*flow.IncorporatedResult) error); ok {
+		r1 = rf(result)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // All provides a mock function with given fields:
@@ -44,28 +51,37 @@ func (_m *IncorporatedResults) All() []*flow.IncorporatedResult {
 }
 
 // ByResultID provides a mock function with given fields: resultID
-func (_m *IncorporatedResults) ByResultID(resultID flow.Identifier) []*flow.IncorporatedResult {
+func (_m *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult) {
 	ret := _m.Called(resultID)
 
-	var r0 []*flow.IncorporatedResult
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.IncorporatedResult); ok {
+	var r0 *flow.ExecutionResult
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ExecutionResult); ok {
 		r0 = rf(resultID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.IncorporatedResult)
+			r0 = ret.Get(0).(*flow.ExecutionResult)
 		}
 	}
 
-	return r0
+	var r1 map[flow.Identifier]*flow.IncorporatedResult
+	if rf, ok := ret.Get(1).(func(flow.Identifier) map[flow.Identifier]*flow.IncorporatedResult); ok {
+		r1 = rf(resultID)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(map[flow.Identifier]*flow.IncorporatedResult)
+		}
+	}
+
+	return r0, r1
 }
 
-// Rem provides a mock function with given fields: incorporatedResultID
-func (_m *IncorporatedResults) Rem(incorporatedResultID flow.Identifier) bool {
-	ret := _m.Called(incorporatedResultID)
+// Rem provides a mock function with given fields: incorporatedResult
+func (_m *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) bool {
+	ret := _m.Called(incorporatedResult)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(incorporatedResultID)
+	if rf, ok := ret.Get(0).(func(*flow.IncorporatedResult) bool); ok {
+		r0 = rf(incorporatedResult)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}

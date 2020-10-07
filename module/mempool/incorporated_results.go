@@ -6,17 +6,18 @@ import "github.com/onflow/flow-go/model/flow"
 // incorporated results
 type IncorporatedResults interface {
 	// Add adds an IncorporatedResult to the mempool
-	Add(result *flow.IncorporatedResult) bool
+	Add(result *flow.IncorporatedResult) (bool, error)
 
 	// All returns all the IncorporatedResults in the mempool
 	All() []*flow.IncorporatedResult
 
 	// ByResultID returns all the IncorporatedResults that contain a specific
+	// ExecutionResult, indexed by IncorporatedBlockID, along with the
 	// ExecutionResult.
-	ByResultID(resultID flow.Identifier) []*flow.IncorporatedResult
+	ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult)
 
 	// Rem removes an IncorporatedResult from the mempool
-	Rem(incorporatedResultID flow.Identifier) bool
+	Rem(incorporatedResult *flow.IncorporatedResult) bool
 
 	// Size returns the number of items in the mempool
 	Size() uint

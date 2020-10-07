@@ -268,10 +268,13 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// mempool will be populated by the finalizer when blocks are validated, and
 	// the IncorporatedBlockID will be the ID of the first block on its fork
 	// that contains a receipt committing to this result.
-	added := e.incorporatedResults.Add(&flow.IncorporatedResult{
+	added, err := e.incorporatedResults.Add(&flow.IncorporatedResult{
 		IncorporatedBlockID: result.BlockID,
 		Result:              result,
 	})
+	if err != nil {
+		e.log.Err(err).Msg("error inserting incorporated result in mempool")
+	}
 	if !added {
 		e.log.Debug().Msg("skipping result already in mempool")
 		return nil
@@ -501,10 +504,9 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 		}
 
 		// look for previous result in mempool and storage
-		var previous *flow.ExecutionResult
 		previousID := incorporatedResult.Result.PreviousResultID
-		previousResults := e.incorporatedResults.ByResultID(previousID)
-		if previousResults == nil || len(previousResults) == 0 {
+		previous, _ := e.incorporatedResults.ByResultID(previousID)
+		if previous == nil {
 			var err error
 			previous, err = e.resultsDB.ByID(previousID)
 			if errors.Is(err, storage.ErrNotFound) {
@@ -514,13 +516,11 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not get previous result: %w", err)
 			}
-		} else {
-			previous = previousResults[0].Result
 		}
 
 		// check sub-graph
 		if block.ParentID != previous.BlockID {
-			_ = e.incorporatedResults.Rem(incorporatedResult.ID())
+			_ = e.incorporatedResults.Rem(incorporatedResult)
 			log.Warn().
 				Str("block_parent_id", block.ParentID.String()).
 				Str("previous_result_block_id", previous.BlockID.String()).
@@ -545,7 +545,7 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 		}
 
 		if len(incorporatedResult.Result.Chunks) != requiredChunks {
-			_ = e.incorporatedResults.Rem(incorporatedResult.ID())
+			_ = e.incorporatedResults.Rem(incorporatedResult)
 			log.Warn().
 				Int("result_chunks", len(incorporatedResult.Result.Chunks)).
 				Int("required_chunks", requiredChunks).
@@ -733,7 +733,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	// if the seal was already built for it (except for seals themselves)
 	for _, result := range e.incorporatedResults.All() {
 		if clear[result.ID()] || shouldClear(result.Result.BlockID) {
-			_ = e.incorporatedResults.Rem(result.ID())
+			_ = e.incorporatedResults.Rem(result)
 		}
 	}
 	for _, approval := range e.approvals.All() {

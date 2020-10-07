@@ -253,17 +253,6 @@ func (ms *MatchingSuite) SetupTest() {
 
 	ms.resultsPL = &mempool.IncorporatedResults{}
 	ms.resultsPL.On("Size").Return(uint(0)) // only for metrics
-	ms.resultsPL.On("ByResultID", mock.Anything).Return(
-		func(resultID flow.Identifier) []*flow.IncorporatedResult {
-			res := []*flow.IncorporatedResult{}
-			for _, ir := range ms.pendingResults {
-				if ir.Result.ID() == resultID {
-					res = append(res, ir)
-				}
-			}
-			return res
-		},
-	)
 	ms.resultsPL.On("All").Return(
 		func() []*flow.IncorporatedResult {
 			results := make([]*flow.IncorporatedResult, 0, len(ms.pendingResults))
@@ -408,7 +397,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 			incorporatedResult := args.Get(0).(*flow.IncorporatedResult)
 			ms.Assert().Equal(incorporatedResult.Result, &receipt.ExecutionResult)
 		},
-	).Return(false)
+	).Return(false, nil)
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for already pending result")
@@ -429,7 +418,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 			incorporatedResult := args.Get(0).(*flow.IncorporatedResult)
 			ms.Assert().Equal(incorporatedResult.Result, &receipt.ExecutionResult)
 		},
-	).Return(true)
+	).Return(true, nil)
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
@@ -597,20 +586,75 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Rem", 0)
 }
 
-func (ms *MatchingSuite) TestSealableResulstUnsealedPrevious() {
+func (ms *MatchingSuite) TestSealableResulstUnknownPrevious() {
 
 	// try to seal a result with a missing previous result
 	block := unittest.BlockFixture()
 	ms.blocks[block.Header.ID()] = &block
-	result := unittest.IncorporatedResultForBlockFixture(&block)
+	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
 
-	ms.pendingResults[result.ID()] = result
+	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+
+	// check that it is looking for the previous result, but return nil as if
+	// not found
+	ms.resultsPL.On("ByResultID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(nil, nil)
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 
 	ms.Assert().Empty(results, "should not select result with unsealed previous")
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Rem", 0)
+}
+
+// if the previous is not found in mempool, we should look for it in the
+// resultsDB
+func (ms *MatchingSuite) TestSealableResultsPreviousNotInMempool() {
+	// try to seal a result with a persisted previous result
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture() // previous does not reference the same block as block parent
+	incorporatedResult.Result.PreviousResultID = previous.ID()
+	ms.sealedResults[previous.ID()] = previous
+
+	// add incorporated result to mempool
+	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
+
+	// check that it is looking for the previous result in the mempool and
+	// return nil
+	ms.resultsPL.On("ByResultID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(nil, nil)
+
+	// check that it is looking for previous in resultsDB, and return previous
+	ms.sealedResultsDB.On("ByID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(previous)
+
+	// check that we are trying to remove the incorporated result from mempool
+	ms.resultsPL.On("Rem", mock.Anything).Run(
+		func(args mock.Arguments) {
+			incResult := args.Get(0).(*flow.IncorporatedResult)
+			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
+		},
+	).Return(true)
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+
+	ms.Assert().Empty(results, "should not select result with invalid subgraph")
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Rem", 1)
 }
 
 // let R1 be a result that references block A, and R2 be R1's parent result.
@@ -622,15 +666,23 @@ func (ms *MatchingSuite) TestSealableResultsInvalidSubgraph() {
 	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
 	previous := unittest.ExecutionResultFixture() // previous does not reference the same block as block parent
 	incorporatedResult.Result.PreviousResultID = previous.ID()
-	ms.sealedResults[previous.ID()] = previous
 
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+	// add incorporated result to mempool
+	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
 
-	// check calls have the correct parameters, and return 0 approvals
+	// check that it is looking for the previous result, and return previous
+	ms.resultsPL.On("ByResultID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(previous, nil)
+
+	// check that we are trying to remove the incorporated result from mempool
 	ms.resultsPL.On("Rem", mock.Anything).Run(
 		func(args mock.Arguments) {
-			resultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.ID(), resultID)
+			incResult := args.Get(0).(*flow.IncorporatedResult)
+			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
 		},
 	).Return(true)
 
@@ -650,20 +702,28 @@ func (ms *MatchingSuite) TestSealResultInvalidChunks() {
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
 	incorporatedResult.Result.PreviousResultID = previous.ID()
-	ms.sealedResults[previous.ID()] = previous
 
 	// add an extra chunk
 	chunk := unittest.ChunkFixture(block.ID())
 	chunk.Index = uint64(len(block.Payload.Guarantees))
 	incorporatedResult.Result.Chunks = append(incorporatedResult.Result.Chunks, chunk)
 
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+	// add incorporated result to mempool
+	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
 
-	// check calls have the correct parameters, and return 0 approvals
+	// check that it is looking for the previous result, and return previous
+	ms.resultsPL.On("ByResultID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(previous, nil)
+
+	// check that we are trying to remove the incorporated result from mempool
 	ms.resultsPL.On("Rem", mock.Anything).Run(
 		func(args mock.Arguments) {
-			resultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.ID(), resultID)
+			incResult := args.Get(0).(*flow.IncorporatedResult)
+			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
 		},
 	).Return(true)
 
@@ -683,9 +743,25 @@ func (ms *MatchingSuite) TestSealableResultsNoPayload() {
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
 	incorporatedResult.Result.PreviousResultID = previous.ID()
-	ms.sealedResults[previous.ID()] = previous
 
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+	// add incorporated result to mempool
+	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
+
+	// check that it is looking for the previous result, and return previous
+	ms.resultsPL.On("ByResultID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(previous, nil)
+
+	// check that we are trying to remove the incorporated result from mempool
+	ms.resultsPL.On("Rem", mock.Anything).Run(
+		func(args mock.Arguments) {
+			incResult := args.Get(0).(*flow.IncorporatedResult)
+			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
+		},
+	).Return(true)
 
 	assignment := chunks.NewAssignment()
 	ms.assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil)
@@ -706,14 +782,31 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
 	incorporatedResult.Result.PreviousResultID = previous.ID()
-	ms.sealedResults[previous.ID()] = previous
 
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+	// add incorporated result to mempool
+	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
+
+	// check that it is looking for the previous result, and return previous
+	ms.resultsPL.On("ByResultID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(previous, nil)
+
+	// check that we are trying to remove the incorporated result from mempool
+	ms.resultsPL.On("Rem", mock.Anything).Run(
+		func(args mock.Arguments) {
+			incResult := args.Get(0).(*flow.IncorporatedResult)
+			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
+		},
+	).Return(true)
 
 	assignment := chunks.NewAssignment()
 	ms.assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil)
 
-	// check calls have the correct parameters, and return 0 approvals
+	// check that we are looking for chunk approvals, but return nil as if not
+	// found
 	ms.approvalsPL.On("ByChunk", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			resultID := args.Get(0).(flow.Identifier)
@@ -746,9 +839,25 @@ func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
 	incorporatedResult.Result.PreviousResultID = previous.ID()
-	ms.sealedResults[previous.ID()] = previous
 
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+	// add incorporated result to mempool
+	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
+
+	// check that it is looking for the previous result, and return previous
+	ms.resultsPL.On("ByResultID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(previous, nil)
+
+	// check that we are trying to remove the incorporated result from mempool
+	ms.resultsPL.On("Rem", mock.Anything).Run(
+		func(args mock.Arguments) {
+			incResult := args.Get(0).(*flow.IncorporatedResult)
+			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
+		},
+	).Return(true)
 
 	// assign each chunk to each approver
 	assignment := chunks.NewAssignment()
@@ -792,9 +901,25 @@ func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
 	incorporatedResult.Result.PreviousResultID = previous.ID()
-	ms.sealedResults[previous.ID()] = previous
 
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+	// add incorporated result to mempool
+	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
+
+	// check that it is looking for the previous result, and return previous
+	ms.resultsPL.On("ByResultID", mock.Anything).Run(
+		func(args mock.Arguments) {
+			previousResultID := args.Get(0).(flow.Identifier)
+			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
+		},
+	).Return(previous, nil)
+
+	// check that we are trying to remove the incorporated result from mempool
+	ms.resultsPL.On("Rem", mock.Anything).Run(
+		func(args mock.Arguments) {
+			incResult := args.Get(0).(*flow.IncorporatedResult)
+			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
+		},
+	).Return(true)
 
 	// list of 3 approvers
 	assignedApprovers := ms.approvers[:3]
@@ -837,7 +962,6 @@ func (ms *MatchingSuite) TestSealResultValid() {
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
 	incorporatedResult.Result.PreviousResultID = previous.ID()
-	ms.sealedResults[previous.ID()] = previous
 
 	realApprovalPool, err := stdmap.NewApprovals(1000)
 	ms.Require().NoError(err)
