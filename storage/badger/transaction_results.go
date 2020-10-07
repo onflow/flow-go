@@ -21,7 +21,7 @@ func NewTransactionResults(db *badger.DB) *TransactionResults {
 
 // Store will store the transaction result for the given block ID
 func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
-	err := operation.RetryOnConflict(tr.db.Update, operation.InsertTransactionResult(blockID, transactionResult))
+	err := operation.RetryOnConflict(tr.db.Update, operation.UpsertTransactionResult(blockID, transactionResult))
 	if err != nil {
 		return fmt.Errorf("could not insert transaction result: %w", err)
 	}
@@ -32,7 +32,7 @@ func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *
 func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
 	err := operation.RetryOnConflict(tr.db.Update, func(tx *badger.Txn) error {
 		for _, txResult := range transactionResults {
-			err := operation.InsertTransactionResult(blockID, &txResult)(tx)
+			err := operation.UpsertTransactionResult(blockID, &txResult)(tx)
 			if err != nil {
 				return err
 			}
