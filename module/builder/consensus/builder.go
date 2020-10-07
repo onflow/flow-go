@@ -28,7 +28,7 @@ type Builder struct {
 	headers  storage.Headers
 	index    storage.Index
 	guarPool mempool.Guarantees
-	sealPool mempool.Seals
+	sealPool mempool.IncorporatedResultSeals
 	cfg      Config
 }
 
@@ -41,7 +41,7 @@ func NewBuilder(
 	seals storage.Seals,
 	index storage.Index,
 	guarPool mempool.Guarantees,
-	sealPool mempool.Seals,
+	sealPool mempool.IncorporatedResultSeals,
 	options ...func(*Config),
 ) *Builder {
 
@@ -198,10 +198,17 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// find one. This creates a valid chain of seals from the last sealed block
 	// to at most the parent.
 
+	// TODO: The following logic for selecting seals will be replaced to match
+	// seals to incorporated results, looping through the fork, from parent to
+	// last sealed, to inspect incorporated receipts and check if the mempool
+	// contains corresponding seals.
+	// This will be implemented in phase 2 of the verification and sealing
+	// roadmap (https://github.com/dapperlabs/flow-go/issues/4872)
+
 	// create a mapping of block to seal for all seals in our pool
 	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
-		byBlock[seal.BlockID] = seal
+		byBlock[seal.Seal.BlockID] = seal.Seal
 	}
 	if int(b.sealPool.Size()) > len(byBlock) {
 		return nil, fmt.Errorf("multiple seals for the same block")
@@ -228,6 +235,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	var seals []*flow.Seal
 	var sealCount uint
 	for height := sealed.Height + 1; height <= finalized; height++ {
+
 		if len(byBlock) == 0 {
 			break
 		}

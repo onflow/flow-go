@@ -699,8 +699,9 @@ func (e *Engine) saveExecutionResults(
 	defer span.Finish()
 
 	originalState := startState
+	blockID := executableBlock.ID()
 
-	err := e.execState.PersistStateInteractions(childCtx, executableBlock.ID(), stateInteractions)
+	err := e.execState.PersistStateInteractions(childCtx, blockID, stateInteractions)
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return nil, err
 	}
@@ -729,7 +730,7 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		chunk := generateChunk(i, startState, endState, collectionID)
+		chunk := generateChunk(i, startState, endState, collectionID, blockID)
 
 		// chunkDataPack
 		allRegisters := view.AllRegisters()
@@ -737,7 +738,7 @@ func (e *Engine) saveExecutionResults(
 		values, proofs, err := e.execState.GetRegistersWithProofs(childCtx, chunk.StartState, allRegisters)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, executableBlock.ID(),
+				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, blockID,
 			)
 		}
 
@@ -753,7 +754,7 @@ func (e *Engine) saveExecutionResults(
 		startState = endState
 	}
 
-	err = e.execState.PersistStateCommitment(childCtx, executableBlock.ID(), endState)
+	err = e.execState.PersistStateCommitment(childCtx, blockID, endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
@@ -779,7 +780,6 @@ func (e *Engine) saveExecutionResults(
 		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionEvents)
 		defer span.Finish()
 
-		blockID := executableBlock.ID()
 		if len(events) > 0 {
 			err = e.events.Store(blockID, events)
 			if err != nil {
@@ -795,7 +795,7 @@ func (e *Engine) saveExecutionResults(
 	err = func() error {
 		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
 		defer span.Finish()
-		blockID := executableBlock.ID()
+
 		err = e.transactionResults.BatchStore(blockID, txResults)
 		if err != nil {
 			return fmt.Errorf("failed to store transaction result error: %w", err)
@@ -846,7 +846,9 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 }
 
 // generateChunk creates a chunk from the provided computation data.
-func generateChunk(colIndex int, startState, endState flow.StateCommitment, colID flow.Identifier) *flow.Chunk {
+func generateChunk(colIndex int,
+	startState, endState flow.StateCommitment,
+	colID, blockID flow.Identifier) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),
@@ -855,6 +857,7 @@ func generateChunk(colIndex int, startState, endState flow.StateCommitment, colI
 			// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
 			// startState stays the same if blocks are empty
 			EventCollection: colID,
+			BlockID:         blockID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
 			// TODO: record number of txs

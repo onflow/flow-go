@@ -185,8 +185,8 @@ func createNode(
 	guaranteeLimit, sealLimit := uint(1000), uint(1000)
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
-	seals, err := stdmap.NewSeals(sealLimit)
-	require.NoError(t, err)
+
+	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
 	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals)

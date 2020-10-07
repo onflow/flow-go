@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 
+	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
@@ -365,8 +366,12 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 
+	resultEvents, err := blockEventsToMessages(results)
+	if err != nil {
+		return nil, err
+	}
 	return &access.EventsResponse{
-		Results: blockEventsToMessages(results),
+		Results: resultEvents,
 	}, nil
 }
 
@@ -390,8 +395,13 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
+	resultEvents, err := blockEventsToMessages(results)
+	if err != nil {
+		return nil, err
+	}
+
 	return &access.EventsResponse{
-		Results: blockEventsToMessages(results),
+		Results: resultEvents,
 	}, nil
 }
 
@@ -417,25 +427,33 @@ func blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, erro
 	}, nil
 }
 
-func blockEventsToMessages(blocks []flow.BlockEvents) []*access.EventsResponse_Result {
+func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {
 	results := make([]*access.EventsResponse_Result, len(blocks))
 
 	for i, block := range blocks {
-		results[i] = blockEventsToMessage(block)
+		event, err := blockEventsToMessage(block)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = event
 	}
 
-	return results
+	return results, nil
 }
 
-func blockEventsToMessage(block flow.BlockEvents) *access.EventsResponse_Result {
+func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result, error) {
 	eventMessages := make([]*entities.Event, len(block.Events))
 	for i, event := range block.Events {
 		eventMessages[i] = convert.EventToMessage(event)
 	}
-
-	return &access.EventsResponse_Result{
-		BlockId:     block.BlockID[:],
-		BlockHeight: block.BlockHeight,
-		Events:      eventMessages,
+	timestamp, err := ptypes.TimestampProto(block.BlockTimestamp)
+	if err != nil {
+		return nil, err
 	}
+	return &access.EventsResponse_Result{
+		BlockId:        block.BlockID[:],
+		BlockHeight:    block.BlockHeight,
+		BlockTimestamp: timestamp,
+		Events:         eventMessages,
+	}, nil
 }
