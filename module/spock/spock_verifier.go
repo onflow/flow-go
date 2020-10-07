@@ -16,7 +16,7 @@ type Verifier struct {
 	receipts map[flow.Identifier][]*flow.ExecutionReceipt
 }
 
-// NewVerifier ...
+// NewVerifier creates a new spock verifier
 func NewVerifier(state protocol.ReadOnlyState) *Verifier {
 	return &Verifier{
 		protocolState: state,
@@ -24,7 +24,8 @@ func NewVerifier(state protocol.ReadOnlyState) *Verifier {
 	}
 }
 
-// AddReceipt ...
+// AddReceipt adds a receipt into map if the spocks do not match any other receipts
+// with the same result id
 func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 	resultID := receipt.ExecutionResult.ID()
 
@@ -53,7 +54,8 @@ func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 	return nil
 }
 
-// VerifyApproval ...
+// VerifyApproval verifies an approval with all the distict receipts for the approvals
+// result id and returns true if spocks match else false
 func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (bool, error) {
 	// find identities
 	approver, err := v.protocolState.AtBlockID(approval.Body.BlockID).Identity(approval.Body.ApproverID)

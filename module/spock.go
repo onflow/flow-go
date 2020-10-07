@@ -7,9 +7,11 @@ import (
 // SpockVerifier provides functionality to verify spocks
 type SpockVerifier interface {
 
-	// AddReceipt ...
+	// AddReceipt adds a receipt into map if the spocks do not match any other receipts
+	// with the same result id
 	AddReceipt(receipt *flow.ExecutionReceipt) error
 
-	// VerifyApproval
+	// VerifyApproval verifies an approval with all the distict receipts for the approvals
+	// result id and returns true if spocks match else false
 	VerifyApproval(*flow.ResultApproval) (bool, error)
 }
