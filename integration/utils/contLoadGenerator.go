@@ -193,7 +193,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		SetReferenceBlockID(blockRef).
 		SetProposalKey(
 			*lg.serviceAccount.address,
-			lg.serviceAccount.accountKey.ID,
+			lg.serviceAccount.accountKey.Index,
 			lg.serviceAccount.accountKey.SequenceNumber,
 		).
 		AddAuthorizer(*lg.serviceAccount.address).
@@ -229,7 +229,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 	err = createAccountTx.SignEnvelope(
 		*lg.serviceAccount.address,
-		lg.serviceAccount.accountKey.ID,
+		lg.serviceAccount.accountKey.Index,
 		lg.serviceAccount.signer,
 	)
 	if err != nil {

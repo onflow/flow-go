@@ -156,13 +156,13 @@ func (lg *BatchLoadGenerator) setupServiceAccountKeys() error {
 
 	addKeysTx.
 		SetReferenceBlockID(blockRef).
-		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
+		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.Index, lg.serviceAccount.accountKey.SequenceNumber).
 		SetPayer(*lg.serviceAccount.address)
 
 	lg.serviceAccount.signerLock.Lock()
 	defer lg.serviceAccount.signerLock.Unlock()
 
-	err = addKeysTx.SignEnvelope(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.signer)
+	err = addKeysTx.SignEnvelope(*lg.serviceAccount.address, lg.serviceAccount.accountKey.Index, lg.serviceAccount.signer)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,6 @@ func (lg *BatchLoadGenerator) createAccounts() error {
 
 		createAccountTx := templates.CreateAccount(
 			[]*flowsdk.AccountKey{accountKey},
-			nil,
 			*lg.serviceAccount.address,
 		)
 
