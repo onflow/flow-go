@@ -837,7 +837,7 @@ func (e *Engine) saveExecutionResults(
 		defer span.Finish()
 
 		if len(events) > 0 {
-			err = e.events.Store(blockID, events)
+			err = e.events.Store(blockID, events, true)
 			if err != nil {
 				return fmt.Errorf("failed to store events: %w", err)
 			}
@@ -852,7 +852,7 @@ func (e *Engine) saveExecutionResults(
 		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
 		defer span.Finish()
 
-		err = e.transactionResults.BatchStore(blockID, txResults)
+		err = e.transactionResults.BatchStore(blockID, txResults, true)
 		if err != nil {
 			return fmt.Errorf("failed to store transaction result error: %w", err)
 		}

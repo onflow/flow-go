@@ -12,6 +12,10 @@ func InsertEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) er
 	return insert(makePrefix(codeEvent, blockID, event.TransactionID, event.TransactionIndex, event.EventIndex), event)
 }
 
+func UpsertEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) error {
+	return upsert(makePrefix(codeEvent, blockID, event.TransactionID, event.TransactionIndex, event.EventIndex), event)
+}
+
 func RetrieveEvents(blockID flow.Identifier, transactionID flow.Identifier, events *[]flow.Event) func(*badger.Txn) error {
 	iterationFunc := eventIterationFunc(events)
 	return traverse(makePrefix(codeEvent, blockID, transactionID), iterationFunc)
