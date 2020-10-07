@@ -29,7 +29,7 @@ func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *
 }
 
 // BatchStore will store the transaction results for the given block ID
-func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, upsert bool) error {
+func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
 	err := operation.RetryOnConflict(tr.db.Update, func(tx *badger.Txn) error {
 		for _, txResult := range transactionResults {
 			err := operation.SkipDuplicates(operation.InsertTransactionResult(blockID, &txResult))(tx)
