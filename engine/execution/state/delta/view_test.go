@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -362,6 +363,42 @@ func TestView_RegisterTouches(t *testing.T) {
 
 		touches := v.Interactions().RegisterTouches()
 		assert.Len(t, touches, 2)
+	})
+}
+
+func TestView_Reads(t *testing.T) {
+	registerID1 := "fruit"
+	registerID2 := "vegetable"
+
+	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		reads := v.Interactions().Reads
+		assert.Empty(t, reads)
+	})
+
+	t.Run("Set and Get", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		_, err := v.Get(registerID2, "", "")
+		assert.NoError(t, err)
+
+		_, err = v.Get(registerID1, "", "")
+		assert.NoError(t, err)
+
+		_, err = v.Get(registerID2, "", "")
+		assert.NoError(t, err)
+
+		touches := v.Interactions().Reads
+		require.Len(t, touches, 2)
+		assert.ElementsMatch(t, []flow.RegisterID{
+			flow.NewRegisterID(registerID1, "", ""),
+			flow.NewRegisterID(registerID2, "", ""),
+		}, touches)
 	})
 }
 
