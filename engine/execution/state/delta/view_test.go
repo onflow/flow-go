@@ -372,10 +372,13 @@ func TestView_AllRegisters(t *testing.T) {
 	})
 
 	t.Run("Empty", func(t *testing.T) {
-    
-  regs := v.Interactions().AllRegisters()
-	assert.Empty(t, regs)
-if owner == "a" {
+		regs := v.Interactions().AllRegisters()
+		assert.Empty(t, regs)
+	})
+
+	t.Run("Set and Get", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if owner == "a" {
 				return flow.RegisterValue("a_value"), nil
 			}
 
@@ -400,7 +403,6 @@ if owner == "a" {
 		allRegs := v.Interactions().AllRegisters()
 		assert.Len(t, allRegs, 6)
 	})
-
 	t.Run("With Merge", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			if owner == "a" {
@@ -435,13 +437,18 @@ if owner == "a" {
 func TestView_Reads(t *testing.T) {
 	registerID1 := "fruit"
 	registerID2 := "vegetable"
+
+	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+
+	t.Run("Empty", func(t *testing.T) {
 		reads := v.Interactions().Reads
 		assert.Empty(t, reads)
 	})
 
 	t.Run("Set and Get", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-
 			return nil, nil
 		})
 
