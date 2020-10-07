@@ -84,21 +84,18 @@ void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
     ep_free(h);
 }
 
-// Verifies a BLS signature in a G1 point.
-// membership check of the signature in G1 is verified in this function
-// membership check of pk in G2 is not verified in this function
-// the membership check is separated to allow optimizing multiple verifications using the same key.
+// Verifies a BLS signature (G1 point) against a public key (G2 point)
+// and a message data.
+// The signature and public key are assumed to be in G1 and G2 respectively. This 
+// function only checks the pairing equality. 
 static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const int len) { 
+    
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
     // elemsG1[0] = s
     ep_new(elemsG1[0]);
     ep_copy(elemsG1[0], (ep_st*)s);
-
-    // check s is on curve and in G1
-    if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
-        return INVALID;
 
     // elemsG1[1] = h
     ep_new(elemsG1[1]);
@@ -143,13 +140,19 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
 }
 
 // Verifies a BLS signature in a byte buffer.
-// membership check of the signature in G1 is verified in this function
-// membership check of pk in G2 is not verified in this function
-// the membership check is separated to allow optimizing multiple verifications using the same key.
+// membership check of the signature in G1 is verified.
+// membership check of pk in G2 is not verified in this function.
+// the membership check in G2 is separated to allow optimizing multiple verifications using the same key.
 int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len) {  
     ep_t s;
     ep_new(s);
+    
+    // deserialize the signature
     if (ep_read_bin_compact(s, sig, SIGNATURE_LEN) != RLC_OK) 
+        return INVALID;
+
+    // check s is on curve and in G1
+    if (check_membership_G1(s) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
     
     return bls_verify_ep(pk, s, data, len);
@@ -258,7 +261,8 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
         ep_new(sigs[i]);
         ep2_new(pks[i]);
         // convert the signature points
-        if (ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK) {
+        if ( ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK || \
+                check_membership_G1(&sigs[i]) != VALID) {
             // set signature as infinity and set result as invald
             ep_set_infty(&sigs[i]);
             ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
