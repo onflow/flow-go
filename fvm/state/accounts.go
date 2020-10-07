@@ -378,6 +378,9 @@ func (a *Accounts) TouchContract(name string, address flow.Address) {
 		a.ledger.Touch(string(address.Bytes()),
 			string(address.Bytes()),
 			a.contractKey(name))
+		a.ledger.Touch(string(address.Bytes()),
+			string(address.Bytes()),
+			keyExists)
 	}
 }
 
