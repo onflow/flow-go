@@ -38,7 +38,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("cannot get mapping for a database")
 	}
 
-	err = writeMegamappings(mappings, flagMappingsFile)
+	err = WriteMegamappings(mappings, flagMappingsFile)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot save mappings to a file")
 	}

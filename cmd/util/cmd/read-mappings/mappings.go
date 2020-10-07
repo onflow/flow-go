@@ -34,7 +34,7 @@ func getMappingsFromDatabase(db *badger.DB) (map[string]delta.Mapping, error) {
 	return mappings, err
 }
 
-func writeMegamappings(mappings map[string]delta.Mapping, filename string) error {
+func WriteMegamappings(mappings map[string]delta.Mapping, filename string) error {
 	hexencodedMappings := make(map[string]delta.Mapping, len(mappings))
 	for k, mapping := range mappings {
 		hexencodedMappings[hex.EncodeToString([]byte(k))] = mapping

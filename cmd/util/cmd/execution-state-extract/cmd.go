@@ -1,10 +1,15 @@
 package extract
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
@@ -69,7 +74,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("cannot get mapping for a database")
 	}
 
-	mappingFromFile, err := readMegamappings(flagMappingsFile)
+	mappingFromFile, err := ReadMegamappings(flagMappingsFile)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot load mappings from a file")
 	}
@@ -78,8 +83,49 @@ func run(*cobra.Command, []string) {
 		mappings[k] = v
 	}
 
-	err = extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, mappings)
+	fixedMappings, err := FixMappings(mappings)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot fix mappings")
+	}
+
+	err = extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, fixedMappings)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate checkpoint with state commitment")
 	}
+}
+
+func fullKey(owner, controller, key string) string {
+	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
+	return strings.Join([]string{owner, controller, key}, "\x1F")
+}
+
+func fullKeyHash(owner, controller, key string) string {
+	hasher := hash.NewSHA2_256()
+	return string(hasher.ComputeHash([]byte(fullKey(owner, controller, key))))
+}
+
+func FixMappings(mappings map[string]delta.Mapping) (map[string]delta.Mapping, error) {
+	fixed := make(map[string]delta.Mapping, len(mappings))
+
+	for k, v := range mappings {
+		rehashed := fullKeyHash(v.Owner, v.Controller, v.Key)
+
+		if rehashed == k { //all good
+			fixed[k] = v
+			continue
+		}
+		rehashedNoController := fullKeyHash(v.Owner, "", v.Key)
+		if rehashedNoController == k {
+			fixed[k] = delta.Mapping{
+				Owner:      v.Owner,
+				Key:        v.Key,
+				Controller: "",
+			}
+			fixed[rehashed] = v
+			continue
+		}
+		return nil, fmt.Errorf("key %x cannot be reconstructed", k)
+	}
+
+	return fixed, nil
 }
