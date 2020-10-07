@@ -48,27 +48,3 @@ func writeMegamappings(mappings map[string]delta.Mapping, filename string) error
 
 	return nil
 }
-
-func readMegamappings(filename string) (map[string]delta.Mapping, error) {
-	var readMappings = map[string]delta.Mapping{}
-	var hexencodedRead map[string]delta.Mapping
-
-	bytes, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("cannot open mappings file: %w", err)
-	}
-	err = json.Unmarshal(bytes, &hexencodedRead)
-	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshall mappings: %w", err)
-	}
-
-	for k, mapping := range hexencodedRead {
-		decodeString, err := hex.DecodeString(k)
-		if err != nil {
-			return nil, fmt.Errorf("cannot decode key: %w", err)
-		}
-		readMappings[string(decodeString)] = mapping
-	}
-
-	return readMappings, nil
-}

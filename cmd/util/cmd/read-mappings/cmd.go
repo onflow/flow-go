@@ -8,8 +8,6 @@ import (
 )
 
 var (
-	flagOutputDir string
-
 	flagDatadir      string
 	flagMappingsFile string
 )
