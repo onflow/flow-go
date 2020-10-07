@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -68,6 +69,8 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get state commitment for block")
 	}
+
+	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment))
 
 	mappings, err := getMappingsFromDatabase(db)
 	if err != nil {
