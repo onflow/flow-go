@@ -86,7 +86,7 @@ func run(*cobra.Command, []string) {
 		mappings[k] = v
 	}
 
-	fixedMappings, err := FixMappings(mappings)
+	fixedMappings, err := RecalculateMappings(mappings)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot fix mappings")
 	}
@@ -107,7 +107,12 @@ func fullKeyHash(owner, controller, key string) string {
 	return string(hasher.ComputeHash([]byte(fullKey(owner, controller, key))))
 }
 
-func FixMappings(mappings map[string]delta.Mapping) (map[string]delta.Mapping, error) {
+// RecalculateMappings regenerates some possibly wrong mappings
+// Due to some errors generate mappings could be wrong. Sometimes the hashes key was calculated
+// correctly using empty `Controller` part, but the resulting mappings has a `Controller` duplicated
+// from `Owner` field.
+// Having the input we can re-hash and check if values matches and fix the eventual problems
+func RecalculateMappings(mappings map[string]delta.Mapping) (map[string]delta.Mapping, error) {
 	fixed := make(map[string]delta.Mapping, len(mappings))
 
 	for k, v := range mappings {

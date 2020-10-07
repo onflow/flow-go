@@ -41,7 +41,7 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot read mappings")
 		}
-		fixedMappings, err := extract.FixMappings(readMappings)
+		fixedMappings, err := extract.RecalculateMappings(readMappings)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot fix mappings from %s", input)
 		}
