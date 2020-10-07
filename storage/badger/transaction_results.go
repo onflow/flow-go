@@ -20,13 +20,8 @@ func NewTransactionResults(db *badger.DB) *TransactionResults {
 }
 
 // Store will store the transaction result for the given block ID
-func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *flow.TransactionResult, upsert bool) error {
-	var err error
-	if upsert {
-		err = operation.RetryOnConflict(tr.db.Update, operation.UpsertTransactionResult(blockID, transactionResult))
-	} else {
-		err = operation.RetryOnConflict(tr.db.Update, operation.InsertTransactionResult(blockID, transactionResult))
-	}
+func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
+	err := operation.RetryOnConflict(tr.db.Update, operation.SkipDuplicates(operation.InsertTransactionResult(blockID, transactionResult)))
 	if err != nil {
 		return fmt.Errorf("could not insert transaction result: %w", err)
 	}
@@ -35,28 +30,15 @@ func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *
 
 // BatchStore will store the transaction results for the given block ID
 func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, upsert bool) error {
-	var err error
-	if upsert {
-		err = operation.RetryOnConflict(tr.db.Update, func(tx *badger.Txn) error {
-			for _, txResult := range transactionResults {
-				err := operation.UpsertTransactionResult(blockID, &txResult)(tx)
-				if err != nil {
-					return err
-				}
+	err := operation.RetryOnConflict(tr.db.Update, func(tx *badger.Txn) error {
+		for _, txResult := range transactionResults {
+			err := operation.SkipDuplicates(operation.InsertTransactionResult(blockID, &txResult))(tx)
+			if err != nil {
+				return err
 			}
-			return nil
-		})
-	} else {
-		err = operation.RetryOnConflict(tr.db.Update, func(tx *badger.Txn) error {
-			for _, txResult := range transactionResults {
-				err := operation.InsertTransactionResult(blockID, &txResult)(tx)
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-	}
+		}
+		return nil
+	})
 	if err != nil {
 		return fmt.Errorf("could not batch insert transaction results: %w", err)
 	}

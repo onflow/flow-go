@@ -11,10 +11,6 @@ func InsertExecutionStateInteractions(blockID flow.Identifier, interactions []*d
 	return insert(makePrefix(codeExecutionStateInteractions, blockID), interactions)
 }
 
-func UpsertExecutionStateInteractions(blockID flow.Identifier, interactions []*delta.Snapshot) func(*badger.Txn) error {
-	return upsert(makePrefix(codeExecutionStateInteractions, blockID), interactions)
-}
-
 func RetrieveExecutionStateInteractions(blockID flow.Identifier, interactions *[]*delta.Snapshot) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeExecutionStateInteractions, blockID), interactions)
 }

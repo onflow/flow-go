@@ -53,36 +53,6 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
-// upsert will encode the given entity using JSON and
-// if the key doesn't exist it will insert the resulting binary data in the badger DB under the provided key.
-// otherwise it will update the value under the provided key.
-func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// update the maximum key size if the inserted key is bigger
-		if uint32(len(key)) > max {
-			max = uint32(len(key))
-			err := SetMax(tx)
-			if err != nil {
-				return fmt.Errorf("could not update max tracker: %w", err)
-			}
-		}
-
-		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
-		if err != nil {
-			return fmt.Errorf("could not encode entity: %w", err)
-		}
-
-		// persist the entity data into the DB
-		err = tx.Set(key, val)
-		if err != nil {
-			return fmt.Errorf("could not store data: %w", err)
-		}
-		return nil
-	}
-}
-
 // update will encode the given entity with JSON and update the binary data
 // under the given key in the badger DB. It will error if the key does not exist
 // yet.
