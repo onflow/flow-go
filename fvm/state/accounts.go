@@ -374,14 +374,11 @@ func (a *Accounts) TouchContract(name string, address flow.Address) {
 	if err != nil {
 		panic(err)
 	}
-	if !contracts.Has(name) {
+	if contracts.Has(name) {
 		a.ledger.Touch(string(address.Bytes()),
 			string(address.Bytes()),
-			a.contractKey(""))
+			a.contractKey(name))
 	}
-	a.ledger.Touch(string(address.Bytes()),
-		string(address.Bytes()),
-		a.contractKey(name))
 }
 
 func (a *Accounts) GetContracts(address flow.Address) (ContractsList, error) {
@@ -405,8 +402,7 @@ func (a *Accounts) GetContract(name string, address flow.Address) ([]byte, error
 		return nil, err
 	}
 	if !contracts.Has(name) {
-		// this contract wasn't deployed the new way. Try getting it the old way
-		return a.getCode("", address)
+		return nil, nil
 	}
 	return a.getCode(name, address)
 }
@@ -433,8 +429,7 @@ func (a *Accounts) DeleteContract(name string, address flow.Address) error {
 		return err
 	}
 	if !contracts.Has(name) {
-		// this contract wasn't deployed the new way. Try deleting teh old contract
-		return a.setCode(string(address.Bytes()), address, nil)
+		return nil
 	}
 	err = a.setCode(name, address, nil)
 	if err != nil {
