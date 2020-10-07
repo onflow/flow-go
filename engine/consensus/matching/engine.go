@@ -514,7 +514,7 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 		var previous *flow.ExecutionResult
 		previousID := incorporatedResult.Result.PreviousResultID
 		previousResults := e.incorporatedResults.ByResultID(previousID)
-		if previousResults == nil || len(previousResults) == 0 {
+		if len(previousResults) == 0 {
 			var err error
 			previous, err = e.resultsDB.ByID(previousID)
 			if errors.Is(err, storage.ErrNotFound) {

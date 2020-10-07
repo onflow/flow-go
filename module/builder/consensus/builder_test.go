@@ -47,7 +47,7 @@ type BuilderSuite struct {
 	incorporatedResults []*flow.IncorporatedResult
 
 	// storage for dbs
-	seals   map[flow.Identifier]*flow.Seal
+	// seals   map[flow.Identifier]*flow.Seal
 	headers map[flow.Identifier]*flow.Header
 	heights map[uint64]*flow.Header
 	index   map[flow.Identifier]*flow.Index
