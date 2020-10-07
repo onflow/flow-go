@@ -758,6 +758,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	for _, result := range e.incorporatedResults.All() {
 		if clear[result.ID()] || shouldClear(result.Result.BlockID) {
 			_ = e.incorporatedResults.Rem(result.ID())
+			_ = e.spockVerifier.ClearReceipts(result.ID())
 		}
 	}
 	for _, approval := range e.approvals.All() {

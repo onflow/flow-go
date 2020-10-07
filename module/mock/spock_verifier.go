@@ -26,6 +26,20 @@ func (_m *SpockVerifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 	return r0
 }
 
+// ClearReceipts provides a mock function with given fields: resultID
+func (_m *SpockVerifier) ClearReceipts(resultID flow.Identifier) bool {
+	ret := _m.Called(resultID)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(resultID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // VerifyApproval provides a mock function with given fields: _a0
 func (_m *SpockVerifier) VerifyApproval(_a0 *flow.ResultApproval) (bool, error) {
 	ret := _m.Called(_a0)

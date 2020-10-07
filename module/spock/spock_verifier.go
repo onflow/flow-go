@@ -54,6 +54,21 @@ func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 	return nil
 }
 
+// ClearReceipts clears all receipts for a specific resultID
+func (v *Verifier) ClearReceipts(resultID flow.Identifier) bool {
+
+	// check if entry exists
+	_, ok := v.receipts[resultID]
+	if !ok {
+		return false
+	}
+
+	// clear receipts
+	delete(v.receipts, resultID)
+
+	return true
+}
+
 // VerifyApproval verifies an approval with all the distict receipts for the approvals
 // result id and returns true if spocks match else false
 func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (bool, error) {
