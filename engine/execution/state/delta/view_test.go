@@ -195,6 +195,8 @@ func TestView_MergeView(t *testing.T) {
 
 	registerID2 := "vegetable"
 
+	registerID3 := "diary"
+
 	t.Run("EmptyView", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -328,6 +330,30 @@ func TestView_MergeView(t *testing.T) {
 		s := v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock1.SumHash()))
 	})
+
+	t.Run("RegisterTouchesDataMerge", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+
+		chView := v.NewChild()
+		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		chView.Set(registerID3, "", "", flow.RegisterValue("milk"))
+
+		v.MergeView(chView)
+
+		reads := v.Interactions().Reads
+
+		require.Len(t, reads, 3)
+		assert.ElementsMatch(t, []flow.RegisterID{
+			flow.NewRegisterID(registerID1, "", ""),
+			flow.NewRegisterID(registerID2, "", ""),
+			flow.NewRegisterID(registerID3, "", ""),
+		}, reads)
+	})
+
 }
 
 func TestView_RegisterTouches(t *testing.T) {
