@@ -533,8 +533,8 @@ func (p *P2PNode) IsConnected(address NodeAddress) (bool, error) {
 		return false, err
 	}
 	// query libp2p for connectedness status of this peer
-	connectedness := p.libP2PHost.Network().Connectedness(pInfo.ID)
-	return network.Connected == connectedness, nil
+	isConnected := p.libP2PHost.Network().Connectedness(pInfo.ID) == network.Connected
+	return isConnected, nil
 }
 
 func generateProtocolID(rootBlockID string) protocol.ID {
