@@ -54,7 +54,6 @@ type Middleware struct {
 	ov                middleware.Overlay
 	wg                *sync.WaitGroup
 	libP2PNode        *P2PNode
-	stop              chan struct{}
 	me                flow.Identifier
 	host              string
 	port              string
@@ -101,7 +100,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		codec:             codec,
 		libP2PNode:        p2p,
 		wg:                &sync.WaitGroup{},
-		stop:              make(chan struct{}),
 		me:                flowID,
 		host:              ip,
 		port:              port,
@@ -200,8 +198,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
-	close(m.stop)
-
 	// stop libp2p
 	done, err := m.libP2PNode.Stop()
 	if err != nil {

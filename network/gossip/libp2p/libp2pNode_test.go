@@ -22,10 +22,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
 const tickForAssertEventually = 100 * time.Millisecond
+
+var rootBlockID = unittest.IdentifierFixture().String()
 
 type LibP2PNodeTestSuite struct {
 	suite.Suite
@@ -208,7 +212,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 
 	address2 := addrs[1]
 
-	flowProtocolID := generateProtocolID(rootID)
+	flowProtocolID := generateProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 
@@ -483,7 +487,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandl
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler, allowList)
+		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootBlockID, handler, allowList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
