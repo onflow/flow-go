@@ -16,6 +16,7 @@ import (
 
 type State struct {
 	metrics  module.ComplianceMetrics
+	tracer   module.Tracer
 	db       *badger.DB
 	headers  storage.Headers
 	seals    storage.Seals
@@ -35,6 +36,7 @@ type State struct {
 // optional configuration parameters.
 func NewState(
 	metrics module.ComplianceMetrics,
+	tracer module.Tracer,
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -49,6 +51,7 @@ func NewState(
 
 	s := &State{
 		metrics:  metrics,
+		tracer:   tracer,
 		db:       db,
 		headers:  headers,
 		seals:    seals,

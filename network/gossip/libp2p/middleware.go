@@ -312,20 +312,11 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
 	}
 
-	// track the number of bytes that will be written to the wire for metrics
-	byteCount := bufw.Buffered()
-
-	// flush the stream
-	err = bufw.Flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
-	}
-
 	// close the stream immediately
 	go helpers.FullClose(stream)
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	m.metrics.NetworkMessageSent(byteCount, metrics.ChannelOneToOne)
+	m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
 
 	return nil
 }
@@ -472,7 +463,7 @@ func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	m.metrics.NetworkMessageSent(len(data), channelID)
+	m.metrics.NetworkMessageSent(len(data), channelID, msg.Type)
 
 	return nil
 }

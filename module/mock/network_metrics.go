@@ -23,19 +23,19 @@ func (_m *NetworkMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
 }
 
-// NetworkDuplicateMessagesDropped provides a mock function with given fields: topic
-func (_m *NetworkMetrics) NetworkDuplicateMessagesDropped(topic string) {
-	_m.Called(topic)
+// NetworkDuplicateMessagesDropped provides a mock function with given fields: topic, messageType
+func (_m *NetworkMetrics) NetworkDuplicateMessagesDropped(topic string, messageType string) {
+	_m.Called(topic, messageType)
 }
 
-// NetworkMessageReceived provides a mock function with given fields: sizeBytes, topic
-func (_m *NetworkMetrics) NetworkMessageReceived(sizeBytes int, topic string) {
-	_m.Called(sizeBytes, topic)
+// NetworkMessageReceived provides a mock function with given fields: sizeBytes, topic, messageType
+func (_m *NetworkMetrics) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {
+	_m.Called(sizeBytes, topic, messageType)
 }
 
-// NetworkMessageSent provides a mock function with given fields: sizeBytes, topic
-func (_m *NetworkMetrics) NetworkMessageSent(sizeBytes int, topic string) {
-	_m.Called(sizeBytes, topic)
+// NetworkMessageSent provides a mock function with given fields: sizeBytes, topic, messageType
+func (_m *NetworkMetrics) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
+	_m.Called(sizeBytes, topic, messageType)
 }
 
 // QueueDuration provides a mock function with given fields: duration, priority

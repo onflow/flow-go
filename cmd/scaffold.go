@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/network/gossip/libp2p/validators"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -183,9 +184,18 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get node id: %w", err)
 		}
 		nodeRole := nodeID.Role
-		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, fnb.Middleware, 10e6, topology, fnb.Metrics.Network)
+		var nodeTopology topology.Topology
+		if nodeRole == flow.RoleCollection {
+			nodeTopology, err = topology.NewCollectionTopology(nodeID.NodeID, fnb.State)
+		} else {
+			nodeTopology, err = topology.NewRandPermTopology(nodeRole, nodeID.NodeID)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not create topology: %w", err)
+		}
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, fnb.Middleware, 10e6, nodeTopology, fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -377,6 +387,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	distributor := events.NewDistributor()
 	state, err := protocol.NewState(
 		fnb.Metrics.Compliance,
+		fnb.Tracer,
 		fnb.DB,
 		fnb.Storage.Headers,
 		fnb.Storage.Seals,

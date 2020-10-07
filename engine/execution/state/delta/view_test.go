@@ -84,9 +84,6 @@ func TestView_Set(t *testing.T) {
 		b, err := v.Get(registerID, "", "")
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
-
-		delta := v.Delta()
-		assert.False(t, delta.HasBeenDeleted(registerID, "", ""))
 	})
 
 	t.Run("SpockSecret", func(t *testing.T) {
@@ -167,9 +164,6 @@ func TestView_Delete(t *testing.T) {
 		b2, err := v.Get(registerID, "", "")
 		assert.NoError(t, err)
 		assert.Nil(t, b2)
-
-		delta := v.Delta()
-		assert.True(t, delta.HasBeenDeleted(registerID, "", ""))
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
@@ -192,9 +186,6 @@ func TestView_Delete(t *testing.T) {
 		b2, err := v.Get(registerID, "", "")
 		assert.NoError(t, err)
 		assert.Nil(t, b2)
-
-		delta := v.Delta()
-		assert.True(t, delta.HasBeenDeleted(registerID, "", ""))
 	})
 }
 

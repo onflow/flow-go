@@ -8,45 +8,56 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/engine/common/synchronization"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/sync"
 	"github.com/onflow/flow-go/fvm"
+	ledger "github.com/onflow/flow-go/ledger/complete"
+	wal "github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/buffer"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 func main() {
 
 	var (
-		ledgerStorage         *ledger.MTrieStorage
+		ledgerStorage         *ledger.Ledger
 		events                *storage.Events
 		txResults             *storage.TransactionResults
 		results               *storage.ExecutionResults
 		receipts              *storage.ExecutionReceipts
 		providerEngine        *exeprovider.Engine
 		syncCore              *chainsync.Core
+		pendingBlocks         *buffer.PendingBlocks // used in follower engine
+		deltas                *ingestion.Deltas
 		syncEngine            *synchronization.Engine
+		followerEng           *followereng.Engine // to sync blocks from consensus nodes
 		computationManager    *computation.Manager
 		collectionRequester   *requester.Engine
 		ingestionEng          *ingestion.Engine
@@ -57,9 +68,12 @@ func main() {
 		collector             module.ExecutionMetrics
 		mTrieCacheSize        uint32
 		checkpointDistance    uint
+		stateDeltasLimit      uint
 		requestInterval       time.Duration
 		preferredExeNodeIDStr string
 		syncByBlocks          bool
+		syncFast              bool
+		syncThreshold         int
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -71,9 +85,12 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
+			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
-			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "sync by blocks instead of execution state deltas")
+			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
+			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
+			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -111,6 +128,14 @@ func main() {
 			receipts = storage.NewExecutionReceipts(node.DB, results)
 			return nil
 		}).
+		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
+			return nil
+		}).
+		Module("state deltas mempool", func(node *cmd.FlowNodeBuilder) error {
+			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
+			return err
+		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
@@ -146,7 +171,7 @@ func main() {
 				}
 			}
 
-			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
+			ledgerStorage, err = ledger.NewLedger(triedir, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), node.MetricsRegisterer)
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -175,8 +200,6 @@ func main() {
 				node.Tracer,
 			)
 
-			stateSync := sync.NewStateSynchronizer(executionState)
-
 			providerEngine, err = exeprovider.New(
 				node.Logger,
 				node.Tracer,
@@ -184,14 +207,12 @@ func main() {
 				node.State,
 				node.Me,
 				executionState,
-				stateSync,
 				collector,
 			)
 
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
@@ -219,27 +240,91 @@ func main() {
 				collectionRequester,
 				node.State,
 				node.Storage.Blocks,
-				node.Storage.Payloads,
 				node.Storage.Collections,
 				events,
 				txResults,
 				computationManager,
 				providerEngine,
-				syncCore,
 				executionState,
-				6, // TODO - config param maybe?
-				preferredExeFilter,
-				syncByBlocks,
 				collector,
 				node.Tracer,
 				true,
+				preferredExeFilter,
+				deltas,
+				syncThreshold,
+				syncFast,
 			)
 
 			// TODO: we should solve these mutual dependencies better
 			// => https://github.com/dapperlabs/flow-go/issues/4360
 			collectionRequester = collectionRequester.WithHandle(ingestionEng.OnCollection)
 
+			node.ProtocolEvents.AddConsumer(ingestionEng)
+
 			return ingestionEng, err
+		}).
+		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+
+			// create a finalizer that handles updating the protocol
+			// state when the follower detects newly finalized blocks
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// initialize and pre-generate leader selections from the seed
+			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
+			}
+
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
+			if err != nil {
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+			}
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
+
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			if err != nil {
+				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
+			}
+
+			// creates a consensus follower with ingestEngine as the notifier
+			// so that it gets notified upon each new finalized block
+			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, ingestionEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower core logic: %w", err)
+			}
+
+			followerEng, err = followereng.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				pendingBlocks,
+				followerCore,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower engine: %w", err)
+			}
+
+			return followerEng, nil
 		}).
 		Component("collection requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
@@ -263,7 +348,6 @@ func main() {
 			)
 			return eng, err
 		}).
-		// TODO: currently issues with this engine on the EXE node, as there is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
 		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
@@ -273,10 +357,8 @@ func main() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				ingestionEng,
+				followerEng,
 				syncCore,
-				// Right now, only used to sync, so never poll
-				synchronization.WithPollInterval(time.Duration(0)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

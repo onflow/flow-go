@@ -21,7 +21,7 @@ func NewTrieVerifier(keyByteSize int) *TrieVerifier {
 // VerifyRegistersProof takes in an encoded proof along with registers, state, and values,
 // and verifies if the proofs are correct
 func (v *TrieVerifier) VerifyRegistersProof(
-	registerIDs []flow.RegisterID,
+	registerIDs []flow.LegacyRegisterID,
 	values []flow.RegisterValue,
 	proof []flow.StorageProof,
 	stateCommitment flow.StateCommitment,

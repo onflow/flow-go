@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	st "github.com/onflow/flow-go/state"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -341,6 +342,7 @@ func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -348,7 +350,7 @@ func TestExtendValid(t *testing.T) {
 		consumer := new(mockprotocol.Consumer)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
 		require.Nil(t, err)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
@@ -390,10 +392,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 		first.SetPayload(flow.Payload{})
 
 		extend := &flow.Seal{
-			BlockID:      first.ID(),
-			ResultID:     flow.ZeroID,
-			InitialState: seal.FinalState,
-			FinalState:   unittest.StateCommitmentFixture(),
+			BlockID:    first.ID(),
+			ResultID:   flow.ZeroID,
+			FinalState: unittest.StateCommitmentFixture(),
 		}
 
 		second := unittest.BlockWithParentFixture(first.Header)
@@ -560,9 +561,8 @@ func TestExtendSealNotConnected(t *testing.T) {
 
 		// create seal for the block
 		second := &flow.Seal{
-			BlockID:      extend.ID(),
-			InitialState: unittest.StateCommitmentFixture(), // not root state
-			FinalState:   unittest.StateCommitmentFixture(),
+			BlockID:    extend.ID(),
+			FinalState: unittest.StateCommitmentFixture(),
 		}
 
 		sealing := unittest.BlockFixture()
@@ -645,11 +645,9 @@ func TestExtendHighestSeal(t *testing.T) {
 		// create seals for block2 and block3
 		seal2 := unittest.SealFixture(
 			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithInitalState(seal.FinalState),
 		)
 		seal3 := unittest.SealFixture(
 			unittest.SealWithBlockID(block3.ID()),
-			unittest.WithInitalState(seal2.FinalState),
 		)
 
 		// include the seals in block4
@@ -677,6 +675,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -685,7 +684,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("BlockFinalized", mock.Anything)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
 		require.Nil(t, err)
 
 		// first bootstrap with the initial epoch
@@ -723,7 +722,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// create the seal referencing block1 and including the setup event
 		seal1 := unittest.SealFixture(
 			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
@@ -771,7 +769,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		seal2 := unittest.SealFixture(
 			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithInitalState(seal1.FinalState),
 			unittest.WithServiceEvents(epoch2Commit.ServiceEvent()),
 		)
 
@@ -898,14 +895,12 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// create one seal containing the first setup event
 		seal1 := unittest.SealFixture(
 			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(nextEpochSetup1.ServiceEvent()),
 		)
 
 		// create another seal containing the second setup event
 		seal2 := unittest.SealFixture(
 			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(nextEpochSetup2.ServiceEvent()),
 		)
 
@@ -969,7 +964,6 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			)
 			seal := unittest.SealFixture(
 				unittest.SealWithBlockID(block1.ID()),
-				unittest.WithInitalState(rootSeal.FinalState),
 				unittest.WithServiceEvents(setup.ServiceEvent()),
 			)
 			return setup, seal
@@ -1052,7 +1046,6 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			)
 			seal := unittest.SealFixture(
 				unittest.SealWithBlockID(block1.ID()),
-				unittest.WithInitalState(rootSeal.FinalState),
 				unittest.WithServiceEvents(setup.ServiceEvent()),
 			)
 			return setup, seal
@@ -1066,7 +1059,6 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 			seal := unittest.SealFixture(
 				unittest.SealWithBlockID(refBlockID),
-				unittest.WithInitalState(initState),
 				unittest.WithServiceEvents(commit.ServiceEvent()),
 			)
 			return commit, seal
@@ -1188,7 +1180,6 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		// create the seal referencing block1 and including the setup event
 		seal1 := unittest.SealFixture(
 			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithInitalState(rootSeal.FinalState),
 			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
@@ -1377,11 +1368,9 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		// create seals for block2 and block3
 		seal2 := unittest.SealFixture(
 			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithInitalState(seal.FinalState),
 		)
 		seal3 := unittest.SealFixture(
 			unittest.SealWithBlockID(block3.ID()),
-			unittest.WithInitalState(seal2.FinalState),
 		)
 
 		// include the seals in block4
@@ -1445,4 +1434,49 @@ func TestMakeValid(t *testing.T) {
 			consumer.AssertCalled(t, "BlockProcessable", block2.Header)
 		})
 	})
+}
+
+// If block A is finalized and contains a seal to block B, then B is the last sealed block
+func TestSealed(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		genesis, result, seal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(genesis, result, seal)
+		require.NoError(t, err)
+
+		// A <- B <- C <- D <- E <- F <- G
+		blockA := unittest.BlockWithParentAndSeal(genesis.Header, nil)
+		blockB := unittest.BlockWithParentAndSeal(blockA.Header, nil)
+		blockC := unittest.BlockWithParentAndSeal(blockB.Header, blockA.Header)
+		blockD := unittest.BlockWithParentAndSeal(blockC.Header, blockB.Header)
+		blockE := unittest.BlockWithParentAndSeal(blockD.Header, nil)
+		blockF := unittest.BlockWithParentAndSeal(blockE.Header, nil)
+		blockG := unittest.BlockWithParentAndSeal(blockF.Header, nil)
+		blockH := unittest.BlockWithParentAndSeal(blockG.Header, nil)
+
+		saveBlock(t, blockA, nil, state)
+		saveBlock(t, blockB, nil, state)
+		saveBlock(t, blockC, nil, state)
+		saveBlock(t, blockD, blockA, state)
+		saveBlock(t, blockE, blockB, state)
+		saveBlock(t, blockF, blockC, state)
+		saveBlock(t, blockG, blockD, state)
+		saveBlock(t, blockH, blockE, state)
+
+		sealed, err := state.Sealed().Head()
+		require.NoError(t, err)
+		require.Equal(t, blockB.Header.Height, sealed.Height)
+	})
+}
+
+func saveBlock(t *testing.T, block *flow.Block, finalizes *flow.Block, state *protocol.State) {
+	err := state.Mutate().HeaderExtend(block)
+	require.NoError(t, err)
+
+	if finalizes != nil {
+		err = state.Mutate().Finalize(finalizes.ID())
+		require.NoError(t, err)
+	}
+
+	err = state.Mutate().MarkValid(block.Header.ID())
+	require.NoError(t, err)
 }

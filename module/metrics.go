@@ -11,13 +11,13 @@ import (
 // Network Metrics
 type NetworkMetrics interface {
 	// NetworkMessageSent size in bytes and count of the network message sent
-	NetworkMessageSent(sizeBytes int, topic string)
+	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
 	// NetworkMessageReceived size in bytes and count of the network message received
-	NetworkMessageReceived(sizeBytes int, topic string)
+	NetworkMessageReceived(sizeBytes int, topic string, messageType string)
 
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
-	NetworkDuplicateMessagesDropped(topic string)
+	NetworkDuplicateMessagesDropped(topic string, messageType string)
 
 	// Message receive queue metrics
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
@@ -227,6 +227,9 @@ type LedgerMetrics interface {
 
 	// ReadDurationPerItem records read time for single value (total duration / number of read values)
 	ReadDurationPerItem(duration time.Duration)
+
+	// DiskSize records the amount of disk space used by the storage (in bytes)
+	DiskSize(uint64)
 }
 
 type RuntimeMetrics interface {
@@ -265,9 +268,6 @@ type ExecutionMetrics interface {
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)
 
-	// ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
-	ExecutionStateStorageDiskTotal(bytes int64)
-
 	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
 	ExecutionStorageStateCommitment(bytes int64)
 
@@ -277,10 +277,13 @@ type ExecutionMetrics interface {
 	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
 	ExecutionTotalExecutedTransactions(numExecuted int)
 
+	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
 
+	// Unused
 	ExecutionCollectionRequestRetried()
 
+	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
 }
 
