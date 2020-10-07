@@ -22,7 +22,7 @@ import (
 //  - Multi-signature verification of an aggregated signatures of a single message
 //  under multiple public keys.
 //  - batch verification of multiple signatures of a single message under multiple
-//  public keys.
+//  public keys: use a binary tree of aggregations to find invalid signatures.
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s

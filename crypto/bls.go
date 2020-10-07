@@ -18,10 +18,10 @@ package crypto
 //  - signature verification checks the membership of signature in G1
 //  - the public key membership check in G2 is implemented separately from the signature verification.
 //  - membership check in G1 is implemented using fast Bowe's check (https://eprint.iacr.org/2019/814.pdf)
-//  - membership check in G2 is using a simple scalar multiplication with the group order
+//  - membership check in G2 is using a simple scalar multiplication with the group order.
 
 // future features:
-//  - multi-signature and batch verification
+//  - multi-signature
 //  - membership checks G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 

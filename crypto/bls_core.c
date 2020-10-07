@@ -29,9 +29,8 @@ int check_membership_Zr(const bn_t a){
     return INVALID;
 }
 
-// checks if input point s is on the curve E1 
+// checks if input point s is on the curve E1
 // and is in the subgroup G1
-// membership check in G1 is using a naive scalar multiplication by the group order 
 static int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
@@ -52,7 +51,7 @@ static int check_membership_G1(const ep_t p){
 
 // checks if input point s is on the curve E2 
 // and is in the subgroup G2
-// membership check in G2 is using a naive scalar multiplication by the group order
+// membership check in G2 is using a scalar multiplication by the group order
 // TODO: switch to the faster Bowe check 
 int check_membership_G2(const ep2_t p){
 #if MEMBERSHIP_CHECK
@@ -216,7 +215,7 @@ static void free_tree(node* root) {
     free(root);
 }
 
-// verify the binary tree and fill the results using recursive batch verification.
+// verify the binary tree and fill the results using recursive batch verifications.
 static void bls_batchVerify_tree(const node* root, const int len, byte* results, 
         const byte* data, const int data_len) {
 
@@ -232,7 +231,7 @@ static void bls_batchVerify_tree(const node* root, const int len, byte* results,
     }
 
     // check if root is a leaf
-    if (root->left == NULL) {
+    if (root->left == NULL) { // no need to check the right side
         *results = INVALID;
         return;
     }
@@ -247,6 +246,11 @@ static void bls_batchVerify_tree(const node* root, const int len, byte* results,
 
 // Batch verifies the validity of a multiple BLS signatures of the 
 // same message under multiple public keys.
+//
+// - membership checks of all signatures is verified upfront.
+// - use random coefficients for signatures and public keys at the same index.
+// - optimize the verification by verifying an aggregated signature against an aggregated
+//  public key, and use a recursive verification to find invalid signatures.  
 void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
      const byte* sigs_bytes, const byte* data, const int data_len) {  
 
@@ -260,7 +264,11 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
     for (int i=0; i < sigs_len; i++) {
         ep_new(sigs[i]);
         ep2_new(pks[i]);
-        // convert the signature points
+        // convert the signature points:
+        // - invalid points are stored as infinity points with an invalid result, so that
+        // the tree aggregations remain valid.
+        // - valid points are multiplied by a random scalar (same for public keys at same index)
+        // to make sure a signature at index (i) is verified against the public key at the same index.
         if ( ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK || \
                 check_membership_G1(&sigs[i]) != VALID) {
             // set signature as infinity and set result as invald
