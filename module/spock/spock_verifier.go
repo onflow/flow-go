@@ -83,7 +83,7 @@ func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (bool, error) {
 
 func (v *Verifier) matchReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
-	unmatchedReceipts, _ := v.receipts[receipt.ExecutionResult.ID()]
+	unmatchedReceipts := v.receipts[receipt.ExecutionResult.ID()]
 	matchedReceipt := false
 
 	// get idenitity of candidate receipt
@@ -113,9 +113,9 @@ MatchingReceiptsLoop:
 
 		// attempt to match every spock in the receipt with the candidate receipt
 		// if not verified then skip receipt
-		for index, spock := range u.Spocks {
+		for _, chunk := range receipt.ExecutionResult.Chunks {
 			// check if spocks match
-			verified, err := crypto.SPOCKVerify(identity.StakingPubKey, receipt.Spocks[index], uIdentity.StakingPubKey, spock)
+			verified, err := crypto.SPOCKVerify(identity.StakingPubKey, receipt.Spocks[chunk.Index], uIdentity.StakingPubKey, u.Spocks[chunk.Index])
 			if err != nil {
 				return false, fmt.Errorf("could not verify spocks: %w", err)
 			}
