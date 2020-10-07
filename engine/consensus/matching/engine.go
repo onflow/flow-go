@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/module/spock"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -33,27 +35,27 @@ import (
 // from verification nodes), and saves the seals into seals mempool for adding
 // into a new block.
 type Engine struct {
-	unit                    *engine.Unit                                 // used to control startup/shutdown
-	log                     zerolog.Logger                               // used to log relevant actions with context
-	metrics                 module.EngineMetrics                         // used to track sent and received messages
-	tracer                  module.Tracer                                // used to trace execution
-	mempool                 module.MempoolMetrics                        // used to track mempool size
-	state                   protocol.State                               // used to access the  protocol state
-	me                      module.Local                                 // used to access local node information
-	requester               module.Requester                             // used to request missing execution receipts by block ID
-	resultsDB               storage.ExecutionResults                     // used to check previous results are known
-	headersDB               storage.Headers                              // used to check sealed headers
-	indexDB                 storage.Index                                // used to check payloads for results
-	results                 mempool.Results                              // holds execution results in memory
-	approvals               mempool.Approvals                            // holds result approvals in memory
-	seals                   mempool.Seals                                // holds block seals in memory
-	missing                 map[flow.Identifier]uint                     // track how often a block was missing
-	assigner                module.ChunkAssigner                         // chunk assignment object
-	checkingSealing         *atomic.Bool                                 // used to rate limit the checksealing call
-	requestReceiptThreshold uint                                         // how many blocks between sealed/finalized before we request execution receipts
-	maxUnsealedResults      int                                          // how many unsealed results to check when check sealing
-	requireApprovals        bool                                         // flag to disable verifying chunk approvals
-	unmatchedSpockReceipts  map[flow.Identifier][]*flow.ExecutionReceipt // map of result id to array of receipts with matching spocks
+	unit                    *engine.Unit             // used to control startup/shutdown
+	log                     zerolog.Logger           // used to log relevant actions with context
+	metrics                 module.EngineMetrics     // used to track sent and received messages
+	tracer                  module.Tracer            // used to trace execution
+	mempool                 module.MempoolMetrics    // used to track mempool size
+	state                   protocol.State           // used to access the  protocol state
+	me                      module.Local             // used to access local node information
+	requester               module.Requester         // used to request missing execution receipts by block ID
+	resultsDB               storage.ExecutionResults // used to check previous results are known
+	headersDB               storage.Headers          // used to check sealed headers
+	indexDB                 storage.Index            // used to check payloads for results
+	results                 mempool.Results          // holds execution results in memory
+	approvals               mempool.Approvals        // holds result approvals in memory
+	seals                   mempool.Seals            // holds block seals in memory
+	missing                 map[flow.Identifier]uint // track how often a block was missing
+	assigner                module.ChunkAssigner     // chunk assignment object
+	checkingSealing         *atomic.Bool             // used to rate limit the checksealing call
+	requestReceiptThreshold uint                     // how many blocks between sealed/finalized before we request execution receipts
+	maxUnsealedResults      int                      // how many unsealed results to check when check sealing
+	requireApprovals        bool                     // flag to disable verifying chunk approvals
+	spockVerifier           module.SpockVerifier     // spock verification manager
 }
 
 // New creates a new collection propagation engine.
@@ -99,7 +101,7 @@ func New(
 		maxUnsealedResults:      200,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
-		unmatchedSpockReceipts:  make(map[flow.Identifier][]*flow.ExecutionReceipt),
+		spockVerifier:           spock.NewVerifier(state),
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
@@ -276,50 +278,10 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.log.Info().Msg("execution result added to mempool")
 
-	// check if result id exists in matchingSpockReceipts else add empty array
-	unmatchedReceipts, ok := e.unmatchedSpockReceipts[result.ID()]
-	if ok {
-		matchedReceipt := false
-
-	MatchingReceiptsLoop:
-		for _, u := range unmatchedReceipts {
-			// get `m` receipt identity
-			mIdentity, err := e.state.AtBlockID(u.ExecutionResult.BlockID).Identity(originID)
-			if err != nil {
-				if protocol.IsIdentityNotFound(err) {
-					return engine.NewInvalidInputErrorf("could not get executor identity: %w", err)
-				}
-				// unknown exception
-				return fmt.Errorf("could not get executor identity: %w", err)
-			}
-
-			for index, spock := range u.Spocks {
-				// check if spocks match
-				verified, err := crypto.SPOCKVerify(identity.StakingPubKey, receipt.Spocks[index], mIdentity.StakingPubKey, spock)
-				if err != nil {
-					return fmt.Errorf("could not verify spocks: %w", err)
-				}
-				if !verified {
-					continue MatchingReceiptsLoop
-				}
-			}
-
-			// all spocks matched so we should exit for loop
-			// since all spocks match we dont need to add this into an array
-			matchedReceipt = true
-			break
-		}
-
-		// if not matched add to receipt array
-		if !matchedReceipt {
-			e.unmatchedSpockReceipts[result.ID()] = append(e.unmatchedSpockReceipts[result.ID()], receipt)
-		}
-
-	} else {
-		// if resultID does not exist create
-		receipts := make([]*flow.ExecutionReceipt, 0)
-		receipts = append(receipts, receipt)
-		e.unmatchedSpockReceipts[result.ID()] = receipts
+	// add receipt to spock verifier
+	err = e.spockVerifier.AddReceipt(receipt)
+	if err != nil {
+		return fmt.Errorf("could not add receipt to spock verifier: %w", err)
 	}
 
 	// kick off a check for potential seal formation
@@ -651,7 +613,7 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 		}
 
 		// check if spocks match
-		valid, err := e.validateSpock(approval)
+		valid, err := e.spockVerifier.VerifyApproval(approval)
 		if err != nil {
 			return false, fmt.Errorf("could get validate spocks: %w", err)
 		}
@@ -675,47 +637,6 @@ func (e *Engine) matchChunk(result *flow.ExecutionResult, chunk *flow.Chunk, ass
 	//  * This is the happy path (requires just one approval per chunk). Should
 	//    be +2/3 of all currently staked verifiers.
 	return len(validApprovers) > 0, nil
-}
-
-// validateSpockschecks if the spock from an approval matches the corresponding one in the receipts
-// TODO: needs testing
-func (e *Engine) validateSpock(approval *flow.ResultApproval) (bool, error) {
-
-	// find identities
-	approver, err := e.state.AtBlockID(approval.Body.BlockID).Identity(approval.Body.ApproverID)
-	if err != nil {
-		return false, fmt.Errorf("could not find approver identity")
-	}
-
-	// TODO: this needs to be reworked to check against all receipts in unmatchedSpockReceipts
-	spockMatched := false
-	receipts := e.unmatchedSpockReceipts[approval.Body.ExecutionResultID]
-	for _, receipt := range receipts {
-		executor, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(receipt.ExecutorID)
-		if err != nil {
-			return false, fmt.Errorf("could not find executor identity")
-		}
-
-		id := receipt.ExecutionResult.ID()
-		e.log.Debug().
-			Str("approval_id", approver.NetworkPubKey.String()).
-			Str("executor_id", executor.NetworkPubKey.String()).
-			Hex("spock_approval", approval.Body.Spock).
-			Hex("spock_receipt", receipt.Spocks[approval.Body.ChunkIndex]).
-			Hex("result_id", id[:]).Msg("found receipt")
-
-		// verify spock
-		verified, err := crypto.SPOCKVerify(approver.StakingPubKey, approval.Body.Spock, executor.StakingPubKey, receipt.Spocks[approval.Body.ChunkIndex])
-		if err != nil {
-			return false, fmt.Errorf("could not verify spocks: %w", err)
-		}
-		if verified {
-			spockMatched = true
-			break
-		}
-	}
-
-	return spockMatched, nil
 }
 
 // sealResult records a matched result in the result database, creates a seal
