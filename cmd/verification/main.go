@@ -237,18 +237,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
-
-			vmOpts := []fvm.Option{
-				fvm.WithChain(node.RootChainID.Chain()),
-				fvm.WithBlocks(node.Storage.Blocks),
-			}
-			if node.RootChainID.Chain() == flow.Testnet {
-				vmOpts = append(vmOpts,
-					fvm.WithRestrictedAccountCreation(false),
-					fvm.WithRestrictedDeployment(false),
-				)
-			}
-			vmCtx := fvm.NewContext(vmOpts...)
+			vmCtx := fvm.NewContext(node.FvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
