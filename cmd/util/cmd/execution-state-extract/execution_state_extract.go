@@ -60,7 +60,7 @@ func getMappingsFromDatabase(db *badger.DB) (map[string]delta.Mapping, error) {
 	return mappings, err
 }
 
-func readMegamappings(filename string) (map[string]delta.Mapping, error) {
+func ReadMegamappings(filename string) (map[string]delta.Mapping, error) {
 	var readMappings = map[string]delta.Mapping{}
 	var hexencodedRead map[string]delta.Mapping
 

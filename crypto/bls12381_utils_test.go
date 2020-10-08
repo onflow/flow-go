@@ -98,7 +98,7 @@ func BenchmarkG2(b *testing.B) {
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
 	_ = newBLSBLS12381()
-	input := make([]byte, opSwUInputLenBLSBLS12381)
+	input := make([]byte, minHashSizeBLSBLS12381)
 	for i := 0; i < len(input); i++ {
 		input[i] = byte(i)
 	}

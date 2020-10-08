@@ -96,11 +96,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
-
-			vmCtx := fvm.NewContext(
-				fvm.WithChain(node.RootChainID.Chain()),
-				fvm.WithBlocks(node.Storage.Blocks),
-			)
+			vmCtx := fvm.NewContext(node.FvmOptions...)
 
 			manager, err := computation.New(
 				node.Logger,
