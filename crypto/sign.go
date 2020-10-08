@@ -3,6 +3,9 @@ package crypto
 
 import (
 	"fmt"
+	"crypto/elliptic"
+
+	"github.com/btcsuite/btcd/btcec"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -25,12 +28,27 @@ type signer interface {
 func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	switch algo {
 	case ECDSAP256:
-		return newECDSAP256(), nil
+		return p256Instance, nil
 	case ECDSASecp256k1:
-		return newECDSASecp256k1(), nil
+		return secp256k1Instance, nil
 	default:
 		return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
 	}
+}
+
+// Initialize the context of all curves supported by ECDSA
+func initNonRelic() {
+	// P-256
+	p256Instance = &(ecdsaAlgo{
+		curve: elliptic.P256(),
+		algo:  ECDSAP256,
+	})
+
+	// secp256k1
+	secp256k1Instance = &(ecdsaAlgo{
+		curve: btcec.S256(),
+		algo:  ECDSASecp256k1,
+	})
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed.

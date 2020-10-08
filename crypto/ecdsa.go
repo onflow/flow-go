@@ -14,11 +14,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/onflow/flow-go/crypto/hash"
-
-	"github.com/btcsuite/btcd/btcec"
 )
 
 // ecdsaAlgo embeds SignAlgo
@@ -29,37 +26,12 @@ type ecdsaAlgo struct {
 	algo SigningAlgorithm
 }
 
-//  Once variables to use a unique instance
+//  ECDSA contexts for each supported curve
+// NIST P-256 curve
 var p256Instance *ecdsaAlgo
-var p256Once sync.Once
-
-// returns NIST P-256 curve
-func newECDSAP256() *ecdsaAlgo {
-	p256Once.Do(func() {
-		p256Instance = &(ecdsaAlgo{
-			curve: elliptic.P256(),
-			algo:  ECDSAP256,
-		})
-	})
-	return p256Instance
-}
-
-//  Once variables to use a unique instance
+// SECG secp256k1 curve https://www.secg.org/sec2-v2.pdf
 var secp256k1Instance *ecdsaAlgo
-var secp256k1Once sync.Once
-
-// returns SECG secp256k1 curve.
-// https://www.secg.org/sec2-v2.pdf
-func newECDSASecp256k1() *ecdsaAlgo {
-	secp256k1Once.Do(func() {
-		secp256k1Instance = &(ecdsaAlgo{
-			curve: btcec.S256(),
-			algo:  ECDSASecp256k1,
-		})
-	})
-	return secp256k1Instance
-}
-
+ 
 func bitsToBytes(bits int) int {
 	return (bits + 7) >> 3
 }

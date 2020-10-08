@@ -36,7 +36,7 @@ import "C"
 // is commutative.
 // No subgroup membership check is performed on the input signatures.
 func AggregateSignatures(sigs []Signature) (Signature, error) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	for _, sig := range sigs {
@@ -68,7 +68,7 @@ func AggregateSignatures(sigs []Signature) (Signature, error) {
 // is commutative. The slice can be empty.
 // No check is performed on the input private keys.
 func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	scalars := make([]scalar, 0, len(keys))
 	for _, sk := range keys {
 		if sk.Algorithm() != BLSBLS12381 {
@@ -100,7 +100,7 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // is commutative. The slice can be empty.
 // No check is performed on the input public keys.
 func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	points := make([]pointG2, 0, len(keys))
 	for _, pk := range keys {
 		if pk.Algorithm() != BLSBLS12381 {
@@ -134,7 +134,7 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 // is commutative. The slice of keys to be removed can be empty.
 // No check is performed on the input public keys.
 func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	if aggKey.Algorithm() != BLSBLS12381 {
 		return nil, fmt.Errorf("all keys must be BLS keys")
 	}

@@ -33,7 +33,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -46,22 +45,9 @@ type blsBLS12381Algo struct {
 	algo SigningAlgorithm
 }
 
-//  Once variable to use a unique instance
+//  BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
-var once sync.Once
 
-// returns a new BLS signer on curve BLS12-381
-func newBLSBLS12381() *blsBLS12381Algo {
-	once.Do(func() {
-		blsInstance = &blsBLS12381Algo{
-			algo: BLSBLS12381,
-		}
-		if err := blsInstance.init(); err != nil {
-			panic(fmt.Sprintf("initialization of BLS has failed: %s", err.Error()))
-		}
-	})
-	return blsInstance
-}
 
 // Sign signs an array of bytes using the private key
 //
@@ -83,7 +69,7 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
-	return newBLSBLS12381().blsSign(&sk.scalar, h), nil
+	return blsInstance.blsSign(&sk.scalar, h), nil
 }
 
 // blsKMACFunction is the customizer used for KMAC in BLS
@@ -123,7 +109,7 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 
-	return newBLSBLS12381().blsVerify(&pk.point, s, h), nil
+	return blsInstance.blsVerify(&pk.point, s, h), nil
 }
 
 // generatePrivateKey generates a private key for BLS on BLS12381 curve.
