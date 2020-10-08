@@ -172,15 +172,20 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	// send the vote the desired recipient
-	err := e.con.Unicast(vote, recipientID)
-	if err != nil {
-		return fmt.Errorf("could not send vote: %w", err)
-	}
+	// TODO: There is currently an issue with the networking layer sporatically taking a long time on 1-1 outgoing messages
+	// Since the result of sending a vote is non-critical, do not block on sending out the vote.
+	go func() {
+		// send the vote the desired recipient
+		err := e.con.Unicast(vote, recipientID)
+		if err != nil {
+			log.Err(err).Msgf("could not send vote to %s", recipientID)
+			return
+		}
 
-	e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
+		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
 
-	log.Info().Msg("block vote transmitted")
+		log.Info().Msg("block vote transmitted")
+	}()
 
 	return nil
 }
