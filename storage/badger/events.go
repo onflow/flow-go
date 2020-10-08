@@ -23,7 +23,7 @@ func NewEvents(db *badger.DB) *Events {
 func (e *Events) Store(blockID flow.Identifier, events []flow.Event) error {
 	return operation.RetryOnConflict(e.db.Update, func(btx *badger.Txn) error {
 		for _, event := range events {
-			err := operation.InsertEvent(blockID, event)(btx)
+			err := operation.SkipDuplicates(operation.InsertEvent(blockID, event))(btx)
 			if err != nil {
 				return fmt.Errorf("could not insert event: %w", err)
 			}
