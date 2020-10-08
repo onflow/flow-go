@@ -52,5 +52,5 @@ func (c ConnManager) Connected(n network.Network, con network.Conn) {
 
 // called by libp2p when a connection closed
 func (c ConnManager) Disconnected(n network.Network, con network.Conn) {
-	c.log.Debug().Str("remote_peer",  con.RemoteMultiaddr().String()).Int("total_conns", len(n.Conns())).Msg("closed connection")
+	c.log.Debug().Str("remote_peer", con.RemoteMultiaddr().String()).Int("total_conns", len(n.Conns())).Msg("closed connection")
 }
