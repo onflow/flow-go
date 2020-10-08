@@ -53,10 +53,12 @@ var once sync.Once
 // returns a new BLS signer on curve BLS12-381
 func newBLSBLS12381() *blsBLS12381Algo {
 	once.Do(func() {
-		blsInstance = &(blsBLS12381Algo{
+		blsInstance = &blsBLS12381Algo{
 			algo: BLSBLS12381,
-		})
-		blsInstance.init()
+		}
+		if err := blsInstance.init(); err != nil {
+			panic(fmt.Sprintf("initialization of BLS has failed: %s", err.Error()))
+		}
 	})
 	return blsInstance
 }
@@ -308,7 +310,7 @@ func (a *blsBLS12381Algo) init() error {
 	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||
 		pubKeyLengthBLSBLS12381 != PubKeyLenBLSBLS12381 ||
 		prKeyLengthBLSBLS12381 != PrKeyLenBLSBLS12381 {
-		return errors.New("BLS on BLS-12381 settings are not correct")
+		return errors.New("BLS-12381 settings in the Go and C layers are not consistent")
 	}
 	return nil
 }
