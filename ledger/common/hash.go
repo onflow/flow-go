@@ -38,6 +38,7 @@ func GetDefaultHashForHeight(height int) []byte {
 }
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
+// note that we don't include the keys here as they are already included in the path
 func HashLeaf(path []byte, value []byte) []byte {
 	hasher := hash.NewSHA3_256()
 	_, err := hasher.Write(path)
