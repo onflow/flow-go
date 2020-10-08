@@ -9,16 +9,16 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Verifier provides functionality to verify spocks (not thread safe)
+// Verifier provides functionality to verify SPoCK proofs
 type Verifier struct {
 	// state is used to query identities at a blockId to get StakingPublicKey
 	protocolState protocol.ReadOnlyState
 
-	// map of receipts by result ID that do not have matching spocks
-	// For instance, if there are 5 receipts that has 5 SpockSets, say, Spockset1, Spockset2, Spockset3, Spockset4, and Spockset5.
+	// map of receipts by result ID that do not have matching SPoCK proofs
+	// For instance, if there are 5 receipts that have 5 SpockSets, say, Spockset1, Spockset2, Spockset3, Spockset4, and Spockset5.
 	// If Spockset1 and Spockset2 are for ER1, and they match with each other;
 	// And Spockset3, Spockset4, Spockset5 are for ER2. and they don't match with each other.
-	// Then there are 2 category, the first category has bucket: ER1_Spockset1, and the second category has buckets: ER2_Spockset3, ER3_Spockset4, and ER4_Spockset5.
+	// Then there are 2 category, the first category has bucket: ER1_Spockset1, and the second category has buckets: ER2_Spockset3, ER2_Spockset4, and ER2_Spockset5.
 	// When we receive each approval, we will first check which category it should go, and find all the buckets to try matching against.
 	receipts map[flow.Identifier][]*flow.ExecutionReceipt
 }
@@ -31,8 +31,7 @@ func NewVerifier(state protocol.ReadOnlyState) *Verifier {
 	}
 }
 
-// AddReceipt adds a receipt into map if the spocks do not match any other receipts
-// with the same result id
+// AddReceipt adds a receipt into map if the SPoCK proofs do not match any other receipt
 func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 	resultID := receipt.ExecutionResult.ID()
 
@@ -45,7 +44,7 @@ func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 		return nil
 	}
 
-	// check if candidate receipt spocks match spocks in map
+	// check if candidate receipt SPoCK proofs match proofs in map
 	matched, err := v.matchReceipt(receipt)
 	if err != nil {
 		return fmt.Errorf("could not match receipt: %w", err)
@@ -56,7 +55,7 @@ func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 		v.receipts[resultID] = append(v.receipts[resultID], receipt)
 	}
 
-	// if matched we do nothing (transitive property of spock verification)
+	// if matched we do nothing (strong-transitive property of the SPoCK scheme)
 
 	return nil
 }
@@ -76,7 +75,7 @@ func (v *Verifier) ClearReceipts(resultID flow.Identifier) bool {
 	return true
 }
 
-// VerifyApproval verifies an approval with all the distict receipts for the approvals
+// VerifyApproval verifies an approval with all the distinct receipts for the approvals
 // result id and returns true if spocks match else false
 func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (bool, error) {
 	// find identities
@@ -106,9 +105,7 @@ func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (bool, error) {
 }
 
 func (v *Verifier) matchReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
-
 	unmatchedReceipts := v.receipts[receipt.ExecutionResult.ID()]
-	matchedReceipt := false
 
 	// get idenitity of candidate receipt
 	identity, err := v.protocolState.AtBlockID(receipt.ExecutionResult.BlockID).Identity(receipt.ExecutorID)
@@ -150,9 +147,8 @@ MatchingReceiptsLoop:
 
 		// all spocks matched so we should exit for loop
 		// since all spocks match we dont need to add this into an array
-		matchedReceipt = true
-		break
+		return true, nil
 	}
 
-	return matchedReceipt, nil
+	return false, nil
 }
