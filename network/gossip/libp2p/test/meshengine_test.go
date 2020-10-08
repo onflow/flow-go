@@ -45,7 +45,7 @@ func TestMeshNetTestSuite(t *testing.T) {
 func (m *MeshEngineTestSuite) SetupTest() {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
-	golog.SetAllLoggers(golog.LevelInfo)
+	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	var err error
 	m.ids, m.mws, m.nets, err = generateIDsMiddlewaresNetworks(count, logger, 100, nil, nil, false)

@@ -42,7 +42,7 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *EchoEngineTestSuite) SetupTest() {
 	const count = 2
-	golog.SetAllLoggers(golog.LevelInfo)
+	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	var err error
 	s.ids, s.mws, s.nets, err = generateIDsMiddlewaresNetworks(count, logger, 100, nil, nil, false)

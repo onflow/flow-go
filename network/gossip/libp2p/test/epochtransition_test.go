@@ -43,7 +43,7 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 
 func (ts *EpochTransitionTestSuite) SetupTest() {
 	nodeCount := 10
-	golog.SetAllLoggers(golog.LevelDebug)
+	golog.SetAllLoggers(golog.LevelError)
 	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	// create ids
