@@ -97,10 +97,17 @@ func main() {
 
 			vm := fvm.New(rt)
 
-			vmCtx := fvm.NewContext(
+			vmOpts := []fvm.Option{
 				fvm.WithChain(node.RootChainID.Chain()),
 				fvm.WithBlocks(node.Storage.Blocks),
-			)
+			}
+			if node.RootChainID.Chain() == flow.Testnet {
+				vmOpts = append(vmOpts,
+					fvm.WithRestrictedAccountCreation(false),
+					fvm.WithRestrictedDeployment(false),
+				)
+			}
+			vmCtx := fvm.NewContext(vmOpts...)
 
 			manager, err := computation.New(
 				node.Logger,
