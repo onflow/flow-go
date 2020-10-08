@@ -104,8 +104,8 @@ func main() {
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
-			pool, err = stdmap.NewTransactions(txLimit)
-			return err
+			pool = stdmap.NewTransactions(txLimit)
+			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
 			followerBuffer = buffer.NewPendingBlocks()

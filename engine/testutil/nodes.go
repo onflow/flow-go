@@ -140,9 +140,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 
 	node := GenericNode(t, hub, identity, identities, chainID, options...)
 
-	pool, err := stdmap.NewTransactions(1000)
-	require.NoError(t, err)
-
+	pool := stdmap.NewTransactions(1000)
 	transactions := storage.NewTransactions(node.Metrics, node.DB)
 	collections := storage.NewCollections(node.DB, transactions)
 
