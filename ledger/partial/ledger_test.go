@@ -15,14 +15,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// func TestNewPartialLedger(t *testing.T) {
-// 	p, s := utils.TrieBatchProofFixture()
-// 	encp := encoding.EncodeTrieBatchProof(p)
-// 	pled, err := partial.NewLedger(encp, s)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, pled.InitState(), s)
-// }
-
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
