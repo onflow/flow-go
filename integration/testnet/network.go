@@ -487,9 +487,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// tests only start 1 verification node
 			nodeContainer.addFlag("chunk-alpha", "1")
 
-			// require one approval per chunk when sealing
-			nodeContainer.addFlag("require-one-approval", "true")
-
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
