@@ -45,19 +45,11 @@ func TestMeshNetTestSuite(t *testing.T) {
 func (m *MeshEngineTestSuite) SetupTest() {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
-	const cacheSize = 100
 	golog.SetAllLoggers(golog.LevelInfo)
-
-	m.ids = CreateIDs(count)
-
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := createMiddleware(logger, m.ids)
+	var err error
+	m.ids, m.mws, m.nets, err = generateIDsMiddlewaresNetworks(count, logger, 100, nil, nil, false)
 	require.NoError(m.Suite.T(), err)
-	m.mws = mws
-
-	nets, err := createNetworks(logger, m.mws, m.ids, cacheSize, false)
-	require.NoError(m.Suite.T(), err)
-	m.nets = nets
 }
 
 // TearDownTest closes the networks within a specified timeout

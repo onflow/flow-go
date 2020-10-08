@@ -115,7 +115,7 @@ func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 	// trigger an epoch transition for all networks
 	for _, n := range newNetworks {
-		n.EpochTransition(uint64(ts.currentEpoch), nil)
+		n.EpochSetupPhaseStarted(uint64(ts.currentEpoch), nil)
 	}
 
 	threshold := len(ts.ids) / 2
@@ -160,7 +160,7 @@ func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
 		if i == removeIndex {
 			continue
 		}
-		n.EpochTransition(uint64(ts.currentEpoch), nil)
+		n.EpochSetupPhaseStarted(uint64(ts.currentEpoch), nil)
 	}
 
 	removedID := ts.ids[removeIndex]

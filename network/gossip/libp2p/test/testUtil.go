@@ -2,11 +2,15 @@ package test
 
 import (
 	"fmt"
+	"reflect"
+	"runtime"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
-	mock2 "github.com/stretchr/testify/mock"
+	testifymock "github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
@@ -20,6 +24,8 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+var rootBlockID = unittest.IdentifierFixture().String()
 
 // generateIDs generate flow Identities with a valid port and networking key
 func generateIDs(n int) ([]*flow.Identity, []crypto.PrivateKey, error) {
@@ -186,6 +192,22 @@ func generateStateSnapshot(ids flow.IdentityList) *protocol.ReadOnlyState {
 	state := new(protocol.ReadOnlyState)
 	snapshot := new(protocol.Snapshot)
 	state.On("Final").Return(snapshot, nil)
-	snapshot.On("Identities", mock2.Anything).Return(ids, nil)
+	snapshot.On("Identities", testifymock.Anything).Return(ids, nil)
+	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
 	return state
+}
+
+// OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
+func optionalSleep(send ConduitSendWrapperFunc) {
+	sendFuncName := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
+	if strings.Contains(sendFuncName, "Multicast") || strings.Contains(sendFuncName, "Publish") {
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// GenerateNetworkingKey generates a Flow ECDSA key using the given seed
+func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	copy(seed, s[:])
+	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }

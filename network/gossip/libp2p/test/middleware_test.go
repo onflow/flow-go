@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	message2 "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/metrics"
@@ -22,12 +21,9 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p/mock"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const testChannel = "test-channel"
-
-var rootID = unittest.BlockFixture().ID().String()
 
 type MiddlewareTestSuite struct {
 	suite.Suite
@@ -347,50 +343,6 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	}, 2*time.Second, time.Millisecond)
 }
 
-// createMiddelwares creates middlewares with mock overlay for each middleware
-func (m *MiddlewareTestSuite) createMiddleWares(count int) ([]flow.Identifier, []*libp2p.Middleware) {
-	var mws []*libp2p.Middleware
-	var ids []flow.Identifier
-
-	// creates the middlewares
-	for i := 0; i < count; i++ {
-		// generating ids of the nodes
-		// as [32]byte{(i+1),0,...,0}
-		var target [32]byte
-		target[0] = byte(i + 1)
-		targetID := flow.Identifier(target)
-		ids = append(ids, targetID)
-
-		// generates logger and coder of the nodes
-		logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-		codec := json.NewCodec()
-
-		key := m.generateNetworkingKey(target[:])
-
-		// creates new middleware (with an arbitrary genesis block id)
-		mw, err := libp2p.NewMiddleware(logger,
-			codec,
-			"0.0.0.0:0",
-			targetID,
-			key,
-			m.metrics,
-			libp2p.DefaultMaxUnicastMsgSize,
-			libp2p.DefaultMaxPubSubMsgSize,
-			rootID)
-		require.NoError(m.Suite.T(), err)
-
-		mws = append(mws, mw)
-	}
-
-	// create the mock overlay (i.e., network) for each middleware
-	for i := 0; i < count; i++ {
-		overlay := &mock.Overlay{}
-		m.ov = append(m.ov, overlay)
-	}
-
-	return ids, mws
-}
-
 func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...string) *message.Message {
 	payload := "hello"
 
@@ -417,13 +369,4 @@ func (m *MiddlewareTestSuite) stopMiddlewares() {
 	m.ov = nil
 	m.ids = nil
 	m.size = 0
-}
-
-// generateNetworkingKey generates a Flow ECDSA key using the given seed
-func (m *MiddlewareTestSuite) generateNetworkingKey(seed []byte) crypto.PrivateKey {
-	s := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
-	copy(s, seed)
-	prvKey, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, s)
-	require.NoError(m.Suite.T(), err)
-	return prvKey
 }
