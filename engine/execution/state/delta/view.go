@@ -16,8 +16,8 @@ type GetRegisterFunc func(owner, controller, key string) (flow.RegisterValue, er
 // underlying data source.
 type View struct {
 	delta       Delta
-	regTouchSet map[string]*flow.RegisterID // contains all the registers that have been touched (either read or written to)
-	readsCount  uint64                      // contains the total number of reads
+	regTouchSet map[string]flow.RegisterID // contains all the registers that have been touched (either read or written to)
+	readsCount  uint64                     // contains the total number of reads
 	// SpocksSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing SpocksSecret
 	// for views other than collection views to improve performance
@@ -36,7 +36,7 @@ type Snapshot struct {
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:             NewDelta(),
-		regTouchSet:       make(map[string]*flow.RegisterID),
+		regTouchSet:       make(map[string]flow.RegisterID),
 		readFunc:          readFunc,
 		spockSecretHasher: hash.NewSHA3_256(),
 	}
@@ -56,7 +56,7 @@ func (v *View) Interactions() *Snapshot {
 	}
 
 	for _, id := range v.regTouchSet {
-		reads = append(reads, *id)
+		reads = append(reads, id)
 	}
 
 	spockSecHashSum := v.spockSecretHasher.SumHash()
@@ -114,7 +114,7 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	registerID := toRegisterID(owner, controller, key)
 
 	// capture register touch
-	v.regTouchSet[registerID.String()] = &registerID
+	v.regTouchSet[registerID.String()] = registerID
 
 	// increase reads
 	v.readsCount++
@@ -136,7 +136,7 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
 	// capture register touch
 	registerID := toRegisterID(owner, controller, key)
 
-	v.regTouchSet[registerID.String()] = &registerID
+	v.regTouchSet[registerID.String()] = registerID
 	// add key value to delta
 	v.delta.Set(owner, controller, key, value)
 }
@@ -155,7 +155,7 @@ func (v *View) Touch(owner, controller, key string) {
 	k := toRegisterID(owner, controller, key)
 
 	// capture register touch
-	v.regTouchSet[k.String()] = &k
+	v.regTouchSet[k.String()] = k
 	// increase reads
 	v.readsCount++
 }
@@ -175,7 +175,7 @@ func (v *View) Delta() Delta {
 // readFunc s.
 func (v *View) MergeView(child *View) {
 	for _, id := range child.Interactions().RegisterTouches() {
-		v.regTouchSet[id.String()] = &id
+		v.regTouchSet[id.String()] = id
 	}
 	// SpockSecret is order aware
 	// TODO return the error and handle it properly on other places
