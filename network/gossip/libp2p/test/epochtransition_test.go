@@ -38,7 +38,7 @@ type EpochTransitionTestSuite struct {
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
-	// suite.Run(t, new(EpochTransitionTestSuite))
+	suite.Run(t, new(EpochTransitionTestSuite))
 }
 
 func (ts *EpochTransitionTestSuite) SetupTest() {
@@ -81,6 +81,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 
 // TearDownTest closes the networks within a specified timeout
 func (ts *EpochTransitionTestSuite) TearDownTest() {
+	ts.T().Skip("skipping till discovery is updated to add and remove nodes on-demand")
 	for _, net := range ts.nets {
 		select {
 		// closes the network
