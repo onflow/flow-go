@@ -21,6 +21,9 @@ require (
 	gopkg.in/yaml.v2 v2.2.8
 )
 
+// temp fix for MacOS build. See comment https://github.com/ory/dockertest/issues/208#issuecomment-686820414
+replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
+
 replace github.com/fxamacker/cbor/v2 => github.com/turbolent/cbor/v2 v2.2.1-0.20200911003300-cac23af49154
 
 replace github.com/onflow/flow-go => ../
