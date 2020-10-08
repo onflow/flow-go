@@ -201,31 +201,6 @@ func (f *MTrieStorage) GetRegistersWithProof(
 	return values, proofToGo, err
 }
 
-// GetRegisterTouches reads values and proofs for the given registers and
-// returns an slice of register touches
-// func (f *MTrieStorage) GetRegisterTouches(
-// 	registerIDs []flow.LegacyRegisterID,
-// 	stateCommitment flow.StateCommitment,
-// ) (
-// 	[]flow.RegisterTouch,
-// 	error,
-// ) {
-// 	values, proofs, err := f.GetRegistersWithProof(registerIDs, stateCommitment)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	rets := make([]flow.RegisterTouch, 0, len(registerIDs))
-// 	for i, reg := range registerIDs {
-// 		rt := flow.RegisterTouch{
-// 			RegisterID: reg,
-// 			Value:      values[i],
-// 			Proof:      proofs[i],
-// 		}
-// 		rets = append(rets, rt)
-// 	}
-// 	return rets, nil
-// }
-
 // UpdateRegistersWithProof updates the values at the given registers and
 // provides proof for those registers after update
 func (f *MTrieStorage) UpdateRegistersWithProof(

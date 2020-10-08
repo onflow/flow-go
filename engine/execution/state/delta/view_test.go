@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -194,6 +195,8 @@ func TestView_MergeView(t *testing.T) {
 
 	registerID2 := "vegetable"
 
+	registerID3 := "diary"
+
 	t.Run("EmptyView", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -327,6 +330,30 @@ func TestView_MergeView(t *testing.T) {
 		s := v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock1.SumHash()))
 	})
+
+	t.Run("RegisterTouchesDataMerge", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+
+		chView := v.NewChild()
+		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		chView.Set(registerID3, "", "", flow.RegisterValue("milk"))
+
+		v.MergeView(chView)
+
+		reads := v.Interactions().Reads
+
+		require.Len(t, reads, 3)
+		assert.ElementsMatch(t, []flow.RegisterID{
+			flow.NewRegisterID(registerID1, "", ""),
+			flow.NewRegisterID(registerID2, "", ""),
+			flow.NewRegisterID(registerID3, "", ""),
+		}, reads)
+	})
+
 }
 
 func TestView_RegisterTouches(t *testing.T) {
@@ -362,6 +389,110 @@ func TestView_RegisterTouches(t *testing.T) {
 
 		touches := v.Interactions().RegisterTouches()
 		assert.Len(t, touches, 2)
+	})
+}
+
+func TestView_AllRegisters(t *testing.T) {
+	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		regs := v.Interactions().AllRegisters()
+		assert.Empty(t, regs)
+	})
+
+	t.Run("Set and Get", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if owner == "a" {
+				return flow.RegisterValue("a_value"), nil
+			}
+
+			if owner == "b" {
+				return flow.RegisterValue("b_value"), nil
+			}
+			return nil, nil
+		})
+
+		_, err := v.Get("a", "", "")
+		assert.NoError(t, err)
+
+		_, err = v.Get("b", "", "")
+		assert.NoError(t, err)
+
+		v.Set("c", "", "", flow.RegisterValue("c_value"))
+		v.Set("d", "", "", flow.RegisterValue("d_value"))
+
+		v.Touch("e", "", "")
+		v.Touch("f", "", "")
+
+		allRegs := v.Interactions().AllRegisters()
+		assert.Len(t, allRegs, 6)
+	})
+	t.Run("With Merge", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if owner == "a" {
+				return flow.RegisterValue("a_value"), nil
+			}
+
+			if owner == "b" {
+				return flow.RegisterValue("b_value"), nil
+			}
+			return nil, nil
+		})
+
+		vv := v.NewChild()
+		_, err := vv.Get("a", "", "")
+		assert.NoError(t, err)
+
+		_, err = vv.Get("b", "", "")
+		assert.NoError(t, err)
+
+		vv.Set("c", "", "", flow.RegisterValue("c_value"))
+		vv.Set("d", "", "", flow.RegisterValue("d_value"))
+
+		vv.Touch("e", "", "")
+		vv.Touch("f", "", "")
+
+		v.MergeView(vv)
+		allRegs := v.Interactions().AllRegisters()
+		assert.Len(t, allRegs, 6)
+	})
+}
+
+func TestView_Reads(t *testing.T) {
+	registerID1 := "fruit"
+	registerID2 := "vegetable"
+
+	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		reads := v.Interactions().Reads
+		assert.Empty(t, reads)
+	})
+
+	t.Run("Set and Get", func(t *testing.T) {
+		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		_, err := v.Get(registerID2, "", "")
+		assert.NoError(t, err)
+
+		_, err = v.Get(registerID1, "", "")
+		assert.NoError(t, err)
+
+		_, err = v.Get(registerID2, "", "")
+		assert.NoError(t, err)
+
+		touches := v.Interactions().Reads
+		require.Len(t, touches, 2)
+		assert.ElementsMatch(t, []flow.RegisterID{
+			flow.NewRegisterID(registerID1, "", ""),
+			flow.NewRegisterID(registerID2, "", ""),
+		}, touches)
 	})
 }
 
