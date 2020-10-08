@@ -302,3 +302,25 @@ func (il IdentityList) StakingKeys() []crypto.PublicKey {
 	}
 	return keys
 }
+
+// Union returns a new identity list containing every identity that occurs in
+// either `il`, or `other`, or both. There are no duplicates in the output,
+// where duplicates are identities with the same node ID.
+func (il IdentityList) Union(other IdentityList) IdentityList {
+
+	// stores the output, the union of the two lists
+	union := make(IdentityList, 0, len(il)+len(other))
+	// efficient lookup to avoid duplicates
+	lookup := make(map[Identifier]struct{})
+
+	// add all identities, omitted duplicates
+	for _, identity := range append(il, other...) {
+		if _, exists := lookup[identity.NodeID]; exists {
+			continue
+		}
+		union = append(union, identity)
+		lookup[identity.NodeID] = struct{}{}
+	}
+
+	return union
+}
