@@ -33,7 +33,7 @@
 // bls core
 int      get_signature_len();
 int      get_pk_len();
-int      get_sk_len(); 
+int      get_sk_len();  
 
 void     bls_sign(byte*, const bn_t, const byte*, const int);
 int      bls_verify(const ep2_t, const byte*, const byte*, const int);
@@ -42,6 +42,8 @@ int      bls_verifyPerDistinctMessage(const byte*, const int, const byte*, const
 int      bls_verifyPerDistinctKey(const byte*, 
                          const int, const ep2_st*, const uint32_t*,
                          const byte*, const uint32_t*);
+void     bls_batchVerify(const int, byte*, const ep2_st*,
+            const byte*, const byte*, const int);
 
 int      check_membership_Zr(const bn_t);
 int      check_membership_G2(const ep2_t);
