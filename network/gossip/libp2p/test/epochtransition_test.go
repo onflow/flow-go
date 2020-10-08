@@ -42,6 +42,7 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 }
 
 func (ts *EpochTransitionTestSuite) SetupTest() {
+	ts.T().Skip("skipping till discovery is updated to add and remove nodes on-demand")
 	nodeCount := 10
 	golog.SetAllLoggers(golog.LevelError)
 	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
