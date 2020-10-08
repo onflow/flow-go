@@ -38,11 +38,13 @@ type EpochTransitionTestSuite struct {
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
+	if _, found := os.LookupEnv("AllNetworkTest"); !found {
+		t.Skip("skipping till discovery is updated to add and remove nodes on-demand")
+	}
 	suite.Run(t, new(EpochTransitionTestSuite))
 }
 
 func (ts *EpochTransitionTestSuite) SetupTest() {
-	ts.T().Skip("skipping till discovery is updated to add and remove nodes on-demand")
 	nodeCount := 10
 	golog.SetAllLoggers(golog.LevelError)
 	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -81,7 +83,6 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 
 // TearDownTest closes the networks within a specified timeout
 func (ts *EpochTransitionTestSuite) TearDownTest() {
-	ts.T().Skip("skipping till discovery is updated to add and remove nodes on-demand")
 	for _, net := range ts.nets {
 		select {
 		// closes the network
@@ -95,7 +96,6 @@ func (ts *EpochTransitionTestSuite) TearDownTest() {
 
 // TestNewNodeAdded tests that an additional node in a new epoch get connected to other nodes and can exchange messages
 func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
-	ts.T().Skip("skipping till discovery is updated to discover newly added nodes")
 
 	// create the id, middleware and network for a new node
 	ids, mws, nets, err := generateIDsMiddlewaresNetworks(1, ts.logger, 100, nil, []*protocol.ReadOnlyState{ts.state}, false)
@@ -142,7 +142,6 @@ func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 // TestNodeRemoved tests that a node that is removed in a new epoch gets disconnected from other nodes
 func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
-	ts.T().Skip("skipping till discovery is updated to evict extra nodes")
 
 	// choose a random index
 	removeIndex := rand.Intn(len(ts.ids))
