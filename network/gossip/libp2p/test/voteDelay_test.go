@@ -82,6 +82,7 @@ func (m *VoteDelayTestSuite) TestBlockVoteSubmission() {
 
 	// shutdown the last engine
 	last := len(m.ids) - 1
+	removedID := m.ids[last]
 	err := m.engs[last].con.Close()
 	assert.NoError(m.T(), err)
 
@@ -92,13 +93,24 @@ func (m *VoteDelayTestSuite) TestBlockVoteSubmission() {
 		m.Suite.Fail("could not stop the network")
 	}
 
-	// test that all remaining engines can still exchange messages
+
 	m.engs = m.engs[:last]
 	m.ids = m.ids[:last]
 	m.nets = m.nets[:last]
 	m.mws = m.mws[:last]
 
+	// let each engine send a message to the discarded engine and fail
+	for i := range m.nets {
+		event := &message.TestMessage{
+			Text: fmt.Sprintf("hello from node %v at %d", i, time.Now().UnixNano()),
+		}
+
+		require.Error(m.Suite.T(), m.Unicast(event, m.engs[i].con, removedID.NodeID))
+	}
+
+	// test that all remaining engines can still exchange messages
 	m.testMessageSendReceive(m.Unicast)
+
 
 }
 
