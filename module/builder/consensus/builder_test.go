@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -67,16 +68,11 @@ type BuilderSuite struct {
 }
 
 func (bs *BuilderSuite) chainSeal(blockID flow.Identifier) {
-	initial := bs.last.FinalState
 	final := unittest.StateCommitmentFixture()
-	if len(bs.chain) > 0 {
-		initial = bs.chain[len(bs.chain)-1].FinalState
-	}
 	seal := &flow.Seal{
-		BlockID:      blockID,
-		ResultID:     flow.ZeroID, // we don't care
-		InitialState: initial,
-		FinalState:   final,
+		BlockID:    blockID,
+		ResultID:   flow.ZeroID, // we don't care
+		FinalState: final,
 	}
 	bs.chain = append(bs.chain, seal)
 }
@@ -84,7 +80,8 @@ func (bs *BuilderSuite) chainSeal(blockID flow.Identifier) {
 func (bs *BuilderSuite) SetupTest() {
 
 	// set up no-op dependencies
-	noop := metrics.NewNoopCollector()
+	noopMetrics := metrics.NewNoopCollector()
+	noopTracer := trace.NewNoopTracer()
 
 	// set up test parameters
 	numFinalized := 4
@@ -115,10 +112,9 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.heights[first.Height] = &first
 	bs.index[first.ID()] = &flow.Index{}
 	bs.last = &flow.Seal{
-		BlockID:      first.ID(),
-		ResultID:     flow.ZeroID,
-		InitialState: unittest.StateCommitmentFixture(),
-		FinalState:   unittest.StateCommitmentFixture(),
+		BlockID:    first.ID(),
+		ResultID:   flow.ZeroID,
+		FinalState: unittest.StateCommitmentFixture(),
 	}
 
 	// insert the finalized blocks between first and final
@@ -250,7 +246,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// initialize the builder
 	bs.build = NewBuilder(
-		noop,
+		noopMetrics,
 		bs.db,
 		bs.state,
 		bs.headerDB,
@@ -258,6 +254,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.indexDB,
 		bs.guarPool,
 		bs.sealPool,
+		noopTracer,
 	)
 
 	bs.build.cfg.expiry = 11

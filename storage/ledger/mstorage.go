@@ -94,7 +94,7 @@ func (f *MTrieStorage) EmptyStateCommitment() flow.StateCommitment {
 // GetRegisters read the values of the given register IDs at the given state commitment
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (f *MTrieStorage) GetRegisters(
-	registerIDs []flow.RegisterID,
+	registerIDs []flow.LegacyRegisterID,
 	stateCommitment flow.StateCommitment,
 ) (
 	values []flow.RegisterValue,
@@ -118,7 +118,7 @@ func (f *MTrieStorage) GetRegisters(
 // UpdateRegisters updates the values by register ID given the state commitment
 // it returns a new state commitment (state after update) and errors (if any)
 func (f *MTrieStorage) UpdateRegisters(
-	ids []flow.RegisterID,
+	ids []flow.LegacyRegisterID,
 	values []flow.RegisterValue,
 	stateCommitment flow.StateCommitment,
 ) (
@@ -171,7 +171,7 @@ func (f *MTrieStorage) UpdateRegisters(
 // GetRegistersWithProof read the values at the given registers at the given state commitment
 // it returns values, inclusion proofs and errors (if any)
 func (f *MTrieStorage) GetRegistersWithProof(
-	registerIDs []flow.RegisterID,
+	registerIDs []flow.LegacyRegisterID,
 	stateCommitment flow.StateCommitment,
 ) (
 	values []flow.RegisterValue,
@@ -201,35 +201,10 @@ func (f *MTrieStorage) GetRegistersWithProof(
 	return values, proofToGo, err
 }
 
-// GetRegisterTouches reads values and proofs for the given registers and
-// returns an slice of register touches
-func (f *MTrieStorage) GetRegisterTouches(
-	registerIDs []flow.RegisterID,
-	stateCommitment flow.StateCommitment,
-) (
-	[]flow.RegisterTouch,
-	error,
-) {
-	values, proofs, err := f.GetRegistersWithProof(registerIDs, stateCommitment)
-	if err != nil {
-		return nil, err
-	}
-	rets := make([]flow.RegisterTouch, 0, len(registerIDs))
-	for i, reg := range registerIDs {
-		rt := flow.RegisterTouch{
-			RegisterID: reg,
-			Value:      values[i],
-			Proof:      proofs[i],
-		}
-		rets = append(rets, rt)
-	}
-	return rets, nil
-}
-
 // UpdateRegistersWithProof updates the values at the given registers and
 // provides proof for those registers after update
 func (f *MTrieStorage) UpdateRegistersWithProof(
-	ids []flow.RegisterID,
+	ids []flow.LegacyRegisterID,
 	values []flow.RegisterValue,
 	stateCommitment flow.StateCommitment,
 ) (
@@ -251,11 +226,7 @@ func (f *MTrieStorage) CloseStorage() {
 	_ = f.wal.Close()
 }
 
-// DiskSize returns the amount of disk space used by the storage (in bytes)
-func (f *MTrieStorage) DiskSize() (int64, error) {
-	return f.mForest.DiskSize()
-}
-
+//
 // ForestSize returns the number of tries stored in the forest
 func (f *MTrieStorage) ForestSize() int {
 	return f.mForest.Size()

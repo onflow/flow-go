@@ -3,12 +3,12 @@
 package badger
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -177,6 +177,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 }
 
 func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
+
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorHeaderExtend)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorHeaderExtend)
+
 	// check if he block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
@@ -199,6 +204,11 @@ func (m *Mutator) HeaderExtend(candidate *flow.Block) error {
 }
 
 func (m *Mutator) Extend(candidate *flow.Block) error {
+
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtend)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtend)
+
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
@@ -229,6 +239,11 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 // header compliance check to verify if the given block connects to the
 // last finalized block.
 func (m *Mutator) headerExtend(candidate *flow.Block) error {
+
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckHeader)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckHeader)
+
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
 
@@ -277,7 +292,15 @@ func (m *Mutator) headerExtend(candidate *flow.Block) error {
 			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
 		if ancestor.Height < finalizedHeight {
-			return state.NewOutdatedExtensionErrorf("candidate block conflicts with finalized state (ancestor: %d final: %d)",
+			// this happens when the candidate block is on a fork that does not include all the
+			// finalized blocks.
+			// for instance:
+			// A (Finalized) <- B (Finalized) <- C (Finalized) <- D <- E <- F
+			//                  ^- G             ^- H             ^- I
+			// block G is not a valid block, because it does not include C which has been finalized.
+			// block H and I are a valid, because its their includes C.
+			return state.NewOutdatedExtensionErrorf(
+				"candidate block conflicts with finalized state (ancestor: %d final: %d)",
 				ancestor.Height, finalizedHeight)
 		}
 		ancestorID = ancestor.ParentID
@@ -291,6 +314,11 @@ func (m *Mutator) headerExtend(candidate *flow.Block) error {
 // guarantee that was expired at the block height, nor should it have been
 // included in any previous payload.
 func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
+
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckGuarantees)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckGuarantees)
+
 	header := candidate.Header
 	payload := candidate.Payload
 
@@ -367,6 +395,11 @@ func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
 // then make a list of unfinalized blocks for the remainder, if any seals
 // remain.
 func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
+
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
+
 	header := candidate.Header
 	payload := candidate.Payload
 
@@ -432,9 +465,6 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		if !found {
 			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
 		}
-		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return nil, state.NewInvalidExtensionError("seal execution states do not connect in finalized")
-		}
 		delete(byBlock, blockID)
 		last = next
 	}
@@ -469,9 +499,6 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		if !found {
 			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
 		}
-		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return nil, state.NewInvalidExtensionErrorf("seal execution states do not connect in pending")
-		}
 		delete(byBlock, pendingID)
 		last = next
 	}
@@ -491,6 +518,11 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
 // be the last sealed for block 101.
 func (m *Mutator) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
+
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorHeaderExtendGetLastSealed)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorHeaderExtendGetLastSealed)
+
 	header := candidate.Header
 	payload := candidate.Payload
 
@@ -522,6 +554,11 @@ func (m *Mutator) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 
 func (m *Mutator) insert(candidate *flow.Block, last *flow.Seal) error {
 
+	blockID := candidate.ID()
+
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendDBInsert)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendDBInsert)
+
 	// SIXTH: epoch transitions and service events
 	//    (i) Determine protocol state for block's _current_ Epoch.
 	//        As we don't have slashing yet, the protocol state is fully
@@ -539,7 +576,6 @@ func (m *Mutator) insert(candidate *flow.Block, last *flow.Seal) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
-	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 		// insert the block into the database AND cache
 		err := m.state.blocks.StoreTx(candidate)(tx)
@@ -578,6 +614,9 @@ func (m *Mutator) insert(candidate *flow.Block, last *flow.Seal) error {
 }
 
 func (m *Mutator) Finalize(blockID flow.Identifier) error {
+
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorFinalize)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorFinalize)
 
 	// FIRST: The finalize call on the protocol state can only finalize one
 	// block at a time. This implies that the parent of the pending block that
@@ -872,7 +911,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 	return ops, nil
 }
 
-// MakeValid marks the block as valid in protocol state, and triggers
+// MarkValid marks the block as valid in protocol state, and triggers
 // `BlockProcessable` event to notify that its parent block is processable.
 // why the parent block is processable, not the block itself?
 // because a block having a child block means it has been verified
@@ -886,6 +925,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 // processing the parent block.
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
+// NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
 func (m *Mutator) MarkValid(blockID flow.Identifier) error {
 	header, err := m.state.headers.ByBlockID(blockID)
 	if err != nil {
