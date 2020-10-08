@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -13,14 +14,16 @@ import (
 
 type State struct {
 	db        *badger.DB
+	tracer    module.Tracer
 	clusterID flow.ChainID
 	headers   storage.Headers
 	payloads  storage.ClusterPayloads
 }
 
-func NewState(db *badger.DB, clusterID flow.ChainID, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
+func NewState(db *badger.DB, tracer module.Tracer, clusterID flow.ChainID, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
 	state := &State{
 		db:        db,
+		tracer:    tracer,
 		clusterID: clusterID,
 		headers:   headers,
 		payloads:  payloads,
