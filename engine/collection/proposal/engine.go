@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state"
@@ -37,7 +36,6 @@ type Engine struct {
 	me             module.Local
 	protoState     protocol.State  // flow-wide protocol chain state
 	clusterState   clusterkv.State // cluster-specific chain state
-	pool           mempool.Transactions
 	transactions   storage.Transactions
 	headers        storage.Headers
 	payloads       storage.ClusterPayloads
@@ -58,7 +56,6 @@ func New(
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
 	clusterState clusterkv.State,
-	pool mempool.Transactions,
 	transactions storage.Transactions,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
@@ -86,7 +83,6 @@ func New(
 		me:             me,
 		protoState:     protoState,
 		clusterState:   clusterState,
-		pool:           pool,
 		transactions:   transactions,
 		headers:        headers,
 		payloads:       payloads,
@@ -353,7 +349,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	log.Debug().Msg("received proposal")
 
 	e.prunePendingCache()
-	e.mempoolMetrics.MempoolEntries(metrics.ResourceTransaction, e.pool.Size())
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later

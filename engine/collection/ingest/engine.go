@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -29,7 +29,7 @@ type Engine struct {
 	conduit              network.Conduit
 	me                   module.Local
 	state                protocol.State
-	pool                 mempool.Transactions
+	pools                *epochs.TransactionPools
 	transactionValidator *access.TransactionValidator
 
 	config Config
@@ -43,7 +43,7 @@ func New(
 	engMetrics module.EngineMetrics,
 	colMetrics module.CollectionMetrics,
 	me module.Local,
-	pool mempool.Transactions,
+	pools *epochs.TransactionPools,
 	config Config,
 ) (*Engine, error) {
 
@@ -67,7 +67,7 @@ func New(
 		colMetrics:           colMetrics,
 		me:                   me,
 		state:                state,
-		pool:                 pool,
+		pools:                pools,
 		config:               config,
 		transactionValidator: transactionValidator,
 	}
@@ -162,6 +162,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	log.Info().Msg("transaction message received")
+
+	// TODO use the appropriate pool based on epoch routing
 
 	// short-circuit if we have already stored the transaction
 	if e.pool.Has(tx.ID()) {
