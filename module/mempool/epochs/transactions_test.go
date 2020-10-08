@@ -2,7 +2,9 @@ package epochs_test
 
 import (
 	"math/rand"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -30,8 +32,11 @@ func TestMultipleEpochs(t *testing.T) {
 	create := func() mempool.Transactions { return stdmap.NewTransactions(100) }
 	pools := epochs.NewTransactionPools(create)
 
+	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			epoch := rand.Uint64()
 
 			var transactions []*flow.TransactionBody
@@ -44,7 +49,9 @@ func TestMultipleEpochs(t *testing.T) {
 
 				tx := unittest.TransactionBodyFixture()
 				transactions = append(transactions, &tx)
+				pool.Add(&tx)
 			}
 		}()
 	}
+	unittest.AssertReturnsBefore(t, wg.Wait, time.Second)
 }
