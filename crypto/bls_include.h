@@ -33,10 +33,12 @@
 // bls core
 int      get_signature_len();
 int      get_pk_len();
-int      get_sk_len(); 
+int      get_sk_len();  
 
 void     bls_sign(byte*, const bn_t, const byte*, const int);
 int      bls_verify(const ep2_t, const byte*, const byte*, const int);
+void     bls_batchVerify(const int, byte*, const ep2_st*,
+            const byte*, const byte*, const int);
 
 int      check_membership_Zr(const bn_t);
 int      check_membership_G2(const ep2_t);
