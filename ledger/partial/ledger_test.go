@@ -40,11 +40,29 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, pled.InitialState(), newState)
 
-		// test missing keys
+		// test missing keys (get)
 		query, err = ledger.NewQuery(newState, keys[1:3])
 		require.NoError(t, err)
 
 		_, err = pled.Get(query)
 		require.Error(t, err)
+
+		e, ok := err.(*ledger.ErrMissingKeys)
+		require.True(t, ok)
+		assert.Equal(t, len(e.Keys), 1)
+		require.True(t, e.Keys[0].Equals(&keys[2]))
+
+		// test missing keys (set)
+		update, err = ledger.NewUpdate(state, keys[1:3], values[1:3])
+		require.NoError(t, err)
+
+		_, err = pled.Set(update)
+		require.Error(t, err)
+
+		e, ok = err.(*ledger.ErrMissingKeys)
+		require.True(t, ok)
+		assert.Equal(t, len(e.Keys), 1)
+		require.True(t, e.Keys[0].Equals(&keys[2]))
+
 	})
 }
