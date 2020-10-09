@@ -45,13 +45,13 @@ func (_m *Deltas) All() []*messages.ExecutionStateDelta {
 	return r0
 }
 
-// ByID provides a mock function with given fields: deltaID
-func (_m *Deltas) ByID(deltaID flow.Identifier) (*messages.ExecutionStateDelta, bool) {
-	ret := _m.Called(deltaID)
+// ByBlockID provides a mock function with given fields: blockID
+func (_m *Deltas) ByBlockID(blockID flow.Identifier) (*messages.ExecutionStateDelta, bool) {
+	ret := _m.Called(blockID)
 
 	var r0 *messages.ExecutionStateDelta
 	if rf, ok := ret.Get(0).(func(flow.Identifier) *messages.ExecutionStateDelta); ok {
-		r0 = rf(deltaID)
+		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*messages.ExecutionStateDelta)
@@ -60,7 +60,7 @@ func (_m *Deltas) ByID(deltaID flow.Identifier) (*messages.ExecutionStateDelta, 
 
 	var r1 bool
 	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
-		r1 = rf(deltaID)
+		r1 = rf(blockID)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
@@ -68,13 +68,13 @@ func (_m *Deltas) ByID(deltaID flow.Identifier) (*messages.ExecutionStateDelta, 
 	return r0, r1
 }
 
-// Has provides a mock function with given fields: deltaID
-func (_m *Deltas) Has(deltaID flow.Identifier) bool {
-	ret := _m.Called(deltaID)
+// Has provides a mock function with given fields: blockID
+func (_m *Deltas) Has(blockID flow.Identifier) bool {
+	ret := _m.Called(blockID)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(deltaID)
+		r0 = rf(blockID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -112,13 +112,13 @@ func (_m *Deltas) Limit() uint {
 	return r0
 }
 
-// Rem provides a mock function with given fields: deltaID
-func (_m *Deltas) Rem(deltaID flow.Identifier) bool {
-	ret := _m.Called(deltaID)
+// Rem provides a mock function with given fields: blockID
+func (_m *Deltas) Rem(blockID flow.Identifier) bool {
+	ret := _m.Called(blockID)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(deltaID)
+		r0 = rf(blockID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
