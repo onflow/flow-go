@@ -31,6 +31,13 @@ var rootBlockID = unittest.IdentifierFixture().String()
 func generateIDs(n int) ([]*flow.Identity, []crypto.PrivateKey, error) {
 	identities := make([]*flow.Identity, n)
 	privateKeys := make([]crypto.PrivateKey, n)
+
+	// get free ports
+	freePorts, err := freeport.GetFreePorts(n)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	for i := 0; i < n; i++ {
 
 		identifier := unittest.IdentifierFixture()
@@ -42,11 +49,7 @@ func generateIDs(n int) ([]*flow.Identity, []crypto.PrivateKey, error) {
 		}
 		privateKeys[i] = key
 
-		// generate port
-		port, err := freeport.GetFreePort()
-		if err != nil {
-			return nil, nil, err
-		}
+		port := freePorts[i]
 
 		opt := []func(id *flow.Identity){
 			func(id *flow.Identity) {
