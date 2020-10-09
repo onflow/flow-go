@@ -37,9 +37,8 @@ type Suite struct {
 
 	pools *epochs.TransactionPools
 
-	identities        flow.IdentityList
-	clusters          flow.ClusterList
-	nextEpochClusters flow.ClusterList
+	identities flow.IdentityList
+	clusters   flow.ClusterList
 
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
