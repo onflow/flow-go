@@ -24,7 +24,8 @@ type signer interface {
 	decodePublicKey([]byte) (PublicKey, error)
 }
 
-// newNonRelicSigner initializes a signer that does not depend on the Relic library.
+
+// newNonRelicSigner returns a signer that does not depend on Relic library.
 func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	switch algo {
 	case ECDSAP256:
@@ -36,7 +37,7 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	}
 }
 
-// Initialize the context of all curves supported by ECDSA
+// Initialize the context of all algos not requiring Relic
 func initNonRelic() {
 	// P-256
 	p256Instance = &(ecdsaAlgo{
