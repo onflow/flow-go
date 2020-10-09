@@ -59,6 +59,9 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * membership check in G1 is using [Bowe's fast check](https://eprint.iacr.org/2019/814.pdf), while membership check in G2 is using a simple scalar multiplication by the group order.
     * non-interactive aggregation of signatures, public keys and private keys.
     * multi-signature verification of an aggregated signature of a single message under multiple public keys.
+    * multi-signature verification of an aggregated signature of multiple messages under multiple public keys.
+    * batch verification of multiple signatures of a single message under multiple
+    public keys: use a binary tree of aggregations to find the invalid signatures.
 
  * Future features:
     * more tools for BLS multi signature and batch verification.
