@@ -12,7 +12,9 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/epochs"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	network "github.com/onflow/flow-go/network/mock"
@@ -20,6 +22,7 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type Suite struct {
@@ -32,20 +35,20 @@ type Suite struct {
 	me      *module.Local
 	conf    Config
 
-	pool *mempool.Transactions
+	pools *epochs.TransactionPools
 
-	identities flow.IdentityList
-	clusters   flow.ClusterList
+	identities        flow.IdentityList
+	clusters          flow.ClusterList
+	nextEpochClusters flow.ClusterList
+
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
-	epochQuery *protocol.EpochQuery
-	epoch      *protocol.Epoch
+	epochQuery *mocks.EpochQuery
 	root       *flow.Block
 
 	// backend for mocks
-	transactions map[flow.Identifier]*flow.TransactionBody
-	blocks       map[flow.Identifier]*flow.Block
-	final        *flow.Block
+	blocks map[flow.Identifier]*flow.Block
+	final  *flow.Block
 
 	engine *Engine
 }
@@ -75,18 +78,9 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)
 
-	suite.pool = new(mempool.Transactions)
-	suite.transactions = make(map[flow.Identifier]*flow.TransactionBody)
-	suite.pool.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			tx := args[0].(*flow.TransactionBody)
-			suite.transactions[tx.ID()] = tx
-		}).Return(true)
-	suite.pool.On("Has", mock.Anything).Return(
-		func(txID flow.Identifier) bool {
-			_, exists := suite.transactions[txID]
-			return exists
-		})
+	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions {
+		return stdmap.NewTransactions(1000)
+	})
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
 	suite.clusters, err = flow.NewClusterList(assignments, collectors)
@@ -113,17 +107,18 @@ func (suite *Suite) SetupTest() {
 			} else {
 				snap.On("Head").Return(nil, storage.ErrNotFound)
 			}
+			snap.On("Epochs").Return(suite.epochQuery)
 			return snap
 		})
 
-	suite.epochQuery = new(protocol.EpochQuery)
-	suite.epoch = new(protocol.Epoch)
-	suite.snapshot.On("Epochs").Return(suite.epochQuery)
-	suite.epochQuery.On("Current").Return(suite.epoch)
-	suite.epoch.On("Clustering").Return(suite.clusters, nil)
+	// set up the current epoch by default, with counter=1
+	epoch := new(protocol.Epoch)
+	epoch.On("Counter").Return(uint64(1), nil)
+	epoch.On("Clustering").Return(suite.clusters, nil)
+	suite.epochQuery = mocks.NewEpochQuery(suite.T(), 1, epoch)
 
 	suite.conf = DefaultConfig()
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pool, suite.conf)
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pools, suite.conf)
 	suite.Require().Nil(err)
 }
 
@@ -206,10 +201,10 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	err := suite.engine.ProcessLocal(&tx)
 	suite.Assert().Nil(err)
 
-	// should be added to local mempool
-	stored, ok := suite.transactions[tx.ID()]
-	suite.Assert().True(ok)
-	suite.Assert().Equal(tx.ID(), stored.ID())
+	// should be added to local mempool for the current epoch
+	counter, err := suite.epochQuery.Current().Counter()
+	suite.Assert().Nil(err)
+	suite.Assert().True(suite.pools.Get(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -237,8 +232,9 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	suite.Assert().Nil(err)
 
 	// should not be added to local mempool
-	_, ok = suite.transactions[tx.ID()]
-	suite.Assert().False(ok)
+	counter, err := suite.epochQuery.Current().Counter()
+	suite.Assert().Nil(err)
+	suite.Assert().False(suite.pools.Get(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -263,10 +259,10 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	err := suite.engine.Process(sender.NodeID, &tx)
 	suite.Assert().Nil(err)
 
-	// should be added to local mempool
-	stored, ok := suite.transactions[tx.ID()]
-	suite.Assert().True(ok)
-	suite.Assert().Equal(tx.ID(), stored.ID())
+	// should be added to local mempool for current epoch
+	counter, err := suite.epochQuery.Current().Counter()
+	suite.Assert().Nil(err)
+	suite.Assert().True(suite.pools.Get(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -292,7 +288,8 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 	_ = suite.engine.ProcessLocal(&tx)
 
 	// should not be added to local mempool
-	_, ok = suite.transactions[tx.ID()]
-	suite.Assert().False(ok)
+	counter, err := suite.epochQuery.Current().Counter()
+	suite.Assert().Nil(err)
+	suite.Assert().False(suite.pools.Get(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }

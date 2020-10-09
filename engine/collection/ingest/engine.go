@@ -199,7 +199,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	localCluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
-		return fmt.Errorf("node is not assigned to any cluster in this epoch: %s", counter)
+		return fmt.Errorf("node is not assigned to any cluster in this epoch: %d", counter)
 	}
 
 	log = log.With().
