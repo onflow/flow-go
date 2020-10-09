@@ -36,10 +36,10 @@ func GenerateExecutionState(
 	metricsCollector := &metrics.NoopCollector{}
 
 	ledgerStorage, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
-	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err
 	}
+	defer ledgerStorage.CloseStorage()
 
 	return bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapLedger(ledgerStorage, accountKey, tokenSupply, chain)
 }
