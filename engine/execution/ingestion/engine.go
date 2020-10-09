@@ -315,7 +315,6 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	// e.metrics.ExecutionStateStorageDiskTotal(diskTotal)
 	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
 
 	e.log.Info().
@@ -1427,17 +1426,7 @@ func generateChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,
 	proof flow.StorageProof,
-	//registers []flow.RegisterID,
-	//values []flow.RegisterValue,
-	//proofs []flow.StorageProof,
 ) *flow.ChunkDataPack {
-	//regTs := make([]flow.RegisterTouch, len(registers))
-	//for i, reg := range registers {
-	//	regTs[i] = flow.RegisterTouch{RegisterID: reg,
-	//		Value: values[i],
-	//		Proof: proofs[i],
-	//	}
-	//}
 	return &flow.ChunkDataPack{
 		ChunkID:      chunk.ID(),
 		StartState:   chunk.StartState,
