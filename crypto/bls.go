@@ -318,11 +318,13 @@ func (a *blsBLS12381Algo) init() error {
 	return nil
 }
 
-// reInit the context of BLS12381 curve assuming there was a previous call to init().
-// If the implementation evolves and relic has multiple contexts,
-// reinit should be called at every a. operation.
+// set the context of BLS 12-381 curve in the lower C and Relic layers assuming the context 
+// was previously initialized with a call to init(). 
+//
+// If the implementation evolves to support multiple contexts,
+// reinit should be called at every blsBLS12381Algo operation.
 func (a *blsBLS12381Algo) reInit() {
-	a.context.reInitContext()
+	a.context.setContext()
 }
 
 // checkMembershipZr checks a scalar is less than the group order (r)
