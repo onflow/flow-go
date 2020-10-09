@@ -12,6 +12,7 @@ import (
 const PathByteSize = 32
 
 // KeyToPath converts key into a path
+// version zero applies sha2-256 on value of the key parts (in order ignoring types)
 func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 	switch version {
 	case 0:
