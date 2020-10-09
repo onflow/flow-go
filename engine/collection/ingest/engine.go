@@ -163,37 +163,43 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	log.Info().Msg("transaction message received")
 
-	// TODO use the appropriate pool based on epoch routing
+	// using the transaction's reference block, determine which cluster we're in
+	refEpoch := e.state.AtBlockID(tx.ReferenceBlockID).Epochs().Current()
+
+	counter, err := refEpoch.Counter()
+	if err != nil {
+		return fmt.Errorf("could not get counter for reference epoch: %w", err)
+	}
+	clusters, err := refEpoch.Clustering()
+	if err != nil {
+		return fmt.Errorf("could not get clusters for reference epoch: %w", err)
+	}
+
+	// use the transaction pool for the epoch the reference block is part of
+	pool := e.pools.Get(counter)
 
 	// short-circuit if we have already stored the transaction
-	if e.pool.Has(tx.ID()) {
+	txID := tx.ID()
+	if pool.Has(txID) {
 		e.log.Debug().Msg("received dupe transaction")
 		return nil
 	}
 
-	// first, we check if the transaction is valid
-	err := e.transactionValidator.Validate(tx)
+	// check if the transaction is valid
+	err = e.transactionValidator.Validate(tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
 	}
 
-	// retrieve the set of collector clusters
-	// TODO needs to be per-epoch
-	clusters, err := e.state.Final().Epochs().Current().Clustering()
-	if err != nil {
-		return fmt.Errorf("could not cluster collection nodes: %w", err)
-	}
-
 	// get the locally assigned cluster and the cluster responsible for the transaction
-	txCluster, ok := clusters.ByTxID(tx.ID())
+	txCluster, ok := clusters.ByTxID(txID)
 	if !ok {
-		return fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
+		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
 
-	localID := e.me.NodeID()
-	localCluster, _, ok := clusters.ByNodeID(localID)
+	localCluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
-		return fmt.Errorf("could not get local cluster")
+		return fmt.Errorf("node is not assigned to any cluster in this epoch: %s", counter)
 	}
 
 	log = log.With().
@@ -203,14 +209,15 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// if our cluster is responsible for the transaction, add it to the mempool
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
-		_ = e.pool.Add(tx)
-		e.colMetrics.TransactionIngested(tx.ID())
+		_ = pool.Add(tx)
+		e.colMetrics.TransactionIngested(txID)
 		log.Debug().Msg("added transaction to pool")
 	}
 
 	// if the message was submitted internally (ie. via the Access API)
-	// propagate it to all members of the responsible cluster
-	if originID == localID {
+	// propagate it to members of the responsible cluster (either our cluster
+	// or a different cluster)
+	if originID == e.me.NodeID() {
 
 		log.Debug().Msg("propagating transaction to cluster")
 
