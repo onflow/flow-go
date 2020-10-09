@@ -104,7 +104,7 @@ func (factory *EpochComponentsFactory) Create(
 		err = fmt.Errorf("could not get epoch counter: %w", err)
 		return
 	}
-	pool := factory.pools.Get(counter)
+	pool := factory.pools.ForEpoch(counter)
 
 	builder, finalizer, err := factory.builder.Create(headers, payloads, pool)
 	if err != nil {

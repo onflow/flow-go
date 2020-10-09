@@ -203,7 +203,7 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	// should be added to local mempool for the current epoch
 	counter, err := suite.epochQuery.Current().Counter()
 	suite.Assert().Nil(err)
-	suite.Assert().True(suite.pools.Get(counter).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -233,7 +233,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	// should not be added to local mempool
 	counter, err := suite.epochQuery.Current().Counter()
 	suite.Assert().Nil(err)
-	suite.Assert().False(suite.pools.Get(counter).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -261,7 +261,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	// should be added to local mempool for current epoch
 	counter, err := suite.epochQuery.Current().Counter()
 	suite.Assert().Nil(err)
-	suite.Assert().True(suite.pools.Get(counter).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -289,7 +289,7 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 	// should not be added to local mempool
 	counter, err := suite.epochQuery.Current().Counter()
 	suite.Assert().Nil(err)
-	suite.Assert().False(suite.pools.Get(counter).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -326,8 +326,8 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	suite.Assert().Nil(err)
 
 	// should add to local mempool for epoch 2 only
-	suite.Assert().True(suite.pools.Get(2).Has(tx.ID()))
-	suite.Assert().False(suite.pools.Get(1).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(2).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -357,6 +357,6 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 	suite.Assert().Error(err)
 
 	// should not add to mempool
-	suite.Assert().False(suite.pools.Get(2).Has(tx.ID()))
-	suite.Assert().False(suite.pools.Get(1).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(2).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.ID()))
 }

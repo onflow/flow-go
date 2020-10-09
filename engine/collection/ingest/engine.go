@@ -176,7 +176,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// use the transaction pool for the epoch the reference block is part of
-	pool := e.pools.Get(counter)
+	pool := e.pools.ForEpoch(counter)
 
 	// short-circuit if we have already stored the transaction
 	txID := tx.ID()

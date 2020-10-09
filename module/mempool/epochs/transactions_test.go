@@ -22,8 +22,8 @@ func TestConsistency(t *testing.T) {
 	pools := epochs.NewTransactionPools(create)
 	epoch := rand.Uint64()
 
-	pool := pools.Get(epoch)
-	assert.Equal(t, pool, pools.Get(epoch))
+	pool := pools.ForEpoch(epoch)
+	assert.Equal(t, pool, pools.ForEpoch(epoch))
 }
 
 // test that different epochs don't interfere, also test concurrent access
@@ -41,7 +41,7 @@ func TestMultipleEpochs(t *testing.T) {
 
 			var transactions []*flow.TransactionBody
 			for i := 0; i < 10; i++ {
-				pool := pools.Get(epoch)
+				pool := pools.ForEpoch(epoch)
 				assert.Equal(t, uint(len(transactions)), pool.Size())
 				for _, tx := range transactions {
 					assert.True(t, pool.Has(tx.ID()))

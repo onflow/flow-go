@@ -29,9 +29,9 @@ func NewTransactionPools(create func() mempool.Transactions) *TransactionPools {
 	return pools
 }
 
-// Get returns the transaction pool for the given pool. All calls to Get for
+// ForEpoch returns the transaction pool for the given pool. All calls for
 // the same epoch will return the same underlying transaction pool.
-func (t *TransactionPools) Get(epoch uint64) mempool.Transactions {
+func (t *TransactionPools) ForEpoch(epoch uint64) mempool.Transactions {
 
 	t.mu.RLock()
 	pool, exists := t.pools[epoch]
