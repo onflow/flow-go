@@ -78,7 +78,8 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	seals := storage.NewSeals(metrics, db)
 	headers := storage.NewHeaders(metrics, db)
 	index := storage.NewIndex(metrics, db)
-	payloads := storage.NewPayloads(db, index, guarantees, seals)
+	receipts := storage.NewExecutionReceipts(db, storage.NewExecutionResults(db))
+	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts)
 	blocks := storage.NewBlocks(db, headers, payloads)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
@@ -219,7 +220,24 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	requireApprovals := true
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, sealedResultsDB, node.Headers, node.Index, results, approvals, seals, assigner, requireApprovals)
+	matchingEngine, err := matching.New(
+		node.Log,
+		node.Metrics,
+		node.Tracer,
+		node.Metrics,
+		node.Net,
+		node.State,
+		node.Me,
+		requesterEng,
+		sealedResultsDB,
+		node.Headers,
+		node.Index,
+		results,
+		receipts,
+		approvals,
+		seals,
+		assigner,
+		requireApprovals)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{

@@ -106,6 +106,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// wait for account to be created
 	accountCreationTxRes, err := serviceAccountClient.WaitForSealed(context.Background(), createAccountTx.ID())
 	require.NoError(t, err)
+	t.Log(accountCreationTxRes)
 
 	var newAccountAddress sdk.Address
 	for _, event := range accountCreationTxRes.Events {
@@ -156,7 +157,6 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		counter, err = readCounter(ctx, serviceAccountClient, newAccountAddress)
 		cancel()
 
-		t.Logf("read counter: counter=%d, err=%v", counter, err)
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)
 }

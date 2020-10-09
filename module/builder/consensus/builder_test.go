@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/mock"
@@ -387,6 +388,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.indexDB,
 		bs.guarPool,
 		bs.sealPool,
+		bs.recPool,
 		noopTracer,
 	)
 
@@ -561,4 +563,157 @@ func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().ElementsMatch(bs.chain[:3], bs.assembled.Seals, "should have included only beginning of broken chain")
+}
+
+// // Receipts for unknown blocks should not be inserted, and should be removed
+// // from the mempool.
+func (bs *BuilderSuite) TestPayloadReceiptUnknownBlock() {
+
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for an unknown block
+	pendingReceiptUnknownBlock := unittest.ExecutionReceiptFixture()
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceiptUnknownBlock)
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are for unknown blocks")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts with unknown blocks")
+}
+
+// Receipts for sealed blocks should not be reinserted, and should be removed
+// from the mempool.
+func (bs *BuilderSuite) TestPayloadReceiptSealedBlock() {
+
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for a known but sealed block
+	pendingReceiptSealedBlock := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceiptSealedBlock.ExecutionResult.BlockID] = &flow.Header{}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceiptSealedBlock)
+
+	bs.sealPool.On("ByID", pendingReceiptSealedBlock.ExecutionResult.BlockID).Return(&flow.Seal{}, nil)
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are for sealed blocks")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts with sealed blocks")
+}
+
+// Receipts that are already included in finalized blocks should not be
+// reinserted and should be removed from the mempool.
+func (bs *BuilderSuite) TestPayloadReceiptInFinalizedBlock() {
+
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for a known, unsealed block
+	pendingReceipt := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
+
+	// put the receipt in a finalized block (chosen at random)
+	blockID := bs.finalizedBlockIDs[rand.Intn(len(bs.finalizedBlockIDs))]
+	index := bs.index[blockID]
+	index.ReceiptIDs = append(index.ReceiptIDs, pendingReceipt.ID())
+	bs.index[blockID] = index
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are already included in finalized blocks")
+	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts that are already in finalized blocks")
+}
+
+// Receipts that are already included in pending blocks should not be reinserted
+// but should stay in the mempool.
+func (bs *BuilderSuite) TestPayloadReceiptInPendingBlock() {
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for a known, unsealed block
+	lastSealHeader := bs.headers[bs.lastSeal.BlockID]
+	lastSealHeight := lastSealHeader.Height
+	pendingReceipt := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{Height: lastSealHeight + 1000}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
+
+	// put the receipt in a pending block (chosen at random)
+	blockID := bs.pendingBlockIDs[rand.Intn(len(bs.pendingBlockIDs))]
+	index := bs.index[blockID]
+	index.ReceiptIDs = append(index.ReceiptIDs, pendingReceipt.ID())
+	bs.index[blockID] = index
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are already included in pending blocks")
+	bs.Assert().Empty(bs.remRecIDs, "should not remove receipts that are already in pending blocks")
+}
+
+// Receipts for blocks that are not on the fork should be skipped but not
+// removed from the mempool
+func (bs *BuilderSuite) TestPayloadReceiptForBlockNotInFork() {
+	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+
+	// create a valid receipt for a known, unsealed block, not on the fork
+	lastSealHeader := bs.headers[bs.lastSeal.BlockID]
+	lastSealHeight := lastSealHeader.Height
+	pendingReceipt := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{Height: lastSealHeight + 1000}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when receipts correspond to blocks not on the fork")
+	bs.Assert().Empty(bs.remRecIDs, "should not remove receipts that are for blocks not on the fork")
+}
+
+// Valid receipts should be inserted in the payload, sorted by block height.
+func (bs *BuilderSuite) TestPayloadReceiptSorted() {
+
+	// create valid receipts for known, unsealed blocks, that are in the fork.
+	// each receipt has a unique result which is not in the fork yet, so every
+	// result should be pushed to the mempool.
+	receipts := []*flow.ExecutionReceipt{}
+	var i uint64
+	for i = 0; i < 5; i++ {
+		blockOnFork := bs.blocks[bs.irsList[i].Seal.BlockID]
+		pendingReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
+		receipts = append(receipts, pendingReceipt)
+	}
+
+	// shuffle receipts
+	sr := make([]*flow.ExecutionReceipt, len(receipts))
+	copy(sr, receipts)
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(sr), func(i, j int) { sr[i], sr[j] = sr[j], sr[i] })
+
+	bs.pendingReceipts = sr
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.assembled.Receipts, receipts, "payload should contain receipts ordered by block height")
+}
+
+// Payloads can contain multiple receipts for a given block.
+func (bs *BuilderSuite) TestPayloadReceiptMultipleReceiptsWithDifferentResults() {
+
+	// create MULTIPLE valid receipts for known, unsealed blocks
+	receipts := []*flow.ExecutionReceipt{}
+
+	var i uint64
+	for i = 0; i < 5; i++ {
+		blockOnFork := bs.blocks[bs.irsList[i].Seal.BlockID]
+		pendingReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
+		receipts = append(receipts, pendingReceipt)
+
+		// insert 3 receipts for the same block but different results
+		for j := 0; j < 3; j++ {
+			dupReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
+			receipts = append(receipts, dupReceipt)
+		}
+	}
+
+	bs.pendingReceipts = receipts
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(receipts, bs.assembled.Receipts, "payload should contain all receipts for a given block")
 }

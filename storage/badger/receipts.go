@@ -25,7 +25,7 @@ func NewExecutionReceipts(db *badger.DB, results *ExecutionResults) *ExecutionRe
 func (r *ExecutionReceipts) store(receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// store the receipt-specific metadata
-		err := operation.InsertExecutionReceiptMeta(receipt.ID(), receipt.Meta())(tx)
+		err := operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receipt.ID(), receipt.Meta()))(tx)
 		if err != nil {
 			return fmt.Errorf("could not store receipt metadata: %w", err)
 		}

@@ -130,7 +130,8 @@ func createNode(
 	guaranteesDB := storage.NewGuarantees(metrics, db)
 	sealsDB := storage.NewSeals(metrics, db)
 	indexDB := storage.NewIndex(metrics, db)
-	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB)
+	receiptsDB := storage.NewExecutionReceipts(db, storage.NewExecutionResults(db))
+	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)
@@ -184,14 +185,28 @@ func createNode(
 	// add a network for this node to the hub
 	net := hub.AddNetwork(localID, node)
 
-	guaranteeLimit, sealLimit := uint(1000), uint(1000)
+	guaranteeLimit, sealLimit, receiptLimit := uint(1000), uint(1000), uint(1000)
+
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
+	require.NoError(t, err)
+
+	receipts, err := stdmap.NewReceipts(receiptLimit)
 	require.NoError(t, err)
 
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals, tracer)
+	build := builder.NewBuilder(
+		metrics,
+		db,
+		state,
+		headersDB,
+		sealsDB,
+		indexDB,
+		guarantees,
+		seals,
+		receipts,
+		tracer)
 
 	signer := &Signer{identity.ID()}
 

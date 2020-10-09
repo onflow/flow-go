@@ -12,6 +12,7 @@ const (
 	ProtoStateMutatorExtendCheckHeader     = "common.state.proto.mutator.extend.checkHeader"
 	ProtoStateMutatorExtendCheckGuarantees = "common.state.proto.mutator.extend.checkGuarantees"
 	ProtoStateMutatorExtendCheckSeals      = "common.state.proto.mutator.extend.checkSeals"
+	ProtoStateMutatorExtendCheckReceipts   = "common.state.proto.mutator.extend.checkReceipts"
 	ProtoStateMutatorExtendDBInsert        = "common.state.proto.mutator.extend.dbInsert"
 
 	// mutator.HeaderExtend - header-only check

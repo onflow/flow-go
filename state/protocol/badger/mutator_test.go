@@ -671,6 +671,148 @@ func TestExtendHighestSeal(t *testing.T) {
 	})
 }
 
+func TestExtendReceiptsDuplicate(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		// bootstrap the root block
+		block1, result, seal := unittest.BootstrapFixture(participants)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+		err := state.Mutate().Bootstrap(block1, result, seal)
+		require.NoError(t, err)
+
+		// create block2 and block3
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Payload.Guarantees = nil
+		block2.Header.PayloadHash = block2.Payload.Hash()
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		receipt := unittest.ReceiptForBlockFixture(&block2)
+
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Payload.Guarantees = nil
+		block3.Payload.Receipts = append(block3.Payload.Receipts, receipt)
+		block3.Header.PayloadHash = block3.Payload.Hash()
+		err = state.Mutate().Extend(&block3)
+		require.Nil(t, err)
+
+		// insert a duplicate receipt
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.Payload.Guarantees = nil
+		block4.Payload.Receipts = append(block4.Payload.Receipts, receipt)
+		block4.Header.PayloadHash = block4.Payload.Hash()
+		err = state.Mutate().Extend(&block4)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
+func TestExtendReceiptsBlockNotOnFork(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		// bootstrap the root block
+		block1, result, seal := unittest.BootstrapFixture(participants)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+		err := state.Mutate().Bootstrap(block1, result, seal)
+		require.NoError(t, err)
+
+		// create block2 and block3
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Payload.Guarantees = nil
+		block2.Header.PayloadHash = block2.Payload.Hash()
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		// Add a receipt that is not tied to a block on the fork
+		receipt := unittest.ExecutionReceiptFixture()
+
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Payload.Guarantees = nil
+		block3.Payload.Receipts = append(block3.Payload.Receipts, receipt)
+		block3.Header.PayloadHash = block3.Payload.Hash()
+		err = state.Mutate().Extend(&block3)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
+func TestExtendReceiptsNotSorted(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		// bootstrap the root block
+		block1, result, seal := unittest.BootstrapFixture(participants)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+		err := state.Mutate().Bootstrap(block1, result, seal)
+		require.NoError(t, err)
+
+		// create block2 and block3
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Payload.Guarantees = nil
+		block2.Header.PayloadHash = block2.Payload.Hash()
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Payload.Guarantees = nil
+		block3.Header.PayloadHash = block3.Payload.Hash()
+		err = state.Mutate().Extend(&block3)
+		require.Nil(t, err)
+
+		// insert a block with payload receipts not sorted by block height.
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.Payload.Guarantees = nil
+		block4.Payload.Receipts = append(block4.Payload.Receipts,
+			unittest.ReceiptForBlockFixture(&block3),
+			unittest.ReceiptForBlockFixture(&block2),
+		)
+		block4.Header.PayloadHash = block4.Payload.Hash()
+		err = state.Mutate().Extend(&block4)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
+func TestExtendReceiptsValid(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		// bootstrap the root block
+		block1, result, seal := unittest.BootstrapFixture(participants)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+		err := state.Mutate().Bootstrap(block1, result, seal)
+		require.NoError(t, err)
+
+		// create block2 and block3
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Payload.Guarantees = nil
+		block2.Header.PayloadHash = block2.Payload.Hash()
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Payload.Guarantees = nil
+		block3.Payload.Receipts = append(block3.Payload.Receipts, unittest.ReceiptForBlockFixture(&block2))
+		block3.Header.PayloadHash = block3.Payload.Hash()
+		err = state.Mutate().Extend(&block3)
+		require.Nil(t, err)
+
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.Payload.Guarantees = nil
+		block4.Header.PayloadHash = block4.Payload.Hash()
+		err = state.Mutate().Extend(&block4)
+		require.Nil(t, err)
+
+		block5 := unittest.BlockWithParentFixture(block4.Header)
+		block5.Payload.Guarantees = nil
+		block5.Payload.Receipts = append(block5.Payload.Receipts,
+			unittest.ReceiptForBlockFixture(&block3),
+			unittest.ReceiptForBlockFixture(&block4),
+		)
+		block5.Header.PayloadHash = block5.Payload.Hash()
+		err = state.Mutate().Extend(&block5)
+		require.Nil(t, err)
+	})
+}
+
 // Tests the full flow of transitioning between epochs by finalizing a setup
 // event, then a commit event, then finalizing the first block of the next epoch.
 // Also tests that appropriate epoch transition events are fired.

@@ -45,8 +45,9 @@ type Engine struct {
 	headersDB               storage.Headers                 // used to check sealed headers
 	indexDB                 storage.Index                   // used to check payloads for results
 	incorporatedResults     mempool.IncorporatedResults     // holds incorporated results in memory
+	receipts                mempool.Receipts                // holds execution receipts in memory
 	approvals               mempool.Approvals               // holds result approvals in memory
-	seals                   mempool.IncorporatedResultSeals // holds block seals in memory
+	seals                   mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
 	missing                 map[flow.Identifier]uint        // track how often a block was missing
 	assigner                module.ChunkAssigner            // chunk assignment object
 	checkingSealing         *atomic.Bool                    // used to rate limit the checksealing call
@@ -69,6 +70,7 @@ func New(
 	headersDB storage.Headers,
 	indexDB storage.Index,
 	incorporatedResults mempool.IncorporatedResults,
+	receipts mempool.Receipts,
 	approvals mempool.Approvals,
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
@@ -89,6 +91,7 @@ func New(
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
 		incorporatedResults:     incorporatedResults,
+		receipts:                receipts,
 		approvals:               approvals,
 		seals:                   seals,
 		missing:                 make(map[flow.Identifier]uint),
@@ -100,6 +103,7 @@ func New(
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
+	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
@@ -251,26 +255,25 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return engine.NewInvalidInputErrorf("executor has zero stake (%x)", identity.NodeID)
 	}
 
-	// check if the result of this receipt is already sealed.
-	result := &receipt.ExecutionResult
-
-	_, err = e.resultsDB.ByID(result.ID())
-	if err == nil {
-		log.Debug().Msg("discarding receipt for sealed result")
+	// add the receipt to the mempool so that the builder can incorporate it in
+	// a block payload
+	added := e.receipts.Add(receipt)
+	if !added {
+		log.Debug().Msg("skipping receipt already in mempool")
 		return nil
 	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check result: %w", err)
-	}
+
+	log.Info().Msg("execution receipt added to mempool")
+	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
 	// store the result belonging to the receipt in the memory pool
 	// TODO: This is a temporary step. In future, the incorporated results
 	// mempool will be populated by the finalizer when blocks are validated, and
 	// the IncorporatedBlockID will be the ID of the first block on its fork
 	// that contains a receipt committing to this result.
-	added, err := e.incorporatedResults.Add(&flow.IncorporatedResult{
-		IncorporatedBlockID: result.BlockID,
-		Result:              result,
+	added, err = e.incorporatedResults.Add(&flow.IncorporatedResult{
+		IncorporatedBlockID: receipt.ExecutionResult.BlockID, // TODO replace with ID of block in which the receipt was added
+		Result:              &receipt.ExecutionResult,
 	})
 	if err != nil {
 		e.log.Err(err).Msg("error inserting incorporated result in mempool")
@@ -281,7 +284,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
-
 	e.log.Info().Msg("execution result added to mempool")
 
 	// kick off a check for potential seal formation
@@ -333,16 +335,6 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	// check if the identity has a stake
 	if identity.Stake == 0 {
 		return engine.NewInvalidInputErrorf("verifier has zero stake (%x)", identity.NodeID)
-	}
-
-	// check if the result of this approval is already sealed
-	_, err = e.resultsDB.ByID(approval.Body.ExecutionResultID)
-	if err == nil {
-		log.Debug().Msg("discarding approval for sealed result")
-		return nil
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check result: %w", err)
 	}
 
 	// store in the memory pool (it won't be added if it is already in there).
@@ -492,8 +484,12 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 	// enough approvals for
 	for _, incorporatedResult := range e.incorporatedResults.All() {
 
+		// TODO: In phase 3, when incorporated results are produced by the
+		// finalizer, block and previous result should be found in storage. Any
+		// error in retrieving block or previous result is unexpected.
+
 		// if we have not received the block yet, we will just keep rechecking
-		// until the block has been received or the result has been purged
+		// until the block has been received or the result has been purged.
 		block, err := e.headersDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			log.Debug().Msg("skipping result with unknown block")
@@ -503,7 +499,8 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 			return nil, fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// look for previous result in mempool and storage
+		// look for previous result in mempool and storage (it could have been
+		// inserted in storage as part of a block payload).
 		previousID := incorporatedResult.Result.PreviousResultID
 		previous, _ := e.incorporatedResults.ByResultID(previousID)
 		if previous == nil {
@@ -619,16 +616,6 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 // seals mempool.
 func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 
-	// store the result to make it persistent for later checks
-	err := e.resultsDB.Store(incorporatedResult.Result)
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not store sealing result: %w", err)
-	}
-	err = e.resultsDB.Index(incorporatedResult.Result.BlockID, incorporatedResult.Result.ID())
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not index sealing result: %w", err)
-	}
-
 	// collect aggregate signatures
 	aggregatedSigs := e.collectAggregateSignatures(incorporatedResult.Result)
 
@@ -736,6 +723,11 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 			_ = e.incorporatedResults.Rem(result)
 		}
 	}
+	for _, receipt := range e.receipts.All() {
+		if clear[receipt.ExecutionResult.ID()] || shouldClear(receipt.ExecutionResult.BlockID) {
+			_ = e.receipts.Rem(receipt.ID())
+		}
+	}
 	for _, approval := range e.approvals.All() {
 		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
 			// delete all the approvals for the corresponding chunk
@@ -762,6 +754,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
+	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 }
@@ -806,14 +799,17 @@ func (e *Engine) requestPending() error {
 
 		blockID := header.ID()
 
-		// check if we have an execution result for the block at this height
-		_, err = e.resultsDB.ByBlockID(blockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-			continue
+		// Check if we have a receipt for this block
+		// TODO, implement an index
+		notFound := true
+		for _, r := range e.receipts.All() {
+			if r.ExecutionResult.BlockID == blockID {
+				notFound = false
+				break
+			}
 		}
-		if err != nil {
-			return fmt.Errorf("could not get execution result (block_id=%x): %w", blockID, err)
+		if notFound {
+			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
 		}
 	}
 

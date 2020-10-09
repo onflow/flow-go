@@ -76,17 +76,18 @@ type MatchingSuite struct {
 	sealedSnapshot *protocol.Snapshot
 	finalSnapshot  *protocol.Snapshot
 
-	sealedResults map[flow.Identifier]*flow.ExecutionResult
-	blocks        map[flow.Identifier]*flow.Block
+	results map[flow.Identifier]*flow.ExecutionResult
+	blocks  map[flow.Identifier]*flow.Block
 
-	sealedResultsDB *storage.ExecutionResults
-	headersDB       *storage.Headers
-	indexDB         *storage.Index
+	resultsDB *storage.ExecutionResults
+	headersDB *storage.Headers
+	indexDB   *storage.Index
 
 	pendingResults map[flow.Identifier]*flow.IncorporatedResult
 	pendingSeals   map[flow.Identifier]*flow.IncorporatedResultSeal
 
 	resultsPL   *mempool.IncorporatedResults
+	receiptsPL  *mempool.Receipts
 	approvalsPL *mempool.Approvals
 	sealsPL     *mempool.IncorporatedResultSeals
 
@@ -169,23 +170,29 @@ func (ms *MatchingSuite) SetupTest() {
 
 	ms.sealedSnapshot = &protocol.Snapshot{}
 
-	ms.sealedResults = make(map[flow.Identifier]*flow.ExecutionResult)
+	ms.results = make(map[flow.Identifier]*flow.ExecutionResult)
 	ms.blocks = make(map[flow.Identifier]*flow.Block)
 
-	ms.sealedResultsDB = &storage.ExecutionResults{}
-	ms.sealedResultsDB.On("ByID", mock.Anything).Return(
+	ms.resultsDB = &storage.ExecutionResults{}
+	ms.resultsDB.On("ByID", mock.Anything).Return(
 		func(resultID flow.Identifier) *flow.ExecutionResult {
-			return ms.sealedResults[resultID]
+			return ms.results[resultID]
 		},
 		func(resultID flow.Identifier) error {
-			_, found := ms.sealedResults[resultID]
+			_, found := ms.results[resultID]
 			if !found {
 				return storerr.ErrNotFound
 			}
 			return nil
 		},
 	)
-	ms.sealedResultsDB.On("Index", mock.Anything, mock.Anything).Return(
+	ms.resultsDB.On("Store", mock.Anything).Return(
+		func(result *flow.ExecutionResult) error {
+			ms.results[result.ID()] = result
+			return nil
+		},
+	)
+	ms.resultsDB.On("Index", mock.Anything, mock.Anything).Return(
 		func(blockID, resultID flow.Identifier) error {
 			return nil
 		},
@@ -263,6 +270,9 @@ func (ms *MatchingSuite) SetupTest() {
 		},
 	)
 
+	ms.receiptsPL = &mempool.Receipts{}
+	ms.receiptsPL.On("Size").Return(uint(0)) // only for metrics
+
 	ms.approvalsPL = &mempool.Approvals{}
 	ms.approvalsPL.On("Size").Return(uint(0)) // only for metrics
 
@@ -288,10 +298,11 @@ func (ms *MatchingSuite) SetupTest() {
 		mempool:                 metrics,
 		state:                   ms.state,
 		requester:               ms.requester,
-		resultsDB:               ms.sealedResultsDB,
+		resultsDB:               ms.resultsDB,
 		headersDB:               ms.headersDB,
 		indexDB:                 ms.indexDB,
 		incorporatedResults:     ms.resultsPL,
+		receipts:                ms.receiptsPL,
 		approvals:               ms.approvalsPL,
 		seals:                   ms.sealsPL,
 		checkingSealing:         atomic.NewBool(false),
@@ -311,6 +322,7 @@ func (ms *MatchingSuite) TestOnReceiptInvalidOrigin() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().Error(err, "should reject receipt with mismatching origin and executor")
 
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -337,6 +349,7 @@ func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for unknown block")
 
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -351,6 +364,7 @@ func (ms *MatchingSuite) TestOnReceiptInvalidRole() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().Error(err, "should reject receipt from wrong node role")
 
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -366,21 +380,47 @@ func (ms *MatchingSuite) TestOnReceiptUnstakedExecutor() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().Error(err, "should reject receipt from unstaked node")
 
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestOnReceiptSealedResult() {
+// func (ms *MatchingSuite) TestOnReceiptSealedResult() {
+
+// 	// try to submit a receipt for a sealed result
+// 	originID := ms.exeID
+// 	receipt := unittest.ExecutionReceiptFixture()
+// 	receipt.ExecutorID = originID
+// 	ms.results[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+
+// 	err := ms.matching.onReceipt(originID, receipt)
+// 	ms.Require().NoError(err, "should ignore receipt for sealed result")
+
+// 	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+// 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+// 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+// }
+
+func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 
 	// try to submit a receipt for a sealed result
 	originID := ms.exeID
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
-	ms.sealedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+
+	// check that we attempted to add the receipt to the mempool and return
+	// false as if it was already in the mempool
+	ms.receiptsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ExecutionReceipt)
+			ms.Assert().Equal(receipt, added)
+		},
+	).Return(false)
 
 	err := ms.matching.onReceipt(originID, receipt)
-	ms.Require().NoError(err, "should ignore receipt for sealed result")
+	ms.Require().NoError(err, "should ignore already pending receipt")
 
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -392,6 +432,15 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
 
+	// pretend the receipt is added to the mempool
+	ms.receiptsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ExecutionReceipt)
+			ms.Assert().Equal(receipt, added)
+		},
+	).Return(true)
+
+	// pretend the result is already in the mempool
 	ms.resultsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			incorporatedResult := args.Get(0).(*flow.IncorporatedResult)
@@ -402,6 +451,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for already pending result")
 
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -413,6 +463,13 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
 
+	ms.receiptsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ExecutionReceipt)
+			ms.Assert().Equal(receipt, added)
+		},
+	).Return(true)
+
 	ms.resultsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			incorporatedResult := args.Get(0).(*flow.IncorporatedResult)
@@ -423,6 +480,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -505,20 +563,20 @@ func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestOnApprovalSealedResult() {
+// func (ms *MatchingSuite) TestOnApprovalSealedResult() {
 
-	// try to submit an approval for a sealed result
-	originID := ms.verID
-	approval := unittest.ResultApprovalFixture()
-	approval.Body.ApproverID = originID
-	ms.sealedResults[approval.Body.ExecutionResultID] = unittest.ExecutionResultFixture()
+// 	// try to submit an approval for a sealed result
+// 	originID := ms.verID
+// 	approval := unittest.ResultApprovalFixture()
+// 	approval.Body.ApproverID = originID
+// 	ms.results[approval.Body.ExecutionResultID] = unittest.ExecutionResultFixture()
 
-	err := ms.matching.onApproval(originID, approval)
-	ms.Require().NoError(err, "should ignore approval for sealed result")
+// 	err := ms.matching.onApproval(originID, approval)
+// 	ms.Require().NoError(err, "should ignore approval for sealed result")
 
-	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
+// 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+// 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+// }
 
 func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 
@@ -620,7 +678,7 @@ func (ms *MatchingSuite) TestSealableResultsPreviousNotInMempool() {
 	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
 	previous := unittest.ExecutionResultFixture() // previous does not reference the same block as block parent
 	incorporatedResult.Result.PreviousResultID = previous.ID()
-	ms.sealedResults[previous.ID()] = previous
+	ms.results[previous.ID()] = previous
 
 	// add incorporated result to mempool
 	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
@@ -635,7 +693,7 @@ func (ms *MatchingSuite) TestSealableResultsPreviousNotInMempool() {
 	).Return(nil, nil)
 
 	// check that it is looking for previous in resultsDB, and return previous
-	ms.sealedResultsDB.On("ByID", mock.Anything).Run(
+	ms.resultsDB.On("ByID", mock.Anything).Run(
 		func(args mock.Arguments) {
 			previousResultID := args.Get(0).(flow.Identifier)
 			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
@@ -980,7 +1038,7 @@ func (ms *MatchingSuite) TestSealResultValid() {
 	}
 
 	// check match when we are storing entities
-	ms.sealedResultsDB.On("Store", mock.Anything).Run(
+	ms.resultsDB.On("Store", mock.Anything).Run(
 		func(args mock.Arguments) {
 			stored := args.Get(0).(*flow.ExecutionResult)
 			ms.Assert().Equal(incorporatedResult.Result, stored)
@@ -1008,7 +1066,6 @@ func (ms *MatchingSuite) TestSealResultValid() {
 	err = ms.matching.sealResult(incorporatedResult)
 	ms.Require().NoError(err, "should generate seal on persisted previous result")
 
-	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 }
 
@@ -1084,8 +1141,8 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 
 	ms.matching.state = ms.state
 
-	// the results are not in the DB, which will trigger request
-	ms.sealedResultsDB.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
+	// the receipts pool is empty, which will trigger request
+	ms.receiptsPL.On("All").Return(nil)
 
 	// keep track of requested blocks
 	requestedBlocks := []flow.Identifier{}

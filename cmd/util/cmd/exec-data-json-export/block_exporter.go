@@ -40,7 +40,8 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) err
 	index := badger.NewIndex(cacheMetrics, db)
 	guarantees := badger.NewGuarantees(cacheMetrics, db)
 	seals := badger.NewSeals(cacheMetrics, db)
-	payloads := badger.NewPayloads(db, index, guarantees, seals)
+	receipts := badger.NewExecutionReceipts(db, badger.NewExecutionResults(db))
+	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts)
 	blocks := badger.NewBlocks(db, headers, payloads)
 
 	activeBlockID := blockID

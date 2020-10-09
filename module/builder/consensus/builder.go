@@ -5,6 +5,7 @@ package consensus
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -31,6 +32,7 @@ type Builder struct {
 	index    storage.Index
 	guarPool mempool.Guarantees
 	sealPool mempool.IncorporatedResultSeals
+	recPool  mempool.Receipts
 	cfg      Config
 }
 
@@ -44,6 +46,7 @@ func NewBuilder(
 	index storage.Index,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
+	recPool mempool.Receipts,
 	tracer module.Tracer,
 	options ...func(*Config),
 ) *Builder {
@@ -71,21 +74,19 @@ func NewBuilder(
 		index:    index,
 		guarPool: guarPool,
 		sealPool: sealPool,
+		recPool:  recPool,
 		cfg:      cfg,
 	}
 	return b
 }
 
-// BuildOn creates a new block header build on the provided parent, using the given view and applying the
-// custom setter function to allow the caller to make changes to the header before storing it.
+// BuildOn creates a new block header on top of the provided parent, using the
+// given view and applying the custom setter function to allow the caller to
+// make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 
 	b.tracer.StartSpan(parentID, trace.CONBuildOn)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
-
-	// STEP ONE: Create a lookup of all previously used guarantees on the part
-	// of the chain that we are building on. We do this separately for pending
-	// and finalized ancestors, so we can differentiate what to do about it.
 
 	b.tracer.StartSpan(parentID, trace.CONBuildOnSetup)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnSetup)
@@ -102,6 +103,120 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	b.tracer.FinishSpan(parentID, trace.CONBuildOnSetup)
+
+	// get the collection guarantees to insert in the payload
+	insertableGuarantees, err := b.getInsertableGuarantees(parentID, finalID, finalized)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the seals to insert in the payload
+	insertableSeals, err := b.getInsertableSeals(parentID, finalID, finalized)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the receipts to insert in the payload
+	insertableReceipts, err := b.getInsertableReceipts(parentID, finalID, finalized)
+	if err != nil {
+		return nil, err
+	}
+
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
+
+	// build the payload so we can get the hash
+	payload := &flow.Payload{
+		Guarantees: insertableGuarantees,
+		Seals:      insertableSeals,
+		Receipts:   insertableReceipts,
+	}
+
+	parent, err := b.headers.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent: %w", err)
+	}
+
+	// calculate the timestamp and cutoffs
+	timestamp := time.Now().UTC()
+	from := parent.Timestamp.Add(b.cfg.minInterval)
+	to := parent.Timestamp.Add(b.cfg.maxInterval)
+
+	// adjust timestamp if outside of cutoffs
+	if timestamp.Before(from) {
+		timestamp = from
+	}
+	if timestamp.After(to) {
+		timestamp = to
+	}
+
+	// construct default block on top of the provided parent
+	header := &flow.Header{
+		ChainID:     parent.ChainID,
+		ParentID:    parentID,
+		Height:      parent.Height + 1,
+		Timestamp:   timestamp,
+		PayloadHash: payload.Hash(),
+
+		// the following fields should be set by the custom function as needed
+		// NOTE: we could abstract all of this away into an interface{} field,
+		// but that would be over the top as we will probably always use hotstuff
+		View:           0,
+		ParentVoterIDs: nil,
+		ParentVoterSig: nil,
+		ProposerID:     flow.ZeroID,
+		ProposerSig:    nil,
+	}
+
+	// apply the custom fields setter of the consensus algorithm
+	err = setter(header)
+	if err != nil {
+		return nil, fmt.Errorf("could not apply setter: %w", err)
+	}
+
+	// insert the proposal into the database
+	proposal := &flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
+
+	err = b.state.Mutate().Extend(proposal)
+	if err != nil {
+		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
+	}
+
+	return header, nil
+}
+
+// getInsertableGuarantees returns the list of CollectionGuarantees that should
+// be inserted in the next payload. It looks in the collection mempool and
+// applies the following filters:
+//
+// 1) If it was already included in the finalized part of the chain, remove it
+//    from the memory pool and skip.
+//
+// 2) If it references an unknown block, remove it from the memory pool and
+//    skip.
+//
+// 3) If the reference block has an expired height, also remove it from the
+//    memory pool and skip.
+//
+// 4) If it was already included in the pending part of the chain, skip, but
+//    keep in memory pool for now.
+//
+// 5) Otherwise, this guarantee can be included in the payload.
+func (b *Builder) getInsertableGuarantees(parentID flow.Identifier,
+	finalID flow.Identifier,
+	finalHeight uint64) ([]*flow.CollectionGuarantee, error) {
+
+	// STEP ONE: Create a lookup of all previously used guarantees on the part
+	// of the chain that we are building on. We do this separately for pending
+	// and finalized ancestors, so we can differentiate what to do about it.
+
 	b.tracer.StartSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
 
@@ -112,7 +227,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-		if ancestor.Height <= finalized {
+		if ancestor.Height <= finalHeight {
 			return nil, fmt.Errorf("should always build on last finalized block")
 		}
 		index, err := b.index.ByBlockID(ancestorID)
@@ -216,13 +331,31 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
 
 	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+
+	return guarantees, nil
+}
+
+// getInsertableSeals returns the list of Seals from the mempool that should be
+// inserted in the next payload, as well as the last created seal (which doesn't
+// necessarily belong to the insertable seals if nothing was taken from the
+// mempool).  It looks in the seal mempool and applies the following filters:
+//
+// 1) Do not collect more than maxSealCount items.
+//
+// 2) The seals should form a valid chain.
+//
+// 3) The seals should correspond to an incorporated result on this fork.
+func (b *Builder) getInsertableSeals(parentID flow.Identifier,
+	finalID flow.Identifier,
+	finalHeight uint64) ([]*flow.Seal, error) {
+
 	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
 
-	// STEP FOUR: We try to get all ancestors from last sealed block all the way
-	// to the parent. Then we try to get seals for each of them until we don't
-	// find one. This creates a valid chain of seals from the last sealed block
-	// to at most the parent.
+	// We try to get all ancestors from last sealed block all the way to the
+	// parent. Then we try to get seals for each of them until we don't find
+	// one. This creates a valid chain of seals from the last sealed block to at
+	// most the parent.
 
 	// TODO: The following logic for selecting seals will be replaced to match
 	// seals to incorporated results, looping through the fork, from parent to
@@ -260,7 +393,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	unchained := false
 	var seals []*flow.Seal
 	var sealCount uint
-	for height := sealed.Height + 1; height <= finalized; height++ {
+	for height := sealed.Height + 1; height <= finalHeight; height++ {
 
 		if len(byBlock) == 0 {
 			break
@@ -299,7 +432,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// parent to just before finalized, and see if we can use up the rest of the
 	// seals. We need to be careful to break when reaching the last sealed block
 	// as it could be higher than the last finalized block.
-	ancestorID = parentID
+	ancestorID := parentID
 	var pendingIDs []flow.Identifier
 	for ancestorID != finalID && ancestorID != last.BlockID {
 		pendingIDs = append(pendingIDs, ancestorID)
@@ -328,70 +461,164 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
 
-	// STEP FOUR: We now have guarantees and seals we can validly include
-	// in the payload built on top of the given parent. Now we need to build
-	// and store the block header, as well as index the payload contents.
+	return seals, nil
+}
 
-	// build the payload so we can get the hash
-	payload := &flow.Payload{
-		Guarantees: guarantees,
-		Seals:      seals,
-	}
+// getInsertableReceipts returns the list of ExecutionReceipts that should be
+// inserted in the next payload. It looks in the receipts mempool and applies
+// the following filter:
+//
+// 1) If it corresponds to an unknown block, remove it from the mempool and
+//    skip.
+//
+// 2) If the corresponding block was already sealed, remove it from the mempool
+//    and skip.
+//
+// 3) If it was already included in the finalized part of the chain, remove it
+//    from the memory pool and skip.
+//
+// 4) If it was already included in the pending part of the chain, skip, but
+//    keep in memory pool for now.
+//
+// 5) If the receipt corresponds to a block that is not on this fork, skip, but
+//    but keep in mempool for now.
+//
+// 6) Otherwise, this receipt can be included in the payload.
+//
+// Receipts have to be ordered by block height.
+func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
+	finalID flow.Identifier,
+	finalHeight uint64) ([]*flow.ExecutionReceipt, error) {
 
-	// calculate the timestamp and cutoffs
-	timestamp := time.Now().UTC()
-	from := parent.Timestamp.Add(b.cfg.minInterval)
-	to := parent.Timestamp.Add(b.cfg.maxInterval)
-
-	// adjust timestamp if outside of cutoffs
-	if timestamp.Before(from) {
-		timestamp = from
-	}
-	if timestamp.After(to) {
-		timestamp = to
-	}
-
-	// construct default block on top of the provided parent
-	header := &flow.Header{
-		ChainID:     parent.ChainID,
-		ParentID:    parentID,
-		Height:      height,
-		Timestamp:   timestamp,
-		PayloadHash: payload.Hash(),
-
-		// the following fields should be set by the custom function as needed
-		// NOTE: we could abstract all of this away into an interface{} field,
-		// but that would be over the top as we will probably always use hotstuff
-		View:           0,
-		ParentVoterIDs: nil,
-		ParentVoterSig: nil,
-		ProposerID:     flow.ZeroID,
-		ProposerSig:    nil,
-	}
-
-	// apply the custom fields setter of the consensus algorithm
-	err = setter(header)
+	var sealedHeight uint64
+	err := b.db.View(operation.RetrieveSealedHeight(&sealedHeight))
 	if err != nil {
-		return nil, fmt.Errorf("could not apply setter: %w", err)
+		return nil, fmt.Errorf("could no retrieve sealed height: %w", err)
 	}
 
-	// insert the proposal into the database
-	proposal := &flow.Block{
-		Header:  header,
-		Payload: payload,
+	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
+	// use it to skip receipts that are not for blocks in the fork.
+	forkBlocks := make(map[flow.Identifier]struct{})
+
+	// Create a lookup table of all the receipts that are already inserted in
+	// finalized unsealed blocks. This will be used to filter out duplicates.
+	finalLookup := make(map[flow.Identifier]struct{})
+	for height := sealedHeight + 1; height <= finalHeight; height++ {
+
+		header, err := b.headers.ByHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block for height (%d): %w", height, err)
+		}
+
+		index, err := b.index.ByBlockID(header.ID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", header.ID(), err)
+		}
+
+		forkBlocks[header.ID()] = struct{}{}
+
+		for _, recID := range index.ReceiptIDs {
+			finalLookup[recID] = struct{}{}
+		}
 	}
 
-	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
-	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
+	// iterate through pending blocks, from parent to final, and keep track of
+	// the receipts already recorded in those blocks.
+	ancestorID := parentID
+	pendingLookup := make(map[flow.Identifier]struct{})
+	for ancestorID != finalID {
+		forkBlocks[ancestorID] = struct{}{}
 
-	err = b.state.Mutate().Extend(proposal)
-	if err != nil {
-		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
+		ancestor, err := b.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
+		}
+		if ancestor.Height <= finalHeight {
+			return nil, fmt.Errorf("should always build on last finalized block")
+		}
+		index, err := b.index.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+		}
+		for _, recID := range index.ReceiptIDs {
+			pendingLookup[recID] = struct{}{}
+		}
+		ancestorID = ancestor.ParentID
 	}
 
-	return header, nil
+	// Go through mempool and collect valid receipts. We store them by block
+	// height so as to sort them later. There can be multiple receipts per block
+	// even if they correspond to the same result.
+	receipts := make(map[uint64][]*flow.ExecutionReceipt) // [height] -> []receipt
+	for _, receipt := range b.recPool.All() {
+
+		// if block is unknown, remove from mempool and continue
+		h, err := b.headers.ByBlockID(receipt.ExecutionResult.BlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			_ = b.recPool.Rem(receipt.ID())
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get reference block: %w", err)
+		}
+
+		// check whether receipt is for block at or below the sealed and
+		// finalized height
+		if h.Height <= sealedHeight {
+			// Block has either already been sealed and finalized  _or_
+			// block is a _sibling_ of a sealed and finalized block.
+			// In either case, we don't need to seal the block anymore
+			// and therefore can discard any ExecutionResults for it.
+			_ = b.recPool.Rem(receipt.ID())
+			continue
+		}
+
+		// if the receipt is already included in a finalized block, remove from
+		// mempool and continue.
+		_, ok := finalLookup[receipt.ID()]
+		if ok {
+			_ = b.recPool.Rem(receipt.ID())
+			continue
+		}
+
+		// if the receipt is already included in a pending block, continue, but
+		// don't remove from mempool.
+		_, ok = pendingLookup[receipt.ID()]
+		if ok {
+			continue
+		}
+
+		// if the receipt is not for a block on this fork, continue, but don't
+		// remove from mempool
+		if _, ok := forkBlocks[receipt.ExecutionResult.BlockID]; !ok {
+			continue
+		}
+
+		receipts[h.Height] = append(receipts[h.Height], receipt)
+	}
+
+	// sort receipts by block height
+	sortedReceipts := sortReceipts(receipts)
+
+	return sortedReceipts, nil
+}
+
+// sortReceipts takes a map of block-height to execution receipt, and returns
+// the receipts in a slice sorted by block-height.
+func sortReceipts(receipts map[uint64][]*flow.ExecutionReceipt) []*flow.ExecutionReceipt {
+
+	keys := make([]uint64, 0, len(receipts))
+	for k := range receipts {
+		keys = append(keys, k)
+	}
+
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+
+	res := make([]*flow.ExecutionReceipt, 0, len(keys))
+	for _, k := range keys {
+		res = append(res, receipts[k]...)
+	}
+
+	return res
 }

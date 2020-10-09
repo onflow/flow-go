@@ -228,6 +228,12 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
 
+	// check if the receipts in the payload are valid
+	err = m.receiptExtend(candidate)
+	if err != nil {
+		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
+	}
+
 	// insert the block and index the last seal for the block
 	err = m.insert(candidate, last)
 	if err != nil {
@@ -509,6 +515,103 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	}
 
 	return last, nil
+}
+
+// receiptExtend checks the compliance of the receipt payload. Receipts should
+// correspond to blocks on the fork, should not appear more than once on a fork,
+// and should be sorted by block height (within a payload).
+func (m *Mutator) receiptExtend(candidate *flow.Block) error {
+	blockID := candidate.ID()
+	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
+	defer m.state.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
+
+	header := candidate.Header
+	payload := candidate.Payload
+
+	var sealedHeight uint64
+	err := m.state.db.View(operation.RetrieveSealedHeight(&sealedHeight))
+	if err != nil {
+		return fmt.Errorf("could no retrieve sealed height: %w", err)
+	}
+
+	// build a list of all previously used guarantees on this part of the chain
+	ancestorID := header.ParentID
+	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
+	// use it to skip receipts that are not for blocks in the fork.
+	forkBlocks := make(map[flow.Identifier]struct{})
+	// Create a lookup table of all the receipts that are already in blocks.
+	// This will be used to filter out duplicates.
+	lookup := make(map[flow.Identifier]struct{})
+	for {
+		forkBlocks[ancestorID] = struct{}{}
+
+		ancestor, err := m.state.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
+		}
+
+		index, err := m.state.index.ByBlockID(ancestorID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
+		}
+
+		for _, recID := range index.ReceiptIDs {
+			lookup[recID] = struct{}{}
+		}
+
+		if ancestor.Height <= sealedHeight {
+			break
+		}
+
+		ancestorID = ancestor.ParentID
+	}
+
+	// prevReceiptHeight is used to check that receipts within a payload are
+	// sorted by block height. For each receipt in the payload, we check that
+	// its block height is greater or equal than the previous receipt.
+	var prevReceiptHeight uint64 = 0
+
+	// check each receipt included in the payload for duplication
+	for _, receipt := range payload.Receipts {
+
+		// if the receipt was already included before, error
+		_, duplicated := lookup[receipt.ID()]
+		if duplicated {
+			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
+		}
+
+		// if the receipt is not for a block on this fork, error
+		if _, ok := forkBlocks[receipt.ExecutionResult.BlockID]; !ok {
+			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
+		}
+
+		// get the reference block to check expiry
+		h, err := m.state.headers.ByBlockID(receipt.ExecutionResult.BlockID)
+		if err != nil {
+			return fmt.Errorf("could not get reference block (%x): %w", receipt.ExecutionResult.BlockID, err)
+		}
+
+		// check whether receipt is for block at or below the sealed and
+		// finalized height
+		if h.Height <= sealedHeight {
+			// Block has either already been sealed and finalized  _or_
+			// block is a _sibling_ of a sealed and finalized block.
+			// In either case, it's an error
+			return state.NewInvalidExtensionErrorf("payload includes receipt for block below sealed height (%x) (%d/%d)",
+				receipt.ExecutionResult.BlockID,
+				h.Height,
+				sealedHeight)
+		}
+
+		// check receipts are sorted by block height
+		if h.Height <= prevReceiptHeight {
+			return state.NewInvalidExtensionError("payload receipts should be sorted by block heigh")
+		}
+
+		prevReceiptHeight = h.Height
+	}
+
+	return nil
 }
 
 // finding the last sealed block on the chain of which the given block is extending
