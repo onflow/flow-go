@@ -1125,7 +1125,7 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 	// reached the targeted height after a while.
 	// for now, we could also rely on the syncFilter to force syncing from a
 	// specific node.
-	err = e.syncConduit.Submit(&exeStateReq, randomExecutionNode.NodeID)
+	err = e.syncConduit.Unicast(&exeStateReq, randomExecutionNode.NodeID)
 
 	if err != nil {
 		return fmt.Errorf("error while sending state sync req to other node (%v): %w",
@@ -1194,7 +1194,7 @@ func (e *Engine) handleStateSyncRequest(
 	ctx := e.unit.Ctx()
 	err = e.deltaRange(ctx, fromHeight, toHeight,
 		func(delta *messages.ExecutionStateDelta) {
-			err := e.syncConduit.Submit(delta, originID)
+			err := e.syncConduit.Unicast(delta, originID)
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not submit block delta")
 			}

@@ -188,7 +188,7 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	// sends requested chunk data pack to the requester
-	err = e.chunksConduit.Submit(response, originID)
+	err = e.chunksConduit.Unicast(response, originID)
 	if err != nil {
 		return fmt.Errorf("could not send requested chunk data pack to (%s): %w", origin, err)
 	}
@@ -217,7 +217,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	err = e.receiptCon.Submit(receipt, identities.NodeIDs()...)
+	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit execution receipts: %w", err)
 	}
