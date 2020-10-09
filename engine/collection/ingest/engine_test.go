@@ -218,7 +218,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	remote, ok := suite.clusters.ByIndex((index + 1) % suite.N_CLUSTERS)
 	suite.Require().True(ok)
 
-	// get a transaction that will be routed to local cluster
+	// get a transaction that will be routed to remote cluster
 	tx := unittest.TransactionBodyFixture()
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, remote, func(transaction *flow.TransactionBody) {})
@@ -292,4 +292,72 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 	suite.Assert().Nil(err)
 	suite.Assert().False(suite.pools.Get(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
+}
+
+// We should route to the appropriate cluster if our cluster assignment changes
+// on an epoch boundary. In this test, the clusters in epoch 2 are the reverse
+// of those in epoch 1, and we check that the transaction is routed based on
+// the clustering in epoch 2.
+func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
+
+	epoch2Clusters := flow.ClusterList{
+		suite.clusters[1],
+		suite.clusters[0],
+	}
+	epoch2 := new(protocol.Epoch)
+	epoch2.On("Counter").Return(uint64(2), nil)
+	epoch2.On("Clustering").Return(epoch2Clusters, nil)
+	// update the mocks to behave as though we have transitioned to epoch 2
+	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.Transition()
+
+	// get the local cluster in epoch 2
+	epoch2Local, _, ok := epoch2Clusters.ByNodeID(suite.me.NodeID())
+	suite.Require().True(ok)
+
+	// get a transaction that will be routed to local cluster
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+	tx = unittest.AlterTransactionForCluster(tx, epoch2Clusters, epoch2Local, func(transaction *flow.TransactionBody) {})
+
+	// should route to local cluster
+	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch2Local.NodeIDs()[0], epoch2Local.NodeIDs()[1]).Return(nil).Once()
+
+	err := suite.engine.ProcessLocal(&tx)
+	suite.Assert().Nil(err)
+
+	// should add to local mempool for epoch 2 only
+	suite.Assert().True(suite.pools.Get(2).Has(tx.ID()))
+	suite.Assert().False(suite.pools.Get(1).Has(tx.ID()))
+	suite.conduit.AssertExpectations(suite.T())
+}
+
+// We will discard all transactions when we aren't assigned to any cluster.
+func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
+
+	// remove ourselves from the cluster assignment for epoch 2
+	withoutMe := suite.identities.
+		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
+		Filter(filter.HasRole(flow.RoleCollection))
+	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
+	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
+	suite.Require().Nil(err)
+
+	epoch2 := new(protocol.Epoch)
+	epoch2.On("Counter").Return(uint64(2), nil)
+	epoch2.On("Clustering").Return(epoch2Clusters, nil)
+	// update the mocks to behave as though we have transitioned to epoch 2
+	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.Transition()
+
+	// any transaction is OK here, since we're not in any cluster
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+
+	err = suite.engine.ProcessLocal(&tx)
+	suite.Assert().Error(err)
+
+	// should not add to mempool
+	suite.Assert().False(suite.pools.Get(2).Has(tx.ID()))
+	suite.Assert().False(suite.pools.Get(1).Has(tx.ID()))
 }
