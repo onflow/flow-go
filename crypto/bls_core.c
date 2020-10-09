@@ -126,16 +126,173 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
 
     int res = fp12_cmp(pair1, pair2);
 #endif
-    fp12_free(&one);
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
     
-    if (res == RLC_EQ && core_get()->code == RLC_OK) 
+    if (res == RLC_EQ && core_get()->code == RLC_OK) {
         return VALID;
-    else 
+    }
+    return INVALID;
+}
+
+
+// Verifies the validity of an aggregated BLS signature under distinct messages.
+//
+// Each message is mapped to a set of public keys, so that the verification equation is 
+// optimized to compute one pairing per message. 
+// - sig is the signature.
+// - nb_hashes is the number of the messages (hashes) in the map
+// - hashes is pointer to all flattened hashes in order where the hash at index i has a byte length len_hashes[i],
+//   is mapped to pks_per_hash[i] public keys. 
+// - the keys are flattened in pks in the same hashes order.
+//
+// membership check of the signature in G1 is verified in this function
+// membership check of pks in G2 is not verified in this function
+// the membership check is separated to allow optimizing multiple verifications using the same pks
+int bls_verifyPerDistinctMessage(const byte* sig, 
+                         const int nb_hashes, const byte* hashes, const uint32_t* len_hashes,
+                         const uint32_t* pks_per_hash, const ep2_st* pks) {  
+    
+    ep_t* elemsG1 = (ep_t*)malloc((nb_hashes + 1) * sizeof(ep_t));
+    ep2_t* elemsG2 = (ep2_t*)malloc((nb_hashes + 1) * sizeof(ep2_t));
+
+    // elemsG1[0] = sig
+    ep_new(elemsG1[0]);
+    if (ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN) != RLC_OK) 
         return INVALID;
+
+    // check s is on curve and in G1
+    if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+        return INVALID;
+
+    // elemsG2[0] = -g2
+    ep2_new(&elemsG2[0]);
+    ep2_neg(elemsG2[0], &core_get()->ep2_g); // could be hardcoded 
+
+    // map all hashes to G1
+    int offset = 0;
+    for (int i=1; i < nb_hashes+1; i++) {
+        // elemsG1[i] = h
+        ep_new(elemsG1[i]);
+        // hash to G1 
+        map_to_G1(elemsG1[i], &hashes[offset], len_hashes[i-1]); 
+        offset += len_hashes[i-1];
+    }
+
+    // aggregate public keys mapping to the same hash
+    offset = 0;
+    for (int i=1; i < nb_hashes+1; i++) {
+        // elemsG2[i] = agg_pk[i]
+        ep2_new(elemsG2[i]);
+        ep2_sum_vector(elemsG2[i], (ep2_st*) &pks[offset] , pks_per_hash[i-1]);
+        offset += pks_per_hash[i-1];
+    }
+
+    fp12_t pair;
+    fp12_new(&pair);
+    // double pairing with Optimal Ate 
+    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), nb_hashes+1);
+
+    // compare the result to 1
+    int res = fp12_cmp_dig(pair, 1);
+
+    for (int i=0; i < nb_hashes+1; i++) {
+        ep_free(elemsG1[i]);
+        ep2_free(elemsG2[i]);
+    }
+    free(elemsG1);
+    free(elemsG2);
+    
+    if (res == RLC_EQ && core_get()->code == RLC_OK) {
+        return VALID;
+    }
+    return INVALID;
+}
+
+
+// Verifies the validity of an aggregated BLS signature under distinct public keys.
+//
+// Each key is mapped to a set of messages, so that the verification equation is 
+// optimized to compute one pairing per public key. 
+// - nb_pks is the number of the public keys in the map.
+// - pks is pointer to all pks in order where the key at index i
+//   is mapped to hashes_per_pk[i] hashes. 
+// - the messages (hashes) are flattened in hashes in the same public key order,
+//  each with a length in len_hashes.
+//
+// membership check of the signature in G1 is verified in this function
+// membership check of pks in G2 is not verified in this function
+// the membership check is separated to allow optimizing multiple verifications using the same pks
+int bls_verifyPerDistinctKey(const byte* sig, 
+                         const int nb_pks, const ep2_st* pks, const uint32_t* hashes_per_pk,
+                         const byte* hashes, const uint32_t* len_hashes){
+
+    
+    ep_t* elemsG1 = (ep_t*)malloc((nb_pks + 1) * sizeof(ep_t));
+    ep2_t* elemsG2 = (ep2_t*)malloc((nb_pks + 1) * sizeof(ep2_t));
+
+    // elemsG1[0] = s
+    ep_new(elemsG1[0]);
+    if (ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN) != RLC_OK) 
+        return INVALID;
+
+    // check s is on curve and in G1
+    if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+        return INVALID;
+
+    // elemsG2[0] = -g2
+    ep2_new(&elemsG2[0]);
+    ep2_neg(elemsG2[0], &core_get()->ep2_g); // could be hardcoded 
+
+    // set the public keys
+    for (int i=1; i < nb_pks+1; i++) {
+        ep2_new(elemsG2[i]);
+        ep2_copy(elemsG2[i], (ep2_st*) &pks[i-1]);
+    }
+
+    // map all hashes to G1 and aggregate the ones with the same public key
+    int data_offset = 0;
+    int index_offset = 0;
+    for (int i=1; i < nb_pks+1; i++) {
+        // array for all the hashes under the same key
+        ep_st* h_array = (ep_st*)malloc(hashes_per_pk[i-1] * sizeof(ep_st));
+        for (int j=0; j < hashes_per_pk[i-1]; j++) {
+            ep_new(&h_array[j]);
+            // map the hash to G1
+            map_to_G1(&h_array[j], &hashes[data_offset], len_hashes[index_offset]); 
+            data_offset += len_hashes[index_offset];
+            index_offset++; 
+        }
+        // aggregate all the points of the array
+        ep_new(elemsG1[i]);   
+        ep_sum_vector(elemsG1[i], h_array, hashes_per_pk[i-1]);
+
+        // free the array
+        for (int j=0; j < hashes_per_pk[i-1]; j++) ep_free(h_array[j]);
+        free(h_array);
+    }
+
+    fp12_t pair;
+    fp12_new(&pair);
+    // double pairing with Optimal Ate 
+    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), nb_pks+1);
+
+    // compare the result to 1
+    int res = fp12_cmp_dig(pair, 1);
+
+    for (int i=0; i < nb_pks+1; i++) {
+        ep_free(elemsG1[i]);
+        ep2_free(elemsG2[i]);
+    }
+    free(elemsG1);
+    free(elemsG2);
+    
+    if (res == RLC_EQ && core_get()->code == RLC_OK) {
+        return VALID;
+    }
+    return INVALID;
 }
 
 // Verifies a BLS signature in a byte buffer.

@@ -47,6 +47,7 @@ The following table lists all work streams and links to their home directory and
 | Verification Node | [/cmd/verification](/cmd/verification) |
 | HotStuff | [/consensus/hotstuff](/consensus/hotstuff) |
 | Storage | [/storage](/storage) |
+| Ledger | [/ledger](/ledger) |
 | Networking | [/network](/network/) |
 | Cryptography | [/crypto](/crypto) |
 
