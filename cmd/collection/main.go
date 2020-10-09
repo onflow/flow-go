@@ -107,7 +107,8 @@ func main() {
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
 			pools = epochpool.NewTransactionPools(create)
-			return nil
+			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
+			return err
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
 			followerBuffer = buffer.NewPendingBlocks()

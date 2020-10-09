@@ -48,3 +48,17 @@ func (t *TransactionPools) ForEpoch(epoch uint64) mempool.Transactions {
 	t.pools[epoch] = pool
 	return pool
 }
+
+// CombinedSize returns the sum of the sizes of all transaction pools.
+func (t *TransactionPools) CombinedSize() uint {
+
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	size := uint(0)
+	for _, pool := range t.pools {
+		size += pool.Size()
+	}
+
+	return size
+}

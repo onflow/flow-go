@@ -55,3 +55,23 @@ func TestMultipleEpochs(t *testing.T) {
 	}
 	unittest.AssertReturnsBefore(t, wg.Wait, time.Second)
 }
+
+func TestCombinedSize(t *testing.T) {
+
+	create := func() mempool.Transactions { return stdmap.NewTransactions(100) }
+	pools := epochs.NewTransactionPools(create)
+
+	nEpochs := rand.Uint64() % 10
+	transactionsPerEpoch := rand.Uint64() % 10
+	expected := uint(nEpochs * transactionsPerEpoch)
+
+	for epoch := uint64(0); epoch < nEpochs; epoch++ {
+		pool := pools.ForEpoch(epoch)
+		for i := 0; i < int(transactionsPerEpoch); i++ {
+			next := unittest.TransactionBodyFixture()
+			pool.Add(&next)
+		}
+	}
+
+	assert.Equal(t, expected, pools.CombinedSize())
+}
