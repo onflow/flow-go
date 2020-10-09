@@ -1,6 +1,7 @@
 package stdmap
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -184,4 +185,20 @@ func TestRaceCondition(t *testing.T) {
 	}()
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
+}
+
+func TestCapacity(t *testing.T) {
+	idMap, err := NewIdentifierMap(10)
+	require.NoError(t, err)
+
+	t.Run("adding items beyond capacity", func(t *testing.T) {
+
+		for i := 0; i < 100; i++ {
+			key := unittest.IdentifierFixture()
+			id := unittest.IdentifierFixture()
+			err := idMap.Append(key, id)
+			require.NoError(t, err)
+			require.True(t, idMap.Size() <= uint(10), fmt.Sprintf("size violation after adding %d item", i))
+		}
+	})
 }
