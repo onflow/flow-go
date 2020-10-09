@@ -48,7 +48,6 @@ type blsBLS12381Algo struct {
 //  BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
 
-
 // Sign signs an array of bytes using the private key
 //
 // Signature is compressed [zcash]
@@ -318,8 +317,8 @@ func (a *blsBLS12381Algo) init() error {
 	return nil
 }
 
-// set the context of BLS 12-381 curve in the lower C and Relic layers assuming the context 
-// was previously initialized with a call to init(). 
+// set the context of BLS 12-381 curve in the lower C and Relic layers assuming the context
+// was previously initialized with a call to init().
 //
 // If the implementation evolves to support multiple contexts,
 // reinit should be called at every blsBLS12381Algo operation.

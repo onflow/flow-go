@@ -29,9 +29,10 @@ type ecdsaAlgo struct {
 //  ECDSA contexts for each supported curve
 // NIST P-256 curve
 var p256Instance *ecdsaAlgo
+
 // SECG secp256k1 curve https://www.secg.org/sec2-v2.pdf
 var secp256k1Instance *ecdsaAlgo
- 
+
 func bitsToBytes(bits int) int {
 	return (bits + 7) >> 3
 }
