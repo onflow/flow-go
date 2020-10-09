@@ -35,12 +35,11 @@ func (t *TransactionPools) ForEpoch(epoch uint64) mempool.Transactions {
 
 	t.mu.RLock()
 	pool, exists := t.pools[epoch]
+	t.mu.RUnlock()
 	if exists {
-		t.mu.RUnlock()
 		return pool
 	}
 
-	t.mu.RUnlock()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
