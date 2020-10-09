@@ -108,8 +108,8 @@ func TestECDSAUtils(t *testing.T) {
 // This is only a sanity check meant to make sure the curve implemented
 // is checked against an independant test vector
 func TestScalarMult(t *testing.T) {
-	secp256k1 := newECDSASecp256k1().curve
-	p256 := newECDSAP256().curve
+	secp256k1 := secp256k1Instance.curve
+	p256 := p256Instance.curve
 	genericMultTests := []struct {
 		curve elliptic.Curve
 		Px    string
