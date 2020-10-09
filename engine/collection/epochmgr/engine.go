@@ -280,7 +280,7 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	select {
 	case <-components.Done():
 		delete(e.epochs, counter)
-		// TODO clear mempool for this epoch
+		e.pools.Get(counter).Clear()
 		return nil
 	case <-time.After(e.startupTimeout):
 		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)

@@ -51,4 +51,10 @@ func TestTransactionPool(t *testing.T) {
 		assert.Len(t, items, 1)
 		assert.Equal(t, item1, items[0])
 	})
+
+	t.Run("should be able to clear", func(t *testing.T) {
+		assert.True(t, pool.Size() > 0)
+		pool.Clear()
+		assert.Equal(t, uint(0), pool.Size())
+	})
 }

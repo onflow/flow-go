@@ -86,6 +86,11 @@ func (b *Backdata) All() []flow.Entity {
 	return entities
 }
 
+// Clear removes all entities from the pool.
+func (b *Backdata) Clear() {
+	b.entities = make(map[flow.Identifier]flow.Entity)
+}
+
 // Hash will use a merkle root hash to hash all items.
 func (b *Backdata) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
@@ -178,6 +183,13 @@ func (b *Backend) All() []flow.Entity {
 	b.RLock()
 	defer b.RUnlock()
 	return b.Backdata.All()
+}
+
+// Clear removes all entities from the pool.
+func (b *Backend) Clear() {
+	b.Lock()
+	defer b.Unlock()
+	b.Backdata.Clear()
 }
 
 // Hash will use a merkle root hash to hash all items.
