@@ -189,8 +189,8 @@ func TestRaceCondition(t *testing.T) {
 
 // TestCapacity defines an identifier map with size limit of `limit`. It then
 // starts adding `swarm`-many items concurrently to the map each on a separate goroutine,
-// where `swarm` > `limit` of the size of the map.
-// and evaluates that size of the map stays within the limit of 10.
+// where `swarm` > `limit`,
+// and evaluates that size of the map stays within the limit.
 func TestCapacity(t *testing.T) {
 	const (
 		limit = 10
@@ -201,23 +201,21 @@ func TestCapacity(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)
-	t.Run("adding items beyond capacity", func(t *testing.T) {
 
-		for i := 0; i < swarm; i++ {
-			go func() {
-				// adds an item on a separate goroutine
-				key := unittest.IdentifierFixture()
-				id := unittest.IdentifierFixture()
-				err := idMap.Append(key, id)
-				require.NoError(t, err)
+	for i := 0; i < swarm; i++ {
+		go func() {
+			// adds an item on a separate goroutine
+			key := unittest.IdentifierFixture()
+			id := unittest.IdentifierFixture()
+			err := idMap.Append(key, id)
+			require.NoError(t, err)
 
-				// evaluates that the size remains in the permissible range
-				require.True(t, idMap.Size() <= uint(limit),
-					fmt.Sprintf("size violation: should be at most: %d, got: %d", limit, idMap.Size()))
-				wg.Done()
-			}()
-		}
-	})
+			// evaluates that the size remains in the permissible range
+			require.True(t, idMap.Size() <= uint(limit),
+				fmt.Sprintf("size violation: should be at most: %d, got: %d", limit, idMap.Size()))
+			wg.Done()
+		}()
+	}
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
 }
