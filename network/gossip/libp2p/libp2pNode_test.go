@@ -49,7 +49,7 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 func (l *LibP2PNodeTestSuite) SetupTest() {
 	l.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	l.ctx, l.cancel = context.WithCancel(context.Background())
-	golog.SetAllLoggers(golog.LevelDebug)
+	golog.SetAllLoggers(golog.LevelWarn)
 }
 
 // TestMultiAddress evaluates correct translations from

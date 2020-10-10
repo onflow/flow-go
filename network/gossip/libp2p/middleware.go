@@ -220,7 +220,7 @@ func (m *Middleware) Stop() {
 	m.cancel()
 
 	// wait for the readConnection and readSubscription routines to stop
-	//m.wg.Wait()
+	m.wg.Wait()
 }
 
 // Send sends the message to the set of target ids
