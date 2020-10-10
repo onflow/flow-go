@@ -237,11 +237,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
-
-			vmCtx := fvm.NewContext(
-				fvm.WithChain(node.RootChainID.Chain()),
-				fvm.WithBlocks(node.Storage.Blocks),
-			)
+			vmCtx := fvm.NewContext(node.FvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,

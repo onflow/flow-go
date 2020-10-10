@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -119,6 +120,7 @@ type FlowNodeBuilder struct {
 	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
 	MsgValidators     []validators.MessageValidator
+	FvmOptions        []fvm.Option
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
@@ -529,6 +531,20 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.ProtocolEvents = distributor
 }
 
+func (fnb *FlowNodeBuilder) initFvmOptions() {
+	vmOpts := []fvm.Option{
+		fvm.WithChain(fnb.RootChainID.Chain()),
+		fvm.WithBlocks(fnb.Storage.Blocks),
+	}
+	if fnb.RootChainID == flow.Testnet {
+		vmOpts = append(vmOpts,
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithRestrictedDeployment(false),
+		)
+	}
+	fnb.FvmOptions = vmOpts
+}
+
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
 	err := v.fn(fnb)
 	if err != nil {
@@ -676,6 +692,8 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.initStorage()
 
 	fnb.initState()
+
+	fnb.initFvmOptions()
 
 	for _, f := range fnb.postInitFns {
 		fnb.handlePostInit(f)
