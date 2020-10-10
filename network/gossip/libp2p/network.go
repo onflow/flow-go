@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
@@ -506,7 +505,7 @@ func idsFromState(state protocol.ReadOnlyState) (flow.IdentityList, error) {
 	// current epoch phase
 	phase, err := state.Final().Phase()
 	if err != nil {
-		log.Err(err).Msg("failed to retrieve epoch phase")
+		return nil, fmt.Errorf("failed to retrieve epoch phase: %w", err)
 	}
 
 	// if node is in epoch setup or epoch committed phase, include the next epoch identities as well
