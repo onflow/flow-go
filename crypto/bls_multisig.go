@@ -39,9 +39,8 @@ import "C"
 // is commutative.
 // No subgroup membership check is performed on the input signatures.
 func AggregateSignatures(sigs []Signature) (Signature, error) {
-	// initialize BLS context
-	_ = newBLSBLS12381()
-
+	// set BLS context
+	blsInstance.reInit()
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	for _, sig := range sigs {
@@ -73,9 +72,8 @@ func AggregateSignatures(sigs []Signature) (Signature, error) {
 // is commutative. The slice can be empty.
 // No check is performed on the input private keys.
 func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
-	// initialize BLS context
-	_ = newBLSBLS12381()
-
+	// set BLS context
+	blsInstance.reInit()
 	scalars := make([]scalar, 0, len(keys))
 	for _, sk := range keys {
 		if sk.Algorithm() != BLSBLS12381 {
@@ -107,9 +105,8 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // is commutative. The slice can be empty.
 // No check is performed on the input public keys.
 func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
-	// initialize BLS context
-	_ = newBLSBLS12381()
-
+	// set BLS context
+	blsInstance.reInit()
 	points := make([]pointG2, 0, len(keys))
 	for i, pk := range keys {
 		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
@@ -142,9 +139,8 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 // is commutative. The slice of keys to be removed can be empty.
 // No check is performed on the input public keys.
 func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
-	// initialize BLS context
-	_ = newBLSBLS12381()
-
+	// set BLS context
+	blsInstance.reInit()
 	if aggKey.Algorithm() != BLSBLS12381 {
 		return nil, fmt.Errorf("all keys must be BLS keys")
 	}
@@ -219,8 +215,8 @@ func VerifySignatureOneMessage(pks []PublicKey, s Signature,
 func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 	messages [][]byte, kmac []hash.Hasher) (bool, error) {
 
-	// initialize BLS context
-	_ = newBLSBLS12381()
+	// set BLS context
+	blsInstance.reInit()
 
 	// check signature length
 	if len(s) != signatureLengthBLSBLS12381 {
@@ -342,7 +338,8 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 // An error is returned if the key slice is empty.
 func BatchVerifySignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	message []byte, kmac hash.Hasher) ([]bool, error) {
-	_ = newBLSBLS12381()
+	// set BLS context
+	blsInstance.reInit()
 
 	// public keys check
 	if len(pks) == 0 || len(pks) != len(sigs) {

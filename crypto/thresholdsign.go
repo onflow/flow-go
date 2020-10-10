@@ -80,8 +80,8 @@ func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash
 		return nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
 	}
 
-	// initialize BLS settings
-	_ = newBLSBLS12381()
+	// set BLS settings
+	blsInstance.reInit()
 
 	// internal list of valid signature shares
 	shares := make([]byte, 0, (threshold+1)*SignatureLenBLSBLS12381)
@@ -322,8 +322,8 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // - Signature: the threshold signature if there is no returned error, nil otherwise
 func ReconstructThresholdSignature(size int, threshold int,
 	shares []Signature, signers []int) (Signature, error) {
-	// initialize BLS settings
-	_ = newBLSBLS12381()
+	// set BLS settings
+	blsInstance.reInit()
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d",
 			ThresholdMinSize, ThresholdMaxSize)
@@ -380,8 +380,8 @@ func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	if threshold >= size || threshold < 0 {
 		return nil, nil, nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
 	}
-	// initialize BLS settings
-	_ = newBLSBLS12381()
+	// set BLS settings
+	blsInstance.reInit()
 	// the scalars x and G2 points y
 	x := make([]scalar, size)
 	y := make([]pointG2, size)
