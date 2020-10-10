@@ -6,3 +6,8 @@ package crypto
 func newSigner(algo SigningAlgorithm) (signer, error) {
 	return newNonRelicSigner(algo)
 }
+
+func init() {
+	initNonRelic()
+}
+

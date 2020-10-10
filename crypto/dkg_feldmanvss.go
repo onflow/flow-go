@@ -66,8 +66,8 @@ func NewFeldmanVSS(size int, threshold int, currentIndex int,
 }
 
 func (s *feldmanVSSstate) init() {
-	// initialize the bls context
-	_ = newBLSBLS12381()
+	// set the bls context
+	blsInstance.reInit()
 	s.running = false
 	s.y = nil
 	s.xReceived = false
