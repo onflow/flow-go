@@ -467,3 +467,133 @@ func BenchmarkBatchVerifyUnHappyPath(b *testing.B) {
 	}
 	b.StopTimer()
 }
+
+// BLS multi-signature
+// signature aggregation sanity check
+//
+// Aggregate n signatures of distinct messages under different keys,
+// and verify the aggregated signature using the multi-signature verification with
+// many message.
+func TestAggregateSignaturesManyMessages(t *testing.T) {
+	//int64(1601003187394381000) //
+	mrand.Seed(time.Now().UnixNano())
+
+	// number of signatures to aggregate
+	sigsNum := mrand.Intn(20) + 1
+	sigs := make([]Signature, 0, sigsNum)
+
+	// number of keys
+	keysNum := mrand.Intn(sigsNum) + 1
+	sks := make([]PrivateKey, 0, keysNum)
+	pks := make([]PublicKey, 0, keysNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	// generate the keys
+	for i := 0; i < keysNum; i++ {
+		sk := randomSK(t, seed)
+		sks = append(sks, sk)
+		pks = append(pks, sk.PublicKey())
+	}
+
+	// number of messages (could be more or less than keys)
+	msgsNum := mrand.Intn(sigsNum) + 1
+	messages := make([][20]byte, msgsNum)
+	for i := 0; i < msgsNum; i++ {
+		_, err := rand.Read(messages[i][:])
+		require.NoError(t, err)
+	}
+
+	inputMsgs := make([][]byte, 0, sigsNum)
+	inputPks := make([]PublicKey, 0, sigsNum)
+	inputKmacs := make([]hash.Hasher, 0, sigsNum)
+
+	// create the signatures
+	for i := 0; i < sigsNum; i++ {
+		kmac := NewBLSKMAC("test tag")
+		// pick a key randomly from the list
+		skRand := mrand.Intn(keysNum)
+		sk := sks[skRand]
+		// pick a message randomly from the list
+		msgRand := mrand.Intn(msgsNum)
+		msg := messages[msgRand][:]
+		// generate a signature
+		s, err := sk.Sign(msg, kmac)
+		require.NoError(t, err)
+		// update signatures and api inputs
+		sigs = append(sigs, s)
+		inputPks = append(inputPks, sk.PublicKey())
+		inputMsgs = append(inputMsgs, msg)
+		inputKmacs = append(inputKmacs, kmac)
+	}
+	// aggregate signatures
+	aggSig, err := AggregateSignatures(sigs)
+	require.NoError(t, err)
+	// Verify the aggregated signature
+	valid, err := VerifySignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
+	require.NoError(t, err)
+	assert.True(t, valid,
+		fmt.Sprintf("Verification of %s failed, should be valid, private keys are %s, inputs are %x, input public keys are %s",
+			aggSig, sks, inputMsgs, inputPks))
+
+	// check if one the signatures is not correct
+	randomIndex := mrand.Intn(sigsNum) // pick a random signature
+	messages[0][0] ^= 1                // make sure the signature is different
+	sigs[randomIndex], err = sks[0].Sign(messages[0][:], inputKmacs[0])
+	messages[0][0] ^= 1
+	aggSig, err = AggregateSignatures(sigs)
+	require.NoError(t, err)
+	valid, err = VerifySignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
+	require.NoError(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("Verification of %s should fail, private keys are %s, inputs are %x, input public keys are %s",
+			aggSig, sks, inputMsgs, inputPks))
+
+	// test the empty keys case
+	valid, err = VerifySignatureManyMessages(inputPks[:0], aggSig, inputMsgs, inputKmacs)
+	assert.Error(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("verification should fail with empty list key"))
+
+	// test inconsistent input arrays
+	valid, err = VerifySignatureManyMessages(inputPks, aggSig, inputMsgs[:sigsNum-1], inputKmacs)
+	assert.Error(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("verification should fail with empty list key"))
+
+	valid, err = VerifySignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs[:sigsNum-1])
+	assert.Error(t, err)
+	assert.False(t, valid,
+		fmt.Sprintf("verification should fail with empty list key"))
+}
+
+// VerifySignatureManyMessages bench
+// Bench the slowest case where all messages and public keys are distinct.
+// (2*n) pairings without aggrgetion Vs (n+1) pairings with aggregation.
+// The function is faster whenever there are redundant messages or public keys.
+func BenchmarkVerifySignatureManyMessages(b *testing.B) {
+	// inputs
+	sigsNum := 100
+	inputKmacs := make([]hash.Hasher, 0, sigsNum)
+	sigs := make([]Signature, 0, sigsNum)
+	pks := make([]PublicKey, 0, sigsNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	inputMsgs := make([][]byte, 0, sigsNum)
+	kmac := NewBLSKMAC("bench tag")
+
+	// create the signatures
+	for i := 0; i < sigsNum; i++ {
+		input := make([]byte, 100)
+		_, _ = mrand.Read(seed)
+		sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
+		s, _ := sk.Sign(input, kmac)
+		sigs = append(sigs, s)
+		pks = append(pks, sk.PublicKey())
+		inputKmacs = append(inputKmacs, kmac)
+		inputMsgs = append(inputMsgs, input)
+	}
+	aggSig, _ := AggregateSignatures(sigs)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = VerifySignatureManyMessages(pks, aggSig, inputMsgs, inputKmacs)
+	}
+	b.StopTimer()
+}

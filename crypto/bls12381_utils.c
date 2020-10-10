@@ -574,7 +574,7 @@ void ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len){
     ep2_add_projc(res, x, res);
 }
 
-// computes the sum of the G2 array elements y and writes the sum in jointy
+// computes the sum of the G1 array elements y and writes the sum in jointy
 void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
     ep_set_infty(jointx);
     for (int i=0; i<len; i++){
@@ -584,7 +584,7 @@ void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
 
 // Computes the sum of the signatures (G1 elements) flattened in an single sigs array
 // and store the sum bytes in dest
-// The function assmues sigs is correctly allocated with regards to len.
+// The function assumes sigs is correctly allocated with regards to len.
 int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     // temp variables
     ep_t acc;        
@@ -592,9 +592,10 @@ int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     ep_set_infty(acc);
     ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
 
-    // convert the points
+    // import the points from the array
     for (int i=0; i < len; i++) {
         ep_new(sigs[i]);
+        // deserialize each point from the input array
         if (ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK)
             return INVALID;
     }
