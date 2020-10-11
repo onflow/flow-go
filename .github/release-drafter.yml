@@ -5,3 +5,14 @@ template: |
   ## Changes
 
   $CHANGES
+categories:
+  - title: 💥 Breaking Changes
+    label: Breaking Change
+  - title: ⭐ Features
+    label: Feature
+  - title: 🛠 Improvements
+    label: Improvement
+  - title: 🐞 Bug Fixes
+    label: Bugfix
+    - title: 📖 Documentation
+    label: Documentation
