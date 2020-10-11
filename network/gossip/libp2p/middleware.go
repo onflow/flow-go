@@ -41,6 +41,9 @@ const (
 
 	// defines maximum message size in unicast mode
 	DefaultMaxUnicastMsgSize = 5 * DefaultMaxPubSubMsgSize // 10 mb
+
+	// maximum time to wait for a unicast request to complete
+	DefaultUnicastTimeout = 2 * time.Second
 )
 
 // the inbound message queue size for One to One and One to K messages (each)
@@ -288,11 +291,15 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), m.maxUnicastMsgSize)
 	}
 
+	// pass in a context with timeout to make the unicast call fail fast
+	ctx, cancel := context.WithTimeout(m.ctx, DefaultUnicastTimeout)
+	defer cancel()
+
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the the receiver
-	stream, err := m.libP2PNode.CreateStream(m.ctx, targetAddress)
+	stream, err := m.libP2PNode.CreateStream(ctx, targetAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create stream for %s :%w", targetAddress.Name, err)
 	}
