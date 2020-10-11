@@ -24,8 +24,7 @@ UNAME := $(shell uname)
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
 # docker container registry
-CONTAINER_REGISTRY=gcr.io/flow-container-registry
-
+export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
 .PHONY: crypto/relic
