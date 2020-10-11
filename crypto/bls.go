@@ -144,7 +144,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 
 	// maps the seed to a private key
 	// error is not checked as it is guaranteed to be nil; len(seed)<maxScalarSize
-	mapToZr(&(sk.scalar), seed)
+	mapToZr(&sk.scalar, seed)
 	return sk, nil
 }
 
@@ -176,7 +176,7 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 		pk: nil,
 	}
 	readScalar(&sk.scalar, privateKeyBytes)
-	if sk.scalar.checkMembershipZr() {
+	if C.check_membership_Zr((*C.bn_st)(&sk.scalar)) == valid {
 		return sk, nil
 	}
 	return nil, errors.New("the private key is not a valid BLS12-381 curve key")
@@ -325,12 +325,6 @@ func (a *blsBLS12381Algo) init() error {
 // reinit should be called at every blsBLS12381Algo operation.
 func (a *blsBLS12381Algo) reInit() {
 	a.context.setContext()
-}
-
-// checkMembershipZr checks a scalar is less than the group order (r)
-func (sk *scalar) checkMembershipZr() bool {
-	verif := C.check_membership_Zr((*C.bn_st)(sk))
-	return verif == valid
 }
 
 // membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.

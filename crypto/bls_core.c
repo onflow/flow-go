@@ -19,14 +19,15 @@ int get_sk_len() {
     return SK_LEN;
 }
 
-// checks an input scalar is less than the groups order (r)
+// checks an input scalar a satisfies 0 < a < r
+// where (r) is the order of G1/G2
 int check_membership_Zr(const bn_t a){
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
-    int res = bn_cmp(a,r);
-    if (res == RLC_LT) return VALID;
-    return INVALID;
+    if (bn_cmp(a,r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) 
+        return INVALID; 
+    return VALID;
 }
 
 // checks if input point s is on the curve E1
@@ -55,8 +56,10 @@ static int check_membership_G1(const ep_t p){
 // TODO: switch to the faster Bowe check 
 int check_membership_G2(const ep2_t p){
 #if MEMBERSHIP_CHECK
-    // check p is on curve
-    if (!ep2_is_valid((ep2_st*)p))
+    // check p is on curve and is non-identity
+    if (!ep2_is_valid((ep2_st*)p) || ep2_is_infty((ep2_st*)p))
+        return INVALID;
+    if (ep2_is_infty((ep2_st*)p))
         return INVALID;
     // check p is in G2
     #if MEMBERSHIP_CHECK_G2 == EXP_ORDER
