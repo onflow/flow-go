@@ -271,6 +271,7 @@ func (cs *ComplianceSuite) TestSendVote() {
 	err := cs.e.SendVote(blockID, view, sig, recipientID)
 	require.NoError(cs.T(), err, "should pass send vote")
 
+	// The vote is transmitted asynchronously. We allow 10ms for the vote to be received:
 	<-time.After(10 * time.Millisecond)
 	<-cs.e.Done()
 
