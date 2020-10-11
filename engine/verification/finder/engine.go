@@ -366,6 +366,7 @@ func (e *Engine) checkCachedReceipts() {
 			err := e.receiptIDsByResult.Append(resultID, receiptID)
 			if err != nil {
 				log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
+				return
 			}
 
 			log.Info().
