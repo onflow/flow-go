@@ -24,7 +24,7 @@ UNAME := $(shell uname)
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
 # docker container registry
-CONTAINER_REGISTRY=gcr.io/dl-flow
+CONTAINER_REGISTRY=gcr.io/flow-container-registry
 
 export DOCKER_BUILDKIT := 1
 
