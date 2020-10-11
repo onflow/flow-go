@@ -82,7 +82,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 				pathToKey[string(path)] = key
 			}
 
-			keys := make([]ledger.Key, len(pErr.Paths))
+			keys := make([]ledger.Key, 0, len(pErr.Paths))
 			for _, path := range pErr.Paths {
 				keys = append(keys, pathToKey[string(path)])
 			}
@@ -113,6 +113,27 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
 	if err != nil {
+		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
+
+			paths, err := pathfinder.KeysToPaths(update.Keys(), PathFinderVersion)
+			if err != nil {
+				return nil, err
+			}
+
+			//store mappings and restore keys from missing paths
+			pathToKey := make(map[string]ledger.Key)
+
+			for i, key := range update.Keys() {
+				path := paths[i]
+				pathToKey[string(path)] = key
+			}
+
+			keys := make([]ledger.Key, 0, len(pErr.Paths))
+			for _, path := range pErr.Paths {
+				keys = append(keys, pathToKey[string(path)])
+			}
+			return nil, &ledger.ErrMissingKeys{Keys: keys}
+		}
 		return nil, err
 	}
 
