@@ -271,6 +271,9 @@ func (cs *ComplianceSuite) TestSendVote() {
 	err := cs.e.SendVote(blockID, view, sig, recipientID)
 	require.NoError(cs.T(), err, "should pass send vote")
 
+	<-time.After(10 * time.Millisecond)
+	<-cs.e.Done()
+
 	// check it was called with right params
 	vote := messages.BlockVote{
 		BlockID: blockID,
