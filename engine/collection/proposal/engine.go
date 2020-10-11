@@ -195,7 +195,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	}
 
 	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
-	go func() {
+	e.unit.Launch(func() {
 		// send the vote the desired recipient
 		err := e.conduit.Unicast(vote, recipientID)
 		if err != nil {
@@ -204,7 +204,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		}
 		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockVote)
 		log.Info().Msg("collection vote transmitted")
-	}()
+	})
 
 	return nil
 }
