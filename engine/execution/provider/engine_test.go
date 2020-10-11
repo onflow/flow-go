@@ -95,7 +95,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		con.On("Submit", mock.Anything, originIdentity.NodeID).
+		con.On("Unicast", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
 				res, ok := args[0].(*messages.ChunkDataResponse)
 				require.True(t, ok)
