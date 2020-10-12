@@ -33,7 +33,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -46,20 +45,8 @@ type blsBLS12381Algo struct {
 	algo SigningAlgorithm
 }
 
-//  Once variable to use a unique instance
+//  BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
-var once sync.Once
-
-// returns a new BLS signer on curve BLS12-381
-func newBLSBLS12381() *blsBLS12381Algo {
-	once.Do(func() {
-		blsInstance = &(blsBLS12381Algo{
-			algo: BLSBLS12381,
-		})
-		blsInstance.init()
-	})
-	return blsInstance
-}
 
 // Sign signs an array of bytes using the private key
 //
@@ -82,8 +69,8 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 
-	// intialize BLS context
-	_ = newBLSBLS12381()
+	// set BLS context
+	blsInstance.reInit()
 
 	s := make([]byte, SignatureLenBLSBLS12381)
 	C.bls_sign((*C.uchar)(&s[0]),
@@ -131,7 +118,7 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	h := kmac.ComputeHash(data)
 
 	// intialize BLS context
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 
 	verif := C.bls_verify((*C.ep2_st)(&pk.point),
 		(*C.uchar)(&s[0]),
@@ -325,16 +312,18 @@ func (a *blsBLS12381Algo) init() error {
 	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||
 		pubKeyLengthBLSBLS12381 != PubKeyLenBLSBLS12381 ||
 		prKeyLengthBLSBLS12381 != PrKeyLenBLSBLS12381 {
-		return errors.New("BLS on BLS-12381 settings are not correct")
+		return errors.New("BLS-12381 settings in the Go and C layers are not consistent")
 	}
 	return nil
 }
 
-// reInit the context of BLS12381 curve assuming there was a previous call to init().
-// If the implementation evolves and relic has multiple contexts,
-// reinit should be called at every a. operation.
+// set the context of BLS 12-381 curve in the lower C and Relic layers assuming the context
+// was previously initialized with a call to init().
+//
+// If the implementation evolves to support multiple contexts,
+// reinit should be called at every blsBLS12381Algo operation.
 func (a *blsBLS12381Algo) reInit() {
-	a.context.reInitContext()
+	a.context.setContext()
 }
 
 // checkMembershipZr checks a scalar is less than the group order (r)
