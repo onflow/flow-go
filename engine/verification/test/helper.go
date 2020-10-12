@@ -464,11 +464,13 @@ func SetupMockVerifierEng(t testing.TB,
 	return eng, &wg
 }
 
-func VerifiableDataChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunkData {
+func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunkData {
 	var endState flow.StateCommitment
 	// last chunk
 	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
-		endState = er.Receipt.ExecutionResult.FinalStateCommit
+		finalState, ok := er.Receipt.ExecutionResult.FinalStateCommitment()
+		require.True(t, ok)
+		endState = finalState
 	} else {
 		endState = er.Receipt.ExecutionResult.Chunks[chunkIndex+1].StartState
 	}

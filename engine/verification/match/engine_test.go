@@ -407,61 +407,84 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 		suite.chunkIDsByResult)
 }
 
-// XXX
-// Duplication: When receives 2 ER for the same block, which only has 1 chunk, only 1 verifiable chunk will be produced.
-// func TestDuplication(t *testing.T) {
-// 	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, snapshot, _, verifier, _, assigner := SetupTest(t, 1)
-// 	// create a execution result that assigns to me
-// 	result, assignment := createExecutionResult(
-// 		head.ID(),
-// 		WithChunks(
-// 			WithAssignee(myID),
-// 			WithAssignee(otherID),
-// 		),
-// 	)
+// TestDuplication checks that when the engine receives 2 ER for the same block,
+// which only has 1 chunk, only 1 verifiable chunk will be produced.
+func (suite *MatchEngineTestSuite) TestDuplication() {
+	e := suite.NewTestMatchEngine(3)
 
-// 	seed := hashResult(result)
-// 	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	// create a execution result that assigns to me
+	result, assignment := createExecutionResult(
+		suite.head.ID(),
+		WithChunks(
+			WithAssignee(suite.myID),
+		),
+	)
 
-// 	// metrics
-// 	// receiving an execution result
-// 	metrics.On("OnExecutionResultReceived").Return().Twice()
-// 	// sending one verifiable chunks
-// 	metrics.On("OnVerifiableChunkSent").Return().Once()
-// 	// receiving one chunk data packs
-// 	metrics.On("OnChunkDataPackReceived").Return().Once()
+	seed := hashResult(result)
+	suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
-// 	// add assignment to assigner
-// 	assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
+	// metrics
+	// receiving an execution result
+	suite.metrics.On("OnExecutionResultReceived").Return().Twice()
+	// sending one verifiable chunks
+	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
+	// receiving one chunk data packs
+	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
 
-// 	// block header has been received
-// 	headerDB[result.BlockID] = head
+	// add assignment to assigner
+	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
-// 	// find the execution node id that created the execution result
-// 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+	// assigned chunk IDs successfully attached to their result ID
+	resultID := result.ID()
+	for _, chunkIndex := range assignment.ByNodeID(suite.myID) {
+		chunkID := result.Chunks[chunkIndex].ID()
+		suite.chunkIDsByResult.On("Append", resultID, chunkID).
+			Return(nil).Once()
+		// mocks resource clean up for assigned chunks
+		suite.chunkIDsByResult.On("RemIdFromKey", resultID, chunkID).Return(nil).Once()
+	}
+	suite.chunkIDsByResult.On("Has", resultID).Return(true)
 
-// 	// setup conduit to return requested chunk data packs
-// 	// return received requests
-// 	_ = ChunkDataPackIsRequestedNTimes(t, 5*time.Second, con, 1, RespondChunkDataPack(t, e, en.ID()))
+	// block header has been received
+	suite.headerDB[result.BlockID] = suite.head
 
-// 	// check verifier's method is called
-// 	vchunkC := VerifierCalledNTimes(t, 5*time.Second, verifier, 1)
+	// find the execution node id that created the execution result
+	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-// 	<-e.Ready()
+	// setup conduit to return requested chunk data packs
+	// return received requests
+	called := 0
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3,
+		func(req *messages.ChunkDataRequest) {
+			called++
+			if called >= 3 {
+				suite.RespondChunkDataPack(e, en.ID())(req)
+			}
+		})
 
-// 	// engine processes the execution result
-// 	err := e.Process(en.ID(), result)
-// 	require.NoError(t, err)
+	// check verifier's method is called
+	vchunkC := suite.VerifierCalledNTimes(5*time.Second, 1)
 
-// 	// engine processes the execution result again
-// 	err = e.Process(en.ID(), result)
-// 	require.NoError(t, err)
+	<-e.Ready()
 
-// 	<-vchunkC
+	// engine processes the execution result
+	err := e.Process(en.ID(), result)
+	require.NoError(suite.T(), err)
 
-// 	<-e.Done()
-// 	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
-// }
+	// engine processes the execution result again
+	err = e.Process(en.ID(), result)
+	require.NoError(suite.T(), err)
+
+	<-vchunkC
+
+	<-e.Done()
+	mock.AssertExpectationsForObjects(suite.T(),
+		suite.assigner,
+		suite.con,
+		suite.verifier,
+		suite.metrics,
+		suite.chunkIDsByResult)
+}
 
 // Retry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 3,
 // the execution node fails to return data for the first 2 requests,
