@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -14,6 +15,15 @@ import (
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
+)
+
+type LoadType int
+
+const (
+	TokenTransferLoadType LoadType = 0
+	TokenAddKeysLoadType  LoadType = 1
+
+	MixedLoadType LoadType = 100
 )
 
 const accountCreationBatchSize = 100
@@ -42,9 +52,11 @@ type ContLoadGenerator struct {
 	workers              []*Worker
 	blockRef             BlockRef
 	stopped              bool
+	loadType             LoadType
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
+// loadType , 0 =
 func NewContLoadGenerator(
 	log zerolog.Logger,
 	loaderMetrics *metrics.LoaderCollector,
@@ -56,6 +68,7 @@ func NewContLoadGenerator(
 	fungibleTokenAddress *flowsdk.Address,
 	flowTokenAddress *flowsdk.Address,
 	tps int,
+	loadType LoadType,
 ) (*ContLoadGenerator, error) {
 
 	numberOfAccounts := tps * 10 // 1 second per block, factor 10 for delays to prevent sequence number collisions
@@ -96,6 +109,7 @@ func NewContLoadGenerator(
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		scriptCreator:        scriptCreator,
 		blockRef:             NewBlockRef(supervisorClient),
+		loadType:             loadType,
 	}
 
 	return lGen, nil
@@ -123,7 +137,18 @@ func (lg *ContLoadGenerator) Init() error {
 func (lg *ContLoadGenerator) Start() {
 	// spawn workers
 	for i := 0; i < lg.tps; i++ {
-		worker := NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
+		var worker Worker
+		ltype := lg.loadType
+		if ltype == MixedLoadType {
+			ltype = LoadType(rand.Intn(int(MixedLoadType)))
+		}
+		switch lg.loadType {
+		case TokenTransferLoadType:
+			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
+		case TokenAddKeysLoadType:
+			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
+		}
+
 		worker.Start()
 		lg.workerStatsTracker.AddWorker()
 
