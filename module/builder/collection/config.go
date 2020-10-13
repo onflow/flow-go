@@ -1,5 +1,9 @@
 package collection
 
+import (
+	"github.com/onflow/flow-go/model/flow"
+)
+
 // Config is the configurable options for the collection builder.
 type Config struct {
 
@@ -14,17 +18,24 @@ type Config struct {
 	ExpiryBuffer uint
 
 	// MaxPayerTransactionRate is the maximum number of transactions per payer
-	// per collection. The rate is computed based on the previous 10 blocks.
+	// per collection. Fractional values greater than 1 are rounded down.
+	// Fractional values 0<k<1 mean that only 1 transaction every ceil(1/k)
+	// collections is allowed.
 	//
-	// A value of 0 indicates no rate limiting.
+	// A negative value or 0 indicates no rate limiting.
 	MaxPayerTransactionRate float64
+
+	// UnlimitedPayer is a set of addresses which are not affected by per-payer
+	// rate limiting.
+	UnlimitedPayers map[flow.Address]struct{}
 }
 
 func DefaultConfig() Config {
 	return Config{
-		MaxCollectionSize:       100, // max 100 transactions per collection
-		ExpiryBuffer:            15,  // leave 15 blocks of time for collections to be included
-		MaxPayerTransactionRate: 0,   // no rate limiting
+		MaxCollectionSize:       100,                             // max 100 transactions per collection
+		ExpiryBuffer:            15,                              // 15 blocks for collections to be included
+		MaxPayerTransactionRate: 0,                               // no rate limiting
+		UnlimitedPayers:         make(map[flow.Address]struct{}), // no unlimited payers
 	}
 }
 
@@ -44,6 +55,19 @@ func WithExpiryBuffer(buf uint) Opt {
 
 func WithMaxPayerTransactionRate(rate float64) Opt {
 	return func(c *Config) {
+		if rate < 0 {
+			rate = 0
+		}
 		c.MaxPayerTransactionRate = rate
+	}
+}
+
+func WithUnlimitedPayers(payers ...flow.Address) Opt {
+	lookup := make(map[flow.Address]struct{})
+	for _, payer := range payers {
+		lookup[payer] = struct{}{}
+	}
+	return func(c *Config) {
+		c.UnlimitedPayers = lookup
 	}
 }
