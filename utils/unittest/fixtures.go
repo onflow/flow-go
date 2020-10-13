@@ -27,6 +27,16 @@ func AddressFixture() flow.Address {
 	return flow.Testnet.Chain().ServiceAddress()
 }
 
+func RandomAddressFixture() flow.Address {
+	// we use a 32-bit index - since the linear address generator uses 45 bits,
+	// this won't error
+	addr, err := flow.Testnet.Chain().AddressAtIndex(uint64(rand.Uint32()))
+	if err != nil {
+		panic(err)
+	}
+	return addr
+}
+
 func TransactionSignatureFixture() flow.TransactionSignature {
 	return flow.TransactionSignature{
 		Address:     AddressFixture(),
