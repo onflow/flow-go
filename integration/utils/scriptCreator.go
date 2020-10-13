@@ -90,3 +90,33 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 
 	return cadence.NewArray(values)
 }
+
+const createAccountsTransactionTemplate = `
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+
+transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
+  prepare(signer: AuthAccount) {
+	let vault = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+      ?? panic("Could not borrow reference to the owner's Vault")
+
+    var i = 0
+    while i < count {
+      let account = AuthAccount(payer: signer)
+      account.addPublicKey(publicKey)
+
+	  let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
+		?? panic("Could not borrow receiver reference to the recipient's Vault")
+
+      receiver.deposit(from: <-vault.withdraw(amount: initialTokenAmount))
+
+      i = i + 1
+    }
+  }
+}
+`
+
+// CreateAccountsTransaction returns a transaction script for creating an account
+func (sc *ScriptCreator) CreateAccountsTransaction(fungibleToken, flowToken flowsdk.Address) []byte {
+	return []byte(fmt.Sprintf(createAccountsTransactionTemplate, fungibleToken, flowToken))
+}
