@@ -38,7 +38,7 @@ func TransactionSignatureFixture() flow.TransactionSignature {
 	return flow.TransactionSignature{
 		Address:     AddressFixture(),
 		SignerIndex: 0,
-		Signature:   []byte{1, 2, 3, 4},
+		Signature:   SeedFixture(32),
 		KeyID:       1,
 	}
 }
