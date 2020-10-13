@@ -25,28 +25,13 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db                *badger.DB
-	mainHeaders       storage.Headers
-	clusterHeaders    storage.Headers
-	payloads          storage.ClusterPayloads
-	transactions      mempool.Transactions
-	tracer            module.Tracer
-	maxCollectionSize uint
-	expiryBuffer      uint
-}
-
-type Opt func(*Builder)
-
-func WithMaxCollectionSize(size uint) Opt {
-	return func(b *Builder) {
-		b.maxCollectionSize = size
-	}
-}
-
-func WithExpiryBuffer(buf uint) Opt {
-	return func(b *Builder) {
-		b.expiryBuffer = buf
-	}
+	db             *badger.DB
+	mainHeaders    storage.Headers
+	clusterHeaders storage.Headers
+	payloads       storage.ClusterPayloads
+	transactions   mempool.Transactions
+	tracer         module.Tracer
+	config         Config
 }
 
 func NewBuilder(
@@ -60,18 +45,17 @@ func NewBuilder(
 ) *Builder {
 
 	b := Builder{
-		db:                db,
-		tracer:            tracer,
-		mainHeaders:       mainHeaders,
-		clusterHeaders:    clusterHeaders,
-		payloads:          payloads,
-		transactions:      transactions,
-		maxCollectionSize: 100,
-		expiryBuffer:      15,
+		db:             db,
+		tracer:         tracer,
+		mainHeaders:    mainHeaders,
+		clusterHeaders: clusterHeaders,
+		payloads:       payloads,
+		transactions:   transactions,
+		config:         DefaultConfig(),
 	}
 
 	for _, apply := range opts {
-		apply(&b)
+		apply(&b.config)
 	}
 	return &b
 }
@@ -202,7 +186,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		for _, tx := range b.transactions.All() {
 
 			// if we have reached maximum number of transactions, stop
-			if uint(len(transactions)) >= b.maxCollectionSize {
+			if uint(len(transactions)) >= b.config.MaxCollectionSize {
 				break
 			}
 
@@ -222,7 +206,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			// ensure the reference block is not too old
 			txID := tx.ID()
-			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.expiryBuffer) {
+			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.config.ExpiryBuffer) {
 				// the transaction is expired, it will never be valid
 				b.transactions.Rem(txID)
 				continue
