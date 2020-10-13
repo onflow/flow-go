@@ -111,6 +111,16 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		b.tracer.StartSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 
+		// RATE LIMITING: the builder module can be configured to limit the
+		// rate at which transactions with a common payer are included in
+		// blocks. Depending on the configured limit, we either allow 1
+		// transaction every N sequential collections, or we allow K transactions
+		// per collection.
+
+		// for each payer, keep track of the height of the last collection in
+		// which a transaction paid by the payer was included
+		latestCollectionHeightByPayer := make(map[flow.Address]uint64)
+
 		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
 		unfinalizedLookup := make(map[flow.Identifier]struct{})
@@ -133,6 +143,18 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			collection := payload.Collection
 			for _, tx := range collection.Transactions {
 				unfinalizedLookup[tx.ID()] = struct{}{}
+
+				// skip tracking payers if we aren't rate-limiting or are configured
+				// to allow multiple transactions per payer per collection
+				if b.config.MaxPayerTransactionRate >= 1 || b.config.MaxPayerTransactionRate <= 0 {
+					continue
+				}
+
+				// update the latest collection by payer
+				payer := tx.Payer
+				if ancestor.Height > latestCollectionHeightByPayer[payer] {
+					latestCollectionHeightByPayer[payer] = ancestor.Height
+				}
 			}
 			ancestorID = ancestor.ParentID
 		}
@@ -166,6 +188,18 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			collection := payload.Collection
 			for _, tx := range collection.Transactions {
 				finalizedLookup[tx.ID()] = struct{}{}
+
+				// skip tracking payers if we aren't rate-limiting or are configured
+				// to allow multiple transactions per payer per collection
+				if b.config.MaxPayerTransactionRate <= 1 {
+					continue
+				}
+
+				// update the latest collection by payer
+				payer := tx.Payer
+				if ancestor.Height > latestCollectionHeightByPayer[payer] {
+					latestCollectionHeightByPayer[payer] = ancestor.Height
+				}
 			}
 
 			ancestorID = ancestor.ParentID
@@ -177,6 +211,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
 		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
+
+		// keep track of how many transactions per payer we are including
+		// in the collection we are building
+		transactionsIncludedPerPayer := make(map[flow.Address]uint)
 
 		minRefHeight := uint64(math.MaxUint64)
 		// start with the finalized reference ID (longest expiry time)
@@ -226,11 +264,48 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 				continue
 			}
 
+			// enforce rate limiting rules
+			payer := tx.Payer
+
+			if b.config.MaxPayerTransactionRate == 0 || b.isUnlimitedPayer(payer) {
+				// skip rate limiting if it is turned off or the payer is unlimited
+
+			} else if b.config.MaxPayerTransactionRate >= 1 {
+				// OPTION 1: we allow N transactions per payer per collection
+
+				n := uint(math.Floor(b.config.MaxPayerTransactionRate))
+				if transactionsIncludedPerPayer[payer] >= n {
+					continue
+				}
+
+			} else if b.config.MaxPayerTransactionRate < 1 {
+				// OPTION 2: we allow 1 transactions per payer every K collections
+
+				// skip if we've already include a transaction for this payer - we can only ever include 1
+				if transactionsIncludedPerPayer[payer] > 0 {
+					continue
+				}
+
+				// otherwise, check whether sufficiently many empty collection
+				// have been built since the last transaction from the payer
+				k := uint64(math.Ceil(1 / b.config.MaxPayerTransactionRate))
+
+				height := parent.Height + 1 // height of collection we are building
+				latestHeight, hasRecentTransaction := latestCollectionHeightByPayer[payer]
+
+				if hasRecentTransaction && height-latestHeight < k {
+					continue
+				}
+			}
+
 			// ensure we find the lowest reference block height
 			if refHeader.Height < minRefHeight {
 				minRefHeight = refHeader.Height
 				minRefID = tx.ReferenceBlockID
 			}
+
+			// update per-payer transaction count
+			transactionsIncludedPerPayer[payer]++
 
 			transactions = append(transactions, tx)
 		}
@@ -285,4 +360,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	return proposal.Header, err
+}
+
+func (b *Builder) isUnlimitedPayer(payer flow.Address) bool {
+	_, exists := b.config.UnlimitedPayers[payer]
+	return exists
 }

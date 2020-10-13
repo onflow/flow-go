@@ -614,6 +614,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	create := func() *flow.TransactionBody {
 		tx := unittest.TransactionBodyFixture()
 		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = unittest.RandomAddressFixture()
 		tx.ProposalKey = flow.ProposalKey{
 			Address:        proposer,
 			KeyID:          rand.Uint64(),
