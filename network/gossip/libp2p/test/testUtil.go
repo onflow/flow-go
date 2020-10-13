@@ -11,6 +11,7 @@ import (
 	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
 	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
@@ -28,15 +29,13 @@ import (
 var rootBlockID = unittest.IdentifierFixture().String()
 
 // generateIDs generate flow Identities with a valid port and networking key
-func generateIDs(n int) ([]*flow.Identity, []crypto.PrivateKey, error) {
+func generateIDs(t *testing.T, n int) ([]*flow.Identity, []crypto.PrivateKey) {
 	identities := make([]*flow.Identity, n)
 	privateKeys := make([]crypto.PrivateKey, n)
 
 	// get free ports
 	freePorts, err := freeport.GetFreePorts(n)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 
 	for i := 0; i < n; i++ {
 
@@ -44,9 +43,7 @@ func generateIDs(n int) ([]*flow.Identity, []crypto.PrivateKey, error) {
 
 		// generate key
 		key, err := GenerateNetworkingKey(identifier)
-		if err != nil {
-			return nil, nil, err
-		}
+		require.NoError(t, err)
 		privateKeys[i] = key
 
 		port := freePorts[i]
@@ -61,11 +58,11 @@ func generateIDs(n int) ([]*flow.Identity, []crypto.PrivateKey, error) {
 
 		identities[i] = unittest.IdentityFixture(opt...)
 	}
-	return identities, privateKeys, nil
+	return identities, privateKeys
 }
 
 // generateMiddlewares creates and initializes middleware instances for all the identities
-func generateMiddlewares(log zerolog.Logger, identities []*flow.Identity, keys []crypto.PrivateKey) ([]*libp2p.Middleware, error) {
+func generateMiddlewares(t *testing.T, log zerolog.Logger, identities []*flow.Identity, keys []crypto.PrivateKey) []*libp2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*libp2p.Middleware, len(identities))
 	for i, id := range identities {
@@ -79,22 +76,20 @@ func generateMiddlewares(log zerolog.Logger, identities []*flow.Identity, keys [
 			libp2p.DefaultMaxUnicastMsgSize,
 			libp2p.DefaultMaxPubSubMsgSize,
 			rootBlockID)
-		if err != nil {
-			return nil, err
-		}
+		require.NoError(t, err)
 		mws[i] = mw
 	}
-	return mws, nil
+	return mws
 }
 
 // generateNetworks generates the network for the given middlewares
-func generateNetworks(log zerolog.Logger,
+func generateNetworks(t *testing.T, log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []*libp2p.Middleware,
 	csize int,
 	tops []topology.Topology,
 	states []*protocol.ReadOnlyState,
-	dryrun bool) ([]*libp2p.Network, error) {
+	dryrun bool) []*libp2p.Network {
 	count := len(ids)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -104,9 +99,7 @@ func generateNetworks(log zerolog.Logger,
 		tops = make([]topology.Topology, count)
 		for i, id := range ids {
 			rpt, err := topology.NewRandPermTopology(id.Role, id.NodeID)
-			if err != nil {
-				return nil, fmt.Errorf("could not create network: %w", err)
-			}
+			require.NoError(t, err)
 			tops[i] = rpt
 		}
 	}
@@ -129,9 +122,7 @@ func generateNetworks(log zerolog.Logger,
 
 		// create the network
 		net, err := libp2p.NewNetwork(log, json.NewCodec(), states[i], me, mws[i], csize, tops[i], metrics)
-		if err != nil {
-			return nil, fmt.Errorf("could not create network: %w", err)
-		}
+		require.NoError(t, err)
 
 		nets = append(nets, net)
 	}
@@ -142,41 +133,25 @@ func generateNetworks(log zerolog.Logger,
 			<-net.Ready()
 		}
 	}
-	return nets, nil
+	return nets
 }
 
-func generateIDsAndMiddlewares(n int, log zerolog.Logger) ([]*flow.Identity, []*libp2p.Middleware, error) {
-	ids, keys, err := generateIDs(n)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	mws, err := generateMiddlewares(log, ids, keys)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return ids, mws, err
+func generateIDsAndMiddlewares(t *testing.T, n int, log zerolog.Logger) ([]*flow.Identity, []*libp2p.Middleware) {
+	ids, keys := generateIDs(t, n)
+	mws := generateMiddlewares(t, log, ids, keys)
+	return ids, mws
 }
 
-func generateIDsMiddlewaresNetworks(n int,
+func generateIDsMiddlewaresNetworks(t *testing.T,
+	n int,
 	log zerolog.Logger,
 	csize int,
 	tops []topology.Topology,
 	states []*protocol.ReadOnlyState,
-	dryrun bool) ([]*flow.Identity, []*libp2p.Middleware, []*libp2p.Network, error) {
-
-	ids, mws, err := generateIDsAndMiddlewares(n, log)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	networks, err := generateNetworks(log, ids, mws, csize, tops, states, dryrun)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return ids, mws, networks, nil
+	dryrun bool) ([]*flow.Identity, []*libp2p.Middleware, []*libp2p.Network) {
+	ids, mws := generateIDsAndMiddlewares(t, n, log)
+	networks := generateNetworks(t, log, ids, mws, csize, tops, states, dryrun)
+	return ids, mws, networks
 }
 
 // generateEngines generates MeshEngines for the given networks

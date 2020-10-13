@@ -34,8 +34,7 @@ func (n *TopologyTestSuite) TestTopologySize() {
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	// create totalNodes number of networks
-	_, _, nets, err := generateIDsMiddlewaresNetworks(totalNodes, logger, 100, nil, nil, true)
-	require.NoError(n.T(), err)
+	_, _, nets := generateIDsMiddlewaresNetworks(n.T(), totalNodes, logger, 100, nil, nil, true)
 
 	// determine the expected size of the id list that should be returned by RandPermTopology
 	rndSubsetSize := int(math.Ceil(float64(totalNodes+1) / 2))
@@ -53,8 +52,7 @@ func (n *TopologyTestSuite) TestTopologySize() {
 // TestMembership evaluates every id in topology to be a protocol id
 func (n *TopologyTestSuite) TestMembership() {
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	ids, _, nets, err := generateIDsMiddlewaresNetworks(100, logger, 100, nil, nil, true)
-	require.NoError(n.T(), err)
+	ids, _, nets := generateIDsMiddlewaresNetworks(n.T(), 100, logger, 100, nil, nil, true)
 
 	// get the subset from the first network
 	subset, err := nets[0].Topology()

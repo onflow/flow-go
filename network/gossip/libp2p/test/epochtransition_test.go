@@ -50,8 +50,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	// create ids
-	ids, mws, err := generateIDsAndMiddlewares(nodeCount, ts.logger)
-	require.NoError(ts.T(), err)
+	ids, mws := generateIDsAndMiddlewares(ts.T(), nodeCount, ts.logger)
 	ts.ids = ids
 	ts.mws = mws
 
@@ -70,8 +69,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	}
 
 	// create networks using the mocked state and default topology
-	nets, err := generateNetworks(ts.logger, ids, mws, 100, nil, states, false)
-	require.NoError(ts.T(), err)
+	nets := generateNetworks(ts.T(), ts.logger, ids, mws, 100, nil, states, false)
 	ts.nets = nets
 
 	// generate the engines
@@ -98,8 +96,7 @@ func (ts *EpochTransitionTestSuite) TearDownTest() {
 func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 	// create the id, middleware and network for a new node
-	ids, mws, nets, err := generateIDsMiddlewaresNetworks(1, ts.logger, 100, nil, []*protocol.ReadOnlyState{ts.state}, false)
-	require.NoError(ts.T(), err)
+	ids, mws, nets := generateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, []*protocol.ReadOnlyState{ts.state}, false)
 	newMiddleware := mws[0]
 
 	newIDs := append(ts.ids, ids...)

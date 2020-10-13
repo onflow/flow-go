@@ -48,7 +48,7 @@ func (m *MeshEngineTestSuite) SetupTest() {
 	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	var err error
-	m.ids, m.mws, m.nets, err = generateIDsMiddlewaresNetworks(count, logger, 100, nil, nil, false)
+	m.ids, m.mws, m.nets = generateIDsMiddlewaresNetworks(m.T(), count, logger, 100, nil, nil, false)
 	require.NoError(m.Suite.T(), err)
 }
 

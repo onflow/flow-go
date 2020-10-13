@@ -49,7 +49,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	// create and start the middlewares
 	var err error
-	m.ids, m.mws, err = generateIDsAndMiddlewares(m.size, logger)
+	m.ids, m.mws = generateIDsAndMiddlewares(m.T(), m.size, logger)
 	require.NoError(m.T(), err)
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
