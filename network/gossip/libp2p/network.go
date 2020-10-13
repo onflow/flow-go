@@ -477,7 +477,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 }
 
 func (n *Network) EpochSetupPhaseStarted(newEpoch uint64, first *flow.Header) {
-	log := n.logger.With().Uint64("epoch", newEpoch).Logger()
+	log := n.logger.With().Uint64("new_epoch", newEpoch).Logger()
 
 	// get the new set of IDs
 	newIDs, err := idsFromState(n.state)
