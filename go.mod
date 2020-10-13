@@ -9,6 +9,7 @@ require (
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
+	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/go-kit/kit v0.9.0
 	github.com/gogo/protobuf v1.3.1
@@ -33,7 +34,9 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0
 	github.com/onflow/flow-go-sdk v0.8.0
 	github.com/onflow/flow-go/crypto v0.9.4
+	github.com/onflow/flow-go/integration v0.0.0-00010101000000-000000000000 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.1.7
+	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
