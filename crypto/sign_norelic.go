@@ -10,4 +10,3 @@ func newSigner(algo SigningAlgorithm) (signer, error) {
 func init() {
 	initNonRelic()
 }
-

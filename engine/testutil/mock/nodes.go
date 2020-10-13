@@ -90,7 +90,7 @@ type ConsensusNode struct {
 	Guarantees      mempool.Guarantees
 	Approvals       mempool.Approvals
 	Receipts        mempool.Receipts
-	Seals           mempool.Seals
+	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
 	MatchingEngine  *matching.Engine
 }
