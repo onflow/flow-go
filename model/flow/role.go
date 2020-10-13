@@ -69,3 +69,6 @@ func (r *Role) UnmarshalText(text []byte) error {
 func Roles() []Role {
 	return []Role{RoleCollection, RoleConsensus, RoleExecution, RoleVerification, RoleAccess}
 }
+
+// RoleList defines a slice of roles in flow system.
+type RoleList []Role
