@@ -158,6 +158,7 @@ func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) er
 	b.Lock()
 	defer b.Unlock()
 	err := f(b.Backdata.entities)
+	b.reduce()
 	return err
 }
 

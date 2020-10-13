@@ -158,11 +158,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
 	log := e.log.With().
-		Uint64("block_view", view).
 		Hex("block_id", blockID[:]).
-		Hex("voter", logging.ID(e.me.NodeID())).
+		Uint64("block_view", view).
+		Hex("recipient_id", recipientID[:]).
 		Logger()
-
 	log.Info().Msg("processing vote transmission request from hotstuff")
 
 	// build the vote message
@@ -172,15 +171,17 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	// send the vote the desired recipient
-	err := e.con.Unicast(vote, recipientID)
-	if err != nil {
-		return fmt.Errorf("could not send vote: %w", err)
-	}
-
-	e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
-
-	log.Info().Msg("block vote transmitted")
+	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
+	e.unit.Launch(func() {
+		// send the vote the desired recipient
+		err := e.con.Unicast(vote, recipientID)
+		if err != nil {
+			log.Warn().Err(err).Msg("could not send vote")
+			return
+		}
+		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
+		log.Info().Msg("block vote transmitted")
+	})
 
 	return nil
 }

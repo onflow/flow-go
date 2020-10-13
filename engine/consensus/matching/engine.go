@@ -33,26 +33,26 @@ import (
 // from verification nodes), and saves the seals into seals mempool for adding
 // into a new block.
 type Engine struct {
-	unit                    *engine.Unit             // used to control startup/shutdown
-	log                     zerolog.Logger           // used to log relevant actions with context
-	metrics                 module.EngineMetrics     // used to track sent and received messages
-	tracer                  module.Tracer            // used to trace execution
-	mempool                 module.MempoolMetrics    // used to track mempool size
-	state                   protocol.State           // used to access the  protocol state
-	me                      module.Local             // used to access local node information
-	requester               module.Requester         // used to request missing execution receipts by block ID
-	resultsDB               storage.ExecutionResults // used to check previous results are known
-	headersDB               storage.Headers          // used to check sealed headers
-	indexDB                 storage.Index            // used to check payloads for results
-	results                 mempool.Results          // holds execution results in memory
-	approvals               mempool.Approvals        // holds result approvals in memory
-	seals                   mempool.Seals            // holds block seals in memory
-	missing                 map[flow.Identifier]uint // track how often a block was missing
-	assigner                module.ChunkAssigner     // chunk assignment object
-	checkingSealing         *atomic.Bool             // used to rate limit the checksealing call
-	requestReceiptThreshold uint                     // how many blocks between sealed/finalized before we request execution receipts
-	maxUnsealedResults      int                      // how many unsealed results to check when check sealing
-	requireApprovals        bool                     // flag to disable verifying chunk approvals
+	unit                    *engine.Unit                    // used to control startup/shutdown
+	log                     zerolog.Logger                  // used to log relevant actions with context
+	metrics                 module.EngineMetrics            // used to track sent and received messages
+	tracer                  module.Tracer                   // used to trace execution
+	mempool                 module.MempoolMetrics           // used to track mempool size
+	state                   protocol.State                  // used to access the  protocol state
+	me                      module.Local                    // used to access local node information
+	requester               module.Requester                // used to request missing execution receipts by block ID
+	resultsDB               storage.ExecutionResults        // used to check previous results are known
+	headersDB               storage.Headers                 // used to check sealed headers
+	indexDB                 storage.Index                   // used to check payloads for results
+	incorporatedResults     mempool.IncorporatedResults     // holds incorporated results in memory
+	approvals               mempool.Approvals               // holds result approvals in memory
+	seals                   mempool.IncorporatedResultSeals // holds block seals in memory
+	missing                 map[flow.Identifier]uint        // track how often a block was missing
+	assigner                module.ChunkAssigner            // chunk assignment object
+	checkingSealing         *atomic.Bool                    // used to rate limit the checksealing call
+	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
+	maxUnsealedResults      int                             // how many unsealed results to check when check sealing
+	requireApprovals        bool                            // flag to disable verifying chunk approvals
 }
 
 // New creates a new collection propagation engine.
@@ -68,10 +68,9 @@ func New(
 	resultsDB storage.ExecutionResults,
 	headersDB storage.Headers,
 	indexDB storage.Index,
-	results mempool.Results,
-	receipts mempool.Receipts,
+	incorporatedResults mempool.IncorporatedResults,
 	approvals mempool.Approvals,
-	seals mempool.Seals,
+	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
 	requireApprovals bool,
 ) (*Engine, error) {
@@ -89,7 +88,7 @@ func New(
 		resultsDB:               resultsDB,
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
-		results:                 results,
+		incorporatedResults:     incorporatedResults,
 		approvals:               approvals,
 		seals:                   seals,
 		missing:                 make(map[flow.Identifier]uint),
@@ -100,7 +99,7 @@ func New(
 		requireApprovals:        requireApprovals,
 	}
 
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
+	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
@@ -199,7 +198,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -207,8 +205,14 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("previous_id", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
-		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Logger()
+
+	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		return fmt.Errorf("could not get final state: no chunks found")
+	}
+
+	log = log.With().Hex("final_state", resultFinalState).Logger()
 
 	log.Info().Msg("execution receipt received")
 
@@ -249,6 +253,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// check if the result of this receipt is already sealed.
 	result := &receipt.ExecutionResult
+
 	_, err = e.resultsDB.ByID(result.ID())
 	if err == nil {
 		log.Debug().Msg("discarding receipt for sealed result")
@@ -259,13 +264,23 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	}
 
 	// store the result belonging to the receipt in the memory pool
-	added := e.results.Add(result)
+	// TODO: This is a temporary step. In future, the incorporated results
+	// mempool will be populated by the finalizer when blocks are validated, and
+	// the IncorporatedBlockID will be the ID of the first block on its fork
+	// that contains a receipt committing to this result.
+	added, err := e.incorporatedResults.Add(&flow.IncorporatedResult{
+		IncorporatedBlockID: result.BlockID,
+		Result:              result,
+	})
+	if err != nil {
+		e.log.Err(err).Msg("error inserting incorporated result in mempool")
+	}
 	if !added {
 		e.log.Debug().Msg("skipping result already in mempool")
 		return nil
 	}
 
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
+	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
 
 	e.log.Info().Msg("execution result added to mempool")
 
@@ -395,17 +410,17 @@ func (e *Engine) checkSealing() {
 
 	// Start spans for tracing within the parent spans trace.CONProcessBlock and
 	// trace.CONProcessCollection
-	for _, result := range sealableResults {
+	for _, incorporatedResult := range sealableResults {
 		// For each execution result, we load the trace.CONProcessBlock span for the executed block. If we find it, we
 		// start a child span that will run until this function returns.
-		if span, ok := e.tracer.GetSpan(result.BlockID, trace.CONProcessBlock); ok {
+		if span, ok := e.tracer.GetSpan(incorporatedResult.Result.BlockID, trace.CONProcessBlock); ok {
 			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
 				start))
 			defer childSpan.Finish()
 		}
 
 		// For each execution result, we load all the collection that are in the executed block.
-		index, err := e.indexDB.ByBlockID(result.BlockID)
+		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if err != nil {
 			continue
 		}
@@ -423,23 +438,24 @@ func (e *Engine) checkSealing() {
 	// seal the matched results
 	var sealedResultIDs []flow.Identifier
 	var sealedBlockIDs []flow.Identifier
-	for _, result := range sealableResults {
+	for _, incorporatedResult := range sealableResults {
 
 		log := e.log.With().
-			Hex("result_id", logging.Entity(result)).
-			Hex("previous_id", result.PreviousResultID[:]).
-			Hex("block_id", result.BlockID[:]).
+			Hex("result_id", logging.Entity(incorporatedResult)).
+			Hex("previous_id", incorporatedResult.Result.PreviousResultID[:]).
+			Hex("block_id", incorporatedResult.Result.BlockID[:]).
+			Hex("incorporated_block_id", incorporatedResult.IncorporatedBlockID[:]).
 			Logger()
 
-		err := e.sealResult(result)
+		err := e.sealResult(incorporatedResult)
 		if err != nil {
 			log.Error().Err(err).Msg("could not seal result")
 			continue
 		}
 
 		// mark the result cleared for mempool cleanup
-		sealedResultIDs = append(sealedResultIDs, result.ID())
-		sealedBlockIDs = append(sealedBlockIDs, result.BlockID)
+		sealedResultIDs = append(sealedResultIDs, incorporatedResult.ID())
+		sealedBlockIDs = append(sealedBlockIDs, incorporatedResult.Result.BlockID)
 	}
 
 	e.log.Debug().Int("sealed", len(sealedResultIDs)).Msg("sealed execution results")
@@ -466,19 +482,19 @@ func (e *Engine) checkSealing() {
 	}
 }
 
-// sealableResults returns the ExecutionResults from the mempool that have
+// sealableResults returns the IncorporatedResults from the mempool that have
 // collected enough approvals on a per-chunk basis, as defined by the matchChunk
 // function. It also filters out results that have an incorrect sub-graph.
-func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
-	var results []*flow.ExecutionResult
+func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
+	var results []*flow.IncorporatedResult
 
 	// go through the results mempool and check which ones we have collected
 	// enough approvals for
-	for _, result := range e.results.All() {
+	for _, incorporatedResult := range e.incorporatedResults.All() {
 
 		// if we have not received the block yet, we will just keep rechecking
 		// until the block has been received or the result has been purged
-		block, err := e.headersDB.ByBlockID(result.BlockID)
+		block, err := e.headersDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			log.Debug().Msg("skipping result with unknown block")
 			continue
@@ -487,18 +503,14 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 			return nil, fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// ensure that previous result is known.
-		// get the previous result from our mempool or storage
-
-		previousID := result.PreviousResultID
-
-		// look for previous in mempool and storage
-		previous, found := e.results.ByID(previousID)
-		if !found {
+		// look for previous result in mempool and storage
+		previousID := incorporatedResult.Result.PreviousResultID
+		previous, _ := e.incorporatedResults.ByResultID(previousID)
+		if previous == nil {
 			var err error
 			previous, err = e.resultsDB.ByID(previousID)
 			if errors.Is(err, storage.ErrNotFound) {
-				log.Debug().Msg("skipping result with unknown previous result")
+				log.Debug().Msg("skipping sealable result with unknown previous result")
 				continue
 			}
 			if err != nil {
@@ -508,7 +520,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 		// check sub-graph
 		if block.ParentID != previous.BlockID {
-			_ = e.results.Rem(result.ID())
+			_ = e.incorporatedResults.Rem(incorporatedResult)
 			log.Warn().
 				Str("block_parent_id", block.ParentID.String()).
 				Str("previous_result_block_id", previous.BlockID.String()).
@@ -523,7 +535,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// approved
 		requiredChunks := 0
 
-		index, err := e.indexDB.ByBlockID(result.BlockID)
+		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if err != nil {
 			return nil, err
 		}
@@ -532,10 +544,10 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 			requiredChunks = len(index.CollectionIDs) + 1
 		}
 
-		if len(result.Chunks) != requiredChunks {
-			_ = e.results.Rem(result.ID())
+		if len(incorporatedResult.Result.Chunks) != requiredChunks {
+			_ = e.incorporatedResults.Rem(incorporatedResult)
 			log.Warn().
-				Int("result_chunks", len(result.Chunks)).
+				Int("result_chunks", len(incorporatedResult.Result.Chunks)).
 				Int("required_chunks", requiredChunks).
 				Msg("removing result with invalid number of chunks")
 			continue
@@ -544,14 +556,9 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// check that each chunk collected enough approvals
 		allChunksMatched := true
 
-		// TODO: the randomness of chunk assignment for a result is determined
-		// by the result and a block ID.
-		// As a temporary shortcut, we can just use the ID of the executed
-		// block, i.e. blockID = result.BlockID. However, in the full protocol,
-		// blockID is the first block in its fork, which references an Execution
-		// Receipt with an Execution Result identical to result.
-		// (where blockID != result.BlockID)
-		assignment, err := e.assigner.Assign(result, result.BlockID)
+		// the chunk assigment is based on the first block in its fork which
+		// contains a receipt that commits to this result.
+		assignment, err := e.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
 		if state.IsNoValidChildBlockError(err) {
 			continue
 		}
@@ -560,8 +567,8 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		}
 
 		// check that each chunk collects enough approvals
-		for _, chunk := range result.Chunks {
-			matched := e.matchChunk(result.ID(), chunk, assignment)
+		for _, chunk := range incorporatedResult.Result.Chunks {
+			matched := e.matchChunk(incorporatedResult.Result.ID(), chunk, assignment)
 			if !matched {
 				allChunksMatched = false
 				break
@@ -571,7 +578,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// add the result to the results that should be sealed
 		if allChunksMatched {
 			e.log.Info().Msg("adding result with sufficient verification")
-			results = append(results, result)
+			results = append(results, incorporatedResult)
 		}
 	}
 
@@ -608,34 +615,42 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 	return len(validApprovers) > 0
 }
 
-// sealResult records a matched result in the result database, creates a seal
-// for the corresponding block and saves in the database and seal mempool for
-// further processing.
-func (e *Engine) sealResult(result *flow.ExecutionResult) error {
+// sealResult creates a seal for the incorporated result and adds it to the
+// seals mempool.
+func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 
 	// store the result to make it persistent for later checks
-	err := e.resultsDB.Store(result)
+	err := e.resultsDB.Store(incorporatedResult.Result)
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
 	}
-	err = e.resultsDB.Index(result.BlockID, result.ID())
+	err = e.resultsDB.Index(incorporatedResult.Result.BlockID, incorporatedResult.Result.ID())
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not index sealing result: %w", err)
 	}
 
 	// collect aggregate signatures
-	aggregatedSigs := e.collectAggregateSignatures(result)
+	aggregatedSigs := e.collectAggregateSignatures(incorporatedResult.Result)
+
+	// get final state of execution result
+	finalState, ok := incorporatedResult.Result.FinalStateCommitment()
+	if !ok {
+		return fmt.Errorf("could not get final state: no chunks found")
+	}
 
 	// generate & store seal
 	seal := &flow.Seal{
-		BlockID:                result.BlockID,
-		ResultID:               result.ID(),
-		FinalState:             result.FinalStateCommit,
+		BlockID:                incorporatedResult.Result.BlockID,
+		ResultID:               incorporatedResult.Result.ID(),
+		FinalState:             finalState,
 		AggregatedApprovalSigs: aggregatedSigs,
 	}
 
-	// we don't care whether the seal is already in the mempool
-	_ = e.seals.Add(seal)
+	// we don't care if the seal is already in the mempool
+	_ = e.seals.Add(&flow.IncorporatedResultSeal{
+		IncorporatedResult: incorporatedResult,
+		Seal:               seal,
+	})
 
 	return nil
 }
@@ -716,9 +731,9 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 
 	// for each memory pool, clear if the related block is no longer relevant or
 	// if the seal was already built for it (except for seals themselves)
-	for _, result := range e.results.All() {
-		if clear[result.ID()] || shouldClear(result.BlockID) {
-			_ = e.results.Rem(result.ID())
+	for _, result := range e.incorporatedResults.All() {
+		if clear[result.ID()] || shouldClear(result.Result.BlockID) {
+			_ = e.incorporatedResults.Rem(result)
 		}
 	}
 	for _, approval := range e.approvals.All() {
@@ -728,7 +743,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 		}
 	}
 	for _, seal := range e.seals.All() {
-		if shouldClear(seal.BlockID) {
+		if shouldClear(seal.Seal.BlockID) {
 			_ = e.seals.Rem(seal.ID())
 		}
 	}
@@ -746,7 +761,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 		e.missing[missingID]++
 	}
 
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
+	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 }

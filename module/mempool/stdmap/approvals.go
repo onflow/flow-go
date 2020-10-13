@@ -161,7 +161,6 @@ func (a *Approvals) All() []*flow.ResultApproval {
 		for _, approval := range approvalMapEntity.Approvals {
 			res = append(res, approval)
 		}
-
 	}
 
 	return res

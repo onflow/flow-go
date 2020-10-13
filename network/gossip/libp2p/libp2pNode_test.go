@@ -7,21 +7,27 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
 	golog "github.com/ipfs/go-log"
+	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
 	swarm "github.com/libp2p/go-libp2p-swarm"
+	"github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
@@ -305,6 +311,35 @@ func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 }
 
+// TestCreateStreamTimeoutWithUnresponsiveNode tests that the CreateStream call does not block longer than the default
+// unicast timeout interval
+func (l *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() {
+	defer l.cancel()
+
+	// creates a regular node
+	peers, addrs := l.CreateNodes(1, nil, false)
+	defer l.StopNodes(peers)
+	require.Len(l.T(), addrs, 1)
+
+	// create a silent node which never replies
+	listener, silentNodeAddress := newSilentNode(l.T())
+	defer listener.Close()
+
+	// setup the context to expire after the default timeout
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
+	defer cancel()
+
+	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
+	grace := 10 * time.Millisecond
+	var err error
+	unittest.AssertReturnsBefore(l.T(),
+		func() {
+			_, err = peers[0].CreateStream(ctx, silentNodeAddress)
+		},
+		DefaultUnicastTimeout+grace)
+	assert.Error(l.T(), err)
+}
+
 // TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
 func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 	defer l.cancel()
@@ -543,4 +578,58 @@ func generateNetworkingKey(seed string) (crypto.PrivKey, error) {
 	var r io.Reader = bytes.NewReader(seedB)
 	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.ECDSA, 0, r)
 	return prvKey, err
+}
+
+// newSilentNode returns a TCP listener and a node which never replies
+func newSilentNode(t *testing.T) (net.Listener, NodeAddress) {
+
+	name := "silent"
+	key, err := generateNetworkingKey(name)
+	require.NoError(t, err)
+
+	lst, err := net.Listen("tcp4", ":0")
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	addr, err := manet.FromNetAddr(lst.Addr())
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	addrs := []multiaddr.Multiaddr{addr}
+	addrs, err = addrutil.ResolveUnspecifiedAddresses(addrs, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go acceptAndHang(lst)
+
+	ip, port, err := IPPortFromMultiAddress(addrs...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodeAddress := NodeAddress{
+		Name:   name,
+		IP:     ip,
+		Port:   port,
+		PubKey: key.GetPublic(),
+	}
+	return lst, nodeAddress
+}
+
+func acceptAndHang(l net.Listener) {
+	conns := make([]net.Conn, 0, 10)
+	for {
+		c, err := l.Accept()
+		if err != nil {
+			break
+		}
+		if c != nil {
+			conns = append(conns, c)
+		}
+	}
+	for _, c := range conns {
+		c.Close()
+	}
 }
