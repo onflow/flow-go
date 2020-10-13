@@ -105,7 +105,7 @@ func (n *TopologyTestSuite) TestDeteministicity() {
 		previous = current
 		current = nil
 		// generate a new topology with a the same ids, size and seed
-		idMap, err := top.Subset(n.ids, topSize)
+		idMap, err := top.Subset(n.ids, topSize, topology.DummyTopic)
 		require.NoError(n.T(), err)
 
 		for _, v := range idMap {
@@ -137,7 +137,7 @@ func (n *TopologyTestSuite) TestUniqueness() {
 		identity, _ := n.ids.ByIndex(uint(i))
 		top, err := topology.NewRandPermTopology(flow.RoleCollection, identity.NodeID)
 		require.NoError(n.T(), err)
-		idMap, err := top.Subset(n.ids, topSize)
+		idMap, err := top.Subset(n.ids, topSize, topology.DummyTopic)
 		require.NoError(n.T(), err)
 
 		for _, v := range idMap {

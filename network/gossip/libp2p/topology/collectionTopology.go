@@ -2,6 +2,7 @@ package topology
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -43,9 +44,13 @@ func NewCollectionTopology(nodeID flow.Identifier, state protocol.ReadOnlyState)
 //to tens or hundreds of collection nodes)
 // Finally, all nodes of the same type should form a connected graph for exchanging messages for role specific topics
 // e.g. Transaction
-func (c CollectionTopology) Subset(idList flow.IdentityList, fanout uint) (flow.IdentityList, error) {
+func (c CollectionTopology) Subset(idList flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
 
-	randPermSample, err := c.RandPermTopology.Subset(idList, fanout)
+	if !strings.EqualFold(topic, DummyTopic) {
+		return nil, fmt.Errorf("could not support topics, expected: %s, got %s", DummyTopic, topic)
+	}
+
+	randPermSample, err := c.RandPermTopology.Subset(idList, fanout, DummyTopic)
 	if err != nil {
 		return nil, err
 	}

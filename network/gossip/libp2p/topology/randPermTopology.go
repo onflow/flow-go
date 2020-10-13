@@ -2,6 +2,7 @@ package topology
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -31,7 +32,11 @@ func NewRandPermTopology(role flow.Role, id flow.Identifier) (RandPermTopology, 
 	}, nil
 }
 
-func (r RandPermTopology) Subset(idList flow.IdentityList, fanout uint) (flow.IdentityList, error) {
+func (r RandPermTopology) Subset(idList flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
+
+	if strings.EqualFold(topic, DummyTopic) {
+		return nil, fmt.Errorf("could not support topics, expected: %s, got %s", DummyTopic, topic)
+	}
 
 	if uint(len(idList)) < fanout {
 		return nil, fmt.Errorf("cannot sample topology idList %d smaller than desired fanout %d", len(idList), fanout)

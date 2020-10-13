@@ -157,7 +157,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	subset, err := n.top.Subset(n.ids, n.fanout())
+	subset, err := n.top.Subset(n.ids, n.fanout(), topology.DummyTopic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
 	}

@@ -55,7 +55,7 @@ func (suite *CollectionTopologyTestSuite) TestSubset() {
 	for _, c := range suite.collectors {
 		collectionTopology, err := topology.NewCollectionTopology(c.NodeID, suite.state)
 		assert.NoError(suite.T(), err)
-		subset, err := collectionTopology.Subset(suite.ids, uint(len(suite.ids)))
+		subset, err := collectionTopology.Subset(suite.ids, uint(len(suite.ids)), topology.DummyTopic)
 		assert.NoError(suite.T(), err)
 		adjencyMap[c.NodeID] = subset
 	}
