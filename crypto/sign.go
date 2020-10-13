@@ -2,8 +2,8 @@
 package crypto
 
 import (
-	"fmt"
 	"crypto/elliptic"
+	"fmt"
 
 	"github.com/btcsuite/btcd/btcec"
 
@@ -23,7 +23,6 @@ type signer interface {
 	// decodePubKey loads a public key from a byte array
 	decodePublicKey([]byte) (PublicKey, error)
 }
-
 
 // newNonRelicSigner returns a signer that does not depend on Relic library.
 func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
