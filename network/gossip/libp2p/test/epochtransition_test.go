@@ -22,19 +22,22 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type EpochTransitionTestSuite struct {
 	suite.Suite
 	ConduitWrapper
-	nets         []*libp2p.Network
-	mws          []*libp2p.Middleware
-	engines      []*MeshEngine
-	state        *protocol.ReadOnlyState
-	snapshot     *protocol.Snapshot
-	ids          flow.IdentityList
-	currentEpoch int //counter to track the current epoch
-	logger       zerolog.Logger
+	nets              []*libp2p.Network
+	mws               []*libp2p.Middleware
+	engines           []*MeshEngine
+	state             *protocol.ReadOnlyState
+	snapshot          *protocol.Snapshot
+	ids               flow.IdentityList
+	currentEpoch      uint64 //counter to track the current epoch
+	currentEpochPhase flow.EpochPhase
+	epochQuery        *mocks.EpochQuery
+	logger            zerolog.Logger
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
@@ -54,13 +57,22 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	ts.ids = ids
 	ts.mws = mws
 
+	// setup current epoch
+	ts.currentEpoch = 0
+	ts.currentEpochPhase = flow.EpochPhaseStaking
+	ts.epochQuery = mocks.NewEpochQuery(ts.T(), ts.currentEpoch)
+	ts.addEpoch(ts.currentEpoch, ts.ids)
+
 	// setup state related mocks
 	ts.state = new(protocol.ReadOnlyState)
 	ts.snapshot = new(protocol.Snapshot)
+	ts.snapshot.On("Identities", mock2.Anything).Return(flow.IdentityList(ids), nil)
+	ts.snapshot.On("Epochs").Return(ts.epochQuery)
+	ts.snapshot.On("Phase").Return(
+		func() flow.EpochPhase { return ts.currentEpochPhase },
+		func() error { return nil },
+	)
 	ts.state.On("Final").Return(ts.snapshot, nil)
-
-	ts.currentEpoch = 0
-	ts.updateSnapshot(0, ts.ids)
 
 	// all nodes use the same state mock
 	states := make([]*protocol.ReadOnlyState, nodeCount)
@@ -102,19 +114,22 @@ func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 	newIDs := append(ts.ids, ids...)
 	newNetworks := append(ts.nets, nets...)
 
-	// increment epoch
-	ts.currentEpoch = ts.currentEpoch + 1
-
-	// update snapshot mock to return the new ids
-	ts.updateSnapshot(ts.currentEpoch, newIDs)
-
 	// create the engine for the new node
 	newEngine := generateEngines(ts.T(), nets)
 	newEngines := append(ts.engines, newEngine...)
 
+	// increment epoch
+	ts.currentEpoch = ts.currentEpoch + 1
+
+	// switch the epoch phase to Setup
+	ts.currentEpochPhase = flow.EpochPhaseSetup
+
+	// update epoch query mock to return new IDs for this epoch
+	ts.addEpoch(ts.currentEpoch, newIDs)
+
 	// trigger an epoch transition for all networks
 	for _, n := range newNetworks {
-		n.EpochSetupPhaseStarted(uint64(ts.currentEpoch), nil)
+		n.EpochSetupPhaseStarted(ts.currentEpoch, nil)
 	}
 
 	threshold := len(ts.ids) / 2
@@ -142,7 +157,6 @@ func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
 
 	// choose a random index
 	removeIndex := rand.Intn(len(ts.ids))
-	fmt.Printf("\nREmoving %s\n", ts.ids[removeIndex].Address)
 
 	// remove the identity at that index from the ids
 	newIDs := ts.ids.Filter(filter.Not(filter.HasNodeID(ts.ids[removeIndex].NodeID)))
@@ -150,8 +164,11 @@ func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
 	// increment epoch
 	ts.currentEpoch = ts.currentEpoch + 1
 
-	// update snapshot mock to return the new ids
-	ts.updateSnapshot(ts.currentEpoch, newIDs)
+	// switch the epoch phase to Setup
+	ts.currentEpochPhase = flow.EpochPhaseSetup
+
+	// update epoch query mock to return new IDs for this epoch
+	ts.addEpoch(ts.currentEpoch, newIDs)
 
 	// trigger an epoch transition for all nodes except the evicted one
 	for i, n := range ts.nets {
@@ -209,8 +226,10 @@ func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngi
 	unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 }
 
-// updateSnapshot sets up the snapshot mock to return ids corresponding to epochs
-func (ts *EpochTransitionTestSuite) updateSnapshot(epoch int, ids flow.IdentityList) {
-	ts.snapshot.On("Identities",
-		mock2.MatchedBy(func(_ flow.IdentityFilter) bool { return ts.currentEpoch == epoch })).Return(ids, nil)
+// addEpoch adds an epoch with the given counter.
+func (ts *EpochTransitionTestSuite) addEpoch(counter uint64, ids flow.IdentityList) {
+	epoch := new(protocol.Epoch)
+	epoch.On("InitialIdentities").Return(ids, nil)
+	epoch.On("Counter").Return(counter, nil)
+	ts.epochQuery.Add(epoch)
 }
