@@ -304,8 +304,3 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	return proposal.Header, err
 }
-
-func (b *Builder) isUnlimitedPayer(payer flow.Address) bool {
-	_, exists := b.config.UnlimitedPayers[payer]
-	return exists
-}
