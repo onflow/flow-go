@@ -731,6 +731,9 @@ func (e *Engine) handleComputationResult(
 		result.TransactionResult,
 		startState,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not save execution results: %w", err)
+	}
 
 	receipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
 	if err != nil {
