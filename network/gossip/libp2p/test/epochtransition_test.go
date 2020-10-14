@@ -30,6 +30,7 @@ type EpochTransitionTestSuite struct {
 	ConduitWrapper
 	nets              []*libp2p.Network
 	mws               []*libp2p.Middleware
+	idRefreshers      []*libp2p.NodeIDRefresher
 	engines           []*MeshEngine
 	state             *protocol.ReadOnlyState
 	snapshot          *protocol.Snapshot
@@ -66,7 +67,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	// setup state related mocks
 	ts.state = new(protocol.ReadOnlyState)
 	ts.snapshot = new(protocol.Snapshot)
-	ts.snapshot.On("Identities", mock2.Anything).Return(flow.IdentityList(ids), nil)
+	ts.snapshot.On("Identities", mock2.Anything).Return(ids, nil)
 	ts.snapshot.On("Epochs").Return(ts.epochQuery)
 	ts.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return ts.currentEpochPhase },
@@ -81,8 +82,11 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	}
 
 	// create networks using the mocked state and default topology
-	nets := generateNetworks(ts.T(), ts.logger, ids, mws, 100, nil, states, false)
+	nets := generateNetworks(ts.T(), ts.logger, ids, mws, 100, nil, false)
 	ts.nets = nets
+
+	// generate the refreshers
+	ts.idRefreshers = ts.generateNodeIDRefreshers(nets)
 
 	// generate the engines
 	ts.engines = generateEngines(ts.T(), nets)
@@ -108,11 +112,14 @@ func (ts *EpochTransitionTestSuite) TearDownTest() {
 func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 	// create the id, middleware and network for a new node
-	ids, mws, nets := generateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, []*protocol.ReadOnlyState{ts.state}, false)
+	ids, mws, nets := generateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, false)
 	newMiddleware := mws[0]
 
 	newIDs := append(ts.ids, ids...)
-	newNetworks := append(ts.nets, nets...)
+
+	// create a new refresher
+	newIDRefresher := ts.generateNodeIDRefreshers(nets)
+	newIDRefreshers := append(ts.idRefreshers, newIDRefresher...)
 
 	// create the engine for the new node
 	newEngine := generateEngines(ts.T(), nets)
@@ -128,7 +135,7 @@ func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 	ts.addEpoch(ts.currentEpoch, newIDs)
 
 	// trigger an epoch transition for all networks
-	for _, n := range newNetworks {
+	for _, n := range newIDRefreshers {
 		n.EpochSetupPhaseStarted(ts.currentEpoch, nil)
 	}
 
@@ -171,7 +178,7 @@ func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
 	ts.addEpoch(ts.currentEpoch, newIDs)
 
 	// trigger an epoch transition for all nodes except the evicted one
-	for i, n := range ts.nets {
+	for i, n := range ts.idRefreshers {
 		if i == removeIndex {
 			continue
 		}
@@ -232,4 +239,12 @@ func (ts *EpochTransitionTestSuite) addEpoch(counter uint64, ids flow.IdentityLi
 	epoch.On("InitialIdentities").Return(ids, nil)
 	epoch.On("Counter").Return(counter, nil)
 	ts.epochQuery.Add(epoch)
+}
+
+func (ts *EpochTransitionTestSuite) generateNodeIDRefreshers(nets []*libp2p.Network) []*libp2p.NodeIDRefresher {
+	refreshers := make([]*libp2p.NodeIDRefresher, len(nets))
+	for i, net := range nets {
+		refreshers[i] = libp2p.NewNodeIDRefresher(ts.logger, ts.state, net.SetIDs)
+	}
+	return refreshers
 }

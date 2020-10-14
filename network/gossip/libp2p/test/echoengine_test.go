@@ -44,7 +44,7 @@ func (s *EchoEngineTestSuite) SetupTest() {
 	const count = 2
 	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	s.ids, s.mws, s.nets = generateIDsMiddlewaresNetworks(s.T(), count, logger, 100, nil, nil, false)
+	s.ids, s.mws, s.nets = generateIDsMiddlewaresNetworks(s.T(), count, logger, 100, nil, false)
 }
 
 // TearDownTest closes the networks within a specified timeout

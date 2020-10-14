@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/gossip/libp2p/cache"
@@ -18,8 +17,6 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
-	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/events"
 )
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
@@ -28,11 +25,9 @@ type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	events.Noop     // network consumes some of the protocol events
 	logger          zerolog.Logger
 	codec           network.Codec
 	ids             flow.IdentityList
-	state           protocol.ReadOnlyState
 	me              module.Local
 	mw              middleware.Middleware
 	top             topology.Topology
@@ -51,7 +46,7 @@ type Network struct {
 func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
-	state protocol.ReadOnlyState,
+	ids flow.IdentityList,
 	me module.Local,
 	mw middleware.Middleware,
 	csize int,
@@ -73,26 +68,16 @@ func NewNetwork(
 		top:             top,
 		metrics:         metrics,
 		subscriptionMgr: newSubscriptionManager(mw),
-		state:           state,
 	}
-
-	// seed the network with the appropriate ids as per the epoch state
-	ids, err := idsFromState(state)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retreive ids: %w", err)
-	}
+	o.ctx, o.cancel = context.WithCancel(context.Background())
 	o.ids = ids
-
-	ctx, cancel := context.WithCancel(context.Background())
-	o.cancel = cancel
-	o.ctx = ctx
 
 	// setup the message queue
 	// create priority queue
-	o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
+	o.queue = queue.NewMessageQueue(o.ctx, queue.GetEventPriority, metrics)
 
 	// create workers to read from the queue and call queueSubmitFunc
-	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+	queue.CreateQueueWorkers(o.ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
 
 	return o, nil
 }
@@ -172,9 +157,10 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (flow.IdentityList, error) {
-	fanout := n.fanout()
 	n.RLock()
 	defer n.RUnlock()
+	// fanout is currently set to half of the system size for connectivity assurance
+	fanout := uint(len(n.ids)+1) / 2
 	subset, err := n.top.Subset(n.ids, fanout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
@@ -207,14 +193,6 @@ func (n *Network) SetIDs(ids flow.IdentityList) error {
 	}
 
 	return nil
-}
-
-// fanout returns the node fanout derived from the identity list
-func (n *Network) fanout() uint {
-	n.RLock()
-	defer n.RUnlock()
-	// fanout is currently set to half of the system size for connectivity assurance
-	return uint(len(n.ids)+1) / 2
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
@@ -474,48 +452,4 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 			Str("sender_id", qm.SenderID.String()).
 			Msg("failed to process message")
 	}
-}
-
-func (n *Network) EpochSetupPhaseStarted(newEpoch uint64, first *flow.Header) {
-	log := n.logger.With().Uint64("new_epoch", newEpoch).Logger()
-
-	// get the new set of IDs
-	newIDs, err := idsFromState(n.state)
-	if err != nil {
-		log.Err(err).Msg("failed to update network ids on epoch transition")
-		return
-	}
-
-	// set the network IDs to a combination of current epoch ids and next epoch ids
-	err = n.SetIDs(newIDs)
-	if err != nil {
-		log.Err(err).Msg("failed to update network ids on epoch transition")
-	}
-}
-
-// idsFromState returns the identities that the network should be using based on the current epoch phase
-func idsFromState(state protocol.ReadOnlyState) (flow.IdentityList, error) {
-
-	// epoch ids from this epoch
-	ids, err := state.Final().Identities(filter.Any)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current epoch ids: %w", err)
-	}
-
-	// current epoch phase
-	phase, err := state.Final().Phase()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve epoch phase: %w", err)
-	}
-
-	// if node is in epoch setup or epoch committed phase, include the next epoch identities as well
-	if phase == flow.EpochPhaseSetup || phase == flow.EpochPhaseCommitted {
-		nextEpochIDs, err := state.Final().Epochs().Next().InitialIdentities()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get next epoch ids: %w", err)
-		}
-		ids = ids.Union(nextEpochIDs)
-	}
-
-	return ids, err
 }

@@ -181,6 +181,11 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 		nodeRole := nodeID.Role
 
+		participants, err := libp2p.IDsFromState(fnb.State)
+		if err != nil {
+			return nil, fmt.Errorf("could not get network identities: %w", err)
+		}
+
 		var nodeTopology topology.Topology
 		if nodeRole == flow.RoleCollection {
 			nodeTopology, err = topology.NewCollectionTopology(nodeID.NodeID, fnb.State)
@@ -191,14 +196,15 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, fnb.Middleware, 10e6, nodeTopology, fnb.Metrics.Network)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, fnb.Middleware, 10e6, nodeTopology, fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
 
 		fnb.Network = net
 
-		fnb.ProtocolEvents.AddConsumer(net)
+		idRefresher := libp2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
+		fnb.ProtocolEvents.AddConsumer(idRefresher)
 
 		return net, err
 	})

@@ -10,7 +10,6 @@ import (
 
 	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
-	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -22,14 +21,13 @@ import (
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var rootBlockID = unittest.IdentifierFixture().String()
 
 // generateIDs generate flow Identities with a valid port and networking key
-func generateIDs(t *testing.T, n int) ([]*flow.Identity, []crypto.PrivateKey) {
+func generateIDs(t *testing.T, n int) (flow.IdentityList, []crypto.PrivateKey) {
 	identities := make([]*flow.Identity, n)
 	privateKeys := make([]crypto.PrivateKey, n)
 
@@ -62,7 +60,7 @@ func generateIDs(t *testing.T, n int) ([]*flow.Identity, []crypto.PrivateKey) {
 }
 
 // generateMiddlewares creates and initializes middleware instances for all the identities
-func generateMiddlewares(t *testing.T, log zerolog.Logger, identities []*flow.Identity, keys []crypto.PrivateKey) []*libp2p.Middleware {
+func generateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*libp2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*libp2p.Middleware, len(identities))
 	for i, id := range identities {
@@ -83,13 +81,7 @@ func generateMiddlewares(t *testing.T, log zerolog.Logger, identities []*flow.Id
 }
 
 // generateNetworks generates the network for the given middlewares
-func generateNetworks(t *testing.T, log zerolog.Logger,
-	ids flow.IdentityList,
-	mws []*libp2p.Middleware,
-	csize int,
-	tops []topology.Topology,
-	states []*protocol.ReadOnlyState,
-	dryrun bool) []*libp2p.Network {
+func generateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, mws []*libp2p.Middleware, csize int, tops []topology.Topology, dryrun bool) []*libp2p.Network {
 	count := len(ids)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -104,14 +96,6 @@ func generateNetworks(t *testing.T, log zerolog.Logger,
 		}
 	}
 
-	// if no state is passed in, use the default mock state for all networks
-	if states == nil {
-		states = make([]*protocol.ReadOnlyState, count)
-		for i := range states {
-			states[i] = generateStateSnapshot(ids)
-		}
-	}
-
 	for i := 0; i < count; i++ {
 
 		// creates and mocks me
@@ -121,7 +105,7 @@ func generateNetworks(t *testing.T, log zerolog.Logger,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), states[i], me, mws[i], csize, tops[i], metrics)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -136,21 +120,15 @@ func generateNetworks(t *testing.T, log zerolog.Logger,
 	return nets
 }
 
-func generateIDsAndMiddlewares(t *testing.T, n int, log zerolog.Logger) ([]*flow.Identity, []*libp2p.Middleware) {
+func generateIDsAndMiddlewares(t *testing.T, n int, log zerolog.Logger) (flow.IdentityList, []*libp2p.Middleware) {
 	ids, keys := generateIDs(t, n)
 	mws := generateMiddlewares(t, log, ids, keys)
 	return ids, mws
 }
 
-func generateIDsMiddlewaresNetworks(t *testing.T,
-	n int,
-	log zerolog.Logger,
-	csize int,
-	tops []topology.Topology,
-	states []*protocol.ReadOnlyState,
-	dryrun bool) ([]*flow.Identity, []*libp2p.Middleware, []*libp2p.Network) {
+func generateIDsMiddlewaresNetworks(t *testing.T, n int, log zerolog.Logger, csize int, tops []topology.Topology, dryrun bool) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
 	ids, mws := generateIDsAndMiddlewares(t, n, log)
-	networks := generateNetworks(t, log, ids, mws, csize, tops, states, dryrun)
+	networks := generateNetworks(t, log, ids, mws, csize, tops, dryrun)
 	return ids, mws, networks
 }
 
@@ -163,16 +141,6 @@ func generateEngines(t *testing.T, nets []*libp2p.Network) []*MeshEngine {
 		engs[i] = eng
 	}
 	return engs
-}
-
-// generateStateSnapshot generates a state and snapshot mock to return the given ids
-func generateStateSnapshot(ids flow.IdentityList) *protocol.ReadOnlyState {
-	state := new(protocol.ReadOnlyState)
-	snapshot := new(protocol.Snapshot)
-	state.On("Final").Return(snapshot, nil)
-	snapshot.On("Identities", testifymock.Anything).Return(ids, nil)
-	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
-	return state
 }
 
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
