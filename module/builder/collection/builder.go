@@ -118,18 +118,18 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// transaction every N sequential collections, or we allow K transactions
 		// per collection.
 
-		// for each payer, keep track of the height of the last collection in
-		// which a transaction paid by the payer was included
-		latestCollectionHeightByPayer := make(map[flow.Address]uint64)
+		// keep track of transactions in the ancestry to avoid duplicates
+		lookup := newTxLookup()
+		// keep track of transactions to enforce rate limiting
+		limiter := newRateLimiter(b.config, parent.Height+1)
 
 		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
-		unfinalizedLookup := make(map[flow.Identifier]struct{})
 		clusterFinalID := clusterFinal.ID()
 		for ancestorID != clusterFinalID {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get noteAncestor header (%x): %w", ancestorID, err)
 			}
 
 			if ancestor.Height <= clusterFinal.Height {
@@ -138,24 +138,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			payload, err := b.payloads.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get noteAncestor payload (%x): %w", ancestorID, err)
 			}
 
 			collection := payload.Collection
 			for _, tx := range collection.Transactions {
-				unfinalizedLookup[tx.ID()] = struct{}{}
-
-				// skip tracking payers if we aren't rate-limiting or are configured
-				// to allow multiple transactions per payer per collection
-				if b.config.MaxPayerTransactionRate >= 1 || b.config.MaxPayerTransactionRate <= 0 {
-					continue
-				}
-
-				// update the latest collection by payer
-				payer := tx.Payer
-				if ancestor.Height > latestCollectionHeightByPayer[payer] {
-					latestCollectionHeightByPayer[payer] = ancestor.Height
-				}
+				lookup.addUnfinalizedAncestor(tx.ID())
+				limiter.addAncestor(ancestor.Height, tx)
 			}
 			ancestorID = ancestor.ParentID
 		}
@@ -173,34 +162,22 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// look up previously included transactions in FINALIZED ancestors
-		finalizedLookup := make(map[flow.Identifier]struct{})
 		ancestorID = clusterFinal.ID()
 		ancestorHeight := clusterFinal.Height
 		for ancestorHeight > limit {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get noteAncestor header (%x): %w", ancestorID, err)
 			}
 			payload, err := b.payloads.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get noteAncestor payload (%x): %w", ancestorID, err)
 			}
 
 			collection := payload.Collection
 			for _, tx := range collection.Transactions {
-				finalizedLookup[tx.ID()] = struct{}{}
-
-				// skip tracking payers if we aren't rate-limiting or are configured
-				// to allow multiple transactions per payer per collection
-				if b.config.MaxPayerTransactionRate <= 1 {
-					continue
-				}
-
-				// update the latest collection by payer
-				payer := tx.Payer
-				if ancestor.Height > latestCollectionHeightByPayer[payer] {
-					latestCollectionHeightByPayer[payer] = ancestor.Height
-				}
+				lookup.addFinalizedAncestor(tx.ID())
+				limiter.addAncestor(ancestor.Height, tx)
 			}
 
 			ancestorID = ancestor.ParentID
@@ -212,10 +189,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
 		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
-
-		// keep track of how many transactions per payer we are including
-		// in the collection we are building
-		transactionsIncludedPerPayer := make(map[flow.Address]uint)
 
 		minRefHeight := uint64(math.MaxUint64)
 		// start with the finalized reference ID (longest expiry time)
@@ -252,51 +225,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			}
 
 			// check that the transaction was not already used in un-finalized history
-			_, duplicated := unfinalizedLookup[txID]
-			if duplicated {
+			if lookup.isUnfinalizedAncestor(txID) {
 				continue
 			}
 
 			// check that the transaction was not already included in finalized history.
-			_, duplicated = finalizedLookup[txID]
-			if duplicated {
+			if lookup.isFinalizedAncestor(txID) {
 				// remove from mempool, conflicts with finalized block will never be valid
 				b.transactions.Rem(txID)
 				continue
 			}
 
 			// enforce rate limiting rules
-			payer := tx.Payer
-
-			if b.config.MaxPayerTransactionRate == 0 || b.isUnlimitedPayer(payer) {
-				// skip rate limiting if it is turned off or the payer is unlimited
-
-			} else if b.config.MaxPayerTransactionRate >= 1 {
-				// OPTION 1: we allow N transactions per payer per collection
-
-				n := uint(math.Floor(b.config.MaxPayerTransactionRate))
-				if transactionsIncludedPerPayer[payer] >= n {
-					continue
-				}
-
-			} else if b.config.MaxPayerTransactionRate < 1 {
-				// OPTION 2: we allow 1 transactions per payer every K collections
-
-				// skip if we've already include a transaction for this payer - we can only ever include 1
-				if transactionsIncludedPerPayer[payer] > 0 {
-					continue
-				}
-
-				// otherwise, check whether sufficiently many empty collection
-				// have been built since the last transaction from the payer
-				k := uint64(math.Ceil(1 / b.config.MaxPayerTransactionRate))
-
-				height := parent.Height + 1 // height of collection we are building
-				latestHeight, hasRecentTransaction := latestCollectionHeightByPayer[payer]
-
-				if hasRecentTransaction && height-latestHeight < k {
-					continue
-				}
+			if limiter.shouldRateLimit(tx) {
+				continue
 			}
 
 			// ensure we find the lowest reference block height
@@ -306,7 +248,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			}
 
 			// update per-payer transaction count
-			transactionsIncludedPerPayer[payer]++
+			limiter.transactionIncluded(tx)
 
 			transactions = append(transactions, tx)
 		}
@@ -366,4 +308,135 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 func (b *Builder) isUnlimitedPayer(payer flow.Address) bool {
 	_, exists := b.config.UnlimitedPayers[payer]
 	return exists
+}
+
+type txlookup struct {
+	finalized   map[flow.Identifier]struct{}
+	unfinalized map[flow.Identifier]struct{}
+}
+
+func newTxLookup() *txlookup {
+	lookup := &txlookup{
+		finalized:   make(map[flow.Identifier]struct{}),
+		unfinalized: make(map[flow.Identifier]struct{}),
+	}
+	return lookup
+}
+
+// note the existence of a transaction in a finalized noteAncestor collection
+func (lookup *txlookup) addFinalizedAncestor(txID flow.Identifier) {
+	lookup.finalized[txID] = struct{}{}
+}
+
+// note the existence of a transaction in a unfinalized noteAncestor collection
+func (lookup *txlookup) addUnfinalizedAncestor(txID flow.Identifier) {
+	lookup.unfinalized[txID] = struct{}{}
+}
+
+// checks whether the given transaction ID is in a finalized noteAncestor collection
+func (lookup *txlookup) isFinalizedAncestor(txID flow.Identifier) bool {
+	_, exists := lookup.finalized[txID]
+	return exists
+}
+
+// checks whether the given transaction ID is in a unfinalized noteAncestor collection
+func (lookup *txlookup) isUnfinalizedAncestor(txID flow.Identifier) bool {
+	_, exists := lookup.unfinalized[txID]
+	return exists
+}
+
+// implements rate limiting by payer address.
+type ratelimiter struct {
+
+	// maximum rate of transactions/payer/collection (from Config)
+	rate float64
+	// set of unlimited payer address (from Config)
+	unlimited map[flow.Address]struct{}
+	// height of the collection we are building
+	height uint64
+
+	// for each payer, height of latest collection in which a transaction for
+	// which they were payer was included
+	latestCollectionHeight map[flow.Address]uint64
+	// number of transactions included in the currently built block per payer
+	txIncludedCount map[flow.Address]uint
+}
+
+func newRateLimiter(conf Config, height uint64) *ratelimiter {
+	limiter := &ratelimiter{
+		rate:                   conf.MaxPayerTransactionRate,
+		unlimited:              conf.UnlimitedPayers,
+		height:                 height,
+		latestCollectionHeight: make(map[flow.Address]uint64),
+		txIncludedCount:        make(map[flow.Address]uint),
+	}
+	return limiter
+}
+
+// note the existence and height of a transaction in an ancestor collection.
+func (limiter *ratelimiter) addAncestor(height uint64, tx *flow.TransactionBody) {
+
+	// skip tracking payers if we aren't rate-limiting or are configured
+	// to allow multiple transactions per payer per collection
+	if limiter.rate >= 1 || limiter.rate <= 0 {
+		return
+	}
+
+	latest := limiter.latestCollectionHeight[tx.Payer]
+	if height >= latest {
+		limiter.latestCollectionHeight[tx.Payer] = height
+	}
+}
+
+// note that we have added a transaction to the collection under construction.
+func (limiter *ratelimiter) transactionIncluded(tx *flow.TransactionBody) {
+	limiter.txIncludedCount[tx.Payer]++
+}
+
+// applies the rate limiting rules, returning whether the transaction should be
+// omitted from the collection under construction.
+func (limiter *ratelimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
+
+	payer := tx.Payer
+
+	// skip rate limiting if it is turned off or the payer is unlimited
+	_, isUnlimited := limiter.unlimited[payer]
+	if limiter.rate == 0 || isUnlimited {
+		return false
+	}
+
+	// if rate >=1, we only consider the current collection and rate limit once
+	// the number of transactions for the payer exceeds rate
+	if limiter.rate >= 1 {
+		if limiter.txIncludedCount[payer] >= uint(math.Floor(limiter.rate)) {
+			return true
+		}
+	}
+
+	// if rate < 1, we need to look back to see when a transaction by this payer
+	// was most recently included - we rate limit if the # of collections since
+	// the payer's last transaction is less than ceil(1/rate)
+	if limiter.rate < 1 {
+
+		// rate limit if we've already include a transaction for this payer, we allow
+		// AT MOST one transaction per payer in a given collection
+		if limiter.txIncludedCount[payer] > 0 {
+			return true
+		}
+
+		// otherwise, check whether sufficiently many empty collection
+		// have been built since the last transaction from the payer
+
+		latestHeight, hasLatest := limiter.latestCollectionHeight[payer]
+		// if there is no recent transaction, don't rate limit
+		if !hasLatest {
+			return false
+		}
+
+		if limiter.height-latestHeight < uint64(math.Ceil(1/limiter.rate)) {
+			return true
+		}
+	}
+
+	return false
 }
