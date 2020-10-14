@@ -82,31 +82,31 @@ func (v *Verifier) ClearReceipts(resultID flow.Identifier) bool {
 
 // VerifyApproval verifies an approval with all the distinct receipts for the approvals
 // result id and returns true if spocks match else false
-func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (bool, error) {
+func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (*flow.ExecutionReceipt, error) {
 	// find identities
 	approver, err := v.protocolState.AtBlockID(approval.Body.BlockID).Identity(approval.Body.ApproverID)
 	if err != nil {
-		return false, fmt.Errorf("could not find approver identity")
+		return nil, fmt.Errorf("could not find approver identity")
 	}
 
 	receipts := v.receipts[approval.Body.ExecutionResultID]
 	for _, receipt := range receipts {
 		executor, err := v.protocolState.AtBlockID(receipt.ExecutionResult.BlockID).Identity(receipt.ExecutorID)
 		if err != nil {
-			return false, fmt.Errorf("could not find executor identity")
+			return nil, fmt.Errorf("could not find executor identity")
 		}
 
 		// verify spock
 		verified, err := crypto.SPOCKVerify(approver.StakingPubKey, approval.Body.Spock, executor.StakingPubKey, receipt.Spocks[approval.Body.ChunkIndex])
 		if err != nil {
-			return false, fmt.Errorf("could not verify spocks: %w", err)
+			return nil, fmt.Errorf("could not verify spocks: %w", err)
 		}
 		if verified {
-			return true, nil
+			return receipt, nil
 		}
 	}
 
-	return false, nil
+	return nil, nil
 }
 
 func (v *Verifier) matchReceipt(receipt *flow.ExecutionReceipt) (bool, error) {

@@ -615,14 +615,16 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 		}
 
 		// check if spocks match
-		valid, err := e.spockVerifier.VerifyApproval(approval)
+		receipt, err := e.spockVerifier.VerifyApproval(approval)
 		if err != nil {
 			return false, fmt.Errorf("could get validate spocks: %w", err)
 		}
-		if !valid {
+		if !receipt {
 			e.log.Error().Msg("spock validation failed: spocks do not match")
 			continue
 		}
+
+		// TODO: some logic to ensure that an invalid receipt was not matched
 
 		// add approver to valid approvers list
 		validApprovers = append(validApprovers, approverID)
