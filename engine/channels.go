@@ -67,25 +67,26 @@ func initializeTopicMap() {
 	// Channels for actively pushing entities to subscribers
 	TopicMap[PushTransactions] = flow.RoleList{flow.RoleCollection}
 	TopicMap[PushGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
-	TopicMap[PushBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification}
-	TopicMap[PushReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification}
+	TopicMap[PushBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+		flow.RoleVerification, flow.RoleAccess}
+	TopicMap[PushReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
 	TopicMap[PushApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	// Channels for actively requesting missing entities
 	TopicMap[RequestCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
 	TopicMap[RequestChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
-	TopicMap[RequestReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus}
+	TopicMap[RequestReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 
 	// Channel aliases to make the code more readable / more robust to errors
-	TopicMap[ReceiveGuarantees] = flow.RoleList{flow.RoleConsensus}
-	TopicMap[ReceiveBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleExecution,
+	TopicMap[ReceiveGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
+	TopicMap[ReceiveBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
-	TopicMap[ReceiveReceipts] = flow.RoleList{flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification}
-	TopicMap[ReceiveApprovals] = flow.RoleList{flow.RoleVerification}
+	TopicMap[ReceiveReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
+	TopicMap[ReceiveApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
-	TopicMap[ProvideCollections] = flow.RoleList{flow.RoleCollection}
-	TopicMap[ProvideChunks] = flow.RoleList{flow.RoleExecution}
-	TopicMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleExecution}
+	TopicMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
+	TopicMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
+	TopicMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 
 }
 
