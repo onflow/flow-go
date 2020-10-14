@@ -327,9 +327,6 @@ func (n *Network) unicast(channelID string, message interface{}, targetID flow.I
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
-	n.logger.Debug().
-		Msg("message successfully unicasted")
-
 	return nil
 }
 
