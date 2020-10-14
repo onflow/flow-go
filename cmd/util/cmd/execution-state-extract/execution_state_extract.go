@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -27,9 +28,7 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, pathfinder.PathByteSize, wal.SegmentSize)
-
-	//w, err := oldWal.NewWAL(nil, nil, dir, oldLedger.CacheSize, oldLedger.RegisterKeySize, oldWal.SegmentSize)
+	w, err := wal.NewWAL(nil, nil, dir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -37,7 +36,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		_ = w.Close()
 	}()
 
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, outputDir, ledger.CacheSize, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, outputDir, complete.DefaultCacheSize, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
 	if err != nil {
 		return fmt.Errorf("cannot create mForest: %w", err)
 	}

@@ -9,8 +9,6 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-const CacheSize = 1000
-
 // Ledger is a stateful fork-aware key/value storage.
 // Any update (value change for a key) to the ledger generates a new ledger state.
 // Updates can be applied to any recent states. These changes don't have to be sequential and ledger supports a tree of states.

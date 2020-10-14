@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -34,7 +35,7 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 		return fmt.Errorf("cannot get state commitment for block: %w", err)
 	}
 
-	w, err := wal.NewWAL(nil, nil, ledgerPath, ledger.CacheSize, pathfinder.PathByteSize, wal.SegmentSize)
+	w, err := wal.NewWAL(nil, nil, ledgerPath, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -43,8 +44,7 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 	}()
 
 	// TODO port this to use new forest
-	//mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, outputPath, 1000, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, outputPath, ledger.CacheSize, &metrics.NoopCollector{}, nil)
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, outputPath, complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
 	if err != nil {
 		return fmt.Errorf("cannot create mForest: %w", err)
 	}
