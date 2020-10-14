@@ -484,13 +484,17 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 // is.
 func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
 
+	collID := collection.ID()
+
+	log := e.log.With().Hex("collection_id", collID[:]).Logger()
+
+	log.Info().Hex("sender", originID[:]).Msg("handle collection")
+
 	// TODO: bail if have seen this collection before.
 	err := e.collections.Store(collection)
 	if err != nil {
 		return fmt.Errorf("cannot store collection: %w", err)
 	}
-
-	collID := collection.ID()
 
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
@@ -501,15 +505,16 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// or it was ejected from the mempool when it was full.
 			// either way, we will return
 			if !exists {
-				e.log.Debug().Hex("collection_id", collID[:]).
-					Msg("could not find block for collection")
+				log.Debug().Msg("could not find block for collection")
 				return nil
 			}
 
 			for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
+				blockID := executableBlock.ID()
+
 				completeCollection, ok := executableBlock.CompleteCollections[collID]
 				if !ok {
-					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
+					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection", blockID)
 				}
 
 				if completeCollection.IsCompleted() {
@@ -523,7 +528,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				completeCollection.Transactions = collection.Transactions
 
 				// check if the block becomes executable
-				_ = e.executeBlockIfComplete(executableBlock)
+				completed := e.executeBlockIfComplete(executableBlock)
+
+				log.Debug().Hex("block_id", blockID[:]).Bool("completed", completed).Msg("collection added to block")
 			}
 
 			// since we've received this collection, remove it from the index
