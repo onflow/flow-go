@@ -636,7 +636,7 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 
 	// skip counting approvals
 	// TODO:
-	//  * This is the happy path (requires just one approval per chunk). Should
+	//  This is the happy path (requires just one approval per chunk). Should
 	//    be +2/3 of all currently staked verifiers.
 	return len(validApprovers) > 0, nil
 }

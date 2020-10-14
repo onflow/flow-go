@@ -2,6 +2,7 @@ package spock
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
@@ -11,6 +12,8 @@ import (
 
 // Verifier provides functionality to verify SPoCK proofs
 type Verifier struct {
+	sync.Mutex
+
 	// state is used to query identities at a blockId to get StakingPublicKey
 	protocolState protocol.ReadOnlyState
 
@@ -62,6 +65,8 @@ func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 
 // ClearReceipts clears all receipts for a specific resultID
 func (v *Verifier) ClearReceipts(resultID flow.Identifier) bool {
+	v.Lock()
+	defer v.Unlock()
 
 	// check if entry exists
 	_, ok := v.receipts[resultID]
