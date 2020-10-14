@@ -7,9 +7,32 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
+type TopicAwareOpt func(*TopicAwareTopology)
+
+// WithTopic is an option function for TopicAwareTopology that adds
+// a topic as well as its related engaged roles to the topology.
+func WithTopic(name string, roles flow.RoleList) TopicAwareOpt {
+	return func(t *TopicAwareTopology) {
+		t.roleByTopic[name] = roles
+	}
+}
+
 type TopicAwareTopology struct {
 	RandPermTopology
 	roleByTopic map[string]flow.RoleList // used to map between topics and roles subscribed to topics
+}
+
+// NewTopicAwareTopology returns an instance of the TopicAwareTopology
+func NewTopicAwareTopology(topics ...TopicAwareOpt) (*TopicAwareTopology, error) {
+	t := &TopicAwareTopology{
+		roleByTopic: make(map[string]flow.RoleList),
+	}
+
+	for _, apply := range topics {
+		apply(t)
+	}
+
+	return t, nil
 }
 
 // Subset receives an identity list and a topic. It then extracts list of nodes subscribed to the topic from the
