@@ -2,24 +2,17 @@ package extract
 
 import (
 	"bytes"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"path"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/wal"
-	"github.com/onflow/flow-go/storage/badger/operation"
-
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -28,58 +21,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-//
 func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
 	return commits.ByBlockID(blockHash)
 }
 
-func getMappingsFromDatabase(db *badger.DB) (map[string]delta.Mapping, error) {
-
-	mappings := make(map[string]delta.Mapping)
-
-	var found [][]*delta.LegacySnapshot
-	err := db.View(operation.FindLegacyExecutionStateInteractions(func(interactions []*delta.LegacySnapshot) bool {
-
-		for _, interaction := range interactions {
-			for k, mapping := range interaction.Delta.ReadMappings {
-				mappings[k] = mapping
-			}
-			for k, mapping := range interaction.Delta.WriteMappings {
-				mappings[k] = mapping
-			}
-		}
-
-		return false
-	}, &found))
-
-	return mappings, err
-}
-
-func ReadMegamappings(filename string) (map[string]delta.Mapping, error) {
-	var readMappings = map[string]delta.Mapping{}
-	var hexencodedRead map[string]delta.Mapping
-
-	bytes, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("cannot open mappings file: %w", err)
-	}
-	err = json.Unmarshal(bytes, &hexencodedRead)
-	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshall mappings: %w", err)
-	}
-
-	for k, mapping := range hexencodedRead {
-		decodeString, err := hex.DecodeString(k)
-		if err != nil {
-			return nil, fmt.Errorf("cannot decode key: %w", err)
-		}
-		readMappings[string(decodeString)] = mapping
-	}
-
-	return readMappings, nil
-}
-
-//
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
 	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, pathfinder.PathByteSize, wal.SegmentSize)
