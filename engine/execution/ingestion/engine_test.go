@@ -217,7 +217,13 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		Return(nil)
 
 	ctx.executionState.
-		On("PersistExecutionResult", mock.Anything, executableBlock.Block.Header).
+		On(
+			"PersistExecutionResult",
+			mock.Anything,
+			mock.MatchedBy(func(executionResult *flow.ExecutionResult) bool {
+				return executionResult.BlockID == executableBlock.Block.ID() && executionResult.PreviousResultID == previousExecutionResultID
+			}),
+		).
 		Return(nil)
 
 	ctx.executionState.

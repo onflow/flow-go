@@ -95,7 +95,13 @@ type state struct {
 }
 
 func (s *state) PersistExecutionResult(ctx context.Context, executionResult *flow.ExecutionResult) error {
-	err := s.results.Index(executionResult.BlockID, executionResult.ID())
+
+	err := s.results.Store(executionResult)
+	if err != nil {
+		return fmt.Errorf("could not store result: %w", err)
+	}
+
+	err = s.results.Index(executionResult.BlockID, executionResult.ID())
 	if err != nil {
 		return fmt.Errorf("could not index execution result: %w", err)
 	}
