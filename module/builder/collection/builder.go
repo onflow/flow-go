@@ -57,6 +57,7 @@ func NewBuilder(
 	for _, apply := range opts {
 		apply(&b.config)
 	}
+
 	return &b
 }
 
