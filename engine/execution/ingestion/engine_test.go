@@ -217,6 +217,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		Return(nil)
 
 	ctx.executionState.
+		On("PersistExecutionResult", mock.Anything, executableBlock.Block.Header).
+		Return(nil)
+
+	ctx.executionState.
 		On(
 			"PersistExecutionReceipt",
 			mock.Anything,
@@ -500,7 +504,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 func Test_SPOCKGeneration(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
-		snapshots := []*delta.Snapshot{
+		snapshots := []*delta.SpockSnapshot{
 			{
 				SpockSecret: []byte{1, 2, 3},
 			},
