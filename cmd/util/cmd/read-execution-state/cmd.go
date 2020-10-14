@@ -8,10 +8,11 @@ import (
 
 	list_accounts "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-accounts"
 	list_tries "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-tries"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/ledger"
 )
 
 var (
@@ -45,14 +46,14 @@ func loadExecutionState() *mtrie.Forest {
 		nil,
 		flagExecutionStateDir,
 		ledger.CacheSize,
-		ledger.RegisterKeySize,
+		pathfinder.PathByteSize,
 		wal.SegmentSize,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating WAL")
 	}
 
-	forest, err := mtrie.NewForest(ledger.RegisterKeySize, flagExecutionStateDir, ledger.CacheSize, metrics.NewNoopCollector(), nil)
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, flagExecutionStateDir, ledger.CacheSize, metrics.NewNoopCollector(), nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating mForest")
 	}

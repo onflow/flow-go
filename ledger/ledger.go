@@ -3,10 +3,13 @@ package ledger
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/onflow/flow-go/module"
 )
+
+const CacheSize = 1000
 
 // Ledger is a stateful fork-aware key/value storage.
 // Any update (value change for a key) to the ledger generates a new ledger state.
@@ -225,6 +228,16 @@ func (kp *KeyPart) DeepCopy() *KeyPart {
 	newV := make([]byte, len(kp.Value))
 	copy(newV, kp.Value)
 	return &KeyPart{Type: kp.Type, Value: newV}
+}
+
+func (kp *KeyPart) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  uint16
+		Value string
+	}{
+		Type:  kp.Type,
+		Value: hex.EncodeToString(kp.Value),
+	})
 }
 
 // Value holds the value part of a ledger key value pair
