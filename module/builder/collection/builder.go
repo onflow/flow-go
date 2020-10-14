@@ -129,7 +129,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		for ancestorID != clusterFinalID {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not get noteAncestor header (%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 			}
 
 			if ancestor.Height <= clusterFinal.Height {
@@ -138,7 +138,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			payload, err := b.payloads.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not get noteAncestor payload (%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 			}
 
 			collection := payload.Collection
@@ -167,11 +167,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		for ancestorHeight > limit {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not get noteAncestor header (%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 			}
 			payload, err := b.payloads.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not get noteAncestor payload (%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 			}
 
 			collection := payload.Collection
