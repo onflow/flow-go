@@ -548,12 +548,6 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 	suite.Assert().Equal(0, built.Payload.Collection.Len())
 }
 
-// should not rate limit with rate=0
-// should not rate limit non-payer accounts
-// should not rate limit wrt conflicting forks
-// should rate limit >1
-// should rate limit <1
-
 // With rate limiting turned off, we should fill collections as fast as we can
 // regardless of how many transactions with the same payer we include.
 func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
