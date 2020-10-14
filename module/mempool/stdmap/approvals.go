@@ -103,8 +103,62 @@ func (a *Approvals) Add(approval *flow.ResultApproval) (bool, error) {
 	return appended, err
 }
 
-// Rem will remove all the approvals corresponding to the chunk.
-func (a *Approvals) Rem(resultID flow.Identifier, chunkIndex uint64) bool {
+// RemApproval removes a specific approval.
+func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
+	// determine the lookup key for the corresponding chunk
+	chunkKey := key(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
+
+	removed := false
+	err := a.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+
+		var chunkApprovals map[flow.Identifier]*flow.ResultApproval
+
+		entity, ok := backdata[chunkKey]
+		if !ok {
+			// no approvals for this chunk
+			return nil
+		} else {
+			approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
+			if !ok {
+				return fmt.Errorf("could not assert entity to ApprovalMapEntity")
+			}
+
+			chunkApprovals = approvalMapEntity.Approvals
+
+			if _, ok := chunkApprovals[approval.Body.ApproverID]; !ok {
+				// no approval for this chunk and approver
+				return nil
+			}
+
+			// removes map entry associated with key for update
+			delete(backdata, chunkKey)
+		}
+
+		// delete the approval to the map
+		delete(chunkApprovals, approval.Body.ApproverID)
+
+		if len(chunkApprovals) > 0 {
+			// adds the new approvals map associated with key to mempool
+			approvalMapEntity := model.ApprovalMapEntity{
+				ChunkKey:   chunkKey,
+				ResultID:   approval.Body.ExecutionResultID,
+				ChunkIndex: approval.Body.ChunkIndex,
+				Approvals:  chunkApprovals,
+			}
+
+			backdata[chunkKey] = approvalMapEntity
+		}
+
+		removed = true
+		a.size--
+		return nil
+	})
+
+	return removed, err
+}
+
+// RemChunk will remove all the approvals corresponding to the chunk.
+func (a *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) bool {
 	chunkKey := key(resultID, chunkIndex)
 
 	removed := false
@@ -129,7 +183,6 @@ func (a *Approvals) Rem(resultID flow.Identifier, chunkIndex uint64) bool {
 	})
 
 	return removed
-
 }
 
 // Get fetches approvals for a specific chunk

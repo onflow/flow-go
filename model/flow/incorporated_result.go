@@ -1,5 +1,7 @@
 package flow
 
+import "github.com/onflow/flow-go/crypto"
+
 // IncorporatedResult is a wrapper around an ExecutionResult which contains the
 // ID of the first block on its fork in which it was incorporated.
 type IncorporatedResult struct {
@@ -12,6 +14,19 @@ type IncorporatedResult struct {
 	// Result is the ExecutionResult contained in the ExecutionReceipt that was
 	// incorporated in the payload of IncorporatedBlockID.
 	Result *ExecutionResult
+
+	// aggregatedSignature is a placeholder for attestation signatures collected
+	// for each chunk. It gets populated by the consensus matching engine when
+	// approvals are matched to execution results.
+	aggregatedSignatures map[uint64]*AggregatedSignature
+}
+
+func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResult) *IncorporatedResult {
+	return &IncorporatedResult{
+		IncorporatedBlockID:  incorporatedBlockID,
+		Result:               result,
+		aggregatedSignatures: make(map[uint64]*AggregatedSignature),
+	}
 }
 
 // ID implements flow.Entity.ID for IncorporatedResult to make it capable of
@@ -24,4 +39,40 @@ func (ir *IncorporatedResult) ID() Identifier {
 // capable of being stored directly in mempools and storage.
 func (ir *IncorporatedResult) Checksum() Identifier {
 	return MakeID(ir)
+}
+
+// GetSignature returns a signature by chunk index and signer ID.
+func (ir *IncorporatedResult) GetSignature(chunkIndex uint64, signerID Identifier) (*crypto.Signature, bool) {
+	as, ok := ir.aggregatedSignatures[chunkIndex]
+	if !ok {
+		return nil, false
+	}
+	return as.BySigner(signerID)
+}
+
+// AddSignature adds a signature to the collection of AggregatedSignatures
+func (ir *IncorporatedResult) AddSignature(chunkIndex uint64, signerID Identifier, signature crypto.Signature) {
+	as, ok := ir.aggregatedSignatures[chunkIndex]
+	if !ok {
+		as = &AggregatedSignature{}
+	}
+
+	as.Add(signerID, signature)
+
+	ir.aggregatedSignatures[chunkIndex] = as
+}
+
+// GetAggregatedSignatures returns all the aggregated signatures orderd by chunk
+// index
+func (ir *IncorporatedResult) GetAggregatedSignatures() []AggregatedSignature {
+	result := make([]AggregatedSignature, 0, len(ir.Result.Chunks))
+
+	for _, chunk := range ir.Result.Chunks {
+		as, ok := ir.aggregatedSignatures[chunk.Index]
+		if ok {
+			result = append(result, *as)
+		}
+	}
+
+	return result
 }

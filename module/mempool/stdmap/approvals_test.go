@@ -67,7 +67,7 @@ func TestApprovals(t *testing.T) {
 
 	// tests against removing a chunk's approvals
 	t.Run("removing chunk", func(t *testing.T) {
-		ok := approvalPL.Rem(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
+		ok := approvalPL.RemChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
 		require.True(t, ok)
 
 		// getting chunk should return empty map

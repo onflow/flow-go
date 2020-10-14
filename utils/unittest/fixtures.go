@@ -431,20 +431,14 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 
 func IncorporatedResultFixture() *flow.IncorporatedResult {
 	result := ExecutionResultFixture()
-	incorporationBlockID := IdentifierFixture()
-	return &flow.IncorporatedResult{
-		IncorporatedBlockID: incorporationBlockID,
-		Result:              result,
-	}
+	incorporatedBlockID := IdentifierFixture()
+	return flow.NewIncorporatedResult(incorporatedBlockID, result)
 }
 
 func IncorporatedResultForBlockFixture(block *flow.Block) *flow.IncorporatedResult {
 	result := ResultForBlockFixture(block)
 	incorporatedBlockID := IdentifierFixture()
-	return &flow.IncorporatedResult{
-		IncorporatedBlockID: incorporatedBlockID,
-		Result:              result,
-	}
+	return flow.NewIncorporatedResult(incorporatedBlockID, result)
 }
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
