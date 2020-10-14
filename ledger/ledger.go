@@ -264,3 +264,7 @@ func (v Value) Equals(other Value) bool {
 	}
 	return bytes.Equal(v, other)
 }
+
+func (v Value) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(v))
+}

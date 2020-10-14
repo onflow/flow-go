@@ -1,13 +1,12 @@
 package trie
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
@@ -388,20 +387,12 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 }
 
 // DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
-func (mt *MTrie) DumpAsJSON(path string) error {
-	fi, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer fi.Close()
-
-	writer := bufio.NewWriter(fi)
-	defer writer.Flush()
+func (mt *MTrie) DumpAsJSON(w io.Writer) error {
 
 	// Use encoder to prevent building entire trie in memory
-	enc := json.NewEncoder(writer)
+	enc := json.NewEncoder(w)
 
-	err = mt.dumpAsJSON(mt.root, enc)
+	err := mt.dumpAsJSON(mt.root, enc)
 	if err != nil {
 		return err
 	}

@@ -1,10 +1,12 @@
 package jsonexporter
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -116,5 +118,16 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 		return fmt.Errorf("cannot get a trie with target hash: %w", err)
 	}
 
-	return trie.DumpAsJSON(filepath.Join(outputPath, hex.EncodeToString(targetHash)+".trie.jsonl"))
+	path := filepath.Join(outputPath, hex.EncodeToString(targetHash)+".trie.jsonl")
+
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	return trie.DumpAsJSON(writer)
 }
