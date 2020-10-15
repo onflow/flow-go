@@ -123,6 +123,44 @@ func New(
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
+
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("could not find last sealed")
+	}
+
+	e.log.Info().Uint64("height", sealed.Height).Hex("block_id", logging.Entity(sealed)).Msg("last sealed")
+
+	for height := sealed.Height - 1; height <= sealed.Height+1; height++ {
+		b, err := e.state.AtHeight(height).Head()
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("could not get block by height")
+		}
+
+		e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Msg("block at height")
+
+		result, err := e.resultsDB.ByBlockID(b.ID())
+		if err == nil {
+			e.log.Info().Uint64("height", height).
+				Hex("block_id", logging.Entity(b)).
+				Hex("result_id", logging.Entity(result)).
+				Hex("previous_result_id", result.PreviousResultID[:]).
+				Hex("result_block_id", result.BlockID[:]).
+				Hex("final_state_commit", result.FinalStateCommit[:]).
+				Str("result", fmt.Sprintf("%+v", result)).
+				Msg("result exists")
+
+			for _, c := range result.Chunks {
+				e.log.Info().Uint64("height", height).
+					Str("chunk", fmt.Sprintf("%+v", c)).
+					Hex("chunk_id", logging.Entity(c)).Msg("chunk id")
+			}
+
+		} else {
+			e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Err(err).Msg("result not exists")
+		}
+	}
+
 	return e.unit.Ready()
 }
 
