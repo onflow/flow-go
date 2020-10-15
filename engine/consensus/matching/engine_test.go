@@ -565,6 +565,9 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 		},
 	).Return(true, nil)
 
+	// mock spock verifier to verify approvals
+	ms.spockVerifier.On("VerifyApproval", mock.Anything).Return(unittest.ExecutionReceiptFixture(), nil).Once()
+
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().NoError(err, "should add approval to mempool if valid")
 

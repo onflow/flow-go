@@ -178,7 +178,6 @@ func (vs *SpockVerifierTestSuite) TestMatchingApprovalSpockWithReceipt() {
 	approvals := vs.ApprovalsForReceipt(receipt, spockSecret)
 	for _, approval := range approvals {
 		matched, err := vs.verifier.VerifyApproval(approval)
-
 		require.NoError(vs.T(), err)
 		require.NotNil(vs.T(), matched)
 	}

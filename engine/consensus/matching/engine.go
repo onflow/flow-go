@@ -368,6 +368,14 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
+	// Attempt to match approval spock to receipt
+	// could possible return nil as receipt might not be availiable to match
+	// but will be matched later when we call checkSealing()
+	_, err = e.spockVerifier.VerifyApproval(approval)
+	if err != nil {
+		return fmt.Errorf("could not verify approval: %w", err)
+	}
+
 	// kick off a check for potential seal formation
 	e.unit.Launch(e.checkSealing)
 

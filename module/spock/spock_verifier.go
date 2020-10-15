@@ -24,6 +24,10 @@ type Verifier struct {
 	// Then there are 2 category, the first category has bucket: ER1_Spockset1, and the second category has buckets: ER2_Spockset3, ER2_Spockset4, and ER2_Spockset5.
 	// When we receive each approval, we will first check which category it should go, and find all the buckets to try matching against.
 	receipts map[flow.Identifier][]*flow.ExecutionReceipt
+
+	// map to cache and keep track of matched approvals
+	// approvals[resultID][approvalID] = receipt
+	approvals map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt
 }
 
 // NewVerifier creates a new spock verifier
@@ -31,6 +35,7 @@ func NewVerifier(state protocol.ReadOnlyState) *Verifier {
 	return &Verifier{
 		protocolState: state,
 		receipts:      make(map[flow.Identifier][]*flow.ExecutionReceipt),
+		approvals:     make(map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt),
 	}
 }
 
@@ -63,26 +68,17 @@ func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 	return nil
 }
 
-// ClearReceipts clears all receipts for a specific resultID
-func (v *Verifier) ClearReceipts(resultID flow.Identifier) bool {
-	v.Lock()
-	defer v.Unlock()
-
-	// check if entry exists
-	_, ok := v.receipts[resultID]
-	if !ok {
-		return false
-	}
-
-	// clear receipts
-	delete(v.receipts, resultID)
-
-	return true
-}
-
 // VerifyApproval verifies an approval with all the distinct receipts for the approvals
 // result id and returns true if spocks match else false
 func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (*flow.ExecutionReceipt, error) {
+
+	// check if verification already done and that a match is there
+	// note: we do not add to cache if the approval was not verified (sanity-check)
+	receipt, ok := v.approvals[approval.Body.ExecutionResultID][approval.ID()]
+	if receipt != nil && ok {
+		return receipt, nil
+	}
+
 	// find identities
 	approver, err := v.protocolState.AtBlockID(approval.Body.BlockID).Identity(approval.Body.ApproverID)
 	if err != nil {
@@ -102,11 +98,41 @@ func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (*flow.Executio
 			return nil, fmt.Errorf("could not verify spocks: %w", err)
 		}
 		if verified {
+			// map doesnt exist create it
+			if _, ok = v.approvals[approval.Body.ExecutionResultID]; !ok {
+				v.approvals[approval.Body.ExecutionResultID] = make(map[flow.Identifier]*flow.ExecutionReceipt)
+			}
+
+			// cache result for future verify calls for this approval
+			v.approvals[approval.Body.ExecutionResultID][approval.ID()] = receipt
+
 			return receipt, nil
 		}
 	}
 
 	return nil, nil
+}
+
+// ClearReceipts clears all receipts for a specific resultID
+func (v *Verifier) ClearReceipts(resultID flow.Identifier) bool {
+	v.Lock()
+	defer v.Unlock()
+
+	// check if entry exists
+	_, ok := v.receipts[resultID]
+	if !ok {
+		return false
+	}
+	_, ok = v.approvals[resultID]
+	if !ok {
+		return false
+	}
+
+	// clear receipts and approval cache
+	delete(v.receipts, resultID)
+	delete(v.approvals, resultID)
+
+	return true
 }
 
 func (v *Verifier) matchReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
@@ -127,6 +153,12 @@ func (v *Verifier) matchReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	// matched
 MatchingReceiptsLoop:
 	for _, u := range unmatchedReceipts {
+		// we check if the receipt chunks length matches, if they dont match we return
+		// false by default
+		if u.ExecutionResult.Chunks.Len() != receipt.ExecutionResult.Chunks.Len() {
+			return false, nil
+		}
+
 		// get receipt identity to get public key
 		uIdentity, err := v.protocolState.AtBlockID(u.ExecutionResult.BlockID).Identity(u.ExecutorID)
 		if err != nil {
@@ -139,7 +171,7 @@ MatchingReceiptsLoop:
 
 		// attempt to match every spock in the receipt with the candidate receipt
 		// if not verified then skip receipt
-		for _, chunk := range receipt.ExecutionResult.Chunks {
+		for _, chunk := range u.ExecutionResult.Chunks {
 			// check if spocks match
 			verified, err := crypto.SPOCKVerify(identity.StakingPubKey, receipt.Spocks[chunk.Index], uIdentity.StakingPubKey, u.Spocks[chunk.Index])
 			if err != nil {
