@@ -8,7 +8,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/gossip/libp2p/cache"
@@ -27,6 +29,7 @@ type Network struct {
 	codec           network.Codec
 	ids             flow.IdentityList
 	me              module.Local
+	role            flow.Role
 	mw              middleware.Middleware
 	top             topology.Topology
 	metrics         module.NetworkMetrics
@@ -46,6 +49,7 @@ func NewNetwork(
 	codec network.Codec,
 	ids flow.IdentityList,
 	me module.Local,
+	role flow.Role,
 	mw middleware.Middleware,
 	csize int,
 	top topology.Topology,
@@ -61,6 +65,7 @@ func NewNetwork(
 		logger:          log,
 		codec:           codec,
 		me:              me,
+		role:            role,
 		mw:              mw,
 		rcache:          rcache,
 		top:             top,
@@ -157,14 +162,22 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	subset, err := n.top.Subset(n.ids, n.fanout(), topology.DummyTopic)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
+	myTopics := engine.GetTopicsByRole(n.role)
+	var myFanout flow.IdentityList
+
+	// samples a connected component fanout from each topic and takes the
+	// union of all fanouts.
+	for _, topic := range myTopics {
+		subset, err := n.top.Subset(n.ids, n.fanout(), topic)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", topic, err)
+		}
+		myFanout = append(myFanout, subset.Filter(filter.Not(filter.In(subset)))...)
 	}
 
 	// creates a map of all the selected ids
 	topMap := make(map[flow.Identifier]flow.Identity)
-	for _, id := range subset {
+	for _, id := range myFanout {
 		topMap[id.NodeID] = *id
 	}
 	return topMap, nil
