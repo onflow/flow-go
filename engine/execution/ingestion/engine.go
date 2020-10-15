@@ -151,6 +151,8 @@ func (e *Engine) Ready() <-chan struct{} {
 		e.log.Fatal().Err(err).Msg("failed to set highest executed")
 	}
 
+	e.log.Fatal().Msg("clean up is done")
+
 	err = e.loadAllFinalizedAndUnexecutedBlocks()
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to load all unexecuted blocks")
