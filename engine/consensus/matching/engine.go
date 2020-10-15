@@ -480,7 +480,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// until the block has been received or the result has been purged
 		block, err := e.headersDB.ByBlockID(result.BlockID)
 		if errors.Is(err, storage.ErrNotFound) {
-			log.Debug().Msg("skipping result with unknown block")
+			e.log.Debug().Msg("skipping result with unknown block")
 			continue
 		}
 		if err != nil {
@@ -498,7 +498,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 			var err error
 			previous, err = e.resultsDB.ByID(previousID)
 			if errors.Is(err, storage.ErrNotFound) {
-				log.Debug().Msg("skipping result with unknown previous result")
+				e.log.Debug().Uint64("height", block.Height).Msg("skipping result with unknown previous result")
 				continue
 			}
 			if err != nil {
@@ -509,7 +509,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// check sub-graph
 		if block.ParentID != previous.BlockID {
 			_ = e.results.Rem(result.ID())
-			log.Warn().
+			e.log.Warn().
 				Str("block_parent_id", block.ParentID.String()).
 				Str("previous_result_block_id", previous.BlockID.String()).
 				Msg("removing result with invalid sub-graph")
