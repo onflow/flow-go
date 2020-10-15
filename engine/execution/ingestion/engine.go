@@ -185,6 +185,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// on nodes startup, we need to load all the unexecuted blocks to the execution queues.
 func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	// get finalized height
 	header, err := e.state.Final().Head()
@@ -342,7 +343,12 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 			// if we found the statecommitment for the parent block, then add it to the executable block.
 			if err == nil {
 				executableBlock.StartState = parentCommitment
-			} else if !errors.Is(err, storage.ErrNotFound) {
+			} else if errors.Is(err, storage.ErrNotFound) {
+				// the parent block is an unexecuted block.
+				// if the queue only has one block, and its parent doesn't
+				// exist in the queue, then we need to load the block from the storage.
+				log.Error().Msgf("an unexecuted parent block is missing in the queue")
+			} else {
 				// if there is exception, then crash
 				log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
 			}
