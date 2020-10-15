@@ -135,7 +135,7 @@ func New(
 func (e *Engine) Ready() <-chan struct{} {
 	err := e.loadAllFinalizedAndUnexecutedBlocks()
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
+		e.log.Error().Err(err).Msg("failed to load all unexecuted blocks")
 	}
 
 	return e.unit.Ready()
@@ -188,13 +188,14 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
 func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
-	// get finalized height
+	// // get finalized height
 	header, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get finalized block: %w", err)
 	}
 
 	finalizedHeight := header.Height
+	futureHeight := 8655590
 
 	// get the last executed height
 	lastExecutedHeight, _, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
@@ -216,7 +217,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	}
 
 	count := 0
-	for height := lastExecutedHeight + 1; height <= finalizedHeight; height++ {
+	for height := lastExecutedHeight + 1; height <= futureHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
 		if err != nil {
 			return fmt.Errorf("could not get block by height: %w", err)
