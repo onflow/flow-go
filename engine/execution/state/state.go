@@ -48,6 +48,8 @@ type ReadOnlyExecutionState interface {
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
 	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
+
+	GetResultByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -472,4 +474,8 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	}
 
 	return highest.Height, blockID, nil
+}
+
+func (s *state) GetResultByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
+	return s.results.ByBlockID(blockID)
 }

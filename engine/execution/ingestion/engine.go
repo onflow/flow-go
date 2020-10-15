@@ -133,6 +133,18 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
+	for height := uint64(7652001); height < uint64(7652004); height++ {
+		header, err := e.state.AtHeight(height).Head()
+		if err != nil {
+			e.log.Error().Err(err).Msg("block not found")
+		}
+
+		result, err := e.execState.GetResultByBlockID(header.ID())
+		if err != nil {
+			e.log.Error().Err(err).Msg("result not found")
+		}
+
+	}
 	err := e.loadAllFinalizedAndUnexecutedBlocks()
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to load all unexecuted blocks")
