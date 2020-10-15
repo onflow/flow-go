@@ -138,9 +138,12 @@ func (e *Engine) Ready() <-chan struct{} {
 
 		e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Msg("block at height")
 
-		_, err = e.resultsDB.ByBlockID(b.ID())
+		result, err := e.resultsDB.ByBlockID(b.ID())
 		if err == nil {
-			e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Err(err).Msg("result exists")
+			e.log.Info().Uint64("height", height).
+				Hex("block_id", logging.Entity(b)).
+				Hex("result_id", logging.Entity(result)).
+				Msg("result exists")
 		} else {
 			e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Err(err).Msg("result not exists")
 		}
