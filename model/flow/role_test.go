@@ -20,3 +20,17 @@ func TestRoleJSON(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, r, actual)
 }
+
+func TestRoleList_Contains(t *testing.T) {
+	roleList := flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+
+	// asserts Contains returns true for roles in the list
+	assert.True(t, roleList.Contains(flow.RoleConsensus))
+	assert.True(t, roleList.Contains(flow.RoleVerification))
+
+	// asserts Contains returns false for roles not in the list
+	assert.False(t, roleList.Contains(flow.RoleAccess))
+	assert.False(t, roleList.Contains(flow.RoleExecution))
+	assert.False(t, roleList.Contains(flow.RoleCollection))
+
+}
