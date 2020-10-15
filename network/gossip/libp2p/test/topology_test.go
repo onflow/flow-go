@@ -2,6 +2,7 @@ package test
 
 import (
 	"os"
+	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/codec/json"
@@ -22,9 +24,10 @@ import (
 // theory assumptions behind the schemes, e.g., random oracle model of hashes
 type TopologyTestSuite struct {
 	suite.Suite
-	ids flow.IdentityList // represents the identity list of all nodes in the system
-	net *libp2p.Network   // represents the single network instance that creates topology
-	me  flow.Identity     // represents identity of single instance of node that creates topology
+	ids    flow.IdentityList // represents the identity list of all nodes in the system
+	net    *libp2p.Network   // represents the single network instance that creates topology
+	me     flow.Identity     // represents identity of single instance of node that creates topology
+	fanout uint              // represents maximum number of connections this peer allows to have
 }
 
 // TestNetworkTestSuit starts all the tests in this test suite
@@ -34,6 +37,10 @@ func TestNetworkTestSuit(t *testing.T) {
 
 // SetupTest initiates the test setups prior to each test
 func (suite *TopologyTestSuite) SetupTest() {
+	// we consider fanout as maximum number of connections the node allows to have
+	// TODO: optimize value of fanout.
+	suite.fanout = 100
+
 	// creates 20 nodes of each type, 100 nodes overall.
 	suite.ids = unittest.IdentityListFixture(20, unittest.WithRole(flow.RoleCollection))
 	suite.ids = append(suite.ids, unittest.IdentityListFixture(20, unittest.WithRole(flow.RoleConsensus))...)
@@ -89,35 +96,42 @@ func (suite *TopologyTestSuite) TestMembership() {
 	}
 }
 
-//// TestDeteministicity verifies that the same seed generates the same topology
-//func (suite *TopologyTestSuite) TestDeteministicity() {
-//	top, err := topology.NewRandPermTopology(flow.RoleCollection, unittest.IdentifierFixture())
-//	require.NoError(suite.T(), err)
-//	// topology of size count/2
-//	topSize := uint(suite.count / 2)
-//	var previous, current []string
-//
-//	for i := 0; i < suite.count; i++ {
-//		previous = current
-//		current = nil
-//		// generate a new topology with a the same ids, size and seed
-//		idMap, err := top.Subset(suite.ids, topSize, topology.DummyTopic)
-//		require.NoError(suite.T(), err)
-//
-//		for _, v := range idMap {
-//			current = append(current, v.NodeID.String())
-//		}
-//		// no guarantees about order is made by Topology.Subset(), hence sort the return values before comparision
-//		sort.Strings(current)
-//
-//		if previous == nil {
-//			continue
-//		}
-//
-//		// assert that a different seed generates a different topology
-//		require.Equal(suite.T(), previous, current)
-//	}
-//}
+// TestDeteministicity verifies that the same seed generates the same topology for a topic
+func (suite *TopologyTestSuite) TestDeteministicity() {
+	top, err := topology.NewTopicAwareTopology(suite.me.NodeID)
+	require.NoError(suite.T(), err)
+
+	topics := engine.GetTopicsByRole(suite.me.Role)
+	require.Greater(suite.T(), len(topics), 1)
+
+	// for each topic samples 100 topologies
+	// all topologies for a topic should be the same
+	for _, topic := range topics {
+		var previous, current []string
+		for i := 0; i < 100; i++ {
+			previous = current
+			current = nil
+
+			// generate a new topology with a the same ids, size and seed
+			idMap, err := top.Subset(suite.ids, suite.fanout, topic)
+			require.NoError(suite.T(), err)
+
+			for _, v := range idMap {
+				current = append(current, v.NodeID.String())
+			}
+			// no guarantees about order is made by Topology.Subset(), hence sort the return values before comparision
+			sort.Strings(current)
+
+			if previous == nil {
+				continue
+			}
+
+			// assert that a different seed generates a different topology
+			require.Equal(suite.T(), previous, current)
+		}
+	}
+}
+
 //
 //// TestUniqueness verifies that different seeds generates different topologies
 //func (suite *TopologyTestSuite) TestUniqueness() {
