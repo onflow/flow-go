@@ -186,6 +186,29 @@ func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 []fl
 	return r0, r1
 }
 
+// GetResultByBlockID provides a mock function with given fields: blockID
+func (_m *ExecutionState) GetResultByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
+	ret := _m.Called(blockID)
+
+	var r0 *flow.ExecutionResult
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ExecutionResult); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ExecutionResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewView provides a mock function with given fields: _a0
 func (_m *ExecutionState) NewView(_a0 []byte) *delta.View {
 	ret := _m.Called(_a0)
