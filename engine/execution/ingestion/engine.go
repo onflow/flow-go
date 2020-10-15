@@ -220,7 +220,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	for height := lastExecutedHeight + 1; height <= futureHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
 		if err != nil {
-			return fmt.Errorf("could not get block by height: %w", err)
+			return fmt.Errorf("could not get block by height: %v %w", height, err)
 		}
 
 		executableBlock := &entity.ExecutableBlock{
