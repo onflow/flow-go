@@ -605,8 +605,10 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 	// get all the chunk approvals from mempool
 	approvals := e.approvals.ByChunk(resultID, chunk.Index)
 
+	// matched approvals map to keep track of approvals by receipt ID
+	matchedApprovals := make(map[flow.Identifier][]*flow.ResultApproval)
+
 	// only keep approvals from assigned verifiers and if spocks match
-	var validApprovers flow.IdentifierList
 	for approverID, approval := range approvals {
 		// check if chunk is assigned
 		ok := chmodule.IsValidVerifer(assignment, chunk, approverID)
@@ -615,19 +617,39 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 		}
 
 		// check if spocks match
-		receipt, err := e.spockVerifier.VerifyApproval(approval)
+		matched, err := e.spockVerifier.VerifyApproval(approval)
 		if err != nil {
 			return false, fmt.Errorf("could get validate spocks: %w", err)
 		}
-		if !receipt {
+		if matched == nil {
 			e.log.Error().Msg("spock validation failed: spocks do not match")
 			continue
 		}
 
-		// TODO: some logic to ensure that an invalid receipt was not matched
+		// add to map to keep track of the receipt matched to approval
+		matchedID := matched.ID()
+		if _, ok := matchedApprovals[matchedID]; !ok {
+			a := make([]*flow.ResultApproval, 0)
+			a = append(a, approval)
+			matchedApprovals[matchedID] = a
+		} else {
+			matchedApprovals[matchedID] = append(matchedApprovals[matchedID], approval)
+		}
+	}
 
-		// add approver to valid approvers list
-		validApprovers = append(validApprovers, approverID)
+	// find most matched receipt
+	mostMatches := 0
+	for receiptID, ras := range matchedApprovals {
+		totalMatchedApprovals := len(ras)
+		// check if they are the same
+		if totalMatchedApprovals == mostMatches {
+			e.log.Warn().Msg("two receipts with equal matching approvals")
+			continue
+		}
+		// set most matches to highest approval count per receipt
+		if totalMatchedApprovals > mostMatches {
+			mostMatches = totalMatchedApprovals
+		}
 	}
 
 	//   * this is only here temporarily to ease the migration to new chunk
@@ -640,7 +662,7 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 	// TODO:
 	//  This is the happy path (requires just one approval per chunk). Should
 	//    be +2/3 of all currently staked verifiers.
-	return len(validApprovers) > 0, nil
+	return len(mostMatches) > 0, nil
 }
 
 // sealResult creates a seal for the incorporated result and adds it to the

@@ -895,7 +895,9 @@ func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 	}
 
 	// mock spock verifier to verify approvals
-	ms.spockVerifier.On("VerifyApproval", mock.Anything).Return(true, nil).Times(incorporatedResult.Result.Chunks.Len() * len(ms.approvers.NodeIDs()))
+	ms.spockVerifier.On("VerifyApproval", mock.Anything).
+		Return(unittest.ExecutionReceiptFixture(), nil).
+		Times(incorporatedResult.Result.Chunks.Len() * len(ms.approvers.NodeIDs()))
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)

@@ -41,14 +41,16 @@ func (_m *SpockVerifier) ClearReceipts(resultID flow.Identifier) bool {
 }
 
 // VerifyApproval provides a mock function with given fields: _a0
-func (_m *SpockVerifier) VerifyApproval(_a0 *flow.ResultApproval) (bool, error) {
+func (_m *SpockVerifier) VerifyApproval(_a0 *flow.ResultApproval) (*flow.ExecutionReceipt, error) {
 	ret := _m.Called(_a0)
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.ResultApproval) bool); ok {
+	var r0 *flow.ExecutionReceipt
+	if rf, ok := ret.Get(0).(func(*flow.ResultApproval) *flow.ExecutionReceipt); ok {
 		r0 = rf(_a0)
 	} else {
-		r0 = ret.Get(0).(bool)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ExecutionReceipt)
+		}
 	}
 
 	var r1 error

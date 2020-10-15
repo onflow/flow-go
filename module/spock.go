@@ -14,7 +14,7 @@ type SpockVerifier interface {
 
 	/// VerifyApproval verifies an approval with all the distinct receipts for the approvals
 	// result id and returns true if spocks match else false
-	VerifyApproval(*flow.ResultApproval) (bool, error)
+	VerifyApproval(*flow.ResultApproval) (*flow.ExecutionReceipt, error)
 
 	// ClearReceipts clears all receipts for a specific resultID
 	ClearReceipts(resultID flow.Identifier) bool
