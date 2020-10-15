@@ -143,7 +143,12 @@ func (e *Engine) Ready() <-chan struct{} {
 			e.log.Info().Uint64("height", height).
 				Hex("block_id", logging.Entity(b)).
 				Hex("result_id", logging.Entity(result)).
+				Hex("previous_result_id", result.PreviousResultID[:]).
+				Hex("result_block_id", result.BlockID[:]).
+				Hex("final_state_commit", result.FinalStateCommit[:]).
+				Str("result", fmt.Sprintf("%+v", result)).
 				Msg("result exists")
+
 		} else {
 			e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Err(err).Msg("result not exists")
 		}
