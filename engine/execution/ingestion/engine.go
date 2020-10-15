@@ -205,6 +205,8 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 
 	e.log.Info().
 		Int64("count", unexecuted).
+		Uint64("last_executed_height", lastExecutedHeight).
+		Uint64("last_finalized_height", finalizedHeight).
 		Msg("reloading finalized and unexecuted blocks to execution queues...")
 
 	// log the number of unexecuted blocks
