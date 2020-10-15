@@ -197,8 +197,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
 
-	results, err := stdmap.NewResults(1000)
-	require.NoError(t, err)
+	results := stdmap.NewIncorporatedResults(1000)
 
 	receipts, err := stdmap.NewReceipts(1000)
 	require.NoError(t, err)
@@ -206,8 +205,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)
 
-	seals, err := stdmap.NewSeals(1000)
-	require.NoError(t, err)
+	seals := stdmap.NewIncorporatedResultSeals(1000)
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
@@ -222,8 +220,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	requireApprovals := true
 
-	// match approvals and results
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, sealedResultsDB, node.Headers, node.Index, results, receipts, approvals, seals, assigner, requireApprovals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, sealedResultsDB, node.Headers, node.Index, results, approvals, seals, assigner, requireApprovals)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{

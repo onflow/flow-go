@@ -182,7 +182,7 @@ func RemovePublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, er
 // The order of the public keys in the slice does not matter. An error is returned if
 // the slice is empty.
 // Membership check is performed on the input signature but not on the input public
-// keys (which is supposed to be guaranteed using the library key generation 
+// keys (which is supposed to be guaranteed using the library key generation
 //	or bytes decode function).
 //
 // This is a special case function of VerifySignatureManyMessages.
@@ -320,7 +320,6 @@ func VerifySignatureManyMessages(pks []PublicKey, s Signature,
 		return (verif == valid), nil
 	}
 }
-
 
 // BatchVerifySignaturesOneMessage is a batch verification of multiple
 // BLS signatures of a single message against multiple BLS public keys that

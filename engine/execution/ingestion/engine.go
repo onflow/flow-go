@@ -736,7 +736,12 @@ func (e *Engine) handleComputationResult(
 		return nil, fmt.Errorf("could not send broadcast order: %w", err)
 	}
 
-	return receipt.ExecutionResult.FinalStateCommit, nil
+	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		finalState = startState
+	}
+
+	return finalState, nil
 }
 
 // save the execution result of a block
@@ -942,7 +947,6 @@ func (e *Engine) generateExecutionResultForBlock(
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: previousErID,
 			BlockID:          block.ID(),
-			FinalStateCommit: endState,
 			Chunks:           chunks,
 		},
 	}
@@ -1125,7 +1129,7 @@ func (e *Engine) startStateSync(fromHeight, toHeight uint64) error {
 	// reached the targeted height after a while.
 	// for now, we could also rely on the syncFilter to force syncing from a
 	// specific node.
-	err = e.syncConduit.Submit(&exeStateReq, randomExecutionNode.NodeID)
+	err = e.syncConduit.Unicast(&exeStateReq, randomExecutionNode.NodeID)
 
 	if err != nil {
 		return fmt.Errorf("error while sending state sync req to other node (%v): %w",
@@ -1194,7 +1198,7 @@ func (e *Engine) handleStateSyncRequest(
 	ctx := e.unit.Ctx()
 	err = e.deltaRange(ctx, fromHeight, toHeight,
 		func(delta *messages.ExecutionStateDelta) {
-			err := e.syncConduit.Submit(delta, originID)
+			err := e.syncConduit.Unicast(delta, originID)
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not submit block delta")
 			}
@@ -1393,9 +1397,15 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 		log.Fatal().Err(err).Msg("fatal error while processing sync message")
 	}
 
-	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, delta.EndState) {
+	finalState, ok := executionReceipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		// set to start state next line will fail anyways
+		finalState = delta.StartState
+	}
+
+	if !bytes.Equal(finalState, delta.EndState) {
 		log.Error().
-			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit).
+			Hex("saved_state", finalState).
 			Hex("delta_end_state", delta.EndState).
 			Hex("delta_start_state", delta.StartState).
 			Err(err).Msg("processing sync message produced unexpected state commitment")
