@@ -6,16 +6,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/ledger/utils"
+
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common"
+	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/ptrie"
-	"github.com/onflow/flow-go/storage/ledger/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func valuesMatches(expected [][]byte, got [][]byte) bool {
+func valuesMatches(expected []ledger.Value, got []ledger.Value) bool {
 	if len(expected) != len(got) {
 		return false
 	}
@@ -31,6 +40,17 @@ func valuesMatches(expected [][]byte, got [][]byte) bool {
 	return true
 }
 
+type kv struct {
+	key   ledger.Key
+	value ledger.Value
+}
+
+type skv struct {
+	key   ledger.Key
+	value ledger.Value
+	sc    flow.StateCommitment
+}
+
 func TestLedgerFunctionality(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	// You can manually increase this for more coverage
@@ -41,68 +61,100 @@ func TestLedgerFunctionality(t *testing.T) {
 	for e := 0; e < experimentRep; e++ {
 		maxNumInsPerStep := 100
 		numHistLookupPerStep := 10
-		keyByteSize := 32
+		//keyByteSize := 32
 		valueMaxByteSize := 64
 		activeTries := 1000
-		steps := 40                            // number of steps
-		histStorage := make(map[string][]byte) // historic storage string(key, statecommitment) -> value
-		latestValue := make(map[string][]byte) // key to value
+		steps := 40                         // number of steps
+		histStorage := make(map[string]skv) // historic storage string(key, statecommitment) -> skv
+		latestValue := make(map[string]kv)  // key to value
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := ledger.NewMTrieStorage(dbDir, activeTries, metricsCollector, nil)
+			led, err := completeLedger.NewLedger(dbDir, activeTries, metricsCollector, zerolog.Nop(), nil)
 			assert.NoError(t, err)
-			stateCommitment := led.EmptyStateCommitment()
+			stateCommitment := led.InitialState()
 			for i := 0; i < steps; i++ {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
-				keys := utils.GetRandomKeysRandN(maxNumInsPerStep, keyByteSize)
-				values := utils.GetRandomValues(len(keys), 0, valueMaxByteSize)
-				newState, err := led.UpdateRegisters(keys, values, stateCommitment)
+				registerIDs := utils.GetRandomRegisterIDs(maxNumInsPerStep)
+				values := utils.GetRandomValues(len(registerIDs), 0, valueMaxByteSize)
+
+				keys := state.RegisterIDSToKeys(registerIDs)
+
+				update, err := ledger.NewUpdate(stateCommitment, keys, values)
+				require.NoError(t, err)
+
+				newState, err := led.Set(update)
 				assert.NoError(t, err)
 
 				// capture new values for future query
 				for j, k := range keys {
-					histStorage[string(k)+string(newState)] = values[j]
-					latestValue[string(k)] = values[j]
+					histStorage[k.String()+string(newState)] = skv{
+						key:   k,
+						value: values[j],
+						sc:    newState,
+					}
+
+					latestValue[k.String()] = kv{
+						key:   k,
+						value: values[j],
+					}
 				}
 
 				// TODO set some to nil
 
+				query, err := ledger.NewQuery(newState, keys)
+				require.NoError(t, err)
+
 				// read values and compare values
-				retValues, err := led.GetRegisters(keys, newState)
+				retValues, err := led.Get(query)
 				assert.NoError(t, err)
 				// byte{} is returned as nil
 				assert.True(t, valuesMatches(values, retValues))
 
 				// validate proofs (check individual proof and batch proof)
-				retValues, proofs, err := led.GetRegistersWithProof(keys, newState)
+				//retValues, proofs, err := led.GetRegistersWithProof(keys, newState)
+				proof, err := led.Prove(query)
 				assert.NoError(t, err)
-				v := ledger.NewTrieVerifier(keyByteSize)
+
+				batchProof, err := encoding.DecodeTrieBatchProof(proof)
+				require.NoError(t, err)
 
 				// validate individual proofs
-				isValid, err := v.VerifyRegistersProof(keys, retValues, proofs, newState)
+				isValid := common.VerifyTrieBatchProof(batchProof, newState)
 				assert.NoError(t, err)
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = ptrie.NewPSMT(newState, keyByteSize, keys, retValues, proofs)
-				assert.NoError(t, err)
+				_, err = partial.NewLedger(proof, newState)
+				require.NoError(t, err)
 
 				// query all exising keys (check no drop)
-				for k, v := range latestValue {
-					rv, err := led.GetRegisters([][]byte{[]byte(k)}, newState)
+				for _, v := range latestValue {
+
+					query, err := ledger.NewQuery(newState, []ledger.Key{v.key})
+					require.NoError(t, err)
+
+					rv, err := led.Get(query)
 					assert.NoError(t, err)
-					assert.True(t, valuesMatches([][]byte{v}, rv))
+
+					assert.True(t, valuesMatches([]ledger.Value{v.value}, rv))
 				}
 
 				// query some of historic values (map return is random)
 				j := 0
-				for s := range histStorage {
-					value := histStorage[s]
-					key := []byte(s[:keyByteSize])
-					state := []byte(s[keyByteSize:])
-					rv, err := led.GetRegisters([][]byte{key}, state)
+				for _, v := range histStorage {
+					//value := histStorage[s]
+					//key := []byte(s[:keyByteSize])
+					//state := []byte(s[keyByteSize:])
+
+					query, err := ledger.NewQuery(v.sc, []ledger.Key{v.key})
+					require.NoError(t, err)
+
+					rv, err := led.Get(query)
+
+					//
+					//rv, err := led.GetRegisters([][]byte{key}, state)
 					assert.NoError(t, err)
-					assert.True(t, valuesMatches([][]byte{value}, rv))
+					assert.True(t, valuesMatches([]ledger.Value{v.value}, rv))
 					j++
 					if j >= numHistLookupPerStep {
 						break

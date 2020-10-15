@@ -4,6 +4,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// A complete collection contains the guarantee and the transactions.
+// the guarantee is the hash of all the transactions. The execution node
+// receives the guarantee from the block, and queries the transactions by
+// the guarantee from the collection node.
+// when receiving a collection from collection node, the execution node will
+// update the Transactions field of a CompleteCollection and make it complete.
 type CompleteCollection struct {
 	Guarantee    *flow.CollectionGuarantee
 	Transactions []*flow.TransactionBody
@@ -18,17 +24,26 @@ type CompleteCollection struct {
 type ExecutableBlock struct {
 	id                  flow.Identifier
 	Block               *flow.Block
-	CompleteCollections map[flow.Identifier]*CompleteCollection
+	CompleteCollections map[flow.Identifier]*CompleteCollection // key is the collection ID.
 	StartState          flow.StateCommitment
 }
 
+// BlocksByCollection represents a collection that the execution node
+// has not received its transactions yet.
+// it also holds references to the blocks that contains this collection
+// and are waiting to be executed.
 type BlocksByCollection struct {
-	CollectionID     flow.Identifier
+	CollectionID flow.Identifier
+	// a reversed map to look up which block contains this collection. key is the collection id
 	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
 }
 
-func (c *CompleteCollection) Collection() flow.Collection {
+func (c CompleteCollection) Collection() flow.Collection {
 	return flow.Collection{Transactions: c.Transactions}
+}
+
+func (c CompleteCollection) IsCompleted() bool {
+	return len(c.Transactions) > 0
 }
 
 func (b *BlocksByCollection) ID() flow.Identifier {
@@ -70,11 +85,13 @@ func (b *ExecutableBlock) Collections() []*CompleteCollection {
 	return collections
 }
 
+// HasAllTransactions returns whether all the transactions for all collections
+// in the block have been received.
 func (b *ExecutableBlock) HasAllTransactions() bool {
 	for _, collection := range b.Block.Payload.Guarantees {
 
 		completeCollection, ok := b.CompleteCollections[collection.ID()]
-		if ok && completeCollection.Transactions != nil {
+		if ok && completeCollection.IsCompleted() {
 			continue
 		}
 		return false
@@ -82,6 +99,14 @@ func (b *ExecutableBlock) HasAllTransactions() bool {
 	return true
 }
 
+// HasStartState returns whether the block has StartState, which
+// indicates whether its parent has been executed.
+func (b *ExecutableBlock) HasStartState() bool {
+	return len(b.StartState) > 0
+}
+
+// IsComplete returns whether all the data needed to executed the block are
+// ready.
 func (b *ExecutableBlock) IsComplete() bool {
-	return b.HasAllTransactions() && len(b.StartState) > 0
+	return b.HasAllTransactions() && b.HasStartState()
 }

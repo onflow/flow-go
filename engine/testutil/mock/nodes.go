@@ -11,45 +11,55 @@ import (
 
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
+	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 )
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log        zerolog.Logger
-	Metrics    *metrics.NoopCollector
-	Tracer     module.Tracer
-	DB         *badger.DB
-	Headers    storage.Headers
-	Identities storage.Identities
-	Guarantees storage.Guarantees
-	Seals      storage.Seals
-	Payloads   storage.Payloads
-	Blocks     storage.Blocks
-	State      protocol.State
-	Index      storage.Index
-	Me         module.Local
-	Net        *stub.Network
-	DBDir      string
-	ChainID    flow.ChainID
+	Log            zerolog.Logger
+	Metrics        *metrics.NoopCollector
+	Tracer         module.Tracer
+	DB             *badger.DB
+	Headers        storage.Headers
+	Identities     storage.Identities
+	Guarantees     storage.Guarantees
+	Seals          storage.Seals
+	Payloads       storage.Payloads
+	Blocks         storage.Blocks
+	State          protocol.State
+	Index          storage.Index
+	Me             module.Local
+	Net            *stub.Network
+	DBDir          string
+	ChainID        flow.ChainID
+	ProtocolEvents *events.Distributor
 }
 
 func (g *GenericNode) Done() {
@@ -86,33 +96,71 @@ type ConsensusNode struct {
 	MatchingEngine  *matching.Engine
 }
 
+func (cn ConsensusNode) Ready() {
+	<-cn.IngestionEngine.Ready()
+	<-cn.MatchingEngine.Ready()
+}
+
+func (cn ConsensusNode) Done() {
+	<-cn.IngestionEngine.Done()
+	<-cn.MatchingEngine.Done()
+}
+
+type ComputerWrap struct {
+	*computation.Manager
+	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view *delta.View)
+}
+
+func (c *ComputerWrap) ComputeBlock(
+	ctx context.Context,
+	block *entity.ExecutableBlock,
+	view *delta.View,
+) (*execution.ComputationResult, error) {
+	if c.OnComputeBlock != nil {
+		c.OnComputeBlock(ctx, block, view)
+	}
+	return c.Manager.ComputeBlock(ctx, block, view)
+}
+
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
 	IngestionEngine *ingestion.Engine
-	ExecutionEngine *computation.Manager
+	ExecutionEngine *ComputerWrap
+	RequestEngine   *requester.Engine
 	ReceiptsEngine  *executionprovider.Engine
+	FollowerEngine  *followereng.Engine
 	SyncEngine      *synchronization.Engine
 	BadgerDB        *badger.DB
 	VM              *fvm.VirtualMachine
 	ExecutionState  state.ExecutionState
-	Ledger          storage.Ledger
+	Ledger          ledger.Ledger
 	LevelDbDir      string
 	Collections     storage.Collections
+	Finalizer       *consensus.Finalizer
 }
 
 func (en ExecutionNode) Ready() {
-	<-en.Ledger.Ready()
-	<-en.ReceiptsEngine.Ready()
-	<-en.IngestionEngine.Ready()
-	<-en.SyncEngine.Ready()
+	lifecycle.AllReady(
+		en.Ledger,
+		en.ReceiptsEngine,
+		en.IngestionEngine,
+		en.FollowerEngine,
+		en.RequestEngine,
+		en.SyncEngine,
+	)
 }
 
 func (en ExecutionNode) Done() {
-	<-en.IngestionEngine.Done()
-	<-en.ReceiptsEngine.Done()
-	<-en.SyncEngine.Done()
-	<-en.Ledger.Done()
+	lifecycle.AllDone(
+		en.IngestionEngine,
+		en.IngestionEngine,
+		en.ReceiptsEngine,
+		en.Ledger,
+		en.FollowerEngine,
+		en.RequestEngine,
+		en.SyncEngine,
+	)
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()
 }

@@ -67,7 +67,7 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(dir, size*10, metricsCollector, logger, nil)
 		require.NoError(t, err)
 
-		var state = led.InitState()
+		var state = led.InitialState()
 
 		//saved data after updates
 		savedData := make(map[string]map[string]ledger.Value)

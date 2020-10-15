@@ -58,8 +58,9 @@ func seedRelic(seed []byte) error {
 	return nil
 }
 
-// reInitContext re init the context of the C layer with pre-saved data
-func (ct *ctx) reInitContext() {
+// setContext sets the context (previously initialized) of the C layer with
+// pre-saved data.
+func (ct *ctx) setContext() {
 	C.core_set(ct.relicCtx)
 	C.precomputed_data_set(ct.precCtx)
 }

@@ -20,25 +20,28 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-	consensusConfigs := []func(*testnet.NodeConfig){
+	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
-	colNode := testnet.NewNodeConfig(flow.RoleCollection, consensusConfigs...)
-	exeNode := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel))
+	consensusConfigs := append(collectionConfigs,
+		testnet.WithAdditionalFlag("--require-one-approval=true"), // require one approval per chunk when sealing)
+		testnet.WithLogLevel(zerolog.DebugLevel),
+	)
 
 	net := []testnet.NodeConfig{
-		colNode,
-		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.WarnLevel)),
-		exeNode,
+		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
+
 	conf := testnet.NewNetworkConfig("mvp", net)
 
 	ctx, cancel := context.WithCancel(context.Background())

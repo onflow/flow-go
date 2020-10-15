@@ -60,7 +60,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	}
 
 	// Submit the message over libp2p
-	err = conduit.Submit(event, flowIDs...)
+	err = conduit.Publish(event, flowIDs...)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to submit message: %v", err)
 	}

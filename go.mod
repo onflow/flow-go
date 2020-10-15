@@ -21,6 +21,7 @@ require (
 	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
+	github.com/libp2p/go-addr-util v0.0.2
 	github.com/libp2p/go-libp2p v0.11.0
 	github.com/libp2p/go-libp2p-core v0.6.1
 	github.com/libp2p/go-libp2p-pubsub v0.3.5
@@ -28,7 +29,7 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.9.0
+	github.com/onflow/cadence v0.9.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.0
 	github.com/onflow/flow-go-sdk v0.8.0
 	github.com/onflow/flow-go/crypto v0.9.4

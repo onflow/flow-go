@@ -180,6 +180,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // SendVote will send a vote to the desired node.
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
+	log := e.log.With().
+		Hex("collection_id", blockID[:]).
+		Uint64("collection_view", view).
+		Hex("recipient_id", recipientID[:]).
+		Logger()
+	log.Info().Msg("processing vote transmission request from hotstuff")
+
 	// build the vote message
 	vote := &messages.ClusterBlockVote{
 		BlockID: blockID,
@@ -187,18 +194,17 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	err := e.conduit.Unicast(vote, recipientID)
-	if err != nil {
-		return fmt.Errorf("could not send vote: %w", err)
-	}
-
-	e.log.Debug().
-		Hex("block_id", blockID[:]).
-		Uint64("view", view).
-		Hex("recipient_id", recipientID[:]).
-		Msg("sending vote")
-
-	e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
+	e.unit.Launch(func() {
+		// send the vote the desired recipient
+		err := e.conduit.Unicast(vote, recipientID)
+		if err != nil {
+			log.Warn().Err(err).Msg("could not send vote")
+			return
+		}
+		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+		log.Info().Msg("collection vote transmitted")
+	})
 
 	return nil
 }
@@ -529,7 +535,7 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 		Msg("processing pending children")
 
 	// then try to process children only this once
-	var result *multierror.Error
+	result := new(multierror.Error)
 	for _, child := range children {
 		proposal := &messages.ClusterBlockProposal{
 			Header:  child.Header,
@@ -544,6 +550,8 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	// remove children from cache
 	e.pending.DropForParent(blockID)
 
+	// flatten out the error tree before returning the error
+	result = multierror.Flatten(result).(*multierror.Error)
 	return result.ErrorOrNil()
 }
 
