@@ -206,6 +206,24 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+func (e *Engine) removeBadData(lastSealed uint64) error {
+	for height := lastSealed; ; height++ {
+		head, err := e.state.AtHeight(height).Head()
+		if err != nil {
+			return err
+		}
+
+		blockID := head.ID()
+
+		err = e.execState.RemoveByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not remove by block ID: %v, %w", blockID, err)
+		}
+		e.log.Info().Msgf("execution state at height :%v has been removed", height)
+	}
+
+}
+
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
 func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	// // get finalized height
