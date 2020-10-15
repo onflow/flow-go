@@ -74,3 +74,16 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	defer tx.Discard()
 	return r.byBlockID(blockID)(tx)
 }
+
+func (r *ExecutionResults) RemoveByBlockID(blockID flow.Identifier) error {
+
+	result, err := r.ByBlockID(blockID)
+	if err != nil {
+		return err
+	}
+
+	tx := r.db.NewTransaction(false)
+	defer tx.Discard()
+
+	return operation.RemoveExecutionResult(blockID, result)(tx)
+}

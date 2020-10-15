@@ -133,7 +133,25 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	err := e.loadAllFinalizedAndUnexecutedBlocks()
+	// last sealed
+	lastSealed := uint64(7651976)
+
+	head, err := e.state.AtHeight(lastSealed).Head()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("could not get last sealed header")
+	}
+
+	err = e.removeBadData(lastSealed)
+	if err != nil {
+		e.log.Info().Err(err).Msg("removed bad data")
+	}
+
+	err = e.execState.SetHighestExecuted(head)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to set highest executed")
+	}
+
+	err = e.loadAllFinalizedAndUnexecutedBlocks()
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to load all unexecuted blocks")
 	}
@@ -184,6 +202,24 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+func (e *Engine) removeBadData(lastSealed uint64) error {
+	for height := lastSealed; ; height++ {
+		head, err := e.state.AtHeight(height).Head()
+		if err != nil {
+			return err
+		}
+
+		blockID := head.ID()
+
+		err = e.execState.RemoveByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not remove by block ID: %v, %w", blockID, err)
+		}
+		e.log.Info().Msgf("execution state at height :%v has been removed", height)
+	}
+
 }
 
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
