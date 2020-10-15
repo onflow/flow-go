@@ -45,49 +45,56 @@ func (c ChainID) getNetworkType() networkType {
 }
 
 type chainImpl interface {
-	newAddressGeneratorAtState(state uint64) AddressGenerator
+	newAddressGeneratorAtIndex(index uint64) AddressGenerator
 	// IsValid returns true if a given address is a valid account address on a given chain,
 	// and false otherwise.
 	//
 	// This is an off-chain check that only tells whether the address format is
 	// valid. If the function returns true, this does not mean
 	// a Flow account with this address has been generated. Such a test would
-	// require on on-chain check.
+	// require an on-chain check.
 	// zeroAddress() fails the check. Although it has a valid format, no account
 	// in Flow is assigned to zeroAddress().
 	IsValid(address Address) bool
 	chain() ChainID
 }
 
+// MonotonicImpl is a simple implementation of adress generation
+// where addresses are simply the index of the account.
 type MonotonicImpl struct{}
 
-func (m *MonotonicImpl) newAddressGeneratorAtState(state uint64) AddressGenerator {
+func (m *MonotonicImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
 	return &MonotonicAddressGenerator{
-		state: state,
+		index: index,
 	}
 }
+
+// IsValid checks the validity of an address
 func (m *MonotonicImpl) IsValid(address Address) bool {
-	return address.uint64() > 0 && address.uint64() <= maxState
+	return address.uint64() > 0 && address.uint64() <= maxIndex
 }
 
 func (m *MonotonicImpl) chain() ChainID {
 	return MonotonicEmulator
 }
 
+// LinearCodeImpl is an implementation of the address generation
+// using linear codes.
 type LinearCodeImpl struct {
 	chainID ChainID
 }
 
-func (l *LinearCodeImpl) newAddressGeneratorAtState(state uint64) AddressGenerator {
+func (l *LinearCodeImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
 	return &LinearCodeAddressGenerator{
-		state:   state,
+		index:   index,
 		chainID: l.chainID,
 	}
 }
 
-func (m *LinearCodeImpl) IsValid(address Address) bool {
+// IsValid checks the validity of an address
+func (l *LinearCodeImpl) IsValid(address Address) bool {
 	codeWord := address.uint64()
-	codeWord ^= uint64(m.chainID.getNetworkType())
+	codeWord ^= uint64(l.chainID.getNetworkType())
 
 	if codeWord == 0 {
 		return false
@@ -104,8 +111,8 @@ func (m *LinearCodeImpl) IsValid(address Address) bool {
 	return parity == 0
 }
 
-func (m *LinearCodeImpl) chain() ChainID {
-	return m.chainID
+func (l *LinearCodeImpl) chain() ChainID {
+	return l.chainID
 }
 
 type addressedChain struct {
@@ -134,6 +141,7 @@ var monotonicEmulator = &addressedChain{
 	chainImpl: &MonotonicImpl{},
 }
 
+// Chain returns the Chain corresponding to the string input
 func (c ChainID) Chain() Chain {
 	switch c {
 	case Mainnet:
@@ -153,6 +161,7 @@ func (c ChainID) String() string {
 	return string(c)
 }
 
+// Chain is the interface for address generation implementations.
 type Chain interface {
 	NewAddressGenerator() AddressGenerator
 	AddressAtIndex(index uint64) (Address, error)
@@ -162,21 +171,21 @@ type Chain interface {
 	String() string
 	// required for the tests
 	zeroAddress() Address
-	newAddressGeneratorAtState(state uint64) AddressGenerator
+	newAddressGeneratorAtIndex(index uint64) AddressGenerator
 }
 
 // NewAddressGenerator returns a new AddressGenerator with an
-// initialized state.
+// initialized index.
 func (id *addressedChain) NewAddressGenerator() AddressGenerator {
-	return id.newAddressGeneratorAtState(0)
+	return id.newAddressGeneratorAtIndex(0)
 }
 
-// AddressAtIndex returns the nth generated account address.
+// AddressAtIndex returns the index-th generated account address.
 func (id *addressedChain) AddressAtIndex(index uint64) (Address, error) {
-	if index >= maxState {
-		return EmptyAddress, fmt.Errorf("index must be less than %x", maxState)
+	if index > maxIndex {
+		return EmptyAddress, fmt.Errorf("index must be less or equal to %x", maxIndex)
 	}
-	return id.newAddressGeneratorAtState(index).CurrentAddress(), nil
+	return id.newAddressGeneratorAtIndex(index).CurrentAddress(), nil
 }
 
 // ServiceAddress returns the root (first) generated account address.
@@ -193,12 +202,12 @@ func (id *addressedChain) zeroAddress() Address {
 	return address
 }
 
-// BytesToAddressGenerator converts an array of bytes into an address state
+// BytesToAddressGenerator converts an array of bytes into an address index
 func (id *addressedChain) BytesToAddressGenerator(b []byte) AddressGenerator {
-	bytes := slices.EnsureByteSliceSize(b, addressStateLength)
+	bytes := slices.EnsureByteSliceSize(b, addressIndexLength)
 
-	state := uint48(bytes[:])
-	return id.newAddressGeneratorAtState(state)
+	index := uint48(bytes[:])
+	return id.newAddressGeneratorAtIndex(index)
 }
 
 func (id *addressedChain) String() string {

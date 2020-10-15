@@ -19,22 +19,22 @@ type AddressGenerator interface {
 }
 
 type MonotonicAddressGenerator struct {
-	state uint64
+	index uint64
 }
 
-// LinearCodeAddressGenerator represents the internal state of the linear code address generation mechanism
+// LinearCodeAddressGenerator represents the internal index of the linear code address generation mechanism
 type LinearCodeAddressGenerator struct {
 	chainID ChainID
-	state   uint64
+	index   uint64
 }
 
 const (
 	// AddressLength is the size of an account address in bytes.
 	// (n) is the size of an account address in bits.
 	AddressLength = (linearCodeN + 7) >> 3
-	// addressStateLength is the size of an account address state in bytes.
+	// addressIndexLength is the size of an account address state in bytes.
 	// (k) is the size of an account address in bits.
-	addressStateLength = (linearCodeK + 7) >> 3
+	addressIndexLength = (linearCodeK + 7) >> 3
 )
 
 // EmptyAddress is the default value of a variable of type Address
@@ -118,20 +118,20 @@ func putUint48(b []byte, v uint64) {
 	b[5] = byte(v)
 }
 
-func stateToBytes(state uint64) []byte {
-	stateBytes := make([]byte, addressStateLength)
-	putUint48(stateBytes, state)
-	return stateBytes
+func indexToBytes(index uint64) []byte {
+	indexBytes := make([]byte, addressIndexLength)
+	putUint48(indexBytes, index)
+	return indexBytes
 }
 
-// Bytes converts an address state into a slice of bytes
+// Bytes converts an address index into a slice of bytes
 func (gen *MonotonicAddressGenerator) Bytes() []byte {
-	return stateToBytes(gen.state)
+	return indexToBytes(gen.index)
 }
 
-// Bytes converts an address state into a slice of bytes
+// Bytes converts an address index into a slice of bytes
 func (gen *LinearCodeAddressGenerator) Bytes() []byte {
-	return stateToBytes(gen.state)
+	return indexToBytes(gen.index)
 }
 
 const (
@@ -156,33 +156,36 @@ const (
 	linearCodeD = 7
 
 	// the maximum value of the internal state, 2^k - 1.
-	maxState = (1 << linearCodeK) - 1
+	maxIndex = (1 << linearCodeK) - 1
 )
 
-func (s *MonotonicAddressGenerator) NextAddress() (Address, error) {
-	if uint64(s.state) > maxState {
-		return EmptyAddress, fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
+// NextAddress increments the internal index and generates the new address
+// corresponding to the new index.
+func (gen *MonotonicAddressGenerator) NextAddress() (Address, error) {
+	gen.index++
+	if uint64(gen.index) > maxIndex {
+		return EmptyAddress, fmt.Errorf("the new index value is not valid, it must be less or equal to %x", maxIndex)
 	}
-	s.state++
-	return s.CurrentAddress(), nil
+	return gen.CurrentAddress(), nil
 }
 
-func (s *MonotonicAddressGenerator) CurrentAddress() Address {
-	return uint64ToAddress(s.state)
+// CurrentAddress returns the address corresponding to the internal index.
+func (gen *MonotonicAddressGenerator) CurrentAddress() Address {
+	return uint64ToAddress(gen.index)
 }
 
-// NextAddress generates an account address from the addressing state.
+// NextAddress generates an account address from the addressing index.
 //
 // The address is generated for a specific network (Flow mainnet, testnet..)
-// The second returned value is the new updated addressing state. The new
-// addressing state should replace the old state to keep generating account
+// The second returned value is the new updated addressing index. The new
+// addressing index should replace the old index to keep generating account
 // addresses in a sequential way.
-// Each state is mapped to exactly one address. There are as many addresses
-// as states.
-// zeroAddress() corresponds to the state "0" while ServiceAddress() corresponds to the
-// state "1".
+// Each index is mapped to exactly one address. There are as many addresses
+// as indices.
+// zeroAddress() corresponds to the index "0" while ServiceAddress() corresponds to the
+// index "1".
 func (gen *LinearCodeAddressGenerator) NextAddress() (Address, error) {
-	err := gen.nextState()
+	err := gen.nextIndex()
 	if err != nil {
 		return EmptyAddress, err
 	}
@@ -198,14 +201,15 @@ func (gen *LinearCodeAddressGenerator) CurrentAddress() Address {
 	return address
 }
 
-// returns the next state given an addressing state.
+// returns the next index given an addressing index.
 //
-// The state values are incremented from 0 to 2^k-1
-func (gen *LinearCodeAddressGenerator) nextState() error {
-	if uint64(gen.state) > maxState {
-		return fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
+// In this implemntation, the index values are simply
+// incremented from 0 to 2^k-1.
+func (gen *LinearCodeAddressGenerator) nextIndex() error {
+	gen.index++
+	if uint64(gen.index) > maxIndex {
+		return fmt.Errorf("the new index value is not valid, it must be less or equal to %x", maxIndex)
 	}
-	gen.state += 1
 	return nil
 }
 
@@ -224,12 +228,12 @@ func (a *Address) uint64() uint64 {
 	return v
 }
 
-// generateAddress returns an account address given an addressing state.
+// generateAddress returns an account address given an addressing index.
 // (network) specifies the network to generate the address for (Flow Mainnet, testent..)
-// The function assumes the state is valid (<2^k) which means
-// a check on the state should be done before calling this function.
+// The function assumes the index is valid (<2^k) which means
+// a check on the index should be done before calling this function.
 func (gen *LinearCodeAddressGenerator) generateAddress() Address {
-	index := gen.state
+	index := gen.index
 
 	// Multiply the index GF(2) vector by the code generator matrix
 	address := uint64(0)
