@@ -9,7 +9,24 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var TopicMap map[string]flow.RoleList
+var topicMap map[string]flow.RoleList
+
+func GetRolesByTopic(topic string) (flow.RoleList, bool) {
+	roles, ok := topicMap[topic]
+	return roles, ok
+}
+
+// GetTopicsByRole returns a list of all topics the role subscribes to
+func GetTopicsByRole(role flow.Role) []string {
+	topics := make([]string, 0)
+	for topic, roles := range topicMap {
+		if roles.Contains(role) {
+			topics = append(topics, topic)
+		}
+	}
+
+	return topics
+}
 
 // channel IDs
 const (
@@ -51,43 +68,47 @@ const (
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 )
 
-func Init() {
-
+func init() {
+	initializeTopicMap()
 }
 
 func initializeTopicMap() {
-	TopicMap := make(map[string]flow.RoleList)
+	topicMap = make(map[string]flow.RoleList)
+
 	// Channels for consensus protocols
-	TopicMap[ConsensusCommittee] = flow.RoleList{flow.RoleConsensus}
+	topicMap[ConsensusCommittee] = flow.RoleList{flow.RoleConsensus}
 
 	// Channels for protocols actively synchronizing state across nodes
-	TopicMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
-	TopicMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
+	topicMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
+	topicMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
 
 	// Channels for actively pushing entities to subscribers
-	TopicMap[PushTransactions] = flow.RoleList{flow.RoleCollection}
-	TopicMap[PushGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
-	TopicMap[PushBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+	topicMap[PushTransactions] = flow.RoleList{flow.RoleCollection}
+	topicMap[PushGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
+	topicMap[PushBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
-	TopicMap[PushReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
-	TopicMap[PushApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+	topicMap[PushReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification,
+		flow.RoleAccess}
+	topicMap[PushApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	// Channels for actively requesting missing entities
-	TopicMap[RequestCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
-	TopicMap[RequestChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
-	TopicMap[RequestReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+	topicMap[RequestCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
+	topicMap[RequestChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
+	topicMap[RequestReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 
 	// Channel aliases to make the code more readable / more robust to errors
-	TopicMap[ReceiveGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
-	TopicMap[ReceiveBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+	topicMap[ReceiveGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
+	topicMap[ReceiveBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
-	TopicMap[ReceiveReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
-	TopicMap[ReceiveApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+	topicMap[ReceiveReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification,
+		flow.RoleAccess}
+	topicMap[ReceiveApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
-	TopicMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
-	TopicMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
-	TopicMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+	topicMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
+	topicMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
+	topicMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 
+	topicMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
 }
 
 // FullyQualifiedChannelName returns the unique channel name made up of channel name string suffixed with root block id

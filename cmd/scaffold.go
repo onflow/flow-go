@@ -197,7 +197,9 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, fnb.Middleware, 10e6, nodeTopology, fnb.Metrics.Network)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, nodeRole, fnb.Middleware, 10e6,
+			nodeTopology,
+			fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
