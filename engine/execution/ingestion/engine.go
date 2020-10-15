@@ -195,7 +195,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	}
 
 	finalizedHeight := header.Height
-	futureHeight := 8655590
+	futureHeight := uint64(8655590)
 
 	// get the last executed height
 	lastExecutedHeight, _, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
