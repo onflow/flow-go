@@ -123,6 +123,29 @@ func New(
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("could not find last sealed")
+	}
+
+	e.log.Info().Uint64("height", sealed.Height).Hex("block_id", logging.Entity(sealed)).Msg("last sealed")
+
+	for height := sealed.Height - 1; height <= sealed.Height+1; height++ {
+		b, err := e.state.AtHeight(height).Head()
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("could not get block by height")
+		}
+
+		e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Msg("block at height")
+
+		_, err = e.resultsDB.ByBlockID(b.ID())
+		if err == nil {
+			e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Err(err).Msg("result exists")
+		} else {
+			e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Err(err).Msg("result not exists")
+		}
+	}
+
 	return e.unit.Ready()
 }
 
