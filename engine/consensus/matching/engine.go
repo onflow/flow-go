@@ -639,7 +639,7 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 
 	// find most matched receipt
 	mostMatches := 0
-	for receiptID, ras := range matchedApprovals {
+	for _, ras := range matchedApprovals {
 		totalMatchedApprovals := len(ras)
 		// check if they are the same
 		if totalMatchedApprovals == mostMatches {
@@ -662,7 +662,7 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 	// TODO:
 	//  This is the happy path (requires just one approval per chunk). Should
 	//    be +2/3 of all currently staked verifiers.
-	return len(mostMatches) > 0, nil
+	return mostMatches > 0, nil
 }
 
 // sealResult creates a seal for the incorporated result and adds it to the
