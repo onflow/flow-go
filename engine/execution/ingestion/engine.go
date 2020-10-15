@@ -133,7 +133,27 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	err := e.loadAllFinalizedAndUnexecutedBlocks()
+	// last sealed
+	lastSealed := uint64(7651976)
+
+	head, err := e.state.AtHeight(lastSealed).Head()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("could not get last sealed header")
+	}
+
+	err = e.removeBadData(lastSealed)
+	if err != nil {
+		e.log.Info().Err(err).Msg("removed bad data")
+	}
+
+	err = e.execState.SetHighestExecuted(head)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to set highest executed")
+	}
+
+	e.log.Fatal().Msg("clean up is done")
+
+	err = e.loadAllFinalizedAndUnexecutedBlocks()
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to load all unexecuted blocks")
 	}
