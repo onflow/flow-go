@@ -215,7 +215,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	}
 
 	count := 0
-	for height := lastExecutedHeight + 1; height <= finalizedHeight; height++ {
+	for height := 7651977; height <= finalizedHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
 		if err != nil {
 			return fmt.Errorf("could not get block by height: %w", err)
@@ -269,7 +269,7 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", blockID, err)
 	}
 
-	e.log.Debug().Hex("block_id", blockID[:]).
+	e.log.Info().Hex("block_id", blockID[:]).
 		Uint64("height", b.Height).
 		Msg("handling new block")
 
