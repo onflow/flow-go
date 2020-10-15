@@ -394,15 +394,11 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
-
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("block_height", executableBlock.Block.Header.Height).
 		Hex("final_state", finalState).
 		Msg("block executed")
-
-	e.metrics.ExecutionLastExecutedBlockHeight(executableBlock.Block.Header.Height)
 
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
@@ -427,6 +423,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 //   14 <- 15 <- 16
 
 func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState flow.StateCommitment) error {
+
+	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
+	e.metrics.ExecutionLastExecutedBlockHeight(executed.Block.Header.Height)
 
 	e.checkStateSyncStop(executed.Block.Header.Height)
 
