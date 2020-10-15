@@ -72,3 +72,13 @@ func Roles() []Role {
 
 // RoleList defines a slice of roles in flow system.
 type RoleList []Role
+
+// Contains returns true if RoleList contains the role, otherwise false.
+func (r RoleList) Contains(role Role) bool {
+	for _, each := range r {
+		if each == role {
+			return true
+		}
+	}
+	return false
+}
