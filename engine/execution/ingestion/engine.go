@@ -267,7 +267,9 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", blockID, err)
 	}
 
-	e.log.Debug().Hex("block_id", blockID[:]).Msg("handling new block")
+	e.log.Debug().Hex("block_id", blockID[:]).
+		Uint64("height", b.Height).
+		Msg("handling new block")
 
 	err = e.handleBlock(e.unit.Ctx(), newBlock)
 	if err != nil {
@@ -749,6 +751,7 @@ func (e *Engine) matchOrRequestCollections(
 
 	e.log.Debug().
 		Hex("block", logging.Entity(executableBlock)).
+		Uint64("height", executableBlock.Block.Header.Height).
 		Int("num_col", len(executableBlock.Block.Payload.Guarantees)).
 		Int("actual_req", actualRequested).
 		Msg("requested all collections")
