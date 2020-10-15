@@ -132,6 +132,11 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
+	err := e.loadAllFinalizedAndUnexecutedBlocks()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
+	}
+
 	return e.unit.Ready()
 }
 
@@ -178,6 +183,78 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
+	// get finalized height
+	header, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized block: %w", err)
+	}
+
+	finalizedHeight := header.Height
+
+	// get the last executed height
+	lastExecutedHeight, _, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
+	if err != nil {
+		return fmt.Errorf("could not get last executed block: %w", err)
+	}
+
+	var unexecuted int64
+	unexecuted = int64(finalizedHeight) - int64(lastExecutedHeight)
+
+	e.log.Info().
+		Int64("count", unexecuted).
+		Msg("reloading finalized and unexecuted blocks to execution queues...")
+
+	// log the number of unexecuted blocks
+	if unexecuted <= 0 {
+		return nil
+	}
+
+	count := 0
+	for height := lastExecutedHeight + 1; height <= finalizedHeight; height++ {
+		block, err := e.blocks.ByHeight(height)
+		if err != nil {
+			return fmt.Errorf("could not get block by height: %w", err)
+		}
+
+		executableBlock := &entity.ExecutableBlock{
+			Block:               block,
+			CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
+		}
+
+		blockID := executableBlock.ID()
+
+		// acquiring the lock so that there is only one process modifying the queue
+		err = e.mempool.Run(
+			func(
+				blockByCollection *stdmap.BlockByCollectionBackdata,
+				executionQueues *stdmap.QueuesBackdata,
+			) error {
+				// adding the block to the queue,
+				_, added := enqueue(executableBlock, executionQueues)
+				if !added {
+					// we started from an empty queue, and added each finalized block to the
+					// queue. Each block should always be added to the queues.
+					// a sanity check it must be an exception if not added.
+					return fmt.Errorf("block %v is not added to the queue", blockID)
+				}
+
+				return nil
+			})
+
+		if err != nil {
+			return fmt.Errorf("failed to recover block %v", err)
+		}
+
+		count++
+	}
+
+	e.log.Info().Int("count", count).
+		Msg("reloaded all the finalized and unexecuted blocks to execution queues")
+
+	return nil
 }
 
 // BlockProcessable handles the new verified blocks (blocks that
