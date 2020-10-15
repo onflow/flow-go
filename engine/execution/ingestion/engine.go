@@ -201,8 +201,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 		return fmt.Errorf("could not get last executed block: %w", err)
 	}
 
-	var unexecuted int64
-	unexecuted = int64(finalizedHeight) - int64(lastExecutedHeight)
+	unexecuted := int64(finalizedHeight) - int64(lastExecutedHeight)
 
 	e.log.Info().
 		Int64("count", unexecuted).
