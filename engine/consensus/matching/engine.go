@@ -149,6 +149,12 @@ func (e *Engine) Ready() <-chan struct{} {
 				Str("result", fmt.Sprintf("%+v", result)).
 				Msg("result exists")
 
+			for _, c := range result.Chunks {
+				e.log.Info().Uint64("height", height).
+					Str("chunk", fmt.Sprintf("%+v", c)).
+					Hex("chunk_id", logging.Entity(c)).Msg("chunk id")
+			}
+
 		} else {
 			e.log.Info().Uint64("height", height).Hex("block_id", logging.Entity(b)).Err(err).Msg("result not exists")
 		}
