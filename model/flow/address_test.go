@@ -77,7 +77,7 @@ func TestFlowAddressConstants(t *testing.T) {
 			// check the Zero and Root constants
 			expected := uint64ToAddress(uint64(chainID.getNetworkType()))
 
-			assert.Equal(t, chain.ZeroAddress(), expected)
+			assert.Equal(t, chain.zeroAddress(), expected)
 			expected = uint64ToAddress(generatorMatrixRows[0] ^ uint64(chainID.getNetworkType()))
 			assert.Equal(t, chain.ServiceAddress(), expected)
 		}
@@ -96,7 +96,7 @@ func TestFlowAddressConstants(t *testing.T) {
 		assert.Error(t, err)
 
 		// check zeroAddress() is an invalid address
-		z := chain.ZeroAddress()
+		z := chain.zeroAddress()
 		check := chain.IsValid(z)
 		assert.False(t, check, "should be invalid")
 	}

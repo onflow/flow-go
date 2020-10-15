@@ -46,7 +46,17 @@ func (c ChainID) getNetworkType() networkType {
 
 type chainImpl interface {
 	newAddressGeneratorAtState(state uint64) AddressGenerator
-	isValid(address Address) bool
+	// IsValid returns true if a given address is a valid account address on a given chain,
+	// and false otherwise.
+	//
+	// This is an off-chain check that only tells whether the address format is
+	// valid. If the function returns true, this does not mean
+	// a Flow account with this address has been generated. Such a test would
+	// require on on-chain check.
+	// zeroAddress() fails the check. Although it has a valid format, no account
+	// in Flow is assigned to zeroAddress().
+	IsValid(address Address) bool
+	chain() ChainID
 }
 
 type MonotonicImpl struct{}
@@ -56,8 +66,12 @@ func (m *MonotonicImpl) newAddressGeneratorAtState(state uint64) AddressGenerato
 		state: state,
 	}
 }
-func (m *MonotonicImpl) isValid(address Address) bool {
-	return address.uint64() > 0 && address.uint64() < maxState
+func (m *MonotonicImpl) IsValid(address Address) bool {
+	return address.uint64() > 0 && address.uint64() <= maxState
+}
+
+func (m *MonotonicImpl) chain() ChainID {
+	return MonotonicEmulator
 }
 
 type LinearCodeImpl struct {
@@ -70,7 +84,8 @@ func (l *LinearCodeImpl) newAddressGeneratorAtState(state uint64) AddressGenerat
 		chainID: l.chainID,
 	}
 }
-func (m *LinearCodeImpl) isValid(address Address) bool {
+
+func (m *LinearCodeImpl) IsValid(address Address) bool {
 	codeWord := address.uint64()
 	codeWord ^= uint64(m.chainID.getNetworkType())
 
@@ -89,35 +104,34 @@ func (m *LinearCodeImpl) isValid(address Address) bool {
 	return parity == 0
 }
 
+func (m *LinearCodeImpl) chain() ChainID {
+	return m.chainID
+}
+
 type addressedChain struct {
-	impl    chainImpl
-	chainID ChainID
+	chainImpl
 }
 
 var mainnet = &addressedChain{
-	chainID: Mainnet,
-	impl: &LinearCodeImpl{
+	chainImpl: &LinearCodeImpl{
 		chainID: Mainnet,
 	},
 }
 
 var testnet = &addressedChain{
-	chainID: Testnet,
-	impl: &LinearCodeImpl{
+	chainImpl: &LinearCodeImpl{
 		chainID: Testnet,
 	},
 }
 
 var emulator = &addressedChain{
-	chainID: Emulator,
-	impl: &LinearCodeImpl{
+	chainImpl: &LinearCodeImpl{
 		chainID: Emulator,
 	},
 }
 
 var monotonicEmulator = &addressedChain{
-	chainID: Emulator,
-	impl:    &MonotonicImpl{},
+	chainImpl: &MonotonicImpl{},
 }
 
 func (c ChainID) Chain() Chain {
@@ -143,21 +157,18 @@ type Chain interface {
 	NewAddressGenerator() AddressGenerator
 	AddressAtIndex(index uint64) (Address, error)
 	ServiceAddress() Address
-	ZeroAddress() Address
 	BytesToAddressGenerator(b []byte) AddressGenerator
 	IsValid(Address) bool
-	newAddressGeneratorAtState(state uint64) AddressGenerator
 	String() string
+	// required for the tests
+	zeroAddress() Address
+	newAddressGeneratorAtState(state uint64) AddressGenerator
 }
 
 // NewAddressGenerator returns a new AddressGenerator with an
 // initialized state.
 func (id *addressedChain) NewAddressGenerator() AddressGenerator {
 	return id.newAddressGeneratorAtState(0)
-}
-
-func (id *addressedChain) newAddressGeneratorAtState(state uint64) AddressGenerator {
-	return id.impl.newAddressGeneratorAtState(state)
 }
 
 // AddressAtIndex returns the nth generated account address.
@@ -176,7 +187,7 @@ func (id *addressedChain) ServiceAddress() Address {
 }
 
 // zeroAddress returns the "zero address" (account that no one owns).
-func (id *addressedChain) ZeroAddress() Address {
+func (id *addressedChain) zeroAddress() Address {
 	// returned error is guaranteed to be nil
 	address, _ := id.AddressAtIndex(0)
 	return address
@@ -190,29 +201,6 @@ func (id *addressedChain) BytesToAddressGenerator(b []byte) AddressGenerator {
 	return id.newAddressGeneratorAtState(state)
 }
 
-// IsValid returns true if a given address is a valid account address on given chain,
-// and false otherwise.
-//
-// This is an off-chain check that only tells whether the address format is
-// valid. If the function returns true, this does not mean
-// a Flow account with this address has been generated. Such a test would
-// require on on-chain check.
-// zeroAddress() fails the check. Although it has a valid format, no account
-// in Flow is assigned to zeroAddress().
-func (id *addressedChain) IsValid(address Address) bool {
-	return id.impl.isValid(address)
-}
-
-// IsValid returns true if a given address is a valid account address on given chain,
-// and false otherwise.
-//
-// This is an off-chain check that only tells whether the address format is
-// valid. If the function returns true, this does not mean
-// a Flow account with this address has been generated. Such a test would
-// require on on-chain check.
-// zeroAddress() fails the check. Although it has a valid format, no account
-// in Flow is assigned to zeroAddress().
-
 func (id *addressedChain) String() string {
-	return string(id.chainID)
+	return string(id.chain())
 }

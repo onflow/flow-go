@@ -155,7 +155,7 @@ const (
 	// d is also the minimum hamming weight of all account addresses (the zero address is not an account address).
 	linearCodeD = 7
 
-	// the maximum value of the internal state, 2^k.
+	// the maximum value of the internal state, 2^k - 1.
 	maxState = (1 << linearCodeK) - 1
 )
 
@@ -179,7 +179,7 @@ func (s *MonotonicAddressGenerator) CurrentAddress() Address {
 // addresses in a sequential way.
 // Each state is mapped to exactly one address. There are as many addresses
 // as states.
-// ZeroAddress() corresponds to the state "0" while ServiceAddress() corresponds to the
+// zeroAddress() corresponds to the state "0" while ServiceAddress() corresponds to the
 // state "1".
 func (gen *LinearCodeAddressGenerator) NextAddress() (Address, error) {
 	err := gen.nextState()
