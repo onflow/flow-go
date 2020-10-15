@@ -8,6 +8,7 @@ import (
 	"math/rand"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
@@ -215,7 +216,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	}
 
 	count := 0
-	for height := 7651977; height <= finalizedHeight; height++ {
+	for height := lastExecutedHeight + 1; height <= finalizedHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
 		if err != nil {
 			return fmt.Errorf("could not get block by height: %w", err)
@@ -235,7 +236,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 				executionQueues *stdmap.QueuesBackdata,
 			) error {
 				// adding the block to the queue,
-				_, added := enqueue(executableBlock, executionQueues)
+				queue, added := enqueue(executableBlock, executionQueues)
 				if !added {
 					// we started from an empty queue, and added each finalized block to the
 					// queue. Each block should always be added to the queues.
@@ -243,6 +244,41 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 					return fmt.Errorf("block %v is not added to the queue", blockID)
 				}
 
+				// check if a block is executable.
+				// a block is executable if the following conditions are all true
+				// 1) the parent state commitment is ready
+				// 2) the collections for the block payload are ready
+				// 3) the child block is ready for querying the randomness
+
+				// check if the block's parent has been executed. (we can't execute the block if the parent has
+				// not been executed yet)
+				// check if there is a statecommitment for the parent block
+				parentCommitment, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), block.Header.ParentID)
+
+				// if we found the statecommitment for the parent block, then add it to the executable block.
+				if err == nil {
+					executableBlock.StartState = parentCommitment
+				} else if errors.Is(err, storage.ErrNotFound) {
+					// the parent block is an unexecuted block.
+					// if the queue only has one block, and its parent doesn't
+					// exist in the queue, then we need to load the block from the storage.
+					_, ok := queue.Nodes[blockID]
+					if !ok {
+						log.Error().Msgf("an unexecuted parent block is missing in the queue")
+					}
+				} else {
+					// if there is exception, then crash
+					log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
+				}
+
+				// check if we have all the collections for the block, and request them if there is missing.
+				err = e.matchOrRequestCollections(executableBlock, blockByCollection)
+				if err != nil {
+					return fmt.Errorf("cannot send collection requests: %w", err)
+				}
+
+				// execute the block if the block is ready to be executed
+				e.executeBlockIfComplete(executableBlock)
 				return nil
 			})
 
