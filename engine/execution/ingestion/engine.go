@@ -346,7 +346,10 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 				// the parent block is an unexecuted block.
 				// if the queue only has one block, and its parent doesn't
 				// exist in the queue, then we need to load the block from the storage.
-				log.Error().Msgf("an unexecuted parent block is missing in the queue")
+				_, ok := queue.Nodes[blockID]
+				if !ok {
+					log.Error().Msgf("an unexecuted parent block is missing in the queue")
+				}
 			} else {
 				// if there is exception, then crash
 				log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
