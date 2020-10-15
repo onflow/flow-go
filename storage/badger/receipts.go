@@ -90,7 +90,7 @@ func (r *ExecutionReceipts) RemoveByBlockID(blockID flow.Identifier) error {
 		return fmt.Errorf("could not find receipt: %w", err)
 	}
 
-	tx := r.db.NewTransaction(false)
+	tx := r.db.NewTransaction(true)
 	defer tx.Discard()
 
 	return operation.RemoveExecutionReceipt(blockID, receipt)(tx)

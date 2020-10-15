@@ -82,7 +82,7 @@ func (r *ExecutionResults) RemoveByBlockID(blockID flow.Identifier) error {
 		return err
 	}
 
-	tx := r.db.NewTransaction(false)
+	tx := r.db.NewTransaction(true)
 	defer tx.Discard()
 
 	return operation.RemoveExecutionResult(blockID, result)(tx)
