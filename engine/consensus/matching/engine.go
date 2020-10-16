@@ -123,7 +123,62 @@ func New(
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
+	err := e.cleanupbaddata()
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to cleanup data")
+	} else {
+		e.log.Info().Msg("finish cleaning up data")
+	}
 	return e.unit.Ready()
+}
+
+func (e *Engine) cleanupbaddata() error {
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not find last sealed: %w", err)
+	}
+
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not find finalized: %w", err)
+	}
+
+	for height := sealed.Height + 1; height <= final.Height; height++ {
+		err := e.cleanupByHeight(height)
+		if err != nil {
+			return fmt.Errorf("could not clean up by height: %v %w", height, err)
+		}
+	}
+
+	pendings, err := e.state.Final().Pending()
+	if err != nil {
+		return fmt.Errorf("could not get pending: %w", err)
+	}
+	for _, pending := range pendings {
+		err := e.cleanupByBlockID(pending)
+		if err != nil {
+			return fmt.Errorf("could not clean up pending by block ID: %v %w", pending, err)
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) cleanupByHeight(height uint64) error {
+	header, err := e.state.AtHeight(height).Head()
+	if err != nil {
+		return fmt.Errorf("could not get height: %v %w", height, err)
+	}
+
+	return e.cleanupByBlockID(header.ID())
+}
+
+func (e *Engine) cleanupByBlockID(blockID flow.Identifier) error {
+	err := e.resultsDB.RemoveByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not remove result by blockID: %v %w", blockID, err)
+	}
+	return nil
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
