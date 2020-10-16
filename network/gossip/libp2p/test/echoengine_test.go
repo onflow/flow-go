@@ -9,16 +9,16 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -45,13 +45,17 @@ func (s *EchoEngineTestSuite) SetupTest() {
 	golog.SetAllLoggers(golog.LevelInfo)
 	s.ids = CreateIDs(count)
 
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := createMiddleware(logger, s.ids)
-	require.NoError(s.Suite.T(), err)
-	s.mws = mws
+	// mocks state for collector nodes topology
+	// considers only a single cluster as higher cluster numbers are tested
+	// in collectionTopology_test
+	state := topology.CreateMockStateForCollectionNodes(s.T(),
+		s.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
-	nets, err := createNetworks(logger, s.mws, s.ids, 100, false)
-	require.NoError(s.Suite.T(), err)
+	// creates topology instances for the nodes based on their roles
+	tops := CreateTopologies(s.T(), state, s.ids)
+
+	// creates network instances
+	nets := CreateNetworks(s.T(), s.ids, tops, 100, false)
 	s.nets = nets
 }
 
