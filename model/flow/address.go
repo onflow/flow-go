@@ -134,31 +134,6 @@ func (gen *linearCodeAddressGenerator) Bytes() []byte {
 	return indexToBytes(gen.index)
 }
 
-const (
-	// [n,k,d]-Linear code parameters
-	// The linear code used in the account addressing is a [64,45,7]
-	// It generates a [64,45]-code, which is the space of Flow account addresses.
-	//
-	// n is the size of the code words in bits,
-	// which is also the size of the account addresses in bits.
-	linearCodeN = 64
-	// k is size of the words in bits.
-	// 2^k is the total number of possible account addresses.
-	linearCodeK = 45
-	// p is the number of code parity bits.
-	// p = n - k
-	//
-	// d is the distance of the linear code.
-	// It is the minimum hamming distance between any two Flow account addresses.
-	// This means any pair of Flow addresses have at least 7 different bits, which
-	// minimizes the mistakes of typing wrong addresses.
-	// d is also the minimum hamming weight of all account addresses (the zero address is not an account address).
-	linearCodeD = 7
-
-	// the maximum value of the internal state, 2^k - 1.
-	maxIndex = (1 << linearCodeK) - 1
-)
-
 // NextAddress increments the internal index and generates the new address
 // corresponding to the new index.
 func (gen *MonotonicAddressGenerator) NextAddress() (Address, error) {
@@ -233,6 +208,31 @@ func (a *Address) uint64() uint64 {
 	v := binary.BigEndian.Uint64(a[:])
 	return v
 }
+
+const (
+	// [n,k,d]-Linear code parameters
+	// The linear code used in the account addressing is a [64,45,7]
+	// It generates a [64,45]-code, which is the space of Flow account addresses.
+	//
+	// n is the size of the code words in bits,
+	// which is also the size of the account addresses in bits.
+	linearCodeN = 64
+	// k is size of the words in bits.
+	// 2^k is the total number of possible account addresses.
+	linearCodeK = 45
+	// p is the number of code parity bits.
+	// p = n - k
+	//
+	// d is the distance of the linear code.
+	// It is the minimum hamming distance between any two Flow account addresses.
+	// This means any pair of Flow addresses have at least 7 different bits, which
+	// minimizes the mistakes of typing wrong addresses.
+	// d is also the minimum hamming weight of all account addresses (the zero address is not an account address).
+	linearCodeD = 7
+
+	// the maximum value of the internal state, 2^k - 1.
+	maxIndex = (1 << linearCodeK) - 1
+)
 
 // invalid code-words in the [64,45] code
 // these constants are used to generate non-Flow-Mainnet addresses

@@ -58,7 +58,14 @@ func TestShort(t *testing.T) {
 	}
 }
 
-func TestFlowAddressConstants(t *testing.T) {
+func TestAccountAddress(t *testing.T) {
+	t.Run("address constants", testAddressConstants)
+	t.Run("address generation", testAddressGeneration)
+	t.Run("chain address intersections", testAddressesIntersection)
+	t.Run("index from address", testIndexFromAddress)
+}
+
+func testAddressConstants(t *testing.T) {
 	// check n and k fit in 8 and 6 bytes
 	assert.LessOrEqual(t, linearCodeN, 8*8)
 	assert.LessOrEqual(t, linearCodeK, 6*8)
@@ -104,7 +111,7 @@ func TestFlowAddressConstants(t *testing.T) {
 
 const invalidCodeWord = uint64(0xab2ae42382900010)
 
-func TestAddressGeneration(t *testing.T) {
+func testAddressGeneration(t *testing.T) {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -195,7 +202,7 @@ func TestAddressGeneration(t *testing.T) {
 	}
 }
 
-func TestAddressesIntersection(t *testing.T) {
+func testAddressesIntersection(t *testing.T) {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -255,12 +262,12 @@ func TestAddressesIntersection(t *testing.T) {
 	}
 }
 
-func TestIndexFromAddress(t *testing.T) {
+func testIndexFromAddress(t *testing.T) {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
 	// loops in each test
-	const loop = 1
+	const loop = 50
 
 	// Test addresses for all type of networks
 	chains := []Chain{
