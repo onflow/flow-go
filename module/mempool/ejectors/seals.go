@@ -24,8 +24,8 @@ func (ls *LatestSeal) Eject(entities map[flow.Identifier]flow.Entity) (flow.Iden
 	maxID := flow.ZeroID
 
 	for sealID, sealEntity := range entities {
-		seal := sealEntity.(*flow.Seal)
-		block, err := ls.headers.ByBlockID(seal.BlockID)
+		sc := sealEntity.(*flow.SealContainer)
+		block, err := ls.headers.ByBlockID(sc.Seal.BlockID)
 		if err != nil {
 			continue
 		}

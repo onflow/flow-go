@@ -38,7 +38,14 @@ func TestLatestSealEjector(t *testing.T) {
 
 			seal := unittest.SealFixture()
 			seal.BlockID = header.ID()
-			ok := pool.Add(seal)
+
+			er := unittest.ExecutionResultFixture()
+			er.BlockID = header.ID()
+			sc := &flow.SealContainer{
+				Seal:            seal,
+				ExecutionResult: er,
+			}
+			ok := pool.Add(sc)
 			assert.True(t, ok)
 
 			if header.Height >= maxHeader.Height {
