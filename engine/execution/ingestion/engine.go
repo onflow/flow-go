@@ -294,6 +294,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 
 				// execute the block if the block is ready to be executed
 				e.executeBlockIfComplete(executableBlock)
+
 				return nil
 			})
 
@@ -414,8 +415,33 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 				return fmt.Errorf("cannot send collection requests: %w", err)
 			}
 
+			head := queue.Head.Item.(*entity.ExecutableBlock)
+
 			// execute the block if the block is ready to be executed
-			e.executeBlockIfComplete(executableBlock)
+			completed := e.executeBlockIfComplete(executableBlock)
+
+			log = log.With().
+				Hex("head_id", logging.Entity(head)).
+				Uint64("head_height", head.Block.Header.Height).
+				Hex("start_state", head.StartState).
+				Int("size", queue.Size()).
+				Logger()
+
+			if !completed {
+				log.Info().Msg("block is not ready to be executed yet")
+			} else {
+				log.Info().Msg("block is ready to be executed")
+			}
+
+			// if a queue has grown more than every 60 blocks ,it will
+			// try fetching the collection for the header
+			if queue.Size()%60 == 59 {
+				err = e.matchOrRequestCollections(head, blockByCollection)
+				if err != nil {
+					return fmt.Errorf("cannot make collection requests: %w", err)
+				}
+				log.Info().Msg("requested collections for the head")
+			}
 
 			return nil
 		},
