@@ -209,6 +209,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
 	if !ok {
+        log.Error().Msg("execution receipt without FinalStateCommit received")
 		return fmt.Errorf("could not get final state: no chunks found")
 	}
 
@@ -216,16 +217,24 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	log.Info().Msg("execution receipt received")
 
-	// check the execution receipt is sent by its executor
-	if receipt.ExecutorID != originID {
-		return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
-	}
+	//// check the execution receipt is sent by its executor
+	//if receipt.ExecutorID != originID {
+	//	return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
+	//}
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later.
-	_, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
+	head, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
 	if err != nil {
 		log.Debug().Msg("discarding receipt for unknown block")
+		return nil
+	}
+
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not find sealed block: %w", err)
+	}
+	if sealed.Height >= head.Height {
 		return nil
 	}
 
@@ -588,6 +597,13 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
 func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
+	// skip counting approvals
+	// TODO:
+	//   * this is only here temporarily to ease the migration to new chunk
+	//     based sealing.
+	if !e.requireApprovals {
+		return true
+	}
 
 	// get all the chunk approvals from mempool
 	approvals := e.approvals.ByChunk(resultID, chunk.Index)
@@ -599,14 +615,6 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 		if ok {
 			validApprovers = append(validApprovers, approverID)
 		}
-	}
-
-	// skip counting approvals
-	// TODO:
-	//   * this is only here temporarily to ease the migration to new chunk
-	//     based sealing.
-	if !e.requireApprovals {
-		return true
 	}
 
 	// TODO:
@@ -788,6 +796,15 @@ func (e *Engine) requestPending() error {
 	// heights would stop the sealing.
 	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, e.maxUnsealedResults)
 
+	// turn mempool into Lookup table: BlockID -> Result
+	knownResultsMap := make(map[flow.Identifier]struct{})
+	for _, r := range e.results.All() {
+		knownResultsMap[r.BlockID] = struct{}{}
+	}
+	for _, sealContainer := range e.seals.All() {
+		knownResultsMap[sealContainer.Seal.BlockID] = struct{}{}
+	}
+
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
 	// order to request them.
@@ -805,6 +822,12 @@ func (e *Engine) requestPending() error {
 		}
 
 		blockID := header.ID()
+
+if _, ok := knownResultsMap[blockID]; ok {
+continue
+}
+missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
+
 
 		// check if we have an execution result for the block at this height
 		_, err = e.resultsDB.ByBlockID(blockID)
