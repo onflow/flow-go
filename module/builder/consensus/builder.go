@@ -227,10 +227,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// create a mapping of block to seal for all seals in our pool
 	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
+		if seal2, found := byBlock[seal.BlockID]; found {
+			fmt.Printf("ERROR: multiple seals for the same block: %v with result IDs %v %v", seal.BlockID, seal.ResultID, seal2.ResultID)
+		}
 		byBlock[seal.BlockID] = seal
 	}
 	if int(b.sealPool.Size()) > len(byBlock) {
-		return nil, fmt.Errorf("multiple seals for the same block")
+		fmt.Printf("ERROR: multiple seals for the same block")
+		byBlock = make(map[flow.Identifier]*flow.Seal)
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
