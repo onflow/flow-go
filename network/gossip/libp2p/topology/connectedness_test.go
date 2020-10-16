@@ -2,28 +2,36 @@ package topology_test
 
 import (
 	"math"
+	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type RandPermTopologyTestSuite struct {
+type ConnectednessTestSuite struct {
 	suite.Suite
 }
 
 func TestRandPermTopologyTestSuite(t *testing.T) {
-	suite.Run(t, new(RandPermTopologyTestSuite))
+	suite.Run(t, new(ConnectednessTestSuite))
 }
 
 // TestNodesConnected tests overall node connectedness and connectedness by role by keeping nodes of one role type in
 // minority (~2%)
-func (r *RandPermTopologyTestSuite) TestNodesConnected() {
+func (r *ConnectednessTestSuite) TestNodesConnected() {
 
 	// test vectors for different network sizes
 	testVector := []struct {
@@ -71,7 +79,7 @@ func (r *RandPermTopologyTestSuite) TestNodesConnected() {
 	}
 }
 
-func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Role, nodeRole flow.Role) {
+func (r *ConnectednessTestSuite) testTopology(total int, minorityRole flow.Role, nodeRole flow.Role) {
 
 	distribution := createDistribution(total, minorityRole)
 
@@ -85,11 +93,33 @@ func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Ro
 	adjencyMap := make(map[flow.Identifier]flow.IdentityList, n)
 
 	for _, id := range ids {
-		rpt, err := topology.NewRandPermTopology(id.Role, id.NodeID)
-		r.NoError(err)
-		top, err := rpt.Subset(ids, uint(n), topology.DummyTopic)
-		r.NoError(err)
-		adjencyMap[id.NodeID] = top
+		logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+		key, err := test.GenerateNetworkingKey(id.NodeID)
+		require.NoError(r.T(), err)
+
+		// creates a middleware instance
+		mw, err := libp2p.NewMiddleware(logger,
+			json.NewCodec(),
+			"0.0.0.0:0",
+			id.NodeID,
+			key,
+			metrics.NewNoopCollector(),
+			libp2p.DefaultMaxUnicastMsgSize,
+			libp2p.DefaultMaxPubSubMsgSize,
+			unittest.IdentifierFixture().String())
+		require.NoError(r.T(), err)
+
+		// creates and returns a topic aware topology instance
+		top, err := topology.NewTopicAwareTopology(id.NodeID)
+		require.NoError(r.T(), err)
+
+		// creates a mock network with the topology instance
+		nets := test.CreateNetworks(r.T(), logger, []*libp2p.Middleware{mw}, ids, 1, true, top)
+		require.Len(r.T(), nets, 1)
+
+		idMap, err := nets[0].Topology()
+		require.NoError(r.T(), err)
+		adjencyMap[id.NodeID] = idMapToList(idMap)
 	}
 
 	// check that nodes of the same role form a connected graph
@@ -101,7 +131,7 @@ func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Ro
 
 // TestSubsetDeterminism tests that if the id list remains the same, the Topology.Subset call always yields the same
 // list of nodes
-func (r *RandPermTopologyTestSuite) TestSubsetDeterminism() {
+func (r *ConnectednessTestSuite) TestSubsetDeterminism() {
 	ids := unittest.IdentityListFixture(100, unittest.WithAllRoles())
 	for _, id := range ids {
 		rpt, err := topology.NewRandPermTopology(flow.RoleConsensus, id.NodeID)
@@ -183,4 +213,14 @@ func dfs(currentID flow.Identifier,
 	for _, id := range adjMap[currentID].Filter(filter) {
 		dfs(id.NodeID, adjMap, visited, filter)
 	}
+}
+
+func idMapToList(idMap map[flow.Identifier]flow.Identity) flow.IdentityList {
+	var list flow.IdentityList
+	for _, identity := range idMap {
+		// avoiding reference closure
+		id := identity
+		list = append(list, &id)
+	}
+	return list
 }
