@@ -256,6 +256,8 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 				// check if there is a statecommitment for the parent block
 				parentCommitment, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), block.Header.ParentID)
 
+				e.log.Info().Msgf("height: %v, parent commitment: %v, err: %v", height, parentCommitment, err)
+
 				// if we found the statecommitment for the parent block, then add it to the executable block.
 				if err == nil {
 					executableBlock.StartState = parentCommitment
