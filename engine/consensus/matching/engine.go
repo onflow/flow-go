@@ -539,7 +539,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// until the block has been received or the result has been purged
 		block, err := e.headersDB.ByBlockID(result.BlockID)
 		if errors.Is(err, storage.ErrNotFound) {
-			e.log.Debug().Msg("skipping result with unknown block")
+			e.log.Debug().Msgf("skipping result with unknown block id: %v height: %v", result.BlockID, block.Height)
 			continue
 		}
 		if err != nil {
