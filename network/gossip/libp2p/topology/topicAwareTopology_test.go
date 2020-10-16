@@ -1,21 +1,15 @@
 package topology_test
 
 import (
-	"os"
 	"sort"
 	"testing"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	assert2 "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
@@ -28,7 +22,7 @@ import (
 type TopicAwareTopologyTestSuite struct {
 	suite.Suite
 	ids    flow.IdentityList // represents the identity list of all nodes in the system
-	net    *libp2p.Network   // represents the single network instance that creates topology
+	nets   []*libp2p.Network // represents the single network instance that creates topology
 	me     flow.Identity     // represents identity of single instance of node that creates topology
 	fanout uint              // represents maximum number of connections this peer allows to have
 }
@@ -54,65 +48,38 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// takes firs id as the current nodes id
 	suite.me = *suite.ids[0]
 
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	key, err := test.GenerateNetworkingKey(suite.me.NodeID)
-	require.NoError(suite.T(), err)
+	// mocks state for collector nodes topology
+	// considers only a single cluster as higher cluster numbers are tested
+	// in collectionTopology_test
+	state := topology.CreateMockStateForCollectionNodes(suite.T(),
+		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
-	// creates a middleware instance
-	mw, err := libp2p.NewMiddleware(logger,
-		json.NewCodec(),
-		"0.0.0.0:0",
-		suite.me.NodeID,
-		key,
-		metrics.NewNoopCollector(),
-		libp2p.DefaultMaxUnicastMsgSize,
-		libp2p.DefaultMaxPubSubMsgSize,
-		unittest.IdentifierFixture().String())
-	require.NoError(suite.T(), err)
-
-	// creates and returns a topic aware topology instance
-	top, err := topology.NewTopicAwareTopology(suite.me.NodeID)
-	require.NoError(suite.T(), err)
-
-	// creates a mock network with the topology instance
-	nets := test.CreateNetworks(suite.T(), logger, []*libp2p.Middleware{mw}, suite.ids, 1, true, top)
-	require.NoError(suite.T(), err)
-	require.Len(suite.T(), nets, 1)
-	suite.net = nets[0]
-}
-
-// TestNoDuplication evaluates that there is no duplicate in topology of a node.
-func (suite *TopicAwareTopologyTestSuite) TestNoDuplication() {
-	visited := map[flow.Identifier]struct{}{}
-	top, err := suite.net.Topology()
-	require.NoError(suite.T(), err)
-
-	for id := range top {
-		_, seen := visited[id]
-		assert2.False(suite.T(), seen, "duplicate in topology")
-
-		// marks id as seen
-		visited[id] = struct{}{}
-	}
+	// creates topology instances for the nodes based on their roles
+	tops := test.CreateTopologies(suite.T(), state, suite.ids)
+	suite.nets = test.CreateNetworks(suite.T(), suite.ids, tops, 1, true)
 }
 
 // TODO: fix this test after we have fanout optimized.
 // TestTopologySize evaluates that overall topology size of a node is bound by its fanout.
 func (suite *TopicAwareTopologyTestSuite) TestTopologySize() {
 	suite.T().Skip("this test requires optimizing the fanout per topic")
-	top, err := suite.net.Topology()
-	require.NoError(suite.T(), err)
-	require.Len(suite.T(), top, int(suite.fanout))
+	for _, net := range suite.nets {
+		top, err := net.Topology()
+		require.NoError(suite.T(), err)
+		require.Len(suite.T(), top, int(suite.fanout))
+	}
 }
 
 // TestMembership evaluates every id in topology to be a protocol id
 func (suite *TopicAwareTopologyTestSuite) TestMembership() {
-	top, err := suite.net.Topology()
-	require.NoError(suite.T(), err)
+	for _, net := range suite.nets {
+		top, err := net.Topology()
+		require.NoError(suite.T(), err)
 
-	// every id in topology should be an id of the protocol
-	for id := range top {
-		require.Contains(suite.T(), suite.ids.NodeIDs(), id)
+		// every id in topology should be an id of the protocol
+		for id := range top {
+			require.Contains(suite.T(), suite.ids.NodeIDs(), id)
+		}
 	}
 }
 

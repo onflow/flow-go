@@ -9,18 +9,19 @@ import (
 )
 
 type TopicAwareTopology struct {
-	RandPermTopology
 	seed int64
+	me   flow.Identifier
 }
 
 // NewTopicAwareTopology returns an instance of the TopicAwareTopology
-func NewTopicAwareTopology(myId flow.Identifier) (*TopicAwareTopology, error) {
-	seed, err := seedFromID(myId)
+func NewTopicAwareTopology(nodeID flow.Identifier) (*TopicAwareTopology, error) {
+	seed, err := seedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seed topology: %w", err)
 	}
 	t := &TopicAwareTopology{
 		seed: seed,
+		me:   nodeID,
 	}
 
 	return t, nil
@@ -38,6 +39,9 @@ func (t *TopicAwareTopology) Subset(idList flow.IdentityList, _ uint, topic stri
 
 	// extract ids of subscribers to the topic
 	subscribers := idList.Filter(filter.HasRole(roles...))
+
+	// excluding the node itself from its topology
+	subscribers = subscribers.Filter(filter.Not(filter.HasNodeID(t.me)))
 
 	// samples subscribers of a connected graph
 	subscriberSample, _ := connectedGraphSample(subscribers, t.seed)
