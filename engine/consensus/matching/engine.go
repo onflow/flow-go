@@ -217,10 +217,10 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	log.Info().Msg("execution receipt received")
 
-	// check the execution receipt is sent by its executor
-	if receipt.ExecutorID != originID {
-		return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
-	}
+	//// check the execution receipt is sent by its executor
+	//if receipt.ExecutorID != originID {
+	//	return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
+	//}
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later.
