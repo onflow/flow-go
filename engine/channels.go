@@ -109,6 +109,11 @@ func initializeTopicMap() {
 	topicMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 
 	topicMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
+	topicMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
+}
+
+func IsClusterTopic(topic string) bool {
+	return strings.HasPrefix(topic, syncClusterPrefix) || strings.HasPrefix(topic, consensusClusterPrefix)
 }
 
 // FullyQualifiedChannelName returns the unique channel name made up of channel name string suffixed with root block id
