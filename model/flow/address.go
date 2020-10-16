@@ -189,16 +189,22 @@ func (gen *linearCodeAddressGenerator) NextAddress() (Address, error) {
 	if err != nil {
 		return EmptyAddress, err
 	}
-	address := gen.generateAddress()
-	return address, nil
+	index := gen.index
+	address := encodeWord(index)
+	// customize the code word for a specific network
+	address ^= gen.chainCodeWord
+	return uint64ToAddress(address), nil
 }
 
 // CurrentAddress returns the current account address.
 //
 // The returned address is the address of the latest created account.
 func (gen *linearCodeAddressGenerator) CurrentAddress() Address {
-	address := gen.generateAddress()
-	return address
+	index := gen.index
+	address := encodeWord(index)
+	// customize the code word for a specific network
+	address ^= gen.chainCodeWord
+	return uint64ToAddress(address)
 }
 
 // returns the next index given an addressing index.
@@ -228,31 +234,56 @@ func (a *Address) uint64() uint64 {
 	return v
 }
 
-// generateAddress returns an account address given an addressing index.
-// (network) specifies the network to generate the address for (Flow Mainnet, testent..)
-// The function assumes the index is valid (<2^k) which means
-// a check on the index should be done before calling this function.
-func (gen *linearCodeAddressGenerator) generateAddress() Address {
-	index := gen.index
-
-	// Multiply the index GF(2) vector by the code generator matrix
-	address := uint64(0)
-	for i := 0; i < linearCodeK; i++ {
-		if index&1 == 1 {
-			address ^= generatorMatrixRows[i]
-		}
-		index >>= 1
-	}
-
-	// customize the code word for a specific network
-	address ^= gen.chainCodeWord
-	return uint64ToAddress(address)
-}
-
 // invalid code-words in the [64,45] code
 // these constants are used to generate non-Flow-Mainnet addresses
 const invalidCodeTestnet = uint64(0x6834ba37b3980209)
 const invalidCodeEmulator = uint64(0x1cb159857af02018)
+
+// encodeWord encodes a word into a code word.
+// In Flow, the word is the account index while the code word
+// is the corresponding address.
+//
+// The function assumes the word is valid (<2^k)
+func encodeWord(word uint64) uint64 {
+	// Multiply the index GF(2) vector by the code generator matrix
+	codeWord := uint64(0)
+	for i := 0; i < linearCodeK; i++ {
+		if word&1 == 1 {
+			codeWord ^= generatorMatrixRows[i]
+		}
+		word >>= 1
+	}
+	return codeWord
+}
+
+// checks if the input is a valid code word of the linear code
+func isValidCodeWord(codeWord uint64) bool {
+	// Multiply the code word GF(2)-vector by the parity-check matrix
+	parity := uint(0)
+	for i := 0; i < linearCodeN; i++ {
+		if codeWord&1 == 1 {
+			parity ^= parityCheckMatrixColumns[i]
+		}
+		codeWord >>= 1
+	}
+	return parity == 0
+}
+
+// reverse the linear code assuming the input is a valid
+// codeWord.
+func decodeCodeWord(codeWord uint64) uint64 {
+	// truncate the address GF(2) vector (last K bits) and multiply it by the inverse matrix of
+	// the partial code generator.
+	word := uint64(0)
+	codeWord >>= (linearCodeN - linearCodeK)
+	for i := 0; i < linearCodeK; i++ {
+		if codeWord&1 == 1 {
+			word ^= inverseMatrixRows[i]
+		}
+		codeWord >>= 1
+	}
+	return word
+}
 
 // Rows of the generator matrix G of the [64,45]-code used for Flow addresses.
 // G is a (k x n) matrix with coefficients in GF(2), each row is converted into
@@ -302,18 +333,6 @@ var parityCheckMatrixColumns = [linearCodeN]uint{
 // a big endian integer representation of the GF(2) raw vector.
 // I is used to generate retrieve indices from account addresses.
 var inverseMatrixRows = [linearCodeK]uint64{
-	/*0x1936cc9752d2, 0x0c9b664ba969, 0x164db325d4b4, 0xb26d992ea5a,
-	0x05936cc9752d, 0x12c9b664ba96, 0x0964db325d4b, 0x14b26d992ea5,
-	0x1a5936cc9752, 0x0d2c9b664ba9, 0x16964db325d4, 0x0b4b26d992ea,
-	0x05a5936cc975, 0x12d2c9b664ba, 0x096964db325d, 0x14b4b26d992e,
-	0x0a5a5936cc97, 0x152d2c9b664b, 0x1a96964db325, 0x1d4b4b26d992,
-	0x0ea5a5936cc9, 0x1752d2c9b664, 0x0ba96964db32, 0x5d4b4b26d99,
-	0x12ea5a5936cc, 0x09752d2c9b66, 0x04ba96964db3, 0x125d4b4b26d9,
-	0x192ea5a5936c, 0x0c9752d2c9b6, 0x064ba96964db, 0x1325d4b4b26d,
-	0x1992ea5a5936, 0x0cc9752d2c9b, 0x1664ba96964d, 0x1b325d4b4b26,
-	0x0d992ea5a593, 0x16cc9752d2c9, 0x1b664ba96964, 0x0db325d4b4b2,
-	0x06d992ea5a59, 0x136cc9752d2c, 0x09b664ba9696, 0x04db325d4b4b,
-	0x126d992ea5a5*/
 	0x14b4ae9336c9, 0x1a5a57499b64, 0x0d2d2ba4cdb2, 0x069695d266d9,
 	0x134b4ae9336c, 0x09a5a57499b6, 0x04d2d2ba4cdb, 0x1269695d266d,
 	0x1934b4ae9336, 0x0c9a5a57499b, 0x164d2d2ba4cd, 0x1b269695d266,

@@ -271,6 +271,8 @@ func TestIndexFromAddress(t *testing.T) {
 
 	for _, chain := range chains {
 		for i := 0; i < loop; i++ {
+			// check the correctness of IndexFromAddress
+
 			// random valid index
 			r := uint64(rand.Intn(maxIndex)) + 1
 			// generate the address
@@ -279,7 +281,17 @@ func TestIndexFromAddress(t *testing.T) {
 			index, err := chain.IndexFromAddress(address)
 			assert.NoError(t, err) // address should be valid
 			assert.Equal(t, r, index, "wrong extracted address %d, should be %d", index, r)
+
+			// check for invalid addresses
+
+			// alter one bit in the address to obtain an invalid address
+			address[0] ^= 1
+			_, err = chain.IndexFromAddress(address)
+			assert.Error(t, err)
 		}
+		// check the zero address error
+		_, err := chain.IndexFromAddress(chain.zeroAddress())
+		assert.Error(t, err)
 	}
 }
 

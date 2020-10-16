@@ -101,19 +101,12 @@ func (l *linearCodeImpl) IsValid(address Address) bool {
 	codeWord := address.uint64()
 	codeWord ^= uint64(l.chainID.getChainCodeWord())
 
+	// zero is not a valid address
 	if codeWord == 0 {
 		return false
 	}
-
-	// Multiply the code word GF(2)-vector by the parity-check matrix
-	parity := uint(0)
-	for i := 0; i < linearCodeN; i++ {
-		if codeWord&1 == 1 {
-			parity ^= parityCheckMatrixColumns[i]
-		}
-		codeWord >>= 1
-	}
-	return parity == 0
+	// check if address is a valid codeWord
+	return isValidCodeWord(codeWord)
 }
 
 // IndexFromAddress returns the index used to generate the address.
@@ -122,35 +115,16 @@ func (l *linearCodeImpl) IndexFromAddress(address Address) (uint64, error) {
 	codeWord := address.uint64()
 	codeWord ^= uint64(l.chainID.getChainCodeWord())
 
+	// zero is not a valid address
+	if codeWord == 0 {
+		return 0, errors.New("address is invalid")
+	}
+
 	// check the address is valid code word
-	codeWordTemp := codeWord
-	if codeWordTemp == 0 {
+	if !isValidCodeWord(codeWord) {
 		return 0, errors.New("address is invalid")
 	}
-
-	// Multiply the code word GF(2)-vector by the parity-check matrix
-	parity := uint(0)
-	for i := 0; i < linearCodeN; i++ {
-		if codeWordTemp&1 == 1 {
-			parity ^= parityCheckMatrixColumns[i]
-		}
-		codeWordTemp >>= 1
-	}
-	if parity != 0 {
-		return 0, errors.New("address is invalid")
-	}
-
-	// truncate the address GF(2) vector (last K bits) and multiply it by the inverse matrix of
-	// the partial code generator.
-	index := uint64(0)
-	codeWord >>= (linearCodeN - linearCodeK)
-	for i := 0; i < linearCodeK; i++ {
-		if codeWord&1 == 1 {
-			index ^= inverseMatrixRows[i]
-		}
-		codeWord >>= 1
-	}
-	return index, nil
+	return decodeCodeWord(codeWord), nil
 }
 
 func (l *linearCodeImpl) chain() ChainID {
