@@ -146,7 +146,9 @@ func (e *Engine) cleanupbaddata() error {
 	for height := sealed.Height + 1; height <= final.Height; height++ {
 		err := e.cleanupByHeight(height)
 		if err != nil {
-			return fmt.Errorf("could not clean up by height: %v %w", height, err)
+			e.log.Error().Err(err).Msgf("could not clean up by height: %v", height)
+		} else {
+			e.log.Info().Msgf("cleaned up for height: %v", height)
 		}
 	}
 
@@ -157,7 +159,9 @@ func (e *Engine) cleanupbaddata() error {
 	for _, pending := range pendings {
 		err := e.cleanupByBlockID(pending)
 		if err != nil {
-			return fmt.Errorf("could not clean up pending by block ID: %v %w", pending, err)
+			e.log.Error().Err(err).Msgf("could not clean up pending by block ID: %v", err)
+		} else {
+			e.log.Info().Msgf("cleaned up for blockID: %v", pending)
 		}
 	}
 
