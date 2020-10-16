@@ -125,6 +125,12 @@ func (ms *MatchingSuite) SetupTest() {
 		},
 		nil,
 	)
+	ms.state.On("Sealed").Return(
+		func() realproto.Snapshot {
+			return ms.sealedSnapshot
+		},
+		nil,
+	)
 	ms.state.On("Final").Return(
 		func() realproto.Snapshot {
 			return ms.finalSnapshot
@@ -437,6 +443,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 }
 
 func (ms *MatchingSuite) TestOnApprovalInvalidOrigin() {
+	ms.T().Skip("skiping as we now ignore result approvals")
 
 	// try to submit an approval with a random origin ID
 	originID := ms.verID
@@ -450,6 +457,8 @@ func (ms *MatchingSuite) TestOnApprovalInvalidOrigin() {
 }
 
 func (ms *MatchingSuite) TestOnApprovalUnknownBlock() {
+	ms.T().Skip("skipping as we now ignore result approvals")
+
 	// try to submit an approval for an unknown block
 	originID := ms.verID
 	approval := unittest.ResultApprovalFixture()
@@ -486,6 +495,7 @@ func (ms *MatchingSuite) TestOnApprovalUnknownBlock() {
 }
 
 func (ms *MatchingSuite) TestOnApprovalInvalidRole() {
+	ms.T().Skip("skiping as we now ignore result approvals")
 
 	// try to submit an approval from a consensus node
 	originID := ms.conID
@@ -500,6 +510,7 @@ func (ms *MatchingSuite) TestOnApprovalInvalidRole() {
 }
 
 func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
+	ms.T().Skip("skipping as we now ignore result approvals")
 
 	// try to submit an approval from an unstaked approver
 	originID := ms.verID
@@ -530,6 +541,7 @@ func (ms *MatchingSuite) TestOnApprovalSealedResult() {
 }
 
 func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
+	ms.T().Skip("skiping as we now ignore result approvals")
 
 	// try to submit an approval that is already in the mempool
 	originID := ms.verID
@@ -552,6 +564,7 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 }
 
 func (ms *MatchingSuite) TestOnApprovalValid() {
+	ms.T().Skip("skipping as we now ignore result approvals")
 
 	// try to submit an approval for a sealed result
 	originID := ms.verID
