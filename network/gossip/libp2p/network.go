@@ -172,7 +172,7 @@ func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", topic, err)
 		}
-		myFanout = append(myFanout, subset.Filter(filter.Not(filter.In(subset)))...)
+		myFanout = append(myFanout, subset.Filter(filter.Not(filter.In(myFanout)))...)
 	}
 
 	// creates a map of all the selected ids

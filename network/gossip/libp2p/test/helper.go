@@ -5,9 +5,11 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
@@ -43,8 +45,9 @@ func CreateIDs(count int) []*flow.Identity {
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
-func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool,
-	tops ...topology.Topology) ([]*libp2p.Network, error) {
+func CreateNetworks(t *testing.T, log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int,
+	dryrun bool,
+	tops ...topology.Topology) []*libp2p.Network {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -57,9 +60,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		tops = make([]topology.Topology, count)
 		for i := range tops {
 			rpt, err := topology.NewRandPermTopology(ids[i].Role, ids[i].NodeID)
-			if err != nil {
-				return nil, fmt.Errorf("could not create network: %w", err)
-			}
+			require.NoError(t, err, fmt.Errorf("could not create network: %w", err))
 			tops[i] = rpt
 		}
 	}
@@ -71,10 +72,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
 		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, ids[i].Role, mws[i], csize, tops[i],
 			metrics)
-		if err != nil {
-			return nil, fmt.Errorf("could not create network: %w", err)
-		}
-
+		require.NoError(t, err, fmt.Errorf("could not create network: %w", err))
 		nets = append(nets, net)
 	}
 
@@ -95,9 +93,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		if !dryrun {
 			m := mws[i]
 			ip, port, err = m.GetIPPort()
-			if err != nil {
-				return nil, err
-			}
+			require.NoError(t, err, fmt.Errorf("could not get ip and port: %w", err))
 			key = m.PublicKey()
 		}
 
@@ -105,7 +101,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		id := flow.Identity{
 			NodeID:        ids[i].NodeID,
 			Address:       fmt.Sprintf("%s:%s", ip, port),
-			Role:          flow.RoleCollection,
+			Role:          ids[i].Role,
 			Stake:         0,
 			NetworkPubKey: key,
 		}
@@ -122,13 +118,11 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	if !dryrun {
 		for _, m := range mws {
 			err := m.UpdateAllowList()
-			if err != nil {
-				return nil, err
-			}
+			require.NoError(t, err, fmt.Errorf("could not update allow list: %w", err))
 		}
 	}
 
-	return nets, nil
+	return nets
 }
 
 // createMiddleware receives an ids slice and creates and initializes a middleware instances for each id
