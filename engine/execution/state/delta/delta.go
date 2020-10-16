@@ -73,13 +73,13 @@ type LegacySnapshot struct {
 
 // A Delta is a record of ledger mutations.
 type Delta struct {
-	Data map[string]flow.RegisterEntry
+	Data               map[string]flow.RegisterEntry
 }
 
 // NewDelta returns an empty ledger delta.
 func NewDelta() Delta {
 	return Delta{
-		Data: make(map[string]flow.RegisterEntry),
+		Data:               make(map[string]flow.RegisterEntry),
 	}
 }
 
@@ -112,25 +112,17 @@ func (d Delta) Get(owner, controller, key string) (flow.RegisterValue, bool) {
 // Set records an update in this delta.
 func (d Delta) Set(owner, controller, key string, value flow.RegisterValue) {
 	k := toString(owner, controller, key)
-	d.Data[k] = flow.RegisterEntry{
+	r := flow.RegisterEntry{
 		Key:   toRegisterID(owner, controller, key),
 		Value: value,
 	}
-}
 
-// Delete records a deletion in this delta.
-func (d Delta) Delete(owner, controller, key string) {
-	k := toString(owner, controller, key)
-	d.Data[k] = flow.RegisterEntry{
-		Key:   toRegisterID(owner, controller, key),
-		Value: nil,
-	}
+	d.Data[k] = r
 }
 
 // RegisterUpdates returns all registers that were updated by this delta.
 // ids are returned sorted, in ascending order
 func (d Delta) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-
 	data := make(flow.RegisterEntries, 0, len(d.Data))
 
 	for _, v := range d.Data {

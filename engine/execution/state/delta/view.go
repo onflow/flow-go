@@ -1,6 +1,7 @@
 package delta
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -136,6 +137,12 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
 	// capture register touch
 	registerID := toRegisterID(owner, controller, key)
 
+	// register size change update
+	err = v.updateRegisterSizeChange(owner, controller, key, value)
+	if err != nil {
+		panic(err)
+	}
+
 	v.regTouchSet[registerID.String()] = registerID
 	// add key value to delta
 	v.delta.Set(owner, controller, key, value)
@@ -146,6 +153,59 @@ func (v *View) updateSpock(value []byte) error {
 	if err != nil {
 		return fmt.Errorf("error updating spock secret data: %w", err)
 	}
+	return nil
+}
+
+func (v *View) updateRegisterSizeChange(owner, controller, key string, value flow.RegisterValue) error {
+	if key == "storage_used" {
+		return nil
+	}
+	oldValue, err := v.Get(owner, controller, key)
+	if err != nil {
+		return err
+	}
+	sizeChange := int64(len(value) - len(oldValue))
+	if sizeChange == 0 {
+		// register size has not changed. Nothing to do
+		return nil
+	}
+
+	oldSizeRegister, err := v.Get(owner, "", "storage_used")
+	if err != nil {
+		return err
+	}
+
+	var oldSize uint64
+	if len(oldSizeRegister) == 0 {
+		// account was just created
+		oldSize = 8
+		buffer := make([]byte, oldSize)
+		binary.LittleEndian.PutUint64(buffer, 8)
+		v.Set(owner, "", "storage_used", buffer)
+	} else {
+		oldSize = binary.LittleEndian.Uint64(oldSizeRegister)
+	}
+
+	// two paths to avoid casting uint to int
+	var newSize uint64
+	if sizeChange < 0 {
+		absChange := uint64(-sizeChange)
+		if absChange > oldSize {
+			// should never happen
+			panic("account storage used would be negative")
+		}
+		newSize = oldSize - absChange
+	} else {
+		absChange := uint64(sizeChange)
+		newSize = oldSize + absChange
+	}
+
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, newSize)
+	// this will put us back in the Set method.
+	// The difference will be that sizeChange will always be 0 when setting storage_used
+	v.Set(owner, "", "storage_used", buffer)
+
 	return nil
 }
 
@@ -162,7 +222,7 @@ func (v *View) Touch(owner, controller, key string) {
 
 // Delete removes a register in this view.
 func (v *View) Delete(owner, controller, key string) {
-	v.delta.Delete(owner, controller, key)
+	v.Set(owner, controller, key, nil)
 }
 
 // Delta returns a record of the registers that were mutated in this view.

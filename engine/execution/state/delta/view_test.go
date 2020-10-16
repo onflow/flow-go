@@ -1,6 +1,7 @@
 package delta_test
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,7 +27,9 @@ func TestView_Get(t *testing.T) {
 
 	t.Run("ValueNotInCache", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if owner == registerID {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			} else if owner == registerID {
 				return flow.RegisterValue("orange"), nil
 			}
 
@@ -39,7 +42,9 @@ func TestView_Get(t *testing.T) {
 
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if owner == registerID {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			} else if owner == registerID {
 				return flow.RegisterValue("orange"), nil
 			}
 
@@ -58,6 +63,9 @@ func TestView_Set(t *testing.T) {
 	registerID := "fruit"
 
 	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		if key == "storage_used" {
+			return uint64AsBytes(100), nil
+		}
 		return nil, nil
 	})
 
@@ -75,6 +83,9 @@ func TestView_Set(t *testing.T) {
 
 	t.Run("AfterDelete", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -89,6 +100,9 @@ func TestView_Set(t *testing.T) {
 
 	t.Run("SpockSecret", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -107,39 +121,80 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID2, "", "", flow.RegisterValue("1"))
 		err = hashIt(expSpock, []byte("1"))
 		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("1"))))) // set "storage_used"
+		assert.NoError(t, err)
+		s := v.SpockSecret()
+		assert.Equal(t, s, []uint8(expSpock.SumHash()))
 
 		v.Set(registerID3, "", "", flow.RegisterValue("2"))
 		err = hashIt(expSpock, []byte("2"))
 		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("2"))))) // set "storage_used"
+		assert.NoError(t, err)
+		s = v.SpockSecret()
+		assert.Equal(t, s, []uint8(expSpock.SumHash()))
 
 		v.Set(registerID1, "", "", flow.RegisterValue("3"))
 		err = hashIt(expSpock, []byte("3"))
 		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // set "storage_used"
+		assert.NoError(t, err)
+		s = v.SpockSecret()
+		assert.Equal(t, s, []uint8(expSpock.SumHash()))
 
 		b, err := v.Get(registerID1, "", "")
 		assert.NoError(t, err)
 		err = hashIt(expSpock, []byte("3"))
 		assert.NoError(t, err)
+		s = v.SpockSecret()
+		assert.Equal(t, s, []uint8(expSpock.SumHash()))
 
 		assert.Equal(t, b, flow.RegisterValue("3"))
 		// this part checks that delete functionality
 		// doesn't impact secret
 		v.Delete(registerID1, "", "")
+		err = hashIt(expSpock, []byte("3"))
+		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // set "storage_used"
+		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		assert.NoError(t, err)
+		s = v.SpockSecret()
+		assert.Equal(t, s, []uint8(expSpock.SumHash()))
+
 		// this part checks that it always update the
 		// intermediate values and not just the final values
 		v.Set(registerID1, "", "", flow.RegisterValue("4"))
 		err = hashIt(expSpock, []byte("4"))
 		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		assert.NoError(t, err)
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("4"))))) // set "storage_used"
+		assert.NoError(t, err)
+		s = v.SpockSecret()
+		assert.Equal(t, s, []uint8(expSpock.SumHash()))
 
 		v.Set(registerID1, "", "", flow.RegisterValue("5"))
 		err = hashIt(expSpock, []byte("5"))
 		assert.NoError(t, err)
+		err = hashIt(expSpock, []byte("4"))
+		assert.NoError(t, err)
+		s = v.SpockSecret()
+		assert.Equal(t, s, []uint8(expSpock.SumHash()))
 
 		v.Set(registerID3, "", "", flow.RegisterValue("6"))
 		err = hashIt(expSpock, []byte("6"))
 		assert.NoError(t, err)
+		err = hashIt(expSpock, []byte("2"))
+		assert.NoError(t, err)
 
-		s := v.SpockSecret()
+		s = v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock.SumHash()))
 
 		t.Run("reflects in the snapshot", func(t *testing.T) {
@@ -153,6 +208,9 @@ func TestView_Delete(t *testing.T) {
 
 	t.Run("ValueNotSet", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -169,6 +227,9 @@ func TestView_Delete(t *testing.T) {
 
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			if owner == registerID {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -199,6 +260,9 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("EmptyView", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -219,6 +283,9 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("EmptyDelta", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -239,6 +306,9 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("NoCollisions", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -259,6 +329,9 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("OverwriteSetValue", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -275,6 +348,9 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("OverwriteDeletedValue", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -292,6 +368,9 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("DeleteSetValue", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -307,12 +386,20 @@ func TestView_MergeView(t *testing.T) {
 	})
 	t.Run("SpockDataMerge", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
 		expSpock1 := hash.NewSHA3_256()
 		v.Set(registerID1, "", "", flow.RegisterValue("apple"))
+
 		err := hashIt(expSpock1, []byte("apple"))
+		assert.NoError(t, err)
+		err = hashIt(expSpock1, uint64AsBytes(100)) // read "storage_used"
+		assert.NoError(t, err)
+		err = hashIt(expSpock1, uint64AsBytes(uint64(100+len([]byte("apple"))))) // set "storage_used"
 		assert.NoError(t, err)
 		assert.Equal(t, v.SpockSecret(), []uint8(expSpock1.SumHash()))
 
@@ -321,7 +408,14 @@ func TestView_MergeView(t *testing.T) {
 		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
 		err = hashIt(expSpock2, []byte("carrot"))
 		assert.NoError(t, err)
+		err = hashIt(expSpock1, uint64AsBytes(100)) // read "storage_used" from parent
+		assert.NoError(t, err)
+		err = hashIt(expSpock2, uint64AsBytes(100)) // read "storage_used"
+		assert.NoError(t, err)
+		err = hashIt(expSpock2, uint64AsBytes(uint64(100+len([]byte("carrot"))))) // set "storage_used"
+		assert.NoError(t, err)
 		assert.Equal(t, chView.SpockSecret(), []uint8(expSpock2.SumHash()))
+		assert.Equal(t, v.SpockSecret(), []uint8(expSpock1.SumHash()))
 
 		v.MergeView(chView)
 		err = hashIt(expSpock1, expSpock2.SumHash())
@@ -333,6 +427,9 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("RegisterTouchesDataMerge", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -346,11 +443,15 @@ func TestView_MergeView(t *testing.T) {
 
 		reads := v.Interactions().Reads
 
-		require.Len(t, reads, 3)
+		// 6 reads, because 3 storage used are read as well
+		require.Len(t, reads, 6)
 		assert.ElementsMatch(t, []flow.RegisterID{
 			flow.NewRegisterID(registerID1, "", ""),
 			flow.NewRegisterID(registerID2, "", ""),
 			flow.NewRegisterID(registerID3, "", ""),
+			flow.NewRegisterID(registerID1, "", "storage_used"),
+			flow.NewRegisterID(registerID2, "", "storage_used"),
+			flow.NewRegisterID(registerID3, "", "storage_used"),
 		}, reads)
 	})
 
@@ -361,6 +462,9 @@ func TestView_RegisterTouches(t *testing.T) {
 	registerID2 := "vegetable"
 
 	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		if key == "storage_used" {
+			return uint64AsBytes(100), nil
+		}
 		return nil, nil
 	})
 
@@ -371,6 +475,10 @@ func TestView_RegisterTouches(t *testing.T) {
 
 	t.Run("Set and Get", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
+
 			if owner == registerID1 {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -388,12 +496,16 @@ func TestView_RegisterTouches(t *testing.T) {
 		v.Set(registerID2, "", "", flow.RegisterValue("apple"))
 
 		touches := v.Interactions().RegisterTouches()
-		assert.Len(t, touches, 2)
+		// 3 touches, because 1 storage used in touched as well
+		assert.Len(t, touches, 3)
 	})
 }
 
 func TestView_AllRegisters(t *testing.T) {
 	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		if key == "storage_used" {
+			return uint64AsBytes(100), nil
+		}
 		return nil, nil
 	})
 
@@ -404,6 +516,10 @@ func TestView_AllRegisters(t *testing.T) {
 
 	t.Run("Set and Get", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
+
 			if owner == "a" {
 				return flow.RegisterValue("a_value"), nil
 			}
@@ -427,10 +543,15 @@ func TestView_AllRegisters(t *testing.T) {
 		v.Touch("f", "", "")
 
 		allRegs := v.Interactions().AllRegisters()
-		assert.Len(t, allRegs, 6)
+		// 8 touches, because 2 storage used are touched as well
+		assert.Len(t, allRegs, 8)
 	})
 	t.Run("With Merge", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
+
 			if owner == "a" {
 				return flow.RegisterValue("a_value"), nil
 			}
@@ -456,7 +577,8 @@ func TestView_AllRegisters(t *testing.T) {
 
 		v.MergeView(vv)
 		allRegs := v.Interactions().AllRegisters()
-		assert.Len(t, allRegs, 6)
+		// 8 touches, because 2 storage used are touched as well
+		assert.Len(t, allRegs, 8)
 	})
 }
 
@@ -465,6 +587,9 @@ func TestView_Reads(t *testing.T) {
 	registerID2 := "vegetable"
 
 	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		if key == "storage_used" {
+			return uint64AsBytes(100), nil
+		}
 		return nil, nil
 	})
 
@@ -475,6 +600,9 @@ func TestView_Reads(t *testing.T) {
 
 	t.Run("Set and Get", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			if key == "storage_used" {
+				return uint64AsBytes(100), nil
+			}
 			return nil, nil
 		})
 
@@ -499,4 +627,10 @@ func TestView_Reads(t *testing.T) {
 func hashIt(spock hash.Hasher, value []byte) error {
 	_, err := spock.Write(value)
 	return err
+}
+
+func uint64AsBytes(u uint64) []byte {
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, u)
+	return buffer
 }
