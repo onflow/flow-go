@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -205,6 +206,26 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
+}
+
+// CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
+// and returns the slice of topologies. It distinguishes between the topology creation of collection nodes
+// and other nodes.
+func CreateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList) []*topology.Topology {
+	tops := make([]*topology.Topology, 0)
+	for _, id := range identities {
+		var top topology.Topology
+		var err error
+		if id.Role == flow.RoleCollection {
+			top, err = topology.NewCollectionTopology(id.NodeID, state)
+		} else {
+			top, err = topology.NewTopicAwareTopology(id.NodeID)
+		}
+
+		require.NoError(t, err)
+		tops = append(tops, &top)
+	}
+	return tops
 }
 
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
