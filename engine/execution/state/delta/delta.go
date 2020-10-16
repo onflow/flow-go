@@ -73,13 +73,13 @@ type LegacySnapshot struct {
 
 // A Delta is a record of ledger mutations.
 type Delta struct {
-	Data               map[string]flow.RegisterEntry
+	Data map[string]flow.RegisterEntry
 }
 
 // NewDelta returns an empty ledger delta.
 func NewDelta() Delta {
 	return Delta{
-		Data:               make(map[string]flow.RegisterEntry),
+		Data: make(map[string]flow.RegisterEntry),
 	}
 }
 
