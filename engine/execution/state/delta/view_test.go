@@ -121,7 +121,7 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID2, "", "", flow.RegisterValue("1"))
 		err = hashIt(expSpock, []byte("1"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // read "storage_used"
 		assert.NoError(t, err)
 		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("1"))))) // set "storage_used"
 		assert.NoError(t, err)
@@ -131,7 +131,7 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID3, "", "", flow.RegisterValue("2"))
 		err = hashIt(expSpock, []byte("2"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // read "storage_used"
 		assert.NoError(t, err)
 		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("2"))))) // set "storage_used"
 		assert.NoError(t, err)
@@ -141,7 +141,7 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID1, "", "", flow.RegisterValue("3"))
 		err = hashIt(expSpock, []byte("3"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // read "storage_used"
 		assert.NoError(t, err)
 		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // set "storage_used"
 		assert.NoError(t, err)
@@ -161,7 +161,7 @@ func TestView_Set(t *testing.T) {
 		v.Delete(registerID1, "", "")
 		err = hashIt(expSpock, []byte("3"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // read "storage_used"
 		assert.NoError(t, err)
 		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
 		assert.NoError(t, err)
@@ -173,7 +173,7 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID1, "", "", flow.RegisterValue("4"))
 		err = hashIt(expSpock, []byte("4"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // read "storage_used"
 		assert.NoError(t, err)
 		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("4"))))) // set "storage_used"
 		assert.NoError(t, err)
