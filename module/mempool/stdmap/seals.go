@@ -22,7 +22,7 @@ func NewSeals(limit uint, opts ...OptionFunc) (*Seals, error) {
 }
 
 // Add adds an block seal to the mempool.
-func (s *Seals) Add(seal *flow.Seal) bool {
+func (s *Seals) Add(seal *flow.SealContainer) bool {
 	added := s.Backend.Add(seal)
 	return added
 }
@@ -34,21 +34,21 @@ func (s *Seals) Rem(sealID flow.Identifier) bool {
 }
 
 // ByID returns the block seal with the given ID from the mempool.
-func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, bool) {
+func (s *Seals) ByID(sealID flow.Identifier) (*flow.SealContainer, bool) {
 	entity, exists := s.Backend.ByID(sealID)
 	if !exists {
 		return nil, false
 	}
-	seal := entity.(*flow.Seal)
+	seal := entity.(*flow.SealContainer)
 	return seal, true
 }
 
 // All returns all block seals from the pool.
-func (s *Seals) All() []*flow.Seal {
+func (s *Seals) All() []*flow.SealContainer {
 	entities := s.Backend.All()
-	seals := make([]*flow.Seal, 0, len(entities))
+	seals := make([]*flow.SealContainer, 0, len(entities))
 	for _, entity := range entities {
-		seals = append(seals, entity.(*flow.Seal))
+		seals = append(seals, entity.(*flow.SealContainer))
 	}
 	return seals
 }

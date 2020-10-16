@@ -14,11 +14,11 @@ type Seals struct {
 }
 
 // Add provides a mock function with given fields: seal
-func (_m *Seals) Add(seal *flow.Seal) bool {
+func (_m *Seals) Add(seal *flow.SealContainer) bool {
 	ret := _m.Called(seal)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.Seal) bool); ok {
+	if rf, ok := ret.Get(0).(func(*flow.SealContainer) bool); ok {
 		r0 = rf(seal)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -28,15 +28,15 @@ func (_m *Seals) Add(seal *flow.Seal) bool {
 }
 
 // All provides a mock function with given fields:
-func (_m *Seals) All() []*flow.Seal {
+func (_m *Seals) All() []*flow.SealContainer {
 	ret := _m.Called()
 
-	var r0 []*flow.Seal
-	if rf, ok := ret.Get(0).(func() []*flow.Seal); ok {
+	var r0 []*flow.SealContainer
+	if rf, ok := ret.Get(0).(func() []*flow.SealContainer); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Seal)
+			r0 = ret.Get(0).([]*flow.SealContainer)
 		}
 	}
 
@@ -44,15 +44,15 @@ func (_m *Seals) All() []*flow.Seal {
 }
 
 // ByID provides a mock function with given fields: sealID
-func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, bool) {
+func (_m *Seals) ByID(sealID flow.Identifier) (*flow.SealContainer, bool) {
 	ret := _m.Called(sealID)
 
-	var r0 *flow.Seal
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Seal); ok {
+	var r0 *flow.SealContainer
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.SealContainer); ok {
 		r0 = rf(sealID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Seal)
+			r0 = ret.Get(0).(*flow.SealContainer)
 		}
 	}
 
