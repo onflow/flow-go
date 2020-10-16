@@ -20,10 +20,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TopologyTestSuite tests the bare minimum requirements of a randomized
+// TopicAwareTopologyTestSuite tests the bare minimum requirements of a randomized
 // topology that is needed for our network. It should not replace the information
 // theory assumptions behind the schemes, e.g., random oracle model of hashes
-type TopologyTestSuite struct {
+type TopicAwareTopologyTestSuite struct {
 	suite.Suite
 	ids    flow.IdentityList // represents the identity list of all nodes in the system
 	net    *libp2p.Network   // represents the single network instance that creates topology
@@ -31,13 +31,13 @@ type TopologyTestSuite struct {
 	fanout uint              // represents maximum number of connections this peer allows to have
 }
 
-// TestNetworkTestSuit starts all the tests in this test suite
-func TestNetworkTestSuit(t *testing.T) {
-	suite.Run(t, new(TopologyTestSuite))
+// TestTopicAwareTopologyTestSuite starts all the tests in this test suite
+func TestTopicAwareTopologyTestSuite(t *testing.T) {
+	suite.Run(t, new(TopicAwareTopologyTestSuite))
 }
 
 // SetupTest initiates the test setups prior to each test
-func (suite *TopologyTestSuite) SetupTest() {
+func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// we consider fanout as maximum number of connections the node allows to have
 	// TODO: optimize value of fanout.
 	suite.fanout = 100
@@ -81,7 +81,7 @@ func (suite *TopologyTestSuite) SetupTest() {
 
 // TODO: fix this test after we have fanout optimized.
 // TestTopologySize evaluates that overall topology size of a node is bound by its fanout.
-func (suite *TopologyTestSuite) TestTopologySize() {
+func (suite *TopicAwareTopologyTestSuite) TestTopologySize() {
 	suite.T().Skip("this test requires optimizing the fanout per topic")
 	top, err := suite.net.Topology()
 	require.NoError(suite.T(), err)
@@ -89,7 +89,7 @@ func (suite *TopologyTestSuite) TestTopologySize() {
 }
 
 // TestMembership evaluates every id in topology to be a protocol id
-func (suite *TopologyTestSuite) TestMembership() {
+func (suite *TopicAwareTopologyTestSuite) TestMembership() {
 	top, err := suite.net.Topology()
 	require.NoError(suite.T(), err)
 
@@ -100,7 +100,7 @@ func (suite *TopologyTestSuite) TestMembership() {
 }
 
 // TestDeteministicity verifies that the same seed generates the same topology for a topic
-func (suite *TopologyTestSuite) TestDeteministicity() {
+func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 	top, err := topology.NewTopicAwareTopology(suite.me.NodeID)
 	require.NoError(suite.T(), err)
 
@@ -143,7 +143,7 @@ func (suite *TopologyTestSuite) TestDeteministicity() {
 // C(n, (n+1)/2) many unique topologies for the same topic across different nodes. Even for small numbers
 // like n = 300, the potential outcomes are large enough (i.e., 10e88) so that the uniqueness is guaranteed.
 // This test however, performs a very weak uniqueness test by checking the uniqueness among consecutive topologies.
-func (suite *TopologyTestSuite) TestUniqueness() {
+func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 	var previous, current []string
 
 	// for each topic samples 100 topologies
