@@ -255,6 +255,34 @@ func TestAddressesIntersection(t *testing.T) {
 	}
 }
 
+func TestIndexFromAddress(t *testing.T) {
+	// seed random generator
+	rand.Seed(time.Now().UnixNano())
+
+	// loops in each test
+	const loop = 1
+
+	// Test addresses for all type of networks
+	chains := []Chain{
+		mainnet,
+		testnet,
+		emulator,
+	}
+
+	for _, chain := range chains {
+		for i := 0; i < loop; i++ {
+			// random valid index
+			r := uint64(rand.Intn(maxIndex)) + 1
+			// generate the address
+			address := chain.newAddressGeneratorAtIndex(r).CurrentAddress()
+			// extract the index and compare
+			index, err := chain.IndexFromAddress(address)
+			assert.NoError(t, err) // address should be valid
+			assert.Equal(t, r, index, "wrong extracted address %d, should be %d", index, r)
+		}
+	}
+}
+
 func TestUint48(t *testing.T) {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())

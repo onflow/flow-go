@@ -294,3 +294,36 @@ var parityCheckMatrixColumns = [linearCodeN]uint{
 	0x0067c, 0x0059d, 0x004eb, 0x003b4,
 	0x0036a, 0x002d9, 0x001c7, 0x0003f,
 }
+
+// Rows of the inverse I of the generator matrix I = sub(G)^(-1).
+// sub(G) is a square sub-matrix of G formed by the first (k) columns. This makes sub(G)
+// an inversible (k x k) matrix.
+// I is a (k x k) matrix with coefficients in GF(2), each row is converted into
+// a big endian integer representation of the GF(2) raw vector.
+// I is used to generate retrieve indices from account addresses.
+var inverseMatrixRows = [linearCodeK]uint64{
+	/*0x1936cc9752d2, 0x0c9b664ba969, 0x164db325d4b4, 0xb26d992ea5a,
+	0x05936cc9752d, 0x12c9b664ba96, 0x0964db325d4b, 0x14b26d992ea5,
+	0x1a5936cc9752, 0x0d2c9b664ba9, 0x16964db325d4, 0x0b4b26d992ea,
+	0x05a5936cc975, 0x12d2c9b664ba, 0x096964db325d, 0x14b4b26d992e,
+	0x0a5a5936cc97, 0x152d2c9b664b, 0x1a96964db325, 0x1d4b4b26d992,
+	0x0ea5a5936cc9, 0x1752d2c9b664, 0x0ba96964db32, 0x5d4b4b26d99,
+	0x12ea5a5936cc, 0x09752d2c9b66, 0x04ba96964db3, 0x125d4b4b26d9,
+	0x192ea5a5936c, 0x0c9752d2c9b6, 0x064ba96964db, 0x1325d4b4b26d,
+	0x1992ea5a5936, 0x0cc9752d2c9b, 0x1664ba96964d, 0x1b325d4b4b26,
+	0x0d992ea5a593, 0x16cc9752d2c9, 0x1b664ba96964, 0x0db325d4b4b2,
+	0x06d992ea5a59, 0x136cc9752d2c, 0x09b664ba9696, 0x04db325d4b4b,
+	0x126d992ea5a5*/
+	0x14b4ae9336c9, 0x1a5a57499b64, 0x0d2d2ba4cdb2, 0x069695d266d9,
+	0x134b4ae9336c, 0x09a5a57499b6, 0x04d2d2ba4cdb, 0x1269695d266d,
+	0x1934b4ae9336, 0x0c9a5a57499b, 0x164d2d2ba4cd, 0x1b269695d266,
+	0x0d934b4ae933, 0x16c9a5a57499, 0x1b64d2d2ba4c, 0x0db269695d26,
+	0x06d934b4ae93, 0x136c9a5a5749, 0x19b64d2d2ba4, 0x0cdb269695d2,
+	0x066d934b4ae9, 0x1336c9a5a574, 0x099b64d2d2ba, 0x04cdb269695d,
+	0x1266d934b4ae, 0x09336c9a5a57, 0x1499b64d2d2b, 0x1a4cdb269695,
+	0x1d266d934b4a, 0x0e9336c9a5a5, 0x17499b64d2d2, 0x0ba4cdb26969,
+	0x15d266d934b4, 0x0ae9336c9a5a, 0x057499b64d2d, 0x12ba4cdb2696,
+	0x095d266d934b, 0x14ae9336c9a5, 0x1a57499b64d2, 0x0d2ba4cdb269,
+	0x1695d266d934, 0x0b4ae9336c9a, 0x05a57499b64d, 0x12d2ba4cdb26,
+	0x09695d266d93,
+}

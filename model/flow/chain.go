@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/utils/slices"
+	"github.com/pkg/errors"
 )
 
 // A ChainID is a unique identifier for a specific Flow network instance.
@@ -50,6 +51,8 @@ type chainImpl interface {
 	// zeroAddress() fails the check. Although it has a valid format, no account
 	// in Flow is assigned to zeroAddress().
 	IsValid(address Address) bool
+	// IndexFromAddress extracts the index used to generate the given address
+	IndexFromAddress(address Address) (uint64, error)
 	chain() ChainID
 }
 
@@ -66,6 +69,14 @@ func (m *monotonicImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerato
 // IsValid checks the validity of an address
 func (m *monotonicImpl) IsValid(address Address) bool {
 	return address.uint64() > 0 && address.uint64() <= maxIndex
+}
+
+// IndexFromAddress returns the index used to generate the address
+func (m *monotonicImpl) IndexFromAddress(address Address) (uint64, error) {
+	if !m.IsValid(address) {
+		return 0, errors.New("address is invalid")
+	}
+	return address.uint64(), nil
 }
 
 func (m *monotonicImpl) chain() ChainID {
@@ -103,6 +114,43 @@ func (l *linearCodeImpl) IsValid(address Address) bool {
 		codeWord >>= 1
 	}
 	return parity == 0
+}
+
+// IndexFromAddress returns the index used to generate the address.
+// It returns an error if the input is not a valid address.
+func (l *linearCodeImpl) IndexFromAddress(address Address) (uint64, error) {
+	codeWord := address.uint64()
+	codeWord ^= uint64(l.chainID.getChainCodeWord())
+
+	// check the address is valid code word
+	codeWordTemp := codeWord
+	if codeWordTemp == 0 {
+		return 0, errors.New("address is invalid")
+	}
+
+	// Multiply the code word GF(2)-vector by the parity-check matrix
+	parity := uint(0)
+	for i := 0; i < linearCodeN; i++ {
+		if codeWordTemp&1 == 1 {
+			parity ^= parityCheckMatrixColumns[i]
+		}
+		codeWordTemp >>= 1
+	}
+	if parity != 0 {
+		return 0, errors.New("address is invalid")
+	}
+
+	// truncate the address GF(2) vector (last K bits) and multiply it by the inverse matrix of
+	// the partial code generator.
+	index := uint64(0)
+	codeWord >>= (linearCodeN - linearCodeK)
+	for i := 0; i < linearCodeK; i++ {
+		if codeWord&1 == 1 {
+			index ^= inverseMatrixRows[i]
+		}
+		codeWord >>= 1
+	}
+	return index, nil
 }
 
 func (l *linearCodeImpl) chain() ChainID {
@@ -162,6 +210,7 @@ type Chain interface {
 	ServiceAddress() Address
 	BytesToAddressGenerator(b []byte) AddressGenerator
 	IsValid(Address) bool
+	IndexFromAddress(address Address) (uint64, error)
 	String() string
 	// required for tests
 	zeroAddress() Address
