@@ -7,11 +7,13 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	assert2 "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
@@ -73,10 +75,25 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	// creates a mock network with the topology instance
-	nets, err := test.CreateNetworks(logger, []*libp2p.Middleware{mw}, suite.ids, 1, true, top)
+	nets := test.CreateNetworks(suite.T(), logger, []*libp2p.Middleware{mw}, suite.ids, 1, true, top)
 	require.NoError(suite.T(), err)
 	require.Len(suite.T(), nets, 1)
 	suite.net = nets[0]
+}
+
+// TestNoDuplication evaluates that there is no duplicate in topology of a node.
+func (suite *TopicAwareTopologyTestSuite) TestNoDuplication() {
+	visited := map[flow.Identifier]struct{}{}
+	top, err := suite.net.Topology()
+	require.NoError(suite.T(), err)
+
+	for id := range top {
+		_, seen := visited[id]
+		assert2.False(suite.T(), seen, "duplicate in topology")
+
+		// marks id as seen
+		visited[id] = struct{}{}
+	}
 }
 
 // TODO: fix this test after we have fanout optimized.
@@ -96,6 +113,29 @@ func (suite *TopicAwareTopologyTestSuite) TestMembership() {
 	// every id in topology should be an id of the protocol
 	for id := range top {
 		require.Contains(suite.T(), suite.ids.NodeIDs(), id)
+	}
+}
+
+// TestTopologySize_Topic verifies that size of each topology fanout per topic is greater than
+// `(k+1)/2` where `k` is number of nodes subscribed to a topic. It does that over 100 random iterations.
+func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
+	for i := 0; i < 100; i++ {
+		top, err := topology.NewTopicAwareTopology(unittest.IdentityFixture().NodeID)
+		require.NoError(suite.T(), err)
+
+		topics := engine.GetTopicsByRole(suite.me.Role)
+		require.Greater(suite.T(), len(topics), 1)
+
+		for _, topic := range topics {
+			// extracts total number of nodes subscribed to topic
+			roles, ok := engine.GetRolesByTopic(topic)
+			require.True(suite.T(), ok)
+			total := len(suite.ids.Filter(filter.HasRole(roles...)))
+
+			idMap, err := top.Subset(suite.ids, suite.fanout, topic)
+			require.NoError(suite.T(), err)
+			require.True(suite.T(), float32(len(idMap)) >= (float32)(total+1)/2)
+		}
 	}
 }
 
