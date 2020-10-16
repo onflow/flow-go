@@ -215,8 +215,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
-	log.Info().Msg("execution receipt received")
-
 	//// check the execution receipt is sent by its executor
 	//if receipt.ExecutorID != originID {
 	//	return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
@@ -229,6 +227,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		log.Debug().Msg("discarding receipt for unknown block")
 		return nil
 	}
+
+	log = log.With().
+		Uint64("block_view", head.View).
+		Uint64("block_height", head.Height).
+		Logger()
+	log.Info().Msg("execution receipt received")
 
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
