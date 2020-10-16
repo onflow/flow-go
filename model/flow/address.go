@@ -22,10 +22,10 @@ type MonotonicAddressGenerator struct {
 	index uint64
 }
 
-// LinearCodeAddressGenerator represents the internal index of the linear code address generation mechanism
-type LinearCodeAddressGenerator struct {
-	chainID ChainID
-	index   uint64
+// linearCodeAddressGenerator represents the internal index of the linear code address generation mechanism
+type linearCodeAddressGenerator struct {
+	chainCodeWord uint64
+	index         uint64
 }
 
 const (
@@ -130,7 +130,7 @@ func (gen *MonotonicAddressGenerator) Bytes() []byte {
 }
 
 // Bytes converts an address index into a slice of bytes
-func (gen *LinearCodeAddressGenerator) Bytes() []byte {
+func (gen *linearCodeAddressGenerator) Bytes() []byte {
 	return indexToBytes(gen.index)
 }
 
@@ -184,7 +184,7 @@ func (gen *MonotonicAddressGenerator) CurrentAddress() Address {
 // as indices.
 // zeroAddress() corresponds to the index "0" while ServiceAddress() corresponds to the
 // index "1".
-func (gen *LinearCodeAddressGenerator) NextAddress() (Address, error) {
+func (gen *linearCodeAddressGenerator) NextAddress() (Address, error) {
 	err := gen.nextIndex()
 	if err != nil {
 		return EmptyAddress, err
@@ -196,7 +196,7 @@ func (gen *LinearCodeAddressGenerator) NextAddress() (Address, error) {
 // CurrentAddress returns the current account address.
 //
 // The returned address is the address of the latest created account.
-func (gen *LinearCodeAddressGenerator) CurrentAddress() Address {
+func (gen *linearCodeAddressGenerator) CurrentAddress() Address {
 	address := gen.generateAddress()
 	return address
 }
@@ -205,7 +205,7 @@ func (gen *LinearCodeAddressGenerator) CurrentAddress() Address {
 //
 // In this implemntation, the index values are simply
 // incremented from 0 to 2^k-1.
-func (gen *LinearCodeAddressGenerator) nextIndex() error {
+func (gen *linearCodeAddressGenerator) nextIndex() error {
 	gen.index++
 	if uint64(gen.index) > maxIndex {
 		return fmt.Errorf("the new index value is not valid, it must be less or equal to %x", maxIndex)
@@ -232,7 +232,7 @@ func (a *Address) uint64() uint64 {
 // (network) specifies the network to generate the address for (Flow Mainnet, testent..)
 // The function assumes the index is valid (<2^k) which means
 // a check on the index should be done before calling this function.
-func (gen *LinearCodeAddressGenerator) generateAddress() Address {
+func (gen *linearCodeAddressGenerator) generateAddress() Address {
 	index := gen.index
 
 	// Multiply the index GF(2) vector by the code generator matrix
@@ -245,7 +245,7 @@ func (gen *LinearCodeAddressGenerator) generateAddress() Address {
 	}
 
 	// customize the code word for a specific network
-	address ^= uint64(gen.chainID.getNetworkType())
+	address ^= gen.chainCodeWord
 	return uint64ToAddress(address)
 }
 

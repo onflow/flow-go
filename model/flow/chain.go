@@ -23,22 +23,16 @@ const Emulator ChainID = "flow-emulator"
 // MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
 const MonotonicEmulator ChainID = "flow-emulator-monotonic"
 
-// networkType is the type of network for which account addresses
-// are generated and checked.
-//
-// A valid address in one network is invalid in the other networks.
-type networkType uint64
-
-// getNetworkType derives the network type used for address generation from the globally
+// getChainCodeWord derives the network type used for address generation from the globally
 // configured chain ID.
-func (c ChainID) getNetworkType() networkType {
+func (c ChainID) getChainCodeWord() uint64 {
 	switch c {
 	case Mainnet:
-		return networkType(0)
+		return 0
 	case Testnet:
-		return networkType(invalidCodeTestnet)
+		return invalidCodeTestnet
 	case Emulator:
-		return networkType(invalidCodeEmulator)
+		return invalidCodeEmulator
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid or does not support linear code address generation", c))
 	}
@@ -59,42 +53,42 @@ type chainImpl interface {
 	chain() ChainID
 }
 
-// MonotonicImpl is a simple implementation of adress generation
+// monotonicImpl is a simple implementation of adress generation
 // where addresses are simply the index of the account.
-type MonotonicImpl struct{}
+type monotonicImpl struct{}
 
-func (m *MonotonicImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
+func (m *monotonicImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
 	return &MonotonicAddressGenerator{
 		index: index,
 	}
 }
 
 // IsValid checks the validity of an address
-func (m *MonotonicImpl) IsValid(address Address) bool {
+func (m *monotonicImpl) IsValid(address Address) bool {
 	return address.uint64() > 0 && address.uint64() <= maxIndex
 }
 
-func (m *MonotonicImpl) chain() ChainID {
+func (m *monotonicImpl) chain() ChainID {
 	return MonotonicEmulator
 }
 
-// LinearCodeImpl is an implementation of the address generation
+// linearCodeImpl is an implementation of the address generation
 // using linear codes.
-type LinearCodeImpl struct {
+type linearCodeImpl struct {
 	chainID ChainID
 }
 
-func (l *LinearCodeImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
-	return &LinearCodeAddressGenerator{
-		index:   index,
-		chainID: l.chainID,
+func (l *linearCodeImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
+	return &linearCodeAddressGenerator{
+		index:         index,
+		chainCodeWord: l.chainID.getChainCodeWord(),
 	}
 }
 
 // IsValid checks the validity of an address
-func (l *LinearCodeImpl) IsValid(address Address) bool {
+func (l *linearCodeImpl) IsValid(address Address) bool {
 	codeWord := address.uint64()
-	codeWord ^= uint64(l.chainID.getNetworkType())
+	codeWord ^= uint64(l.chainID.getChainCodeWord())
 
 	if codeWord == 0 {
 		return false
@@ -111,7 +105,7 @@ func (l *LinearCodeImpl) IsValid(address Address) bool {
 	return parity == 0
 }
 
-func (l *LinearCodeImpl) chain() ChainID {
+func (l *linearCodeImpl) chain() ChainID {
 	return l.chainID
 }
 
@@ -120,25 +114,25 @@ type addressedChain struct {
 }
 
 var mainnet = &addressedChain{
-	chainImpl: &LinearCodeImpl{
+	chainImpl: &linearCodeImpl{
 		chainID: Mainnet,
 	},
 }
 
 var testnet = &addressedChain{
-	chainImpl: &LinearCodeImpl{
+	chainImpl: &linearCodeImpl{
 		chainID: Testnet,
 	},
 }
 
 var emulator = &addressedChain{
-	chainImpl: &LinearCodeImpl{
+	chainImpl: &linearCodeImpl{
 		chainID: Emulator,
 	},
 }
 
 var monotonicEmulator = &addressedChain{
-	chainImpl: &MonotonicImpl{},
+	chainImpl: &monotonicImpl{},
 }
 
 // Chain returns the Chain corresponding to the string input
@@ -169,7 +163,7 @@ type Chain interface {
 	BytesToAddressGenerator(b []byte) AddressGenerator
 	IsValid(Address) bool
 	String() string
-	// required for the tests
+	// required for tests
 	zeroAddress() Address
 	newAddressGeneratorAtIndex(index uint64) AddressGenerator
 }

@@ -75,10 +75,10 @@ func TestFlowAddressConstants(t *testing.T) {
 		chain := chainID.Chain()
 		if chainID != Emulator {
 			// check the Zero and Root constants
-			expected := uint64ToAddress(uint64(chainID.getNetworkType()))
+			expected := uint64ToAddress(uint64(chainID.getChainCodeWord()))
 
 			assert.Equal(t, chain.zeroAddress(), expected)
-			expected = uint64ToAddress(generatorMatrixRows[0] ^ uint64(chainID.getNetworkType()))
+			expected = uint64ToAddress(generatorMatrixRows[0] ^ uint64(chainID.getChainCodeWord()))
 			assert.Equal(t, chain.ServiceAddress(), expected)
 		}
 
@@ -129,7 +129,8 @@ func TestAddressGeneration(t *testing.T) {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			expectedIndex++
-			expectedAddress := chain.newAddressGeneratorAtIndex(expectedIndex).CurrentAddress()
+			expectedAddress, err := chain.AddressAtIndex(expectedIndex)
+			require.NoError(t, err)
 			assert.Equal(t, address, expectedAddress)
 			require.Equal(t, state.CurrentAddress(), expectedAddress)
 		}
