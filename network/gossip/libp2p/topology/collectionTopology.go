@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -30,43 +29,21 @@ func NewCollectionTopology(nodeID flow.Identifier, state protocol.ReadOnlyState)
 	}, nil
 }
 
-// Subset samples the idList and returns a list of nodes to connect with such that:
-// a. this node is directly or indirectly connected to all other nodes in the same cluster
-// b. to all other nodes that it shares a subscription topic
-// The collection nodes within a collection cluster need to form a connected graph among themselves independent of any
-// other nodes to ensure reliable dissemination of cluster specific topic messages. e.g ClusterBlockProposal
-// Similarly, they should maintain a connected graph component with each node they share a topic,
-// to ensure reliable dissemination of messages.
-func (c CollectionTopology) Subset(idList flow.IdentityList, fanout uint, _ string) (flow.IdentityList, error) {
-	var subset flow.IdentityList
-
-	// extracts cluster peer ids to which the node belongs to
-	clusterPeers, err := c.clusterPeers()
-	if err != nil {
-		return nil, fmt.Errorf("failed to find cluster peers for node %s", c.nodeID.String())
-	}
-
-	// samples a connected graph fanout from the cluster peers set
-	clusterSample, _ := connectedGraphSample(clusterPeers, c.seed)
-	subset = append(subset, clusterSample...)
-
-	// extracts topics to which this collection node belongs to
-	topics := engine.GetTopicsByRole(flow.RoleCollection)
-
-	for _, topic := range topics {
-		topicSample, err := c.TopicAwareTopology.Subset(idList, 0, topic)
+// Subset samples and returns a connected graph fanout of the subscribers to the topic from the idList.
+// A connected graph fanout means that the subset of ids returned by this method on different nodes collectively
+// construct a connected graph component among all the subscribers to the topic.
+// If topic is a cluster-related topic it samples only among the cluster nodes to which the collection node belongs to.
+func (c CollectionTopology) Subset(idList flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
+	if engine.IsClusterTopic(topic) {
+		// extracts cluster peer ids to which the node belongs to
+		clusterPeers, err := c.clusterPeers()
 		if err != nil {
-			return nil, fmt.Errorf("could not sample topology for topic %s", topic)
+			return nil, fmt.Errorf("failed to find cluster peers for node %s", c.nodeID.String())
 		}
-
-		// extracts unique samples not existing in subset
-		uniqueSample := topicSample.Filter(filter.Not(filter.In(subset)))
-
-		// merges unique samples with the subset
-		subset = append(subset, uniqueSample...)
+		idList = clusterPeers
 	}
 
-	return subset, nil
+	return c.TopicAwareTopology.Subset(idList, fanout, topic)
 }
 
 // clusterPeers returns the list of other nodes within the same cluster as this node

@@ -3,12 +3,13 @@ package topology_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -22,6 +23,7 @@ type CollectionTopologyTestSuite struct {
 	clusterList flow.ClusterList
 	ids         flow.IdentityList
 	collectors  flow.IdentityList
+	nets        []*libp2p.Network
 }
 
 func TestCollectionTopologyTestSuite(t *testing.T) {
@@ -29,6 +31,7 @@ func TestCollectionTopologyTestSuite(t *testing.T) {
 }
 
 func (suite *CollectionTopologyTestSuite) SetupTest() {
+	suite.nets = make([]*libp2p.Network, 0)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.epochQuery = new(protocol.EpochQuery)
@@ -41,10 +44,27 @@ func (suite *CollectionTopologyTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 	suite.clusterList = clusters
 	epoch := new(protocol.Epoch)
-	epoch.On("Clustering").Return(clusters, nil).Times(nCollectors)
-	suite.epochQuery.On("Current").Return(epoch).Times(nCollectors)
-	suite.snapshot.On("Epochs").Return(suite.epochQuery).Times(nCollectors)
-	suite.state.On("Final").Return(suite.snapshot, nil).Times(nCollectors)
+	epoch.On("Clustering").Return(clusters, nil)
+	suite.epochQuery.On("Current").Return(epoch)
+	suite.snapshot.On("Epochs").Return(suite.epochQuery)
+	suite.state.On("Final").Return(suite.snapshot, nil)
+
+	// creates a topology instance for the nodes based on their roles
+	tops := make([]*topology.Topology, 0)
+	for _, id := range suite.ids {
+		var top topology.Topology
+		var err error
+		if id.Role == flow.RoleCollection {
+			top, err = topology.NewCollectionTopology(id.NodeID, suite.state)
+		} else {
+			top, err = topology.NewTopicAwareTopology(id.NodeID)
+		}
+
+		require.NoError(suite.T(), err)
+		tops = append(tops, &top)
+	}
+
+	suite.nets = test.CreateNetworks(suite.T(), suite.ids, tops, 1, true)
 }
 
 // TestSubset tests that the collection nodes using CollectionTopology form a connected graph and nodes within the same
@@ -52,12 +72,16 @@ func (suite *CollectionTopologyTestSuite) SetupTest() {
 func (suite *CollectionTopologyTestSuite) TestSubset() {
 	var adjencyMap = make(map[flow.Identifier]flow.IdentityList, len(suite.collectors))
 	// for each of the collector node, find a subset of nodes it should connect to using the CollectionTopology
-	for _, c := range suite.collectors {
-		collectionTopology, err := topology.NewCollectionTopology(c.NodeID, suite.state)
-		assert.NoError(suite.T(), err)
-		subset, err := collectionTopology.Subset(suite.ids, uint(len(suite.ids)), topology.DummyTopic)
-		assert.NoError(suite.T(), err)
-		adjencyMap[c.NodeID] = subset
+	for i, id := range suite.ids {
+		if id.Role != flow.RoleCollection {
+			continue
+		}
+
+		idMap, err := suite.nets[i].Topology()
+		require.NoError(suite.T(), err)
+
+		subset := idMapToList(idMap)
+		adjencyMap[id.NodeID] = subset
 	}
 
 	// check that all collection nodes are either directly connected or indirectly connected via other collection nodes
