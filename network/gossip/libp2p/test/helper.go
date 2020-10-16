@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -45,35 +47,53 @@ func CreateIDs(count int) []*flow.Identity {
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
-func CreateNetworks(t *testing.T, log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int,
-	dryrun bool,
-	tops ...topology.Topology) []*libp2p.Network {
-	count := len(mws)
+func CreateNetworks(t *testing.T,
+	ids flow.IdentityList,
+	tops []*topology.Topology,
+	csize int,
+	dryrun bool) []*libp2p.Network {
+
 	nets := make([]*libp2p.Network, 0)
-	metrics := metrics.NewNoopCollector()
+	mws := make([]*libp2p.Middleware, 0)
+
 	// create an empty identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
 	// identities are set to appropriate IP Port after the network and middleware are started
 	identities := make(flow.IdentityList, 0)
 
-	// if no topology is passed in, use the default topology for all networks
-	if tops == nil {
-		tops = make([]topology.Topology, count)
-		for i := range tops {
-			rpt, err := topology.NewRandPermTopology(ids[i].Role, ids[i].NodeID)
-			require.NoError(t, err, fmt.Errorf("could not create network: %w", err))
-			tops[i] = rpt
-		}
-	}
+	for i := 0; i < len(ids); i++ {
+		logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+		key, err := GenerateNetworkingKey(ids[i].NodeID)
+		require.NoError(t, err)
 
-	for i := 0; i < count; i++ {
+		// creates a middleware instance for node
+		mw, err := libp2p.NewMiddleware(logger,
+			json.NewCodec(),
+			"0.0.0.0:0",
+			ids[i].NodeID,
+			key,
+			metrics.NewNoopCollector(),
+			libp2p.DefaultMaxUnicastMsgSize,
+			libp2p.DefaultMaxPubSubMsgSize,
+			unittest.IdentifierFixture().String())
+		require.NoError(t, err)
+
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
 		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, ids[i].Role, mws[i], csize, tops[i],
-			metrics)
+		net, err := libp2p.NewNetwork(logger,
+			json.NewCodec(),
+			identities,
+			me,
+			ids[i].Role,
+			mw,
+			csize,
+			*tops[i],
+			metrics.NewNoopCollector())
+
 		require.NoError(t, err, fmt.Errorf("could not create network: %w", err))
 		nets = append(nets, net)
+		mws = append(mws, mw)
 	}
 
 	// if dryrun then don't actually start the network
