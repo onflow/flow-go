@@ -132,34 +132,33 @@ func (suite *TopologyTestSuite) TestDeteministicity() {
 	}
 }
 
-//
-//// TestUniqueness verifies that different seeds generates different topologies
-//func (suite *TopologyTestSuite) TestUniqueness() {
-//
-//	// topology of size count/2
-//	topSize := uint(suite.count / 2)
-//	var previous, current []string
-//
-//	for i := 0; i < suite.count; i++ {
-//		previous = current
-//		current = nil
-//		// generate a new topology with a the same ids, size but a different seed for each iteration
-//		identity, _ := suite.ids.ByIndex(uint(i))
-//		top, err := topology.NewRandPermTopology(flow.RoleCollection, identity.NodeID)
-//		require.NoError(suite.T(), err)
-//		idMap, err := top.Subset(suite.ids, topSize, topology.DummyTopic)
-//		require.NoError(suite.T(), err)
-//
-//		for _, v := range idMap {
-//			current = append(current, v.NodeID.String())
-//		}
-//		sort.Strings(current)
-//
-//		if previous == nil {
-//			continue
-//		}
-//
-//		// assert that a different seed generates a different topology
-//		require.NotEqual(suite.T(), previous, current)
-//	}
-//}
+// TestUniqueness verifies that different seeds generates different topologies
+func (suite *TopologyTestSuite) TestUniqueness() {
+
+	// topology of size count/2
+	topSize := uint(suite.count / 2)
+	var previous, current []string
+
+	for i := 0; i < suite.count; i++ {
+		previous = current
+		current = nil
+		// generate a new topology with a the same ids, size but a different seed for each iteration
+		identity, _ := suite.ids.ByIndex(uint(i))
+		top, err := topology.NewRandPermTopology(flow.RoleCollection, identity.NodeID)
+		require.NoError(suite.T(), err)
+		idMap, err := top.Subset(suite.ids, topSize, topology.DummyTopic)
+		require.NoError(suite.T(), err)
+
+		for _, v := range idMap {
+			current = append(current, v.NodeID.String())
+		}
+		sort.Strings(current)
+
+		if previous == nil {
+			continue
+		}
+
+		// assert that a different seed generates a different topology
+		require.NotEqual(suite.T(), previous, current)
+	}
+}
