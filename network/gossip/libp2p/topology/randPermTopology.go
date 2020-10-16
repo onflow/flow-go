@@ -20,6 +20,8 @@ type RandPermTopology struct {
 	seed   int64
 }
 
+// Deprecated: RandPermTopology is planned for deprecation and should not be utilized
+// use TopicAwareTopology instead.
 func NewRandPermTopology(role flow.Role, id flow.Identifier) (RandPermTopology, error) {
 	seed, err := seedFromID(id)
 	if err != nil {
