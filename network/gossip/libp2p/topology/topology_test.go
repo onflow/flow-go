@@ -1,4 +1,4 @@
-package test
+package topology_test
 
 import (
 	"os"
@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -52,7 +53,7 @@ func (suite *TopologyTestSuite) SetupTest() {
 	suite.me = *suite.ids[0]
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	key, err := GenerateNetworkingKey(suite.me.NodeID)
+	key, err := test.GenerateNetworkingKey(suite.me.NodeID)
 	require.NoError(suite.T(), err)
 
 	// creates a middleware instance
@@ -72,7 +73,7 @@ func (suite *TopologyTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	// creates a mock network with the topology instance
-	nets, err := createNetworks(logger, []*libp2p.Middleware{mw}, suite.ids, 1, true, top)
+	nets, err := test.CreateNetworks(logger, []*libp2p.Middleware{mw}, suite.ids, 1, true, top)
 	require.NoError(suite.T(), err)
 	require.Len(suite.T(), nets, 1)
 	suite.net = nets[0]

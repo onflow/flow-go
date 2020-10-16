@@ -39,11 +39,11 @@ func CreateIDs(count int) []*flow.Identity {
 	return identities
 }
 
-// createNetworks receives a slice of middlewares their associated flow identifiers,
+// CreateNetworks receives a slice of middlewares their associated flow identifiers,
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
-func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool,
+func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool,
 	tops ...topology.Topology) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
