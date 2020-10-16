@@ -539,7 +539,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// until the block has been received or the result has been purged
 		block, err := e.headersDB.ByBlockID(result.BlockID)
 		if errors.Is(err, storage.ErrNotFound) {
-			log.Debug().Msg("skipping result with unknown block")
+			e.log.Debug().Msg("skipping result with unknown block")
 			continue
 		}
 		if err != nil {
@@ -557,7 +557,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 			var err error
 			previous, err = e.resultsDB.ByID(previousID)
 			if errors.Is(err, storage.ErrNotFound) {
-				log.Debug().Msg("skipping result with unknown previous result")
+				e.log.Debug().Msg("skipping result with unknown previous result")
 				continue
 			}
 			if err != nil {
@@ -593,7 +593,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 		if len(result.Chunks) != requiredChunks {
 			_ = e.results.Rem(result.ID())
-			log.Warn().
+			e.log.Warn().
 				Int("result_chunks", len(result.Chunks)).
 				Int("required_chunks", requiredChunks).
 				Msg("removing result with invalid number of chunks")
