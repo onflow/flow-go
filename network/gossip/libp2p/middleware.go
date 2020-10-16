@@ -98,6 +98,11 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		maxUnicastMsgSize = DefaultMaxUnicastMsgSize
 	}
 
+	err = InitializePeerInfoCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create middleware: %w", err)
+	}
+
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
 		ctx:               ctx,
