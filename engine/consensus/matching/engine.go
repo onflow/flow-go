@@ -231,16 +231,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	}
 
 	if len(receipt.ExecutionResult.FinalStateCommit) == 0 {
-		lastChunk := chunks[numberChunks-1]
-		altFinalState := lastChunk.EndState
-		if len(altFinalState) < 1 {
-			log.Error().Msg("execution receipt with neither FinalStateCommit nor lastChunk.EndState")
-			return nil
-		}
-		receipt.ExecutionResult.FinalStateCommit = altFinalState
-		log.Warn().Msg("execution receipt received with empty FinalStateCommit BUT used lastChunk.EndState instead")
-	} else {
-		log.Info().Msg("execution receipt received")
+		log.Error().Msg("dropping execution receipt with empty final state commitment")
+		return nil
 	}
 
 	//// check the execution receipt is sent by its executor
