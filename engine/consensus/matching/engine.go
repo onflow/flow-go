@@ -95,7 +95,7 @@ func New(
 		missing:                 make(map[flow.Identifier]uint),
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
-		maxUnsealedResults:      200,
+		maxUnsealedResults:      10,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
 	}
