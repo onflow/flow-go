@@ -182,7 +182,7 @@ func (gen *linearCodeAddressGenerator) CurrentAddress() Address {
 	return uint64ToAddress(address)
 }
 
-// returns the next index given an addressing index.
+// increments the internal index of the generator.
 //
 // In this implemntation, the index values are simply
 // incremented from 0 to 2^k-1.
