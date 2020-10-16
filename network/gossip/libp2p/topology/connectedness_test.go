@@ -22,8 +22,6 @@ type ConnectednessTestSuite struct {
 func TestRandPermTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(ConnectednessTestSuite))
 }
-func (suite *ConnectednessTestSuite) SetupTest() {
-}
 
 // TestNodesConnected tests overall node connectedness and connectedness by role by keeping nodes of one role type in
 // minority (~2%)
