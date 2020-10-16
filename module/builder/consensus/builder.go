@@ -3,6 +3,7 @@
 package consensus
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -225,16 +226,17 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// to at most the parent.
 
 	// create a mapping of block to seal for all seals in our pool
-	byBlock := make(map[flow.Identifier]*flow.Seal)
-	for _, seal := range b.sealPool.All() {
-		if seal2, found := byBlock[seal.BlockID]; found {
-			fmt.Printf("ERROR: multiple seals for the same block: %v with result IDs %v %v", seal.BlockID, seal.ResultID, seal2.ResultID)
+	byBlock := make(map[flow.Identifier]*flow.SealContainer)
+	for _, sealContainer := range b.sealPool.All() {
+		seal := sealContainer.Seal
+		if sc2, found := byBlock[seal.BlockID]; found {
+			fmt.Printf("ERROR: multiple seals for the same block: %v with result IDs %v %v", seal.BlockID, seal.ResultID, sc2.Seal.ResultID)
 		}
-		byBlock[seal.BlockID] = seal
+		byBlock[seal.BlockID] = sealContainer
 	}
 	if int(b.sealPool.Size()) > len(byBlock) {
 		fmt.Printf("ERROR: multiple seals for the same block")
-		byBlock = make(map[flow.Identifier]*flow.Seal)
+		byBlock = make(map[flow.Identifier]*flow.SealContainer)
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -279,10 +281,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			break
 		}
 
-		seals = append(seals, next)
+		nextErToBeSealed := next.ExecutionResult
+		if len(nextErToBeSealed.Chunks) < 1 {
+			return nil, fmt.Errorf("ExecutionResult without chunks: %v", nextErToBeSealed.ID())
+		}
+		initialState := nextErToBeSealed.Chunks[0].StartState
+		if !bytes.Equal(initialState, last.FinalState) {
+			return nil, fmt.Errorf("seal execution states do not connect in finalized")
+		}
+
+		seals = append(seals, next.Seal)
 		sealCount++
 		delete(byBlock, blockID)
-		last = next
+		last = next.Seal
 	}
 
 	// NOTE: We should only run the next part in case we did not use up all
@@ -318,9 +329,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			break
 		}
 
-		seals = append(seals, next)
+		seals = append(seals, next.Seal)
 		delete(byBlock, pendingID)
-		last = next
+		last = next.Seal
 	}
 
 	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
