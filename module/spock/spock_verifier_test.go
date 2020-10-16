@@ -95,7 +95,8 @@ func (vs *SpockVerifierTestSuite) SetupTest() {
 	vs.verifier = NewVerifier(vs.state)
 }
 
-// TestResultIDNotAdded tests if `verfiier.AddReceipt` creates a map entry if the result.ID() does not exists
+// TestResultIDNotAdded tests if `verfiier.AddReceipt` creates a map entry if
+// the result.ID() does not exists
 func (vs *SpockVerifierTestSuite) TestResultIDNotAdded() {
 	receipt := unittest.ExecutionReceiptFixture()
 
@@ -109,6 +110,8 @@ func (vs *SpockVerifierTestSuite) TestResultIDNotAdded() {
 	require.True(vs.T(), len(receipts) == 1)
 }
 
+// TestAddReceiptWithMatchingSpocks tests whether two receipts added  with matching
+// spocks get included in the receipts map
 func (vs *SpockVerifierTestSuite) TestAddReceiptWithMatchingSpocks() {
 	receipt, _ := vs.ReceiptWithSpocks()
 
@@ -131,6 +134,8 @@ func (vs *SpockVerifierTestSuite) TestAddReceiptWithMatchingSpocks() {
 	require.True(vs.T(), len(receipts) == 1)
 }
 
+// TestAddReceiptWithNonMatchingSpocks tests if the receipts are inluded if they
+// have matching and non matching spocks
 func (vs *SpockVerifierTestSuite) TestAddReceiptWithNonMatchingSpocks() {
 	receipt1, _ := vs.ReceiptWithSpocks()
 	receipt2, _ := vs.ReceiptWithSpocks()
@@ -167,6 +172,8 @@ func (vs *SpockVerifierTestSuite) TestAddReceiptWithNonMatchingSpocks() {
 	require.True(vs.T(), len(receipts) == 1)
 }
 
+// TestMatchingApprovalSpockWithReceipt tests if the approvals get verified when
+// matching with receipt which is already in map
 func (vs *SpockVerifierTestSuite) TestMatchingApprovalSpockWithReceipt() {
 	receipt, spockSecret := vs.ReceiptWithSpocks()
 
@@ -181,6 +188,30 @@ func (vs *SpockVerifierTestSuite) TestMatchingApprovalSpockWithReceipt() {
 		require.NoError(vs.T(), err)
 		require.NotNil(vs.T(), matched)
 	}
+}
+
+// TestApprovalCache tests if the cache for approval works as intended and
+// caches receipt matching approval on first call to `VerifyApproval`
+func (vs *SpockVerifierTestSuite) TestApprovalCache() {
+	receipt, spockSecret := vs.ReceiptWithSpocks()
+
+	// add receipt to verifier buckets
+	err := vs.verifier.AddReceipt(receipt)
+	require.NoError(vs.T(), err)
+
+	// check if approval spock matched receipt spocks
+	approvals := vs.ApprovalsForReceipt(receipt, spockSecret)
+	approval := approvals[0]
+
+	// submit approval for verification
+	matchedReceipt, err := vs.verifier.VerifyApproval(approval)
+	require.NoError(vs.T(), err)
+	require.NotNil(vs.T(), matchedReceipt)
+
+	// matched receipt should be cached for this approval
+	cachedReceipt, ok := vs.verifier.approvals[receipt.ExecutionResult.ID()][approval.ID()]
+	require.True(vs.T(), ok)
+	require.Equal(vs.T(), matchedReceipt.ID(), cachedReceipt.ID())
 }
 
 // ReceiptWithSpocks generates a receipt with the exe id and generates spocks for each

@@ -73,9 +73,9 @@ func (v *Verifier) AddReceipt(receipt *flow.ExecutionReceipt) error {
 func (v *Verifier) VerifyApproval(approval *flow.ResultApproval) (*flow.ExecutionReceipt, error) {
 
 	// check if verification already done and that a match is there
-	// note: we do not add to cache if the approval was not verified (sanity-check)
+	// note: we do not add to cache if the approval was not verified
 	receipt, ok := v.approvals[approval.Body.ExecutionResultID][approval.ID()]
-	if receipt != nil && ok {
+	if ok {
 		return receipt, nil
 	}
 

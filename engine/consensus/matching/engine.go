@@ -170,7 +170,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // Receipts can come from this function or the receipt provider setup in the
 // engine constructor.
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
-
 	e.log.Debug().Msg("received receipt from requester engine")
 
 	err := e.process(originID, receipt)
