@@ -78,11 +78,13 @@ func (suite *TopologyTestSuite) SetupTest() {
 	suite.net = nets[0]
 }
 
+// TODO: fix this test after we have fanout optimized.
+// TestTopologySize evaluates that overall topology size of a node is bound by its fanout.
 func (suite *TopologyTestSuite) TestTopologySize() {
-	//// topology of size the entire network
-	//top, err := suite.net.Topology()
-	//require.NoError(suite.T(), err)
-	//require.Len(suite.T(), top, suite.expectedSize)
+	suite.T().Skip("this test requires optimizing the fanout per topic")
+	top, err := suite.net.Topology()
+	require.NoError(suite.T(), err)
+	require.Len(suite.T(), top, int(suite.fanout))
 }
 
 // TestMembership evaluates every id in topology to be a protocol id
@@ -132,21 +134,36 @@ func (suite *TopologyTestSuite) TestDeteministicity() {
 	}
 }
 
-// TestUniqueness verifies that different seeds generates different topologies
+// TestUniqueness generates a topology for the first topic of consensus nodes.
+// Since topologies are seeded with the node ids, it evaluates that every two consecutive
+// topologies of the same topic for distinct nodes are distinct.
+//
+// Note: currently we are using a linear fanout for guaranteed delivery, hence there are
+// C(n, (n+1)/2) many unique topologies for the same topic across different nodes. Even for small numbers
+// like n = 300, the potential outcomes are large enough (i.e., 10e88) so that the uniqueness is guaranteed.
+// This test however, performs a very weak uniqueness test by checking the uniqueness among consecutive topologies.
 func (suite *TopologyTestSuite) TestUniqueness() {
-
-	// topology of size count/2
-	topSize := uint(suite.count / 2)
 	var previous, current []string
 
-	for i := 0; i < suite.count; i++ {
+	// for each topic samples 100 topologies
+	// all topologies for a topic should be the same
+	topics := engine.GetTopicsByRole(flow.RoleConsensus)
+	require.Greater(suite.T(), len(topics), 1)
+
+	for i := 0; i < len(suite.ids); i++ {
 		previous = current
 		current = nil
-		// generate a new topology with a the same ids, size but a different seed for each iteration
+
+		// extracts all topics node (i) subscribed to
 		identity, _ := suite.ids.ByIndex(uint(i))
-		top, err := topology.NewRandPermTopology(flow.RoleCollection, identity.NodeID)
+		if identity.Role != flow.RoleConsensus {
+			continue
+		}
+
+		// creates and samples a new topic aware topology for the first topic of collection nodes
+		top, err := topology.NewTopicAwareTopology(identity.NodeID)
 		require.NoError(suite.T(), err)
-		idMap, err := top.Subset(suite.ids, topSize, topology.DummyTopic)
+		idMap, err := top.Subset(suite.ids, suite.fanout, topics[0])
 		require.NoError(suite.T(), err)
 
 		for _, v := range idMap {
