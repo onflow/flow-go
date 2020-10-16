@@ -210,6 +210,11 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Logger()
 
+	if len(receipt.ExecutionResult.FinalStateCommit) == 0 {
+		log.Error().Msg("execution receipt without FinalStateCommit received")
+		return nil
+	}
+
 	log.Info().Msg("execution receipt received")
 
 	// check the execution receipt is sent by its executor
