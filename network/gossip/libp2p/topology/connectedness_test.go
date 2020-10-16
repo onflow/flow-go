@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -91,19 +91,7 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	// mocks state for collector nodes topology
 	// considers only a single cluster as higher cluster numbers are tested
 	// in collectionTopology_test
-	state := new(protocol.State)
-	snapshot := new(protocol.Snapshot)
-	epochQuery := new(protocol.EpochQuery)
-	collectors := ids.Filter(filter.HasRole(flow.RoleCollection))
-	assignments := unittest.ClusterAssignment(1, collectors)
-	clusters, err := flow.NewClusterList(assignments, collectors)
-	require.NoError(suite.T(), err)
-
-	epoch := new(protocol.Epoch)
-	epoch.On("Clustering").Return(clusters, nil)
-	epochQuery.On("Current").Return(epoch)
-	snapshot.On("Epochs").Return(epochQuery)
-	state.On("Final").Return(snapshot, nil)
+	state := topology.CreateMockStateForCollectionNodes(suite.T(), ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
 	tops := test.CreateTopologies(suite.T(), state, ids)
@@ -122,24 +110,6 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 
 	// check that nodes form a connected graph
 	checkConnectedness(suite.T(), adjencyMap, ids)
-}
-
-// TestSubsetDeterminism tests that if the id list remains the same, the Topology.Subset call always yields the same
-// list of nodes
-func (suite *ConnectednessTestSuite) TestSubsetDeterminism() {
-	//ids := unittest.IdentityListFixture(100, unittest.WithAllRoles())
-	//for _, id := range ids {
-	//	rpt, err := topology.NewRandPermTopology(flow.RoleConsensus, id.NodeID)
-	//	suite.NoError(err)
-	//	var prev flow.IdentityList
-	//	for i := 0; i < 10; i++ {
-	//		current, err := rpt.Subset(ids, uint(100), topology.DummyTopic)
-	//		suite.NoError(err)
-	//		if prev != nil {
-	//			assert.EqualValues(suite.T(), prev, current)
-	//		}
-	//	}
-	//}
 }
 
 // createDistribution creates a count distribution of ~total number of nodes with 2% minority node count

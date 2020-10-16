@@ -13,7 +13,7 @@ import (
 
 // createMockStateForCollectionNodes is a test helper function that generate a mock state
 // clustering collection nodes into `clusterNum` clusters.
-func createMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, clusterNum uint) protocol.State {
+func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, clusterNum uint) protocol.State {
 	state := new(mock2.State)
 	snapshot := new(mock2.Snapshot)
 	epochQuery := new(mock2.EpochQuery)
