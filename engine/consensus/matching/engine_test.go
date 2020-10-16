@@ -95,6 +95,8 @@ type MatchingSuite struct {
 	assigner *module.ChunkAssigner
 
 	matching *Engine
+
+	spockVerifier *module.SpockVerifier
 }
 
 func (ms *MatchingSuite) SetupTest() {
@@ -281,6 +283,8 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.requester = new(module.Requester)
 	ms.assigner = &module.ChunkAssigner{}
 
+	ms.spockVerifier = &module.SpockVerifier{}
+
 	ms.matching = &Engine{
 		unit:                    unit,
 		log:                     log,
@@ -299,6 +303,7 @@ func (ms *MatchingSuite) SetupTest() {
 		maxUnsealedResults:      200,
 		assigner:                ms.assigner,
 		requireApprovals:        true,
+		spockVerifier:           ms.spockVerifier,
 	}
 }
 
@@ -419,6 +424,9 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 			ms.Assert().Equal(incorporatedResult.Result, &receipt.ExecutionResult)
 		},
 	).Return(true, nil)
+
+	// mock AddReceipt to return no errors
+	ms.spockVerifier.On("AddReceipt", mock.Anything).Return(nil)
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
@@ -556,6 +564,9 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 			ms.Assert().Equal(approval, added)
 		},
 	).Return(true, nil)
+
+	// mock spock verifier to verify approvals
+	ms.spockVerifier.On("VerifyApproval", mock.Anything).Return(unittest.ExecutionReceiptFixture(), nil).Once()
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().NoError(err, "should add approval to mempool if valid")
@@ -881,9 +892,15 @@ func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 			approval.Body.ApproverID = approver.NodeID
 			approval.Body.ChunkIndex = index
 			_, err := ms.matching.approvals.Add(approval)
+
 			ms.Require().NoError(err)
 		}
 	}
+
+	// mock spock verifier to verify approvals
+	ms.spockVerifier.On("VerifyApproval", mock.Anything).
+		Return(unittest.ExecutionReceiptFixture(), nil).
+		Times(incorporatedResult.Result.Chunks.Len() * len(ms.approvers.NodeIDs()))
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)

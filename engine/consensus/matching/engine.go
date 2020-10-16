@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/module/spock"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -53,6 +55,7 @@ type Engine struct {
 	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
 	maxUnsealedResults      int                             // how many unsealed results to check when check sealing
 	requireApprovals        bool                            // flag to disable verifying chunk approvals
+	spockVerifier           module.SpockVerifier            // spock verification manager
 }
 
 // New creates a new collection propagation engine.
@@ -97,6 +100,7 @@ func New(
 		maxUnsealedResults:      200,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
+		spockVerifier:           spock.NewVerifier(state),
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
@@ -166,7 +170,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // Receipts can come from this function or the receipt provider setup in the
 // engine constructor.
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
-
 	e.log.Debug().Msg("received receipt from requester engine")
 
 	err := e.process(originID, receipt)
@@ -284,6 +287,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.log.Info().Msg("execution result added to mempool")
 
+	// add receipt to spock verifier
+	err = e.spockVerifier.AddReceipt(receipt)
+	if err != nil {
+		return fmt.Errorf("could not add receipt to spock verifier: %w", err)
+	}
+
 	// kick off a check for potential seal formation
 	e.unit.Launch(e.checkSealing)
 
@@ -357,6 +366,14 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
+
+	// Attempt to match approval spock to receipt
+	// could possible return nil as receipt might not be availiable to match
+	// but will be matched later when we call checkSealing()
+	_, err = e.spockVerifier.VerifyApproval(approval)
+	if err != nil {
+		return fmt.Errorf("could not verify approval: %w", err)
+	}
 
 	// kick off a check for potential seal formation
 	e.unit.Launch(e.checkSealing)
@@ -568,7 +585,10 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 
 		// check that each chunk collects enough approvals
 		for _, chunk := range incorporatedResult.Result.Chunks {
-			matched := e.matchChunk(incorporatedResult.Result.ID(), chunk, assignment)
+			matched, err := e.matchChunk(incorporatedResult.Result.ID(), chunk, assignment)
+			if err != nil {
+				return nil, fmt.Errorf("could not match chunk: %w", err)
+			}
 			if !matched {
 				allChunksMatched = false
 				break
@@ -587,32 +607,69 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold.
-func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
+func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
 
 	// get all the chunk approvals from mempool
 	approvals := e.approvals.ByChunk(resultID, chunk.Index)
 
-	// only keep approvals from assigned verifiers
-	var validApprovers flow.IdentifierList
-	for approverID := range approvals {
+	// matched approvals map to keep track of approvals by receipt ID
+	matchedApprovals := make(map[flow.Identifier][]*flow.ResultApproval)
+
+	// only keep approvals from assigned verifiers and if spocks match
+	for approverID, approval := range approvals {
+		// check if chunk is assigned
 		ok := chmodule.IsValidVerifer(assignment, chunk, approverID)
-		if ok {
-			validApprovers = append(validApprovers, approverID)
+		if !ok {
+			continue
 		}
+
+		// check if spocks match
+		matched, err := e.spockVerifier.VerifyApproval(approval)
+		if err != nil {
+			return false, fmt.Errorf("could get validate spocks: %w", err)
+		}
+		if matched == nil {
+			e.log.Error().Msg("spock validation failed: spocks do not match")
+			continue
+		}
+
+		// add to map to keep track of the receipt matched to approval
+		matchedID := matched.ID()
+		if _, ok := matchedApprovals[matchedID]; !ok {
+			a := make([]*flow.ResultApproval, 0)
+			a = append(a, approval)
+			matchedApprovals[matchedID] = a
+		} else {
+			matchedApprovals[matchedID] = append(matchedApprovals[matchedID], approval)
+		}
+	}
+
+	// find most matched receipt
+	mostMatches := 0
+	for _, ras := range matchedApprovals {
+		totalMatchedApprovals := len(ras)
+		// check if they are the same
+		if totalMatchedApprovals == mostMatches {
+			e.log.Warn().Msg("two receipts with equal matching approvals")
+			continue
+		}
+		// set most matches to highest approval count per receipt
+		if totalMatchedApprovals > mostMatches {
+			mostMatches = totalMatchedApprovals
+		}
+	}
+
+	//   * this is only here temporarily to ease the migration to new chunk
+	//     based sealing.
+	if !e.requireApprovals {
+		return true, nil
 	}
 
 	// skip counting approvals
 	// TODO:
-	//   * this is only here temporarily to ease the migration to new chunk
-	//     based sealing.
-	if !e.requireApprovals {
-		return true
-	}
-
-	// TODO:
-	//   * This is the happy path (requires just one approval per chunk).
-	//   * Full protocol should be +2/3 of all currently staked verifiers.
-	return len(validApprovers) > 0
+	//  This is the happy path (requires just one approval per chunk). Should
+	//    be +2/3 of all currently staked verifiers.
+	return mostMatches > 0, nil
 }
 
 // sealResult creates a seal for the incorporated result and adds it to the
@@ -655,9 +712,7 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	return nil
 }
 
-// collectAggregateSignatures collects approver signatures and identities per
-// chunk
-// TODO: needs testing
+// collectAggregateSignatures collects approver signatures and identities per chunk
 func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
 	resultID := result.ID()
 	signatures := make([]flow.AggregatedSignature, 0, len(result.Chunks))
@@ -734,6 +789,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	for _, result := range e.incorporatedResults.All() {
 		if clear[result.ID()] || shouldClear(result.Result.BlockID) {
 			_ = e.incorporatedResults.Rem(result)
+			_ = e.spockVerifier.ClearReceipts(result.ID())
 		}
 	}
 	for _, approval := range e.approvals.All() {
