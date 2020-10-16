@@ -210,20 +210,43 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Logger()
 
-	log.Info().Msg("execution receipt received")
-
-	// check the execution receipt is sent by its executor
-	if receipt.ExecutorID != originID {
-		return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
-	}
-
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later.
-	_, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
+	head, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
 	if err != nil {
 		log.Debug().Msg("discarding receipt for unknown block")
 		return nil
 	}
+	log = log.With().
+		Uint64("block_view", head.View).
+		Uint64("block_height", head.Height).
+		Logger()
+	log.Info().Msg("execution receipt received")
+
+	chunks := receipt.ExecutionResult.Chunks
+	numberChunks := len(chunks)
+	if numberChunks < 1 {
+		log.Error().Msg("dropping execution receipt with zero chunks")
+		return nil
+	}
+
+	if len(receipt.ExecutionResult.FinalStateCommit) == 0 {
+		lastChunk := chunks[numberChunks-1]
+		altFinalState := lastChunk.EndState
+		if len(altFinalState) < 1 {
+			log.Error().Msg("execution receipt with neither FinalStateCommit nor lastChunk.EndState")
+			return nil
+		}
+		receipt.ExecutionResult.FinalStateCommit = altFinalState
+		log.Warn().Msg("execution receipt received with empty FinalStateCommit BUT used lastChunk.EndState instead")
+	} else {
+		log.Info().Msg("execution receipt received")
+	}
+
+	//// check the execution receipt is sent by its executor
+	//if receipt.ExecutorID != originID {
+	//	return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
+	//}
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a execution receipt (usually execution nodes)
