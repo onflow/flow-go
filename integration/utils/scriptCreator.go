@@ -129,7 +129,7 @@ transaction() {
 	  var s: Int256 = 1024102410241024
 	  var m: Int256 = 3
 	  var i = 0
-	  while i < %s {
+	  while i < %d {
 		  s = s * m
 		i = i + 1
 	  }
