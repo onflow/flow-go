@@ -342,6 +342,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if len(byBlock) == 0 {
 			break
 		}
+		// add at most <maxSealCount> number of seals in a new block proposal
+		// in order to prevent the block payload from being too big.
+		if sealCount >= b.cfg.maxSealCount {
+			break
+		}
 		if unchained {
 			break
 		}
