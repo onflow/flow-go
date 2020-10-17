@@ -410,7 +410,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 
 func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	// TODO move this as a configurable parameter
-	numberOfKeysToAdd := 5
+	numberOfKeysToAdd := 20
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error getting reference block")
