@@ -96,8 +96,9 @@ func dequeue(queue *Queue) *Queue {
 	cache := make(map[flow.Identifier]*Node)
 
 	//copy all but head caches
+	headID := queue.Head.Item.ID() // hashing is a comparatively expensive operation (about 1000 cpu cycles)
 	for key, val := range queue.Nodes {
-		if key != queue.Head.Item.ID() {
+		if key != headID {
 			cache[key] = val
 		}
 	}
@@ -108,9 +109,18 @@ func dequeue(queue *Queue) *Queue {
 	}
 }
 
-// TryAdd tries to add a new Node to the queue and returns if the operation has been successful
-// A node can only be added if the parent exists in the queue
+// TryAdd tries to add a new Node to the queue.
+// A node can only be added if the parent exists in the queue.
+// Returns:
+// True if and only if _after_ the operation, the executableBlock is stored in the queue.
+// This is the case if (a) the element was newly added to the queue or (b) the element
+// was already stored in the queue _before_ the call.
 func (q *Queue) TryAdd(executableBlock Blockify) bool {
+	if _, blockAlreadyPresent := q.Nodes[executableBlock.ID()]; blockAlreadyPresent {
+		return true
+	}
+	// at this point, we are sure that the node is _not_ in the queue and therefore,
+	// the element cannot be referenced as a child by any other element in the queue
 	n, ok := q.Nodes[executableBlock.ParentID()]
 	if !ok {
 		return false
