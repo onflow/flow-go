@@ -210,6 +210,11 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Logger()
 
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not get sealed head: %w", err)
+	}
+
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later.
 	head, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
@@ -217,6 +222,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		log.Debug().Msg("discarding receipt for unknown block")
 		return nil
 	}
+
+	if head.Height <= sealed.Height {
+		log.Debug().Msg("discarding receipt for already sealed block")
+		return nil
+	}
+
 	log = log.With().
 		Uint64("block_view", head.View).
 		Uint64("block_height", head.Height).
