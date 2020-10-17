@@ -120,3 +120,24 @@ transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
 func (sc *ScriptCreator) CreateAccountsTransaction(fungibleToken, flowToken flowsdk.Address) []byte {
 	return []byte(fmt.Sprintf(createAccountsTransactionTemplate, fungibleToken, flowToken))
 }
+
+const compHeavyTransactionTemplate = `
+transaction() {
+	prepare(signer1: AuthAccount){
+	}
+	execute {
+	  var s: Int256 = 1024102410241024
+	  var m: Int256 = 3
+	  var i = 0
+	  while i < %s {
+		  s = s * m
+		i = i + 1
+	  }
+	  log(s)
+  }
+}
+`
+
+func (sc *ScriptCreator) CreateCompHeavyTransaction(steps int) []byte {
+	return []byte(fmt.Sprintf(compHeavyTransactionTemplate, steps))
+}

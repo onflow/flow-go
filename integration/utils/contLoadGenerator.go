@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -22,8 +21,7 @@ type LoadType int
 const (
 	TokenTransferLoadType LoadType = 0
 	TokenAddKeysLoadType  LoadType = 1
-
-	MixedLoadType LoadType = 100
+	CompHeavyLoadType     LoadType = 2
 )
 
 const accountCreationBatchSize = 100
@@ -138,15 +136,14 @@ func (lg *ContLoadGenerator) Start() {
 	// spawn workers
 	for i := 0; i < lg.tps; i++ {
 		var worker Worker
-		ltype := lg.loadType
-		if ltype == MixedLoadType {
-			ltype = LoadType(rand.Intn(int(MixedLoadType)))
-		}
+
 		switch lg.loadType {
 		case TokenTransferLoadType:
 			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
 		case TokenAddKeysLoadType:
 			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
+		case CompHeavyLoadType:
+			worker = NewWorker(i, 1*time.Second, lg.sendCompHeavyTx)
 		}
 
 		worker.Start()
@@ -494,6 +491,100 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 			}, // on timout
 			func(_ flowsdk.Identifier, err error) {
 				lg.log.Error().Err(err).Str("tx_id", addKeysTx.ID().String()).Msgf("tx error")
+				if !stopped {
+					stopped = true
+					wg.Done()
+				}
+			}, // on error
+			60)
+		wg.Add(1)
+		wg.Wait()
+	}
+}
+
+func (lg *ContLoadGenerator) sendCompHeavyTx(workerID int) {
+	// TODO move this as a configurable parameter
+	numberOfKeysToAdd := 20
+	blockRef, err := lg.blockRef.Get()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error getting reference block")
+		return
+	}
+
+	lg.log.Trace().Msgf("getting next available account")
+
+	acc := <-lg.availableAccounts
+	defer func() { lg.availableAccounts <- acc }()
+
+	lg.log.Trace().Msgf("creating add proposer key script")
+	keys := make([]*flowsdk.AccountKey, 0)
+	for i := 0; i < numberOfKeysToAdd; i++ {
+		keys = append(keys, lg.serviceAccount.accountKey)
+	}
+
+	txScript := lg.scriptCreator.CreateCompHeavyTransaction(3)
+
+	lg.log.Trace().Msgf("creating transaction")
+	tx := flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef).
+		SetScript(txScript).
+		SetProposalKey(*acc.address, 0, acc.seqNumber).
+		SetPayer(*acc.address).
+		AddAuthorizer(*acc.address)
+
+	lg.log.Trace().Msgf("signing transaction")
+	acc.signerLock.Lock()
+	err = tx.SignEnvelope(*acc.address, 0, acc.signer)
+	if err != nil {
+		acc.signerLock.Unlock()
+		lg.log.Error().Err(err).Msgf("error signing transaction")
+		return
+	}
+	acc.seqNumber++
+	acc.signerLock.Unlock()
+
+	lg.log.Trace().Msgf("sending transaction")
+	err = lg.flowClient.SendTransaction(context.Background(), *tx)
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error sending transaction")
+		return
+	}
+
+	lg.log.Trace().Msgf("tracking sent transaction")
+	lg.workerStatsTracker.AddTxSent()
+	lg.loaderMetrics.TransactionSent()
+
+	if lg.trackTxs {
+		stopped := false
+		wg := sync.WaitGroup{}
+		lg.txTracker.AddTx(tx.ID(),
+			nil,
+			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+				lg.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+				if !stopped {
+					stopped = true
+					wg.Done()
+				}
+			}, // on finalized
+			func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
+				lg.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
+			}, // on sealed
+			func(_ flowsdk.Identifier) {
+				lg.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
+				if !stopped {
+					stopped = true
+					wg.Done()
+				}
+			}, // on expired
+			func(_ flowsdk.Identifier) {
+				lg.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
+				if !stopped {
+					stopped = true
+					wg.Done()
+				}
+			}, // on timout
+			func(_ flowsdk.Identifier, err error) {
+				lg.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
 				if !stopped {
 					stopped = true
 					wg.Done()
