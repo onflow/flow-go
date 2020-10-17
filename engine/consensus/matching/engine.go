@@ -283,14 +283,14 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// check if the result of this receipt is already sealed.
 	result := &receipt.ExecutionResult
-	_, err = e.resultsDB.ByID(result.ID())
-	if err == nil {
-		log.Debug().Msg("discarding receipt for sealed result")
-		return nil
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check result: %w", err)
-	}
+	//_, err = e.resultsDB.ByID(result.ID())
+	//if err == nil {
+	//	log.Debug().Msg("discarding receipt for sealed result")
+	//	return nil
+	//}
+	//if !errors.Is(err, storage.ErrNotFound) {
+	//	return fmt.Errorf("could not check result: %w", err)
+	//}
 
 	// store the result belonging to the receipt in the memory pool
 	added := e.results.Add(result)
@@ -311,6 +311,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 // onApproval processes a new result approval.
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+
+	// TODO HOTFIX we aren't checking RAs
+	return nil
 
 	log := e.log.With().
 		Hex("approval_id", logging.Entity(approval)).
@@ -828,17 +831,19 @@ func (e *Engine) requestPending() error {
 			return fmt.Errorf("could not get header (height=%d): %w", height, err)
 		}
 
+		// we will request receipts even if we already have them
 		blockID := header.ID()
+		missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
 
-		// check if we have an execution result for the block at this height
-		_, err = e.resultsDB.ByBlockID(blockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("could not get execution result (block_id=%x): %w", blockID, err)
-		}
+		//// check if we have an execution result for the block at this height
+		//_, err = e.resultsDB.ByBlockID(blockID)
+		//if errors.Is(err, storage.ErrNotFound) {
+		//	missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
+		//	continue
+		//}
+		//if err != nil {
+		//	return fmt.Errorf("could not get execution result (block_id=%x): %w", blockID, err)
+		//}
 	}
 
 	e.log.Info().
