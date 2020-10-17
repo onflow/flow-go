@@ -407,7 +407,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 
 func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	// TODO move this as a configurable parameter
-	numberOfKeysToAdd := 20
+	numberOfKeysToAdd := 40
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error getting reference block")
@@ -504,7 +504,6 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 
 func (lg *ContLoadGenerator) sendCompHeavyTx(workerID int) {
 	// TODO move this as a configurable parameter
-	numberOfKeysToAdd := 20
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error getting reference block")
@@ -516,14 +515,7 @@ func (lg *ContLoadGenerator) sendCompHeavyTx(workerID int) {
 	acc := <-lg.availableAccounts
 	defer func() { lg.availableAccounts <- acc }()
 
-	lg.log.Trace().Msgf("creating add proposer key script")
-	keys := make([]*flowsdk.AccountKey, 0)
-	for i := 0; i < numberOfKeysToAdd; i++ {
-		keys = append(keys, lg.serviceAccount.accountKey)
-	}
-
 	txScript := lg.scriptCreator.CreateCompHeavyTransaction(3)
-
 	lg.log.Trace().Msgf("creating transaction")
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef).
