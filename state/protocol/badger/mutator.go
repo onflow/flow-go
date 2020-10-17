@@ -466,6 +466,23 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		blockID := header.ID()
 		next, found := byBlock[blockID]
 		if !found {
+
+			// TODO HOTFIX
+			// if we ever encounter a broken seal chain, log information about the latest sealed,
+			// when we fail, and all the seals in the payload that caused the failure
+			msg := fmt.Sprintf(">> MUTATOR_ERROR: sealed_height=%d\tsealed_id=%x failed_at_height=%d >>>>", sealed.Height, sealed.ID(), height)
+			for _, seal := range payload.Seals {
+				sealHead, err := m.state.headers.ByBlockID(seal.BlockID)
+				if err != nil {
+					msg += "ERROR: " + err.Error()
+					continue
+				}
+				msg += fmt.Sprintf(" {SEAL block_id=%x block_height=%d final_state=%x result_id=%x} ",
+					seal.BlockID, sealHead.Height, seal.FinalState, seal.ResultID)
+			}
+
+			fmt.Println(msg)
+
 			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
 		}
 		delete(byBlock, blockID)
