@@ -127,7 +127,7 @@ transaction() {
 	}
 	execute {
 	  var s: Int256 = 1024102410241024
-	  var m: Int256 = 3
+	  var m: Int256 = 7
 	  var i = 0
 	  while i < %d {
 		  s = s * m

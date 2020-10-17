@@ -515,7 +515,7 @@ func (lg *ContLoadGenerator) sendCompHeavyTx(workerID int) {
 	acc := <-lg.availableAccounts
 	defer func() { lg.availableAccounts <- acc }()
 
-	txScript := lg.scriptCreator.CreateCompHeavyTransaction(3)
+	txScript := lg.scriptCreator.CreateCompHeavyTransaction(30)
 	lg.log.Trace().Msgf("creating transaction")
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef).
