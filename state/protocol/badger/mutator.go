@@ -409,6 +409,9 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range payload.Seals {
 		byBlock[seal.BlockID] = seal
+		if len(seal.FinalState) < 1 {
+			return nil, state.NewInvalidExtensionErrorf("seal with empty FinalState")
+		}
 	}
 	if len(payload.Seals) != len(byBlock) {
 		return nil, state.NewInvalidExtensionErrorf("multiple seals for the same block")

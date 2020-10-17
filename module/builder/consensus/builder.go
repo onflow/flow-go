@@ -3,6 +3,8 @@
 package consensus
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -225,12 +227,38 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// to at most the parent.
 
 	// create a mapping of block to seal for all seals in our pool
-	byBlock := make(map[flow.Identifier]*flow.Seal)
-	for _, seal := range b.sealPool.All() {
-		byBlock[seal.BlockID] = seal
+	encounteredInconsistentSealsForSameBlock := false
+	byBlock := make(map[flow.Identifier]*flow.SealContainer)
+	for _, sealContainer := range b.sealPool.All() {
+		seal := sealContainer.Seal
+		if sc2, found := byBlock[seal.BlockID]; found {
+			if len(sealContainer.ExecutionResult.Chunks) < 1 {
+				return nil, fmt.Errorf("ExecutionResult without chunks: %v", sealContainer.ExecutionResult.ID())
+			}
+			if len(sc2.ExecutionResult.Chunks) < 1 {
+				return nil, fmt.Errorf("ExecutionResult without chunks: %v", sc2.ExecutionResult.ID())
+			}
+			// only continue if both seals have same start AND end state:
+			if !bytes.Equal(sealContainer.Seal.FinalState, sc2.Seal.FinalState) ||
+				!bytes.Equal(sealContainer.ExecutionResult.Chunks[0].StartState, sc2.ExecutionResult.Chunks[0].StartState) {
+				sc1json, err := json.Marshal(sealContainer)
+				if err != nil {
+					return nil, err
+				}
+				sc2json, err := json.Marshal(sc2)
+				if err != nil {
+					return nil, err
+				}
+
+				fmt.Printf("ERROR: multiple seals for the same block %v: %s and %s", seal.BlockID, string(sc1json), string(sc2json))
+				encounteredInconsistentSealsForSameBlock = true
+			}
+		} else {
+			byBlock[seal.BlockID] = sealContainer
+		}
 	}
-	if int(b.sealPool.Size()) > len(byBlock) {
-		return nil, fmt.Errorf("multiple seals for the same block")
+	if encounteredInconsistentSealsForSameBlock {
+		byBlock = make(map[flow.Identifier]*flow.SealContainer)
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -275,10 +303,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			break
 		}
 
-		seals = append(seals, next)
+		nextErToBeSealed := next.ExecutionResult
+		if len(nextErToBeSealed.Chunks) < 1 {
+			return nil, fmt.Errorf("ExecutionResult without chunks: %v", nextErToBeSealed.ID())
+		}
+		initialState := nextErToBeSealed.Chunks[0].StartState
+		if !bytes.Equal(initialState, last.FinalState) {
+			return nil, fmt.Errorf("seal execution states do not connect in finalized")
+		}
+
+		seals = append(seals, next.Seal)
 		sealCount++
 		delete(byBlock, blockID)
-		last = next
+		last = next.Seal
 	}
 
 	// NOTE: We should only run the next part in case we did not use up all
@@ -314,9 +351,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			break
 		}
 
-		seals = append(seals, next)
+		seals = append(seals, next.Seal)
 		delete(byBlock, pendingID)
-		last = next
+		last = next.Seal
 	}
 
 	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)

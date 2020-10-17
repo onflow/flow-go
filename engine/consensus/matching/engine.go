@@ -658,7 +658,11 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	}
 
 	// we don't care whether the seal is already in the mempool
-	_ = e.seals.Add(seal)
+	sc := &flow.SealContainer{
+		Seal:            seal,
+		ExecutionResult: result,
+	}
+	_ = e.seals.Add(sc)
 
 	return nil
 }
@@ -750,7 +754,8 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 			e.approvals.Rem(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 		}
 	}
-	for _, seal := range e.seals.All() {
+	for _, sealContainer := range e.seals.All() {
+		seal := sealContainer.Seal
 		if shouldClear(seal.BlockID) {
 			_ = e.seals.Rem(seal.ID())
 		}
