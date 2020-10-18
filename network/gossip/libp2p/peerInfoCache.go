@@ -22,7 +22,7 @@ func InitializePeerInfoCache() error {
 		return fmt.Errorf("failed to initialize PeerInfo cache: %w", err)
 	}
 	infoCache = &peerInfoCache{
-		Cache : cache,
+		Cache: cache,
 	}
 	return nil
 }
@@ -54,4 +54,3 @@ func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
 
 	return addr, nil
 }
-

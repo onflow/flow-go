@@ -16,7 +16,7 @@ import (
 
 type libp2pConnector struct {
 	backoffConnector *discovery.BackoffConnector
-	host host.Host
+	host             host.Host
 }
 
 var _ Connector = &libp2pConnector{}
@@ -28,7 +28,7 @@ func NewLibp2pConnector(host host.Host) (*libp2pConnector, error) {
 	}
 	return &libp2pConnector{
 		backoffConnector: connector,
-		host: host,
+		host:             host,
 	}, nil
 }
 
@@ -43,6 +43,9 @@ func (l *libp2pConnector) ConnectPeers(ctx context.Context, ids flow.IdentityLis
 	for _, peerInfo := range validIDs {
 		peerCh <- peerInfo
 	}
+
+	// close the channel to ensure Connect does not block
+	close(peerCh)
 
 	// ask the connector to connect to all the peers
 	l.backoffConnector.Connect(ctx, peerCh)
@@ -72,7 +75,7 @@ func (l *libp2pConnector) isConnected(peerInfo peer.AddrInfo) bool {
 	return connectedness == network.Connected
 }
 
-func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector, error){
+func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector, error) {
 	rngSrc := rand.NewSource(rand.Int63())
 	minBackoff, maxBackoff := time.Second*10, time.Hour
 	cacheSize := 100

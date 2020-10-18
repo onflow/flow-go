@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-
 // Connector connects to peer and disconnects from peer using the underlying networking library
 type Connector interface {
 
@@ -60,7 +59,6 @@ func (pm *PeerManager) Start() error {
 	return nil
 }
 
-
 // updateLoop triggers an update peer request when it has been requested
 func (pm *PeerManager) updateLoop() {
 	for {
@@ -103,8 +101,6 @@ func (pm *PeerManager) RequestPeerUpdate() {
 // updatePeers updates the peers by connecting to all the nodes provided by the idsProvider callback and disconnecting from
 // previous nodes that are no longer in the new list of nodes.
 func (pm *PeerManager) updatePeers() {
-
-	pm.logger.Debug().Msg("updating peers")
 
 	idProvider := pm.idsProvider
 	if idProvider == nil {
@@ -158,7 +154,6 @@ func (pm *PeerManager) disconnect(ids flow.IdentityList) {
 		pm.logger.Error().Int("failed_peer_count", len(failedIDs)).Err(err).Msg("failed to disconnect from peers")
 	}
 }
-
 
 // failedIDMapToSingleError converts the failedIDs map to a single error
 func failedIDMapToSingleError(failedIDs map[flow.Identity]error) error {

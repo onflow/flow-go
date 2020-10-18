@@ -79,7 +79,12 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	rootBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create middleware: %w", err)
+	}
+
+	err = InitializePeerInfoCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
 	p2p := &P2PNode{}
@@ -96,11 +101,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 
 	if maxUnicastMsgSize <= 0 {
 		maxUnicastMsgSize = DefaultMaxUnicastMsgSize
-	}
-
-	err = InitializePeerInfoCache()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
 	// create the node entity and inject dependencies & config
@@ -204,7 +204,10 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
 	pm := NewPeerManager(m.ctx, m.log, m.topology, libp2pConnector)
-	pm.Start()
+	err = pm.Start()
+	if err != nil {
+		return fmt.Errorf("failed to start peer manager: %w", err)
+	}
 
 	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
 	m.host, m.port, err = m.libP2PNode.GetIPPort()
@@ -241,10 +244,13 @@ func (m *Middleware) topology() (flow.IdentityList, error) {
 	if err != nil {
 		return nil, err
 	}
+	delete(topMap, m.Me())
 	ids := make(flow.IdentityList, len(topMap))
 	index := 0
+
 	for _, id := range topMap {
-		ids[index] = &id
+		tmpID := id
+		ids[index] = &tmpID
 		index++
 	}
 	return ids, nil
