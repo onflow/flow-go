@@ -27,6 +27,7 @@ func (ts *PeerInfoCacheTestSuite) SetupTest() {
 	require.NoError(ts.T(), InitializePeerInfoCache())
 }
 
+// TestPeerInfoFromID tests that PeerInfoFromID converts a flow.Identity to peer.AddrInfo correctly
 func (ts *PeerInfoCacheTestSuite) TestPeerInfoFromID() {
 	ids, exceptedPeerInfos := idsAndPeerInfos(ts.T())
 	for i, id := range ids {
@@ -36,13 +37,22 @@ func (ts *PeerInfoCacheTestSuite) TestPeerInfoFromID() {
 	}
 }
 
+// TestPeerInfoFromIDCacheHits tests that peer.AddrInfos are cached once generated and always returned from cache
+// after that
 func (ts *PeerInfoCacheTestSuite) TestPeerInfoFromIDCacheHits() {
+
+	// assert that cache is empty
 	assert.Zero(ts.T(), infoCache.Len())
+
+	// generate test ids and equivalent peer.AddrInfo
 	ids, exceptedPeerInfos := idsAndPeerInfos(ts.T())
+
+	// convert ids to peer.AddrInfo
 	for _, id := range ids {
 		_, err := PeerInfoFromID(*id)
 		assert.NoError(ts.T(), err)
 	}
+
 	// assert that cache now has expected number of entries
 	assert.Equal(ts.T(), infoCache.Len(), len(ids))
 

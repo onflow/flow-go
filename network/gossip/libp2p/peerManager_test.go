@@ -47,7 +47,7 @@ func (ts *PeerManagerTestSuite) TestUpdatePeers() {
 		return currentIDs, nil
 	}
 
-	// track IDs that should be disconnect from
+	// track IDs that should be disconnected
 	var extraIDs flow.IdentityList
 
 	// create the connector mock to check ids requested for connect and disconnect

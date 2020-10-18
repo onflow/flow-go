@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
 type libp2pConnector struct {
 	backoffConnector *discovery.BackoffConnector
 	host             host.Host
@@ -75,6 +76,8 @@ func (l *libp2pConnector) isConnected(peerInfo peer.AddrInfo) bool {
 	return connectedness == network.Connected
 }
 
+// defaultLibp2pBackoffConnector creates a default libp2p backoff connector similar to the one created by libp2p.pubsub
+// (https://github.com/libp2p/go-libp2p-pubsub/blob/master/discovery.go#L34)
 func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector, error) {
 	rngSrc := rand.NewSource(rand.Int63())
 	minBackoff, maxBackoff := time.Second*10, time.Hour
@@ -88,6 +91,9 @@ func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector,
 	return backoffConnector, nil
 }
 
+// peerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
+// If the conversion of flow.Identifier succeeds it is included in map[flow.Identity]peer.AddrInfo else it included
+// in map[flow.Identity]error.
 func peerInfosFromIDs(ids flow.IdentityList) (map[flow.Identity]peer.AddrInfo, map[flow.Identity]error) {
 	validIDs := make(map[flow.Identity]peer.AddrInfo)
 	invalidIDs := make(map[flow.Identity]error)

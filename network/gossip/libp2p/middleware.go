@@ -164,13 +164,9 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
 	}
 
-	// create a discovery object to help libp2p discover peers
-	//d := NewDiscovery(m.log, m.ov, m.me, m.stop)
 
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
-		// set the discovery object
-		// pubsub.WithDiscovery(d),
 		// skip message signing
 		pubsub.WithMessageSigning(false),
 		// skip message signature
