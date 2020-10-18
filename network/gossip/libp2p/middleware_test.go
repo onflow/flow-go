@@ -368,6 +368,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 // createMiddelwares creates middlewares with mock overlay for each middleware
 func (m *MiddlewareTestSuite) createMiddleWares(count int) ([]flow.Identifier, []*Middleware) {
+	PeerUpdateInterval = 100 * time.Millisecond
 	var mws []*Middleware
 	var ids []flow.Identifier
 
