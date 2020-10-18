@@ -70,6 +70,7 @@ type Middleware struct {
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
 	rootBlockID       string
 	validators        []validators.MessageValidator
+	peerManager       *PeerManager
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -198,8 +199,8 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
-	pm := NewPeerManager(m.ctx, m.log, m.topology, libp2pConnector)
-	err = pm.Start()
+	m.peerManager = NewPeerManager(m.ctx, m.log, m.topology, libp2pConnector)
+	err = m.peerManager.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start peer manager: %w", err)
 	}
@@ -445,13 +446,23 @@ func (m *Middleware) Subscribe(channelID string) error {
 	// kick off the receive loop to continuously receive messages
 	go rs.receiveLoop(m.wg)
 
+	// update peers to add some nodes interested in the same topic as direct peers
+	m.peerManager.RequestPeerUpdate()
+
 	return nil
 }
 
 // Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
 func (m *Middleware) Unsubscribe(channelID string) error {
 	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
-	return m.libP2PNode.UnSubscribe(topic)
+	err := m.libP2PNode.UnSubscribe(topic)
+	if err != nil {
+		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channelID, err)
+	}
+	// update peers to remove nodes subscribed to channelID
+	m.peerManager.RequestPeerUpdate()
+
+	return nil
 }
 
 // processMessage processes a message and eventually passes it to the overlay
