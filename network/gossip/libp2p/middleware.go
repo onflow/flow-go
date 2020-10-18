@@ -165,12 +165,12 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// create a discovery object to help libp2p discover peers
-	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
+	//d := NewDiscovery(m.log, m.ov, m.me, m.stop)
 
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
 		// set the discovery object
-		pubsub.WithDiscovery(d),
+		// pubsub.WithDiscovery(d),
 		// skip message signing
 		pubsub.WithMessageSigning(false),
 		// skip message signature
@@ -199,6 +199,13 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
 
+	libp2pConnector, err := NewLibp2pConnector(m.libP2PNode.libP2PHost)
+	if err != nil {
+		return fmt.Errorf("failed to create libp2pConnector: %w", err)
+	}
+	pm := NewPeerManager(m.ctx, m.log, m.topology, libp2pConnector)
+	pm.Start()
+
 	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
 	m.host, m.port, err = m.libP2PNode.GetIPPort()
 	if err != nil {
@@ -226,6 +233,21 @@ func (m *Middleware) Stop() {
 
 	// wait for the readConnection and readSubscription routines to stop
 	m.wg.Wait()
+}
+
+// TEMP fix till PR that changes overlay.Topology to return a flow.IdentityList instead of a map is merged to master
+func (m *Middleware) topology() (flow.IdentityList, error) {
+	topMap, err := m.ov.Topology()
+	if err != nil {
+		return nil, err
+	}
+	ids := make(flow.IdentityList, len(topMap))
+	index := 0
+	for _, id := range topMap {
+		ids[index] = &id
+		index++
+	}
+	return ids, nil
 }
 
 // Send sends the message to the set of target ids

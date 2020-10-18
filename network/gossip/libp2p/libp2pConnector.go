@@ -1,4 +1,4 @@
-package peermgr
+package libp2p
 
 import (
 	"context"
@@ -6,13 +6,12 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/gossip/libp2p"
 )
 
 type libp2pConnector struct {
@@ -33,35 +32,44 @@ func NewLibp2pConnector(host host.Host) (*libp2pConnector, error) {
 	}, nil
 }
 
-func (l *libp2pConnector) ConnectPeers(ctx context.Context, ids flow.IdentityList) error {
+func (l *libp2pConnector) ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identity]error {
+
+	validIDs, invalidIDs := peerInfosFromIDs(ids)
+
 	// create a channel of peer.AddrInfo as expected by the connector
 	peerCh := make(chan peer.AddrInfo, len(ids))
 
-	var errs *multierror.Error
-
-	// convert flow identity to peer.AddrInfo and stuff it into the peerCh channel
-	for _, id := range ids {
-		peerInfo, err := libp2p.PeerInfoFromID(*id)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf(""))
-		}
+	// stuff all the peer.AddrInfo it into the channel
+	for _, peerInfo := range validIDs {
 		peerCh <- peerInfo
 	}
 
 	// ask the connector to connect to all the peers
 	l.backoffConnector.Connect(ctx, peerCh)
 
-	// return an error if any of the flow ids could not be converted to peer.AddressInfo
-	errCnt := errs.Len()
-	if errCnt > 0 {
-		return fmt.Errorf("failed to convert Flow Identity to libp2p peerInfo: %w", errs)
-	}
-
-	return nil
+	return invalidIDs
 }
 
-func (l *libp2pConnector) DisconnectPeers(ctx context.Context, ids flow.IdentityList) error {
-	return nil
+func (l *libp2pConnector) DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identity]error {
+
+	validIDs, invalidIDs := peerInfosFromIDs(ids)
+
+	// disconnect from each of the peer.AddrInfo
+	for id, peerInfo := range validIDs {
+		if l.isConnected(peerInfo) {
+			err := l.host.Network().ClosePeer(peerInfo.ID)
+			if err != nil {
+				invalidIDs[id] = err
+			}
+		}
+	}
+
+	return invalidIDs
+}
+
+func (l *libp2pConnector) isConnected(peerInfo peer.AddrInfo) bool {
+	connectedness := l.host.Network().Connectedness(peerInfo.ID)
+	return connectedness == network.Connected
 }
 
 func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector, error){
@@ -77,3 +85,16 @@ func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector,
 	return backoffConnector, nil
 }
 
+func peerInfosFromIDs(ids flow.IdentityList) (map[flow.Identity]peer.AddrInfo, map[flow.Identity]error) {
+	validIDs := make(map[flow.Identity]peer.AddrInfo)
+	invalidIDs := make(map[flow.Identity]error)
+	for _, id := range ids {
+		peerInfo, err := PeerInfoFromID(*id)
+		if err != nil {
+			invalidIDs[*id] = err
+			continue
+		}
+		validIDs[*id] = peerInfo
+	}
+	return validIDs, invalidIDs
+}

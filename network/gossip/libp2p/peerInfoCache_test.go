@@ -27,7 +27,7 @@ func (ts *PeerInfoCacheTestSuite) SetupTest() {
 	require.NoError(ts.T(), InitializePeerInfoCache())
 }
 
-func (ts *PeerInfoCacheTestSuite) TestPeerInfoFromIDCorrectness() {
+func (ts *PeerInfoCacheTestSuite) TestPeerInfoFromID() {
 	ids, exceptedPeerInfos := idsAndPeerInfos(ts.T())
 	for i, id := range ids {
 		actualAddrInfo, err := PeerInfoFromID(*id)

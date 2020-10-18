@@ -11,6 +11,7 @@ import (
 
 var infoCache *peerInfoCache
 
+// peerInfoCache caches the peer.AddrInfo created from a flow.Identity
 type peerInfoCache struct {
 	*lru.Cache
 }
@@ -26,6 +27,11 @@ func InitializePeerInfoCache() error {
 	return nil
 }
 
+// PeerInfoFromID converts the flow.Identity to peer.AddrInfo and caches the result
+// A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
+// flow.Identity           ---> peer.AddrInfo
+//    |-- Address          --->   |-- []multiaddr.Multiaddr
+//    |-- NetworkPublicKey --->   |-- ID
 func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
 
 	cacheKey := id.NodeID
@@ -48,3 +54,4 @@ func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
 
 	return addr, nil
 }
+
