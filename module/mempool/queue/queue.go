@@ -47,6 +47,8 @@ func (q *Queue) Size() int {
 }
 
 // Returns difference between lowest and highest element in the queue
+// Formally, the Queue stores a tree. The height of the tree is the
+// number of edges on the longest downward path between the root and any leaf.
 func (q *Queue) Height() uint64 {
 	return q.Highest.Item.Height() - q.Head.Item.Height()
 }
@@ -96,7 +98,7 @@ func dequeue(queue *Queue) *Queue {
 	cache := make(map[flow.Identifier]*Node)
 
 	//copy all but head caches
-	headID := queue.Head.Item.ID() // hashing is a comparatively expensive operation (about 1000 cpu cycles)
+	headID := queue.Head.Item.ID() // ID computation is about as expensive 1000 Go int additions
 	for key, val := range queue.Nodes {
 		if key != headID {
 			cache[key] = val
@@ -109,32 +111,42 @@ func dequeue(queue *Queue) *Queue {
 	}
 }
 
-// TryAdd tries to add a new Node to the queue.
-// A node can only be added if the parent exists in the queue.
+// TryAdd tries to add a new element to the queue.
+// A element can only be added if the parent exists in the queue.
+// TryAdd(elmt) is an idempotent operation for the same elmt, i.e.
+// after the first, subsequent additions of the same elements are NoOps.
 // Returns:
-// True if and only if _after_ the operation, the executableBlock is stored in the queue.
-// This is the case if (a) the element was newly added to the queue or (b) the element
-// was already stored in the queue _before_ the call.
-func (q *Queue) TryAdd(executableBlock Blockify) bool {
-	if _, blockAlreadyPresent := q.Nodes[executableBlock.ID()]; blockAlreadyPresent {
-		return true
-	}
-	// at this point, we are sure that the node is _not_ in the queue and therefore,
+// True if and only if _after_ the operation, the element is stored in the
+// queue. This is the case if (a) element was newly added to the queue or
+// (b) element was already stored in the queue _before_ the call.
+// Adding an element fails with return value `false` in the following cases:
+//   * element.ParentID() is _not_ stored in the queue
+//   * element's height is _unequal to_ its parent's height + 1
+func (q *Queue) TryAdd(element Blockify) bool {
+	//if _, found := q.Nodes[element.ID()]; found {
+	//	// (b) element was already stored in the queue _before_ the call.
+	//	return true
+	//}
+	// at this point, we are sure that the element is _not_ in the queue and therefore,
 	// the element cannot be referenced as a child by any other element in the queue
-	n, ok := q.Nodes[executableBlock.ParentID()]
+	n, ok := q.Nodes[element.ParentID()]
 	if !ok {
 		return false
 	}
-	if n.Item.Height() != executableBlock.Height()-1 {
+	if n.Item.Height() != element.Height()-1 {
 		return false
 	}
 	newNode := &Node{
-		Item:     executableBlock,
+		Item:     element,
 		Children: nil,
 	}
+	// we know: element is _not_ (yet) in the queue
+	// => it cannot be in _any_ nodes Children list
+	// => the following operation is guaranteed to _not_ produce
+	//    duplicates in the Children list
 	n.Children = append(n.Children, newNode)
-	q.Nodes[executableBlock.ID()] = newNode
-	if executableBlock.Height() > q.Highest.Item.Height() {
+	q.Nodes[element.ID()] = newNode
+	if element.Height() > q.Highest.Item.Height() {
 		q.Highest = newNode
 	}
 	return true
