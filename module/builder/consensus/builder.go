@@ -4,6 +4,7 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -226,16 +227,37 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// to at most the parent.
 
 	// create a mapping of block to seal for all seals in our pool
+	encounteredInconsistentSealsForSameBlock := false
 	byBlock := make(map[flow.Identifier]*flow.SealContainer)
 	for _, sealContainer := range b.sealPool.All() {
 		seal := sealContainer.Seal
 		if sc2, found := byBlock[seal.BlockID]; found {
-			fmt.Printf("ERROR: multiple seals for the same block: %v with result IDs %v %v", seal.BlockID, seal.ResultID, sc2.Seal.ResultID)
+			if len(sealContainer.ExecutionResult.Chunks) < 1 {
+				return nil, fmt.Errorf("ExecutionResult without chunks: %v", sealContainer.ExecutionResult.ID())
+			}
+			if len(sc2.ExecutionResult.Chunks) < 1 {
+				return nil, fmt.Errorf("ExecutionResult without chunks: %v", sc2.ExecutionResult.ID())
+			}
+			// only continue if both seals have same start AND end state:
+			if !bytes.Equal(sealContainer.Seal.FinalState, sc2.Seal.FinalState) ||
+				!bytes.Equal(sealContainer.ExecutionResult.Chunks[0].StartState, sc2.ExecutionResult.Chunks[0].StartState) {
+				sc1json, err := json.Marshal(sealContainer)
+				if err != nil {
+					return nil, err
+				}
+				sc2json, err := json.Marshal(sc2)
+				if err != nil {
+					return nil, err
+				}
+
+				fmt.Printf("ERROR: multiple seals for the same block %v: %s and %s", seal.BlockID, string(sc1json), string(sc2json))
+				encounteredInconsistentSealsForSameBlock = true
+			}
+		} else {
+			byBlock[seal.BlockID] = sealContainer
 		}
-		byBlock[seal.BlockID] = sealContainer
 	}
-	if int(b.sealPool.Size()) > len(byBlock) {
-		fmt.Printf("ERROR: multiple seals for the same block")
+	if encounteredInconsistentSealsForSameBlock {
 		byBlock = make(map[flow.Identifier]*flow.SealContainer)
 	}
 
@@ -320,6 +342,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if len(byBlock) == 0 {
 			break
 		}
+		// add at most <maxSealCount> number of seals in a new block proposal
+		// in order to prevent the block payload from being too big.
+		if sealCount >= b.cfg.maxSealCount {
+			break
+		}
 		if unchained {
 			break
 		}
@@ -330,6 +357,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		seals = append(seals, next.Seal)
+		sealCount++
 		delete(byBlock, pendingID)
 		last = next.Seal
 	}
