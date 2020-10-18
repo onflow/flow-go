@@ -164,7 +164,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
 	}
 
-
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
 		// skip message signing
