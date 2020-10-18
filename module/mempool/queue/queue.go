@@ -123,10 +123,10 @@ func dequeue(queue *Queue) *Queue {
 //   * element.ParentID() is _not_ stored in the queue
 //   * element's height is _unequal to_ its parent's height + 1
 func (q *Queue) TryAdd(element Blockify) bool {
-	//if _, found := q.Nodes[element.ID()]; found {
-	//	// (b) element was already stored in the queue _before_ the call.
-	//	return true
-	//}
+	if _, found := q.Nodes[element.ID()]; found {
+		// (b) element was already stored in the queue _before_ the call.
+		return true
+	}
 	// at this point, we are sure that the element is _not_ in the queue and therefore,
 	// the element cannot be referenced as a child by any other element in the queue
 	n, ok := q.Nodes[element.ParentID()]
