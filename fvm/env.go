@@ -150,23 +150,23 @@ func (e *hostEnv) ResolveLocation(
 
 	if len(identifiers) == 0 {
 		address := flow.Address(addressLocation.ToAddress())
-		contracts, err := e.accounts.GetContracts(address)
+		contractNames, err := e.accounts.GetContractNames(address)
 		if err != nil {
 			panic(err)
 		}
 
-		// if there are no contracts deployed,
+		// if there are no contractNames deployed,
 		// then return no resolved locations
 
-		if len(contracts) == 0 {
+		if len(contractNames) == 0 {
 			return nil
 		}
 
-		identifiers = make([]ast.Identifier, len(contracts))
+		identifiers = make([]ast.Identifier, len(contractNames))
 
 		for i := range identifiers {
 			identifiers[i] = runtime.Identifier{
-				Identifier: contracts[i],
+				Identifier: contractNames[i],
 			}
 		}
 	}

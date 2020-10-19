@@ -7,14 +7,15 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/onflow/flow-go/model/encoding/rlp"
+	"github.com/fxamacker/cbor/v2"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
 	keyExists         = "exists"
 	keyCode           = "code"
-	keyContracts      = "contracts"
+	keyContractNames  = "contract_names"
 	keyPublicKeyCount = "public_key_count"
 )
 
@@ -32,27 +33,28 @@ type Accounts struct {
 	*addresses
 }
 
-// ContractsList should always be sorted. To ensure this, don't sort while reading it from storage, but sort it while adding elements
-type ContractsList []string
+// contractNames container for a list of contract names. Should always be sorted.
+// To ensure this, don't sort while reading it from storage, but sort it while adding/removing elements
+type contractNames []string
 
-func (l ContractsList) Has(contract string) bool {
-	i := sort.SearchStrings(l, contract)
-	return i != len(l) && l[i] == contract
+func (l contractNames) Has(contractNames string) bool {
+	i := sort.SearchStrings(l, contractNames)
+	return i != len(l) && l[i] == contractNames
 }
-func (l *ContractsList) add(contract string) {
-	i := sort.SearchStrings(*l, contract)
-	if i != len(*l) && (*l)[i] == contract {
+func (l *contractNames) add(contractNames string) {
+	i := sort.SearchStrings(*l, contractNames)
+	if i != len(*l) && (*l)[i] == contractNames {
 		// list already contains element
 		return
 	}
 	*l = append(*l, "")
 	copy((*l)[i+1:], (*l)[i:])
-	(*l)[i] = contract
+	(*l)[i] = contractNames
 }
-func (l *ContractsList) remove(contract string) {
-	i := sort.SearchStrings(*l, contract)
-	if i == len(*l) || (*l)[i] != contract {
-		// list doesnt contain the element element
+func (l *contractNames) remove(contractName string) {
+	i := sort.SearchStrings(*l, contractName)
+	if i == len(*l) || (*l)[i] != contractName {
+		// list doesnt contain the element
 		return
 	}
 	*l = append((*l)[:i], (*l)[i+1:]...)
@@ -80,7 +82,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 		return nil, ErrAccountNotFound
 	}
 	contracts := make(map[string][]byte)
-	contractNames, err := a.GetContracts(address)
+	contractNames, err := a.getContractNames(address)
 
 	if err != nil {
 		return nil, err
@@ -292,7 +294,7 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 	return nil
 }
 
-func (a *Accounts) contractKey(contractName string) string {
+func contractKey(contractName string) string {
 	return fmt.Sprintf("%s.%s", keyCode, contractName)
 }
 
@@ -300,7 +302,7 @@ func (a *Accounts) getCode(name string, address flow.Address) ([]byte, error) {
 
 	code, err := a.ledger.Get(string(address.Bytes()),
 		string(address.Bytes()),
-		a.contractKey(name))
+		contractKey(name))
 	if err != nil {
 		return nil, newLedgerGetError(name, address, err)
 	}
@@ -319,7 +321,7 @@ func (a *Accounts) setCode(name string, address flow.Address, code []byte) error
 	}
 
 	var prevCode []byte
-	prevCode, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), a.contractKey(name))
+	prevCode, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), contractKey(name))
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
@@ -329,7 +331,7 @@ func (a *Accounts) setCode(name string, address flow.Address, code []byte) error
 		return nil
 	}
 
-	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), a.contractKey(name), code)
+	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), contractKey(name), code)
 
 	return nil
 }
@@ -338,7 +340,7 @@ func newLedgerGetError(key string, address flow.Address, err error) error {
 	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
 }
 
-func (a *Accounts) setContracts(contracts ContractsList, address flow.Address) error {
+func (a *Accounts) setContractNames(contracts contractNames, address flow.Address) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -347,68 +349,77 @@ func (a *Accounts) setContracts(contracts ContractsList, address flow.Address) e
 	if !ok {
 		return fmt.Errorf("account with address %s does not exist", address)
 	}
-
-	newContracts, err := rlp.NewEncoder().Encode(contracts)
+	var buf bytes.Buffer
+	cborEncoder := cbor.NewEncoder(&buf)
+	err = cborEncoder.Encode(contracts)
 	if err != nil {
-		return fmt.Errorf("cannot serialize contract list")
+		return fmt.Errorf("cannot serialize contract names")
+	}
+	newContractNames := buf.Bytes()
+
+	var prevContractNames []byte
+	prevContractNames, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContractNames)
+	if err != nil {
+		return fmt.Errorf("cannot retreive current contract names: %w", err)
 	}
 
-	var prevContracts []byte
-	prevContracts, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContracts)
-	if err != nil {
-		return fmt.Errorf("cannot retreive current contracts: %w", err)
-	}
-
-	// skip updating if the new contracts equal the old
-	if bytes.Equal(prevContracts, newContracts) {
+	// skip updating if the new contract names equal the old
+	if bytes.Equal(prevContractNames, newContractNames) {
 		return nil
 	}
 
-	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), keyContracts, newContracts)
+	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), keyContractNames, newContractNames)
 
 	return nil
 }
 
 func (a *Accounts) TouchContract(name string, address flow.Address) {
-	contracts, err := a.GetContracts(address)
+	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		panic(err)
 	}
-	if contracts.Has(name) {
+	if contractNames.Has(name) {
 		a.ledger.Touch(string(address.Bytes()),
 			string(address.Bytes()),
-			a.contractKey(name))
+			contractKey(name))
 	}
 }
 
-func (a *Accounts) GetContracts(address flow.Address) (ContractsList, error) {
-	encContractList, err := a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContracts)
+// GetContractNames gets a sorted list of names of contracts deployed on an address
+func (a *Accounts) GetContractNames(address flow.Address) ([]string, error) {
+	return a.getContractNames(address)
+}
+
+func (a *Accounts) getContractNames(address flow.Address) (contractNames, error) {
+	encContractNames, err := a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContractNames)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get deployed contract list: %w", err)
+		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
 	}
 	identifiers := make([]string, 0)
-	if len(encContractList) > 0 {
-		err = rlp.NewEncoder().Decode(encContractList, &identifiers)
+	if len(encContractNames) > 0 {
+		buf := bytes.NewReader(encContractNames)
+		cborDecoder := cbor.NewDecoder(buf)
+		err = cborDecoder.Decode(&identifiers)
 		if err != nil {
-			return nil, fmt.Errorf("cannot decode deployed contract list %x: %w", encContractList, err)
+			return nil, fmt.Errorf("cannot decode deployed contract names %x: %w", encContractNames, err)
 		}
 	}
 	return identifiers, nil
 }
 
 func (a *Accounts) GetContract(name string, address flow.Address) ([]byte, error) {
-	contracts, err := a.GetContracts(address)
+	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return nil, err
 	}
-	if !contracts.Has(name) {
+	if !contractNames.Has(name) {
 		return nil, nil
 	}
 	return a.getCode(name, address)
 }
 
 func (a *Accounts) SetContract(name string, address flow.Address, code []byte) error {
-	contracts, err := a.GetContracts(address)
+	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return err
 	}
@@ -416,22 +427,22 @@ func (a *Accounts) SetContract(name string, address flow.Address, code []byte) e
 	if err != nil {
 		return err
 	}
-	contracts.add(name)
-	return a.setContracts(contracts, address)
+	contractNames.add(name)
+	return a.setContractNames(contractNames, address)
 }
 
 func (a *Accounts) DeleteContract(name string, address flow.Address) error {
-	contracts, err := a.GetContracts(address)
+	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return err
 	}
-	if !contracts.Has(name) {
+	if !contractNames.Has(name) {
 		return nil
 	}
 	err = a.setCode(name, address, nil)
 	if err != nil {
 		return err
 	}
-	contracts.remove(name)
-	return a.setContracts(contracts, address)
+	contractNames.remove(name)
+	return a.setContractNames(contractNames, address)
 }

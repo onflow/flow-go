@@ -51,7 +51,7 @@ type TestLedger struct {
 }
 
 func (l *TestLedger) Set(_, _, key string, value flow.RegisterValue) {
-	if key == "contracts" {
+	if key == "contract_names" {
 		l.contracts = value
 	}
 }
@@ -59,7 +59,7 @@ func (l *TestLedger) Get(_, _, key string) (flow.RegisterValue, error) {
 	if key == "exists" {
 		return []byte("1"), nil
 	}
-	if key == "contracts" {
+	if key == "contract_names" {
 		return l.contracts, nil
 	}
 	return nil, nil
@@ -79,11 +79,11 @@ func TestAccounts_SetContracts(t *testing.T) {
 		if err != nil {
 			t.Errorf("SetContract() error = %v", err)
 		}
-		contracts, err := a.GetContracts(address)
+		contractNames, err := a.GetContractNames(address)
 		if err != nil {
-			t.Errorf("GetContracts() error = %v", err)
+			t.Errorf("getContractNames() error = %v", err)
 		}
-		if len(contracts) != 1 || contracts[0] != "Dummy" {
+		if len(contractNames) != 1 || contractNames[0] != "Dummy" {
 			t.Errorf("There should be only one contract")
 		}
 	})
@@ -98,11 +98,11 @@ func TestAccounts_SetContracts(t *testing.T) {
 		if err != nil {
 			t.Errorf("SetContract() error = %v", err)
 		}
-		contracts, err := a.GetContracts(address)
+		contractNames, err := a.GetContractNames(address)
 		if err != nil {
-			t.Errorf("GetContracts() error = %v", err)
+			t.Errorf("getContractNames() error = %v", err)
 		}
-		if len(contracts) != 1 || contracts[0] != "Dummy" {
+		if len(contractNames) != 1 || contractNames[0] != "Dummy" {
 			t.Errorf("There should be only one contract")
 		}
 	})
@@ -121,11 +121,11 @@ func TestAccounts_SetContracts(t *testing.T) {
 		if err != nil {
 			t.Errorf("SetContract() error = %v", err)
 		}
-		contracts, err := a.GetContracts(address)
+		contractNames, err := a.GetContractNames(address)
 		if err != nil {
-			t.Errorf("GetContracts() error = %v", err)
+			t.Errorf("getContractNames() error = %v", err)
 		}
-		if len(contracts) != 3 || contracts[0] != "ADummy" || contracts[1] != "Dummy" || contracts[2] != "ZedDummy" {
+		if len(contractNames) != 3 || contractNames[0] != "ADummy" || contractNames[1] != "Dummy" || contractNames[2] != "ZedDummy" {
 			t.Errorf("Contracts should be sorted")
 		}
 	})
@@ -148,11 +148,11 @@ func TestAccounts_SetContracts(t *testing.T) {
 		if err != nil {
 			t.Errorf("DeleteContract() error = %v", err)
 		}
-		contracts, err := a.GetContracts(address)
+		contractNames, err := a.GetContractNames(address)
 		if err != nil {
-			t.Errorf("GetContracts() error = %v", err)
+			t.Errorf("getContractNames() error = %v", err)
 		}
-		if len(contracts) != 0 {
+		if len(contractNames) != 0 {
 			t.Errorf("There should be no contract")
 		}
 	})
