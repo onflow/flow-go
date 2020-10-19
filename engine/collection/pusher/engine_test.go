@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	metrics "github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	network "github.com/onflow/flow-go/network/mock"
@@ -29,7 +28,6 @@ type Suite struct {
 	snapshot     *protocol.Snapshot
 	conduit      *network.Conduit
 	me           *module.Local
-	pool         *mempool.Transactions
 	collections  *storage.Collections
 	transactions *storage.Transactions
 
@@ -61,7 +59,6 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)
 
-	suite.pool = new(mempool.Transactions)
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
 
@@ -72,7 +69,6 @@ func (suite *Suite) SetupTest() {
 		metrics,
 		metrics,
 		suite.me,
-		suite.pool,
 		suite.collections,
 		suite.transactions,
 	)
