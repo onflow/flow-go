@@ -3,13 +3,10 @@ package test
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -19,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // SparseTopologyTestSuite test 1-k messaging in a sparsely connected network
@@ -38,64 +36,48 @@ func TestSparseTopologyTestSuite(t *testing.T) {
 
 // TestSparselyConnectedNetworkScenario_Submit evaluates sparselyConnectedNetworkScenario on Submit method
 // of Conduits
-func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetworkScenario_Submit() {
-	// Todo investigate flakiness
-	stt.T().Skip()
-	stt.sparselyConnectedNetworkScenario(stt.Submit)
+func (suite *SparseTopologyTestSuite) TestSparselyConnectedNetworkScenario_Submit() {
+	suite.sparselyConnectedNetworkScenario(suite.Submit)
 }
 
 // TestSparselyConnectedNetworkScenario_Multicast evaluates sparselyConnectedNetworkScenario on Multicast
 // method of Conduits
-func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetworkScenario_Multicast() {
-	// Todo investigate flakiness
-	stt.T().Skip()
-	stt.sparselyConnectedNetworkScenario(stt.Multicast)
+func (suite *SparseTopologyTestSuite) TestSparselyConnectedNetworkScenario_Multicast() {
+	suite.sparselyConnectedNetworkScenario(suite.Multicast)
 }
 
 // TestSparselyConnectedNetworkScenario_Unicast evaluates sparselyConnectedNetworkScenario on Unicast
 // method of Conduits
-func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetworkScenario_Unicast() {
-	// Todo investigate flakiness
-	stt.T().Skip()
-	stt.sparselyConnectedNetworkScenario(stt.Unicast)
+func (suite *SparseTopologyTestSuite) TestSparselyConnectedNetworkScenario_Unicast() {
+	suite.sparselyConnectedNetworkScenario(suite.Unicast)
 }
 
 // TestSparselyConnectedNetworkScenario_Publish evaluates sparselyConnectedNetworkScenario on Publish
 // method of Conduits
-func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetworkScenario_Publish() {
-	// Todo investigate flakiness
-	stt.T().Skip()
-	stt.sparselyConnectedNetworkScenario(stt.Publish)
+func (suite *SparseTopologyTestSuite) TestSparselyConnectedNetworkScenario_Publish() {
+	suite.sparselyConnectedNetworkScenario(suite.Publish)
 }
 
-// sparselyConnectedNetworkScenario creates a network configuration with of 9 nodes with 3 subsets. The subsets are connected
-// with each other with only one node
+// sparselyConnectedNetworkScenario creates a network configuration with of 9 nodes with 3 subsets.
+// The subsets are connected with each other with only one node
 // 0,1,2,3 <-> 3,4,5,6 <-> 6,7,8,9
 // Message sent by a node from one subset should be able to make it to nodes all subsets
-func (stt *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send ConduitSendWrapperFunc) {
-	stt.T().Skip()
-
+func (suite *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send ConduitSendWrapperFunc) {
 	// total number of nodes in the network
 	const count = 9
 	// total number of subnets (should be less than count)
 	const subsets = 3
 
-	stt.ids = CreateIDs(count)
+	suite.ids = CreateIDs(count)
 
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	var err error
-	stt.mws, err = createMiddleware(logger, stt.ids)
-	require.NoError(stt.Suite.T(), err)
+	tops := createSparseTopology(count, subsets)
 
-	//tops := createSparseTopology(count, subsets)
-	//
-	//stt.nets, err = createNetworks(logger, stt.mws, stt.ids, 100, false, tops...)
-	//require.NoError(stt.Suite.T(), err)
+	suite.nets = CreateNetworks(suite.T(), suite.ids, tops, 100, false)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
-	for _, n := range stt.nets {
-		eng := NewMeshEngine(stt.Suite.T(), n, count-1, engine.TestNetwork)
+	for _, n := range suite.nets {
+		eng := NewMeshEngine(suite.Suite.T(), n, count-1, engine.TestNetwork)
 		engs = append(engs, eng)
 	}
 
@@ -106,74 +88,53 @@ func (stt *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Condui
 	event := &message.TestMessage{
 		Text: "hello from node 0",
 	}
-	require.NoError(stt.Suite.T(), engs[0].con.Submit(event, stt.ids.NodeIDs()...))
+	require.NoError(suite.Suite.T(), send(event, engs[0].con, suite.ids.NodeIDs()...))
 
 	// wait for message to be received by all recipients (excluding node 0)
-	stt.checkMessageReception(engs, 1, count)
+	suite.checkMessageReception(engs, 1, count)
 
 }
 
 // TestDisjoinedNetworkScenario_Submit evaluates disjointedNetworkScenario using Submit method
 // of conduits
-func (stt *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Submit() {
-	// Todo investigate flakiness
-	stt.T().Skip()
-	stt.disjointedNetworkScenario(stt.Submit)
+func (suite *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Submit() {
+	suite.disjointedNetworkScenario(suite.Submit)
 }
 
 // TestDisjoinedNetworkScenario_Publish evaluates disjointedNetworkScenario using Publish method
 // of conduits
-func (stt *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Publish() {
-	// Todo investigate flakiness
-	// stt.T().Skip()
-	stt.disjointedNetworkScenario(stt.Publish)
-}
-
-// TestDisjoinedNetworkScenario_Unicast evaluates disjointedNetworkScenario using Unicast method
-// of conduits
-func (stt *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Unicast() {
-	// Todo investigate flakiness
-	stt.T().Skip()
-	stt.disjointedNetworkScenario(stt.Unicast)
+func (suite *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Publish() {
+	suite.disjointedNetworkScenario(suite.Publish)
 }
 
 // TestDisjoinedNetworkScenario_Multicast evaluates disjointedNetworkScenario using Multicast method
 // of conduits
-func (stt *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Multicast() {
-	// Todo investigate flakiness
-	stt.T().Skip()
-	stt.disjointedNetworkScenario(stt.Multicast)
+func (suite *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Multicast() {
+	suite.disjointedNetworkScenario(suite.Multicast)
 }
 
-// disjointedNetworkScenario creates a network configuration of 9 nodes with 3 subsets. The subsets are not connected
-// with each other.
+// disjointedNetworkScenario creates a network configuration of 9 nodes with 3 subsets.
+// The subsets are not connected with each other.
 // 0,1,2 <-> 3,4,5 <-> 6,7,8
 // Message sent by a node from one subset should not be able to make to nodes in a different subset
 // This test is created primarily to prove that topology is indeed honored by the networking layer since technically,
 // each node does have the ip addresses of all other nodes and could just disregard topology all together and connect
 // to every other node directly making the sparselyConnectedNetworkScenario test meaningless
-func (stt *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSendWrapperFunc) {
+func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSendWrapperFunc) {
 	// total number of nodes in the network
 	const count = 9
 	// total number of subnets (should be less than count)
 	const subsets = 3
 
-	stt.ids = CreateIDs(count)
+	suite.ids = CreateIDs(count)
 
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	var err error
-	stt.mws, err = createMiddleware(logger, stt.ids)
-	require.NoError(stt.Suite.T(), err)
-
-	// tops := createDisjointedTopology(count, subsets)
-
-	//stt.nets, err = createNetworks(logger, stt.mws, stt.ids, 100, false, tops...)
-	//require.NoError(stt.Suite.T(), err)
+	tops := createDisjointedTopology(count, subsets)
+	suite.nets = CreateNetworks(suite.T(), suite.ids, tops, 100, false)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
-	for _, n := range stt.nets {
-		eng := NewMeshEngine(stt.Suite.T(), n, count-1, engine.TestNetwork)
+	for _, n := range suite.nets {
+		eng := NewMeshEngine(suite.Suite.T(), n, count-1, engine.TestNetwork)
 		engs = append(engs, eng)
 	}
 
@@ -185,26 +146,26 @@ func (stt *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSendWr
 	event := &message.TestMessage{
 		Text: "hello from node 0",
 	}
-	require.NoError(stt.Suite.T(), send(event, engs[0].con, stt.ids.NodeIDs()...))
+	require.NoError(suite.Suite.T(), send(event, engs[0].con, suite.ids.NodeIDs()...))
 
 	// wait for message to be received by nodes only in subset 1 (excluding node 0)
-	stt.checkMessageReception(engs, 1, subsets)
+	suite.checkMessageReception(engs, 1, subsets)
 }
 
 // TearDownTest closes the networks within a specified timeout
-func (stt *SparseTopologyTestSuite) TearDownTest() {
-	for _, net := range stt.nets {
+func (suite *SparseTopologyTestSuite) TearDownTest() {
+	for _, net := range suite.nets {
 		select {
 		// closes the network
 		case <-net.Done():
 			continue
 		case <-time.After(3 * time.Second):
-			stt.Suite.Fail("could not stop the network")
+			suite.Suite.Fail("could not stop the network")
 		}
 	}
-	stt.ids = nil
-	stt.mws = nil
-	stt.nets = nil
+	suite.ids = nil
+	suite.mws = nil
+	suite.nets = nil
 }
 
 // IndexBoundTopology is a topology implementation that limits the subset by indices of the identity list
@@ -221,8 +182,8 @@ func (ibt IndexBoundTopology) Subset(idList flow.IdentityList, _ uint, _ string)
 
 // createSparseTopology creates topologies for nodes such that subsets have one overlapping node
 // e.g. top 1 - 0,1,2,3; top 2 - 3,4,5,6; top 3 - 6,7,8,9
-func createSparseTopology(count int, subsets int) []topology.Topology {
-	tops := make([]topology.Topology, count)
+func createSparseTopology(count int, subsets int) []*topology.Topology {
+	tops := make([]*topology.Topology, count)
 	subsetLen := count / subsets
 	for i := 0; i < count; i++ {
 		s := i / subsets          // which subset does this node belong to
@@ -233,19 +194,19 @@ func createSparseTopology(count int, subsets int) []topology.Topology {
 		} else {
 			maxIndex = ((s + 1) * subsetLen) + 1 // a plus one to cause an overlap between subsets
 		}
-		st := IndexBoundTopology{
+		var top topology.Topology = IndexBoundTopology{
 			minIndex: minIndex,
 			maxIndex: maxIndex,
 		}
-		tops[i] = st
+		tops[i] = &top
 	}
 	return tops
 }
 
 // createDisjointedTopology creates topologies for nodes such that subsets don't have any overlap
 // e.g. top 1 - 0,1,2; top 2 - 3,4,5; top 3 - 6,7,8
-func createDisjointedTopology(count int, subsets int) []topology.Topology {
-	tops := make([]topology.Topology, count)
+func createDisjointedTopology(count int, subsets int) []*topology.Topology {
+	tops := make([]*topology.Topology, count)
 	subsetLen := count / subsets
 	for i := 0; i < count; i++ {
 		s := i / subsets          // which subset does this node belong to
@@ -256,17 +217,19 @@ func createDisjointedTopology(count int, subsets int) []topology.Topology {
 		} else {
 			maxIndex = (s + 1) * subsetLen
 		}
-		st := IndexBoundTopology{
+
+		var top topology.Topology = IndexBoundTopology{
 			minIndex: minIndex,
 			maxIndex: maxIndex,
 		}
-		tops[i] = st
+
+		tops[i] = &top
 	}
 	return tops
 }
 
 // checkMessageReception checks if engs[low:high) have received a message while all the other engs have not
-func (stt SparseTopologyTestSuite) checkMessageReception(engs []*MeshEngine, low int, high int) {
+func (suite SparseTopologyTestSuite) checkMessageReception(engs []*MeshEngine, low int, high int) {
 	wg := sync.WaitGroup{}
 	// fires a goroutine for all engines to listens for the incoming message
 	for _, e := range engs[low:high] {
@@ -277,24 +240,14 @@ func (stt SparseTopologyTestSuite) checkMessageReception(engs []*MeshEngine, low
 		}(e)
 	}
 
-	c := make(chan struct{})
-	go func() {
-		wg.Wait()
-		c <- struct{}{}
-	}()
-
-	select {
-	case <-c:
-	case <-time.After(10 * time.Second):
-		assert.Fail(stt.Suite.T(), "test timed out on broadcast dissemination")
-	}
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 10*time.Second, "test timed out on broadcast dissemination")
 
 	// evaluates that all messages are received
 	for i, e := range engs {
 		if i >= low && i < high {
-			assert.Len(stt.Suite.T(), e.event, 1, fmt.Sprintf("engine %d did not receive the message", i))
+			assert.Len(suite.Suite.T(), e.event, 1, fmt.Sprintf("engine %d did not receive the message", i))
 		} else {
-			assert.Len(stt.Suite.T(), e.event, 0, fmt.Sprintf("engine %d received the message", i))
+			assert.Len(suite.Suite.T(), e.event, 0, fmt.Sprintf("engine %d received the message", i))
 		}
 	}
 }
