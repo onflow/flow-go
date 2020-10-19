@@ -202,11 +202,8 @@ func CreateTopologies(t *testing.T, state protocol.State, identities flow.Identi
 	for _, id := range identities {
 		var top topology.Topology
 		var err error
-		if id.Role == flow.RoleCollection {
-			top, err = topology.NewCollectionTopology(id.NodeID, state)
-		} else {
-			top, err = topology.NewTopicAwareTopology(id.NodeID)
-		}
+
+		top, err = topology.NewTopicAwareTopology(id.NodeID, state)
 
 		require.NoError(t, err)
 		tops = append(tops, &top)
