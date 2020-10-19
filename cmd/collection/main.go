@@ -32,6 +32,7 @@ import (
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
+	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -58,8 +59,8 @@ func main() {
 		ingestConf  ingest.Config
 		ingressConf ingress.Config
 
-		pool           mempool.Transactions  // shared tx pool
-		followerBuffer *buffer.PendingBlocks // pending block cache for follower
+		pools          *epochpool.TransactionPools // epoch-scoped transaction pools
+		followerBuffer *buffer.PendingBlocks       // pending block cache for follower
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -110,7 +111,9 @@ func main() {
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
-			pool, err = stdmap.NewTransactions(txLimit)
+			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
+			pools = epochpool.NewTransactionPools(create)
+			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -228,7 +231,7 @@ func main() {
 				node.Metrics.Engine,
 				colMetrics,
 				node.Me,
-				pool,
+				pools,
 				ingestConf,
 			)
 			return ing, err
@@ -256,7 +259,6 @@ func main() {
 				node.Metrics.Engine,
 				colMetrics,
 				node.Me,
-				pool,
 				node.Storage.Collections,
 				node.Storage.Transactions,
 			)
@@ -301,7 +303,6 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.State,
-				pool,
 				node.Storage.Transactions,
 			)
 			if err != nil {
@@ -347,7 +348,7 @@ func main() {
 
 			factory := factories.NewEpochComponentsFactory(
 				node.Me,
-				pool,
+				pools,
 				builderFactory,
 				clusterStateFactory,
 				hotstuffFactory,
@@ -362,6 +363,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
+				pools,
 				rootQCVoter,
 				factory,
 				heightEvents,
