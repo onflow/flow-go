@@ -33,7 +33,7 @@ func NewRandPermTopology(role flow.Role, id flow.Identifier) (RandPermTopology, 
 	}, nil
 }
 
-func (r RandPermTopology) Subset(idList flow.IdentityList, fanout uint, _ string) (flow.IdentityList, error) {
+func (r RandPermTopology) Subset(idList flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
 	if uint(len(idList)) < fanout {
 		return nil, fmt.Errorf("cannot sample topology idList %d smaller than desired fanout %d", len(idList), fanout)
 	}
