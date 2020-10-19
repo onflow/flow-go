@@ -188,11 +188,9 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		nodeRole := nodeID.Role
 
 		var nodeTopology topology.Topology
-		if nodeRole == flow.RoleCollection {
-			nodeTopology, err = topology.NewCollectionTopology(nodeID.NodeID, fnb.State)
-		} else {
-			nodeTopology, err = topology.NewRandPermTopology(nodeRole, nodeID.NodeID)
-		}
+
+		nodeTopology, err = topology.NewTopicAwareTopology(fnb.Me.NodeID(), fnb.State)
+
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
