@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -100,6 +101,12 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, err
 
 	// mark that this account exists
 	a.ledger.Set(string(newAddress.Bytes()), "", keyExists, []byte{1})
+
+	// TODO: This is temporary! Need to fix with next PR before this can be merged to master
+	// this will be in the transaction that created the account. It's here now so I can run the tests.
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, 100000)
+	a.ledger.Set(string(newAddress.Bytes()), "", StorageCapacityRegisterName, buffer)
 
 	a.ledger.Set(string(newAddress.Bytes()), string(newAddress.Bytes()), keyCode, nil)
 

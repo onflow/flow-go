@@ -149,6 +149,10 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
 	v.delta.Set(owner, controller, key, value)
 }
 
+func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
+	return v.delta.RegisterUpdates()
+}
+
 func (v *View) updateSpock(value []byte) error {
 	_, err := v.spockSecretHasher.Write(value)
 	if err != nil {
@@ -159,12 +163,18 @@ func (v *View) updateSpock(value []byte) error {
 
 func (v *View) updateRegisterSizeChange(owner, controller, key string, value flow.RegisterValue) error {
 	if key == state.StorageUsedRegisterName {
+		// Don't check size change on this register
+		// Size of this register will always be 8
+		// If this is the first time storage_used register was set it should be set to the size of itself (8)
 		return nil
 	}
+	// get old value
+	// len will be 0 if there is no old value
 	oldValue, err := v.Get(owner, controller, key)
 	if err != nil {
 		return err
 	}
+
 	sizeChange := int64(len(value) - len(oldValue))
 	if sizeChange == 0 {
 		// register size has not changed. Nothing to do
@@ -179,6 +189,7 @@ func (v *View) updateRegisterSizeChange(owner, controller, key string, value flo
 	var oldSize uint64
 	if len(oldSizeRegister) == 0 {
 		// account was just created
+		// set the storage used to 8 which is the size of the storage used register
 		oldSize = 8
 		buffer := make([]byte, oldSize)
 		binary.LittleEndian.PutUint64(buffer, 8)

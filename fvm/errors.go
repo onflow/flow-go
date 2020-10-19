@@ -25,6 +25,8 @@ const (
 
 	errCodeInvalidHashAlgorithm = 10
 
+	errCodeOverStorageCapacity = 11
+
 	errCodeExecution = 100
 )
 
@@ -211,6 +213,21 @@ func (e *InvalidHashAlgorithmError) Error() string {
 
 func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithm
+}
+
+// An OverStorageCapacityError indicates that a given key has an invalid hash algorithm.
+type OverStorageCapacityError struct {
+	Address         flow.Address
+	StorageUsed     uint64
+	StorageCapacity uint64
+}
+
+func (e *OverStorageCapacityError) Error() string {
+	return fmt.Sprintf("address %s storage %d is over capacity %d", e.Address, e.StorageUsed, e.StorageCapacity)
+}
+
+func (e *OverStorageCapacityError) Code() uint32 {
+	return errCodeOverStorageCapacity
 }
 
 type ExecutionError struct {

@@ -66,6 +66,7 @@ func defaultContext() Context {
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
 			NewTransactionInvocator(),
+			NewTransactionStorageLimiter(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
