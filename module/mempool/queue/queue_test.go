@@ -238,16 +238,8 @@ func TestQueue(t *testing.T) {
 	//       c
 	// queue B:
 	//    d--c-a
-	// attach queueA to queueB: we expect
-	// [Option 1: error]
-	// [Option 2: head a and subtree:
-	//     g-b
-	//	     \
-	//	  d--c ]
-	// [Current: strange result :-( ]
-	// TODO: current, this operation produces a strange resultwith duplicated element c
+	// attach queueA to queueB: we expect an error as the queues have nodes in common
 	t.Run("Attaching_partially_overlapped_queue", func(t *testing.T) {
-		//t.Skip() // TODO: skipping test as hotfix: current implementation does _not_ use `Queue.Attach` method
 		queueA := NewQueue(c)
 		assert.True(t, queueA.TryAdd(b))
 		assert.True(t, queueA.TryAdd(g))
@@ -257,35 +249,7 @@ func TestQueue(t *testing.T) {
 		assert.True(t, queueB.TryAdd(d))
 
 		err := queueB.Attach(queueA)
-		assert.NoError(t, err)
-		// we expect: header a and a single child queue with c as its head
-		//   g-b
-		//      \
-		//    d--c - a
-		assert.Equal(t, a, queueB.Head.Item)
-		assert.Equal(t, 5, queueB.Size())
-
-		// dismounting a:
-		head, childQueues := queueB.Dismount()
-		assert.Equal(t, a, head)
-		// childQueues should only contains the single sub-tree `cSubtree`
-		//   g-b
-		//      \
-		//    d--c
-		assert.Equal(t, 1, len(childQueues), "There should only be a single child queue")
-		cSubtree := childQueues[0]
-		assert.Equal(t, c, cSubtree.Head.Item)
-		assert.Equal(t, 4, cSubtree.Size())
-
-		// dismounting c, we expect
-		// head c; two children queues: [g-b] and [d]
-		head, childQueues = cSubtree.Dismount()
-		assert.Equal(t, c, head)
-
-		gbSubtree := childQueues[0] // we got [g-b]
-		assert.Equal(t, b, gbSubtree)
-		assert.Equal(t, 2, gbSubtree.Size())
-
+		assert.Error(t, err)
 	})
 
 }
