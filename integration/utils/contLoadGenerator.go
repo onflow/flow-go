@@ -54,7 +54,6 @@ type ContLoadGenerator struct {
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
-// loadType , 0 =
 func NewContLoadGenerator(
 	log zerolog.Logger,
 	loaderMetrics *metrics.LoaderCollector,
