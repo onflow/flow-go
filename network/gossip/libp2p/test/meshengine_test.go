@@ -3,7 +3,6 @@ package test
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,8 +10,6 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -22,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,10 +27,9 @@ import (
 // of engines over a complete graph
 type MeshEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                      // used as a wrapper around conduit methods
-	nets           []*libp2p.Network    // used to keep track of the networks
-	mws            []*libp2p.Middleware // used to keep track of the middlewares associated with networks
-	ids            flow.IdentityList    // used to keep track of the identifiers associated with networks
+	ConduitWrapper                   // used as a wrapper around conduit methods
+	nets           []*libp2p.Network // used to keep track of the networks
+	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
@@ -50,14 +47,16 @@ func (m *MeshEngineTestSuite) SetupTest() {
 
 	m.ids = CreateIDs(count)
 
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := createMiddleware(logger, m.ids)
-	require.NoError(m.Suite.T(), err)
-	m.mws = mws
+	// mocks state for collector nodes topology
+	// considers only a single cluster as higher cluster numbers are tested
+	// in collectionTopology_test
+	state := topology.CreateMockStateForCollectionNodes(m.T(),
+		m.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
-	//nets, err := createNetworks(logger, m.mws, m.ids, cacheSize, false)
-	//require.NoError(m.Suite.T(), err)
-	//m.nets = nets
+	// creates topology instances for the nodes based on their roles
+	tops := CreateTopologies(m.T(), state, m.ids)
+
+	m.nets = CreateNetworks(m.T(), m.ids, tops, cacheSize, false)
 }
 
 // TearDownTest closes the networks within a specified timeout
