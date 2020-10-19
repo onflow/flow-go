@@ -55,17 +55,20 @@ func (factory *EpochComponentsFactory) Create(
 	err error,
 ) {
 
+	fmt.Println("EpochComponentsFactory.Create Clustering")
 	// determine this node's cluster for the epoch
 	clusters, err := epoch.Clustering()
 	if err != nil {
 		err = fmt.Errorf("could not get clusters for epoch: %w", err)
 		return
 	}
+	fmt.Println("EpochComponentsFactory.Create ByNodeID")
 	_, clusterIndex, ok := clusters.ByNodeID(factory.me.NodeID())
 	if !ok {
 		err = fmt.Errorf("could not find my cluster")
 		return
 	}
+	fmt.Println("EpochComponentsFactory.Create Cluster")
 	cluster, err := epoch.Cluster(clusterIndex)
 	if err != nil {
 		err = fmt.Errorf("could not get cluster info: %w", err)
@@ -78,12 +81,15 @@ func (factory *EpochComponentsFactory) Create(
 		payloads storage.ClusterPayloads
 		blocks   storage.ClusterBlocks
 	)
+	fmt.Println("EpochComponentsFactory.Create clsuter state")
 	state, headers, payloads, blocks, err = factory.state.Create(cluster.ChainID())
 	if err != nil {
 		err = fmt.Errorf("could not create cluster state: %w", err)
 		return
 	}
+	fmt.Println("EpochComponentsFactory.Create final head")
 	_, err = state.Final().Head()
+	fmt.Println("EpochComponentsFactory.Create final head err: ", err)
 	// storage layer error while checking state - fail fast
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		err = fmt.Errorf("could not check cluster state db: %w", err)
@@ -91,6 +97,7 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	if errors.Is(err, storage.ErrNotFound) {
 		// no existing cluster state, bootstrap with root block for epoch
+		fmt.Println("EpochComponentsFactory.Create Bootstrap")
 		err = state.Mutate().Bootstrap(cluster.RootBlock())
 		if err != nil {
 			err = fmt.Errorf("could not bootstrap cluster state: %w", err)
@@ -98,30 +105,35 @@ func (factory *EpochComponentsFactory) Create(
 		}
 	}
 
+	fmt.Println("EpochComponentsFactory.Create builder/finalzier")
 	builder, finalizer, err := factory.builder.Create(headers, payloads, factory.pool)
 	if err != nil {
 		err = fmt.Errorf("could not create builder/finalizer: %w", err)
 		return
 	}
 
+	fmt.Println("EpochComponentsFactory.Create seed")
 	seed, err := epoch.Seed(indices.ProtocolCollectorClusterLeaderSelection(clusterIndex)...)
 	if err != nil {
 		err = fmt.Errorf("could not get leader selection seed: %w", err)
 		return
 	}
 
+	fmt.Println("EpochComponentsFactory.Create proposaleng")
 	proposalEng, err := factory.proposal.Create(state, headers, payloads)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
 		return
 	}
 
+	fmt.Println("EpochComponentsFactory.Create sync")
 	var syncCore *chainsync.Core
 	syncCore, sync, err = factory.sync.Create(cluster.Members(), state, blocks, proposalEng)
 	if err != nil {
 		err = fmt.Errorf("could not create sync engine: %w", err)
 		return
 	}
+	fmt.Println("EpochComponentsFactory.Create hotstuff")
 	hotstuff, err = factory.hotstuff.Create(
 		cluster.ChainID(),
 		cluster.Members(),
@@ -140,6 +152,7 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
+	fmt.Println("EpochComponentsFactory.Create attach to proposal eng")
 	// attach dependencies to the proposal engine
 	proposal = proposalEng.
 		WithHotStuff(hotstuff).

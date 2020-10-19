@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -19,6 +20,7 @@ func NewDistributor() *Distributor {
 }
 
 func (d *Distributor) AddConsumer(consumer protocol.Consumer) {
+	fmt.Println("Distributor.AddConsumer")
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.subscribers = append(d.subscribers, consumer)

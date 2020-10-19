@@ -260,6 +260,7 @@ func main() {
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
+			fmt.Println("> epoch manager start")
 			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
@@ -339,10 +340,13 @@ func main() {
 				proposalFactory,
 				syncFactory,
 			)
+			fmt.Println("> epoch manager NewHeights")
 
 			heightEvents := gadgets.NewHeights()
+			fmt.Println("> epoch manager AddConsumer heights")
 			node.ProtocolEvents.AddConsumer(heightEvents)
 
+			fmt.Println("> epoch manager epochmgr.New")
 			manager, err := epochmgr.New(
 				node.Logger,
 				node.Me,
@@ -355,6 +359,7 @@ func main() {
 				return nil, fmt.Errorf("could not create epoch manager: %w", err)
 			}
 
+			fmt.Println("> epoch manager AddConsumer manager")
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
 

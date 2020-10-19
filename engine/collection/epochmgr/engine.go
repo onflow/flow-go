@@ -77,12 +77,15 @@ func New(
 		startupTimeout: DefaultStartupTimeout,
 	}
 
+	fmt.Println("epochmgr.New get epoch")
 	// set up epoch-scoped epoch managed by this engine for the current epoch
 	epoch := e.state.Final().Epochs().Current()
+	fmt.Println("epochmgr.New get epoch counter")
 	counter, err := epoch.Counter()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch counter: %w", err)
 	}
+	fmt.Println("epochmgr.New create components")
 	components, err := e.createEpochComponents(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch components for current epoch: %w", err)
