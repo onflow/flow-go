@@ -10,9 +10,11 @@ import (
 )
 
 const (
-	keyExists         = "exists"
-	keyCode           = "code"
-	keyPublicKeyCount = "public_key_count"
+	keyExists                   = "exists"
+	keyCode                     = "code"
+	keyPublicKeyCount           = "public_key_count"
+	StorageUsedRegisterName     = "storage_used"
+	StorageCapacityRegisterName = "storage_capacity"
 )
 
 var (

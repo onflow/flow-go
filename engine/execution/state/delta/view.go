@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -157,7 +158,7 @@ func (v *View) updateSpock(value []byte) error {
 }
 
 func (v *View) updateRegisterSizeChange(owner, controller, key string, value flow.RegisterValue) error {
-	if key == "storage_used" {
+	if key == state.StorageUsedRegisterName {
 		return nil
 	}
 	oldValue, err := v.Get(owner, controller, key)
@@ -170,7 +171,7 @@ func (v *View) updateRegisterSizeChange(owner, controller, key string, value flo
 		return nil
 	}
 
-	oldSizeRegister, err := v.Get(owner, "", "storage_used")
+	oldSizeRegister, err := v.Get(owner, "", state.StorageUsedRegisterName)
 	if err != nil {
 		return err
 	}
@@ -181,7 +182,7 @@ func (v *View) updateRegisterSizeChange(owner, controller, key string, value flo
 		oldSize = 8
 		buffer := make([]byte, oldSize)
 		binary.LittleEndian.PutUint64(buffer, 8)
-		v.Set(owner, "", "storage_used", buffer)
+		v.Set(owner, "", state.StorageUsedRegisterName, buffer)
 	} else {
 		oldSize = binary.LittleEndian.Uint64(oldSizeRegister)
 	}
@@ -204,7 +205,7 @@ func (v *View) updateRegisterSizeChange(owner, controller, key string, value flo
 	binary.LittleEndian.PutUint64(buffer, newSize)
 	// this will put us back in the Set method.
 	// The difference will be that sizeChange will always be 0 when setting storage_used
-	v.Set(owner, "", "storage_used", buffer)
+	v.Set(owner, "", state.StorageUsedRegisterName, buffer)
 
 	return nil
 }

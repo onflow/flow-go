@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -27,7 +28,7 @@ func TestView_Get(t *testing.T) {
 
 	t.Run("ValueNotInCache", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			} else if owner == registerID {
 				return flow.RegisterValue("orange"), nil
@@ -42,7 +43,7 @@ func TestView_Get(t *testing.T) {
 
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			} else if owner == registerID {
 				return flow.RegisterValue("orange"), nil
@@ -63,7 +64,7 @@ func TestView_Set(t *testing.T) {
 	registerID := "fruit"
 
 	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		if key == "storage_used" {
+		if key == state.StorageUsedRegisterName {
 			return uint64AsBytes(100), nil
 		}
 		return nil, nil
@@ -83,7 +84,7 @@ func TestView_Set(t *testing.T) {
 
 	t.Run("AfterDelete", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -100,7 +101,7 @@ func TestView_Set(t *testing.T) {
 
 	t.Run("SpockSecret", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -121,9 +122,9 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID2, "", "", flow.RegisterValue("1"))
 		err = hashIt(expSpock, []byte("1"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // read "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // read state.StorageUsedRegisterName
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("1"))))) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("1"))))) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		s := v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock.SumHash()))
@@ -131,9 +132,9 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID3, "", "", flow.RegisterValue("2"))
 		err = hashIt(expSpock, []byte("2"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // read "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // read state.StorageUsedRegisterName
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("2"))))) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("2"))))) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		s = v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock.SumHash()))
@@ -141,9 +142,9 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID1, "", "", flow.RegisterValue("3"))
 		err = hashIt(expSpock, []byte("3"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // read "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // read state.StorageUsedRegisterName
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		s = v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock.SumHash()))
@@ -161,9 +162,9 @@ func TestView_Set(t *testing.T) {
 		v.Delete(registerID1, "", "")
 		err = hashIt(expSpock, []byte("3"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // read "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // read state.StorageUsedRegisterName
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		s = v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock.SumHash()))
@@ -173,9 +174,9 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID1, "", "", flow.RegisterValue("4"))
 		err = hashIt(expSpock, []byte("4"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // read "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(100)) // read state.StorageUsedRegisterName
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("4"))))) // set "storage_used"
+		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("4"))))) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		s = v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock.SumHash()))
@@ -208,7 +209,7 @@ func TestView_Delete(t *testing.T) {
 
 	t.Run("ValueNotSet", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -227,7 +228,7 @@ func TestView_Delete(t *testing.T) {
 
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			if owner == registerID {
@@ -260,7 +261,7 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("EmptyView", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -283,7 +284,7 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("EmptyDelta", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -306,7 +307,7 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("NoCollisions", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -329,7 +330,7 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("OverwriteSetValue", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -348,7 +349,7 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("OverwriteDeletedValue", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -368,7 +369,7 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("DeleteSetValue", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -386,7 +387,7 @@ func TestView_MergeView(t *testing.T) {
 	})
 	t.Run("SpockDataMerge", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -397,9 +398,9 @@ func TestView_MergeView(t *testing.T) {
 
 		err := hashIt(expSpock1, []byte("apple"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock1, uint64AsBytes(100)) // read "storage_used"
+		err = hashIt(expSpock1, uint64AsBytes(100)) // read state.StorageUsedRegisterName
 		assert.NoError(t, err)
-		err = hashIt(expSpock1, uint64AsBytes(uint64(100+len([]byte("apple"))))) // set "storage_used"
+		err = hashIt(expSpock1, uint64AsBytes(uint64(100+len([]byte("apple"))))) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		assert.Equal(t, v.SpockSecret(), []uint8(expSpock1.SumHash()))
 
@@ -408,11 +409,11 @@ func TestView_MergeView(t *testing.T) {
 		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
 		err = hashIt(expSpock2, []byte("carrot"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock1, uint64AsBytes(100)) // read "storage_used" from parent
+		err = hashIt(expSpock1, uint64AsBytes(100)) // read state.StorageUsedRegisterName from parent
 		assert.NoError(t, err)
-		err = hashIt(expSpock2, uint64AsBytes(100)) // read "storage_used"
+		err = hashIt(expSpock2, uint64AsBytes(100)) // read state.StorageUsedRegisterName
 		assert.NoError(t, err)
-		err = hashIt(expSpock2, uint64AsBytes(uint64(100+len([]byte("carrot"))))) // set "storage_used"
+		err = hashIt(expSpock2, uint64AsBytes(uint64(100+len([]byte("carrot"))))) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		assert.Equal(t, chView.SpockSecret(), []uint8(expSpock2.SumHash()))
 		assert.Equal(t, v.SpockSecret(), []uint8(expSpock1.SumHash()))
@@ -427,7 +428,7 @@ func TestView_MergeView(t *testing.T) {
 
 	t.Run("RegisterTouchesDataMerge", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
@@ -449,9 +450,9 @@ func TestView_MergeView(t *testing.T) {
 			flow.NewRegisterID(registerID1, "", ""),
 			flow.NewRegisterID(registerID2, "", ""),
 			flow.NewRegisterID(registerID3, "", ""),
-			flow.NewRegisterID(registerID1, "", "storage_used"),
-			flow.NewRegisterID(registerID2, "", "storage_used"),
-			flow.NewRegisterID(registerID3, "", "storage_used"),
+			flow.NewRegisterID(registerID1, "", state.StorageUsedRegisterName),
+			flow.NewRegisterID(registerID2, "", state.StorageUsedRegisterName),
+			flow.NewRegisterID(registerID3, "", state.StorageUsedRegisterName),
 		}, reads)
 	})
 
@@ -462,7 +463,7 @@ func TestView_RegisterTouches(t *testing.T) {
 	registerID2 := "vegetable"
 
 	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		if key == "storage_used" {
+		if key == state.StorageUsedRegisterName {
 			return uint64AsBytes(100), nil
 		}
 		return nil, nil
@@ -475,7 +476,7 @@ func TestView_RegisterTouches(t *testing.T) {
 
 	t.Run("Set and Get", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 
@@ -503,7 +504,7 @@ func TestView_RegisterTouches(t *testing.T) {
 
 func TestView_AllRegisters(t *testing.T) {
 	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		if key == "storage_used" {
+		if key == state.StorageUsedRegisterName {
 			return uint64AsBytes(100), nil
 		}
 		return nil, nil
@@ -516,7 +517,7 @@ func TestView_AllRegisters(t *testing.T) {
 
 	t.Run("Set and Get", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 
@@ -548,7 +549,7 @@ func TestView_AllRegisters(t *testing.T) {
 	})
 	t.Run("With Merge", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 
@@ -587,7 +588,7 @@ func TestView_Reads(t *testing.T) {
 	registerID2 := "vegetable"
 
 	v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		if key == "storage_used" {
+		if key == state.StorageUsedRegisterName {
 			return uint64AsBytes(100), nil
 		}
 		return nil, nil
@@ -600,7 +601,7 @@ func TestView_Reads(t *testing.T) {
 
 	t.Run("Set and Get", func(t *testing.T) {
 		v := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			if key == "storage_used" {
+			if key == state.StorageUsedRegisterName {
 				return uint64AsBytes(100), nil
 			}
 			return nil, nil
