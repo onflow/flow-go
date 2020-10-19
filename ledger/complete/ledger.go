@@ -18,6 +18,7 @@ import (
 )
 
 const DefaultCacheSize = 1000
+const DefaultPathFinderVersion = 1
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -37,6 +38,7 @@ type Ledger struct {
 	logger  zerolog.Logger
 	// disk size reading can be time consuming, so limit how often its read
 	diskUpdateLimiter *time.Ticker
+	pathFinderVersion uint8
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
@@ -44,7 +46,8 @@ func NewLedger(dbDir string,
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
-	reg prometheus.Registerer) (*Ledger, error) {
+	reg prometheus.Registerer,
+	pathFinderVer uint8) (*Ledger, error) {
 
 	w, err := wal.NewWAL(nil, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
@@ -66,6 +69,7 @@ func NewLedger(dbDir string,
 		metrics:           metrics,
 		logger:            logger,
 		diskUpdateLimiter: time.NewTicker(5 * time.Second),
+		pathFinderVersion: pathFinderVer,
 	}
 
 	err = w.ReplayOnForest(forest)
@@ -105,7 +109,7 @@ func (l *Ledger) InitialState() ledger.State {
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	start := time.Now()
-	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +146,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +196,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 // Prove provides proofs for a ledger query and errors (if any)
 func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 
-	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}

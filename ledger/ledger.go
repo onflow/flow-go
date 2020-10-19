@@ -163,15 +163,19 @@ func (k *Key) Size() int {
 	return size
 }
 
-func (k *Key) String() string {
+// CanonicalForm returns a byte slice describing the key
+// Warning, Changing this has an impact on how leaf hashes are computed
+// don't use this to reconstruct the key later
+func (k *Key) CanonicalForm() []byte {
 	ret := ""
 	for _, kp := range k.KeyParts {
-		ret += "/"
-		ret += string(kp.Type)
-		ret += "/"
-		ret += string(kp.Value)
+		ret += fmt.Sprintf("/%d/%v", kp.Type, string(kp.Value))
 	}
-	return ret
+	return []byte(ret)
+}
+
+func (k *Key) String() string {
+	return string(k.CanonicalForm())
 }
 
 // DeepCopy returns a deep copy of the key

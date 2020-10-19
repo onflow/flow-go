@@ -138,6 +138,8 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		return fmt.Errorf("cannot flatten forest: %w", err)
 	}
 
+	// migrations
+
 	checkpointWriter, err := wal.CreateCheckpointWriterForFile(path.Join(outputDir, wal.RootCheckpointFilename))
 	if err != nil {
 		return fmt.Errorf("cannot create checkpointer writer: %w", err)

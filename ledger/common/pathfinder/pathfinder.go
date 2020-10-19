@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -27,6 +28,15 @@ func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 				return nil, err
 			}
 			return ledger.Path(h.Sum(nil)), nil
+		}
+	case 1:
+		{
+			hasher := hash.NewSHA3_256()
+			_, err := hasher.Write(key.CanonicalForm())
+			if err != nil {
+				panic(err)
+			}
+			return ledger.Path(hasher.SumHash()), nil
 		}
 	}
 	return nil, fmt.Errorf("unsuported key to path version")

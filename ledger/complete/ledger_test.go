@@ -24,7 +24,7 @@ import (
 func TestNewLedger(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
 		metricsCollector := &metrics.NoopCollector{}
-		_, err := complete.NewLedger(dbDir, 100, metricsCollector, zerolog.Logger{}, nil)
+		_, err := complete.NewLedger(dbDir, 100, metricsCollector, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 		assert.NoError(t, err)
 	})
 }
@@ -33,7 +33,7 @@ func TestLedger_Update(t *testing.T) {
 	t.Run("empty update", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 
-			l, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+			l, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			// create empty update
@@ -53,7 +53,7 @@ func TestLedger_Update(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			// UpdateFixture
 
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			curSC := led.InitialState()
@@ -81,7 +81,7 @@ func TestLedger_Update(t *testing.T) {
 func TestLedger_Get(t *testing.T) {
 	t.Run("empty query", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			curSC := led.InitialState()
@@ -96,7 +96,7 @@ func TestLedger_Get(t *testing.T) {
 
 	t.Run("empty keys", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			curS := led.InitialState()
@@ -117,7 +117,7 @@ func TestLedger_Get(t *testing.T) {
 func TestLedger_Proof(t *testing.T) {
 	t.Run("empty query", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			curSC := led.InitialState()
@@ -135,7 +135,7 @@ func TestLedger_Proof(t *testing.T) {
 
 	t.Run("non-existing keys", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			curS := led.InitialState()
@@ -155,7 +155,7 @@ func TestLedger_Proof(t *testing.T) {
 
 	t.Run("existing keys", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			curS := led.InitialState()
@@ -194,7 +194,7 @@ func Test_WAL(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 
 		// cache size intentionally is set to size to test deletion
-		led, err := complete.NewLedger(dir, size, metricsCollector, logger, nil)
+		led, err := complete.NewLedger(dir, size, metricsCollector, logger, nil, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		var state = led.InitialState()
@@ -223,7 +223,7 @@ func Test_WAL(t *testing.T) {
 
 		<-led.Done()
 
-		led2, err := complete.NewLedger(dir, size+10, metricsCollector, logger, nil)
+		led2, err := complete.NewLedger(dir, size+10, metricsCollector, logger, nil, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		// random map iteration order is a benefit here
@@ -277,7 +277,7 @@ func TestLedgerFunctionality(t *testing.T) {
 		histStorage := make(map[string]ledger.Value) // historic storage string(key, state) -> value
 		latestValue := make(map[string]ledger.Value) // key to value
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, activeTries, metricsCollector, logger, nil)
+			led, err := complete.NewLedger(dbDir, activeTries, metricsCollector, logger, nil, complete.DefaultPathFinderVersion)
 			assert.NoError(t, err)
 			state := led.InitialState()
 			for i := 0; i < steps; i++ {

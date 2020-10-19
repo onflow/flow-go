@@ -75,6 +75,7 @@ func run(*cobra.Command, []string) {
 	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 
 		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, controller, key))
+		// TODO (RAMTIN) change the path finder version
 		path, err := pathfinder.KeyToPath(ledgerKey, 0)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot convert key to path")
