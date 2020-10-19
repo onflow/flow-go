@@ -344,7 +344,7 @@ func main() {
 
 			heightEvents := gadgets.NewHeights()
 			fmt.Println("> epoch manager AddConsumer heights")
-			//node.ProtocolEvents.AddConsumer(heightEvents)
+			node.ProtocolEvents.AddConsumer(heightEvents)
 
 			fmt.Println("> epoch manager epochmgr.New")
 			manager, err := epochmgr.New(
@@ -361,7 +361,7 @@ func main() {
 
 			fmt.Println("> epoch manager AddConsumer manager")
 			// register the manager for protocol events
-			//node.ProtocolEvents.AddConsumer(manager)
+			node.ProtocolEvents.AddConsumer(manager)
 
 			return manager, err
 		}).
