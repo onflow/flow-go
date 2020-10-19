@@ -41,16 +41,3 @@ func (s Seal) ID() Identifier {
 func (s Seal) Checksum() Identifier {
 	return MakeID(s)
 }
-
-type SealContainer struct {
-	Seal            *Seal
-	ExecutionResult *ExecutionResult
-}
-
-func (s SealContainer) ID() Identifier {
-	return s.Seal.ID()
-}
-
-func (s *SealContainer) Checksum() Identifier {
-	return s.Seal.Checksum()
-}
