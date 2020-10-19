@@ -132,7 +132,6 @@ func createNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 
 // createMiddleware receives an ids slice and creates and initializes a middleware instances for each id
 func createMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2p.Middleware, error) {
-
 	metrics := metrics.NewNoopCollector()
 	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
