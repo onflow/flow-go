@@ -2,8 +2,11 @@ package topology_test
 
 import (
 	"math"
+	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -93,7 +96,11 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 
 	// creates topology instances for the nodes based on their roles
 	tops := test.CreateTopologies(suite.T(), state, ids)
-	nets := test.CreateNetworks(suite.T(), ids, tops, 1, true)
+
+	// creates middleware and network instances
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws := test.CreateMiddleware(suite.T(), logger, ids)
+	nets := test.CreateNetworks(suite.T(), logger, ids, mws, tops, 1, true)
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range nets {

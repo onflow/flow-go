@@ -42,25 +42,25 @@ func TestStubEngineTestSuite(t *testing.T) {
 	suite.Run(t, new(EchoEngineTestSuite))
 }
 
-func (s *EchoEngineTestSuite) SetupTest() {
+func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
 	golog.SetAllLoggers(golog.LevelInfo)
-	s.ids = CreateIDs(count)
+	suite.ids = CreateIDs(count)
 
 	// mocks state for collector nodes topology
 	// considers only a single cluster as higher cluster numbers are tested
 	// in collectionTopology_test
-	state := topology.CreateMockStateForCollectionNodes(s.T(),
-		s.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
+	state := topology.CreateMockStateForCollectionNodes(suite.T(),
+		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
-	tops := CreateTopologies(s.T(), state, s.ids)
+	tops := CreateTopologies(suite.T(), state, suite.ids)
 
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := CreateMiddleware(s.T(), logger, s.ids)
-	nets := CreateNetworks(s.T(), logger, s.ids, mws, tops, 100, false)
-	s.nets = nets
+	mws := CreateMiddleware(suite.T(), logger, suite.ids)
+	nets := CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 100, false)
+	suite.nets = nets
 }
 
 // TearDownTest closes the networks within a specified timeout
