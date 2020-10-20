@@ -140,6 +140,10 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 
 	// migrations
 
+	// TODO(RAMTIN) HERE
+	// load from zero insert into path finder 1
+	// f, err := complete.NewLedger(execdir, size*10, metr, zerolog.Nop(), nil, complete.DefaultPathFinderVersion)
+
 	checkpointWriter, err := wal.CreateCheckpointWriterForFile(path.Join(outputDir, wal.RootCheckpointFilename))
 	if err != nil {
 		return fmt.Errorf("cannot create checkpointer writer: %w", err)
