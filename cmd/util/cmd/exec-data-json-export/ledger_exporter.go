@@ -1,24 +1,27 @@
 package jsonexporter
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/mtrie"
-	"github.com/onflow/flow-go/storage/ledger/mtrie/flattener"
-	"github.com/onflow/flow-go/storage/ledger/mtrie/trie"
-	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 // ExportLedger exports ledger key value pairs at the given blockID
@@ -34,7 +37,7 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 		return fmt.Errorf("cannot get state commitment for block: %w", err)
 	}
 
-	w, err := wal.NewWAL(nil, nil, ledgerPath, ledger.CacheSize, ledger.RegisterKeySize, wal.SegmentSize)
+	w, err := wal.NewWAL(nil, nil, ledgerPath, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -43,7 +46,7 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 	}()
 
 	// TODO port this to use new forest
-	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, outputPath, 1000, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, outputPath, complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
 	if err != nil {
 		return fmt.Errorf("cannot create mForest: %w", err)
 	}
@@ -61,27 +64,27 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 			if err != nil {
 				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
 			}
-			err = mForest.AddTries(rebuiltTries)
+			err = forest.AddTries(rebuiltTries)
 			if err != nil {
 				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
 			}
 			return nil
 		},
-		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+		func(update *ledger.TrieUpdate) error {
 
-			newTrie, err := mForest.Update(stateCommitment, keys, values)
+			newTrieHash, err := forest.Update(update)
 
-			for _, value := range values {
-				valuesSize += len(value)
+			for _, value := range update.Payloads {
+				valuesSize += len(value.Value)
 			}
 
-			valuesCount += len(values)
+			valuesCount += len(update.Payloads)
 
 			if err != nil {
 				return fmt.Errorf("error while updating mForest: %w", err)
 			}
 
-			if bytes.Equal(targetHash, newTrie.RootHash()) {
+			if bytes.Equal(targetHash, newTrieHash) {
 				found = true
 				return FoundHashError
 			}
@@ -93,7 +96,7 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 
 			return err
 		},
-		func(commitment flow.StateCommitment) error {
+		func(commitment ledger.RootHash) error {
 			return nil
 		})
 
@@ -110,5 +113,21 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished seeking")
 	log.Info().Msg("writing root checkpoint")
 
-	return mForest.DumpTrieAsJSON(targetHash, filepath.Join(outputPath, hex.EncodeToString(targetHash)+".trie.jsonl"))
+	trie, err := forest.GetTrie(targetHash)
+	if err != nil {
+		return fmt.Errorf("cannot get a trie with target hash: %w", err)
+	}
+
+	path := filepath.Join(outputPath, hex.EncodeToString(targetHash)+".trie.jsonl")
+
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	return trie.DumpAsJSON(writer)
 }
