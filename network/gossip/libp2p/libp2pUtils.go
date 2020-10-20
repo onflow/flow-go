@@ -92,7 +92,7 @@ func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 	return filteredStreams
 }
 
-// PeerInfoFromID converts the flow.Identity to peer.AddrInfo and caches the result
+// PeerInfoFromID converts the flow.Identity to peer.AddrInfo.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
 // flow.Identity           ---> peer.AddrInfo
 //    |-- Address          --->   |-- []multiaddr.Multiaddr
