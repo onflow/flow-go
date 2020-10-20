@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine"
+	engine2 "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -117,6 +117,9 @@ func (n *Network) Done() <-chan struct{} {
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
+	if _, ok := engine2.GetRolesByTopic(channelID); !ok {
+		return nil, fmt.Errorf("unknown channel id: %s, should be registered in topic map", channelID)
+	}
 
 	err := n.subscriptionMgr.register(channelID, engine)
 	if err != nil {
@@ -162,7 +165,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	myTopics := engine.GetTopicsByRole(n.role)
+	myTopics := engine2.GetTopicsByRole(n.role)
 	var myFanout flow.IdentityList
 
 	// samples a connected component fanout from each topic and takes the
