@@ -33,33 +33,6 @@ type Accounts struct {
 	*addresses
 }
 
-// contractNames container for a list of contract names. Should always be sorted.
-// To ensure this, don't sort while reading it from storage, but sort it while adding/removing elements
-type contractNames []string
-
-func (l contractNames) Has(contractNames string) bool {
-	i := sort.SearchStrings(l, contractNames)
-	return i != len(l) && l[i] == contractNames
-}
-func (l *contractNames) add(contractNames string) {
-	i := sort.SearchStrings(*l, contractNames)
-	if i != len(*l) && (*l)[i] == contractNames {
-		// list already contains element
-		return
-	}
-	*l = append(*l, "")
-	copy((*l)[i+1:], (*l)[i:])
-	(*l)[i] = contractNames
-}
-func (l *contractNames) remove(contractName string) {
-	i := sort.SearchStrings(*l, contractName)
-	if i == len(*l) || (*l)[i] != contractName {
-		// list doesnt contain the element
-		return
-	}
-	*l = append((*l)[:i], (*l)[i+1:]...)
-}
-
 func NewAccounts(ledger Ledger, chain flow.Chain) *Accounts {
 	addresses := newAddresses(ledger, chain)
 
@@ -88,11 +61,11 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 		return nil, err
 	}
 	for _, name := range contractNames {
-		code, err := a.getCode(name, address)
+		contract, err := a.getContract(name, address)
 		if err != nil {
 			return nil, err
 		}
-		contracts[name] = code
+		contracts[name] = contract
 	}
 
 	var publicKeys []flow.AccountPublicKey
@@ -103,7 +76,6 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 
 	return &flow.Account{
 		Address:   address,
-		Code:      nil,
 		Keys:      publicKeys,
 		Contracts: contracts,
 	}, nil
@@ -298,19 +270,18 @@ func contractKey(contractName string) string {
 	return fmt.Sprintf("%s.%s", keyCode, contractName)
 }
 
-func (a *Accounts) getCode(name string, address flow.Address) ([]byte, error) {
-
-	code, err := a.ledger.Get(string(address.Bytes()),
+func (a *Accounts) getContract(contractName string, address flow.Address) ([]byte, error) {
+	contract, err := a.ledger.Get(string(address.Bytes()),
 		string(address.Bytes()),
-		contractKey(name))
+		contractKey(contractName))
 	if err != nil {
-		return nil, newLedgerGetError(name, address, err)
+		return nil, newLedgerGetError(contractName, address, err)
 	}
 
-	return code, nil
+	return contract, nil
 }
 
-func (a *Accounts) setCode(name string, address flow.Address, code []byte) error {
+func (a *Accounts) setContract(contractName string, address flow.Address, contract []byte) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -320,18 +291,18 @@ func (a *Accounts) setCode(name string, address flow.Address, code []byte) error
 		return fmt.Errorf("account with address %s does not exist", address)
 	}
 
-	var prevCode []byte
-	prevCode, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), contractKey(name))
+	var prevContract []byte
+	prevContract, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), contractKey(contractName))
 	if err != nil {
-		return fmt.Errorf("cannot retreive previous code: %w", err)
+		return fmt.Errorf("cannot retreive previous contract: %w", err)
 	}
 
-	// skip updating if the new code equals the old
-	if bytes.Equal(prevCode, code) {
+	// skip updating if the new contract equals the old
+	if bytes.Equal(prevContract, contract) {
 		return nil
 	}
 
-	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), contractKey(name), code)
+	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), contractKey(contractName), contract)
 
 	return nil
 }
@@ -340,7 +311,7 @@ func newLedgerGetError(key string, address flow.Address, err error) error {
 	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
 }
 
-func (a *Accounts) setContractNames(contracts contractNames, address flow.Address) error {
+func (a *Accounts) setContractNames(contractNames contractNames, address flow.Address) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -351,9 +322,9 @@ func (a *Accounts) setContractNames(contracts contractNames, address flow.Addres
 	}
 	var buf bytes.Buffer
 	cborEncoder := cbor.NewEncoder(&buf)
-	err = cborEncoder.Encode(contracts)
+	err = cborEncoder.Encode(contractNames)
 	if err != nil {
-		return fmt.Errorf("cannot serialize contract names")
+		return fmt.Errorf("cannot encode contract names")
 	}
 	newContractNames := buf.Bytes()
 
@@ -373,15 +344,15 @@ func (a *Accounts) setContractNames(contracts contractNames, address flow.Addres
 	return nil
 }
 
-func (a *Accounts) TouchContract(name string, address flow.Address) {
+func (a *Accounts) TouchContract(contractName string, address flow.Address) {
 	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		panic(err)
 	}
-	if contractNames.Has(name) {
+	if contractNames.Has(contractName) {
 		a.ledger.Touch(string(address.Bytes()),
 			string(address.Bytes()),
-			contractKey(name))
+			contractKey(contractName))
 	}
 }
 
@@ -407,42 +378,69 @@ func (a *Accounts) getContractNames(address flow.Address) (contractNames, error)
 	return identifiers, nil
 }
 
-func (a *Accounts) GetContract(name string, address flow.Address) ([]byte, error) {
+func (a *Accounts) GetContract(contractName string, address flow.Address) ([]byte, error) {
 	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return nil, err
 	}
-	if !contractNames.Has(name) {
+	if !contractNames.Has(contractName) {
 		return nil, nil
 	}
-	return a.getCode(name, address)
+	return a.getContract(contractName, address)
 }
 
-func (a *Accounts) SetContract(name string, address flow.Address, code []byte) error {
+func (a *Accounts) SetContract(contractName string, address flow.Address, contract []byte) error {
 	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return err
 	}
-	err = a.setCode(name, address, code)
+	err = a.setContract(contractName, address, contract)
 	if err != nil {
 		return err
 	}
-	contractNames.add(name)
+	contractNames.add(contractName)
 	return a.setContractNames(contractNames, address)
 }
 
-func (a *Accounts) DeleteContract(name string, address flow.Address) error {
+func (a *Accounts) DeleteContract(contractName string, address flow.Address) error {
 	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return err
 	}
-	if !contractNames.Has(name) {
+	if !contractNames.Has(contractName) {
 		return nil
 	}
-	err = a.setCode(name, address, nil)
+	err = a.setContract(contractName, address, nil)
 	if err != nil {
 		return err
 	}
-	contractNames.remove(name)
+	contractNames.remove(contractName)
 	return a.setContractNames(contractNames, address)
+}
+
+// contractNames container for a list of contract names. Should always be sorted.
+// To ensure this, don't sort while reading it from storage, but sort it while adding/removing elements
+type contractNames []string
+
+func (l contractNames) Has(contractNames string) bool {
+	i := sort.SearchStrings(l, contractNames)
+	return i != len(l) && l[i] == contractNames
+}
+func (l *contractNames) add(contractNames string) {
+	i := sort.SearchStrings(*l, contractNames)
+	if i != len(*l) && (*l)[i] == contractNames {
+		// list already contains element
+		return
+	}
+	*l = append(*l, "")
+	copy((*l)[i+1:], (*l)[i:])
+	(*l)[i] = contractNames
+}
+func (l *contractNames) remove(contractName string) {
+	i := sort.SearchStrings(*l, contractName)
+	if i == len(*l) || (*l)[i] != contractName {
+		// list doesnt contain the element
+		return
+	}
+	*l = append((*l)[:i], (*l)[i+1:]...)
 }

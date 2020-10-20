@@ -231,7 +231,7 @@ func AccountToMessage(a *flow.Account) (*entitiesproto.Account, error) {
 	return &entitiesproto.Account{
 		Address: a.Address.Bytes(),
 		Balance: a.Balance,
-		Code:    a.Code,
+		Code:    nil,
 		Keys:    keys,
 	}, nil
 }

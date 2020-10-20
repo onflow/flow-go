@@ -17,7 +17,6 @@ import (
 type Account struct {
 	Address   Address
 	Balance   uint64
-	Code      []byte
 	Keys      []AccountPublicKey
 	Contracts map[string][]byte
 }

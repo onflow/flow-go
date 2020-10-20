@@ -246,7 +246,6 @@ func MessageToAccount(m *entities.Account) (*flow.Account, error) {
 	return &flow.Account{
 		Address:   flow.BytesToAddress(m.GetAddress()),
 		Balance:   m.GetBalance(),
-		Code:      m.GetCode(),
 		Keys:      accountKeys,
 		Contracts: m.Contracts,
 	}, nil
@@ -265,7 +264,7 @@ func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 	return &entities.Account{
 		Address:   a.Address.Bytes(),
 		Balance:   a.Balance,
-		Code:      a.Code,
+		Code:      nil,
 		Keys:      keys,
 		Contracts: a.Contracts,
 	}, nil

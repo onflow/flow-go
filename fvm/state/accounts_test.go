@@ -75,85 +75,73 @@ func TestAccounts_SetContracts(t *testing.T) {
 	t.Run("Setting a contract puts it in Contracts", func(t *testing.T) {
 		ledger := TestLedger{}
 		a := state.NewAccounts(&ledger, chain)
+
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
-		if err != nil {
-			t.Errorf("SetContract() error = %v", err)
-		}
+		require.NoError(t, err)
+
 		contractNames, err := a.GetContractNames(address)
-		if err != nil {
-			t.Errorf("getContractNames() error = %v", err)
-		}
-		if len(contractNames) != 1 || contractNames[0] != "Dummy" {
-			t.Errorf("There should be only one contract")
-		}
+		require.NoError(t, err)
+
+		require.Len(t, contractNames, 1, "There should only be one contract")
+		require.Equal(t, contractNames[0], "Dummy")
 	})
 	t.Run("Setting a contract again, does not add it to contracts", func(t *testing.T) {
 		ledger := TestLedger{}
 		a := state.NewAccounts(&ledger, chain)
+
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
-		if err != nil {
-			t.Errorf("SetContract() error = %v", err)
-		}
+		require.NoError(t, err)
+
 		err = a.SetContract("Dummy", address, []byte("non empty string"))
-		if err != nil {
-			t.Errorf("SetContract() error = %v", err)
-		}
+		require.NoError(t, err)
+
 		contractNames, err := a.GetContractNames(address)
-		if err != nil {
-			t.Errorf("getContractNames() error = %v", err)
-		}
-		if len(contractNames) != 1 || contractNames[0] != "Dummy" {
-			t.Errorf("There should be only one contract")
-		}
+		require.NoError(t, err)
+
+		require.Len(t, contractNames, 1, "There should only be one contract")
+		require.Equal(t, contractNames[0], "Dummy")
 	})
 	t.Run("Setting more contracts always keeps them sorted", func(t *testing.T) {
 		ledger := TestLedger{}
 		a := state.NewAccounts(&ledger, chain)
+
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
-		if err != nil {
-			t.Errorf("SetContract() error = %v", err)
-		}
+		require.NoError(t, err)
+
 		err = a.SetContract("ZedDummy", address, []byte("non empty string"))
-		if err != nil {
-			t.Errorf("SetContract() error = %v", err)
-		}
+		require.NoError(t, err)
+
 		err = a.SetContract("ADummy", address, []byte("non empty string"))
-		if err != nil {
-			t.Errorf("SetContract() error = %v", err)
-		}
+		require.NoError(t, err)
+
 		contractNames, err := a.GetContractNames(address)
-		if err != nil {
-			t.Errorf("getContractNames() error = %v", err)
-		}
-		if len(contractNames) != 3 || contractNames[0] != "ADummy" || contractNames[1] != "Dummy" || contractNames[2] != "ZedDummy" {
-			t.Errorf("Contracts should be sorted")
-		}
+		require.NoError(t, err)
+
+		require.Len(t, contractNames, 3)
+		require.Equal(t, contractNames[0], "ADummy")
+		require.Equal(t, contractNames[1], "Dummy")
+		require.Equal(t, contractNames[2], "ZedDummy")
 	})
 	t.Run("Removing a contract does not fail if there is none", func(t *testing.T) {
 		ledger := TestLedger{}
 		a := state.NewAccounts(&ledger, chain)
+
 		err := a.DeleteContract("Dummy", address)
-		if err != nil {
-			t.Errorf("DeleteContract() error = %v", err)
-		}
+		require.NoError(t, err)
 	})
 	t.Run("Removing a contract removes it", func(t *testing.T) {
 		ledger := TestLedger{}
 		a := state.NewAccounts(&ledger, chain)
+
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
-		if err != nil {
-			t.Errorf("SetContract() error = %v", err)
-		}
+		require.NoError(t, err)
+
 		err = a.DeleteContract("Dummy", address)
-		if err != nil {
-			t.Errorf("DeleteContract() error = %v", err)
-		}
+		require.NoError(t, err)
+
 		contractNames, err := a.GetContractNames(address)
-		if err != nil {
-			t.Errorf("getContractNames() error = %v", err)
-		}
-		if len(contractNames) != 0 {
-			t.Errorf("There should be no contract")
-		}
+		require.NoError(t, err)
+
+		require.Len(t, contractNames, 0, "There should be no contract")
 	})
 }
