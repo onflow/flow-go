@@ -330,9 +330,6 @@ func (n *Network) unicast(channelID string, message interface{}, targetID flow.I
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
-	n.logger.Debug().
-		Msg("message successfully unicasted")
-
 	return nil
 }
 
@@ -347,11 +344,6 @@ func (n *Network) publish(channelID string, message interface{}, targetIDs ...fl
 	if err != nil {
 		return fmt.Errorf("failed to publish on channel ID %s: %w", channelID, err)
 	}
-
-	n.logger.
-		Debug().
-		Str("channel_id", channelID).
-		Msg("message successfully published")
 
 	return nil
 }
@@ -368,12 +360,6 @@ func (n *Network) multicast(channelID string, message interface{}, num uint, tar
 	if err != nil {
 		return fmt.Errorf("failed to multicast on channel ID %s: %w", channelID, err)
 	}
-
-	n.logger.
-		Debug().
-		Str("channel_id", channelID).
-		Uint("target_count", num).
-		Msg("message successfully multicasted")
 
 	return nil
 }

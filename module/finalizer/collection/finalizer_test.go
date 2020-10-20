@@ -42,8 +42,7 @@ func TestFinalizer(t *testing.T) {
 		require.NoError(t, err)
 		mutator := state.Mutate()
 
-		pool, err := stdmap.NewTransactions(1000)
-		require.NoError(t, err)
+		pool := stdmap.NewTransactions(1000)
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {

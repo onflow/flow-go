@@ -44,6 +44,8 @@ const (
 	opSwUInputLenBLSBLS12381 = 2 * (fieldSize + (securityBits / 8))
 	// minimum output size as required by the chosen implementation of hash to curve
 	minHashSizeBLSBLS12381 = opSwUInputLenBLSBLS12381
+	// Cipher suite with all the settings
+	BLSCipherSuite = "BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_"
 
 	// ECDSA
 
