@@ -38,7 +38,7 @@ func (l *libp2pConnector) ConnectPeers(ctx context.Context, ids flow.IdentityLis
 	validIDs, invalidIDs := peerInfosFromIDs(ids)
 
 	// create a channel of peer.AddrInfo as expected by the connector
-	peerCh := make(chan peer.AddrInfo, len(ids))
+	peerCh := make(chan peer.AddrInfo, len(validIDs))
 
 	// stuff all the peer.AddrInfo it into the channel
 	for _, peerInfo := range validIDs {
