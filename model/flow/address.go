@@ -331,7 +331,7 @@ var parityCheckMatrixColumns = [linearCodeN]uint{
 // an inversible (k x k) matrix.
 // I is a (k x k) matrix with coefficients in GF(2), each row is converted into
 // a big endian integer representation of the GF(2) raw vector.
-// I is used to generate retrieve indices from account addresses.
+// I is used to retrieve indices from account addresses.
 var inverseMatrixRows = [linearCodeK]uint64{
 	0x14b4ae9336c9, 0x1a5a57499b64, 0x0d2d2ba4cdb2, 0x069695d266d9,
 	0x134b4ae9336c, 0x09a5a57499b6, 0x04d2d2ba4cdb, 0x1269695d266d,
