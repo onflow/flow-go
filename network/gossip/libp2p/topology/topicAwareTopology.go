@@ -32,31 +32,34 @@ func NewTopicAwareTopology(nodeID flow.Identifier, state protocol.ReadOnlyState)
 	return t, nil
 }
 
-// Subset samples and returns a connected graph fanout of the subscribers to the topic from the idList.
+// Subset samples and returns a connected graph of the subscribers to the topic from the ids.
 // A connected graph fanout means that the subset of ids returned by this method on different nodes collectively
 // construct a connected graph component among all the subscribers to the topic.
-func (t *TopicAwareTopology) Subset(idList flow.IdentityList, _ uint, topic string) (flow.IdentityList, error) {
+func (t *TopicAwareTopology) Subset(ids flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
+	var subscribers flow.IdentityList
 	if engine.IsClusterTopic(topic) {
 		// extracts cluster peer ids to which the node belongs to.
 		clusterPeers, err := t.clusterPeers()
 		if err != nil {
 			return nil, fmt.Errorf("failed to find cluster peers for node %s", t.me.String())
 		}
-		// replaces idList with subset of co-cluster nodes.
-		idList = clusterPeers
+
+		subscribers = clusterPeers
+	} else {
+		// not a cluster-based topic.
+		//
+		// extracts flow roles subscribed to topic.
+		roles, ok := engine.GetRolesByTopic(topic)
+		if !ok {
+			return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", topic)
+		}
+
+		// extract ids of subscribers to the topic
+		subscribers = ids.Filter(filter.HasRole(roles...))
+
+		// excluding the node itself from its topology
+		subscribers = subscribers.Filter(filter.Not(filter.HasNodeID(t.me)))
 	}
-
-	// extracts flow roles subscribed to topic.
-	roles, ok := engine.GetRolesByTopic(topic)
-	if !ok {
-		return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", topic)
-	}
-
-	// extract ids of subscribers to the topic
-	subscribers := idList.Filter(filter.HasRole(roles...))
-
-	// excluding the node itself from its topology
-	subscribers = subscribers.Filter(filter.Not(filter.HasNodeID(t.me)))
 
 	// samples subscribers of a connected graph
 	subscriberSample, _ := connectedGraphSample(subscribers, t.seed)
