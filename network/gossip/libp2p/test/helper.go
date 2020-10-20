@@ -2,7 +2,6 @@ package test
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -49,16 +47,14 @@ func CreateIDs(count int) []*flow.Identity {
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
 func CreateNetworks(t *testing.T,
+	logger zerolog.Logger,
 	ids flow.IdentityList,
+	mws []*libp2p.Middleware,
 	tops []*topology.Topology,
 	csize int,
 	dryrun bool) []*libp2p.Network {
 
 	nets := make([]*libp2p.Network, 0)
-
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := createMiddleware(logger, ids)
-	require.NoError(t, err)
 
 	// create an empty identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
 	// identities are set to appropriate IP Port after the network and middleware are started
@@ -132,17 +128,15 @@ func CreateNetworks(t *testing.T,
 	return nets
 }
 
-// createMiddleware receives an ids slice and creates and initializes a middleware instances for each id
-func createMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2p.Middleware, error) {
+// CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id
+func CreateMiddleware(t *testing.T, log zerolog.Logger, identities []*flow.Identity) []*libp2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
 
 		key, err := GenerateNetworkingKey(identities[i].NodeID)
-		if err != nil {
-			return nil, err
-		}
+		require.NoError(t, err)
 
 		// creating middleware of nodes
 		mw, err := libp2p.NewMiddleware(log,
@@ -154,13 +148,10 @@ func createMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 			libp2p.DefaultMaxUnicastMsgSize,
 			libp2p.DefaultMaxPubSubMsgSize,
 			rootBlockID)
-		if err != nil {
-			return nil, err
-		}
-
+		require.NoError(t, err)
 		mws = append(mws, mw)
 	}
-	return mws, nil
+	return mws
 }
 
 type SnapshotMock struct {
