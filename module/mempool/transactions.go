@@ -32,6 +32,9 @@ type Transactions interface {
 	// as a slice.
 	All() []*flow.TransactionBody
 
+	// Clear removes all transactions from the mempool.
+	Clear()
+
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.
 	Hash() flow.Identifier
