@@ -21,6 +21,7 @@ func TestRoleJSON(t *testing.T) {
 	assert.Equal(t, r, actual)
 }
 
+// TestRoleList_Contains evaluates correctness of Contains method of RoleList.
 func TestRoleList_Contains(t *testing.T) {
 	roleList := flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
