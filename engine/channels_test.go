@@ -9,6 +9,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TestGetRolesByTopic evaluates correctness of GetRoleByTopic function against
+// inclusion and exclusion of roles. Essentially, the test evaluates that GetRolesByTopic
+// operates on top of topicMap.
 func TestGetRolesByTopic(t *testing.T) {
 	// asserts existing topic with its role
 	// the roles list should contain collection and consensus roles
@@ -28,7 +31,8 @@ func TestGetRolesByTopic(t *testing.T) {
 }
 
 // TestGetTopicsByRole evaluates retrieving topics associated with a role from the
-// topics map.
+// topics map using GetTopicsByRole. Essentially it evaluates that GetTopicsByRole
+// operates on top of topicMap.
 func TestGetTopicsByRole(t *testing.T) {
 	// asserts topics by the role for verification node
 	// it should have the topics of

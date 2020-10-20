@@ -24,7 +24,7 @@ func GetRolesByTopic(topic string) (flow.RoleList, bool) {
 	return roles, ok
 }
 
-// GetTopicsByRole returns a list of all topics the role subscribes to
+// GetTopicsByRole returns a list of all topics the role subscribes to.
 func GetTopicsByRole(role flow.Role) []string {
 	topics := make([]string, 0)
 	for topic, roles := range topicMap {
