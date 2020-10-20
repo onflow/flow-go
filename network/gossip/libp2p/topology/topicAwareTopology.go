@@ -56,10 +56,10 @@ func (t *TopicAwareTopology) Subset(ids flow.IdentityList, fanout uint, topic st
 
 		// extract ids of subscribers to the topic
 		subscribers = ids.Filter(filter.HasRole(roles...))
-
-		// excluding the node itself from its topology
-		subscribers = subscribers.Filter(filter.Not(filter.HasNodeID(t.me)))
 	}
+
+	// excluding the node itself from its topology
+	subscribers = subscribers.Filter(filter.Not(filter.HasNodeID(t.me)))
 
 	// samples subscribers of a connected graph
 	subscriberSample, _ := connectedGraphSample(subscribers, t.seed)
@@ -72,7 +72,7 @@ func (t TopicAwareTopology) clusterPeers() (flow.IdentityList, error) {
 	currentEpoch := t.state.Final().Epochs().Current()
 	clusterList, err := currentEpoch.Clustering()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to extract cluster list %w", err)
 	}
 
 	myCluster, _, found := clusterList.ByNodeID(t.me)
