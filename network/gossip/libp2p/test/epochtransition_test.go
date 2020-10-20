@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"sync"
@@ -12,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
-	mock2 "github.com/stretchr/testify/mock"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -42,13 +43,11 @@ type EpochTransitionTestSuite struct {
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
-	if _, found := os.LookupEnv("AllNetworkTest"); !found {
-		t.Skip("skipping till discovery is updated to add and remove nodes on-demand")
-	}
 	suite.Run(t, new(EpochTransitionTestSuite))
 }
 
 func (ts *EpochTransitionTestSuite) SetupTest() {
+	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
 	golog.SetAllLoggers(golog.LevelError)
 	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -67,7 +66,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	// setup state related mocks
 	ts.state = new(protocol.ReadOnlyState)
 	ts.snapshot = new(protocol.Snapshot)
-	ts.snapshot.On("Identities", mock2.Anything).Return(ids, nil)
+	ts.snapshot.On("Identities", testifymock.Anything).Return(ids, nil)
 	ts.snapshot.On("Epochs").Return(ts.epochQuery)
 	ts.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return ts.currentEpochPhase },
@@ -108,7 +107,8 @@ func (ts *EpochTransitionTestSuite) TearDownTest() {
 	}
 }
 
-// TestNewNodeAdded tests that an additional node in a new epoch get connected to other nodes and can exchange messages
+// TestNewNodeAdded tests that an additional node in the next epoch gets connected to other nodes and can exchange messages
+// in the current epoch
 func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 	// create the id, middleware and network for a new node
@@ -125,78 +125,71 @@ func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 	newEngine := generateEngines(ts.T(), nets)
 	newEngines := append(ts.engines, newEngine...)
 
-	// increment epoch
-	ts.currentEpoch = ts.currentEpoch + 1
+	// update epoch query mock to return new IDs for the next epoch
+	nextEpoch := ts.currentEpoch + 1
+	ts.addEpoch(nextEpoch, newIDs)
 
-	// switch the epoch phase to Setup
+	// adjust the epoch phase
 	ts.currentEpochPhase = flow.EpochPhaseSetup
 
-	// update epoch query mock to return new IDs for this epoch
-	ts.addEpoch(ts.currentEpoch, newIDs)
-
-	// trigger an epoch transition for all networks
+	// trigger an epoch phase change for all networks going from flow.EpochPhaseStaking to flow.EpochPhaseSetup
 	for _, n := range newIDRefreshers {
-		n.EpochSetupPhaseStarted(ts.currentEpoch, nil)
+		n.EpochSetupPhaseStarted(nextEpoch, nil)
 	}
 
-	threshold := len(ts.ids) / 2
-
-	// check if the new node has at least threshold connections with the existing nodes
+	// check if the new node has sufficient connections with the existing nodes
 	// if it does, then it has been inducted successfully in the network
-	assert.Eventually(ts.T(), func() bool {
+	checkConnectivity(ts.T(), newMiddleware, ids)
+
+	// check that all the engines on this new epoch can talk to each other
+	sendMessagesAndVerify(ts.T(), newIDs, newEngines, ts.Publish)
+}
+
+// TestNodeRemoved tests that a node that is removed in the next epoch remains connected for the current epoch
+func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
+
+	// choose a random node to remove
+	removeIndex := rand.Intn(len(ts.ids))
+	removedID := ts.ids[removeIndex]
+	removedMW := ts.mws[removeIndex]
+
+	// remove the identity at that index from the ids
+	newIDs := ts.ids.Filter(filter.Not(filter.HasNodeID(removedID.NodeID)))
+
+	// update epoch query mock to return new IDs for the next epoch
+	nextEpoch := ts.currentEpoch + 1
+	ts.addEpoch(nextEpoch, newIDs)
+
+	// adjust the epoch phase
+	ts.currentEpochPhase = flow.EpochPhaseSetup
+
+	// trigger an epoch phase change for all nodes
+	// from flow.EpochPhaseStaking to flow.EpochPhaseSetup
+	for _, n := range ts.idRefreshers {
+		n.EpochSetupPhaseStarted(nextEpoch, nil)
+	}
+
+	// check if the evicted node still has sufficient connections with the existing nodes
+	checkConnectivity(ts.T(), removedMW, newIDs)
+
+	// check that all the engines on this new epoch can still talk to each other
+	sendMessagesAndVerify(ts.T(), ts.ids, ts.engines, ts.Publish)
+}
+
+// checkConnectivity checks that the middleware of a node is directly connected to atleast half of the other nodes
+func checkConnectivity(t *testing.T, mw *libp2p.Middleware, ids flow.IdentityList) {
+	threshold := len(ids) / 2
+	assert.Eventually(t, func() bool {
 		connections := 0
-		for _, id := range ts.ids {
-			connected, err := newMiddleware.IsConnected(*id)
-			require.NoError(ts.T(), err)
+		for _, id := range ids {
+			connected, err := mw.IsConnected(*id)
+			require.NoError(t, err)
 			if connected {
 				connections++
 			}
 		}
 		return connections >= threshold
 	}, 5*time.Second, time.Millisecond)
-
-	// check that all the engines on this new epoch can talk to each other
-	sendMessagesAndVerify(ts.T(), newIDs, newEngines, ts.Publish)
-}
-
-// TestNodeRemoved tests that a node that is removed in a new epoch gets disconnected from other nodes
-func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
-
-	// choose a random index
-	removeIndex := rand.Intn(len(ts.ids))
-
-	// remove the identity at that index from the ids
-	newIDs := ts.ids.Filter(filter.Not(filter.HasNodeID(ts.ids[removeIndex].NodeID)))
-
-	// increment epoch
-	ts.currentEpoch = ts.currentEpoch + 1
-
-	// switch the epoch phase to Setup
-	ts.currentEpochPhase = flow.EpochPhaseSetup
-
-	// update epoch query mock to return new IDs for this epoch
-	ts.addEpoch(ts.currentEpoch, newIDs)
-
-	// trigger an epoch transition for all nodes except the evicted one
-	for i, n := range ts.idRefreshers {
-		if i == removeIndex {
-			continue
-		}
-		n.EpochSetupPhaseStarted(uint64(ts.currentEpoch), nil)
-	}
-
-	removedID := ts.ids[removeIndex]
-	// check that the evicted node has no connections
-	assert.Eventually(ts.T(), func() bool {
-		for i := range newIDs {
-			connected, err := ts.mws[i].IsConnected(*removedID)
-			require.NoError(ts.T(), err)
-			if connected {
-				return false
-			}
-		}
-		return true
-	}, 30*time.Second, 10*time.Millisecond)
 }
 
 // sendMessagesAndVerify sends a message from each engine to the other engines and verifies that all the messages are
@@ -211,8 +204,9 @@ func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngi
 
 	// each node broadcasting a message to all others
 	for i, eng := range engs {
+		nonce := rand.Intn(math.MaxInt64)
 		event := &message.TestMessage{
-			Text: fmt.Sprintf("hello from node %d to %d other nodes", i, count),
+			Text: fmt.Sprintf("%d: hello from node %d", nonce, i),
 		}
 		others := ids.Filter(filter.Not(filter.HasNodeID(ids[i].NodeID))).NodeIDs()
 		require.NoError(t, send(event, eng.con, others...))

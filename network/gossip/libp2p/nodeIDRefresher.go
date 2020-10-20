@@ -46,7 +46,16 @@ func (listener *NodeIDRefresher) EpochSetupPhaseStarted(newEpoch uint64, first *
 	}
 }
 
-// IDsFromState returns the identities that the network should be using based on the current epoch phase
+// IDsFromState returns the identities that the network should be using based on the current epoch phase as following:
+// ----------------------------------------------------------------------------------------------------
+// |       Epoch Phase   |               IDs included                                                  |
+// |---------------------------------------------------------------------------------------------------
+// | EpochPhaseStaking   | All IDs from current epoch are included (TODO: add ids from preivous state) |
+// |---------------------------------------------------------------------------------------------------|
+// | EpochPhaseSetup     | All IDs from current and next epoch are included                            |
+// |---------------------------------------------------------------------------------------------------|
+// | EpochPhaseCommitted | All IDs from current and next epoch are included                            |
+// |---------------------------------------------------------------------------------------------------|
 func IDsFromState(state protocol.ReadOnlyState) (flow.IdentityList, error) {
 
 	// epoch ids from this epoch
@@ -60,6 +69,11 @@ func IDsFromState(state protocol.ReadOnlyState) (flow.IdentityList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve epoch phase: %w", err)
 	}
+
+	//TODO: Add epoch ids from previous phase
+	//if phase == flow.EpochPhaseStaking {
+	//	ids = ids.Union(state.Final().Epochs().Previous().InitialIdentities())
+	//}
 
 	// if node is in epoch setup or epoch committed phase, include the next epoch identities as well
 	if phase == flow.EpochPhaseSetup || phase == flow.EpochPhaseCommitted {
