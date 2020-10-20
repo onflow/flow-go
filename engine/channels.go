@@ -81,6 +81,12 @@ const (
 func initializeTopicMap() {
 	topicMap = make(map[string]flow.RoleList)
 
+	// Channels for test
+	topicMap[TestNetwork] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+		flow.RoleVerification, flow.RoleAccess}
+	topicMap[TestMetrics] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+		flow.RoleVerification, flow.RoleAccess}
+
 	// Channels for consensus protocols
 	topicMap[ConsensusCommittee] = flow.RoleList{flow.RoleConsensus}
 
