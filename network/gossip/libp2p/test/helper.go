@@ -96,7 +96,7 @@ func CreateNetworks(t *testing.T,
 		if !dryrun {
 			m := mws[i]
 			ip, port, err = m.GetIPPort()
-			require.NoError(t, err, fmt.Errorf("could not get ip and port: %w", err))
+			require.NoError(t, err, fmt.Errorf("could not get ip and port on a non-dryrun: %w", err))
 			key = m.PublicKey()
 		}
 
