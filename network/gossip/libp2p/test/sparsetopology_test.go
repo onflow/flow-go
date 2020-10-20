@@ -3,10 +3,13 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -72,7 +75,10 @@ func (suite *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Cond
 
 	tops := createSparseTopology(count, subsets)
 
-	suite.nets = CreateNetworks(suite.T(), suite.ids, tops, 100, false)
+	// creates middleware and network instances
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws := CreateMiddleware(suite.T(), logger, suite.ids)
+	suite.nets = CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 100, false)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
@@ -129,7 +135,11 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	suite.ids = CreateIDs(count)
 
 	tops := createDisjointedTopology(count, subsets)
-	suite.nets = CreateNetworks(suite.T(), suite.ids, tops, 100, false)
+
+	// creates middleware and network instances
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws := CreateMiddleware(suite.T(), logger, suite.ids)
+	suite.nets = CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 100, false)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
