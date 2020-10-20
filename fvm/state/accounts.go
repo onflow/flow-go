@@ -360,7 +360,7 @@ func (a *Accounts) setContractNames(contracts contractNames, address flow.Addres
 	var prevContractNames []byte
 	prevContractNames, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContractNames)
 	if err != nil {
-		return fmt.Errorf("cannot retreive current contract names: %w", err)
+		return fmt.Errorf("cannot retrieve current contract names: %w", err)
 	}
 
 	// skip updating if the new contract names equal the old
