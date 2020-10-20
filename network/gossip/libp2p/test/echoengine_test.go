@@ -9,6 +9,8 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -54,8 +56,10 @@ func (s *EchoEngineTestSuite) SetupTest() {
 	// creates topology instances for the nodes based on their roles
 	tops := CreateTopologies(s.T(), state, s.ids)
 
-	// creates network instances
-	nets := CreateNetworks(s.T(), s.ids, tops, 100, false)
+	// creates middleware and network instances
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws := CreateMiddleware(s.T(), logger, s.ids)
+	nets := CreateNetworks(s.T(), logger, s.ids, mws, tops, 100, false)
 	s.nets = nets
 }
 
