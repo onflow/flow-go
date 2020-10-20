@@ -33,7 +33,7 @@ func NewLibp2pConnector(host host.Host) (*libp2pConnector, error) {
 	}, nil
 }
 
-func (l *libp2pConnector) ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identity]error {
+func (l *libp2pConnector) ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error {
 
 	validIDs, invalidIDs := peerInfosFromIDs(ids)
 
@@ -54,7 +54,7 @@ func (l *libp2pConnector) ConnectPeers(ctx context.Context, ids flow.IdentityLis
 	return invalidIDs
 }
 
-func (l *libp2pConnector) DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identity]error {
+func (l *libp2pConnector) DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error {
 
 	validIDs, invalidIDs := peerInfosFromIDs(ids)
 
@@ -92,18 +92,18 @@ func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector,
 }
 
 // peerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
-// If the conversion of flow.Identifier succeeds it is included in map[flow.Identity]peer.AddrInfo else it included
-// in map[flow.Identity]error.
-func peerInfosFromIDs(ids flow.IdentityList) (map[flow.Identity]peer.AddrInfo, map[flow.Identity]error) {
-	validIDs := make(map[flow.Identity]peer.AddrInfo)
-	invalidIDs := make(map[flow.Identity]error)
+// If the conversion of flow.Identifier succeeds it is included in map[flow.Identifier]peer.AddrInfo else it included
+// in map[flow.Identifier]error.
+func peerInfosFromIDs(ids flow.IdentityList) (map[flow.Identifier]peer.AddrInfo, map[flow.Identifier]error) {
+	validIDs := make(map[flow.Identifier]peer.AddrInfo)
+	invalidIDs := make(map[flow.Identifier]error)
 	for _, id := range ids {
 		peerInfo, err := PeerInfoFromID(*id)
 		if err != nil {
-			invalidIDs[*id] = err
+			invalidIDs[id.NodeID] = err
 			continue
 		}
-		validIDs[*id] = peerInfo
+		validIDs[id.NodeID] = peerInfo
 	}
 	return validIDs, invalidIDs
 }

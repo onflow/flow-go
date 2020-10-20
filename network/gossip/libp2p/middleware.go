@@ -83,11 +83,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
-	err = InitializePeerInfoCache()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create middleware: %w", err)
-	}
-
 	p2p := &P2PNode{}
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -373,27 +368,6 @@ func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) 
 	}
 
 	return nodeAddressFromIdentity(flowIdentity)
-}
-
-// nodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
-func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
-
-	// split the node address into ip and port
-	ip, port, err := net.SplitHostPort(flowIdentity.Address)
-	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not parse address %s: %w", flowIdentity.Address, err)
-	}
-
-	// convert the Flow key to a LibP2P key
-	lkey, err := PublicKey(flowIdentity.NetworkPubKey)
-	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
-	}
-
-	// create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
-
-	return nodeAddress, nil
 }
 
 func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {

@@ -15,15 +15,15 @@ import (
 // Connector connects to peer and disconnects from peer using the underlying networking library
 type Connector interface {
 
-	// ConnectPeers connect to the given flow.Identities and returns a map of identities which failed.
+	// ConnectPeers connect to the given flow.Identities and returns a map of identifiers which failed.
 	// ConnectPeer implementation should be idempotent such that multiple calls to connect to the same peer should not
 	// return an error or create multiple connections
-	ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identity]error
+	ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error
 
-	// DisconnectPeers disconnect from the given flow.Identities and returns a map of identities which failed.
+	// DisconnectPeers disconnect from the given flow.Identities and returns a map of identifiers which failed.
 	// DisconnectPeers implementation should be idempotent such that multiple calls to connect to the same peer should
 	// not return an error
-	DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identity]error
+	DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error
 }
 
 // PeerUpdateInterval is how long the peer manager waits in between attempts to update peer connections
@@ -90,7 +90,9 @@ func (pm *PeerManager) periodicUpdate() {
 	}
 }
 
-// RequestPeerUpdate initiates an update to peer connections of this node
+// RequestPeerUpdate requests an update to the peer connections of this node.
+// If a peer update has already been requested (either as a periodic request or an on-demand request) and is outstanding,
+// then this call is a no-op.
 func (pm *PeerManager) RequestPeerUpdate() {
 	select {
 	case pm.peerRequestQ <- struct{}{}:
@@ -102,14 +104,11 @@ func (pm *PeerManager) RequestPeerUpdate() {
 // previous nodes that are no longer in the new list of nodes.
 func (pm *PeerManager) updatePeers() {
 
-	idProvider := pm.idsProvider
-	if idProvider == nil {
-		pm.logger.Error().Msg("failed to update peers: id provider callback is not set")
-	}
-
-	ids, err := idProvider()
+	// get all the ids to connect to
+	ids, err := pm.idsProvider()
 	if err != nil {
 		pm.logger.Error().Err(err).Msg("failed to update peers")
+		return
 	}
 
 	// connect to all the current IDs
@@ -156,7 +155,7 @@ func (pm *PeerManager) disconnect(ids flow.IdentityList) {
 }
 
 // failedIDMapToSingleError converts the failedIDs map to a single error
-func failedIDMapToSingleError(failedIDs map[flow.Identity]error) error {
+func failedIDMapToSingleError(failedIDs map[flow.Identifier]error) error {
 	multierr := new(multierror.Error)
 	for id, err := range failedIDs {
 		multierr = multierror.Append(multierr, fmt.Errorf("failed to connect to %s: %w", id.String(), err))

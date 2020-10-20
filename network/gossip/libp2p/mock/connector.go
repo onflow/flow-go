@@ -16,15 +16,15 @@ type Connector struct {
 }
 
 // ConnectPeers provides a mock function with given fields: ctx, ids
-func (_m *Connector) ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identity]error {
+func (_m *Connector) ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error {
 	ret := _m.Called(ctx, ids)
 
-	var r0 map[flow.Identity]error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.IdentityList) map[flow.Identity]error); ok {
+	var r0 map[flow.Identifier]error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.IdentityList) map[flow.Identifier]error); ok {
 		r0 = rf(ctx, ids)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identity]error)
+			r0 = ret.Get(0).(map[flow.Identifier]error)
 		}
 	}
 
@@ -32,15 +32,15 @@ func (_m *Connector) ConnectPeers(ctx context.Context, ids flow.IdentityList) ma
 }
 
 // DisconnectPeers provides a mock function with given fields: ctx, ids
-func (_m *Connector) DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identity]error {
+func (_m *Connector) DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error {
 	ret := _m.Called(ctx, ids)
 
-	var r0 map[flow.Identity]error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.IdentityList) map[flow.Identity]error); ok {
+	var r0 map[flow.Identifier]error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.IdentityList) map[flow.Identifier]error); ok {
 		r0 = rf(ctx, ids)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identity]error)
+			r0 = ret.Get(0).(map[flow.Identifier]error)
 		}
 	}
 
