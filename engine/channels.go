@@ -9,8 +9,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// init is a native golang function getting called the first time this package is imported
+// externally. It creates and initializes the topic map.
+func init() {
+	initializeTopicMap()
+}
+
+// topicMap keeps a map between topics and list of flow roles involved in that topic.
 var topicMap map[string]flow.RoleList
 
+// GetRolesByTopic returns list of flow roles involved in the topic.
 func GetRolesByTopic(topic string) (flow.RoleList, bool) {
 	roles, ok := topicMap[topic]
 	return roles, ok
@@ -68,10 +76,8 @@ const (
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 )
 
-func init() {
-	initializeTopicMap()
-}
-
+// initializeTopicMap initializes an instance of topicMap and populates it with the topics and their
+// corresponding list of roles.
 func initializeTopicMap() {
 	topicMap = make(map[string]flow.RoleList)
 
@@ -112,6 +118,8 @@ func initializeTopicMap() {
 	topicMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
 }
 
+// IsClusterTopic returns true if topic is a cluster-related topic.
+// At the current implementation, only collection nodes are involved in a cluster-related topic.
 func IsClusterTopic(topic string) bool {
 	return strings.HasPrefix(topic, syncClusterPrefix) || strings.HasPrefix(topic, consensusClusterPrefix)
 }
