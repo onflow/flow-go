@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// createMockStateForCollectionNodes is a test helper function that generate a mock state
+// CreateMockStateForCollectionNodes is a test helper function that generate a mock state
 // clustering collection nodes into `clusterNum` clusters.
 func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, clusterNum uint) protocol.State {
 	state := new(mock2.State)

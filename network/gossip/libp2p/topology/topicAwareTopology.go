@@ -9,13 +9,15 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// TopicAwareTopology is a deterministic topology mapping that creates a connected graph component among the nodes
+// involved in each topic.
 type TopicAwareTopology struct {
-	seed  int64
-	me    flow.Identifier
-	state protocol.ReadOnlyState
+	seed  int64                  // used for sampling connected graph
+	me    flow.Identifier        // used to keep identifier of the node
+	state protocol.ReadOnlyState // used to keep a read only protocol state
 }
 
-// NewTopicAwareTopology returns an instance of the TopicAwareTopology
+// NewTopicAwareTopology returns an instance of the TopicAwareTopology.
 func NewTopicAwareTopology(nodeID flow.Identifier, state protocol.ReadOnlyState) (*TopicAwareTopology, error) {
 	seed, err := seedFromID(nodeID)
 	if err != nil {
