@@ -128,7 +128,8 @@ func CreateNetworks(t *testing.T,
 	return nets
 }
 
-// CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id
+// CreateMiddleware is a helper test function that receives an identity slice and creates and initializes a middleware
+// instances for each identity.
 func CreateMiddleware(t *testing.T, log zerolog.Logger, identities []*flow.Identity) []*libp2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	count := len(identities)
@@ -186,8 +187,7 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 }
 
 // CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
-// and returns the slice of topologies. It distinguishes between the topology creation of collection nodes
-// and other nodes.
+// and returns the slice of topologies.
 func CreateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList) []*topology.Topology {
 	tops := make([]*topology.Topology, 0)
 	for _, id := range identities {
