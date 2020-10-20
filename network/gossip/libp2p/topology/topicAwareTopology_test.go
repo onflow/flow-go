@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -21,6 +22,7 @@ import (
 // theory assumptions behind the schemes, e.g., random oracle model of hashes
 type TopicAwareTopologyTestSuite struct {
 	suite.Suite
+	state  *protocol.State   // represents a mocked protocol state
 	ids    flow.IdentityList // represents the identity list of all nodes in the system
 	nets   []*libp2p.Network // represents the single network instance that creates topology
 	me     flow.Identity     // represents identity of single instance of node that creates topology
@@ -87,7 +89,7 @@ func (suite *TopicAwareTopologyTestSuite) TestMembership() {
 // `(k+1)/2` where `k` is number of nodes subscribed to a topic. It does that over 100 random iterations.
 func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 	for i := 0; i < 100; i++ {
-		top, err := topology.NewTopicAwareTopology(unittest.IdentityFixture().NodeID)
+		top, err := topology.NewTopicAwareTopology(unittest.IdentityFixture().NodeID, suite.state)
 		require.NoError(suite.T(), err)
 
 		topics := engine.GetTopicsByRole(suite.me.Role)
@@ -108,7 +110,7 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 
 // TestDeteministicity verifies that the same seed generates the same topology for a topic
 func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
-	top, err := topology.NewTopicAwareTopology(suite.me.NodeID)
+	top, err := topology.NewTopicAwareTopology(suite.me.NodeID, suite.state)
 	require.NoError(suite.T(), err)
 
 	topics := engine.GetTopicsByRole(suite.me.Role)
@@ -169,7 +171,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		}
 
 		// creates and samples a new topic aware topology for the first topic of collection nodes
-		top, err := topology.NewTopicAwareTopology(identity.NodeID)
+		top, err := topology.NewTopicAwareTopology(identity.NodeID, suite.state)
 		require.NoError(suite.T(), err)
 		idMap, err := top.Subset(suite.ids, suite.fanout, topics[0])
 		require.NoError(suite.T(), err)
