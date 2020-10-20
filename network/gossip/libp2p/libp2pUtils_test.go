@@ -3,7 +3,6 @@ package libp2p
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -28,10 +27,7 @@ func TestLibP2PUtilsTestSuite(t *testing.T) {
 func (ts *LibP2PUtilsTestSuite) TestPeerInfoFromID() {
 	ids, exceptedPeerInfos := idsAndPeerInfos(ts.T())
 	for i, id := range ids {
-		now := time.Now()
 		actualAddrInfo, err := PeerInfoFromID(*id)
-		elapsed := time.Since(now)
-		fmt.Println(elapsed.Milliseconds())
 		assert.NoError(ts.T(), err)
 		assert.Equal(ts.T(), exceptedPeerInfos[i].String(), actualAddrInfo.String())
 	}
