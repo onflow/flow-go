@@ -135,6 +135,29 @@ func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.
 	return model.PayloadFromTransactions(final.ID(), transactions...)
 }
 
+// ProtoStateRoot returns the root block of the protocol state.
+func (suite *BuilderSuite) ProtoStateRoot() *flow.Header {
+	root, err := suite.protoState.Params().Root()
+	suite.Require().Nil(err)
+	return root
+}
+
+// ClearPool removes all items from the pool
+func (suite *BuilderSuite) ClearPool() {
+	// TODO use Clear()
+	for _, tx := range suite.pool.All() {
+		suite.pool.Rem(tx.ID())
+	}
+}
+
+// FillPool adds n transactions to the pool, using the given generator function.
+func (suite *BuilderSuite) FillPool(n int, create func() *flow.TransactionBody) {
+	for i := 0; i < n; i++ {
+		tx := create()
+		suite.pool.Add(tx)
+	}
+}
+
 func TestBuilder(t *testing.T) {
 	suite.Run(t, new(BuilderSuite))
 }
@@ -516,6 +539,210 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 
 	// the payload should be empty
 	suite.Assert().Equal(0, built.Payload.Collection.Len())
+}
+
+// With rate limiting turned off, we should fill collections as fast as we can
+// regardless of how many transactions with the same payer we include.
+func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
+
+	// start with an empty mempool
+	suite.ClearPool()
+
+	// create builder with no rate limit and max 10 tx/collection
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+		builder.WithMaxCollectionSize(10),
+		builder.WithMaxPayerTransactionRate(0),
+	)
+
+	// fill the pool with 100 transactions from the same payer
+	payer := unittest.RandomAddressFixture()
+	create := func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = payer
+		return &tx
+	}
+	suite.FillPool(100, create)
+
+	// since we have no rate limiting we should fill all collections and in 10 blocks
+	parentID := suite.genesis.ID()
+	for i := 0; i < 10; i++ {
+		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		suite.Require().Nil(err)
+		parentID = header.ID()
+
+		// each collection should be full with 10 transactions
+		var built model.Block
+		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+		suite.Assert().Nil(err)
+		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
+	}
+}
+
+// With rate limiting turned on, we should be able to fill transactions as fast
+// as possible so long as per-payer limits are not reached. This test generates
+// transactions such that the number of transactions with a given proposer exceeds
+// the rate limit -- since it's the proposer not the payer, it shouldn't limit
+// our collections.
+func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
+
+	// start with an empty mempool
+	suite.ClearPool()
+
+	// create builder with 5 tx/payer and max 10 tx/collection
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+		builder.WithMaxCollectionSize(10),
+		builder.WithMaxPayerTransactionRate(5),
+	)
+
+	// fill the pool with 100 transactions with the same proposer
+	// since it's not the same payer, rate limit does not apply
+	proposer := unittest.RandomAddressFixture()
+	create := func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = unittest.RandomAddressFixture()
+		tx.ProposalKey = flow.ProposalKey{
+			Address:        proposer,
+			KeyID:          rand.Uint64(),
+			SequenceNumber: rand.Uint64(),
+		}
+		return &tx
+	}
+	suite.FillPool(100, create)
+
+	// since rate limiting does not apply to non-payer keys, we should fill all collections in 10 blocks
+	parentID := suite.genesis.ID()
+	for i := 0; i < 10; i++ {
+		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		suite.Require().Nil(err)
+		parentID = header.ID()
+
+		// each collection should be full with 10 transactions
+		var built model.Block
+		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+		suite.Assert().Nil(err)
+		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
+	}
+}
+
+// When configured with a rate limit of k>1, we should be able to include up to
+// k transactions with a given payer per collection
+func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
+
+	// start with an empty mempool
+	suite.ClearPool()
+
+	// create builder with 5 tx/payer and max 10 tx/collection
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+		builder.WithMaxCollectionSize(10),
+		builder.WithMaxPayerTransactionRate(5),
+	)
+
+	// fill the pool with 50 transactions from the same payer
+	payer := unittest.RandomAddressFixture()
+	create := func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = payer
+		return &tx
+	}
+	suite.FillPool(50, create)
+
+	// rate-limiting should be applied, resulting in half-full collections (5/10)
+	parentID := suite.genesis.ID()
+	for i := 0; i < 10; i++ {
+		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		suite.Require().Nil(err)
+		parentID = header.ID()
+
+		// each collection should be half-full with 5 transactions
+		var built model.Block
+		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+		suite.Assert().Nil(err)
+		suite.Assert().Len(built.Payload.Collection.Transactions, 5)
+	}
+}
+
+// When configured with a rate limit of k<1, we should be able to include 1
+// transactions with a given payer every ceil(1/k) collections
+func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
+
+	// start with an empty mempool
+	suite.ClearPool()
+
+	// create builder with .5 tx/payer and max 10 tx/collection
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+		builder.WithMaxCollectionSize(10),
+		builder.WithMaxPayerTransactionRate(.5),
+	)
+
+	// fill the pool with 5 transactions from the same payer
+	payer := unittest.RandomAddressFixture()
+	create := func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = payer
+		return &tx
+	}
+	suite.FillPool(5, create)
+
+	// rate-limiting should be applied, resulting in every ceil(1/k) collections
+	// having one transaction and empty collections otherwise
+	parentID := suite.genesis.ID()
+	for i := 0; i < 10; i++ {
+		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		suite.Require().Nil(err)
+		parentID = header.ID()
+
+		// collections should either be empty or have 1 transaction
+		var built model.Block
+		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+		suite.Assert().Nil(err)
+		if i%2 == 0 {
+			suite.Assert().Len(built.Payload.Collection.Transactions, 1)
+		} else {
+			suite.Assert().Len(built.Payload.Collection.Transactions, 0)
+		}
+	}
+}
+func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
+
+	// start with an empty mempool
+	suite.ClearPool()
+
+	// create builder with 5 tx/payer and max 10 tx/collection
+	// configure an unlimited payer
+	payer := unittest.RandomAddressFixture()
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+		builder.WithMaxCollectionSize(10),
+		builder.WithMaxPayerTransactionRate(5),
+		builder.WithUnlimitedPayers(payer),
+	)
+
+	// fill the pool with 100 transactions from the same payer
+	create := func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = payer
+		return &tx
+	}
+	suite.FillPool(100, create)
+
+	// rate-limiting should not be applied, since the payer is marked as unlimited
+	parentID := suite.genesis.ID()
+	for i := 0; i < 10; i++ {
+		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		suite.Require().Nil(err)
+		parentID = header.ID()
+
+		// each collection should be full with 10 transactions
+		var built model.Block
+		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+		suite.Assert().Nil(err)
+		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
+
+	}
 }
 
 // helper to check whether a collection contains each of the given transactions.
