@@ -4,11 +4,6 @@ import (
 	"fmt"
 )
 
-//LegacyRegisterID is a legacy key format (raw bytes) which is needed in the codebase
-//for the migration purposes and will be removed afterwards
-// TODO Remove after migration
-type LegacyRegisterID = []byte
-
 type RegisterID struct {
 	Owner      string
 	Controller string
