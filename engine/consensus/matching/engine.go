@@ -209,18 +209,11 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
 	if !ok {
-        log.Error().Msg("execution receipt without FinalStateCommit received")
-		return fmt.Errorf("could not get final state: no chunks found")
+		log.Error().Msg("execution receipt without FinalStateCommit received")
+		return fmt.Errorf("failed to get final state commitment from Execution Result")
 	}
-
 	log = log.With().Hex("final_state", resultFinalState).Logger()
-
 	log.Info().Msg("execution receipt received")
-
-	//// check the execution receipt is sent by its executor
-	//if receipt.ExecutorID != originID {
-	//	return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
-	//}
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later.
@@ -230,11 +223,14 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
+	// if Execution Receipt is for block whose height is lower or equal to already sealed height
+	//  => drop Receipt
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
 		return fmt.Errorf("could not find sealed block: %w", err)
 	}
 	if sealed.Height >= head.Height {
+		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
 		return nil
 	}
 
@@ -260,17 +256,18 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return engine.NewInvalidInputErrorf("executor has zero stake (%x)", identity.NodeID)
 	}
 
-	// check if the result of this receipt is already sealed.
 	result := &receipt.ExecutionResult
 
-	_, err = e.resultsDB.ByID(result.ID())
-	if err == nil {
-		log.Debug().Msg("discarding receipt for sealed result")
-		return nil
+	// store the result to make it persistent for later
+	err = e.resultsDB.Store(result) // internally de-duplicates
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		return fmt.Errorf("could not store sealing result: %w", err)
 	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check result: %w", err)
-	}
+	// Do NOT return here if resultsDB already contained result!
+	// resultsDB is persistent storage while Mempools are in-memory only.
+	// After a crash, the replica still needs to be able to generate a seal
+	// for an Result even if it had stored the Result before the crash.
+	// Otherwise, liveness of sealing is undermined.
 
 	// store the result belonging to the receipt in the memory pool
 	// TODO: This is a temporary step. In future, the incorporated results
@@ -408,10 +405,14 @@ func (e *Engine) checkSealing() {
 	// don't overflow the seal mempool
 	space := e.seals.Limit() - e.seals.Size()
 	if len(sealableResults) > int(space) {
-		e.log.Debug().
+		e.log.Warn().
 			Int("space", int(space)).
 			Int("results", len(sealableResults)).
-			Msg("cut and return the first x results")
+			Msg("discarding sealable results due to mempool limitations")
+		// TODO: dangerous operation potentially undermining sealing liveness
+		// If we are missing an early seal, we might not add it to the mempool here due to
+		// size restrictions. (sealable results are unordered) The seal mempool has
+		// a eject-newest seal policy which we are shortcutting here!
 		sealableResults = sealableResults[:space]
 	}
 
@@ -512,19 +513,18 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 			return nil, fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// look for previous result in mempool and storage
+		// Retrieve parent result / skip if parent result still unknown:
+		// Before we store a result into the incorporatedResults mempool, we store it in resultsDB.
+		// I.e. resultsDB contains a superset of all results stored in the mempool. Hence, we only need
+		// to check resultsDB. Any result not in resultsDB cannot be in incorporatedResults mempool.
 		previousID := incorporatedResult.Result.PreviousResultID
-		previous, _ := e.incorporatedResults.ByResultID(previousID)
-		if previous == nil {
-			var err error
-			previous, err = e.resultsDB.ByID(previousID)
-			if errors.Is(err, storage.ErrNotFound) {
-				log.Debug().Msg("skipping sealable result with unknown previous result")
-				continue
-			}
-			if err != nil {
-				return nil, fmt.Errorf("could not get previous result: %w", err)
-			}
+		previous, err := e.resultsDB.ByID(previousID)
+		if errors.Is(err, storage.ErrNotFound) {
+			log.Debug().Msg("skipping sealable result with unknown previous result")
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get previous result: %w", err)
 		}
 
 		// check sub-graph
@@ -542,16 +542,11 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 		// number of guarantees plus one; this will ensure the execution receipt
 		// cannot lie about having less chunks and having the remaining ones
 		// approved
-		requiredChunks := 0
-
 		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if err != nil {
 			return nil, err
 		}
-
-		if index != nil {
-			requiredChunks = len(index.CollectionIDs) + 1
-		}
+		requiredChunks := len(index.CollectionIDs) + 1
 
 		if len(incorporatedResult.Result.Chunks) != requiredChunks {
 			_ = e.incorporatedResults.Rem(incorporatedResult)
@@ -610,7 +605,7 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 
 	// only keep approvals from assigned verifiers
 	var validApprovers flow.IdentifierList
-	for approverID := range approvals {
+	for approverID, _ := range approvals {
 		ok := chmodule.IsValidVerifer(assignment, chunk, approverID)
 		if ok {
 			validApprovers = append(validApprovers, approverID)
@@ -632,10 +627,6 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
 	}
-	err = e.resultsDB.Index(incorporatedResult.Result.BlockID, incorporatedResult.Result.ID())
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not index sealing result: %w", err)
-	}
 
 	// collect aggregate signatures
 	aggregatedSigs := e.collectAggregateSignatures(incorporatedResult.Result)
@@ -643,7 +634,7 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	// get final state of execution result
 	finalState, ok := incorporatedResult.Result.FinalStateCommitment()
 	if !ok {
-		return fmt.Errorf("could not get final state: no chunks found")
+		return fmt.Errorf("failed to get final state commitment from Execution Result")
 	}
 
 	// generate & store seal
@@ -823,14 +814,13 @@ func (e *Engine) requestPending() error {
 
 		blockID := header.ID()
 
-if _, ok := knownResultsMap[blockID]; ok {
-continue
-}
-missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-
+		if _, ok := knownResultsMap[blockID]; ok {
+			continue
+		}
+		missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
 
 		// check if we have an execution result for the block at this height
-		_, err = e.resultsDB.ByBlockID(blockID)
+		_, err = e.resultsDB.ByBlockID(blockID) !!
 		if errors.Is(err, storage.ErrNotFound) {
 			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
 			continue
