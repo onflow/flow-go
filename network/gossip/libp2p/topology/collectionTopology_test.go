@@ -1,8 +1,11 @@
 package topology_test
 
 import (
+	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -17,7 +20,6 @@ import (
 
 type CollectionTopologyTestSuite struct {
 	suite.Suite
-	state       *protocol.State
 	snapshot    *protocol.Snapshot
 	epochQuery  *protocol.EpochQuery
 	clusterList flow.ClusterList
@@ -32,39 +34,24 @@ func TestCollectionTopologyTestSuite(t *testing.T) {
 
 func (suite *CollectionTopologyTestSuite) SetupTest() {
 	suite.nets = make([]*libp2p.Network, 0)
-	suite.state = new(protocol.State)
-	suite.snapshot = new(protocol.Snapshot)
-	suite.epochQuery = new(protocol.EpochQuery)
 	nClusters := 3
 	nCollectors := 7
+
 	suite.collectors = unittest.IdentityListFixture(nCollectors, unittest.WithRole(flow.RoleCollection))
 	suite.ids = append(unittest.IdentityListFixture(1000, unittest.WithAllRolesExcept(flow.RoleCollection)), suite.collectors...)
-	assignments := unittest.ClusterAssignment(uint(nClusters), suite.collectors)
-	clusters, err := flow.NewClusterList(assignments, suite.collectors)
-	require.NoError(suite.T(), err)
-	suite.clusterList = clusters
-	epoch := new(protocol.Epoch)
-	epoch.On("Clustering").Return(clusters, nil)
-	suite.epochQuery.On("Current").Return(epoch)
-	suite.snapshot.On("Epochs").Return(suite.epochQuery)
-	suite.state.On("Final").Return(suite.snapshot, nil)
+
+	// mocks state for collector nodes topology
+	// considers only a 3 clusters
+	state := topology.CreateMockStateForCollectionNodes(suite.T(),
+		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
 
 	// creates a topology instance for the nodes based on their roles
-	tops := make([]*topology.Topology, 0)
-	for _, id := range suite.ids {
-		var top topology.Topology
-		var err error
-		if id.Role == flow.RoleCollection {
-			top, err = topology.NewCollectionTopology(id.NodeID, suite.state)
-		} else {
-			top, err = topology.NewTopicAwareTopology(id.NodeID)
-		}
+	tops := test.CreateTopologies(suite.T(), state, suite.ids)
 
-		require.NoError(suite.T(), err)
-		tops = append(tops, &top)
-	}
-
-	suite.nets = test.CreateNetworks(suite.T(), suite.ids, tops, 1, true)
+	// creates middleware and network instances
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws := test.CreateMiddleware(suite.T(), logger, suite.ids)
+	suite.nets = test.CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 1, true)
 }
 
 // TestSubset tests that the collection nodes using CollectionTopology form a connected graph and nodes within the same
