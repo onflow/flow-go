@@ -1,17 +1,18 @@
 package stdmap
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/model"
+	"github.com/onflow/flow-go/storage"
 )
 
 // IncorporatedResults implements the incorporated results memory pool of the
 // consensus nodes, used to store results that need to be sealed.
 type IncorporatedResults struct {
 	*Backend
-	size uint
 }
 
 // NewIncorporatedResults creates a mempool for the incorporated results.
@@ -36,6 +37,12 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 			// no record with key is available in the mempool, initialise
 			// incResults.
 			incResults = make(map[flow.Identifier]*flow.IncorporatedResult)
+
+			// adds the new incorporated results map associated with key to mempool
+			backdata[key] = model.IncorporatedResultMap{
+				ExecutionResult:     incorporatedResult.Result,
+				IncorporatedResults: incResults,
+			}
 		} else {
 			incorporatedResultMap, ok := entity.(model.IncorporatedResultMap)
 			if !ok {
@@ -49,23 +56,11 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 				// incorporated block.
 				return nil
 			}
-
-			// removes map entry associated with key for update
-			delete(backdata, key)
 		}
 
 		// appends incorporated result to the map
 		incResults[incorporatedResult.IncorporatedBlockID] = incorporatedResult
-
-		// adds the new incorporated results map associated with key to mempool
-		incorporatedResultMap := model.IncorporatedResultMap{
-			ExecutionResult:     incorporatedResult.Result,
-			IncorporatedResults: incResults,
-		}
-
-		backdata[key] = incorporatedResultMap
 		appended = true
-		ir.size++
 		return nil
 	})
 
@@ -75,34 +70,46 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 // All returns all the items in the mempool.
 func (ir *IncorporatedResults) All() []*flow.IncorporatedResult {
 	res := make([]*flow.IncorporatedResult, 0)
-
-	entities := ir.Backend.All()
-	for _, entity := range entities {
-		irMap, _ := entity.(model.IncorporatedResultMap)
-
-		for _, ir := range irMap.IncorporatedResults {
-			res = append(res, ir)
+	ir.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		for _, entity := range backdata {
+			irMap, _ := entity.(model.IncorporatedResultMap)
+			for _, ir := range irMap.IncorporatedResults {
+				res = append(res, ir)
+			}
 		}
-	}
-
+		return nil
+	})
 	return res
 }
 
 // ByResultID returns all the IncorporatedResults that contain a specific
 // ExecutionResult, indexed by IncorporatedBlockID.
-func (ir *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult) {
+func (ir *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult, bool) {
 
-	entity, exists := ir.Backend.ByID(resultID)
-	if !exists {
-		return nil, nil
+	// To guarantee concurrency safety, we need to copy the map in via a locked operation in the backend.
+	// Otherwise, another routine might concurrently modify the map stored for the Execution Result.
+	var result *flow.ExecutionResult
+	incResults := make(map[flow.Identifier]*flow.IncorporatedResult)
+	err := ir.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, exists := backdata[resultID]
+		if !exists {
+			return storage.ErrNotFound
+		}
+		irMap := entity.(model.IncorporatedResultMap)
+		result = irMap.ExecutionResult
+		for i, res := range irMap.IncorporatedResults {
+			incResults[i] = res
+		}
+		return nil
+	})
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, nil, false
+	} else if err != nil {
+		// should never happen: above method can only return storage.ErrNotFound
+		panic("Internal Error in IncorporatedResults mempool: unexpected backend error")
 	}
 
-	irMap, ok := entity.(model.IncorporatedResultMap)
-	if !ok {
-		return nil, nil
-	}
-
-	return irMap.ExecutionResult, irMap.IncorporatedResults
+	return result, incResults, true
 }
 
 // Rem removes an IncorporatedResult from the mempool.
@@ -148,7 +155,6 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 		}
 
 		removed = true
-		ir.size--
 		return nil
 	})
 
@@ -157,5 +163,5 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 
 // Size returns the number of incorporated results in the mempool.
 func (ir *IncorporatedResults) Size() uint {
-	return ir.size
+	return ir.Backend.Size()
 }
