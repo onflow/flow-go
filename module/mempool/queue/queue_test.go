@@ -253,10 +253,3 @@ func TestQueue(t *testing.T) {
 	})
 
 }
-
-func queueElement(t *testing.T, queue *Queue, elm Blockify) {
-	added := queue.TryAdd(elm)
-	assert.True(t, added)
-	assert.Equal(t, 2, queue.Size())
-	assert.Equal(t, uint64(1), queue.Height())
-}
