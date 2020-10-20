@@ -1,9 +1,12 @@
 package topology_test
 
 import (
+	"os"
 	"sort"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -13,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	protocol2 "github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,7 +25,7 @@ import (
 // theory assumptions behind the schemes, e.g., random oracle model of hashes
 type TopicAwareTopologyTestSuite struct {
 	suite.Suite
-	state  *protocol.State   // represents a mocked protocol state
+	state  protocol2.State   // represents a mocked protocol state
 	ids    flow.IdentityList // represents the identity list of all nodes in the system
 	nets   []*libp2p.Network // represents the single network instance that creates topology
 	me     flow.Identity     // represents identity of single instance of node that creates topology
@@ -53,12 +56,16 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// mocks state for collector nodes topology
 	// considers only a single cluster as higher cluster numbers are tested
 	// in collectionTopology_test
-	state := topology.CreateMockStateForCollectionNodes(suite.T(),
+	suite.state = topology.CreateMockStateForCollectionNodes(suite.T(),
 		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
-	tops := test.CreateTopologies(suite.T(), state, suite.ids)
-	suite.nets = test.CreateNetworks(suite.T(), suite.ids, tops, 1, true)
+	tops := test.CreateTopologies(suite.T(), suite.state, suite.ids)
+
+	// creates middleware and network instances
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws := test.CreateMiddleware(suite.T(), logger, suite.ids)
+	suite.nets = test.CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 1, true)
 }
 
 // TODO: fix this test after we have fanout optimized.
@@ -108,7 +115,10 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 	}
 }
 
-// TestDeteministicity verifies that the same seed generates the same topology for a topic
+// TestDeteministicity verifies that the same seed generates the same topology for a topic.
+//
+// It also checks the topology against non-inclusion of the node itself in its own topology.
+//
 func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 	top, err := topology.NewTopicAwareTopology(suite.me.NodeID, suite.state)
 	require.NoError(suite.T(), err)
@@ -125,10 +135,13 @@ func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 			current = nil
 
 			// generate a new topology with a the same ids, size and seed
-			idMap, err := top.Subset(suite.ids, suite.fanout, topic)
+			ids, err := top.Subset(suite.ids, suite.fanout, topic)
 			require.NoError(suite.T(), err)
 
-			for _, v := range idMap {
+			// topology should not contain the node itself
+			require.Empty(suite.T(), ids.Filter(filter.HasNodeID(suite.me.NodeID)))
+
+			for _, v := range ids {
 				current = append(current, v.NodeID.String())
 			}
 			// no guarantees about order is made by Topology.Subset(), hence sort the return values before comparision
@@ -148,6 +161,8 @@ func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 // Since topologies are seeded with the node ids, it evaluates that every two consecutive
 // topologies of the same topic for distinct nodes are distinct.
 //
+// It also checks the topology against non-inclusion of the node itself in its own topology.
+//
 // Note: currently we are using a linear fanout for guaranteed delivery, hence there are
 // C(n, (n+1)/2) many unique topologies for the same topic across different nodes. Even for small numbers
 // like n = 300, the potential outcomes are large enough (i.e., 10e88) so that the uniqueness is guaranteed.
@@ -160,23 +175,25 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 	topics := engine.GetTopicsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
-	for i := 0; i < len(suite.ids); i++ {
-		previous = current
-		current = nil
-
+	for _, identity := range suite.ids {
 		// extracts all topics node (i) subscribed to
-		identity, _ := suite.ids.ByIndex(uint(i))
 		if identity.Role != flow.RoleConsensus {
 			continue
 		}
 
+		previous = current
+		current = nil
+
 		// creates and samples a new topic aware topology for the first topic of collection nodes
 		top, err := topology.NewTopicAwareTopology(identity.NodeID, suite.state)
 		require.NoError(suite.T(), err)
-		idMap, err := top.Subset(suite.ids, suite.fanout, topics[0])
+		ids, err := top.Subset(suite.ids, suite.fanout, topics[0])
 		require.NoError(suite.T(), err)
 
-		for _, v := range idMap {
+		// topology should not contain the node itself
+		require.Empty(suite.T(), ids.Filter(filter.HasNodeID(suite.me.NodeID)))
+
+		for _, v := range ids {
 			current = append(current, v.NodeID.String())
 		}
 		sort.Strings(current)
