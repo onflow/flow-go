@@ -40,11 +40,15 @@ func TestGetTopicsByRole(t *testing.T) {
 	// - PushReceipts
 	// - PushApprovals
 	// - ProvideChunks
+	// - TestNetwork
+	// - TestMetric
 	// the roles list should contain collection and consensus roles
 	topics := engine.GetTopicsByRole(flow.RoleVerification)
-	assert.Len(t, topics, 4)
+	assert.Len(t, topics, 6)
 	assert.Contains(t, topics, engine.PushBlocks)
 	assert.Contains(t, topics, engine.PushReceipts)
 	assert.Contains(t, topics, engine.PushApprovals)
 	assert.Contains(t, topics, engine.RequestChunks)
+	assert.Contains(t, topics, engine.TestMetrics)
+	assert.Contains(t, topics, engine.TestNetwork)
 }
