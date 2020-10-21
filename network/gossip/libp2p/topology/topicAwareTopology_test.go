@@ -96,7 +96,7 @@ func (suite *TopicAwareTopologyTestSuite) TestMembership() {
 // `(k+1)/2` where `k` is number of nodes subscribed to a topic. It does that over 100 random iterations.
 func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 	for i := 0; i < 100; i++ {
-		top, err := topology.NewTopicAwareTopology(unittest.IdentityFixture().NodeID, suite.state)
+		top, err := topology.NewTopicAwareTopology(suite.me.NodeID, suite.state)
 		require.NoError(suite.T(), err)
 
 		topics := engine.GetTopicsByRole(suite.me.Role)
@@ -106,11 +106,14 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 			// extracts total number of nodes subscribed to topic
 			roles, ok := engine.GetRolesByTopic(topic)
 			require.True(suite.T(), ok)
-			total := len(suite.ids.Filter(filter.HasRole(roles...)))
 
-			idMap, err := top.Subset(suite.ids, suite.fanout, topic)
+			ids, err := top.Subset(suite.ids, suite.fanout, topic)
 			require.NoError(suite.T(), err)
-			require.True(suite.T(), float32(len(idMap)) >= (float32)(total+1)/2)
+
+			// counts total number of nodes that has the roles and are not `suite.me`  (node of interest).
+			total := len(suite.ids.Filter(filter.And(filter.HasRole(roles...),
+				filter.Not(filter.HasNodeID(suite.me.NodeID)))))
+			require.True(suite.T(), float64(len(ids)) >= (float64)(total+1)/2)
 		}
 	}
 }
