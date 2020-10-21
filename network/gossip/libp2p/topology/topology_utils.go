@@ -18,44 +18,8 @@ func connectedGraph(ids flow.IdentityList, seed int64) flow.IdentityList {
 	return ids.DeterministicSample(size, seed)
 }
 
-// connectedGraph returns a random subset of length (n+1)/2 of the specified role
-func connectedGraphByRole(ids flow.IdentityList, seed int64, role flow.Role) flow.IdentityList {
-	filteredIds := ids.Filter(filter.HasRole(role))
-	if len(filteredIds) == 0 {
-		// there are no more nodes of this role to choose from
-		return flow.IdentityList{}
-	}
-	return connectedGraph(filteredIds, seed)
-}
-
-// oneOfRole returns one random id of the given role
-func oneOfRole(ids flow.IdentityList, seed int64, role flow.Role) flow.IdentityList {
-	filteredIds := ids.Filter(filter.HasRole(role))
-	if len(filteredIds) == 0 {
-		// there are no more nodes of this role to choose from
-		return flow.IdentityList{}
-	}
-
-	// choose 1 out of all the remaining nodes of this role
-	selectedID := filteredIds.DeterministicSample(1, seed)
-
-	return selectedID
-}
-
 func connectedGraphSample(ids flow.IdentityList, seed int64) (flow.IdentityList, flow.IdentityList) {
 	result := connectedGraph(ids, seed)
-	remainder := ids.Filter(filter.Not(filter.In(result)))
-	return result, remainder
-}
-
-func connectedGraphByRoleSample(ids flow.IdentityList, seed int64, role flow.Role) (flow.IdentityList, flow.IdentityList) {
-	result := connectedGraphByRole(ids, seed, role)
-	remainder := ids.Filter(filter.Not(filter.In(result)))
-	return result, remainder
-}
-
-func oneOfEachRoleSample(ids flow.IdentityList, seed int64, role flow.Role) (flow.IdentityList, flow.IdentityList) {
-	result := oneOfRole(ids, seed, role)
 	remainder := ids.Filter(filter.Not(filter.In(result)))
 	return result, remainder
 }
