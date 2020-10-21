@@ -85,7 +85,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(fungibleToken, contracts.FungibleToken()),
+		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
 		b.ledger,
 	)
 	if err != nil {
@@ -141,7 +141,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract),
+		deployContractTransaction(service, contract, "FlowServiceAccount"),
 		b.ledger,
 	)
 	if err != nil {
@@ -166,7 +166,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 const deployContractTransactionTemplate = `
 transaction {
   prepare(signer: AuthAccount) {
-    signer.setCode("%s".decodeHex())
+    signer.contracts.add(name: "%s", code: "%s".decodeHex())
   }
 }
 `
@@ -175,7 +175,7 @@ const deployFlowTokenTransactionTemplate = `
 transaction {
   prepare(flowTokenAccount: AuthAccount, serviceAccount: AuthAccount) {
     let adminAccount = serviceAccount
-    flowTokenAccount.setCode("%s".decodeHex(), adminAccount)
+    flowTokenAccount.contracts.add(name: "FlowToken", code: "%s".decodeHex(), adminAccount: adminAccount)
   }
 }
 `
@@ -184,7 +184,7 @@ const deployFlowFeesTransactionTemplate = `
 transaction {
   prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
     let adminAccount = serviceAccount
-    flowFeesAccount.setCode("%s".decodeHex(), adminAccount)
+    flowFeesAccount.contracts.add(name: "FlowFees", code: "%s".decodeHex(), adminAccount: adminAccount)
   }
 }
 `
@@ -220,10 +220,10 @@ transaction(amount: UFix64) {
 }
 `
 
-func deployContractTransaction(address flow.Address, contract []byte) *TransactionProcedure {
+func deployContractTransaction(address flow.Address, contract []byte, contractName string) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, hex.EncodeToString(contract)))).
+			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, contractName, hex.EncodeToString(contract)))).
 			AddAuthorizer(address),
 	)
 }
