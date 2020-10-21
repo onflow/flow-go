@@ -93,6 +93,7 @@ func (w *LedgerWAL) Replay(
 }
 
 func (w *LedgerWAL) ReplayLogsOnly(
+	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
@@ -100,7 +101,7 @@ func (w *LedgerWAL) ReplayLogsOnly(
 	if err != nil {
 		return err
 	}
-	return w.replay(from, to, nil, updateFn, deleteFn, false)
+	return w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
 }
 
 func (w *LedgerWAL) replay(
