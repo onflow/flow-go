@@ -28,10 +28,9 @@ import (
 // single message from one engine to the other one through different scenarios.
 type EchoEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                      // used as a wrapper around conduit methods
-	nets           []*libp2p.Network    // used to keep track of the networks
-	mws            []*libp2p.Middleware // used to keep track of the middlewares associated with networks
-	ids            flow.IdentityList    // used to keep track of the identifiers associated with networks
+	ConduitWrapper                   // used as a wrapper around conduit methods
+	nets           []*libp2p.Network // used to keep track of the networks
+	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
 }
 
 // Some tests are skipped to speedup the build.
