@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
@@ -104,6 +105,11 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range nets {
+		topics := engine.GetTopicsByRole(ids[i].Role)
+		for _, topic := range topics {
+			net.Register(topic)
+		}
+
 		subset, err := net.Topology()
 
 		require.NoError(suite.T(), err)
