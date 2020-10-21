@@ -194,7 +194,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		require.NoError(suite.T(), err)
 
 		// topology should not contain the node itself
-		require.Empty(suite.T(), ids.Filter(filter.HasNodeID(suite.me.NodeID)))
+		require.Empty(suite.T(), ids.Filter(filter.HasNodeID(identity.NodeID)))
 
 		for _, v := range ids {
 			current = append(current, v.NodeID.String())
