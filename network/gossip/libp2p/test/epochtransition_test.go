@@ -2,7 +2,6 @@ package test
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"sync"
@@ -89,9 +88,6 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 
 	// generate the engines
 	ts.engines = generateEngines(ts.T(), nets)
-
-	// ensure that nodes can communicate with each other
-	sendMessagesAndVerify(ts.T(), ts.ids, ts.engines, ts.Publish)
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -204,9 +200,8 @@ func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngi
 
 	// each node broadcasting a message to all others
 	for i, eng := range engs {
-		nonce := rand.Intn(math.MaxInt64)
 		event := &message.TestMessage{
-			Text: fmt.Sprintf("%d: hello from node %d", nonce, i),
+			Text: fmt.Sprintf("hello from node %d", i),
 		}
 		others := ids.Filter(filter.Not(filter.HasNodeID(ids[i].NodeID))).NodeIDs()
 		require.NoError(t, send(event, eng.con, others...))
