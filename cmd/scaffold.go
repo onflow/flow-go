@@ -66,6 +66,7 @@ type Metrics struct {
 	Compliance module.ComplianceMetrics
 	Cache      module.CacheMetrics
 	Mempool    module.MempoolMetrics
+	Node       module.NodeMetrics
 }
 
 type Storage struct {
@@ -292,8 +293,11 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
 		Cache:      metrics.NewCacheCollector(fnb.RootChainID),
+		Node:       metrics.NewNodeCollector(),
 		Mempool:    mempools,
 	}
+
+	fnb.Metrics.Node.Restarted()
 
 	// registers mempools as a Component so that its Ready method is invoked upon startup
 	fnb.Component("mempools metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {

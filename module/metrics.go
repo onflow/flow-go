@@ -58,6 +58,10 @@ type MempoolMetrics interface {
 	Register(resource string, entriesFunc metrics.EntriesFunc) error
 }
 
+type NodeMetrics interface {
+	Restarted()
+}
+
 type HotstuffMetrics interface {
 	// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
 	HotStuffBusyDuration(duration time.Duration, event string)

@@ -10,6 +10,7 @@ const (
 	namespaceVerification = "verification"
 	namespaceExecution    = "execution"
 	namespaceLoader       = "loader"
+	namespaceNode         = "node"
 )
 
 // Network subsystems represent the various layers of networking.
