@@ -162,8 +162,6 @@ func TestView_Set(t *testing.T) {
 		v.Delete(registerID1, "", "")
 		err = hashIt(expSpock, []byte("3"))
 		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("3"))))) // read state.StorageUsedRegisterName
-		assert.NoError(t, err)
 		err = hashIt(expSpock, uint64AsBytes(100)) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		s = v.SpockSecret()
@@ -173,8 +171,6 @@ func TestView_Set(t *testing.T) {
 		// intermediate values and not just the final values
 		v.Set(registerID1, "", "", flow.RegisterValue("4"))
 		err = hashIt(expSpock, []byte("4"))
-		assert.NoError(t, err)
-		err = hashIt(expSpock, uint64AsBytes(100)) // read state.StorageUsedRegisterName
 		assert.NoError(t, err)
 		err = hashIt(expSpock, uint64AsBytes(uint64(100+len([]byte("4"))))) // set state.StorageUsedRegisterName
 		assert.NoError(t, err)

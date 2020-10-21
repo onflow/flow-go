@@ -23,8 +23,9 @@ type View struct {
 	// SpocksSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing SpocksSecret
 	// for views other than collection views to improve performance
-	spockSecretHasher hash.Hasher
-	readFunc          GetRegisterFunc
+	spockSecretHasher       hash.Hasher
+	readFunc                GetRegisterFunc
+	accountStorageUsedCache map[string]uint64 // cache for account storage used value
 }
 
 // Snapshot is set of interactions with the register
@@ -37,10 +38,11 @@ type Snapshot struct {
 // NewView instantiates a new ledger view with the provided read function.
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
-		delta:             NewDelta(),
-		regTouchSet:       make(map[string]flow.RegisterID),
-		readFunc:          readFunc,
-		spockSecretHasher: hash.NewSHA3_256(),
+		delta:                   NewDelta(),
+		regTouchSet:             make(map[string]flow.RegisterID),
+		readFunc:                readFunc,
+		spockSecretHasher:       hash.NewSHA3_256(),
+		accountStorageUsedCache: make(map[string]uint64),
 	}
 }
 
@@ -181,21 +183,9 @@ func (v *View) updateRegisterSizeChange(owner, controller, key string, value flo
 		return nil
 	}
 
-	oldSizeRegister, err := v.Get(owner, "", state.StorageUsedRegisterName)
+	oldSize, err := v.getAccountStorageUsed(owner)
 	if err != nil {
 		return err
-	}
-
-	var oldSize uint64
-	if len(oldSizeRegister) == 0 {
-		// account was just created
-		// set the storage used to 8 which is the size of the storage used register
-		oldSize = 8
-		buffer := make([]byte, oldSize)
-		binary.LittleEndian.PutUint64(buffer, 8)
-		v.Set(owner, "", state.StorageUsedRegisterName, buffer)
-	} else {
-		oldSize = binary.LittleEndian.Uint64(oldSizeRegister)
 	}
 
 	// two paths to avoid casting uint to int
@@ -216,9 +206,46 @@ func (v *View) updateRegisterSizeChange(owner, controller, key string, value flo
 	binary.LittleEndian.PutUint64(buffer, newSize)
 	// this will put us back in the Set method.
 	// The difference will be that sizeChange will always be 0 when setting storage_used
-	v.Set(owner, "", state.StorageUsedRegisterName, buffer)
+	v.setAccountStorageUsed(owner, newSize)
 
 	return nil
+}
+
+// getAccountStorageUsed gets account storage used. On the first call (for each owner) caches the result,
+// next call uses the cache
+func (v *View) getAccountStorageUsed(owner string) (uint64, error) {
+	storageUsed, cached := v.accountStorageUsedCache[owner]
+	if cached {
+		return storageUsed, nil
+	}
+
+	oldSizeRegister, err := v.Get(owner, "", state.StorageUsedRegisterName)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(oldSizeRegister) == 0 {
+		// account was just created
+		// set the storage to 8 which is the size of the storage register itself
+		v.setAccountStorageUsed(owner, 8)
+		storageUsed = 8
+	} else {
+		storageUsed = binary.LittleEndian.Uint64(oldSizeRegister)
+	}
+
+	// cache result
+	v.accountStorageUsedCache[owner] = storageUsed
+	return storageUsed, nil
+}
+
+// setAccountStorageUsed sets account storage used. Also updates the account storage used cache
+func (v *View) setAccountStorageUsed(owner string, used uint64) {
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, used)
+	v.Set(owner, "", state.StorageUsedRegisterName, buffer)
+
+	//update cache
+	v.accountStorageUsedCache[owner] = used
 }
 
 // Touch explicitly adds a register to the touched registers set.
