@@ -227,9 +227,19 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later.
-	_, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
+	header, err := e.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		log.Debug().Msg("discarding receipt for unknown block")
+		return nil
+	}
+
+	lastSealed, err := e.headersDB.GetLastSealed()
+	if err != nil {
+		return err
+	}
+
+	if header.Height <= lastSealed.Height {
+		log.Debug().Msg("discarding receipt for sealed block")
 		return nil
 	}
 
@@ -297,6 +307,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	log := e.log.With().
 		Hex("approval_id", logging.Entity(approval)).
+		Hex("block_id", approval.Body.BlockID[:]).
 		Hex("result_id", approval.Body.ExecutionResultID[:]).
 		Logger()
 
@@ -309,9 +320,19 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	// if the approval is for an unknown block, cache it. It will be picked up
 	// later when the finalizer processes new blocks.
-	_, err := e.state.AtBlockID(approval.Body.BlockID).Head()
+	header, err := e.headersDB.ByBlockID(approval.Body.BlockID)
 	if err != nil {
 		_, _ = e.approvals.Add(approval)
+		return nil
+	}
+
+	lastSealed, err := e.headersDB.GetLastSealed()
+	if err != nil {
+		return err
+	}
+
+	if header.Height <= lastSealed.Height {
+		log.Debug().Msg("discarding receipt for sealed block")
 		return nil
 	}
 
@@ -485,8 +506,8 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 	for _, incorporatedResult := range e.incorporatedResults.All() {
 
 		// TODO: In phase 3, when incorporated results are produced by the
-		// finalizer, block and previous result should be found in storage. Any
-		// error in retrieving block or previous result is unexpected.
+		// finalizer, the result's block and previous result should be found in
+		// storage. Any error in retrieving them is unexpected.
 
 		// if we have not received the block yet, we will just keep rechecking
 		// until the block has been received or the result has been purged.

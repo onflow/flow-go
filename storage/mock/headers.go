@@ -81,6 +81,29 @@ func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) 
 	return r0, r1
 }
 
+// GetLastSealed provides a mock function with given fields:
+func (_m *Headers) GetLastSealed() (*flow.Header, error) {
+	ret := _m.Called()
+
+	var r0 *flow.Header
+	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Header)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Store provides a mock function with given fields: header
 func (_m *Headers) Store(header *flow.Header) error {
 	ret := _m.Called(header)

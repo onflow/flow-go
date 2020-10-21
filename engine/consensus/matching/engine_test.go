@@ -73,6 +73,7 @@ type MatchingSuite struct {
 
 	state *protocol.State
 
+	lastSealed     *flow.Header
 	sealedSnapshot *protocol.Snapshot
 	finalSnapshot  *protocol.Snapshot
 
@@ -168,6 +169,8 @@ func (ms *MatchingSuite) SetupTest() {
 		nil,
 	)
 
+	ms.lastSealed = &flow.Header{}
+
 	ms.sealedSnapshot = &protocol.Snapshot{}
 
 	ms.results = make(map[flow.Identifier]*flow.ExecutionResult)
@@ -183,17 +186,6 @@ func (ms *MatchingSuite) SetupTest() {
 			if !found {
 				return storerr.ErrNotFound
 			}
-			return nil
-		},
-	)
-	ms.resultsDB.On("Store", mock.Anything).Return(
-		func(result *flow.ExecutionResult) error {
-			ms.results[result.ID()] = result
-			return nil
-		},
-	)
-	ms.resultsDB.On("Index", mock.Anything, mock.Anything).Return(
-		func(blockID, resultID flow.Identifier) error {
 			return nil
 		},
 	)
@@ -231,6 +223,14 @@ func (ms *MatchingSuite) SetupTest() {
 				}
 			}
 			return storerr.ErrNotFound
+		},
+	)
+	ms.headersDB.On("GetLastSealed").Return(
+		func() *flow.Header {
+			return ms.lastSealed
+		},
+		func() error {
+			return nil
 		},
 	)
 
@@ -333,18 +333,6 @@ func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
 
-	// force state to not find the receipt's corresponding block
-	ms.state = &protocol.State{}
-	ms.state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) realproto.Snapshot {
-			snapshot := &protocol.Snapshot{}
-			snapshot.On("Head").Return(nil, fmt.Errorf("forced error"))
-			return snapshot
-		},
-		nil,
-	)
-	ms.matching.state = ms.state
-
 	// onReceipt should not throw an error
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for unknown block")
@@ -354,11 +342,35 @@ func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+func (ms *MatchingSuite) TestOnReceiptSealedResult() {
+
+	// try to submit a receipt for a sealed result
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
+	originID := ms.exeID
+	receipt := unittest.ReceiptForBlockFixture(&block)
+	receipt.ExecutorID = originID
+
+	// pretend that the receipt's block is already sealed
+	ms.lastSealed = block.Header
+
+	err := ms.matching.onReceipt(originID, receipt)
+	ms.Require().NoError(err, "should ignore receipt for sealed result")
+
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
 func (ms *MatchingSuite) TestOnReceiptInvalidRole() {
 
 	// try ot submit a receipt from a consensus node
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.conID
-	receipt := unittest.ExecutionReceiptFixture()
+	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = originID
 
 	err := ms.matching.onReceipt(originID, receipt)
@@ -372,8 +384,11 @@ func (ms *MatchingSuite) TestOnReceiptInvalidRole() {
 func (ms *MatchingSuite) TestOnReceiptUnstakedExecutor() {
 
 	// try ot submit a receipt from an unstaked node
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
+	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = originID
 	ms.identities[originID].Stake = 0
 
@@ -385,27 +400,13 @@ func (ms *MatchingSuite) TestOnReceiptUnstakedExecutor() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-// func (ms *MatchingSuite) TestOnReceiptSealedResult() {
-
-// 	// try to submit a receipt for a sealed result
-// 	originID := ms.exeID
-// 	receipt := unittest.ExecutionReceiptFixture()
-// 	receipt.ExecutorID = originID
-// 	ms.results[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
-
-// 	err := ms.matching.onReceipt(originID, receipt)
-// 	ms.Require().NoError(err, "should ignore receipt for sealed result")
-
-// 	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-// 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-// 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-// }
-
 func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 
-	// try to submit a receipt for a sealed result
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
+	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = originID
 
 	// check that we attempted to add the receipt to the mempool and return
@@ -427,9 +428,12 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 
 func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 
-	// try to submit a receipt for a sealed result
+	// try to submit a receipt for a result that is already in the mempool
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
+	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = originID
 
 	// pretend the receipt is added to the mempool
@@ -459,8 +463,11 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 func (ms *MatchingSuite) TestOnReceiptValid() {
 
 	// try to submit a receipt that should be valid
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
+	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = originID
 
 	ms.receiptsPL.On("Add", mock.Anything).Run(
@@ -504,18 +511,6 @@ func (ms *MatchingSuite) TestOnApprovalUnknownBlock() {
 	approval := unittest.ResultApprovalFixture()
 	approval.Body.ApproverID = originID
 
-	// force state to not find the receipt's corresponding block
-	ms.state = &protocol.State{}
-	ms.state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) realproto.Snapshot {
-			snapshot := &protocol.Snapshot{}
-			snapshot.On("Head").Return(nil, fmt.Errorf("forced error"))
-			return snapshot
-		},
-		nil,
-	)
-	ms.matching.state = ms.state
-
 	// make sure the approval is added to the cache for future processing
 	// check calls have the correct parameters
 	ms.approvalsPL.On("Add", mock.Anything).Run(
@@ -534,11 +529,36 @@ func (ms *MatchingSuite) TestOnApprovalUnknownBlock() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+func (ms *MatchingSuite) TestOnApprovalSealedResult() {
+
+	// try to submit an approval for a sealed result
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
+	originID := ms.verID
+	approval := unittest.ResultApprovalFixture()
+	approval.Body.BlockID = block.ID()
+	approval.Body.ApproverID = originID
+
+	// pretend that the block is already sealed
+	ms.lastSealed = block.Header
+
+	err := ms.matching.onApproval(originID, approval)
+	ms.Require().NoError(err, "should ignore approval for sealed result")
+
+	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
 func (ms *MatchingSuite) TestOnApprovalInvalidRole() {
 
 	// try to submit an approval from a consensus node
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.conID
 	approval := unittest.ResultApprovalFixture()
+	approval.Body.BlockID = block.ID()
 	approval.Body.ApproverID = originID
 
 	err := ms.matching.onApproval(originID, approval)
@@ -551,9 +571,14 @@ func (ms *MatchingSuite) TestOnApprovalInvalidRole() {
 func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
 
 	// try to submit an approval from an unstaked approver
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.verID
 	approval := unittest.ResultApprovalFixture()
+	approval.Body.BlockID = block.ID()
 	approval.Body.ApproverID = originID
+
 	ms.identities[originID].Stake = 0
 
 	err := ms.matching.onApproval(originID, approval)
@@ -563,26 +588,15 @@ func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-// func (ms *MatchingSuite) TestOnApprovalSealedResult() {
-
-// 	// try to submit an approval for a sealed result
-// 	originID := ms.verID
-// 	approval := unittest.ResultApprovalFixture()
-// 	approval.Body.ApproverID = originID
-// 	ms.results[approval.Body.ExecutionResultID] = unittest.ExecutionResultFixture()
-
-// 	err := ms.matching.onApproval(originID, approval)
-// 	ms.Require().NoError(err, "should ignore approval for sealed result")
-
-// 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-// 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-// }
-
 func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 
 	// try to submit an approval that is already in the mempool
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.verID
 	approval := unittest.ResultApprovalFixture()
+	approval.Body.BlockID = block.ID()
 	approval.Body.ApproverID = originID
 
 	// check calls have the correct parameters
@@ -603,8 +617,12 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 func (ms *MatchingSuite) TestOnApprovalValid() {
 
 	// try to submit an approval for a sealed result
+	block := unittest.BlockFixture()
+	ms.blocks[block.ID()] = &block
+
 	originID := ms.verID
 	approval := unittest.ResultApprovalFixture()
+	approval.Body.BlockID = block.ID()
 	approval.Body.ApproverID = originID
 
 	// check calls have the correct parameters
