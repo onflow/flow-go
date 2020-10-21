@@ -12,34 +12,107 @@ import (
 )
 
 func TestTransactionStorageLimiter_Process(t *testing.T) {
-	t.Run("capacity > storage == OK", func(t *testing.T) {
-		owner := "1"
+	t.Run("capacity > storage -> OK", func(t *testing.T) {
+		owner := string(flow.HexToAddress("1").Bytes())
 		ledger := newMockLedger(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsedOKV(owner, 99),
 				storageCapacityOKV(owner, 100),
+				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
-		if err := d.Process(nil, fvm.Context{}, nil, ledger); err != nil {
-			t.Errorf("Transaction with higher capacity than storage used should work")
-		}
+
+		err := d.Process(nil, fvm.Context{}, nil, ledger)
+
+		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
-	t.Run("capacity = storage == OK", func(t *testing.T) {
-		owner := "1"
+	t.Run("capacity = storage -> OK", func(t *testing.T) {
+		owner := string(flow.HexToAddress("1").Bytes())
 		ledger := newMockLedger(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsedOKV(owner, 100),
 				storageCapacityOKV(owner, 100),
+				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
-		if err := d.Process(nil, fvm.Context{}, nil, ledger); err != nil {
-			t.Errorf("Transaction with equal capacity than storage used should work")
-		}
+
+		err := d.Process(nil, fvm.Context{}, nil, ledger)
+
+		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
-	t.Run("capacity < storage == Not OK", func(t *testing.T) {
-		owner := "1"
+	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
+		owner := string(flow.HexToAddress("1").Bytes())
+		ledger := newMockLedger(
+			[]string{owner},
+			[]OwnerKeyValue{
+				storageUsedOKV(owner, 101),
+				storageCapacityOKV(owner, 100),
+				accountExists(owner),
+			})
+		d := &fvm.TransactionStorageLimiter{}
+
+		err := d.Process(nil, fvm.Context{}, nil, ledger)
+
+		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
+	})
+	t.Run("if two registers change on the same account, only check capacity once", func(t *testing.T) {
+		owner := string(flow.HexToAddress("1").Bytes())
+		ledger := newMockLedger(
+			[]string{owner, owner},
+			[]OwnerKeyValue{
+				storageUsedOKV(owner, 99),
+				storageCapacityOKV(owner, 100),
+				accountExists(owner),
+			})
+		d := &fvm.TransactionStorageLimiter{}
+
+		err := d.Process(nil, fvm.Context{}, nil, ledger)
+
+		require.NoError(t, err)
+		// three touches per account: get exists, get capacity, get used
+		require.Equal(t, 3, ledger.GetCalls[owner])
+	})
+	t.Run("two registers change on different accounts, only check capacity once per account", func(t *testing.T) {
+		owner1 := string(flow.HexToAddress("1").Bytes())
+		owner2 := string(flow.HexToAddress("2").Bytes())
+		ledger := newMockLedger(
+			[]string{owner1, owner1, owner2, owner2},
+			[]OwnerKeyValue{
+				storageUsedOKV(owner1, 99),
+				storageCapacityOKV(owner1, 100),
+				accountExists(owner2),
+				storageUsedOKV(owner2, 999),
+				storageCapacityOKV(owner2, 1000),
+				accountExists(owner2),
+			})
+		d := &fvm.TransactionStorageLimiter{}
+
+		err := d.Process(nil, fvm.Context{}, nil, ledger)
+
+		require.NoError(t, err)
+		// three touches per account: get exists, get capacity, get used
+		require.Equal(t, 3, ledger.GetCalls[owner1])
+		require.Equal(t, 3, ledger.GetCalls[owner2])
+	})
+	t.Run("non account registers are ignored", func(t *testing.T) {
+		owner := ""
+		ledger := newMockLedger(
+			[]string{owner},
+			[]OwnerKeyValue{
+				storageUsedOKV(owner, 101),
+				storageCapacityOKV(owner, 100),
+				accountExists(owner), // it has exists value, but it cannot be parsed as an address
+			})
+		d := &fvm.TransactionStorageLimiter{}
+
+		err := d.Process(nil, fvm.Context{}, nil, ledger)
+
+		require.NoError(t, err)
+	})
+	t.Run("account registers without exists are ignored", func(t *testing.T) {
+		owner := string(flow.HexToAddress("1").Bytes())
 		ledger := newMockLedger(
 			[]string{owner},
 			[]OwnerKeyValue{
@@ -47,43 +120,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 				storageCapacityOKV(owner, 100),
 			})
 		d := &fvm.TransactionStorageLimiter{}
-		if err := d.Process(nil, fvm.Context{}, nil, ledger); err == nil {
-			t.Errorf("Transaction with lower capacity than storage used should fail")
-		}
-	})
 
-	t.Run("two registers change with the same account: call get only once", func(t *testing.T) {
-		owner := "1"
-		ledger := newMockLedger(
-			[]string{owner, owner},
-			[]OwnerKeyValue{
-				storageUsedOKV(owner, 99),
-				storageCapacityOKV(owner, 100),
-			})
-		d := &fvm.TransactionStorageLimiter{}
-		if err := d.Process(nil, fvm.Context{}, nil, ledger); err != nil {
-			t.Errorf("Transaction should no fail")
-		}
-		require.Equal(t, 2, ledger.GetCalls[owner])
-	})
+		err := d.Process(nil, fvm.Context{}, nil, ledger)
 
-	t.Run("two registers change with different same accounts: call get once per account", func(t *testing.T) {
-		owner1 := "1"
-		owner2 := "2"
-		ledger := newMockLedger(
-			[]string{owner1, owner2},
-			[]OwnerKeyValue{
-				storageUsedOKV(owner1, 99),
-				storageCapacityOKV(owner1, 100),
-				storageUsedOKV(owner2, 999),
-				storageCapacityOKV(owner2, 1000),
-			})
-		d := &fvm.TransactionStorageLimiter{}
-		if err := d.Process(nil, fvm.Context{}, nil, ledger); err != nil {
-			t.Errorf("Transaction should no fail")
-		}
-		require.Equal(t, 2, ledger.GetCalls[owner1])
-		require.Equal(t, 2, ledger.GetCalls[owner2])
+		require.NoError(t, err)
 	})
 }
 
@@ -112,6 +152,14 @@ func storageCapacityOKV(owner string, value uint64) OwnerKeyValue {
 		Owner: owner,
 		Key:   state.StorageCapacityRegisterName,
 		Value: value,
+	}
+}
+
+func accountExists(owner string) OwnerKeyValue {
+	return OwnerKeyValue{
+		Owner: owner,
+		Key:   "exists",
+		Value: 1,
 	}
 }
 

@@ -16,10 +16,12 @@ func NewTransactionStorageLimiter() *TransactionStorageLimiter {
 
 func (d *TransactionStorageLimiter) Process(
 	_ *VirtualMachine,
-	_ Context,
+	ctx Context,
 	_ *TransactionProcedure,
 	ledger state.Ledger,
 ) error {
+	accounts := state.NewAccounts(ledger, ctx.Chain)
+
 	registerIds, _ := ledger.RegisterUpdates()
 
 	checked := map[string]struct{}{}
@@ -32,6 +34,16 @@ func (d *TransactionStorageLimiter) Process(
 			continue
 		}
 		checked[owner] = struct{}{}
+
+		// is this an address?
+		// does it exist?
+		exists, err := isExistingAccount(accounts, owner)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			continue
+		}
 
 		// get capacity. Capacity will be 0 if not set yet. This can only be in the case of a bug.
 		// It should have been set during account creation
@@ -67,4 +79,15 @@ func getStorageRegisterValue(ledger state.Ledger, owner, key string) (uint64, er
 		panic(fmt.Sprintf("storage size of %s should be 8 bytes", key))
 	}
 	return binary.LittleEndian.Uint64(bValue), nil
+}
+
+func isExistingAccount(accounts *state.Accounts, owner string) (bool, error) {
+	ownerBytes := []byte(owner)
+	if len(ownerBytes) != flow.AddressLength {
+		// not an address
+		return false, nil
+	}
+
+	accountExists, err := accounts.Exists(flow.BytesToAddress(ownerBytes))
+	return accountExists, err
 }
