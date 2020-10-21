@@ -74,3 +74,13 @@ func (sm *subscriptionManager) getEngine(channelID string) (network.Engine, erro
 	}
 	return eng, nil
 }
+
+// registeredTopics returns list of topics this subscription manager has an engine registered for.
+func (sm *subscriptionManager) registeredTopics() []string {
+	topics := make([]string, 0)
+	for topic := range sm.engines {
+		topics = append(topics, topic)
+	}
+
+	return topics
+}

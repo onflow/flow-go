@@ -29,7 +29,6 @@ type Network struct {
 	codec           network.Codec
 	ids             flow.IdentityList
 	me              module.Local
-	role            flow.Role
 	mw              middleware.Middleware
 	top             topology.Topology
 	metrics         module.NetworkMetrics
@@ -49,7 +48,6 @@ func NewNetwork(
 	codec network.Codec,
 	ids flow.IdentityList,
 	me module.Local,
-	role flow.Role,
 	mw middleware.Middleware,
 	csize int,
 	top topology.Topology,
@@ -65,7 +63,6 @@ func NewNetwork(
 		logger:          log,
 		codec:           codec,
 		me:              me,
-		role:            role,
 		mw:              mw,
 		rcache:          rcache,
 		top:             top,
@@ -165,7 +162,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	myTopics := engine2.GetTopicsByRole(n.role)
+	myTopics := n.subscriptionMgr.registeredTopics()
 	var myFanout flow.IdentityList
 
 	// samples a connected component fanout from each topic and takes the
