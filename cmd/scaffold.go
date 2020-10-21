@@ -183,7 +183,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		var nodeTopology topology.Topology
 
-		nodeTopology, err = topology.NewTopicAwareTopology(fnb.Me.NodeID(), fnb.State)
+		nodeTopology, err = topology.NewTopicBasedTopology(fnb.Me.NodeID(), fnb.State)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)

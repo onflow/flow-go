@@ -9,21 +9,21 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// TopicAwareTopology is a deterministic topology mapping that creates a connected graph component among the nodes
+// TopicBasedTopology is a deterministic topology mapping that creates a connected graph component among the nodes
 // involved in each topic.
-type TopicAwareTopology struct {
+type TopicBasedTopology struct {
 	seed  int64                  // used for sampling connected graph
 	me    flow.Identifier        // used to keep identifier of the node
 	state protocol.ReadOnlyState // used to keep a read only protocol state
 }
 
-// NewTopicAwareTopology returns an instance of the TopicAwareTopology.
-func NewTopicAwareTopology(nodeID flow.Identifier, state protocol.ReadOnlyState) (*TopicAwareTopology, error) {
+// NewTopicBasedTopology returns an instance of the TopicBasedTopology.
+func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState) (*TopicBasedTopology, error) {
 	seed, err := seedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seed topology: %w", err)
 	}
-	t := &TopicAwareTopology{
+	t := &TopicBasedTopology{
 		seed:  seed,
 		me:    nodeID,
 		state: state,
@@ -35,13 +35,13 @@ func NewTopicAwareTopology(nodeID flow.Identifier, state protocol.ReadOnlyState)
 // Subset samples and returns a connected graph of the subscribers to the topic from the ids.
 // A connected graph fanout means that the subset of ids returned by this method on different nodes collectively
 // construct a connected graph component among all the subscribers to the topic.
-func (t *TopicAwareTopology) Subset(ids flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
+func (t *TopicBasedTopology) Subset(ids flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
 	var subscribers flow.IdentityList
 	if engine.IsClusterTopic(topic) {
 		// extracts cluster peer ids to which the node belongs to.
 		clusterPeers, err := t.clusterPeers()
 		if err != nil {
-			return nil, fmt.Errorf("failed to find cluster peers for node %s", t.me.String())
+			return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", t.me.String(), err)
 		}
 
 		subscribers = clusterPeers
@@ -68,7 +68,7 @@ func (t *TopicAwareTopology) Subset(ids flow.IdentityList, fanout uint, topic st
 }
 
 // clusterPeers returns the list of other nodes within the same cluster as this node.
-func (t TopicAwareTopology) clusterPeers() (flow.IdentityList, error) {
+func (t TopicBasedTopology) clusterPeers() (flow.IdentityList, error) {
 	currentEpoch := t.state.Final().Epochs().Current()
 	clusterList, err := currentEpoch.Clustering()
 	if err != nil {

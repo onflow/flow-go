@@ -96,7 +96,7 @@ func (suite *TopicAwareTopologyTestSuite) TestMembership() {
 // `(k+1)/2` where `k` is number of nodes subscribed to a topic. It does that over 100 random iterations.
 func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 	for i := 0; i < 100; i++ {
-		top, err := topology.NewTopicAwareTopology(suite.me.NodeID, suite.state)
+		top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state)
 		require.NoError(suite.T(), err)
 
 		topics := engine.GetTopicsByRole(suite.me.Role)
@@ -123,7 +123,7 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 // It also checks the topology against non-inclusion of the node itself in its own topology.
 //
 func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
-	top, err := topology.NewTopicAwareTopology(suite.me.NodeID, suite.state)
+	top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state)
 	require.NoError(suite.T(), err)
 
 	topics := engine.GetTopicsByRole(suite.me.Role)
@@ -188,7 +188,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		current = nil
 
 		// creates and samples a new topic aware topology for the first topic of collection nodes
-		top, err := topology.NewTopicAwareTopology(identity.NodeID, suite.state)
+		top, err := topology.NewTopicBasedTopology(identity.NodeID, suite.state)
 		require.NoError(suite.T(), err)
 		ids, err := top.Subset(suite.ids, suite.fanout, topics[0])
 		require.NoError(suite.T(), err)

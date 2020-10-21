@@ -193,7 +193,7 @@ func CreateTopologies(t *testing.T, state protocol.State, identities flow.Identi
 		var top topology.Topology
 		var err error
 
-		top, err = topology.NewTopicAwareTopology(id.NodeID, state)
+		top, err = topology.NewTopicBasedTopology(id.NodeID, state)
 
 		require.NoError(t, err)
 		tops = append(tops, &top)
