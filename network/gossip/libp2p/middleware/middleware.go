@@ -59,7 +59,7 @@ type Middleware interface {
 // overlay network layer.
 type Overlay interface {
 	// Topology returns the identities of a uniform subset of nodes in protocol state
-	Topology() (map[flow.Identifier]flow.Identity, error)
+	Topology() (flow.IdentityList, error)
 	// Identity returns a map of all identifier to flow identity
 	Identity() (map[flow.Identifier]flow.Identity, error)
 	Receive(nodeID flow.Identifier, msg *message.Message) error

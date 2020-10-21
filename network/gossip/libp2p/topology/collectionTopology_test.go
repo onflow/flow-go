@@ -61,10 +61,9 @@ func (suite *CollectionTopologyTestSuite) TestSubset() {
 			continue
 		}
 
-		idMap, err := suite.nets[i].Topology()
+		subset, err := suite.nets[i].Topology()
 		require.NoError(suite.T(), err)
 
-		subset := idMapToList(idMap)
 		adjencyMap[id.NodeID] = subset
 	}
 

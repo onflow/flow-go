@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 )
 
@@ -58,7 +59,7 @@ func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option
 	}
 
 	// remove self from list of nodes to avoid self dial
-	delete(ids, d.me)
+	ids = ids.Filter(filter.Not(filter.HasNodeID(d.me)))
 
 	// create a channel of peer.AddrInfo that needs to be returned
 	ch := make(chan peer.AddrInfo, len(ids))

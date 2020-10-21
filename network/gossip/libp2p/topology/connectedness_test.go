@@ -104,10 +104,10 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range nets {
-		idMap, err := net.Topology()
+		subset, err := net.Topology()
 
 		require.NoError(suite.T(), err)
-		adjencyMap[ids[i].NodeID] = idMapToList(idMap)
+		adjencyMap[ids[i].NodeID] = subset
 	}
 
 	// check that nodes of the same role form a connected graph
@@ -183,14 +183,4 @@ func dfs(currentID flow.Identifier,
 	for _, id := range adjMap[currentID].Filter(filter) {
 		dfs(id.NodeID, adjMap, visited, filter)
 	}
-}
-
-func idMapToList(idMap map[flow.Identifier]flow.Identity) flow.IdentityList {
-	var list flow.IdentityList
-	for _, identity := range idMap {
-		// avoiding reference closure
-		id := identity
-		list = append(list, &id)
-	}
-	return list
 }

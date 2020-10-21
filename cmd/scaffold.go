@@ -181,12 +181,6 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
-		if err != nil {
-			return nil, fmt.Errorf("could not get node id: %w", err)
-		}
-		nodeRole := nodeID.Role
-
 		var nodeTopology topology.Topology
 
 		nodeTopology, err = topology.NewTopicAwareTopology(fnb.Me.NodeID(), fnb.State)

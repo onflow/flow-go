@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	engine2 "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/gossip/libp2p/cache"
@@ -160,10 +159,11 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 	return identifierToID, nil
 }
 
-// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
-func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
+// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
+// Independent invocations of Topology on different nodes collectively constructs a connected network graph.
+func (n *Network) Topology() (flow.IdentityList, error) {
 	myTopics := n.subscriptionMgr.registeredTopics()
-	var myFanout flow.IdentityList
+	myFanout := flow.IdentityList{}
 
 	// samples a connected component fanout from each topic and takes the
 	// union of all fanouts.
@@ -172,15 +172,10 @@ func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", topic, err)
 		}
-		myFanout = append(myFanout, subset.Filter(filter.Not(filter.In(myFanout)))...)
+		myFanout = myFanout.Union(subset)
 	}
 
-	// creates a map of all the selected ids
-	topMap := make(map[flow.Identifier]flow.Identity)
-	for _, id := range myFanout {
-		topMap[id.NodeID] = *id
-	}
-	return topMap, nil
+	return myFanout, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
