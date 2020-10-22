@@ -27,41 +27,32 @@ import (
 
 var rootBlockID = unittest.IdentifierFixture().String()
 
-// generateIDs generate flow Identities with a valid port and networking key
-func generateIDs(t *testing.T, n int) (flow.IdentityList, []crypto.PrivateKey) {
-	identities := make([]*flow.Identity, n)
+// GenerateIDs generate flow Identities with a valid port and networking key
+func GenerateIDs(t *testing.T, n int, opts ...func(*flow.Identity)) (flow.IdentityList, []crypto.PrivateKey) {
 	privateKeys := make([]crypto.PrivateKey, n)
 
 	// get free ports
 	freePorts, err := freeport.GetFreePorts(n)
 	require.NoError(t, err)
 
-	for i := 0; i < n; i++ {
+	identities := unittest.IdentityListFixture(n, opts...)
 
-		identifier := unittest.IdentifierFixture()
-
+	// generates keys and address for the node
+	for i, id := range identities {
 		// generate key
-		key, err := GenerateNetworkingKey(identifier)
+		key, err := GenerateNetworkingKey(id.NodeID)
 		require.NoError(t, err)
 		privateKeys[i] = key
-
 		port := freePorts[i]
 
-		opt := []func(id *flow.Identity){
-			func(id *flow.Identity) {
-				id.NodeID = identifier
-				id.Address = fmt.Sprintf("0.0.0.0:%d", port)
-				id.NetworkPubKey = key.PublicKey()
-			},
-		}
-
-		identities[i] = unittest.IdentityFixture(opt...)
+		identities[i].Address = fmt.Sprintf("0.0.0.0:%d", port)
+		identities[i].NetworkPubKey = key.PublicKey()
 	}
 	return identities, privateKeys
 }
 
-// generateMiddlewares creates and initializes middleware instances for all the identities
-func generateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*libp2p.Middleware {
+// GenerateMiddlewares creates and initializes middleware instances for all the identities
+func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*libp2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*libp2p.Middleware, len(identities))
 	for i, id := range identities {
@@ -81,8 +72,8 @@ func generateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.Ident
 	return mws
 }
 
-// generateNetworks generates the network for the given middlewares
-func generateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, mws []*libp2p.Middleware, csize int, tops []topology.Topology, dryrun bool) []*libp2p.Network {
+// GenerateNetworks generates the network for the given middlewares
+func GenerateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, mws []*libp2p.Middleware, csize int, tops []topology.Topology, dryrun bool) []*libp2p.Network {
 	count := len(ids)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -123,15 +114,16 @@ func generateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, m
 	return nets
 }
 
-func generateIDsAndMiddlewares(t *testing.T, n int, log zerolog.Logger) (flow.IdentityList, []*libp2p.Middleware) {
-	ids, keys := generateIDs(t, n)
-	mws := generateMiddlewares(t, log, ids, keys)
+func GenerateIDsAndMiddlewares(t *testing.T, n int, log zerolog.Logger) (flow.IdentityList, []*libp2p.Middleware) {
+	ids, keys := GenerateIDs(t, n)
+	mws := GenerateMiddlewares(t, log, ids, keys)
 	return ids, mws
 }
 
-func generateIDsMiddlewaresNetworks(t *testing.T, n int, log zerolog.Logger, csize int, tops []topology.Topology, dryrun bool) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
-	ids, mws := generateIDsAndMiddlewares(t, n, log)
-	networks := generateNetworks(t, log, ids, mws, csize, tops, dryrun)
+func GenerateIDsMiddlewaresNetworks(t *testing.T, n int, log zerolog.Logger, csize int, tops []topology.Topology,
+	dryrun bool) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
+	ids, mws := GenerateIDsAndMiddlewares(t, n, log)
+	networks := GenerateNetworks(t, log, ids, mws, csize, tops, dryrun)
 	return ids, mws, networks
 }
 
