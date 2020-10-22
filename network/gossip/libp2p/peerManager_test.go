@@ -136,7 +136,7 @@ func (ts *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	assert.NoError(ts.T(), err)
 	assert.Eventually(ts.T(), func() bool {
 		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
-	}, 2*PeerUpdateInterval+2*time.Millisecond, 2*PeerUpdateInterval)
+	}, 2*PeerUpdateInterval+4*time.Millisecond, 2*PeerUpdateInterval)
 }
 
 // TestOnDemandPeerUpdate tests that the a peer update can be requested on demand and in between the periodic runs
@@ -158,7 +158,7 @@ func (ts *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	// wait for the first periodic update initiated after start to complete
 	assert.Eventually(ts.T(), func() bool {
 		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 1)
-	}, 2*time.Millisecond, 1*time.Millisecond)
+	}, 10*time.Millisecond, 1*time.Millisecond)
 
 	// make a request for peer update
 	pm.RequestPeerUpdate()
@@ -166,7 +166,7 @@ func (ts *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	// assert that a call to connect to peers is made
 	assert.Eventually(ts.T(), func() bool {
 		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
-	}, 2*time.Millisecond, 1*time.Millisecond)
+	}, 10*time.Millisecond, 1*time.Millisecond)
 }
 
 // TestConcurrentOnDemandPeerUpdate tests that concurrent on-demand peer update request never block
@@ -215,7 +215,7 @@ func (ts *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	// assert that only two calls to ConnectPeers were made (one for periodic update and one for the on-demand request)
 	assert.Eventually(ts.T(), func() bool {
 		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
-	}, 2*time.Millisecond, 1*time.Millisecond)
+	}, 10*time.Millisecond, 1*time.Millisecond)
 }
 
 // assertListsEqual asserts that two identity list are equal ignoring the order
