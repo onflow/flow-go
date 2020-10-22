@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -103,7 +104,7 @@ func ComputationHeavyScript(steps int) []byte {
 	return []byte(fmt.Sprintf(compHeavyScriptTemplate, steps))
 }
 
-const myFavSmartContractTemplate = `
+const myFavContract = `
 access(all) contract MyFavContract {
 
     init() {
@@ -144,7 +145,7 @@ access(all) contract MyFavContract {
     access(all) fun AddManyRandomItems(_ n: Int){
         var i = 0
         while i < n {
-            MyFavContract.AddItem({"data": "ABCDEFGHIJK"})
+            MyFavContract.AddItem({"data": "ABCDEFGHIJKLMNOP"})
             i = i + 1
         }
     }
@@ -181,6 +182,19 @@ access(all) contract MyFavContract {
     }
 }
 `
+
+const deployingMyFavContractScriptTemplate = `
+transaction {
+  prepare(signer: AuthAccount) {
+    signer.setCode("%s".decodeHex())
+  }
+}
+`
+
+func DeployingMyFavContractScript() []byte {
+	return []byte(fmt.Sprintf(deployingMyFavContractScriptTemplate, hex.EncodeToString([]byte(myFavContract))))
+
+}
 
 func bytesToCadenceArray(l []byte) cadence.Array {
 	values := make([]cadence.Value, len(l))
