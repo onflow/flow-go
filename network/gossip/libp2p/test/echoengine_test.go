@@ -17,10 +17,8 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
-	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -44,22 +42,11 @@ func TestStubEngineTestSuite(t *testing.T) {
 func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
 	golog.SetAllLoggers(golog.LevelInfo)
-	suite.ids = CreateIDs(count)
-
-	// mocks state for collector nodes topology
-	// considers only a single cluster as higher cluster numbers are tested
-	// in collectionTopology_test
-	state := topology.CreateMockStateForCollectionNodes(suite.T(),
-		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
-
-	// creates topology instances for the nodes based on their roles
-	tops := CreateTopologies(suite.T(), state, suite.ids)
 
 	// creates middleware and network instances
+	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := CreateMiddleware(suite.T(), logger, suite.ids)
-	nets := CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 100, false)
-	suite.nets = nets
+	suite.ids, _, suite.nets = generateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, false)
 }
 
 // TearDownTest closes the networks within a specified timeout

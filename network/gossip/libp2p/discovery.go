@@ -3,7 +3,6 @@ package libp2p
 import (
 	"context"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/discovery"
@@ -17,42 +16,45 @@ import (
 
 // Discovery implements the discovery.Discovery interface to provide libp2p a way to discover other nodes
 type Discovery struct {
+	ctx     context.Context
 	log     zerolog.Logger
 	overlay middleware.Overlay
 	me      flow.Identifier
-	done    chan struct{}
 }
 
-func NewDiscovery(log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier, done chan struct{}) *Discovery {
-	d := &Discovery{overlay: overlay, log: log, me: me, done: done}
+func NewDiscovery(ctx context.Context, log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier) *Discovery {
+	d := &Discovery{
+		ctx:     ctx,
+		overlay: overlay,
+		log:     log,
+		me:      me,
+	}
 	return d
 }
 
 // Advertise is suppose to advertise this node's interest in a topic to a discovery service. However, we are not using
 // a discovery service hence this function just returns a long duration to reduce the frequency with which libp2p calls it.
-func (d *Discovery) Advertise(_ context.Context, _ string, _ ...discovery.Option) (time.Duration, error) {
-	select {
-	case <-d.done:
-		return 0, fmt.Errorf("middleware stopped")
-	default:
-		return time.Hour, nil
+func (d *Discovery) Advertise(ctx context.Context, _ string, _ ...discovery.Option) (time.Duration, error) {
+	err := ctx.Err()
+	if err != nil {
+		return 0, err
 	}
+	return time.Hour, nil
 }
 
 // FindPeers returns a channel providing all peers of the node. No parameters are needed as of now since the overlay.Identity
 // provides all the information about the other nodes.
-func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
+func (d *Discovery) FindPeers(ctx context.Context, topic string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
 
-	// if middleware has been stopped, don't return any peers
-	select {
-	case <-d.done:
+	d.log.Debug().Str("topic", topic).Msg("initiating peer discovery")
+
+	err := ctx.Err()
+	if err != nil {
 		emptyCh := make(chan peer.AddrInfo)
 		close(emptyCh)
-		return emptyCh, fmt.Errorf("middleware stopped")
-	default:
+		return emptyCh, err
 	}
-
-	// query the overlay to get all the other nodes that should be directly connected to this node for 1-k messaging
+	// call the callback to get all the other nodes that should be directly connected to this node for 1-k messaging
 	ids, err := d.overlay.Topology()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ids: %w", err)
@@ -66,22 +68,15 @@ func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option
 
 	// send each id to the channel after converting it to a peer.AddrInfo
 	for _, id := range ids {
-		// create a new NodeAddress
-		ip, port, err := net.SplitHostPort(id.Address)
+
+		nodeAddress, err := nodeAddressFromIdentity(*id)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse address %s: %w", id.Address, err)
+			return nil, fmt.Errorf(" invalid node address: %s, %w", id.String(), err)
 		}
 
-		// convert the Flow key to a LibP2P key
-		lkey, err := PublicKey(id.NetworkPubKey)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert flow public key to libp2p public key: %v", err)
-		}
-
-		nodeAddress := NodeAddress{Name: id.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
 		addrInfo, err := GetPeerInfo(nodeAddress)
 		if err != nil {
-			return nil, fmt.Errorf(" invalid node address: %s, %w", nodeAddress.Name, err)
+			return nil, fmt.Errorf(" invalid node address: %s, %w", id.String(), err)
 		}
 
 		// add the address to the channel

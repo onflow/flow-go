@@ -202,6 +202,10 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		fnb.Network = net
+
+		idRefresher := libp2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
+		fnb.ProtocolEvents.AddConsumer(idRefresher)
+
 		return net, err
 	})
 }

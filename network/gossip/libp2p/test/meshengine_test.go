@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
-	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -45,24 +44,11 @@ func TestMeshNetTestSuite(t *testing.T) {
 func (suite *MeshEngineTestSuite) SetupTest() {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
-	const cacheSize = 100
-	golog.SetAllLoggers(golog.LevelInfo)
-
-	suite.ids = CreateIDs(count)
-
-	// mocks state for collector nodes topology
-	// considers only a single cluster as higher cluster numbers are tested
-	// in collectionTopology_test
-	state := topology.CreateMockStateForCollectionNodes(suite.T(),
-		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
-
-	// creates topology instances for the nodes based on their roles
-	tops := CreateTopologies(suite.T(), state, suite.ids)
-
-	// creates middleware and network instances
+	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := CreateMiddleware(suite.T(), logger, suite.ids)
-	suite.nets = CreateNetworks(suite.T(), logger, suite.ids, mws, tops, cacheSize, false)
+	var err error
+	suite.ids, _, suite.nets = generateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, false)
+	require.NoError(suite.T(), err)
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -196,7 +182,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Each node broadcasting a message to all others
 	for i := range suite.nets {
