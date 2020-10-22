@@ -83,27 +83,6 @@ func CreateAccountsScript(fungibleToken, flowToken flowsdk.Address) []byte {
 	return []byte(fmt.Sprintf(createAccountsScriptTemplate, fungibleToken, flowToken))
 }
 
-// const compHeavyScriptTemplate = `
-// transaction() {
-// 	prepare(signer1: AuthAccount){
-// 	}
-// 	execute {
-// 	  var s: Int256 = 1024102410241024
-// 	  var m: Int256 = 7
-// 	  var i = 0
-// 	  while i < %d {
-// 		  s = s * m
-// 		i = i + 1
-// 	  }
-// 	  log(s)
-//   }
-// }
-// `
-
-// func ComputationHeavyScript(steps int) []byte {
-// 	return []byte(fmt.Sprintf(compHeavyScriptTemplate, steps))
-// }
-
 const myFavContract = `
 access(all) contract MyFavContract {
 
@@ -196,15 +175,6 @@ func DeployingMyFavContractScript() []byte {
 
 }
 
-func bytesToCadenceArray(l []byte) cadence.Array {
-	values := make([]cadence.Value, len(l))
-	for i, b := range l {
-		values[i] = cadence.NewUInt8(b)
-	}
-
-	return cadence.NewArray(values)
-}
-
 const eventHeavyScriptTemplate = `
 import MyFavContract from 0x%s
 
@@ -226,11 +196,35 @@ import MyFavContract from 0x%s
 transaction {
   prepare(acct: AuthAccount) {}
   execute {
-    MyFavContract.EventHeavy()
+    MyFavContract.ComputationHeavy()
   }
 }
 `
 
 func ComputationHeavyScript(favContractAddress flowsdk.Address) []byte {
 	return []byte(fmt.Sprintf(compHeavyScriptTemplate, favContractAddress))
+}
+
+const ledgerHeavyScriptTemplate = `
+import MyFavContract from 0x%s
+
+transaction {
+  prepare(acct: AuthAccount) {}
+  execute {
+    MyFavContract.LedgerInteractionHeavy()
+  }
+}
+`
+
+func LedgerHeavyScript(favContractAddress flowsdk.Address) []byte {
+	return []byte(fmt.Sprintf(ledgerHeavyScriptTemplate, favContractAddress))
+}
+
+func bytesToCadenceArray(l []byte) cadence.Array {
+	values := make([]cadence.Value, len(l))
+	for i, b := range l {
+		values[i] = cadence.NewUInt8(b)
+	}
+
+	return cadence.NewArray(values)
 }

@@ -22,6 +22,8 @@ const (
 	TokenTransferLoadType LoadType = "token-transfer"
 	TokenAddKeysLoadType  LoadType = "add-keys"
 	CompHeavyLoadType     LoadType = "computation-heavy"
+	EventHeavyLoadType    LoadType = "event-heavy"
+	LedgerHeavyLoadType   LoadType = "ledger-heavy"
 )
 
 const accountCreationBatchSize = 100
