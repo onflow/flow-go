@@ -3,17 +3,21 @@ package topology_test
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/network/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,13 +33,24 @@ func TestCollectionTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(CollectionTopologyTestSuite))
 }
 
+func (suite *CollectionTopologyTestSuite) TearDownTest() {
+	for _, net := range suite.nets {
+		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
+	}
+}
+
 func (suite *CollectionTopologyTestSuite) SetupTest() {
 	suite.nets = make([]*libp2p.Network, 0)
+	keys := make([]crypto.PrivateKey, 0)
 	nClusters := 3
 	nCollectors := 7
 
-	suite.collectors = unittest.IdentityListFixture(nCollectors, unittest.WithRole(flow.RoleCollection))
-	suite.ids = append(unittest.IdentityListFixture(1000, unittest.WithAllRolesExcept(flow.RoleCollection)), suite.collectors...)
+	collectors, collectorKeys := test.GenerateIDs(suite.T(), nCollectors, unittest.WithRole(flow.RoleCollection))
+	suite.collectors = collectors
+
+	others, otherskeys := test.GenerateIDs(suite.T(), 1000, unittest.WithAllRolesExcept(flow.RoleCollection))
+	suite.ids = append(others, collectors...)
+	keys = append(otherskeys, collectorKeys...)
 
 	// mocks state for collector nodes topology
 	// considers only a 3 clusters
@@ -43,12 +58,12 @@ func (suite *CollectionTopologyTestSuite) SetupTest() {
 		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
 
 	// creates a topology instance for the nodes based on their roles
-	tops := test.CreateTopologies(suite.T(), state, suite.ids)
+	tops := test.GenerateTopologies(suite.T(), state, suite.ids)
 
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := test.CreateMiddleware(suite.T(), logger, suite.ids)
-	suite.nets = test.CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 1, true)
+	mws := test.GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, false)
 }
 
 // TestSubset tests that the collection nodes using CollectionTopology form a connected graph and nodes within the same
@@ -59,6 +74,14 @@ func (suite *CollectionTopologyTestSuite) TestSubset() {
 	for i, id := range suite.ids {
 		if id.Role != flow.RoleCollection {
 			continue
+		}
+
+		// registers all topics of this node on subscription manager
+		// so that it later can be extracted from it by the network
+		topics := engine.GetTopicsByRole(id.Role)
+		for _, topic := range topics {
+			_, err := suite.nets[i].Register(topic, &mocks.MockEngine{})
+			require.NoError(suite.T(), err)
 		}
 
 		subset, err := suite.nets[i].Topology()
