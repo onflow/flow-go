@@ -41,6 +41,7 @@ type ContLoadGenerator struct {
 	serviceAccount       *flowAccount
 	flowTokenAddress     *flowsdk.Address
 	fungibleTokenAddress *flowsdk.Address
+	favContractAddress   *flowsdk.Address
 	accounts             []*flowAccount
 	availableAccounts    chan *flowAccount // queue with accounts that are available for workers
 	txTracker            *TxTracker
@@ -120,6 +121,52 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
+	lg.SetupFavContract()
+	return nil
+}
+
+func (lg *ContLoadGenerator) SetupFavContract() error {
+	// take one of the accounts
+	if len(lg.accounts) == 0 {
+		return fmt.Errorf("can't setup fav contract, zero accounts available")
+	}
+
+	acc := lg.accounts[0]
+
+	blockRef, err := lg.blockRef.Get()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error getting reference block")
+		return err
+	}
+
+	lg.log.Trace().Msgf("creating fav contract deployment script")
+	deployScript := DeployingMyFavContractScript()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error creating fav contract deployment script")
+		return err
+	}
+
+	lg.log.Trace().Msgf("creating fav contract deployment transaction")
+	deploymentTx := flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef).
+		SetScript(deployScript).
+		SetProposalKey(*acc.address, 0, acc.seqNumber).
+		SetPayer(*acc.address).
+		AddAuthorizer(*acc.address)
+
+	lg.log.Trace().Msgf("signing transaction")
+	acc.signerLock.Lock()
+	err = deploymentTx.SignEnvelope(*acc.address, 0, acc.signer)
+	if err != nil {
+		acc.signerLock.Unlock()
+		lg.log.Error().Err(err).Msgf("error signing transaction")
+		return err
+	}
+	acc.seqNumber++
+	acc.signerLock.Unlock()
+
+	lg.sendTx(deploymentTx)
+	lg.favContractAddress = acc.address
 
 	return nil
 }
