@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -176,16 +175,16 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 		fnb.Middleware = mw
 
-		participants, err := fnb.State.Final().Identities(filter.Any)
-		if err != nil {
-			return nil, fmt.Errorf("could not get network identities: %w", err)
-		}
-
 		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get node id: %w", err)
 		}
 		nodeRole := nodeID.Role
+
+		participants, err := libp2p.IDsFromState(fnb.State)
+		if err != nil {
+			return nil, fmt.Errorf("could not get network identities: %w", err)
+		}
 
 		var nodeTopology topology.Topology
 		if nodeRole == flow.RoleCollection {
@@ -203,6 +202,10 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		fnb.Network = net
+
+		idRefresher := libp2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
+		fnb.ProtocolEvents.AddConsumer(idRefresher)
+
 		return net, err
 	})
 }

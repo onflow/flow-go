@@ -51,6 +51,11 @@ func (a *Assignment) ByNodeID(this flow.Identifier) []uint64 {
 	return chunks
 }
 
+// Len returns the number of chunks in the assignment
+func (a *Assignment) Len() int {
+	return len(a.table)
+}
+
 // AssignmentDataPack
 //
 // AssignmentDataPack provides a storable representation of chunk assignments on

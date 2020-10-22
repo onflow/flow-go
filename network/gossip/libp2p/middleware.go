@@ -46,9 +46,6 @@ const (
 	DefaultUnicastTimeout = 2 * time.Second
 )
 
-// the inbound message queue size for One to One and One to K messages (each)
-const InboundMessageQueueSize = 100
-
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -60,7 +57,6 @@ type Middleware struct {
 	ov                middleware.Overlay
 	wg                *sync.WaitGroup
 	libP2PNode        *P2PNode
-	stop              chan struct{}
 	me                flow.Identifier
 	host              string
 	port              string
@@ -70,6 +66,7 @@ type Middleware struct {
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
 	rootBlockID       string
 	validators        []validators.MessageValidator
+	discovery         *Discovery
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -106,7 +103,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		codec:             codec,
 		libP2PNode:        p2p,
 		wg:                &sync.WaitGroup{},
-		stop:              make(chan struct{}),
 		me:                flowID,
 		host:              ip,
 		port:              port,
@@ -160,12 +156,12 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// create a discovery object to help libp2p discover peers
-	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
+	m.discovery = NewDiscovery(m.ctx, m.log, m.ov, m.me)
 
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
 		// set the discovery object
-		pubsub.WithDiscovery(d),
+		pubsub.WithDiscovery(m.discovery),
 		// skip message signing
 		pubsub.WithMessageSigning(false),
 		// skip message signature
@@ -205,8 +201,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
-	close(m.stop)
-
 	// stop libp2p
 	done, err := m.libP2PNode.Stop()
 	if err != nil {
@@ -500,10 +494,19 @@ func (m *Middleware) UpdateAllowList() error {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
 	}
 
+	// update libp2pNode's approve lists
 	err = m.libP2PNode.UpdateAllowlist(nodeAddrsAllowList...)
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
 	}
-
 	return nil
+}
+
+// IsConnected returns true if this node is connected to the node with id nodeID
+func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
+	nodeAddress, err := nodeAddressFromIdentity(identity)
+	if err != nil {
+		return false, err
+	}
+	return m.libP2PNode.IsConnected(nodeAddress)
 }
