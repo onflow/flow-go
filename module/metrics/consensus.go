@@ -1,6 +1,10 @@
 package metrics
 
 import (
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -18,14 +22,28 @@ const (
 	consensusBlockToSeal = "consensus_block_to_seal"
 )
 
+// ConsensusCollector ...
 type ConsensusCollector struct {
 	tracer *trace.OpenTracer
+
+	// The duration of the full sealing check
+	checkSealingDuration prometheus.Histogram
 }
 
-func NewConsensusCollector(tracer *trace.OpenTracer) *ConsensusCollector {
+// NewConsensusCollector created a new consensus collector
+func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ConsensusCollector {
+	checkSealingDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemMatchEngine,
+		Name:      "check_sealing_duration",
+		Help:      "duration of consensus match engine sealing check in seconds",
+	})
+
+	registerer.MustRegister(checkSealingDuration)
 
 	cc := &ConsensusCollector{
-		tracer: tracer,
+		tracer:               tracer,
+		checkSealingDuration: checkSealingDuration,
 	}
 
 	return cc
@@ -49,4 +67,9 @@ func (cc *ConsensusCollector) StartBlockToSeal(blockID flow.Identifier) {
 // FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 func (cc *ConsensusCollector) FinishBlockToSeal(blockID flow.Identifier) {
 	cc.tracer.FinishSpan(blockID, consensusBlockToSeal)
+}
+
+// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
+func (cc *ConsensusCollector) CheckSealingDuration(duration time.Duration) {
+	cc.checkSealingDuration.Observe(duration.Seconds())
 }
