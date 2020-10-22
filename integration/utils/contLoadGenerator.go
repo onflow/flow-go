@@ -43,7 +43,6 @@ type ContLoadGenerator struct {
 	fungibleTokenAddress *flowsdk.Address
 	accounts             []*flowAccount
 	availableAccounts    chan *flowAccount // queue with accounts that are available for workers
-	scriptCreator        *ScriptCreator
 	txTracker            *TxTracker
 	txStatsTracker       *TxStatsTracker
 	workerStatsTracker   *WorkerStatsTracker
@@ -82,11 +81,6 @@ func NewContLoadGenerator(
 		return nil, err
 	}
 
-	scriptCreator, err := NewScriptCreator()
-	if err != nil {
-		return nil, err
-	}
-
 	lGen := &ContLoadGenerator{
 		log:                  log,
 		loaderMetrics:        loaderMetrics,
@@ -104,7 +98,6 @@ func NewContLoadGenerator(
 		txTracker:            txTracker,
 		txStatsTracker:       txStatsTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
-		scriptCreator:        scriptCreator,
 		blockRef:             NewBlockRef(supervisorClient),
 		loadType:             loadType,
 	}
@@ -181,7 +174,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
-		SetScript(lg.scriptCreator.CreateAccountsTransaction(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
+		SetScript(CreateAccountsScript(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
 		SetReferenceBlockID(blockRef).
 		SetProposalKey(
 			*lg.serviceAccount.address,
@@ -321,14 +314,28 @@ func (lg *ContLoadGenerator) buildAndSendAddKeyTx(workerID int) {
 	defer func() { lg.availableAccounts <- acc }()
 
 	lg.log.Trace().Msgf("creating add proposer key script")
-	keys := make([]*flowsdk.AccountKey, 0)
+	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
 	for i := 0; i < numberOfKeysToAdd; i++ {
-		keys = append(keys, lg.serviceAccount.accountKey)
+		cadenceKeys[i] = bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
+	}
+	cadenceKeysArray := cadence.NewArray(cadenceKeys)
+
+	addKeysScript, err := AddKeyToAccountScript()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error getting add key to account script")
+		return
 	}
 
-	addKeysTx, err := lg.scriptCreator.AddKeysToAccountTransaction(*(acc.address), keys)
+	addKeysTx := flowsdk.NewTransaction().
+		SetScript(addKeysScript).
+		AddAuthorizer(*acc.address).
+		SetReferenceBlockID(blockRef).
+		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
+		SetPayer(*lg.serviceAccount.address)
+
+	err = addKeysTx.AddArgument(cadenceKeysArray)
 	if err != nil {
-		lg.log.Error().Err(err).Msgf("error creating token transferscript")
+		lg.log.Error().Err(err).Msgf("error constructing add keys to account transaction")
 		return
 	}
 
@@ -369,7 +376,7 @@ func (lg *ContLoadGenerator) buildAndSendTokenTransferTx(workerID int) {
 	nextAcc := lg.accounts[(acc.i+1)%len(lg.accounts)]
 
 	lg.log.Trace().Msgf("creating transfer script")
-	transferScript, err := lg.scriptCreator.TokenTransferScript(
+	transferScript, err := TokenTransferScript(
 		lg.fungibleTokenAddress,
 		acc.address,
 		nextAcc.address,
@@ -403,7 +410,7 @@ func (lg *ContLoadGenerator) buildAndSendCompHeavyTx(workerID int) {
 	acc := <-lg.availableAccounts
 	defer func() { lg.availableAccounts <- acc }()
 
-	txScript := lg.scriptCreator.CreateCompHeavyTransaction(30)
+	txScript := ComputationHeavyScript(30)
 
 	lg.log.Trace().Msgf("creating transaction")
 	tx := flowsdk.NewTransaction().

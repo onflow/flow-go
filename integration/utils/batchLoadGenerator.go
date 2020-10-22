@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/rs/zerolog"
@@ -46,7 +47,6 @@ type BatchLoadGenerator struct {
 	fungibleTokenAddress *flowsdk.Address
 	accounts             []*flowAccount
 	step                 int
-	scriptCreator        *ScriptCreator
 	txTracker            *TxTracker
 	statsTracker         *TxStatsTracker
 }
@@ -74,11 +74,6 @@ func NewBatchLoadGenerator(fclient *client.Client,
 		return nil, err
 	}
 
-	scriptCreator, err := NewScriptCreator()
-	if err != nil {
-		return nil, err
-	}
-
 	lGen := &BatchLoadGenerator{
 		numberOfAccounts:     numberOfAccounts,
 		flowClient:           fclient,
@@ -89,7 +84,6 @@ func NewBatchLoadGenerator(fclient *client.Client,
 		step:                 0,
 		txTracker:            txTracker,
 		statsTracker:         stTracker,
-		scriptCreator:        scriptCreator,
 	}
 	return lGen, nil
 }
@@ -144,20 +138,28 @@ func (lg *BatchLoadGenerator) setupServiceAccountKeys() error {
 		return err
 	}
 
-	keys := make([]*flowsdk.AccountKey, 0)
+	cadenceKeys := make([]cadence.Value, lg.numberOfAccounts)
 	for i := 0; i < lg.numberOfAccounts; i++ {
-		keys = append(keys, lg.serviceAccount.accountKey)
+		cadenceKeys[i] = bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
 	}
+	cadenceKeysArray := cadence.NewArray(cadenceKeys)
 
-	addKeysTx, err := lg.scriptCreator.AddKeysToAccountTransaction(*lg.serviceAccount.address, keys)
+	addKeysScript, err := AddKeyToAccountScript()
 	if err != nil {
 		return err
 	}
 
-	addKeysTx.
+	addKeysTx := flowsdk.NewTransaction().
+		SetScript(addKeysScript).
+		AddAuthorizer(*lg.serviceAccount.address).
 		SetReferenceBlockID(blockRef).
 		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
 		SetPayer(*lg.serviceAccount.address)
+
+	err = addKeysTx.AddArgument(cadenceKeysArray)
+	if err != nil {
+		return err
+	}
 
 	lg.serviceAccount.signerLock.Lock()
 	defer lg.serviceAccount.signerLock.Unlock()
@@ -286,7 +288,7 @@ func (lg *BatchLoadGenerator) distributeInitialTokens() error {
 	for i := 0; i < len(lg.accounts); i++ {
 
 		// Transfer 10000 tokens
-		transferScript, err := lg.scriptCreator.TokenTransferScript(
+		transferScript, err := TokenTransferScript(
 			lg.fungibleTokenAddress,
 			lg.flowTokenAddress,
 			lg.accounts[i].address,
@@ -339,7 +341,7 @@ func (lg *BatchLoadGenerator) rotateTokens() error {
 
 	for i := 0; i < len(lg.accounts); i++ {
 		j := (i + 1) % len(lg.accounts)
-		transferScript, err := lg.scriptCreator.TokenTransferScript(
+		transferScript, err := TokenTransferScript(
 			lg.fungibleTokenAddress,
 			lg.accounts[i].address,
 			lg.accounts[j].address,
