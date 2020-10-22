@@ -12,7 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,6 +26,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
+
+var ErrBlockNotFound = errors.New("block not found")
 
 // Engine is the Matching engine, which builds seals by matching receipts (aka
 // ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
@@ -271,10 +272,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// mempool will be populated by the finalizer when blocks are validated, and
 	// the IncorporatedBlockID will be the ID of the first block on its fork
 	// that contains a receipt committing to this result.
-	added, err := e.incorporatedResults.Add(&flow.IncorporatedResult{
-		IncorporatedBlockID: result.BlockID,
-		Result:              result,
-	})
+	added, err := e.incorporatedResults.Add(flow.NewIncorporatedResult(result.BlockID, result))
 	if err != nil {
 		e.log.Err(err).Msg("error inserting incorporated result in mempool")
 	}
@@ -308,35 +306,18 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
 	}
 
-	// if the approval is for an unknown block, cache it. It will be picked up
-	// later when the finalizer processes new blocks.
-	_, err := e.state.AtBlockID(approval.Body.BlockID).Head()
+	// Check if the approver was a staked verifier at that block. Don't error
+	// out if the block is not known yet, because this method will be called
+	// again for some house cleaning when we try to match approvals to chunks.
+	err := e.checkApproverIsStakedVerifier(approval.Body.ApproverID, approval.Body.BlockID)
 	if err != nil {
-		_, _ = e.approvals.Add(approval)
-		return nil
-	}
-
-	// get the identity of the origin node, so we can check if it's a valid
-	// source for an approval (usually verification nodes)
-	identity, err := e.state.AtBlockID(approval.Body.BlockID).Identity(originID)
-	if err != nil {
-		if protocol.IsIdentityNotFound(err) {
-			return engine.NewInvalidInputErrorf("could not get approver identity: %w", err)
+		// don't error out if the block was not found yet
+		if !errors.Is(err, ErrBlockNotFound) {
+			return err
 		}
-
-		// unknown exception
-		return fmt.Errorf("could not get approver identity: %w", err)
 	}
 
-	// check that the origin is a verification node
-	if identity.Role != flow.RoleVerification {
-		return engine.NewInvalidInputErrorf("invalid approver node role (%s)", identity.Role)
-	}
-
-	// check if the identity has a stake
-	if identity.Stake == 0 {
-		return engine.NewInvalidInputErrorf("verifier has zero stake (%x)", identity.NodeID)
-	}
+	// TODO: check the approval's cryptographic integrity
 
 	// check if the result of this approval is already sealed
 	_, err = e.resultsDB.ByID(approval.Body.ExecutionResultID)
@@ -496,6 +477,7 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 
 	// go through the results mempool and check which ones we have collected
 	// enough approvals for
+RES_LOOP:
 	for _, incorporatedResult := range e.incorporatedResults.All() {
 
 		// if we have not received the block yet, we will just keep rechecking
@@ -543,14 +525,15 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 
 		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if err != nil {
-			return nil, err
-		}
-
-		if index != nil {
+			// the block could have no payload
+			if !errors.Is(err, storage.ErrNotFound) {
+				return nil, err
+			}
+		} else {
 			requiredChunks = len(index.CollectionIDs) + 1
 		}
 
-		if len(incorporatedResult.Result.Chunks) != requiredChunks {
+		if incorporatedResult.Result.Chunks.Len() != requiredChunks {
 			_ = e.incorporatedResults.Rem(incorporatedResult)
 			log.Warn().
 				Int("result_chunks", len(incorporatedResult.Result.Chunks)).
@@ -569,12 +552,31 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not assign verifiers: %w", err)
+			log.Warn().Msgf("could not compute chunk assignment: %v", err)
+			continue
 		}
 
 		// check that each chunk collects enough approvals
-		for _, chunk := range incorporatedResult.Result.Chunks {
-			matched := e.matchChunk(incorporatedResult.Result.ID(), chunk, assignment)
+		for i := 0; i < assignment.Len(); i++ {
+			// arriving at a failure condition here means that the execution
+			// result is invalid; we should skip it and move on to the next
+			// execution result.
+
+			// get chunk at position i
+			chunk, ok := incorporatedResult.Result.Chunks.ByIndex(uint64(i))
+			if !ok {
+				log.Warn().Msgf("chunk out of range requested: %d", i)
+				continue RES_LOOP
+			}
+
+			// Check if chunk index matches its position. This ensures that the
+			// result contains all chunks and no duplicates.
+			if chunk.Index != uint64(i) {
+				log.Warn().Msgf("chunk out of place: pos = %d, index = %d", i, chunk.Index)
+				continue RES_LOOP
+			}
+
+			matched := e.matchChunk(incorporatedResult, chunk, assignment)
 			if !matched {
 				allChunksMatched = false
 				break
@@ -592,25 +594,50 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 }
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
-// exceeds the required threshold.
-func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
+// exceeds the required threshold. It also populates the IncorporatedResult's
+// collection of approval signatures to avoid repeated work.
+func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
 
 	// get all the chunk approvals from mempool
-	approvals := e.approvals.ByChunk(resultID, chunk.Index)
+	approvals := e.approvals.ByChunk(incorporatedResult.Result.ID(), chunk.Index)
 
-	// only keep approvals from assigned verifiers
-	var validApprovers flow.IdentifierList
-	for approverID := range approvals {
-		ok := chmodule.IsValidVerifer(assignment, chunk, approverID)
+	validApprovals := 0
+	for approverID, approval := range approvals {
+		// skip if the incorporated result already has a signature for that
+		// chunk and verifier
+		_, ok := incorporatedResult.GetSignature(chunk.Index, approverID)
 		if ok {
-			validApprovers = append(validApprovers, approverID)
+			validApprovals++
+			continue
 		}
+
+		// check if the approver is assigned to this chunk.
+		ok = chmodule.IsValidVerifer(assignment, chunk, approverID)
+		if !ok {
+			// if the approval comes from a node that wasn't even a staked
+			// verifier at that block, remove the approval from the mempool.
+			err := e.checkApproverIsStakedVerifier(approverID, incorporatedResult.Result.BlockID)
+			if err != nil {
+				// don't remove the approval if the error indicates that the
+				// block is not known yet.
+				if !errors.Is(err, ErrBlockNotFound) {
+					_, _ = e.approvals.RemApproval(approval)
+				}
+			}
+			continue
+		}
+
+		// Add signature to incorporated result so that we don't have to check
+		// it again.
+		incorporatedResult.AddSignature(chunk.Index, approverID, approval.Body.AttestationSignature)
+
+		validApprovals++
 	}
 
-	// skip counting approvals
-	// TODO:
-	//   * this is only here temporarily to ease the migration to new chunk
-	//     based sealing.
+	// skip counting approvals. We don't put this earlier in the function
+	// because we still want to test that the above code doesn't panic.
+	// TODO: this is only here temporarily to ease the migration to new chunk
+	// based sealing.
 	if !e.requireApprovals {
 		return true
 	}
@@ -618,7 +645,46 @@ func (e *Engine) matchChunk(resultID flow.Identifier, chunk *flow.Chunk, assignm
 	// TODO:
 	//   * This is the happy path (requires just one approval per chunk).
 	//   * Full protocol should be +2/3 of all currently staked verifiers.
-	return len(validApprovers) > 0
+	return validApprovals > 0
+}
+
+// checkApproverIsStakedVerifier checks if the approver was a valid staked
+// verifier at a given block, and returns an error if it wasn't, or if the block
+// is not known yet. If the block is not known yet, it returns a
+// ErrBlockNotFound sentinel error.
+func (e *Engine) checkApproverIsStakedVerifier(approverID flow.Identifier, blockID flow.Identifier) error {
+
+	// if we dont know the block yet, return a ErrBlockNotFound error
+	_, err := e.state.AtBlockID(blockID).Head()
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return ErrBlockNotFound
+		}
+		return err
+	}
+
+	// get the identity of the origin node
+	identity, err := e.state.AtBlockID(blockID).Identity(approverID)
+	if err != nil {
+		if protocol.IsIdentityNotFound(err) {
+			return engine.NewInvalidInputErrorf("could not get approver identity: %w", err)
+		}
+
+		// unknown exception
+		return fmt.Errorf("could not get approver identity: %w", err)
+	}
+
+	// check that the origin is a verification node
+	if identity.Role != flow.RoleVerification {
+		return engine.NewInvalidInputErrorf("invalid approver node role (%s)", identity.Role)
+	}
+
+	// check if the identity has a stake
+	if identity.Stake == 0 {
+		return engine.NewInvalidInputErrorf("verifier has zero stake (%x)", identity.NodeID)
+	}
+
+	return nil
 }
 
 // sealResult creates a seal for the incorporated result and adds it to the
@@ -636,13 +702,15 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	}
 
 	// collect aggregate signatures
-	aggregatedSigs := e.collectAggregateSignatures(incorporatedResult.Result)
+	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
 	// get final state of execution result
 	finalState, ok := incorporatedResult.Result.FinalStateCommitment()
 	if !ok {
 		return fmt.Errorf("could not get final state: no chunks found")
 	}
+
+	// TODO: Check SPoCK proofs
 
 	// generate & store seal
 	seal := &flow.Seal{
@@ -661,45 +729,10 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	return nil
 }
 
-// collectAggregateSignatures collects approver signatures and identities per
-// chunk
-// TODO: needs testing
-func (e *Engine) collectAggregateSignatures(result *flow.ExecutionResult) []flow.AggregatedSignature {
-	resultID := result.ID()
-	signatures := make([]flow.AggregatedSignature, 0, len(result.Chunks))
-
-	for _, chunk := range result.Chunks {
-		// get approvals for result with chunk index
-		approvals := e.approvals.ByChunk(resultID, chunk.Index)
-		if approvals == nil {
-			continue
-		}
-
-		// temp slices to store signatures and ids
-		sigs := make([]crypto.Signature, 0, len(approvals))
-		ids := make([]flow.Identifier, 0, len(approvals))
-
-		// for each approval collect signature and approver id
-		for _, approval := range approvals {
-			ids = append(ids, approval.Body.ApproverID)
-			sigs = append(sigs, approval.Body.AttestationSignature)
-		}
-
-		aggSign := flow.AggregatedSignature{
-			VerifierSignatures: sigs,
-			SignerIDs:          ids,
-		}
-
-		signatures = append(signatures, aggSign)
-	}
-
-	return signatures
-}
-
 // clearPools clears the memory pools of all entities related to blocks that are
 // already sealed. If we don't know the block, we purge the entities once we
-// have sealed a further 100 blocks without seeing the block (it's probably no
-// longer a valid extension of the state anyway).
+// have called checkSealing 1000 times without seeing the block (it's probably
+// no longer a valid extension of the state anyway).
 func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 
 	clear := make(map[flow.Identifier]bool)
@@ -717,7 +750,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	// if it references the block with the given ID
 	missingIDs := make(map[flow.Identifier]bool) // count each missing block only once
 	shouldClear := func(blockID flow.Identifier) bool {
-		if e.missing[blockID] >= 100 {
+		if e.missing[blockID] >= 1000 {
 			return true // clear if block is missing for 100 seals already
 		}
 		header, err := e.headersDB.ByBlockID(blockID)
@@ -745,7 +778,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	for _, approval := range e.approvals.All() {
 		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
 			// delete all the approvals for the corresponding chunk
-			e.approvals.Rem(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
+			_, _ = e.approvals.RemChunk(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 		}
 	}
 	for _, seal := range e.seals.All() {
@@ -759,7 +792,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	// increase the count for the remaining missing blocks
 	for missingID, count := range e.missing {
 		_, err := e.headersDB.ByBlockID(missingID)
-		if count >= 100 || err == nil {
+		if count >= 1000 || err == nil {
 			delete(e.missing, missingID)
 		}
 	}
