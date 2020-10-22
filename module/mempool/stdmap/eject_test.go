@@ -240,11 +240,9 @@ func TestSizeEjector(t *testing.T) {
 
 	ejector := NewSizeEjector(&size)
 
-	ids := make([]flow.Identifier, 100)
 	entities := make(map[flow.Identifier]flow.Entity, 100)
 	for i := 0; i < 100; i++ {
 		id := unittest.IdentifierFixture()
-		ids = append(ids, id)
 		entities[id] = MockEntity{}
 		size++
 	}
