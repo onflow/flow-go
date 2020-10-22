@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/network/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -78,12 +80,10 @@ func (suite *ConnectednessTestSuite) TestNodesConnected() {
 }
 
 func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.Role, nodeRole flow.Role) {
-
 	distribution := createDistribution(total, minorityRole)
-
 	ids := make(flow.IdentityList, 0)
 	for role, count := range distribution {
-		roleIDs := unittest.IdentityListFixture(count, unittest.WithRole(role))
+		roleIDs, _ := test.GenerateIDs(suite.T(), count, unittest.WithRole(role))
 		ids = append(ids, roleIDs...)
 	}
 
@@ -96,18 +96,21 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	state := topology.CreateMockStateForCollectionNodes(suite.T(), ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
-	tops := test.CreateTopologies(suite.T(), state, ids)
+	tops := test.GenerateTopologies(suite.T(), state, ids)
 
-	// creates middleware and network instances
+	// creates topology instances for the nodes based on their roles
+	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := test.CreateMiddleware(suite.T(), logger, ids)
-	nets := test.CreateNetworks(suite.T(), logger, ids, mws, tops, 1, true)
+	ids, _, nets := test.GenerateIDsMiddlewaresNetworks(suite.T(), total, logger, 100, tops, false)
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range nets {
+		// registers all topics of this node on subscription manager
+		// so that it later can be extracted from it by the network
 		topics := engine.GetTopicsByRole(ids[i].Role)
 		for _, topic := range topics {
-			net.Register(topic)
+			_, err := net.Register(topic, &mocks.MockEngine{})
+			require.NoError(suite.T(), err)
 		}
 
 		subset, err := net.Topology()
