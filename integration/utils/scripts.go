@@ -229,7 +229,6 @@ transaction {
     MyFavContract.EventHeavy()
   }
 }
-}
 `
 
 func ComputationHeavyScript(favContractAddress flowsdk.Address) []byte {
