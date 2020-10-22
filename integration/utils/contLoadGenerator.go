@@ -457,7 +457,7 @@ func (lg *ContLoadGenerator) buildAndSendCompHeavyTx(workerID int) {
 	acc := <-lg.availableAccounts
 	defer func() { lg.availableAccounts <- acc }()
 
-	txScript := ComputationHeavyScript(30)
+	txScript := ComputationHeavyScript(*lg.favContractAddress)
 
 	lg.log.Trace().Msgf("creating transaction")
 	tx := flowsdk.NewTransaction().

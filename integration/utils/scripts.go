@@ -83,26 +83,26 @@ func CreateAccountsScript(fungibleToken, flowToken flowsdk.Address) []byte {
 	return []byte(fmt.Sprintf(createAccountsScriptTemplate, fungibleToken, flowToken))
 }
 
-const compHeavyScriptTemplate = `
-transaction() {
-	prepare(signer1: AuthAccount){
-	}
-	execute {
-	  var s: Int256 = 1024102410241024
-	  var m: Int256 = 7
-	  var i = 0
-	  while i < %d {
-		  s = s * m
-		i = i + 1
-	  }
-	  log(s)
-  }
-}
-`
+// const compHeavyScriptTemplate = `
+// transaction() {
+// 	prepare(signer1: AuthAccount){
+// 	}
+// 	execute {
+// 	  var s: Int256 = 1024102410241024
+// 	  var m: Int256 = 7
+// 	  var i = 0
+// 	  while i < %d {
+// 		  s = s * m
+// 		i = i + 1
+// 	  }
+// 	  log(s)
+//   }
+// }
+// `
 
-func ComputationHeavyScript(steps int) []byte {
-	return []byte(fmt.Sprintf(compHeavyScriptTemplate, steps))
-}
+// func ComputationHeavyScript(steps int) []byte {
+// 	return []byte(fmt.Sprintf(compHeavyScriptTemplate, steps))
+// }
 
 const myFavContract = `
 access(all) contract MyFavContract {
@@ -203,4 +203,35 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 	}
 
 	return cadence.NewArray(values)
+}
+
+const eventHeavyScriptTemplate = `
+import MyFavContract from 0x%s
+
+transaction {
+  prepare(acct: AuthAccount) {}
+  execute {
+    MyFavContract.EventHeavy()
+  }
+}
+`
+
+func EventHeavyScript(favContractAddress flowsdk.Address) []byte {
+	return []byte(fmt.Sprintf(eventHeavyScriptTemplate, favContractAddress))
+}
+
+const compHeavyScriptTemplate = `
+import MyFavContract from 0x%s
+
+transaction {
+  prepare(acct: AuthAccount) {}
+  execute {
+    MyFavContract.EventHeavy()
+  }
+}
+}
+`
+
+func ComputationHeavyScript(favContractAddress flowsdk.Address) []byte {
+	return []byte(fmt.Sprintf(compHeavyScriptTemplate, favContractAddress))
 }
