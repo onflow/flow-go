@@ -189,7 +189,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
-	m.peerManager = NewPeerManager(m.ctx, m.log, m.topology, libp2pConnector)
+	m.peerManager = NewPeerManager(m.ctx, m.log, m.ov.Topology, libp2pConnector)
 	err = m.peerManager.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start peer manager: %w", err)
@@ -220,24 +220,6 @@ func (m *Middleware) Stop() {
 
 	// wait for the readConnection and readSubscription routines to stop
 	m.wg.Wait()
-}
-
-// TEMP fix till PR that changes overlay.Topology to return a flow.IdentityList instead of a map is merged to master
-func (m *Middleware) topology() (flow.IdentityList, error) {
-	topMap, err := m.ov.Topology()
-	if err != nil {
-		return nil, err
-	}
-	delete(topMap, m.Me())
-	ids := make(flow.IdentityList, len(topMap))
-	index := 0
-
-	for _, id := range topMap {
-		tmpID := id
-		ids[index] = &tmpID
-		index++
-	}
-	return ids, nil
 }
 
 // Send sends the message to the set of target ids
@@ -511,6 +493,10 @@ func (m *Middleware) UpdateAllowList() error {
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
 	}
+
+	// update peer connections
+	m.peerManager.RequestPeerUpdate()
+
 	return nil
 }
 

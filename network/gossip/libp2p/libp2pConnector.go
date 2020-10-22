@@ -25,7 +25,7 @@ var _ Connector = &libp2pConnector{}
 func NewLibp2pConnector(host host.Host) (*libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
 	}
 	return &libp2pConnector{
 		backoffConnector: connector,

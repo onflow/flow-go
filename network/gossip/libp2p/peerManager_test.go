@@ -3,6 +3,7 @@ package libp2p
 import (
 	"context"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -163,6 +164,55 @@ func (ts *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	pm.RequestPeerUpdate()
 
 	// assert that a call to connect to peers is made
+	assert.Eventually(ts.T(), func() bool {
+		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
+	}, 2*time.Millisecond, 1*time.Millisecond)
+}
+
+// TestConcurrentOnDemandPeerUpdate tests that concurrent on-demand peer update request never block
+func (ts *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
+	currentIDs := unittest.IdentityListFixture(10)
+	idProvider := func() (flow.IdentityList, error) {
+		return currentIDs, nil
+	}
+
+	ctx, cancel := context.WithCancel(ts.ctx)
+	defer cancel()
+
+	connector := new(mock.Connector)
+	// connectPeerGate channel gates the return of the connector
+	connectPeerGate := make(chan time.Time)
+	defer close(connectPeerGate)
+	connector.On("ConnectPeers", ctx, testifymock.Anything).Return(nil).WaitUntil(connectPeerGate)
+	connector.On("DisconnectPeers", ctx, testifymock.Anything).Return(nil)
+
+	pm := NewPeerManager(ctx, ts.log, idProvider, connector)
+
+	// set the periodic interval to a high value so that periodic runs don't interfere with this test
+	PeerUpdateInterval = time.Hour
+
+	// start the peer manager
+	// this should trigger the first update and which will block on the ConnectPeers to return
+	err := pm.Start()
+	assert.NoError(ts.T(), err)
+
+	// make 10 concurrent request for peer update
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			pm.RequestPeerUpdate()
+			wg.Done()
+		}()
+	}
+
+	// assert that none of the request is blocked even if update is blocked
+	unittest.AssertReturnsBefore(ts.T(), wg.Wait, time.Second)
+
+	// allow the first update to finish
+	connectPeerGate <- time.Now()
+
+	// assert that only two calls to ConnectPeers were made (one for periodic update and one for the on-demand request)
 	assert.Eventually(ts.T(), func() bool {
 		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
 	}, 2*time.Millisecond, 1*time.Millisecond)

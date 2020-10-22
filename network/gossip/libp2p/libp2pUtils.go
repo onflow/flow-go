@@ -101,12 +101,12 @@ func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
 
 	nodeAddress, err := nodeAddressFromIdentity(id)
 	if err != nil {
-		return peer.AddrInfo{}, err
+		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
 	}
 
 	addr, err := GetPeerInfo(nodeAddress)
 	if err != nil {
-		return peer.AddrInfo{}, err
+		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
 	}
 
 	return addr, nil
