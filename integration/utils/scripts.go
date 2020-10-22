@@ -135,7 +135,7 @@ access(all) contract MyFavContract {
     	var s: Int256 = 1024102410241024
         var m: Int256 = 7
         var i = 0
-        while i < 30 {
+        while i < 60 {
             s = s * m
             i = i + 1
         }
