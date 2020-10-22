@@ -357,12 +357,6 @@ func CollectionFixture(n int) flow.Collection {
 	return flow.Collection{Transactions: transactions}
 }
 
-func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
-	res := ExecutionReceiptFixture()
-	res.ExecutionResult = *ResultForBlockFixture(block)
-	return res
-}
-
 func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &entity.CompleteCollection{
@@ -404,6 +398,55 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	return executableBlock
 }
 
+func WithExecutorID(executorID flow.Identifier) func(*flow.ExecutionReceipt) {
+	return func(er *flow.ExecutionReceipt) {
+		er.ExecutorID = executorID
+	}
+}
+
+func WithBlock(block *flow.Block) func(*flow.ExecutionReceipt) {
+	return func(er *flow.ExecutionReceipt) {
+		er.ExecutionResult = *ResultForBlockFixture(block)
+	}
+}
+
+func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.ExecutionReceipt {
+	receipt := &flow.ExecutionReceipt{
+		ExecutorID:        IdentifierFixture(),
+		ExecutionResult:   *ExecutionResultFixture(),
+		Spocks:            nil,
+		ExecutorSignature: SignatureFixture(),
+	}
+
+	for _, apply := range opts {
+		apply(receipt)
+	}
+
+	return receipt
+}
+
+func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
+	return ExecutionReceiptFixture(
+		WithBlock(block),
+	)
+}
+
+func ExecutionResultFixture() *flow.ExecutionResult {
+	blockID := IdentifierFixture()
+
+	return &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: IdentifierFixture(),
+			BlockID:          blockID,
+			Chunks: flow.ChunkList{
+				ChunkFixture(blockID),
+				ChunkFixture(blockID),
+			},
+		},
+		Signatures: SignaturesFixture(6),
+	}
+}
+
 func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
 	chunks := 0
 	if block.Payload != nil {
@@ -421,40 +464,47 @@ func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
 	}
 }
 
-func ExecutionReceiptFixture() *flow.ExecutionReceipt {
-	return &flow.ExecutionReceipt{
-		ExecutorID:        IdentifierFixture(),
-		ExecutionResult:   *ExecutionResultFixture(),
-		Spocks:            nil,
-		ExecutorSignature: SignatureFixture(),
+func WithIRBlock(block *flow.Block) func(*flow.IncorporatedResult) {
+	return func(ir *flow.IncorporatedResult) {
+		ir.Result = ResultForBlockFixture(block)
 	}
 }
 
-func ExecutionResultFixture() *flow.ExecutionResult {
-	blockID := IdentifierFixture()
-	return &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: IdentifierFixture(),
-			BlockID:          IdentifierFixture(),
-			Chunks: flow.ChunkList{
-				ChunkFixture(blockID),
-				ChunkFixture(blockID),
-			},
-		},
-		Signatures: SignaturesFixture(6),
+func WithIRPrevious(previousResID flow.Identifier) func(*flow.IncorporatedResult) {
+	return func(ir *flow.IncorporatedResult) {
+		ir.Result.PreviousResultID = previousResID
 	}
 }
 
-func IncorporatedResultFixture() *flow.IncorporatedResult {
+func IncorporatedResultFixture(opts ...func(*flow.IncorporatedResult)) *flow.IncorporatedResult {
 	result := ExecutionResultFixture()
 	incorporatedBlockID := IdentifierFixture()
-	return flow.NewIncorporatedResult(incorporatedBlockID, result)
+
+	res := flow.NewIncorporatedResult(incorporatedBlockID, result)
+
+	for _, apply := range opts {
+		apply(res)
+	}
+
+	return res
 }
 
 func IncorporatedResultForBlockFixture(block *flow.Block) *flow.IncorporatedResult {
 	result := ResultForBlockFixture(block)
 	incorporatedBlockID := IdentifierFixture()
 	return flow.NewIncorporatedResult(incorporatedBlockID, result)
+}
+
+func WithApproverID(approverID flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.Body.ApproverID = approverID
+	}
+}
+
+func WithAttestationBlock(block *flow.Block) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.Body.Attestation.BlockID = block.ID()
+	}
 }
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {

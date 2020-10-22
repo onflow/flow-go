@@ -106,7 +106,7 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 }
 
 // GetLastSealed returns the header of the heighest sealed block
-func (b *Blocks) GetLastSealed() (*flow.Header, error) {
+func (h *Headers) GetLastSealed() (*flow.Header, error) {
 	var sealedHeight uint64
 	err := h.db.View(operation.RetrieveSealedHeight(&sealedHeight))
 	if err != nil {

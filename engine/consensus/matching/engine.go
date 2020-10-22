@@ -679,8 +679,9 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, chunk *
 // ErrBlockNotFound sentinel error.
 func (e *Engine) checkApproverIsStakedVerifier(approverID flow.Identifier, blockID flow.Identifier) error {
 
-	// if we dont know the block yet, return a ErrBlockNotFound error
-	_, err := e.state.AtBlockID(blockID).Head()
+	// if the approval is for an unknown block, cache it. It will be picked up
+	// later when the finalizer processes new blocks.
+	_, err := e.headersDB.ByBlockID(blockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return ErrBlockNotFound
