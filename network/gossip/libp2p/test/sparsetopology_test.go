@@ -167,13 +167,7 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 // TearDownTest closes the networks within a specified timeout
 func (suite *SparseTopologyTestSuite) TearDownTest() {
 	for _, net := range suite.nets {
-		select {
-		// closes the network
-		case <-net.Done():
-			continue
-		case <-time.After(3 * time.Second):
-			suite.Suite.Fail("could not stop the network")
-		}
+		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
 	}
 	suite.ids = nil
 	suite.mws = nil
