@@ -174,6 +174,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
+				conMetrics,
 				node.Network,
 				node.State,
 				node.Me,

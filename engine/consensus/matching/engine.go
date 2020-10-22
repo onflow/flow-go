@@ -35,9 +35,10 @@ import (
 type Engine struct {
 	unit                    *engine.Unit                    // used to control startup/shutdown
 	log                     zerolog.Logger                  // used to log relevant actions with context
-	metrics                 module.EngineMetrics            // used to track sent and received messages
+	collector               module.EngineMetrics            // used to track sent and received messages
 	tracer                  module.Tracer                   // used to trace execution
 	mempool                 module.MempoolMetrics           // used to track mempool size
+	metrics                 module.ConsensusMetrics         // used to track consensus metrics
 	state                   protocol.State                  // used to access the  protocol state
 	me                      module.Local                    // used to access local node information
 	requester               module.Requester                // used to request missing execution receipts by block ID
@@ -61,6 +62,7 @@ func New(
 	collector module.EngineMetrics,
 	tracer module.Tracer,
 	mempool module.MempoolMetrics,
+	conMetrics module.ConsensusMetrics,
 	net module.Network,
 	state protocol.State,
 	me module.Local,
@@ -79,9 +81,10 @@ func New(
 	e := &Engine{
 		unit:                    engine.NewUnit(),
 		log:                     log.With().Str("engine", "matching").Logger(),
-		metrics:                 collector,
+		collector:               collector,
 		tracer:                  tracer,
 		mempool:                 mempool,
+		metrics:                 conMetrics,
 		state:                   state,
 		me:                      me,
 		requester:               requester,
@@ -180,16 +183,16 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *flow.ExecutionReceipt:
-		e.metrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		e.collector.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		e.unit.Lock()
 		defer e.unit.Unlock()
-		defer e.metrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		defer e.collector.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
-		e.metrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		e.collector.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
 		e.unit.Lock()
 		defer e.unit.Unlock()
-		defer e.metrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+		defer e.collector.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
