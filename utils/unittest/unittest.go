@@ -64,10 +64,16 @@ func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, messag
 		close(done)
 	}()
 
+	RequireCloseBefore(t, done, duration, "could not close done channel on time")
+}
+
+// RequireCloseBefore requires that the given channel returns before the
+// duration expires.
+func RequireCloseBefore(t testing.TB, c <-chan struct{}, duration time.Duration, message string) {
 	select {
 	case <-time.After(duration):
 		require.Fail(t, "function did not return in time: "+message)
-	case <-done:
+	case <-c:
 		return
 	}
 }
