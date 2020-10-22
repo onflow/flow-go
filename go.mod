@@ -24,6 +24,7 @@ require (
 	github.com/libp2p/go-addr-util v0.0.2
 	github.com/libp2p/go-libp2p v0.11.0
 	github.com/libp2p/go-libp2p-core v0.6.1
+	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-pubsub v0.3.5
 	github.com/libp2p/go-libp2p-swarm v0.2.8
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
@@ -35,6 +36,7 @@ require (
 	github.com/onflow/flow-go/crypto v0.9.4
 	github.com/onflow/flow/protobuf/go/flow v0.1.7
 	github.com/opentracing/opentracing-go v1.2.0
+	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/tsdb v0.7.1

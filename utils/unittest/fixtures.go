@@ -27,11 +27,21 @@ func AddressFixture() flow.Address {
 	return flow.Testnet.Chain().ServiceAddress()
 }
 
+func RandomAddressFixture() flow.Address {
+	// we use a 32-bit index - since the linear address generator uses 45 bits,
+	// this won't error
+	addr, err := flow.Testnet.Chain().AddressAtIndex(uint64(rand.Uint32()))
+	if err != nil {
+		panic(err)
+	}
+	return addr
+}
+
 func TransactionSignatureFixture() flow.TransactionSignature {
 	return flow.TransactionSignature{
 		Address:     AddressFixture(),
 		SignerIndex: 0,
-		Signature:   []byte{1, 2, 3, 4},
+		Signature:   SeedFixture(64),
 		KeyID:       1,
 	}
 }
@@ -431,20 +441,14 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 
 func IncorporatedResultFixture() *flow.IncorporatedResult {
 	result := ExecutionResultFixture()
-	incorporationBlockID := IdentifierFixture()
-	return &flow.IncorporatedResult{
-		IncorporatedBlockID: incorporationBlockID,
-		Result:              result,
-	}
+	incorporatedBlockID := IdentifierFixture()
+	return flow.NewIncorporatedResult(incorporatedBlockID, result)
 }
 
 func IncorporatedResultForBlockFixture(block *flow.Block) *flow.IncorporatedResult {
 	result := ResultForBlockFixture(block)
 	incorporatedBlockID := IdentifierFixture()
-	return &flow.IncorporatedResult{
-		IncorporatedBlockID: incorporatedBlockID,
-		Result:              result,
-	}
+	return flow.NewIncorporatedResult(incorporatedBlockID, result)
 }
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
