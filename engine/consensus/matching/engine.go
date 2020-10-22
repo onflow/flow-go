@@ -483,6 +483,9 @@ func (e *Engine) checkSealing() {
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not request pending block results")
 	}
+
+	// record duration of check sealing
+	e.metrics.CheckSealingDuration(time.Since(start))
 }
 
 // sealableResults returns the IncorporatedResults from the mempool that have
