@@ -46,7 +46,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	// creates middleware and network instances
 	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	suite.ids, _, suite.nets = generateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, false)
+	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, false)
 }
 
 // TearDownTest closes the networks within a specified timeout

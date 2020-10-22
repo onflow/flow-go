@@ -43,12 +43,8 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// TODO: optimize value of fanout.
 	suite.fanout = 100
 
-	// creates 20 nodes of each type, 100 nodes overall.
-	suite.ids = unittest.IdentityListFixture(20, unittest.WithRole(flow.RoleCollection))
-	suite.ids = append(suite.ids, unittest.IdentityListFixture(20, unittest.WithRole(flow.RoleConsensus))...)
-	suite.ids = append(suite.ids, unittest.IdentityListFixture(20, unittest.WithRole(flow.RoleVerification))...)
-	suite.ids = append(suite.ids, unittest.IdentityListFixture(20, unittest.WithRole(flow.RoleExecution))...)
-	suite.ids = append(suite.ids, unittest.IdentityListFixture(20, unittest.WithRole(flow.RoleAccess))...)
+	ids, keys := test.GenerateIDs(suite.T(), 100, unittest.WithAllRoles())
+	suite.ids = ids
 
 	// takes firs id as the current nodes id
 	suite.me = *suite.ids[0]
@@ -60,12 +56,12 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
-	tops := test.CreateTopologies(suite.T(), suite.state, suite.ids)
+	tops := test.GenerateTopologies(suite.T(), suite.state, suite.ids)
 
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := test.CreateMiddleware(suite.T(), logger, suite.ids)
-	suite.nets = test.CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 1, true)
+	mws := test.GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, false)
 }
 
 // TODO: fix this test after we have fanout optimized.

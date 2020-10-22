@@ -71,14 +71,15 @@ func (suite *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Cond
 	// total number of subnets (should be less than count)
 	const subsets = 3
 
-	suite.ids = CreateIDs(count)
+	ids, keys := GenerateIDs(suite.T(), count)
+	suite.ids = ids
 
 	tops := createSparseTopology(count, subsets)
 
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := CreateMiddleware(suite.T(), logger, suite.ids)
-	suite.nets = CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 100, false)
+	mws := GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
+	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, false)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
@@ -132,14 +133,15 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	// total number of subnets (should be less than count)
 	const subsets = 3
 
-	suite.ids = CreateIDs(count)
+	ids, keys := GenerateIDs(suite.T(), count)
+	suite.ids = ids
 
 	tops := createDisjointedTopology(count, subsets)
 
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := CreateMiddleware(suite.T(), logger, suite.ids)
-	suite.nets = CreateNetworks(suite.T(), logger, suite.ids, mws, tops, 100, false)
+	mws := GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
+	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, false)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
@@ -192,8 +194,8 @@ func (ibt IndexBoundTopology) Subset(idList flow.IdentityList, _ uint, _ string)
 
 // createSparseTopology creates topologies for nodes such that subsets have one overlapping node
 // e.g. top 1 - 0,1,2,3; top 2 - 3,4,5,6; top 3 - 6,7,8,9
-func createSparseTopology(count int, subsets int) []*topology.Topology {
-	tops := make([]*topology.Topology, count)
+func createSparseTopology(count int, subsets int) []topology.Topology {
+	tops := make([]topology.Topology, count)
 	subsetLen := count / subsets
 	for i := 0; i < count; i++ {
 		s := i / subsets          // which subset does this node belong to
@@ -208,15 +210,15 @@ func createSparseTopology(count int, subsets int) []*topology.Topology {
 			minIndex: minIndex,
 			maxIndex: maxIndex,
 		}
-		tops[i] = &top
+		tops[i] = top
 	}
 	return tops
 }
 
 // createDisjointedTopology creates topologies for nodes such that subsets don't have any overlap
 // e.g. top 1 - 0,1,2; top 2 - 3,4,5; top 3 - 6,7,8
-func createDisjointedTopology(count int, subsets int) []*topology.Topology {
-	tops := make([]*topology.Topology, count)
+func createDisjointedTopology(count int, subsets int) []topology.Topology {
+	tops := make([]topology.Topology, count)
 	subsetLen := count / subsets
 	for i := 0; i < count; i++ {
 		s := i / subsets          // which subset does this node belong to
@@ -233,7 +235,7 @@ func createDisjointedTopology(count int, subsets int) []*topology.Topology {
 			maxIndex: maxIndex,
 		}
 
-		tops[i] = &top
+		tops[i] = top
 	}
 	return tops
 }
