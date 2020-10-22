@@ -21,9 +21,8 @@ import (
 // where chunk_key is an identifier obtained by combining the approval's result
 // ID and chunk index.
 type Approvals struct {
-	*Backend
-
-	size uint
+	backend *Backend
+	size    *uint
 }
 
 // key computes the composite key used to index an approval in the backend. It
@@ -43,20 +42,26 @@ func key(resultID flow.Identifier, chunkIndex uint64) flow.Identifier {
 
 // NewApprovals creates a new memory pool for result approvals.
 func NewApprovals(limit uint) (*Approvals, error) {
+	var size uint
+	ejector := NewSizeEjector(&size)
 	a := &Approvals{
-		Backend: NewBackend(WithLimit(limit)),
+		size: &size,
+		backend: NewBackend(
+			WithLimit(limit),
+			WithEject(ejector.Eject),
+		),
 	}
 	return a, nil
 }
 
-// Add adds an result approval to the mempool.
+// Add adds a result approval to the mempool.
 func (a *Approvals) Add(approval *flow.ResultApproval) (bool, error) {
 
 	// determine the lookup key for the corresponding chunk
 	chunkKey := key(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 
 	appended := false
-	err := a.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 
 		var chunkApprovals map[flow.Identifier]*flow.ResultApproval
 
@@ -96,7 +101,7 @@ func (a *Approvals) Add(approval *flow.ResultApproval) (bool, error) {
 
 		backdata[chunkKey] = approvalMapEntity
 		appended = true
-		a.size++
+		*a.size++
 		return nil
 	})
 
@@ -109,7 +114,7 @@ func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 	chunkKey := key(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 
 	removed := false
-	err := a.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 
 		var chunkApprovals map[flow.Identifier]*flow.ResultApproval
 
@@ -150,7 +155,7 @@ func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 		}
 
 		removed = true
-		a.size--
+		*a.size--
 		return nil
 	})
 
@@ -158,11 +163,11 @@ func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 }
 
 // RemChunk will remove all the approvals corresponding to the chunk.
-func (a *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) bool {
+func (a *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) (bool, error) {
 	chunkKey := key(resultID, chunkIndex)
 
 	removed := false
-	_ = a.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[chunkKey]
 		if !exists {
 			return nil
@@ -173,7 +178,7 @@ func (a *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) bool {
 			return fmt.Errorf("could not assert entity to ApprovalMapEntity")
 		}
 
-		a.size = a.size - uint(len(approvalMapEntity.Approvals))
+		*a.size = *a.size - uint(len(approvalMapEntity.Approvals))
 
 		delete(backdata, chunkKey)
 
@@ -182,7 +187,7 @@ func (a *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) bool {
 		return nil
 	})
 
-	return removed
+	return removed, err
 }
 
 // Get fetches approvals for a specific chunk
@@ -190,7 +195,7 @@ func (a *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flo
 	// determine the lookup key for the corresponding chunk
 	chunkKey := key(resultID, chunkIndex)
 
-	entity, exists := a.Backend.ByID(chunkKey)
+	entity, exists := a.backend.ByID(chunkKey)
 	if !exists {
 		return nil
 	}
@@ -207,7 +212,7 @@ func (a *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flo
 func (a *Approvals) All() []*flow.ResultApproval {
 	res := make([]*flow.ResultApproval, 0)
 
-	entities := a.Backend.All()
+	entities := a.backend.All()
 	for _, entity := range entities {
 		approvalMapEntity, _ := entity.(model.ApprovalMapEntity)
 
@@ -221,5 +226,5 @@ func (a *Approvals) All() []*flow.ResultApproval {
 
 // Size returns the number of approvals in the mempool.
 func (a *Approvals) Size() uint {
-	return a.size
+	return *a.size
 }

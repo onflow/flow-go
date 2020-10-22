@@ -88,7 +88,7 @@ func (_m *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 }
 
 // RemChunk provides a mock function with given fields: resultID, chunkIndex
-func (_m *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) bool {
+func (_m *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) (bool, error) {
 	ret := _m.Called(resultID, chunkIndex)
 
 	var r0 bool
@@ -98,7 +98,14 @@ func (_m *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) bool 
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64) error); ok {
+		r1 = rf(resultID, chunkIndex)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Size provides a mock function with given fields:

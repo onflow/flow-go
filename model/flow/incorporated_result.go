@@ -18,6 +18,9 @@ type IncorporatedResult struct {
 	// aggregatedSignature is a placeholder for attestation signatures collected
 	// for each chunk. It gets populated by the consensus matching engine when
 	// approvals are matched to execution results.
+	// This field is not exported (name doesn't start with a capital letter), so
+	// it is not used in calculating the ID and Checksum of the Incorporated
+	// Result (RLP encoding ignores private fields).
 	aggregatedSignatures map[uint64]*AggregatedSignature
 }
 

@@ -471,6 +471,7 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 
 	// go through the results mempool and check which ones we have collected
 	// enough approvals for
+RES_LOOP:
 	for _, incorporatedResult := range e.incorporatedResults.All() {
 
 		// if we have not received the block yet, we will just keep rechecking
@@ -545,21 +546,28 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not compute chunk assignment: %w", err)
+			log.Warn().Msgf("could not compute chunk assignment: %v", err)
+			continue
 		}
 
 		// check that each chunk collects enough approvals
 		for i := 0; i < assignment.Len(); i++ {
+			// arriving at a failure condition here means that the execution
+			// result is invalid; we should skip it and move on to the next
+			// execution result.
+
 			// get chunk at position i
 			chunk, ok := incorporatedResult.Result.Chunks.ByIndex(uint64(i))
 			if !ok {
-				return nil, fmt.Errorf("chunk out of range requested: %d", i)
+				log.Warn().Msgf("chunk out of range requested: %d", i)
+				continue RES_LOOP
 			}
 
 			// Check if chunk index matches its position. This ensures that the
 			// result contains all chunks and no duplicates.
 			if chunk.Index != uint64(i) {
-				return nil, fmt.Errorf("chunk out of place: pos = %d, index = %d", i, chunk.Index)
+				log.Warn().Msgf("chunk out of place: pos = %d, index = %d", i, chunk.Index)
+				continue RES_LOOP
 			}
 
 			matched := e.matchChunk(incorporatedResult, chunk, assignment)
@@ -764,7 +772,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	for _, approval := range e.approvals.All() {
 		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
 			// delete all the approvals for the corresponding chunk
-			e.approvals.RemChunk(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
+			_, _ = e.approvals.RemChunk(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 		}
 	}
 	for _, seal := range e.seals.All() {

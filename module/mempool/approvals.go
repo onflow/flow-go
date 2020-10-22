@@ -17,7 +17,7 @@ type Approvals interface {
 	RemApproval(approval *flow.ResultApproval) (bool, error)
 
 	// Rem will attempt to remove all the approvals associated with a chunk.
-	RemChunk(resultID flow.Identifier, chunkIndex uint64) bool
+	RemChunk(resultID flow.Identifier, chunkIndex uint64) (bool, error)
 
 	// ByChunk returns all the approvals associated with a chunk. It returns an
 	// empty map if there is nothing.
