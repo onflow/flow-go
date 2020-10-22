@@ -87,7 +87,7 @@ func GenerateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, m
 		state := topology.CreateMockStateForCollectionNodes(t,
 			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 		// creates topology instances for the nodes based on their roles
-		tops = createTopologies(t, state, ids)
+		tops = GenerateTopologies(t, state, ids)
 	}
 
 	for i := 0; i < count; i++ {
@@ -127,8 +127,8 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T, n int, log zerolog.Logger, csi
 	return ids, mws, networks
 }
 
-// generateEngines generates MeshEngines for the given networks
-func generateEngines(t *testing.T, nets []*libp2p.Network) []*MeshEngine {
+// GenerateEngines generates MeshEngines for the given networks
+func GenerateEngines(t *testing.T, nets []*libp2p.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
@@ -155,7 +155,7 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 
 // CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
 // and returns the slice of topologies.
-func createTopologies(t *testing.T, state protocol.State, identities flow.IdentityList) []topology.Topology {
+func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList) []topology.Topology {
 	tops := make([]topology.Topology, 0)
 	for _, id := range identities {
 		var top topology.Topology
