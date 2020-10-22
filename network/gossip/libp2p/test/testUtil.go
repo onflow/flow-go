@@ -11,7 +11,6 @@ import (
 	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
@@ -165,7 +164,7 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 // CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
 // and returns the slice of topologies.
 func createTopologies(t *testing.T, state protocol.State, identities flow.IdentityList) []topology.Topology {
-	tops := make([]*topology.Topology, 0)
+	tops := make([]topology.Topology, 0)
 	for _, id := range identities {
 		var top topology.Topology
 		var err error
@@ -173,7 +172,7 @@ func createTopologies(t *testing.T, state protocol.State, identities flow.Identi
 		top, err = topology.NewTopicBasedTopology(id.NodeID, state)
 
 		require.NoError(t, err)
-		tops = append(tops, &top)
+		tops = append(tops, top)
 	}
 	return tops
 }
