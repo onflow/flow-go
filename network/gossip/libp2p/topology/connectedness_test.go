@@ -4,7 +4,6 @@ import (
 	"math"
 	"os"
 	"testing"
-	"time"
 
 	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
@@ -14,13 +13,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
-	"github.com/onflow/flow-go/network/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -38,12 +35,10 @@ func (suite *ConnectednessTestSuite) TestTopologySmallScaleCollectionMinority() 
 }
 
 func (suite *ConnectednessTestSuite) TestTopologyModerateScaleCollectionMinority() {
-	suite.T().Skip("skipping this test as it requires injectable subscription manager")
 	suite.testTopology(100, flow.RoleCollection)
 }
 
 func (suite *ConnectednessTestSuite) TestTopologyMatureScaleCollectionMinority() {
-	suite.T().Skip("skipping this test as it requires injectable subscription manager")
 	suite.testTopology(1000, flow.RoleCollection)
 }
 
@@ -73,18 +68,13 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := test.GenerateMiddlewares(suite.T(), logger, ids, keys)
-	suite.nets = test.GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, test.RunNetwork)
+
+	// mocks subscription manager and creates network in dryrun
+	sms := test.MockSubscriptionManager(suite.T(), ids)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, sms, test.DryRunNetwork)
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range suite.nets {
-		// registers all topics of this node on subscription manager
-		// so that it later can be extracted from it by the network
-		topics := engine.GetTopicsByRole(ids[i].Role)
-		for _, topic := range topics {
-			_, err := net.Register(topic, &mocks.MockEngine{})
-			require.NoError(suite.T(), err)
-		}
-
 		subset, err := net.Topology()
 
 		require.NoError(suite.T(), err)
@@ -98,12 +88,6 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	// TODO: remove it once we have connectedness by topic
 	// check that nodes form a connected graph
 	checkConnectedness(suite.T(), adjencyMap, ids)
-}
-
-func (suite *ConnectednessTestSuite) TearDownTest() {
-	for _, net := range suite.nets {
-		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
-	}
 }
 
 // createDistribution creates a count distribution of ~total number of nodes with 2% minority node count
