@@ -44,7 +44,7 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// TODO: optimize value of fanout.
 	suite.fanout = 100
 
-	ids, keys := test.GenerateIDs(suite.T(), 100, unittest.WithAllRoles())
+	ids, keys := test.GenerateIDs(suite.T(), 100, test.RunNetwork, unittest.WithAllRoles())
 	suite.ids = ids
 
 	// takes firs id as the current nodes id
@@ -62,7 +62,7 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := test.GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, false)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, test.RunNetwork)
 }
 
 func (suite *TopicAwareTopologyTestSuite) TearDownTest() {

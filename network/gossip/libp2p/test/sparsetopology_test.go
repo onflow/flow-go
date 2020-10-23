@@ -71,7 +71,7 @@ func (suite *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Cond
 	// total number of subnets (should be less than count)
 	const subsets = 3
 
-	ids, keys := GenerateIDs(suite.T(), count)
+	ids, keys := GenerateIDs(suite.T(), count, RunNetwork)
 	suite.ids = ids
 
 	tops := createSparseTopology(count, subsets)
@@ -79,7 +79,7 @@ func (suite *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Cond
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, false)
+	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, RunNetwork)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
@@ -133,7 +133,7 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	// total number of subnets (should be less than count)
 	const subsets = 3
 
-	ids, keys := GenerateIDs(suite.T(), count)
+	ids, keys := GenerateIDs(suite.T(), count, RunNetwork)
 	suite.ids = ids
 
 	tops := createDisjointedTopology(count, subsets)
@@ -141,7 +141,7 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, false)
+	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, RunNetwork)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)

@@ -53,7 +53,7 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	keys := make([]crypto.PrivateKey, 0)
 	ids := make(flow.IdentityList, 0)
 	for role, count := range distribution {
-		roleIDs, roleKeys := test.GenerateIDs(suite.T(), count, unittest.WithRole(role))
+		roleIDs, roleKeys := test.GenerateIDs(suite.T(), count, test.RunNetwork, unittest.WithRole(role))
 		ids = append(ids, roleIDs...)
 		keys = append(keys, roleKeys...)
 	}
@@ -72,7 +72,7 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := test.GenerateMiddlewares(suite.T(), logger, ids, keys)
-	suite.nets = test.GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, false)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, test.RunNetwork)
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range suite.nets {

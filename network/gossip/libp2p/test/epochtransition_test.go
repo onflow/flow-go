@@ -52,7 +52,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	// create ids
-	ids, mws := GenerateIDsAndMiddlewares(ts.T(), nodeCount, ts.logger)
+	ids, mws := GenerateIDsAndMiddlewares(ts.T(), nodeCount, RunNetwork, ts.logger)
 	ts.ids = ids
 	ts.mws = mws
 
@@ -80,7 +80,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	}
 
 	// create networks using the mocked state and default topology
-	nets := GenerateNetworks(ts.T(), ts.logger, ids, mws, 100, nil, false)
+	nets := GenerateNetworks(ts.T(), ts.logger, ids, mws, 100, nil, RunNetwork)
 	ts.nets = nets
 
 	// generate the refreshers
@@ -102,7 +102,7 @@ func (ts *EpochTransitionTestSuite) TearDownTest() {
 func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 	// create the id, middleware and network for a new node
-	ids, mws, nets := GenerateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, false)
+	ids, mws, nets := GenerateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, RunNetwork)
 	newMiddleware := mws[0]
 
 	newIDs := append(ts.ids, ids...)

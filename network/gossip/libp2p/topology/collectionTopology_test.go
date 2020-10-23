@@ -45,10 +45,12 @@ func (suite *CollectionTopologyTestSuite) SetupTest() {
 	nClusters := 3
 	nCollectors := 7
 
-	collectors, collectorKeys := test.GenerateIDs(suite.T(), nCollectors, unittest.WithRole(flow.RoleCollection))
+	collectors, collectorKeys := test.GenerateIDs(suite.T(), nCollectors, test.RunNetwork,
+		unittest.WithRole(flow.RoleCollection))
 	suite.collectors = collectors
 
-	others, otherskeys := test.GenerateIDs(suite.T(), 1000, unittest.WithAllRolesExcept(flow.RoleCollection))
+	others, otherskeys := test.GenerateIDs(suite.T(), 1000, test.RunNetwork,
+		unittest.WithAllRolesExcept(flow.RoleCollection))
 	suite.ids = append(others, collectors...)
 	keys = append(otherskeys, collectorKeys...)
 
@@ -63,7 +65,7 @@ func (suite *CollectionTopologyTestSuite) SetupTest() {
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := test.GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, false)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, test.RunNetwork)
 }
 
 // TestSubset tests that the collection nodes using CollectionTopology form a connected graph and nodes within the same
