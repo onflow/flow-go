@@ -4,6 +4,7 @@ import (
 	"math"
 	"os"
 	"testing"
+	"time"
 
 	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
@@ -12,9 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/network/mocks"
@@ -23,72 +26,39 @@ import (
 
 type ConnectednessTestSuite struct {
 	suite.Suite
+	nets []*libp2p.Network
 }
 
 func TestRandPermTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(ConnectednessTestSuite))
 }
 
-// TestNodesConnected tests overall node connectedness and connectedness by role by keeping nodes of one role type in
-// minority (~2%)
-func (suite *ConnectednessTestSuite) TestNodesConnected() {
-
-	// test vectors for different network sizes
-	testVector := []struct {
-		total        int
-		minorityRole flow.Role
-		nodeRole     flow.Role
-	}{
-		// integration tests - order of 10s
-		{
-			total:        12,
-			minorityRole: flow.RoleCollection,
-			nodeRole:     flow.RoleCollection,
-		},
-		{
-			total:        12,
-			minorityRole: flow.RoleCollection,
-			nodeRole:     flow.RoleConsensus,
-		},
-		// alpha main net order of 100s
-		{
-			total:        100,
-			minorityRole: flow.RoleCollection,
-			nodeRole:     flow.RoleCollection,
-		},
-		{
-			total:        100,
-			minorityRole: flow.RoleCollection,
-			nodeRole:     flow.RoleConsensus,
-		},
-		// mature flow order of 1000s
-		{
-			total:        1000,
-			minorityRole: flow.RoleCollection,
-			nodeRole:     flow.RoleCollection,
-		},
-		{
-			total:        1000,
-			minorityRole: flow.RoleCollection,
-			nodeRole:     flow.RoleConsensus,
-		},
-	}
-
-	for _, v := range testVector {
-		suite.testTopology(v.total, v.minorityRole, v.nodeRole)
-	}
+func (suite *ConnectednessTestSuite) TestTopologySmallScaleCollectionMinority() {
+	suite.testTopology(12, flow.RoleCollection)
 }
 
-func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.Role, nodeRole flow.Role) {
+func (suite *ConnectednessTestSuite) TestTopologyModerateScaleCollectionMinority() {
+	suite.testTopology(100, flow.RoleCollection)
+}
+
+func (suite *ConnectednessTestSuite) TestTopologyMatureScaleCollectionMinority() {
+	suite.T().Skip("skipping this test as it requires injectable subscription manager")
+	suite.testTopology(1000, flow.RoleCollection)
+}
+
+// testTopology tests overall node connectedness and connectedness by role by keeping nodes of one role type in
+// minority (~2%)
+func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.Role) {
 	distribution := createDistribution(total, minorityRole)
+	keys := make([]crypto.PrivateKey, 0)
 	ids := make(flow.IdentityList, 0)
 	for role, count := range distribution {
-		roleIDs, _ := test.GenerateIDs(suite.T(), count, unittest.WithRole(role))
+		roleIDs, roleKeys := test.GenerateIDs(suite.T(), count, unittest.WithRole(role))
 		ids = append(ids, roleIDs...)
+		keys = append(keys, roleKeys...)
 	}
 
-	n := len(ids)
-	adjencyMap := make(map[flow.Identifier]flow.IdentityList, n)
+	adjencyMap := make(map[flow.Identifier]flow.IdentityList, total)
 
 	// mocks state for collector nodes topology
 	// considers only a single cluster as higher cluster numbers are tested
@@ -101,10 +71,11 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	// creates topology instances for the nodes based on their roles
 	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	ids, _, nets := test.GenerateIDsMiddlewaresNetworks(suite.T(), total, logger, 100, tops, false)
+	mws := test.GenerateMiddlewares(suite.T(), logger, ids, keys)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, false)
 
 	// extracts adjacency matrix of the entire system
-	for i, net := range nets {
+	for i, net := range suite.nets {
 		// registers all topics of this node on subscription manager
 		// so that it later can be extracted from it by the network
 		topics := engine.GetTopicsByRole(ids[i].Role)
@@ -124,6 +95,12 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 
 	// check that nodes form a connected graph
 	checkConnectedness(suite.T(), adjencyMap, ids)
+}
+
+func (suite *ConnectednessTestSuite) TearDownTest() {
+	for _, net := range suite.nets {
+		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
+	}
 }
 
 // createDistribution creates a count distribution of ~total number of nodes with 2% minority node count
