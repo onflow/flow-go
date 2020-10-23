@@ -41,7 +41,7 @@ func (suite *CollectionTopologyTestSuite) TearDownTest() {
 
 func (suite *CollectionTopologyTestSuite) SetupTest() {
 	suite.nets = make([]*libp2p.Network, 0)
-	keys := make([]crypto.PrivateKey, 0)
+	var keys []crypto.PrivateKey
 	nClusters := 3
 	nCollectors := 7
 
