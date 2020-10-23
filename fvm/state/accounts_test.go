@@ -10,13 +10,12 @@ import (
 )
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
-	chain := flow.Mainnet.Chain()
-
 	ledger := state.NewMapLedger()
 
-	accounts := state.NewAccounts(ledger, chain)
+	accounts := state.NewAccounts(ledger)
+	addressGenerator := &flow.MonotonicAddressGenerator{}
 
-	address, err := accounts.Create(nil)
+	address, err := accounts.Create(nil, addressGenerator)
 	require.NoError(t, err)
 
 	require.NotPanics(t, func() {
@@ -27,13 +26,12 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 // Some old account could be created without key count register
 // we recreate it in a test
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
-	chain := flow.Mainnet.Chain()
-
 	ledger := state.NewMapLedger()
 
-	accounts := state.NewAccounts(ledger, chain)
+	accounts := state.NewAccounts(ledger)
+	addressGenerator := &flow.MonotonicAddressGenerator{}
 
-	address, err := accounts.Create(nil)
+	address, err := accounts.Create(nil, addressGenerator)
 	require.NoError(t, err)
 
 	ledger.Delete(

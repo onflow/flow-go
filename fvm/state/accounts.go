@@ -26,15 +26,11 @@ func keyPublicKey(index uint64) string {
 
 type Accounts struct {
 	ledger Ledger
-	*addresses
 }
 
-func NewAccounts(ledger Ledger, chain flow.Chain) *Accounts {
-	addresses := newAddresses(ledger, chain)
-
+func NewAccounts(ledger Ledger) *Accounts {
 	return &Accounts{
-		ledger:    ledger,
-		addresses: addresses,
+		ledger: ledger,
 	}
 }
 
@@ -83,15 +79,10 @@ func (a *Accounts) Exists(address flow.Address) (bool, error) {
 	return false, nil
 }
 
-func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	addressState, err := a.addresses.GetAddressGeneratorState()
-	if err != nil {
-		return flow.EmptyAddress, err
-	}
-
+func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, generator flow.AddressGenerator) (flow.Address, error) {
 	// generate the new account address
 	var newAddress flow.Address
-	newAddress, err = addressState.NextAddress()
+	newAddress, err := generator.NextAddress()
 	if err != nil {
 		return flow.EmptyAddress, err
 	}
@@ -105,9 +96,6 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, err
 	if err != nil {
 		return flow.EmptyAddress, err
 	}
-
-	// update the address state
-	a.addresses.SetAddressGeneratorState(addressState)
 
 	return newAddress, nil
 }

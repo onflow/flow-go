@@ -24,6 +24,7 @@ type BootstrapProcedure struct {
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
 	initialTokenSupply      cadence.UFix64
+	addressGenerator        flow.AddressGenerator
 }
 
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
@@ -44,8 +45,13 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 	b.ledger = ledger
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(ledger, ctx.Chain)
-	b.accounts.InitAddressGeneratorState()
+	b.accounts = state.NewAccounts(ledger)
+	addressGeneratorState := state.NewAddressGeneratorState(ledger, ctx.Chain)
+	addressGenerator, err := addressGeneratorState.GetGenerator()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create address generator: %s", err.Error()))
+	}
+	b.addressGenerator = addressGenerator
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
@@ -63,7 +69,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := b.accounts.Create(nil)
+	address, err := b.accounts.Create(nil, b.addressGenerator)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -72,7 +78,7 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := b.accounts.Create([]flow.AccountPublicKey{accountKey})
+	address, err := b.accounts.Create([]flow.AccountPublicKey{accountKey}, b.addressGenerator)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
