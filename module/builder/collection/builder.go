@@ -263,7 +263,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			limiter.transactionIncluded(tx)
 
 			transactions = append(transactions, tx)
-			totalBytesSize += tx.ByteSize()
+			totalBytesSize += uint(tx.ByteSize())
 			totalGas += tx.GasLimit
 		}
 
