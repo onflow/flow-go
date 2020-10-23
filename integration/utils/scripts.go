@@ -133,15 +133,19 @@ access(all) contract MyFavContract {
     // computation heavy function
     access(all) fun ComputationHeavy() {
     	var s: Int256 = 1024102410241024
-        var m: Int256 = 7
         var i = 0
-        while i < 60 {
-            s = s * m
+        var a = Int256(7)
+        var b = Int256(5)
+        var c = Int256(2)
+        while i < 15000 {
+            s = s * a
+            s = s / b
+            s = s / c
             i = i + 1
         }
         log(i)
     }
-
+    
     access(all) event LargeEvent(value: Int256, str: String, list: [UInt256], dic: {String: String})
 
     // event heavy function
@@ -228,3 +232,5 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 
 	return cadence.NewArray(values)
 }
+
+// TODO add tx size heavy similar to add keys
