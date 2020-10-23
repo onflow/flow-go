@@ -833,7 +833,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
 
-	err = e.execState.PersistExecutionResult(ctx, executionResult)
+	err = e.execState.PersistExecutionResult(childCtx, executionResult)
 	if err != nil {
 		return nil, fmt.Errorf("could not persist execution result: %w", err)
 	}
