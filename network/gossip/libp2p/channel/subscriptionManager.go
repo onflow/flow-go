@@ -1,4 +1,4 @@
-package subscriptionmanager
+package channel
 
 import (
 	"github.com/onflow/flow-go/network"

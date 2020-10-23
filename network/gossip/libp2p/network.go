@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/gossip/libp2p/cache"
+	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
 	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
@@ -26,18 +27,18 @@ type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	logger          zerolog.Logger
-	codec           network.Codec
-	ids             flow.IdentityList
-	me              module.Local
-	mw              middleware.Middleware
-	top             topology.Topology
-	metrics         module.NetworkMetrics
-	rcache          *cache.RcvCache // used to deduplicate incoming messages
-	queue           queue.MessageQueue
-	ctx             context.Context
-	cancel          context.CancelFunc
-	subscriptionMgr *subscriptionManager
+	logger  zerolog.Logger
+	codec   network.Codec
+	ids     flow.IdentityList
+	me      module.Local
+	mw      middleware.Middleware
+	top     topology.Topology
+	metrics module.NetworkMetrics
+	rcache  *cache.RcvCache // used to deduplicate incoming messages
+	queue   queue.MessageQueue
+	ctx     context.Context
+	cancel  context.CancelFunc
+	sm      channel.SubscriptionManager
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -52,6 +53,7 @@ func NewNetwork(
 	mw middleware.Middleware,
 	csize int,
 	top topology.Topology,
+	sm channel.SubscriptionManager,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
 
@@ -61,14 +63,14 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:          log,
-		codec:           codec,
-		me:              me,
-		mw:              mw,
-		rcache:          rcache,
-		top:             top,
-		metrics:         metrics,
-		subscriptionMgr: newSubscriptionManager(mw),
+		logger:  log,
+		codec:   codec,
+		me:      me,
+		mw:      mw,
+		rcache:  rcache,
+		top:     top,
+		metrics: metrics,
+		sm:      sm,
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 	o.ids = ids
@@ -115,7 +117,7 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 		return nil, fmt.Errorf("unknown channel id: %s, should be registered in topic map", channelID)
 	}
 
-	err := n.subscriptionMgr.Register(channelID, engine)
+	err := n.sm.Register(channelID, engine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channelID, err)
 	}
@@ -141,7 +143,7 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 // unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
 // receive messages from that channelID
 func (n *Network) unregister(channelID string) error {
-	err := n.subscriptionMgr.Unregister(channelID)
+	err := n.sm.Unregister(channelID)
 	if err != nil {
 		return fmt.Errorf("failed to unregister engine for channelID %s: %w", channelID, err)
 	}
@@ -167,7 +169,7 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 
 	fanout := uint(len(n.ids)+1) / 2
 
-	myTopics := n.subscriptionMgr.GetChannelIDs()
+	myTopics := n.sm.GetChannelIDs()
 	myFanout := flow.IdentityList{}
 
 	// samples a connected component fanout from each topic and takes the
@@ -433,7 +435,7 @@ func (n *Network) sendOnChannel(channelID string, message interface{}, targetIDs
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QueueMessage)
-	eng, err := n.subscriptionMgr.GetEngine(qm.ChannelID)
+	eng, err := n.sm.GetEngine(qm.ChannelID)
 	if err != nil {
 		n.logger.Error().
 			Err(err).

@@ -8,21 +8,21 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 )
 
-// subscriptionManager manages the engine to channelID subscription
-type subscriptionManager struct {
+// ChannelSubscriptionManager manages the engine to channelID subscription
+type ChannelSubscriptionManager struct {
 	sync.RWMutex
 	engines map[string]network.Engine
 	mw      middleware.Middleware
 }
 
-func newSubscriptionManager(mw middleware.Middleware) *subscriptionManager {
-	return &subscriptionManager{
+func NewSubscriptionManager(mw middleware.Middleware) *ChannelSubscriptionManager {
+	return &ChannelSubscriptionManager{
 		engines: make(map[string]network.Engine),
 		mw:      mw,
 	}
 }
 
-func (sm *subscriptionManager) Register(channelID string, engine network.Engine) error {
+func (sm *ChannelSubscriptionManager) Register(channelID string, engine network.Engine) error {
 	sm.Lock()
 	defer sm.Unlock()
 
@@ -44,7 +44,7 @@ func (sm *subscriptionManager) Register(channelID string, engine network.Engine)
 	return nil
 }
 
-func (sm *subscriptionManager) Unregister(channelID string) error {
+func (sm *ChannelSubscriptionManager) Unregister(channelID string) error {
 	sm.Lock()
 	defer sm.Unlock()
 
@@ -65,7 +65,7 @@ func (sm *subscriptionManager) Unregister(channelID string) error {
 	return nil
 }
 
-func (sm *subscriptionManager) GetEngine(channelID string) (network.Engine, error) {
+func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engine, error) {
 	sm.RLock()
 	defer sm.RUnlock()
 	eng, found := sm.engines[channelID]
@@ -76,7 +76,7 @@ func (sm *subscriptionManager) GetEngine(channelID string) (network.Engine, erro
 }
 
 // GetChannelIDs returns list of topics this subscription manager has an engine registered for.
-func (sm *subscriptionManager) GetChannelIDs() []string {
+func (sm *ChannelSubscriptionManager) GetChannelIDs() []string {
 	topics := make([]string, 0)
 	for topic := range sm.engines {
 		topics = append(topics, topic)

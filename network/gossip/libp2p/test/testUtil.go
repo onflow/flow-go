@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -87,8 +88,14 @@ func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.Ident
 }
 
 // GenerateNetworks generates the network for the given middlewares
-func GenerateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, mws []*libp2p.Middleware, csize int,
-	tops []topology.Topology, runningMode string) []*libp2p.Network {
+func GenerateNetworks(t *testing.T,
+	log zerolog.Logger,
+	ids flow.IdentityList,
+	mws []*libp2p.Middleware,
+	csize int,
+	tops []topology.Topology,
+	sm channel.SubscriptionManager,
+	runningMode string) []*libp2p.Network {
 	count := len(ids)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -114,7 +121,7 @@ func GenerateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, m
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], metrics)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sm, metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -129,17 +136,25 @@ func GenerateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, m
 	return nets
 }
 
-func GenerateIDsAndMiddlewares(t *testing.T, n int, runningMode string, log zerolog.Logger) (flow.IdentityList,
+func GenerateIDsAndMiddlewares(t *testing.T,
+	n int,
+	runningMode string,
+	log zerolog.Logger) (flow.IdentityList,
 	[]*libp2p.Middleware) {
 	ids, keys := GenerateIDs(t, n, runningMode)
 	mws := GenerateMiddlewares(t, log, ids, keys)
 	return ids, mws
 }
 
-func GenerateIDsMiddlewaresNetworks(t *testing.T, n int, log zerolog.Logger, csize int, tops []topology.Topology,
+func GenerateIDsMiddlewaresNetworks(t *testing.T,
+	n int,
+	log zerolog.Logger,
+	csize int,
+	tops []topology.Topology,
+	sm channel.SubscriptionManager,
 	runninMode string) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
 	ids, mws := GenerateIDsAndMiddlewares(t, n, runninMode, log)
-	networks := GenerateNetworks(t, log, ids, mws, csize, tops, runninMode)
+	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sm, runninMode)
 	return ids, mws, networks
 }
 
