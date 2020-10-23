@@ -10,6 +10,7 @@ import (
 
 	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
+	mock3 "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -21,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
+	mock2 "github.com/onflow/flow-go/network/gossip/libp2p/mock"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -94,7 +96,7 @@ func GenerateNetworks(t *testing.T,
 	mws []*libp2p.Middleware,
 	csize int,
 	tops []topology.Topology,
-	sm channel.SubscriptionManager,
+	sms []channel.SubscriptionManager,
 	runningMode string) []*libp2p.Network {
 	count := len(ids)
 	nets := make([]*libp2p.Network, 0)
@@ -121,7 +123,7 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sm, metrics)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -151,10 +153,10 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []topology.Topology,
-	sm channel.SubscriptionManager,
 	runninMode string) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
 	ids, mws := GenerateIDsAndMiddlewares(t, n, runninMode, log)
-	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sm, runninMode)
+	sms := GenerateSubscriptionManagers(t, mws)
+	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, runninMode)
 	return ids, mws, networks
 }
 
@@ -198,4 +200,35 @@ func GenerateTopologies(t *testing.T, state protocol.State, identities flow.Iden
 		tops = append(tops, top)
 	}
 	return tops
+}
+
+// GenerateSubscriptionManagers creates and returns a ChannelSubscriptionManager for each middleware object.
+func GenerateSubscriptionManagers(t *testing.T, mws []*libp2p.Middleware) []channel.SubscriptionManager {
+	require.NotEmpty(t, mws)
+
+	sms := make([]channel.SubscriptionManager, len(mws))
+	for i, mw := range mws {
+		sms[i] = libp2p.NewSubscriptionManager(mw)
+	}
+	return sms
+}
+
+// MockSubscriptionManager returns a list of mocked subscription manages for the input
+// identities. It only mocks the GetChannelIDs method of the subscription manager. Other methods
+// return an error, as they are not supposed to be invoked.
+func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.SubscriptionManager {
+	require.NotEmpty(t, ids)
+
+	sms := make([]channel.SubscriptionManager, len(ids))
+	for i, id := range ids {
+		sm := &mock2.SubscriptionManager{}
+		err := fmt.Errorf("this method should not be called on mock subscription manager")
+		sm.On("Register", mock3.Anything, mock3.Anything).Return(err)
+		sm.On("Unregister", mock3.Anything).Return(err)
+		sm.On("GetEngine", mock3.Anything).Return(err)
+		sm.On("GetChannelIDs").Return(engine.GetTopicsByRole(id.Role))
+		sms[i] = sm
+	}
+
+	return sms
 }
