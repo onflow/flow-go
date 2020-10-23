@@ -80,7 +80,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	}
 
 	// create networks using the mocked state and default topology
-	sms := GenerateSubscriptionManagers(mws)
+	sms := GenerateSubscriptionManagers(ts.T(), mws)
 	nets := GenerateNetworks(ts.T(), ts.logger, ids, mws, 100, nil, sms, RunNetwork)
 	ts.nets = nets
 
