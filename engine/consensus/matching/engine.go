@@ -842,6 +842,11 @@ func (e *Engine) requestPending() error {
 		return fmt.Errorf("could not get finalized height: %w", err)
 	}
 
+	// only request if number of unsealed finalized blocks exceeds the threshold
+	if uint(final.Height-sealed.Height) < e.requestReceiptThreshold {
+		return nil
+	}
+
 	// order the missing blocks by height from low to high such that when
 	// passing them to the missing block requester, they can be requested in the
 	// right order. The right order gives the priority to the execution result
@@ -888,17 +893,15 @@ func (e *Engine) requestPending() error {
 		Int("missing", len(missingBlocksOrderedByHeight)).
 		Msg("check missing receipts")
 
-	// request missing execution results, if sealed height is low enough
-	if uint(final.Height-sealed.Height) >= e.requestReceiptThreshold {
-		requestedCount := 0
-		for _, blockID := range missingBlocksOrderedByHeight {
-			e.requester.EntityByID(blockID, filter.Any)
-			requestedCount++
-		}
-		e.log.Info().
-			Int("count", requestedCount).
-			Msg("requested missing results")
+	requestedCount := 0
+	for _, blockID := range missingBlocksOrderedByHeight {
+		e.requester.EntityByID(blockID, filter.Any)
+		requestedCount++
 	}
+
+	e.log.Info().
+		Int("count", requestedCount).
+		Msg("requested missing results")
 
 	return nil
 }
