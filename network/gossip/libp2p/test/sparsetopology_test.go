@@ -79,7 +79,8 @@ func (suite *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Cond
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, RunNetwork)
+	sms := GenerateSubscriptionManagers(mws)
+	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, sms, RunNetwork)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
@@ -141,7 +142,8 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, RunNetwork)
+
+	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, tops, sms, RunNetwork)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
