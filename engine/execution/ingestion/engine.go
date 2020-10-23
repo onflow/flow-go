@@ -361,8 +361,8 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			if !exists {
 				// when the block no longer exists in the queue, it means there was a race condition that
 				// two onBlockExecuted was called for the same block, and one process has already removed the
-				// block from the queue, so we could simply bail here.
-				return nil
+				// block from the queue, so we will print an error here
+				return fmt.Errorf("block has been executed already, no long exists in the queue")
 			}
 
 			// dismount the executed block and all its children
