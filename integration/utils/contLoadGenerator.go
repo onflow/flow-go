@@ -256,7 +256,6 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	}
 
 	lg.serviceAccount.signerLock.Lock()
-
 	err = createAccountTx.SignEnvelope(
 		*lg.serviceAccount.address,
 		lg.serviceAccount.accountKey.ID,
@@ -265,9 +264,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	if err != nil {
 		return err
 	}
-
 	lg.serviceAccount.accountKey.SequenceNumber++
-
 	lg.serviceAccount.signerLock.Unlock()
 
 	err = lg.flowClient.SendTransaction(context.Background(), *createAccountTx)

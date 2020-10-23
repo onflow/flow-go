@@ -145,7 +145,7 @@ access(all) contract MyFavContract {
         }
         log(i)
     }
-    
+
     access(all) event LargeEvent(value: Int256, str: String, list: [UInt256], dic: {String: String})
 
     // event heavy function
@@ -161,7 +161,7 @@ access(all) contract MyFavContract {
     }
 
     access(all) fun LedgerInteractionHeavy() {
-        MyFavContract.AddManyRandomItems(1000)
+        MyFavContract.AddManyRandomItems(800)
     }
 }
 `
