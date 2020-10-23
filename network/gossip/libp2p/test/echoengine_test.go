@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -52,13 +53,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 // TearDownTest closes the networks within a specified timeout
 func (suite *EchoEngineTestSuite) TearDownTest() {
 	for _, net := range suite.nets {
-		select {
-		// closes the network
-		case <-net.Done():
-			continue
-		case <-time.After(3 * time.Second):
-			suite.Suite.Fail("could not stop the network")
-		}
+		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
 	}
 }
 

@@ -93,13 +93,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 // TearDownTest closes the networks within a specified timeout
 func (ts *EpochTransitionTestSuite) TearDownTest() {
 	for _, net := range ts.nets {
-		select {
-		// closes the network
-		case <-net.Done():
-			continue
-		case <-time.After(3 * time.Second):
-			ts.Suite.Fail("could not stop the network")
-		}
+		unittest.RequireCloseBefore(ts.T(), net.Done(), 3*time.Second, "could not stop the network")
 	}
 }
 

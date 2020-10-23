@@ -4,6 +4,7 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -62,6 +63,12 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := test.GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
 	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, false)
+}
+
+func (suite *TopicAwareTopologyTestSuite) TearDownTest() {
+	for _, net := range suite.nets {
+		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
+	}
 }
 
 // TODO: fix this test after we have fanout optimized.
