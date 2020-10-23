@@ -46,8 +46,7 @@ const (
 	DefaultUnicastTimeout = 2 * time.Second
 )
 
-// the inbound message queue size for One to One and One to K messages (each)
-const InboundMessageQueueSize = 100
+var unicastTimeout = DefaultUnicastTimeout
 
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
@@ -292,7 +291,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	}
 
 	// pass in a context with timeout to make the unicast call fail fast
-	ctx, cancel := context.WithTimeout(m.ctx, DefaultUnicastTimeout)
+	ctx, cancel := context.WithTimeout(m.ctx, unicastTimeout)
 	defer cancel()
 
 	// create new stream
