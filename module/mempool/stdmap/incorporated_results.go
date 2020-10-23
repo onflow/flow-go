@@ -30,7 +30,7 @@ func NewIncorporatedResults(limit uint) *IncorporatedResults {
 }
 
 // Add adds an IncorporatedResult to the mempool.
-func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) bool {
+func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) (bool, error) {
 
 	key := incorporatedResult.Result.ID()
 
@@ -41,8 +41,8 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 
 		entity, ok := backdata[key]
 		if !ok {
-			// no record with key is available in the mempool,
-			// initialise incResults.
+			// no record with key is available in the mempool, initialise
+			// incResults.
 			incResults = make(map[flow.Identifier]*flow.IncorporatedResult)
 			// add the new map to mempool for holding all incorporated results for the same result.ID
 			backdata[key] = model.IncorporatedResultMap{
@@ -69,14 +69,8 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 		*ir.size++
 		return nil
 	})
-	if err != nil {
-		// The current implementation never reaches this path, as it only stores
-		// IncorporatedResultMap as entities in the mempool. Reaching this error
-		// condition implies this code was inconsistently modified.
-		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
-	}
 
-	return appended
+	return appended, err
 }
 
 // All returns all the items in the mempool.
@@ -88,7 +82,7 @@ func (ir *IncorporatedResults) All() []*flow.IncorporatedResult {
 		for _, entity := range backdata {
 			irMap, ok := entity.(model.IncorporatedResultMap)
 			if !ok {
-				// should never happen: as the mempoo
+				// should never happen: as the mempool only stores IncorporatedResultMap
 				return fmt.Errorf("unexpected entity type %T", entity)
 			}
 			for _, ir := range irMap.IncorporatedResults {
@@ -190,5 +184,12 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 
 // Size returns the number of incorporated results in the mempool.
 func (ir *IncorporatedResults) Size() uint {
+	// To guarantee concurrency safety, i.e. that the read retrieves the latest size value,
+	// we need run the read through a locked operation in the backend.
+	// To guarantee concurrency safety, i.e. that the read retrieves the latest size value,
+	// we need run utilize the backend lock.
+	ir.backend.RLock()
+	defer ir.backend.RUnlock()
 	return *ir.size
+
 }

@@ -3,10 +3,10 @@ package stdmap
 import (
 	"testing"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,6 +22,7 @@ func TestApprovals(t *testing.T) {
 		ok, err := approvalPL.Add(approval1)
 		require.True(t, ok)
 		require.NoError(t, err)
+		println("Foo")
 
 		// checks the existence of approval for key
 		approvals := approvalPL.ByChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)

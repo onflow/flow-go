@@ -112,36 +112,24 @@ func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 		if !ok {
 			// no approvals for this chunk
 			return nil
-		} else {
-			approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
-			if !ok {
-				return fmt.Errorf("unexpected entity type %T", entity)
-			}
-
-			chunkApprovals = approvalMapEntity.Approvals
-
-			if _, ok := chunkApprovals[approval.Body.ApproverID]; !ok {
-				// no approval for this chunk and approver
-				return nil
-			}
-
-			// removes map entry associated with key for update
-			delete(backdata, chunkKey)
+		}
+		approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
+		if !ok {
+			return fmt.Errorf("unexpected entity type %T", entity)
 		}
 
-		// delete the approval to the map
-		delete(chunkApprovals, approval.Body.ApproverID)
-
-		if len(chunkApprovals) > 0 {
-			// adds the new approvals map associated with key to mempool
-			approvalMapEntity := model.ApprovalMapEntity{
-				ChunkKey:   chunkKey,
-				ResultID:   approval.Body.ExecutionResultID,
-				ChunkIndex: approval.Body.ChunkIndex,
-				Approvals:  chunkApprovals,
-			}
-
-			backdata[chunkKey] = approvalMapEntity
+		chunkApprovals = approvalMapEntity.Approvals
+		if _, ok := chunkApprovals[approval.Body.ApproverID]; !ok {
+			// no approval for this chunk and approver
+			return nil
+		}
+		if len(chunkApprovals) == 1 {
+			// special case: there is only a single approval stored for this chunkKey
+			// => remove entire map with all approvals for this chunk
+			delete(backdata, chunkKey)
+		} else {
+			// remove item from map
+			delete(chunkApprovals, approval.Body.ApproverID)
 		}
 
 		removed = true
@@ -165,7 +153,7 @@ func (a *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) (bool,
 
 		approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
 		if !ok {
-			return fmt.Errorf("could not assert entity to ApprovalMapEntity")
+			return fmt.Errorf("unexpected entity type %T", entity)
 		}
 
 		*a.size = *a.size - uint(len(approvalMapEntity.Approvals))
@@ -185,30 +173,55 @@ func (a *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flo
 	// determine the lookup key for the corresponding chunk
 	chunkKey := key(resultID, chunkIndex)
 
-	entity, exists := a.backend.ByID(chunkKey)
-	if !exists {
+	// To guarantee concurrency safety, we need to copy the map via a locked operation in the backend.
+	// Otherwise, another routine might concurrently modify the map stored for the same resultID.
+	approvals := make(map[flow.Identifier]*flow.ResultApproval)
+	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, exists := backdata[chunkKey]
+		if !exists {
+			return nil
+		}
+		approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
+		if !ok {
+			return fmt.Errorf("unexpected entity type %T", entity)
+		}
+		for i, app := range approvalMapEntity.Approvals {
+			approvals[i] = app
+		}
 		return nil
+	})
+	if err != nil {
+		// The current implementation never reaches this path, as it only stores
+		// ApprovalMapEntity as entities in the mempool. Reaching this error
+		// condition implies this code was inconsistently modified.
+		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
 	}
 
-	approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
-	if !ok {
-		return nil
-	}
-
-	return approvalMapEntity.Approvals
+	return approvals
 }
 
 // All will return all approvals in the memory pool.
 func (a *Approvals) All() []*flow.ResultApproval {
 	res := make([]*flow.ResultApproval, 0)
 
-	entities := a.backend.All()
-	for _, entity := range entities {
-		approvalMapEntity, _ := entity.(model.ApprovalMapEntity)
-
-		for _, approval := range approvalMapEntity.Approvals {
-			res = append(res, approval)
+	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		for _, entity := range backdata {
+			approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
+			if !ok {
+				// should never happen: as the mempool only stores ApprovalMapEntity
+				return fmt.Errorf("unexpected entity type %T", entity)
+			}
+			for _, approval := range approvalMapEntity.Approvals {
+				res = append(res, approval)
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		// The current implementation never reaches this path, as it only stores
+		// ApprovalMapEntity as entities in the mempool. Reaching this error
+		// condition implies this code was inconsistently modified.
+		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
 	}
 
 	return res
@@ -216,5 +229,9 @@ func (a *Approvals) All() []*flow.ResultApproval {
 
 // Size returns the number of approvals in the mempool.
 func (a *Approvals) Size() uint {
+	// To guarantee concurrency safety, i.e. that the read retrieves the latest size value,
+	// we need run utilize the backend lock.
+	a.backend.RLock()
+	defer a.backend.RUnlock()
 	return *a.size
 }
