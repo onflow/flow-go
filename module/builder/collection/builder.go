@@ -195,11 +195,23 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		minRefID := refChainFinalizedID
 
 		var transactions []*flow.TransactionBody
+		var totalBytesSize uint
+		var totalGas uint64
 		for _, tx := range b.transactions.All() {
 
 			// if we have reached maximum number of transactions, stop
 			if uint(len(transactions)) >= b.config.MaxCollectionSize {
 				break
+			}
+
+			// skip the transaction (keep for the next collection)
+			if totalBytesSize >= b.config.MaxCollectionByteSize {
+				continue
+			}
+
+			// skip the transaction (keep for the next collection)
+			if totalGas >= b.config.MaxCollectionTotalGas {
+				continue
 			}
 
 			// retrieve the main chain header that was used as reference
@@ -251,6 +263,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			limiter.transactionIncluded(tx)
 
 			transactions = append(transactions, tx)
+			totalBytesSize += tx.ByteSize()
+			totalGas += tx.GasLimit
 		}
 
 		// STEP FOUR: we have a set of transactions that are valid to include
