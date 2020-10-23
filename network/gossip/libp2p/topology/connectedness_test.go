@@ -38,6 +38,7 @@ func (suite *ConnectednessTestSuite) TestTopologySmallScaleCollectionMinority() 
 }
 
 func (suite *ConnectednessTestSuite) TestTopologyModerateScaleCollectionMinority() {
+	suite.T().Skip("skipping this test as it requires injectable subscription manager")
 	suite.testTopology(100, flow.RoleCollection)
 }
 
@@ -90,9 +91,11 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 		adjencyMap[ids[i].NodeID] = subset
 	}
 
+	// TODO: change it to connectedness by topic
 	// check that nodes of the same role form a connected graph
 	checkConnectednessByRole(suite.T(), adjencyMap, ids, minorityRole)
 
+	// TODO: remove it once we have connectedness by topic
 	// check that nodes form a connected graph
 	checkConnectedness(suite.T(), adjencyMap, ids)
 }
