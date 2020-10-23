@@ -3,7 +3,6 @@ package topology_test
 import (
 	"os"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -11,13 +10,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
-	"github.com/onflow/flow-go/network/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,12 +28,6 @@ type CollectionTopologyTestSuite struct {
 
 func TestCollectionTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(CollectionTopologyTestSuite))
-}
-
-func (suite *CollectionTopologyTestSuite) TearDownTest() {
-	for _, net := range suite.nets {
-		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
-	}
 }
 
 func (suite *CollectionTopologyTestSuite) SetupTest() {
@@ -65,7 +56,9 @@ func (suite *CollectionTopologyTestSuite) SetupTest() {
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := test.GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, test.RunNetwork)
+	// mocks subscription manager and creates network in dryrun
+	sms := test.MockSubscriptionManager(suite.T(), suite.ids)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, sms, test.DryRunNetwork)
 }
 
 // TestSubset tests that the collection nodes using CollectionTopology form a connected graph and nodes within the same
@@ -76,14 +69,6 @@ func (suite *CollectionTopologyTestSuite) TestSubset() {
 	for i, id := range suite.ids {
 		if id.Role != flow.RoleCollection {
 			continue
-		}
-
-		// registers all topics of this node on subscription manager
-		// so that it later can be extracted from it by the network
-		topics := engine.GetTopicsByRole(id.Role)
-		for _, topic := range topics {
-			_, err := suite.nets[i].Register(topic, &mocks.MockEngine{})
-			require.NoError(suite.T(), err)
 		}
 
 		subset, err := suite.nets[i].Topology()
