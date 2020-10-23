@@ -187,9 +187,8 @@ func (ir *IncorporatedResults) Size() uint {
 	// To guarantee concurrency safety, i.e. that the read retrieves the latest size value,
 	// we need run the read through a locked operation in the backend.
 	// To guarantee concurrency safety, i.e. that the read retrieves the latest size value,
-	// we need run utilize the backend lock.
+	// we need run utilize the backend's lock.
 	ir.backend.RLock()
 	defer ir.backend.RUnlock()
 	return *ir.size
-
 }

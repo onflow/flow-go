@@ -230,7 +230,7 @@ func (a *Approvals) All() []*flow.ResultApproval {
 // Size returns the number of approvals in the mempool.
 func (a *Approvals) Size() uint {
 	// To guarantee concurrency safety, i.e. that the read retrieves the latest size value,
-	// we need run utilize the backend lock.
+	// we need run utilize the backend's lock.
 	a.backend.RLock()
 	defer a.backend.RUnlock()
 	return *a.size
