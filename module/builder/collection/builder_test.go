@@ -459,6 +459,42 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	suite.Assert().Equal(builtCollection.Len(), 1)
 }
 
+func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
+	// set the max collection byte size to 50
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(50))
+
+	// build a block
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// retrieve the built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	// should be only 1 transaction in the collection
+	suite.Assert().Equal(builtCollection.Len(), 1)
+}
+
+func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
+	// set the max gas to 10000
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(10000))
+
+	// build a block
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// retrieve the built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	// should be only 1 transaction in the collection
+	suite.Assert().Equal(builtCollection.Len(), 1)
+}
+
 func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 
 	// create enough main-chain blocks that an expired transaction is possible
