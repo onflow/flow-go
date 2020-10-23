@@ -26,7 +26,7 @@ func (d *Distributor) AddConsumer(consumer protocol.Consumer) {
 
 func (d *Distributor) BlockFinalized(block *flow.Header) {
 	d.mu.RLock()
-	defer d.mu.RLock()
+	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
 		sub.BlockFinalized(block)
 	}
@@ -34,7 +34,7 @@ func (d *Distributor) BlockFinalized(block *flow.Header) {
 
 func (d *Distributor) BlockProcessable(block *flow.Header) {
 	d.mu.RLock()
-	defer d.mu.RLock()
+	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
 		sub.BlockProcessable(block)
 	}
@@ -42,7 +42,7 @@ func (d *Distributor) BlockProcessable(block *flow.Header) {
 
 func (d *Distributor) EpochTransition(newEpoch uint64, first *flow.Header) {
 	d.mu.RLock()
-	defer d.mu.RLock()
+	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
 		sub.EpochTransition(newEpoch, first)
 	}
@@ -50,7 +50,7 @@ func (d *Distributor) EpochTransition(newEpoch uint64, first *flow.Header) {
 
 func (d *Distributor) EpochSetupPhaseStarted(epoch uint64, first *flow.Header) {
 	d.mu.RLock()
-	defer d.mu.RLock()
+	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
 		sub.EpochSetupPhaseStarted(epoch, first)
 	}
@@ -58,7 +58,7 @@ func (d *Distributor) EpochSetupPhaseStarted(epoch uint64, first *flow.Header) {
 
 func (d *Distributor) EpochCommittedPhaseStarted(epoch uint64, first *flow.Header) {
 	d.mu.RLock()
-	defer d.mu.RLock()
+	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
 		sub.EpochCommittedPhaseStarted(epoch, first)
 	}

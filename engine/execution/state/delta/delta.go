@@ -1,75 +1,12 @@
 package delta
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
 )
-
-// TODO Remove after migration
-type Mapping struct {
-	Owner      string
-	Key        string
-	Controller string
-}
-
-type MappingForJson struct {
-	Owner      string
-	Key        string
-	Controller string
-}
-
-func (m Mapping) MarshalJSON() ([]byte, error) {
-	return json.Marshal(MappingForJson{
-		Owner:      hex.EncodeToString([]byte(m.Owner)),
-		Key:        hex.EncodeToString([]byte(m.Key)),
-		Controller: hex.EncodeToString([]byte(m.Controller)),
-	})
-}
-
-func (m *Mapping) UnmarshalJSON(data []byte) error {
-	var mm MappingForJson
-	err := json.Unmarshal(data, &mm)
-	if err != nil {
-		return err
-	}
-	dOwner, err := hex.DecodeString(mm.Owner)
-	if err != nil {
-		return fmt.Errorf("cannot decode owner: %w", err)
-	}
-	dController, err := hex.DecodeString(mm.Controller)
-	if err != nil {
-		return fmt.Errorf("cannot decode controller: %w", err)
-	}
-	dKey, err := hex.DecodeString(mm.Key)
-	if err != nil {
-		return fmt.Errorf("cannot decode key: %w", err)
-	}
-
-	*m = Mapping{
-		Owner:      string(dOwner),
-		Key:        string(dKey),
-		Controller: string(dController),
-	}
-	return nil
-}
-
-type LegacyDelta struct {
-	Data          map[string]flow.RegisterValue
-	ReadMappings  map[string]Mapping // kept for Ledger migration only
-	WriteMappings map[string]Mapping // kept for Ledger migration only
-}
-
-type LegacySnapshot struct {
-	Delta       LegacyDelta
-	Reads       []flow.LegacyRegisterID
-	SpockSecret []byte
-}
-
-// End of removal
 
 // A Delta is a record of ledger mutations.
 type Delta struct {
@@ -95,10 +32,6 @@ func toRegisterID(owner, controller, key string) flow.RegisterID {
 		Key:        key,
 	}
 }
-
-// func fromString(key string) flow.RegisterID {
-// 	return []byte(key)
-// }
 
 // Get reads a register value from this delta.
 //

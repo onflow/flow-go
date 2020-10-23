@@ -47,6 +47,8 @@ func main() {
 		txLimit                                uint
 		maxCollectionSize                      uint
 		builderExpiryBuffer                    uint
+		builderPayerRateLimit                  float64
+		builderUnlimitedPayers                 []string
 		hotstuffTimeout                        time.Duration
 		hotstuffMinTimeout                     time.Duration
 		hotstuffTimeoutIncreaseFactor          float64
@@ -86,6 +88,10 @@ func main() {
 				"how many additional cluster members we propagate transactions to")
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 25,
 				"expiry buffer for transactions in proposed collections")
+			flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", 0, // no rate limiting
+				"rate limit for each payer (transactions/collection)")
+			flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
+				"set of payer addresses which are omitted from rate limiting")
 			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 200,
 				"maximum number of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
@@ -267,6 +273,13 @@ func main() {
 				return nil, err
 			}
 
+			// convert hex string flag values to addresses
+			unlimitedPayers := make([]flow.Address, 0, len(builderUnlimitedPayers))
+			for _, payerStr := range builderUnlimitedPayers {
+				payerAddr := flow.HexToAddress(payerStr)
+				unlimitedPayers = append(unlimitedPayers, payerAddr)
+			}
+
 			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
 				node.Storage.Headers,
@@ -275,6 +288,8 @@ func main() {
 				push,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
+				builder.WithMaxPayerTransactionRate(builderPayerRateLimit),
+				builder.WithUnlimitedPayers(unlimitedPayers...),
 			)
 			if err != nil {
 				return nil, err

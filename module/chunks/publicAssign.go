@@ -186,7 +186,7 @@ func fingerPrint(blockID flow.Identifier, resultID flow.Identifier, alpha int) (
 	return hasher.SumHash(), nil
 }
 
-// IsValidVerifer ...
+// IsValidVerifer returns true if the approver was assigned to the chunk
 func IsValidVerifer(assignment *chunkmodels.Assignment, chunk *flow.Chunk, approver flow.Identifier) bool {
 	verifiers := assignment.Verifiers(chunk)
 	for _, verifier := range verifiers {

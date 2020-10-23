@@ -24,7 +24,7 @@ const (
 	DockerComposeFile        = "./docker-compose.nodes.yml"
 	DockerComposeFileVersion = "3.7"
 	PrometheusTargetsFile    = "./targets.nodes.json"
-	DefaultCollectionCount   = 1
+	DefaultCollectionCount   = 3
 	DefaultConsensusCount    = 3
 	DefaultExecutionCount    = 1
 	DefaultVerificationCount = 1
