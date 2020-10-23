@@ -157,15 +157,11 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	acc.signerLock.Lock()
-	err = deploymentTx.SignEnvelope(*acc.address, 0, acc.signer)
+	acc.signTx(deploymentTx, 0)
 	if err != nil {
-		acc.signerLock.Unlock()
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return err
 	}
-	acc.seqNumber++
-	acc.signerLock.Unlock()
 
 	lg.sendTx(deploymentTx)
 	lg.favContractAddress = acc.address
@@ -396,15 +392,11 @@ func (lg *ContLoadGenerator) buildAndSendAddKeyTx(workerID int) {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	acc.signerLock.Lock()
-	err = addKeysTx.SignEnvelope(*acc.address, 0, acc.signer)
+	acc.signTx(addKeysTx, 0)
 	if err != nil {
-		acc.signerLock.Unlock()
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return
 	}
-	acc.seqNumber++
-	acc.signerLock.Unlock()
 
 	lg.sendTx(addKeysTx)
 }
@@ -443,6 +435,13 @@ func (lg *ContLoadGenerator) buildAndSendTokenTransferTx(workerID int) {
 		SetPayer(*acc.address).
 		AddAuthorizer(*acc.address)
 
+	lg.log.Trace().Msgf("signing transaction")
+	acc.signTx(transferTx, 0)
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error signing transaction")
+		return
+	}
+
 	lg.sendTx(transferTx)
 }
 
@@ -470,15 +469,11 @@ func (lg *ContLoadGenerator) buildAndSendCompHeavyTx(workerID int) {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	acc.signerLock.Lock()
-	err = tx.SignEnvelope(*acc.address, 0, acc.signer)
+	acc.signTx(tx, 0)
 	if err != nil {
-		acc.signerLock.Unlock()
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return
 	}
-	acc.seqNumber++
-	acc.signerLock.Unlock()
 
 	lg.sendTx(tx)
 }

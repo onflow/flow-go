@@ -26,6 +26,17 @@ type flowAccount struct {
 	signerLock sync.Mutex
 }
 
+func (acc *flowAccount) signTx(tx *flowsdk.Transaction, keyID int) error {
+	acc.signerLock.Lock()
+	defer acc.signerLock.Unlock()
+	err := tx.SignEnvelope(*acc.address, keyID, acc.signer)
+	if err != nil {
+		return err
+	}
+	acc.seqNumber++
+	return nil
+}
+
 func newFlowAccount(i int, address *flowsdk.Address, accountKey *flowsdk.AccountKey, signer crypto.InMemorySigner) *flowAccount {
 	return &flowAccount{
 		i:          i,
