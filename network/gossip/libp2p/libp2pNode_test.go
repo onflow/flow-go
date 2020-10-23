@@ -410,7 +410,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 		wg.Add(1)
 		go createStream()
 	}
-	// open the gate
+	// open the gate by closing the channel
 	close(gate)
 
 	// no call should block
