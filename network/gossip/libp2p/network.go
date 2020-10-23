@@ -115,7 +115,7 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 		return nil, fmt.Errorf("unknown channel id: %s, should be registered in topic map", channelID)
 	}
 
-	err := n.subscriptionMgr.register(channelID, engine)
+	err := n.subscriptionMgr.Register(channelID, engine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channelID, err)
 	}
@@ -141,7 +141,7 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 // unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
 // receive messages from that channelID
 func (n *Network) unregister(channelID string) error {
-	err := n.subscriptionMgr.unregister(channelID)
+	err := n.subscriptionMgr.Unregister(channelID)
 	if err != nil {
 		return fmt.Errorf("failed to unregister engine for channelID %s: %w", channelID, err)
 	}
@@ -167,7 +167,7 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 
 	fanout := uint(len(n.ids)+1) / 2
 
-	myTopics := n.subscriptionMgr.registeredTopics()
+	myTopics := n.subscriptionMgr.GetChannelIDs()
 	myFanout := flow.IdentityList{}
 
 	// samples a connected component fanout from each topic and takes the
@@ -433,7 +433,7 @@ func (n *Network) sendOnChannel(channelID string, message interface{}, targetIDs
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QueueMessage)
-	eng, err := n.subscriptionMgr.getEngine(qm.ChannelID)
+	eng, err := n.subscriptionMgr.GetEngine(qm.ChannelID)
 	if err != nil {
 		n.logger.Error().
 			Err(err).

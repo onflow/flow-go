@@ -22,7 +22,7 @@ func newSubscriptionManager(mw middleware.Middleware) *subscriptionManager {
 	}
 }
 
-func (sm *subscriptionManager) register(channelID string, engine network.Engine) error {
+func (sm *subscriptionManager) Register(channelID string, engine network.Engine) error {
 	sm.Lock()
 	defer sm.Unlock()
 
@@ -44,7 +44,7 @@ func (sm *subscriptionManager) register(channelID string, engine network.Engine)
 	return nil
 }
 
-func (sm *subscriptionManager) unregister(channelID string) error {
+func (sm *subscriptionManager) Unregister(channelID string) error {
 	sm.Lock()
 	defer sm.Unlock()
 
@@ -65,7 +65,7 @@ func (sm *subscriptionManager) unregister(channelID string) error {
 	return nil
 }
 
-func (sm *subscriptionManager) getEngine(channelID string) (network.Engine, error) {
+func (sm *subscriptionManager) GetEngine(channelID string) (network.Engine, error) {
 	sm.RLock()
 	defer sm.RUnlock()
 	eng, found := sm.engines[channelID]
@@ -75,8 +75,8 @@ func (sm *subscriptionManager) getEngine(channelID string) (network.Engine, erro
 	return eng, nil
 }
 
-// registeredTopics returns list of topics this subscription manager has an engine registered for.
-func (sm *subscriptionManager) registeredTopics() []string {
+// GetChannelIDs returns list of topics this subscription manager has an engine registered for.
+func (sm *subscriptionManager) GetChannelIDs() []string {
 	topics := make([]string, 0)
 	for topic := range sm.engines {
 		topics = append(topics, topic)
