@@ -176,11 +176,12 @@ func (lg *ContLoadGenerator) Start() {
 
 		switch lg.loadType {
 		case TokenTransferLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.buildAndSendTokenTransferTx)
+			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
 		case TokenAddKeysLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.buildAndSendAddKeyTx)
-		case CompHeavyLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.buildAndSendCompHeavyTx)
+			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
+		// other types
+		default:
+			worker = NewWorker(i, 1*time.Second, lg.sendFavContractTx)
 		}
 
 		worker.Start()
@@ -341,7 +342,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) buildAndSendAddKeyTx(workerID int) {
+func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	// TODO move this as a configurable parameter
 	numberOfKeysToAdd := 40
 	blockRef, err := lg.blockRef.Get()
@@ -398,7 +399,7 @@ func (lg *ContLoadGenerator) buildAndSendAddKeyTx(workerID int) {
 	lg.sendTx(addKeysTx)
 }
 
-func (lg *ContLoadGenerator) buildAndSendTokenTransferTx(workerID int) {
+func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
@@ -442,7 +443,8 @@ func (lg *ContLoadGenerator) buildAndSendTokenTransferTx(workerID int) {
 	lg.sendTx(transferTx)
 }
 
-func (lg *ContLoadGenerator) buildAndSendCompHeavyTx(workerID int) {
+// TODO update this to include loadtype
+func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
@@ -454,8 +456,16 @@ func (lg *ContLoadGenerator) buildAndSendCompHeavyTx(workerID int) {
 
 	acc := <-lg.availableAccounts
 	defer func() { lg.availableAccounts <- acc }()
+	var txScript []byte
 
-	txScript := ComputationHeavyScript(*lg.favContractAddress)
+	switch lg.loadType {
+	case CompHeavyLoadType:
+		txScript = ComputationHeavyScript(*lg.favContractAddress)
+	case EventHeavyLoadType:
+		txScript = EventHeavyScript(*lg.favContractAddress)
+	case LedgerHeavyLoadType:
+		txScript = LedgerHeavyScript(*lg.favContractAddress)
+	}
 
 	lg.log.Trace().Msgf("creating transaction")
 	tx := flowsdk.NewTransaction().
