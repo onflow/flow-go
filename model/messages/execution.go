@@ -35,6 +35,7 @@ type ExecutionStateDelta struct {
 	StateInteractions  []*delta.Snapshot
 	EndState           flow.StateCommitment
 	Events             []flow.Event
+	ServiceEvents      []flow.Event
 	TransactionResults []flow.TransactionResult
 }
 

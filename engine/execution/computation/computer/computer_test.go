@@ -16,6 +16,7 @@ import (
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
@@ -142,6 +143,90 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 		}
 		assert.ElementsMatch(t, expectedResults, result.TransactionResult[0:len(result.TransactionResult)-1]) //strip system chunk
+
+		vm.AssertExpectations(t)
+	})
+
+	t.Run("service events are emitted", func(t *testing.T) {
+		execCtx := fvm.NewContext()
+
+		vm := new(computermock.VirtualMachine)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
+
+		collectionCount := 2
+		transactionsPerCollection := 2
+
+		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
+
+		// create a block with 2 collections with 2 transactions each
+		block := generateBlock(collectionCount, transactionsPerCollection)
+
+		ordinaryEvent := cadence.Event{
+			EventType: &cadence.EventType{
+				EventTypeID: cadence.CompositeTypeID{
+					Location:   "what",
+					Identifier: "ever",
+				},
+				Identifier: "what.ever",
+			},
+		}
+
+		eventWhitelist := event.GetServiceEventWhitelist()
+		serviceEventA := cadence.Event{
+			EventType: &cadence.EventType{
+				EventTypeID: cadence.CompositeTypeID{
+					Location:   execCtx.Chain.ServiceAddress().String(),
+					Identifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				},
+				TypeID: "eventA",
+			},
+		}
+		serviceEventB := cadence.Event{
+			EventType: &cadence.EventType{
+				EventTypeID: cadence.CompositeTypeID{
+					Location:   execCtx.Chain.ServiceAddress().String(),
+					Identifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				},
+				TypeID: "eventB",
+			},
+		}
+
+		//events to emit for each iteration/transaction
+		events := make([][]cadence.Event, totalTransactionCount)
+		events[0] = nil
+		events[1] = []cadence.Event{serviceEventA, ordinaryEvent}
+		events[2] = []cadence.Event{ordinaryEvent}
+		events[3] = nil
+		events[4] = []cadence.Event{serviceEventB}
+
+		txCount := 0
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+
+				tx := args[1].(*fvm.TransactionProcedure)
+
+				tx.Err = &fvm.MissingPayerError{}
+				tx.Events = events[txCount]
+				txCount++
+			}).
+			Return(nil).
+			Times(totalTransactionCount)
+
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		assert.NoError(t, err)
+
+		// all events should have been collected
+		assert.Len(t, result.ServiceEvents, 2)
+
+		//events are ordered
+		assert.Equal(t, serviceEventA.EventType.TypeID, string(result.ServiceEvents[0].Type))
+		assert.Equal(t, serviceEventB.EventType.TypeID, string(result.ServiceEvents[1].Type))
 
 		vm.AssertExpectations(t)
 	})

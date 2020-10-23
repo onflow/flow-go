@@ -228,6 +228,7 @@ func main() {
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.DB)
+			serviceEvents := storage.NewServiceEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
@@ -238,6 +239,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				events,
+				serviceEvents,
 				txResults,
 				computationManager,
 				providerEngine,

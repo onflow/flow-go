@@ -7,6 +7,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
+	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -49,13 +50,14 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger st
 	return nil
 }
 
-func (proc *TransactionProcedure) ConvertEvents(txIndex uint32) ([]flow.Event, error) {
+func (proc *TransactionProcedure) ConvertEvents(txIndex uint32, chain flow.Chain) ([]flow.Event, []flow.Event, error) {
 	flowEvents := make([]flow.Event, len(proc.Events))
+	serviceEvents := make([]flow.Event, 0)
 
 	for i, event := range proc.Events {
 		payload, err := jsoncdc.Encode(event)
 		if err != nil {
-			return nil, fmt.Errorf("failed to encode event: %w", err)
+			return nil, nil, fmt.Errorf("failed to encode event: %w", err)
 		}
 
 		flowEvents[i] = flow.Event{
@@ -65,9 +67,14 @@ func (proc *TransactionProcedure) ConvertEvents(txIndex uint32) ([]flow.Event, e
 			EventIndex:       uint32(i),
 			Payload:          payload,
 		}
+
+		if fvmEvent.IsServiceEvent(event, chain) {
+			serviceEvents = append(serviceEvents, flowEvents[i])
+		}
+
 	}
 
-	return flowEvents, nil
+	return flowEvents, serviceEvents, nil
 }
 
 type TransactionInvocator struct{}

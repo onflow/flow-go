@@ -10,7 +10,7 @@ require (
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
-	github.com/fxamacker/cbor/v2 v2.2.0
+	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
 	github.com/go-kit/kit v0.9.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.4
@@ -69,3 +69,6 @@ replace github.com/onflow/flow-go => ./
 replace github.com/onflow/flow-go/crypto => ./crypto
 
 replace github.com/onflow/flow-go/integration => ./integration
+
+//TODO - Cadence PR
+replace github.com/onflow/cadence => ../cadence

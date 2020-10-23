@@ -62,6 +62,7 @@ const (
 	codeExecutionStateInteractions   = 103
 	codeTransactionResult            = 104
 	codeFinalizedCluster             = 105
+	codeServiceEvent                 = 106
 	codeIndexCollection              = 200
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
