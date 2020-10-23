@@ -30,7 +30,7 @@ func NewIncorporatedResults(limit uint) *IncorporatedResults {
 }
 
 // Add adds an IncorporatedResult to the mempool.
-func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) (bool, error) {
+func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) bool {
 
 	key := incorporatedResult.Result.ID()
 
@@ -41,9 +41,10 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 
 		entity, ok := backdata[key]
 		if !ok {
-			// no record with key is available in the mempool, initialise incResults.
+			// no record with key is available in the mempool,
+			// initialise incResults.
 			incResults = make(map[flow.Identifier]*flow.IncorporatedResult)
-			// add the new incorporated results map associated with key to mempool
+			// add the new map to mempool for holding all incorporated results for the same result.ID
 			backdata[key] = model.IncorporatedResultMap{
 				ExecutionResult:     incorporatedResult.Result,
 				IncorporatedResults: incResults,
@@ -51,12 +52,13 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 		} else {
 			incorporatedResultMap, ok := entity.(model.IncorporatedResultMap)
 			if !ok {
-				return fmt.Errorf("could not assert entity to IncorporatedResultMap")
+				return fmt.Errorf("unexpected entity type %T", entity)
 			}
 
 			incResults = incorporatedResultMap.IncorporatedResults
 			if _, ok := incResults[incorporatedResult.IncorporatedBlockID]; ok {
-				// incorporated result is already associated with result and incorporated block.
+				// incorporated result is already associated with result and
+				// incorporated block.
 				return nil
 			}
 		}
@@ -74,7 +76,7 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
 	}
 
-	return appended, err
+	return appended
 }
 
 // All returns all the items in the mempool.

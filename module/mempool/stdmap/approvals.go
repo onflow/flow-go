@@ -67,39 +67,30 @@ func (a *Approvals) Add(approval *flow.ResultApproval) (bool, error) {
 
 		entity, ok := backdata[chunkKey]
 		if !ok {
-			// no record with key is available in the mempool, initialise
-			// chunkApprovals.
+			// no record with key is available in the mempool, initialise chunkApprovals.
 			chunkApprovals = make(map[flow.Identifier]*flow.ResultApproval)
+			backdata[chunkKey] = model.ApprovalMapEntity{
+				ChunkKey:   chunkKey,
+				ResultID:   approval.Body.ExecutionResultID,
+				ChunkIndex: approval.Body.ChunkIndex,
+				Approvals:  chunkApprovals,
+			}
 		} else {
 			approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
 			if !ok {
-				return fmt.Errorf("could not assert entity to ApprovalMapEntity")
+				return fmt.Errorf("unexpected entity type %T", entity)
 			}
 
 			chunkApprovals = approvalMapEntity.Approvals
-
 			if _, ok := chunkApprovals[approval.Body.ApproverID]; ok {
 				// approval is already associated with the chunk key and
 				// approver, no need to append
 				return nil
 			}
-
-			// removes map entry associated with key for update
-			delete(backdata, chunkKey)
 		}
 
 		// appends approval to the map
 		chunkApprovals[approval.Body.ApproverID] = approval
-
-		// adds the new approvals map associated with key to mempool
-		approvalMapEntity := model.ApprovalMapEntity{
-			ChunkKey:   chunkKey,
-			ResultID:   approval.Body.ExecutionResultID,
-			ChunkIndex: approval.Body.ChunkIndex,
-			Approvals:  chunkApprovals,
-		}
-
-		backdata[chunkKey] = approvalMapEntity
 		appended = true
 		*a.size++
 		return nil
@@ -115,7 +106,6 @@ func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 
 	removed := false
 	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-
 		var chunkApprovals map[flow.Identifier]*flow.ResultApproval
 
 		entity, ok := backdata[chunkKey]
@@ -125,7 +115,7 @@ func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 		} else {
 			approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
 			if !ok {
-				return fmt.Errorf("could not assert entity to ApprovalMapEntity")
+				return fmt.Errorf("unexpected entity type %T", entity)
 			}
 
 			chunkApprovals = approvalMapEntity.Approvals
