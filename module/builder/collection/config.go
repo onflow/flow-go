@@ -43,7 +43,7 @@ func DefaultConfig() Config {
 		MaxPayerTransactionRate: 0,                               // no rate limiting
 		UnlimitedPayers:         make(map[flow.Address]struct{}), // no unlimited payers
 		MaxCollectionByteSize:   1000000,                         // 1MB
-		MaxCollectionTotalGas:   uint64(10000000),                // 10M
+		MaxCollectionTotalGas:   uint64(1000000),                 // 1M
 	}
 }
 
