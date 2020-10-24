@@ -4,7 +4,6 @@ import (
 	"os"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -62,13 +61,10 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := test.GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, test.RunNetwork)
-}
 
-func (suite *TopicAwareTopologyTestSuite) TearDownTest() {
-	for _, net := range suite.nets {
-		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
-	}
+	// mocks subscription manager and creates network in dryrun
+	sms := test.MockSubscriptionManager(suite.T(), suite.ids)
+	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, sms, test.DryRunNetwork)
 }
 
 // TODO: fix this test after we have fanout optimized.
@@ -89,8 +85,8 @@ func (suite *TopicAwareTopologyTestSuite) TestMembership() {
 		require.NoError(suite.T(), err)
 
 		// every id in topology should be an id of the protocol
-		for id := range top {
-			require.Contains(suite.T(), suite.ids.NodeIDs(), id)
+		for _, id := range top {
+			require.Contains(suite.T(), suite.ids.NodeIDs(), id.NodeID)
 		}
 	}
 }
