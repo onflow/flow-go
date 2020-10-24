@@ -382,6 +382,14 @@ func (l *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 		},
 		10*time.Millisecond)
 	assert.NoError(l.T(), err)
+
+	// assert that the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
+	// good address
+	select {
+	case <-ch:
+		assert.Fail(l.T(), "CreateStream attempt to the unresponsive peer did not block")
+	default:
+	}
 }
 
 // TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
