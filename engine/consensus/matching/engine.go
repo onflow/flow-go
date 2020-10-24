@@ -211,13 +211,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
 	if !ok {
 		log.Error().Msg("execution receipt without FinalStateCommit received")
-		return fmt.Errorf("failed to get final state commitment from Execution Result")
+		return engine.NewInvalidInputErrorf("execution receipt without FinalStateCommit: %x", receipt.ID())
 	}
 	log = log.With().Hex("final_state", resultFinalState).Logger()
 	log.Info().Msg("execution receipt received")
 
-	// if the receipt is for an unknown block, skip it. It will be re-requested
-	// later.
+	// if the receipt is for an unknown block, skip it. It will be re-requested later.
 	head, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
 	if err != nil {
 		log.Debug().Msg("discarding receipt for unknown block")
@@ -226,6 +225,15 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// if Execution Receipt is for block whose height is lower or equal to already sealed height
 	//  => drop Receipt
+	forUnsealedBlock, err := e.isAboveSealedHeight(head)
+	if err != nil {
+		return fmt.Errorf("could not find sealed block: %w", err)
+	}
+	if !forUnsealedBlock {
+		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
+		return nil
+	}
+
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
 		return fmt.Errorf("could not find sealed block: %w", err)
@@ -234,6 +242,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
 		return nil
 	}
+
+	err := e.ensureStakedNodeWithRole(receipt.ExecutorID, receipt.ExecutionResult.BlockID, flow.RoleExecution)
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a execution receipt (usually execution nodes)
@@ -312,7 +322,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	// Check if the approver was a staked verifier at that block. Don't error
 	// out if the block is not known yet, because this method will be called
 	// again for some house cleaning when we try to match approvals to chunks.
-	err := e.checkApproverIsStakedVerifier(approval.Body.ApproverID, approval.Body.BlockID)
+	err := e.ensureStakedNodeWithRole(approval.Body.ApproverID, approval.Body.BlockID, flow.RoleVerification)
 	if err != nil {
 		// don't error out if the block was not found yet
 		if !errors.Is(err, ErrBlockNotFound) {
@@ -386,7 +396,6 @@ func (e *Engine) checkSealing() {
 	// don't overflow the seal mempool
 	space := e.seals.Limit() - e.seals.Size()
 	if len(sealableResults) > int(space) {
---
 		e.log.Warn().
 			Int("space", int(space)).
 			Int("results", len(sealableResults)).
@@ -525,17 +534,16 @@ RES_LOOP:
 		// number of guarantees plus one; this will ensure the execution receipt
 		// cannot lie about having less chunks and having the remaining ones
 		// approved
-		requiredChunks := 0
+		requiredChunks := 1 // system chunk must exist for each block's ExecutionResult, even if the block payload itself does not contain any chunks
 
 		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if err != nil {
-			// the block could have no payload
 			if !errors.Is(err, storage.ErrNotFound) {
 				return nil, err
 			}
---> required chunks must be 1
+			// reaching this line means the block is empty, i.e. it has no payload => we expect only the system chunk
 		} else {
-			requiredChunks = len(index.CollectionIDs) + 1
+			requiredChunks += len(index.CollectionIDs)
 		}
 
 		if incorporatedResult.Result.Chunks.Len() != requiredChunks {
@@ -554,9 +562,9 @@ RES_LOOP:
 			continue
 		}
 		if err != nil {
---> this is a fatal implementation bug: return nil, fmt.Errorf("could not assign verifiers: %w", err)
-			log.Warn().Msgf("could not compute chunk assignment: %v", err)
-			continue
+			// at this point, we know the block and a valid child block exists. Not being able to compute
+			// the assignment constitutes a fatal implementation bug:
+			return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 		}
 
 		// check that each chunk collects enough approvals
@@ -579,18 +587,14 @@ RES_LOOP:
 				continue RES_LOOP
 			}
 
-			matched := e.matchChunk(incorporatedResult, chunk, assignment)
-			if !matched {
-				allChunksMatched = false
-				break
+			if !e.matchChunk(incorporatedResult, chunk, assignment) {
+				continue RES_LOOP
 			}
 		}
 
 		// add the result to the results that should be sealed
-		if allChunksMatched {
-			e.log.Info().Msg("adding result with sufficient verification")
-			results = append(results, incorporatedResult)
-		}
+		e.log.Info().Msg("adding result with sufficient verification")
+		results = append(results, incorporatedResult)
 	}
 
 	return results, nil
@@ -619,7 +623,7 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, chunk *
 		if !ok {
 			// if the approval comes from a node that wasn't even a staked
 			// verifier at that block, remove the approval from the mempool.
-			err := e.checkApproverIsStakedVerifier(approverID, incorporatedResult.Result.BlockID)
+			err := e.ensureStakedNodeWithRole(approverID, incorporatedResult.Result.BlockID, flow.RoleVerification)
 			if err != nil {
 				// don't remove the approval if the error indicates that the
 				// block is not known yet.
@@ -651,43 +655,51 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, chunk *
 	return validApprovals > 0
 }
 
-// checkApproverIsStakedVerifier checks if the approver was a valid staked
-// verifier at a given block, and returns an error if it wasn't, or if the block
-// is not known yet. If the block is not known yet, it returns a
-// ErrBlockNotFound sentinel error.
-func (e *Engine) checkApproverIsStakedVerifier(approverID flow.Identifier, blockID flow.Identifier) error {
-
-	// if we dont know the block yet, return a ErrBlockNotFound error
-	_, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return ErrBlockNotFound
-		}
-		return err
-	}
-
+// checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
+//   * is an authorized member of the network
+//   * has _positive_ weight
+//   * and has the expected role
+// Returns the following errors:
+//   * sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
+//   * generic error indicating a fatal internal bug
+// Note: the method receives the block header as proof of its existence.
+// Therefore, we consider the case where the respective block is unknown to the
+// protocol state as a symptom of a fatal implementation bug.
+func (e *Engine) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.Header, expectedRole flow.Role) error {
 	// get the identity of the origin node
-	identity, err := e.state.AtBlockID(blockID).Identity(approverID)
+	identity, err := e.state.AtBlockID(block.ID()).Identity(nodeID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
-			return engine.NewInvalidInputErrorf("could not get approver identity: %w", err)
+			return engine.NewInvalidInputErrorf("unknown node identity: %w", err)
 		}
-
-		// unknown exception
-		return fmt.Errorf("could not get approver identity: %w", err)
+		// unexpected exception
+		return fmt.Errorf("failed to retrieve node identity: %w", err)
 	}
 
 	// check that the origin is a verification node
-	if identity.Role != flow.RoleVerification {
-		return engine.NewInvalidInputErrorf("invalid approver node role (%s)", identity.Role)
+	if identity.Role != expectedRole {
+		return engine.NewInvalidInputErrorf("expected node %x to have identity %s but got %s", nodeID, expectedRole, identity.Role)
 	}
 
 	// check if the identity has a stake
 	if identity.Stake == 0 {
-		return engine.NewInvalidInputErrorf("verifier has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
 	}
 
 	return nil
+}
+
+// isAboveSealedHeight returns true if and only if block's Height is
+// strictly larger than the highest _sealed and finalized_ block.
+func (e *Engine) isAboveSealedHeight(block *flow.Header) (bool, error) {
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return false, fmt.Errorf("could not retrieve sealed block: %w", err)
+	}
+	if sealed.Height >= block.Height {
+		return false, nil
+	}
+	return true, nil
 }
 
 // sealResult creates a seal for the incorporated result and adds it to the
@@ -827,12 +839,12 @@ func (e *Engine) requestPending() error {
 	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, e.maxUnsealedResults)
 
 	// turn mempool into Lookup table: BlockID -> Result
-	knownResultsMap := make(map[flow.Identifier]struct{})
-	for _, r := range e.results.All() {
-		knownResultsMap[r.BlockID] = struct{}{}
+	knownResultForBlock := make(map[flow.Identifier]struct{})
+	for _, r := range e.incorporatedResults.All() {
+		knownResultForBlock[r.Result.BlockID] = struct{}{}
 	}
-	for _, sealContainer := range e.seals.All() {
-		knownResultsMap[sealContainer.Seal.BlockID] = struct{}{}
+	for _, s := range e.seals.All() {
+		knownResultForBlock[s.Seal.BlockID] = struct{}{}
 	}
 
 	// traverse each unsealed and finalized block with height from low to high,
@@ -851,21 +863,10 @@ func (e *Engine) requestPending() error {
 			return fmt.Errorf("could not get header (height=%d): %w", height, err)
 		}
 
+		// check if we have an result for the block at this height
 		blockID := header.ID()
-
-		if _, ok := knownResultsMap[blockID]; ok {
-			continue
-		}
-		missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-
-		// check if we have an execution result for the block at this height
-		_, err = e.resultsDB.ByBlockID(blockID) !!
-		if errors.Is(err, storage.ErrNotFound) {
+		if _, ok := knownResultForBlock[blockID]; !ok {
 			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("could not get execution result (block_id=%x): %w", blockID, err)
 		}
 	}
 

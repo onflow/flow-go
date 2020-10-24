@@ -415,13 +415,30 @@ func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
 	}
 }
 
-func ExecutionReceiptFixture() *flow.ExecutionReceipt {
-	return &flow.ExecutionReceipt{
+func WithExecutorID(id flow.Identifier) func(*flow.ExecutionReceipt) {
+	return func(receipt *flow.ExecutionReceipt) {
+		receipt.ExecutorID = id
+	}
+}
+
+func WithBlock(block *flow.Block) func(*flow.ExecutionReceipt) {
+	return func(receipt *flow.ExecutionReceipt) {
+		receipt.ExecutionResult = *ResultForBlockFixture(block)
+	}
+}
+
+func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.ExecutionReceipt {
+	receipt := &flow.ExecutionReceipt{
 		ExecutorID:        IdentifierFixture(),
 		ExecutionResult:   *ExecutionResultFixture(),
 		Spocks:            nil,
 		ExecutorSignature: SignatureFixture(),
 	}
+
+	for _, apply := range opts {
+		apply(receipt)
+	}
+	return receipt
 }
 
 func ExecutionResultFixture() *flow.ExecutionResult {
@@ -454,6 +471,18 @@ func IncorporatedResultForBlockFixture(block *flow.Block) *flow.IncorporatedResu
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
 		ra.Body.ExecutionResultID = id
+	}
+}
+
+func WithApproverID(id flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.Body.ApproverID = id
+	}
+}
+
+func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.Body.Attestation.BlockID = id
 	}
 }
 

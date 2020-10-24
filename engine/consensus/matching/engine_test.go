@@ -3,7 +3,6 @@
 package matching
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -31,7 +30,7 @@ import (
 // 1. Matching engine should validate the incoming receipt (aka ExecutionReceipt):
 //     1. it should stores it to the mempool if valid
 //     2. it should ignore it when:
-//         1. the origin is invalid
+//         1. the origin is invalid [Condition removed for now -> will be replaced by valid EN signature in future]
 //         2. the role is invalid
 //         3. the result (a receipt has one result, multiple receipts might have the same result) has been sealed already
 //         4. the receipt has been received before
@@ -63,42 +62,57 @@ func TestMatchingEngine(t *testing.T) {
 type MatchingSuite struct {
 	suite.Suite
 
+	// IDENTITIES
 	conID flow.Identifier
 	exeID flow.Identifier
 	verID flow.Identifier
 
 	identities map[flow.Identifier]*flow.Identity
+	approvers  flow.IdentityList
 
-	approvers flow.IdentityList
+	// BLOCKS
+	rootBlock            flow.Block
+	latestSealedBlock    flow.Block
+	latestFinalizedBlock flow.Block
+	unfinalizedBlock     flow.Block
+	blocks               map[flow.Identifier]*flow.Block
 
-	state *protocol.State
-
+	// PROTOCOL STATE
+	state          *protocol.State
 	sealedSnapshot *protocol.Snapshot
 	finalSnapshot  *protocol.Snapshot
 
-	sealedResults map[flow.Identifier]*flow.ExecutionResult
-	blocks        map[flow.Identifier]*flow.Block
-
+	// MEMPOOLS and STORAGE which are injected into Matching Engine
+	// mock storage.ExecutionResults: backed by in-memory map sealedResults
 	sealedResultsDB *storage.ExecutionResults
-	headersDB       *storage.Headers
-	indexDB         *storage.Index
+	sealedResults   map[flow.Identifier]*flow.ExecutionResult
 
+	// mock mempool.IncorporatedResults: backed by in-memory map pendingResults
+	resultsPL      *mempool.IncorporatedResults
 	pendingResults map[flow.Identifier]*flow.IncorporatedResult
-	pendingSeals   map[flow.Identifier]*flow.IncorporatedResultSeal
 
-	resultsPL   *mempool.IncorporatedResults
+	// mock mempool.IncorporatedResultSeals: backed by in-memory map pendingSeals
+	sealsPL      *mempool.IncorporatedResultSeals
+	pendingSeals map[flow.Identifier]*flow.IncorporatedResultSeal
+
+	// mock BLOCK STORAGE: backed by in-memory map blocks
+	headersDB *storage.Headers // backed by map blocks
+	indexDB   *storage.Index   // backed by map blocks
+
+	// mock mempool.Approvals: used to test whether or not Matching Engine stores approvals
 	approvalsPL *mempool.Approvals
-	sealsPL     *mempool.IncorporatedResultSeals
 
+	// misc SERVICE COMPONENTS which are injected into Matching Engine
 	requester *module.Requester
+	assigner  *module.ChunkAssigner
 
-	assigner *module.ChunkAssigner
-
+	// MATCHING ENGINE
 	matching *Engine
 }
 
 func (ms *MatchingSuite) SetupTest() {
 
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP IDENTITIES ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	unit := engine.NewUnit()
 	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
@@ -118,59 +132,122 @@ func (ms *MatchingSuite) SetupTest() {
 
 	ms.approvers = unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleVerification))
 
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP BLOCKS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
+	// rootBlock <- latestSealedBlock <- latestFinalizedBlock <- unfinalizedBlock
+	ms.rootBlock = unittest.BlockFixture()
+	ms.latestSealedBlock = unittest.BlockWithParentFixture(ms.rootBlock.Header)
+	ms.latestFinalizedBlock = unittest.BlockWithParentFixture(ms.latestSealedBlock.Header)
+	ms.unfinalizedBlock = unittest.BlockWithParentFixture(ms.latestFinalizedBlock.Header)
+
+	ms.blocks = make(map[flow.Identifier]*flow.Block)
+	ms.blocks[ms.rootBlock.ID()] = &ms.rootBlock
+	ms.blocks[ms.latestSealedBlock.ID()] = &ms.latestSealedBlock
+	ms.blocks[ms.latestFinalizedBlock.ID()] = &ms.latestFinalizedBlock
+	ms.blocks[ms.unfinalizedBlock.ID()] = &ms.unfinalizedBlock
+
+	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP PROTOCOL STATE ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.state = &protocol.State{}
-	ms.state.On("Sealed").Return(
-		func() realproto.Snapshot {
-			return ms.sealedSnapshot
-		},
-		nil,
-	)
+
+	// define the protocol state snapshot of the latest finalized block
 	ms.state.On("Final").Return(
 		func() realproto.Snapshot {
 			return ms.finalSnapshot
 		},
 		nil,
 	)
-	ms.state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) realproto.Snapshot {
-			return ms.finalSnapshot
-		},
-		nil,
-	)
-
 	ms.finalSnapshot = &protocol.Snapshot{}
-	ms.finalSnapshot.On("Identity", mock.Anything).Return(
-		func(nodeID flow.Identifier) *flow.Identity {
-			identity := ms.identities[nodeID]
-			return identity
-		},
-		func(nodeID flow.Identifier) error {
-			_, found := ms.identities[nodeID]
-			if !found {
-				return fmt.Errorf("could not get identity (%x)", nodeID)
-			}
-			return nil
-		},
-	)
-	ms.finalSnapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
-			return ms.approvers
-		},
-		func(selector flow.IdentityFilter) error {
-			return nil
-		},
-	)
 	ms.finalSnapshot.On("Head").Return(
 		func() *flow.Header {
-			return &flow.Header{} // we don't care
+			return ms.latestFinalizedBlock.Header
 		},
 		nil,
 	)
 
+	// define the protocol state snapshot of the latest finalized and sealed block
+	ms.state.On("Sealed").Return(
+		func() realproto.Snapshot {
+			return ms.sealedSnapshot
+		},
+		nil,
+	)
 	ms.sealedSnapshot = &protocol.Snapshot{}
+	ms.sealedSnapshot.On("Head").Return(
+		func() *flow.Header {
+			return ms.latestSealedBlock.Header
+		},
+		nil,
+	)
+
+	// define the protocol state snapshot for any block in `ms.blocks`
+	ms.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) realproto.Snapshot {
+			block, found := ms.blocks[blockID]
+			if !found {
+				return stateSnapshotForUnknownBlock()
+			}
+			return stateSnapshotForKnownBlock(block.Header, ms.identities)
+		},
+	)
+	//ms.finalSnapshot.On("Identity", mock.Anything).Return(
+	//	func(nodeID flow.Identifier) *flow.Identity {
+	//		identity := ms.identities[nodeID]
+	//		return identity
+	//	},
+	//	func(nodeID flow.Identifier) error {
+	//		_, found := ms.identities[nodeID]
+	//		if !found {
+	//			return fmt.Errorf("could not get identity (%x)", nodeID)
+	//		}
+	//		return nil
+	//	},
+	//)
+	//ms.finalSnapshot.On("Identities", mock.Anything).Return(
+	//	func(selector flow.IdentityFilter) flow.IdentityList {
+	//		return ms.approvers
+	//	},
+	//	func(selector flow.IdentityFilter) error {
+	//		return nil
+	//	},
+	//)
+	//
+	//ms.state.On("AtBlockID", mock.Anything).Return(
+	//	func(blockID flow.Identifier) realproto.Snapshot {
+	//		return ms.refBlockSnapshot
+	//	},
+	//	nil,
+	//)
+
+	//ms.refBlockHeader = &flow.Header{Height: 20} // only need height
+	//ms.refBlockSnapshot = &protocol.Snapshot{}
+	//ms.refBlockSnapshot.On("Identity", mock.Anything).Return(
+	//	func(nodeID flow.Identifier) *flow.Identity {
+	//		identity := ms.identities[nodeID]
+	//		return identity
+	//	},
+	//	func(nodeID flow.Identifier) error {
+	//		_, found := ms.identities[nodeID]
+	//		if !found {
+	//			return fmt.Errorf("could not get identity (%x)", nodeID)
+	//		}
+	//		return nil
+	//	},
+	//)
+	//ms.refBlockSnapshot.On("Identities", mock.Anything).Return(
+	//	func(selector flow.IdentityFilter) flow.IdentityList {
+	//		return ms.approvers
+	//	},
+	//	func(selector flow.IdentityFilter) error {
+	//		return nil
+	//	},
+	//)
+	//ms.refBlockSnapshot.On("Head").Return(
+	//	func() *flow.Header {
+	//		return ms.refBlockHeader
+	//	},
+	//	nil,
+	//)
 
 	ms.sealedResults = make(map[flow.Identifier]*flow.ExecutionResult)
-	ms.blocks = make(map[flow.Identifier]*flow.Block)
 
 	ms.sealedResultsDB = &storage.ExecutionResults{}
 	ms.sealedResultsDB.On("ByID", mock.Anything).Return(
@@ -185,8 +262,12 @@ func (ms *MatchingSuite) SetupTest() {
 			return nil
 		},
 	)
-	ms.sealedResultsDB.On("Index", mock.Anything, mock.Anything).Return(
-		func(blockID, resultID flow.Identifier) error {
+	ms.sealedResultsDB.On("Store", mock.Anything).Return(
+		func(result *flow.ExecutionResult) error {
+			_, found := ms.sealedResults[result.BlockID]
+			if found {
+				return storerr.ErrAlreadyExists
+			}
 			return nil
 		},
 	)
@@ -306,6 +387,9 @@ func (ms *MatchingSuite) SetupTest() {
 }
 
 func (ms *MatchingSuite) TestOnReceiptInvalidOrigin() {
+	// we don't validate the origin of an execution receipt anymore, as Execution Nodes
+	// might forward us Execution Receipts from others for blocks they haven't computed themselves
+	ms.T().Skip()
 
 	// try to submit a receipt with a random origin ID
 	originID := ms.exeID
@@ -314,85 +398,93 @@ func (ms *MatchingSuite) TestOnReceiptInvalidOrigin() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().Error(err, "should reject receipt with mismatching origin and executor")
 
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+// try to submit a receipt from a NON-ExecutionNode  (here: consensus node)
 func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
-	// try ot submit a receipt from a consensus node
 	originID := ms.conID
-	receipt := unittest.ExecutionReceiptFixture()
-	receipt.ExecutorID = originID
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(originID))
 
-	// force state to not find the receipt's corresponding block
-	ms.state = &protocol.State{}
-	ms.state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) realproto.Snapshot {
-			snapshot := &protocol.Snapshot{}
-			snapshot.On("Head").Return(nil, fmt.Errorf("forced error"))
-			return snapshot
-		},
-		nil,
-	)
-	ms.matching.state = ms.state
+	//// force state to not find the receipt's corresponding block
+	//ms.state = &protocol.State{}
+	//ms.state.On("AtBlockID", mock.Anything).Return(
+	//	func(blockID flow.Identifier) realproto.Snapshot {
+	//		snapshot := &protocol.Snapshot{}
+	//		snapshot.On("Head").Return(nil, fmt.Errorf("forced error"))
+	//		return snapshot
+	//	},
+	//	nil,
+	//)
+	//ms.matching.state = ms.state
 
 	// onReceipt should not throw an error
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for unknown block")
 
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+// try to submit a receipt for a known block from a consensus node
 func (ms *MatchingSuite) TestOnReceiptInvalidRole() {
-
-	// try ot submit a receipt from a consensus node
 	originID := ms.conID
-	receipt := unittest.ExecutionReceiptFixture()
-	receipt.ExecutorID = originID
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(originID),
+		unittest.WithBlock(&ms.unfinalizedBlock),
+	)
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().Error(err, "should reject receipt from wrong node role")
+	ms.Require().True(engine.IsInvalidInputError(err))
 
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+// try ot submit a receipt from an Execution node, with zero unstaked node
 func (ms *MatchingSuite) TestOnReceiptUnstakedExecutor() {
-
-	// try ot submit a receipt from an unstaked node
 	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
-	receipt.ExecutorID = originID
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(originID),
+		unittest.WithBlock(&ms.unfinalizedBlock),
+	)
 	ms.identities[originID].Stake = 0
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().Error(err, "should reject receipt from unstaked node")
+	ms.Require().True(engine.IsInvalidInputError(err))
 
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+// matching engine should drop Result for known block that is already sealed
+// without trying to store anything
 func (ms *MatchingSuite) TestOnReceiptSealedResult() {
-
-	// try to submit a receipt for a sealed result
 	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
-	receipt.ExecutorID = originID
-	ms.sealedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(originID),
+		unittest.WithBlock(&ms.latestSealedBlock),
+	)
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for sealed result")
 
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+// try to submit a receipt for an already received result
 func (ms *MatchingSuite) TestOnReceiptPendingResult() {
-
-	// try to submit a receipt for a sealed result
 	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(originID))
 	receipt.ExecutorID = originID
 
 	ms.resultsPL.On("Add", mock.Anything).Run(
@@ -407,14 +499,14 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 
 	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+	ms.sealedResultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 }
 
 func (ms *MatchingSuite) TestOnReceiptValid() {
 
 	// try to submit a receipt that should be valid
 	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
-	receipt.ExecutorID = originID
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(originID))
 
 	ms.resultsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
@@ -431,14 +523,23 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 }
 
 func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
-
-	// try to submit an approval with a random origin ID
+	// approval from valid origin (i.e. a verification node) but with random ApproverID
 	originID := ms.verID
-	approval := unittest.ResultApprovalFixture()
+	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
+	ms.Require().True(engine.IsInvalidInputError(err))
 
+	// approval from random origin but with valid ApproverID (i.e. a verification node)
+	originID = unittest.IdentifierFixture() // random origin
+	approval = unittest.ResultApprovalFixture(unittest.WithApproverID(ms.verID))
+
+	err = ms.matching.onApproval(originID, approval)
+	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
+	ms.Require().True(engine.IsInvalidInputError(err))
+
+	// In both cases, we expect the approval to be rejected without hitting the mempools
 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -446,20 +547,7 @@ func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
 func (ms *MatchingSuite) TestApprovalUnknownBlock() {
 	// try to submit an approval for an unknown block
 	originID := ms.verID
-	approval := unittest.ResultApprovalFixture()
-	approval.Body.ApproverID = originID
-
-	// force state to not find the receipt's corresponding block
-	ms.state = &protocol.State{}
-	ms.state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) realproto.Snapshot {
-			snapshot := &protocol.Snapshot{}
-			snapshot.On("Head").Return(nil, storerr.ErrNotFound)
-			return snapshot
-		},
-		nil,
-	)
-	ms.matching.state = ms.state
+	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(originID)) // generates approval for random block
 
 	// make sure the approval is added to the cache for future processing
 	// check calls have the correct parameters
@@ -468,7 +556,7 @@ func (ms *MatchingSuite) TestApprovalUnknownBlock() {
 			added := args.Get(0).(*flow.ResultApproval)
 			ms.Assert().Equal(approval, added)
 		},
-	).Return(false, nil)
+	).Return(true, nil)
 
 	// onApproval should not throw an error
 	err := ms.matching.onApproval(originID, approval)
@@ -480,29 +568,33 @@ func (ms *MatchingSuite) TestApprovalUnknownBlock() {
 }
 
 func (ms *MatchingSuite) TestOnApprovalInvalidRole() {
-
 	// try to submit an approval from a consensus node
 	originID := ms.conID
-	approval := unittest.ResultApprovalFixture()
-	approval.Body.ApproverID = originID
+	approval := unittest.ResultApprovalFixture(
+		unittest.WithBlockID(ms.unfinalizedBlock.ID()),
+		unittest.WithApproverID(originID),
+	)
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().Error(err, "should reject approval from wrong approver role")
+	ms.Require().True(engine.IsInvalidInputError(err))
 
 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
 func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
-
 	// try to submit an approval from an unstaked approver
 	originID := ms.verID
-	approval := unittest.ResultApprovalFixture()
-	approval.Body.ApproverID = originID
+	approval := unittest.ResultApprovalFixture(
+		unittest.WithBlockID(ms.unfinalizedBlock.ID()),
+		unittest.WithApproverID(originID),
+	)
 	ms.identities[originID].Stake = 0
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().Error(err, "should reject approval from unstaked approver")
+	ms.Require().True(engine.IsInvalidInputError(err))
 
 	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -1133,4 +1225,33 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 
 	// should request n-1 blocks if n > requestReceiptThreshold
 	ms.Assert().Equal(len(requestedBlocks), n-1)
+}
+
+func stateSnapshotForUnknownBlock() *protocol.Snapshot {
+	snapshot := &protocol.Snapshot{}
+	snapshot.On("Identity", mock.Anything).Return(
+		nil, storerr.ErrNotFound,
+	)
+	snapshot.On("Head", mock.Anything).Return(
+		nil, storerr.ErrNotFound,
+	)
+	return snapshot
+}
+
+func stateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifier]*flow.Identity) *protocol.Snapshot {
+	snapshot := &protocol.Snapshot{}
+	snapshot.On("Identity", mock.Anything).Return(
+		func(nodeID flow.Identifier) *flow.Identity {
+			return identities[nodeID]
+		},
+		func(nodeID flow.Identifier) error {
+			_, found := identities[nodeID]
+			if !found {
+				return realproto.IdentityNotFoundErr{NodeID: nodeID}
+			}
+			return nil
+		},
+	)
+	snapshot.On("Head").Return(block, nil)
+	return snapshot
 }
