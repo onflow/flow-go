@@ -111,7 +111,7 @@ func (suite *BuilderSuite) Bootstrap() {
 		transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
 			tx.ReferenceBlockID = root.ID()
 			tx.ProposalKey.SequenceNumber = uint64(i)
-			tx.GasLimit = uint64(99999)
+			tx.GasLimit = uint64(9999)
 		})
 		added := suite.pool.Add(&transaction)
 		suite.Assert().True(added)
@@ -480,7 +480,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	// set the max gas to 200,000
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(200000))
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(20000))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
