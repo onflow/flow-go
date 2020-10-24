@@ -66,7 +66,7 @@ type Middleware struct {
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
 	rootBlockID       string
 	validators        []validators.MessageValidator
-	discovery         *Discovery
+	peerManager       *PeerManager
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -76,7 +76,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	rootBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
 	p2p := &P2PNode{}
@@ -155,13 +155,8 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
 	}
 
-	// create a discovery object to help libp2p discover peers
-	m.discovery = NewDiscovery(m.ctx, m.log, m.ov, m.me)
-
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
-		// set the discovery object
-		pubsub.WithDiscovery(m.discovery),
 		// skip message signing
 		pubsub.WithMessageSigning(false),
 		// skip message signature
@@ -188,6 +183,16 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		psOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
+	}
+
+	libp2pConnector, err := NewLibp2pConnector(m.libP2PNode.libP2PHost)
+	if err != nil {
+		return fmt.Errorf("failed to create libp2pConnector: %w", err)
+	}
+	m.peerManager = NewPeerManager(m.ctx, m.log, m.ov.Topology, libp2pConnector)
+	err = m.peerManager.Start()
+	if err != nil {
+		return fmt.Errorf("failed to start peer manager: %w", err)
 	}
 
 	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
@@ -340,27 +345,6 @@ func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) 
 	return nodeAddressFromIdentity(flowIdentity)
 }
 
-// nodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
-func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
-
-	// split the node address into ip and port
-	ip, port, err := net.SplitHostPort(flowIdentity.Address)
-	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not parse address %s: %w", flowIdentity.Address, err)
-	}
-
-	// convert the Flow key to a LibP2P key
-	lkey, err := PublicKey(flowIdentity.NetworkPubKey)
-	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
-	}
-
-	// create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
-
-	return nodeAddress, nil
-}
-
 func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {
 	var nodeAddrs []NodeAddress
 	for _, identity := range identityMap {
@@ -411,13 +395,23 @@ func (m *Middleware) Subscribe(channelID string) error {
 	// kick off the receive loop to continuously receive messages
 	go rs.receiveLoop(m.wg)
 
+	// update peers to add some nodes interested in the same topic as direct peers
+	m.peerManager.RequestPeerUpdate()
+
 	return nil
 }
 
 // Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
 func (m *Middleware) Unsubscribe(channelID string) error {
 	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
-	return m.libP2PNode.UnSubscribe(topic)
+	err := m.libP2PNode.UnSubscribe(topic)
+	if err != nil {
+		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channelID, err)
+	}
+	// update peers to remove nodes subscribed to channelID
+	m.peerManager.RequestPeerUpdate()
+
+	return nil
 }
 
 // processMessage processes a message and eventually passes it to the overlay
@@ -499,6 +493,10 @@ func (m *Middleware) UpdateAllowList() error {
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
 	}
+
+	// update peer connections
+	m.peerManager.RequestPeerUpdate()
+
 	return nil
 }
 
