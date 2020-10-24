@@ -27,8 +27,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-var ErrBlockNotFound = errors.New("block not found")
-
 // Engine is the Matching engine, which builds seals by matching receipts (aka
 // ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
 // from verification nodes), and saves the seals into seals mempool for adding
@@ -292,7 +290,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	// check if we already have the block the approval pertains to
 	head, err := e.state.AtBlockID(approval.Body.BlockID).Head()
 	if err != nil {
-		if !errors.Is(err, ErrBlockNotFound) {
+		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
 		}
 		// Don't error if the block is not known yet, because the checks in the
