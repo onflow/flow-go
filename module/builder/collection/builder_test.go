@@ -111,6 +111,7 @@ func (suite *BuilderSuite) Bootstrap() {
 		transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
 			tx.ReferenceBlockID = root.ID()
 			tx.ProposalKey.SequenceNumber = uint64(i)
+			tx.GasLimit = uint64(99999)
 		})
 		added := suite.pool.Add(&transaction)
 		suite.Assert().True(added)
@@ -460,8 +461,8 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 }
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
-	// set the max collection byte size to 50
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(50))
+	// set the max collection byte size to 600 (each tx is about 273 bytes)
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(600))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -474,12 +475,12 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	builtCollection := built.Payload.Collection
 
 	// should be only 1 transaction in the collection
-	suite.Assert().Equal(builtCollection.Len(), 1)
+	suite.Assert().Equal(builtCollection.Len(), 2)
 }
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
-	// set the max gas to 10000
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(10000))
+	// set the max gas to 200,000
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(200000))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -492,7 +493,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	builtCollection := built.Payload.Collection
 
 	// should be only 1 transaction in the collection
-	suite.Assert().Equal(builtCollection.Len(), 1)
+	suite.Assert().Equal(builtCollection.Len(), 2)
 }
 
 func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
