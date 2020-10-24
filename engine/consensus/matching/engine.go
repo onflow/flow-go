@@ -225,15 +225,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// if Execution Receipt is for block whose height is lower or equal to already sealed height
 	//  => drop Receipt
-	forUnsealedBlock, err := e.isAboveSealedHeight(head)
-	if err != nil {
-		return fmt.Errorf("could not find sealed block: %w", err)
-	}
-	if !forUnsealedBlock {
-		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
-		return nil
-	}
-
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
 		return fmt.Errorf("could not find sealed block: %w", err)
@@ -243,33 +234,16 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
-	err := e.ensureStakedNodeWithRole(receipt.ExecutorID, receipt.ExecutionResult.BlockID, flow.RoleExecution)
-
-	// get the identity of the origin node, so we can check if it's a valid
-	// source for a execution receipt (usually execution nodes)
-	identity, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
+	err = e.ensureStakedNodeWithRole(receipt.ExecutorID, head, flow.RoleExecution)
 	if err != nil {
-		if protocol.IsIdentityNotFound(err) {
-			return engine.NewInvalidInputErrorf("could not get executor identity: %w", err)
-		}
-
-		// unknown exception
-		return fmt.Errorf("could not get executor identity: %w", err)
+		return fmt.Errorf("failed to process execution receipt: %w", err)
 	}
 
-	// check that the origin is an execution node
-	if identity.Role != flow.RoleExecution {
-		return engine.NewInvalidInputErrorf("invalid executor node role (%s)", identity.Role)
-	}
-
-	// check if the identity has a stake
-	if identity.Stake == 0 {
-		return engine.NewInvalidInputErrorf("executor has zero stake (%x)", identity.NodeID)
-	}
-
-	result := &receipt.ExecutionResult
+	// TODO: check the approval's cryptographic integrityt.
+	//				if !errors.Is(err
 
 	// store the result to make it persistent for later
+	result := &receipt.ExecutionResult
 	err = e.resultsDB.Store(result) // internally de-duplicates
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
@@ -293,9 +267,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		e.log.Debug().Msg("skipping result already in mempool")
 		return nil
 	}
-
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
-
 	e.log.Info().Msg("execution result added to mempool")
 
 	// kick off a check for potential seal formation
@@ -306,12 +278,10 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 // onApproval processes a new result approval.
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
-
 	log := e.log.With().
 		Hex("approval_id", logging.Entity(approval)).
 		Hex("result_id", approval.Body.ExecutionResultID[:]).
 		Logger()
-
 	log.Info().Msg("result approval received")
 
 	// check approver matches the origin ID
@@ -319,27 +289,32 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
 	}
 
-	// Check if the approver was a staked verifier at that block. Don't error
-	// out if the block is not known yet, because this method will be called
-	// again for some house cleaning when we try to match approvals to chunks.
-	err := e.ensureStakedNodeWithRole(approval.Body.ApproverID, approval.Body.BlockID, flow.RoleVerification)
+	// check if we already have the block the approval pertains to
+	head, err := e.state.AtBlockID(approval.Body.BlockID).Head()
 	if err != nil {
-		// don't error out if the block was not found yet
 		if !errors.Is(err, ErrBlockNotFound) {
-			return err
+			return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
 		}
-	}
+		// Don't error if the block is not known yet, because the checks in the
+		// else-branch below are called again when we try to match approvals to chunks.
+	} else {
+		// drop approval, if it is for block whose height is lower or equal to already sealed height
+		sealed, err := e.state.Sealed().Head()
+		if err != nil {
+			return fmt.Errorf("could not find sealed block: %w", err)
+		}
+		if sealed.Height >= head.Height {
+			log.Debug().Msg("discarding approval for already sealed and finalized block height")
+			return nil
+		}
 
-	// TODO: check the approval's cryptographic integrity
+		// Check if the approver was a staked verifier at that block.
+		err = e.ensureStakedNodeWithRole(approval.Body.ApproverID, head, flow.RoleVerification)
+		if err != nil {
+			return fmt.Errorf("failed to process approval: %w", err)
+		}
 
-	// check if the result of this approval is already sealed
-	_, err = e.resultsDB.ByID(approval.Body.ExecutionResultID)
-	if err == nil {
-		log.Debug().Msg("discarding approval for sealed result")
-		return nil
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check result: %w", err)
+		// TODO: check the approval's cryptographic integrity
 	}
 
 	// store in the memory pool (it won't be added if it is already in there).
@@ -347,12 +322,10 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	if err != nil {
 		return err
 	}
-
 	if !added {
 		e.log.Debug().Msg("skipping approval already in mempool")
 		return nil
 	}
-
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
 	// kick off a check for potential seal formation
@@ -494,13 +467,11 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 RES_LOOP:
 	for _, incorporatedResult := range e.incorporatedResults.All() {
 
-		// if we have not received the block yet, we will just keep rechecking
-		// until the block has been received or the result has been purged
+		// not finding the block header for an incorporated result is a fatal
+		// implementation bug, as we only add results to the IncorporatedResults
+		// mempool, where _both_ the block that incorporates the result as well
+		// as the block the result pertains to are known
 		block, err := e.headersDB.ByBlockID(incorporatedResult.Result.BlockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			log.Debug().Msg("skipping result with unknown block")
-			continue
-		}
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -529,12 +500,12 @@ RES_LOOP:
 			continue
 		}
 
-		// we create one chunk per collection (at least for now), plus the
+		// we create one chunk per collection, plus the
 		// system chunk. so we can check if the chunk number matches with the
 		// number of guarantees plus one; this will ensure the execution receipt
 		// cannot lie about having less chunks and having the remaining ones
 		// approved
-		requiredChunks := 1 // system chunk must exist for each block's ExecutionResult, even if the block payload itself does not contain any chunks
+		requiredChunks := 1 // system chunk: must exist for block's ExecutionResult, even if block payload itself is empty
 
 		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if err != nil {
@@ -568,7 +539,7 @@ RES_LOOP:
 		}
 
 		// check that each chunk collects enough approvals
-		for i := 0; i < assignment.Len(); i++ {
+		for i := 0; i < requiredChunks; i++ {
 			// arriving at a failure condition here means that the execution
 			// result is invalid; we should skip it and move on to the next
 			// execution result.
@@ -577,6 +548,7 @@ RES_LOOP:
 			chunk, ok := incorporatedResult.Result.Chunks.ByIndex(uint64(i))
 			if !ok {
 				log.Warn().Msgf("chunk out of range requested: %d", i)
+				_ = e.incorporatedResults.Rem(incorporatedResult)
 				continue RES_LOOP
 			}
 
@@ -584,10 +556,15 @@ RES_LOOP:
 			// result contains all chunks and no duplicates.
 			if chunk.Index != uint64(i) {
 				log.Warn().Msgf("chunk out of place: pos = %d, index = %d", i, chunk.Index)
+				_ = e.incorporatedResults.Rem(incorporatedResult)
 				continue RES_LOOP
 			}
 
-			if !e.matchChunk(incorporatedResult, chunk, assignment) {
+			matched, err := e.matchChunk(incorporatedResult, block, chunk, assignment)
+			if err != nil {
+				return nil, fmt.Errorf("")
+			}
+			if !matched {
 				continue RES_LOOP
 			}
 		}
@@ -603,7 +580,7 @@ RES_LOOP:
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold. It also populates the IncorporatedResult's
 // collection of approval signatures to avoid repeated work.
-func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, chunk *flow.Chunk, assignment *chunks.Assignment) bool {
+func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *flow.Header, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
 
 	// get all the chunk approvals from mempool
 	approvals := e.approvals.ByChunk(incorporatedResult.Result.ID(), chunk.Index)
@@ -623,15 +600,17 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, chunk *
 		if !ok {
 			// if the approval comes from a node that wasn't even a staked
 			// verifier at that block, remove the approval from the mempool.
-			err := e.ensureStakedNodeWithRole(approverID, incorporatedResult.Result.BlockID, flow.RoleVerification)
+			err := e.ensureStakedNodeWithRole(approverID, block, flow.RoleVerification)
 			if err != nil {
-				// don't remove the approval if the error indicates that the
-				// block is not known yet.
-				if !errors.Is(err, ErrBlockNotFound) {
-					_, _ = e.approvals.RemApproval(approval)
+				if engine.IsInvalidInputError(err) {
+					_, err = e.approvals.RemApproval(approval)
+					if err != nil {
+						return false, fmt.Errorf("failed to remove approval from mempool: %w", err)
+					}
+					continue
 				}
+				return false, fmt.Errorf("failed to match chunks: %w", err)
 			}
-			continue
 		}
 
 		// Add signature to incorporated result so that we don't have to check
@@ -646,13 +625,13 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, chunk *
 	// TODO: this is only here temporarily to ease the migration to new chunk
 	// based sealing.
 	if !e.requireApprovals {
-		return true
+		return true, nil
 	}
 
 	// TODO:
 	//   * This is the happy path (requires just one approval per chunk).
 	//   * Full protocol should be +2/3 of all currently staked verifiers.
-	return validApprovals > 0
+	return validApprovals > 0, nil
 }
 
 // checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
@@ -687,19 +666,6 @@ func (e *Engine) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.He
 	}
 
 	return nil
-}
-
-// isAboveSealedHeight returns true if and only if block's Height is
-// strictly larger than the highest _sealed and finalized_ block.
-func (e *Engine) isAboveSealedHeight(block *flow.Header) (bool, error) {
-	sealed, err := e.state.Sealed().Head()
-	if err != nil {
-		return false, fmt.Errorf("could not retrieve sealed block: %w", err)
-	}
-	if sealed.Height >= block.Height {
-		return false, nil
-	}
-	return true, nil
 }
 
 // sealResult creates a seal for the incorporated result and adds it to the
@@ -852,7 +818,7 @@ func (e *Engine) requestPending() error {
 	// order to request them.
 	for height := sealed.Height; height < final.Height; height++ {
 		// add at most <maxUnsealedResults> number of results
-		if len(missingBlocksOrderedByHeight) >= int(e.maxUnsealedResults) {
+		if len(missingBlocksOrderedByHeight) >= e.maxUnsealedResults {
 			break
 		}
 
