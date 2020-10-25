@@ -47,6 +47,8 @@ func (q *Queue) Size() int {
 }
 
 // Returns difference between lowest and highest element in the queue
+// Formally, the Queue stores a tree. The height of the tree is the
+// number of edges on the longest downward path between the root and any leaf.
 func (q *Queue) Height() uint64 {
 	return q.Highest.Item.Height() - q.Head.Item.Height()
 }
@@ -96,11 +98,13 @@ func dequeue(queue *Queue) *Queue {
 	cache := make(map[flow.Identifier]*Node)
 
 	//copy all but head caches
+	headID := queue.Head.Item.ID()
 	for key, val := range queue.Nodes {
-		if key != queue.Head.Item.ID() {
+		if key != headID {
 			cache[key] = val
 		}
 	}
+
 	return &Queue{
 		Head:    onlyChild,
 		Nodes:   cache,

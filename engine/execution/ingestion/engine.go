@@ -220,7 +220,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	for height := lastExecutedHeight; height <= futureHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
 		if err != nil {
-			return fmt.Errorf("could not get block by height: %w", err)
+			return fmt.Errorf("could not get block by height: %v %w", height, err)
 		}
 
 		executableBlock := &entity.ExecutableBlock{
@@ -630,7 +630,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// or it was ejected from the mempool when it was full.
 			// either way, we will return
 			if !exists {
-				log.Debug().Msg("could not find block for collection")
+				e.log.Debug().Hex("collection_id", collID[:]).
+					Msg("could not find block for collection")
 				return nil
 			}
 
@@ -639,7 +640,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 				completeCollection, ok := executableBlock.CompleteCollections[collID]
 				if !ok {
-					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection", blockID)
+					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection",
+						blockID)
 				}
 
 				if completeCollection.IsCompleted() {
@@ -653,9 +655,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				completeCollection.Transactions = collection.Transactions
 
 				// check if the block becomes executable
-				completed := e.executeBlockIfComplete(executableBlock)
-
-				log.Debug().Hex("block_id", blockID[:]).Bool("completed", completed).Msg("collection added to block")
+				_ = e.executeBlockIfComplete(executableBlock)
 			}
 
 			// since we've received this collection, remove it from the index
