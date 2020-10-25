@@ -169,7 +169,7 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 
 	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)
 	errCount := 0
-	for result == nil || (result.Status != sdk.TransactionStatusFinalized && result.Status != sdk.TransactionStatusSealed) {
+	for result == nil || (result.Status != sdk.TransactionStatusSealed) {
 		time.Sleep(time.Second)
 		result, err = c.client.GetTransactionResult(ctx, id)
 		if err != nil {
