@@ -659,6 +659,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			}
 
 			// since we've received this collection, remove it from the index
+			// this also prevents from executing the same block twice, because the second
+			// time when the collection arrives, it will not be found in the blockByCollectionID
+			// index.
 			backdata.Rem(collID)
 
 			return nil
