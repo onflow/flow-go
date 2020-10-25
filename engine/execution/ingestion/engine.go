@@ -872,6 +872,20 @@ func (e *Engine) saveExecutionResults(
 		return nil, err
 	}
 
+	err = func() error {
+		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveExecutionReceipt)
+		defer span.Finish()
+
+		err = e.execState.PersistExecutionReceipt(ctx, receipt)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not persist execution receipt: %w", err)
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Hex("start_state", originalState).
@@ -992,11 +1006,6 @@ func (e *Engine) generateExecutionReceipt(
 	}
 
 	receipt.ExecutorSignature = sig
-
-	err = e.execState.PersistExecutionReceipt(ctx, receipt)
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return nil, fmt.Errorf("could not persist execution result: %w", err)
-	}
 
 	return receipt, nil
 }
