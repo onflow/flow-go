@@ -878,7 +878,7 @@ func (e *Engine) saveExecutionResults(
 
 		err = e.execState.PersistExecutionReceipt(ctx, receipt)
 		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return nil, fmt.Errorf("could not persist execution receipt: %w", err)
+			return fmt.Errorf("could not persist execution receipt: %w", err)
 		}
 		return nil
 	}()
