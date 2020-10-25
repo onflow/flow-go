@@ -33,6 +33,8 @@ import (
 // Workaround for https://github.com/stretchr/testify/pull/808
 const tickForAssertEventually = 100 * time.Millisecond
 
+var rootBlockID = unittest.IdentifierFixture().String()
+
 type LibP2PNodeTestSuite struct {
 	suite.Suite
 	ctx    context.Context
@@ -49,13 +51,16 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 func (l *LibP2PNodeTestSuite) SetupTest() {
 	l.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	l.ctx, l.cancel = context.WithCancel(context.Background())
-	golog.SetAllLoggers(golog.LevelWarn)
+	golog.SetAllLoggers(golog.LevelDebug)
+}
+
+func (l *LibP2PNodeTestSuite) TearDownTest() {
+	l.cancel()
 }
 
 // TestMultiAddress evaluates correct translations from
 // dns and ip4 to libp2p multi-address
 func (l *LibP2PNodeTestSuite) TestMultiAddress() {
-	defer l.cancel()
 	tt := []struct {
 		address      NodeAddress
 		multiaddress string
@@ -94,8 +99,6 @@ func (l *LibP2PNodeTestSuite) TestMultiAddress() {
 }
 
 func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
-	defer l.cancel()
-
 	// creates a single
 	nodes, _ := l.CreateNodes(1, nil, false)
 
@@ -137,7 +140,6 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 
 // TestAddPeers checks if nodes can be added as peers to a given node
 func (l *LibP2PNodeTestSuite) TestAddPeers() {
-	defer l.cancel()
 
 	count := 3
 
@@ -167,7 +169,6 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 
 // TestAddPeers checks if nodes can be added as peers to a given node
 func (l *LibP2PNodeTestSuite) TestRemovePeers() {
-	defer l.cancel()
 
 	count := 3
 
@@ -205,7 +206,7 @@ func (l *LibP2PNodeTestSuite) TestRemovePeers() {
 
 // TestCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
 func (l *LibP2PNodeTestSuite) TestCreateStream() {
-	defer l.cancel()
+
 	count := 2
 
 	// Creates nodes
@@ -214,7 +215,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 
 	address2 := addrs[1]
 
-	flowProtocolID := generateProtocolID(rootID)
+	flowProtocolID := generateProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 
@@ -249,7 +250,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
 func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
-	defer l.cancel()
+
 	count := 2
 	ch := make(chan string, count)
 
@@ -314,7 +315,6 @@ func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
 // TestCreateStreamTimeoutWithUnresponsiveNode tests that the CreateStream call does not block longer than the default
 // unicast timeout interval
 func (l *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() {
-	defer l.cancel()
 
 	// creates a regular node
 	peers, addrs := l.CreateNodes(1, nil, false)
@@ -340,9 +340,94 @@ func (l *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() {
 	assert.Error(l.T(), err)
 }
 
+// TestCreateStreamIsConcurrent tests that CreateStream calls can be made concurrently such that one blocked call
+// does not block another concurrent call.
+func (l *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
+
+	// bump up the unicast timeout to a high value
+	unicastTimeout = time.Hour
+
+	// create two regular node
+	goodPeers, goodAddrs := l.CreateNodes(2, nil, false)
+	defer l.StopNodes(goodPeers)
+	require.Len(l.T(), goodAddrs, 2)
+
+	// create a silent node which never replies
+	listener, silentNodeAddress := newSilentNode(l.T())
+	defer listener.Close()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	ch := make(chan struct{})
+	// spin off a go routine to create a stream to the unresponsive node
+	go func() {
+		wg.Done()
+		_, _ = goodPeers[0].CreateStream(l.ctx, silentNodeAddress) // this call will block
+		close(ch)
+	}()
+
+	// make sure the go routine to create a stream with the unresponsive node actually started
+	unittest.AssertReturnsBefore(l.T(), wg.Wait, 5*time.Millisecond)
+	// make sure the go routine to create a stream did not finish
+	select {
+	case <-time.After(10 * time.Millisecond):
+	case <-ch:
+		assert.Fail(l.T(), "CreateStream attempt to the unresponsive peer did not block")
+	}
+
+	var err error
+	// assert that the same peer can still connect to the other regular peer without being blocked
+	unittest.AssertReturnsBefore(l.T(),
+		func() {
+			_, err = goodPeers[0].CreateStream(l.ctx, goodAddrs[1])
+		},
+		10*time.Millisecond)
+	assert.NoError(l.T(), err)
+
+	// assert that the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
+	// good address
+	select {
+	case <-ch:
+		assert.Fail(l.T(), "CreateStream attempt to the unresponsive peer did not block")
+	default:
+	}
+}
+
+// TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
+func (l *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
+
+	// create two nodes
+	peers, addrs := l.CreateNodes(2, nil, false)
+	defer l.StopNodes(peers)
+	require.Len(l.T(), addrs, 2)
+
+	wg := sync.WaitGroup{}
+
+	// create a gate which gates the call to CreateStream for all concurrent go routines
+	gate := make(chan struct{})
+
+	createStream := func() {
+		<-gate
+		_, err := peers[0].CreateStream(l.ctx, addrs[1])
+		assert.NoError(l.T(), err) // assert that stream was successfully created
+		wg.Done()
+	}
+	// kick off 10 concurrent calls to CreateStream
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go createStream()
+	}
+	// open the gate by closing the channel
+	close(gate)
+
+	// no call should block
+	unittest.AssertReturnsBefore(l.T(), wg.Wait, 10*time.Millisecond)
+}
+
 // TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
 func (l *LibP2PNodeTestSuite) TestStreamClosing() {
-	defer l.cancel()
+
 	count := 10
 	ch := make(chan string, count)
 	defer close(ch)
@@ -416,7 +501,6 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 
 // TestPing tests that a node can ping another node
 func (l *LibP2PNodeTestSuite) TestPing() {
-	defer l.cancel()
 
 	// creates two nodes
 	nodes, nodeAddr := l.CreateNodes(2, nil, false)
@@ -438,7 +522,6 @@ func (l *LibP2PNodeTestSuite) TestPing() {
 
 // TestConnectionGating tests node allow listing by peer.ID
 func (l *LibP2PNodeTestSuite) TestConnectionGating() {
-	defer l.cancel()
 
 	// create 2 nodes
 	nodes, nodeAddrs := l.CreateNodes(2, nil, true)
@@ -518,7 +601,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandl
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler, allowList)
+		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootBlockID, handler, allowList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}

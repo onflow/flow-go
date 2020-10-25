@@ -42,17 +42,9 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *EchoEngineTestSuite) SetupTest() {
 	const count = 2
-	golog.SetAllLoggers(golog.LevelInfo)
-	s.ids = CreateIDs(count)
-
+	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := createMiddleware(logger, s.ids)
-	require.NoError(s.Suite.T(), err)
-	s.mws = mws
-
-	nets, err := createNetworks(logger, s.mws, s.ids, 100, false)
-	require.NoError(s.Suite.T(), err)
-	s.nets = nets
+	s.ids, s.mws, s.nets = generateIDsMiddlewaresNetworks(s.T(), count, logger, 100, nil, false)
 }
 
 // TearDownTest closes the networks within a specified timeout

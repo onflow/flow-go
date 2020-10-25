@@ -10,14 +10,20 @@ import (
 // IncorporatedResults implements the incorporated results memory pool of the
 // consensus nodes, used to store results that need to be sealed.
 type IncorporatedResults struct {
-	*Backend
-	size uint
+	backend *Backend
+	size    *uint
 }
 
 // NewIncorporatedResults creates a mempool for the incorporated results.
 func NewIncorporatedResults(limit uint) *IncorporatedResults {
+	var size uint
+	ejector := NewSizeEjector(&size)
 	return &IncorporatedResults{
-		Backend: NewBackend(WithLimit(limit)),
+		size: &size,
+		backend: NewBackend(
+			WithLimit(limit),
+			WithEject(ejector.Eject),
+		),
 	}
 }
 
@@ -27,7 +33,7 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 	key := incorporatedResult.Result.ID()
 
 	appended := false
-	err := ir.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	err := ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 
 		var incResults map[flow.Identifier]*flow.IncorporatedResult
 
@@ -65,7 +71,7 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 
 		backdata[key] = incorporatedResultMap
 		appended = true
-		ir.size++
+		*ir.size++
 		return nil
 	})
 
@@ -76,7 +82,7 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 func (ir *IncorporatedResults) All() []*flow.IncorporatedResult {
 	res := make([]*flow.IncorporatedResult, 0)
 
-	entities := ir.Backend.All()
+	entities := ir.backend.All()
 	for _, entity := range entities {
 		irMap, _ := entity.(model.IncorporatedResultMap)
 
@@ -92,7 +98,7 @@ func (ir *IncorporatedResults) All() []*flow.IncorporatedResult {
 // ExecutionResult, indexed by IncorporatedBlockID.
 func (ir *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult) {
 
-	entity, exists := ir.Backend.ByID(resultID)
+	entity, exists := ir.backend.ByID(resultID)
 	if !exists {
 		return nil, nil
 	}
@@ -110,7 +116,7 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 	key := incorporatedResult.Result.ID()
 
 	removed := false
-	_ = ir.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	_ = ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		var incResults map[flow.Identifier]*flow.IncorporatedResult
 
 		entity, ok := backdata[key]
@@ -148,7 +154,7 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 		}
 
 		removed = true
-		ir.size--
+		*ir.size--
 		return nil
 	})
 
@@ -157,5 +163,5 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 
 // Size returns the number of incorporated results in the mempool.
 func (ir *IncorporatedResults) Size() uint {
-	return ir.size
+	return *ir.size
 }
