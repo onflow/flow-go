@@ -55,12 +55,15 @@ type ReadOnlyExecutionState interface {
 // it checks whether the statecommitment exists in execution state.
 func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
 	_, err := state.StateCommitmentByBlockID(ctx, block)
+
+	// statecommitment exists means the block has been executed
 	if err == nil {
-		return false, nil
+		return true, nil
 	}
 
+	// statecommitment not exists means the block hasn't been executed yet
 	if errors.Is(err, storage.ErrNotFound) {
-		return true, nil
+		return false, nil
 	}
 
 	return false, err
