@@ -16,35 +16,34 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type ConnectednessTestSuite struct {
+type TopologyTestSuite struct {
 	suite.Suite
-	nets []*libp2p.Network
 }
 
 func TestRandPermTopologyTestSuite(t *testing.T) {
-	suite.Run(t, new(ConnectednessTestSuite))
+	suite.Run(t, new(TopologyTestSuite))
 }
 
-func (suite *ConnectednessTestSuite) TestTopologySmallScaleCollectionMinority() {
+func (suite *TopologyTestSuite) TestTopologySmallScaleCollectionMinority() {
 	suite.testTopology(12, flow.RoleCollection)
 }
 
-func (suite *ConnectednessTestSuite) TestTopologyModerateScaleCollectionMinority() {
+func (suite *TopologyTestSuite) TestTopologyModerateScaleCollectionMinority() {
 	suite.testTopology(100, flow.RoleCollection)
 }
 
-func (suite *ConnectednessTestSuite) TestTopologyMatureScaleCollectionMinority() {
+func (suite *TopologyTestSuite) TestTopologyMatureScaleCollectionMinority() {
 	suite.testTopology(1000, flow.RoleCollection)
 }
 
-// testTopology tests overall node connectedness and connectedness by role by keeping nodes of one role type in
-// minority (~2%)
-func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.Role) {
+// testTopology tests overall node connectedness and connectedness by channel ID by keeping nodes of one role type in
+// minority (~2%).
+// It is also evaluating the validity of identities in the generated topology as well as overall size of topology.
+func (suite *TopologyTestSuite) testTopology(total int, minorityRole flow.Role) {
 	distribution := createDistribution(total, minorityRole)
 	keys := make([]crypto.PrivateKey, 0)
 	ids := make(flow.IdentityList, 0)
@@ -57,8 +56,7 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	adjencyMap := make(map[flow.Identifier]flow.IdentityList, total)
 
 	// mocks state for collector nodes topology
-	// considers only a single cluster as higher cluster numbers are tested
-	// in collectionTopology_test
+
 	state := topology.CreateMockStateForCollectionNodes(suite.T(), ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
@@ -71,21 +69,34 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 
 	// mocks subscription manager and creates network in dryrun
 	sms := MockSubscriptionManager(suite.T(), ids)
-	suite.nets = GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, sms, DryRunNetwork)
+	nets := GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, sms, DryRunNetwork)
 
 	// extracts adjacency matrix of the entire system
-	for i, net := range suite.nets {
-		subset, err := net.Topology()
-
+	for i, net := range nets {
+		top, err := net.Topology()
 		require.NoError(suite.T(), err)
-		adjencyMap[ids[i].NodeID] = subset
+
+		// evaluates size of topology
+		checkTopologySize(suite.T(), total, top)
+
+		// evaluates all ids in topology are valid
+		checkMembership(suite.T(), top, ids)
+		adjencyMap[ids[i].NodeID] = top
 	}
 
-	// evaluates subgraph of nodes subscribed to a channelID is connected
-	for channelID := engine.ChannelIDs(){
-		checkConnectednessByChannelID()
+	// evaluates subgraph of nodes subscribed to a channelID is connected.
+	for _, channelID := range engine.ChannelIDs() {
+		checkConnectednessByChannelID(suite.T(), adjencyMap, ids, channelID)
+
+		if engine.IsClusterChannelID(channelID) {
+			checkConnectedness()
+		}
 	}
 
+	// evaluates graph as whole is connected
+	// this implies that follower engines on distinct nodes can exchange messages
+	// and follow the consensus.
+	checkConnectedness(suite.T(), adjencyMap, ids)
 }
 
 // createDistribution creates a count distribution of ~total number of nodes with 2% minority node count
@@ -112,9 +123,9 @@ func createDistribution(total int, minority flow.Role) map[flow.Role]int {
 	return countMap
 }
 
-// checkConnectednessByRole verifies that the subgraph of nodes of the same role is connected.
-func checkConnectednessByRole(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, role flow.Role) {
-	checkGraphConnected(t, adjMap, ids, filter.HasRole(role))
+// checkConnectedness verifies graph as a whole is connected.
+func checkConnectedness(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList) {
+	checkGraphConnected(t, adjMap, ids, filter.Any)
 }
 
 // checkConnectednessByChannelID verifies that the subgraph of nodes subscribed to a channelID is connected.
@@ -142,6 +153,33 @@ func checkGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityL
 
 	// assert that expected number of nodes were visited by DFS
 	assert.Equal(t, expectedCount, len(visited))
+}
+
+// checkMembership checks each identity in a top list belongs to all identity list
+func checkMembership(t *testing.T, top flow.IdentityList, all flow.IdentityList) {
+	for _, id := range top {
+		require.Contains(t, all, id.NodeID)
+	}
+}
+
+// TODO: fix this test after we have fanout optimized.
+// checkTopologySize evaluates that overall topology size of a node is bound by the fanout of system.
+func checkTopologySize(t *testing.T, total int, top flow.IdentityList) {
+	t.Skip("this test requires optimizing the fanout per topic")
+	fanout := (total + 1) / 2
+	require.True(t, len(top) <= fanout)
+}
+
+func clusterNum(t *testing.T, ids flow.IdentityList, size int) int {
+	collectors := ids.Filter(filter.HasRole(flow.RoleCollection))
+
+	// we need at least two collector nodes to generate a cluster
+	// and check the connectedness
+	require.True(t, len(collectors) >= 2)
+	require.True(t, size > 0)
+
+	clusterNum := len(collectors) / size
+	return int(math.Max(float64(clusterNum), 1))
 }
 
 // dfs to check graph connectedness
