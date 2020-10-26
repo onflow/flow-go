@@ -10,12 +10,12 @@ import (
 )
 
 // TestGetRolesByTopic evaluates correctness of GetRoleByTopic function against
-// inclusion and exclusion of roles. Essentially, the test evaluates that GetRolesByTopic
-// operates on top of topicMap.
-func TestGetRolesByTopic(t *testing.T) {
+// inclusion and exclusion of roles. Essentially, the test evaluates that RolesByChannelID
+// operates on top of channelIdMap.
+func TestGetRolesByChannelID(t *testing.T) {
 	// asserts existing topic with its role
 	// the roles list should contain collection and consensus roles
-	roles, ok := engine.GetRolesByTopic(engine.PushGuarantees)
+	roles, ok := engine.RolesByChannelID(engine.PushGuarantees)
 	assert.True(t, ok)
 	assert.Len(t, roles, 2)
 	assert.Contains(t, roles, flow.RoleConsensus)
@@ -25,15 +25,15 @@ func TestGetRolesByTopic(t *testing.T) {
 	assert.NotContains(t, roles, flow.RoleAccess)
 
 	// asserts a non-existing topic
-	roles, ok = engine.GetRolesByTopic("non-existing-topic")
+	roles, ok = engine.RolesByChannelID("non-existing-topic")
 	assert.False(t, ok)
 	assert.Nil(t, roles)
 }
 
-// TestGetTopicsByRole evaluates retrieving topics associated with a role from the
-// topics map using GetTopicsByRole. Essentially it evaluates that GetTopicsByRole
-// operates on top of topicMap.
-func TestGetTopicsByRole(t *testing.T) {
+// TestGetChannelIDByRole evaluates retrieving channel IDs associated with a role from the
+// channel IDs map using ChannelIDsByRole. Essentially it evaluates that ChannelIDsByRole
+// operates on top of channelIDMap.
+func TestGetChannelIDByRole(t *testing.T) {
 	// asserts topics by the role for verification node
 	// it should have the topics of
 	// - PushBlocks
@@ -43,7 +43,7 @@ func TestGetTopicsByRole(t *testing.T) {
 	// - TestNetwork
 	// - TestMetric
 	// the roles list should contain collection and consensus roles
-	topics := engine.GetTopicsByRole(flow.RoleVerification)
+	topics := engine.ChannelIDsByRole(flow.RoleVerification)
 	assert.Len(t, topics, 6)
 	assert.Contains(t, topics, engine.PushBlocks)
 	assert.Contains(t, topics, engine.PushReceipts)
