@@ -1,19 +1,15 @@
 package topology_test
 
 import (
-	"os"
 	"sort"
 	"testing"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	protocol2 "github.com/onflow/flow-go/state/protocol"
@@ -27,7 +23,6 @@ type TopicAwareTopologyTestSuite struct {
 	suite.Suite
 	state  protocol2.State   // represents a mocked protocol state
 	ids    flow.IdentityList // represents the identity list of all nodes in the system
-	nets   []*libp2p.Network // represents the single network instance that creates topology
 	me     flow.Identity     // represents identity of single instance of node that creates topology
 	fanout uint              // represents maximum number of connections this peer allows to have
 }
@@ -43,52 +38,10 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// TODO: optimize value of fanout.
 	suite.fanout = 100
 
-	ids, keys := test.GenerateIDs(suite.T(), 100, test.RunNetwork, unittest.WithAllRoles())
-	suite.ids = ids
+	suite.ids, _ = test.GenerateIDs(suite.T(), 100, test.RunNetwork, unittest.WithAllRoles())
 
 	// takes firs id as the current nodes id
 	suite.me = *suite.ids[0]
-
-	// mocks state for collector nodes topology
-	// considers only a single cluster as higher cluster numbers are tested
-	// in collectionTopology_test
-	suite.state = topology.CreateMockStateForCollectionNodes(suite.T(),
-		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
-
-	// creates topology instances for the nodes based on their roles
-	tops := test.GenerateTopologies(suite.T(), suite.state, suite.ids)
-
-	// creates middleware and network instances
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := test.GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
-
-	// mocks subscription manager and creates network in dryrun
-	sms := test.MockSubscriptionManager(suite.T(), suite.ids)
-	suite.nets = test.GenerateNetworks(suite.T(), logger, suite.ids, mws, 1, tops, sms, test.DryRunNetwork)
-}
-
-// TODO: fix this test after we have fanout optimized.
-// TestTopologySize evaluates that overall topology size of a node is bound by its fanout.
-func (suite *TopicAwareTopologyTestSuite) TestTopologySize() {
-	suite.T().Skip("this test requires optimizing the fanout per topic")
-	for _, net := range suite.nets {
-		top, err := net.Topology()
-		require.NoError(suite.T(), err)
-		require.Len(suite.T(), top, int(suite.fanout))
-	}
-}
-
-// TestMembership evaluates every id in topology to be a protocol id
-func (suite *TopicAwareTopologyTestSuite) TestMembership() {
-	for _, net := range suite.nets {
-		top, err := net.Topology()
-		require.NoError(suite.T(), err)
-
-		// every id in topology should be an id of the protocol
-		for _, id := range top {
-			require.Contains(suite.T(), suite.ids.NodeIDs(), id.NodeID)
-		}
-	}
 }
 
 // TestTopologySize_Topic verifies that size of each topology fanout per topic is greater than
@@ -98,12 +51,12 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 		top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state)
 		require.NoError(suite.T(), err)
 
-		topics := engine.GetTopicsByRole(suite.me.Role)
+		topics := engine.ChannelIDsByRole(suite.me.Role)
 		require.Greater(suite.T(), len(topics), 1)
 
 		for _, topic := range topics {
 			// extracts total number of nodes subscribed to topic
-			roles, ok := engine.GetRolesByTopic(topic)
+			roles, ok := engine.RolesByChannelID(topic)
 			require.True(suite.T(), ok)
 
 			ids, err := top.Subset(suite.ids, suite.fanout, topic)
@@ -125,7 +78,7 @@ func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 	top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state)
 	require.NoError(suite.T(), err)
 
-	topics := engine.GetTopicsByRole(suite.me.Role)
+	topics := engine.ChannelIDsByRole(suite.me.Role)
 	require.Greater(suite.T(), len(topics), 1)
 
 	// for each topic samples 100 topologies
@@ -174,7 +127,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 
 	// for each topic samples 100 topologies
 	// all topologies for a topic should be the same
-	topics := engine.GetTopicsByRole(flow.RoleConsensus)
+	topics := engine.ChannelIDsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
 	for _, identity := range suite.ids {
