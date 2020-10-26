@@ -237,7 +237,7 @@ func (e *Engine) reloadFinalizedUnexecutedBlocks() error {
 
 	e.log.Info().Msgf("last finalized and executed height: %v", firstUnexecuted)
 
-	// starting from the last executed block, go through each unexecuted and finalized block
+	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
 	for height := firstUnexecuted; height <= final.Height; height++ {
 		header, err := e.state.AtHeight(height).Head()
