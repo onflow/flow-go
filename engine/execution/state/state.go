@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -48,6 +49,21 @@ type ReadOnlyExecutionState interface {
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
 	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
+}
+
+// IsBlockExecuted returns whether the block has been executed.
+// it checks whether the statecommitment exists in execution state.
+func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
+	_, err := state.StateCommitmentByBlockID(ctx, block)
+	if err == nil {
+		return false, nil
+	}
+
+	if errors.Is(err, storage.ErrNotFound) {
+		return true, nil
+	}
+
+	return false, err
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
