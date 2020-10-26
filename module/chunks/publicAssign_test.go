@@ -10,7 +10,6 @@ import (
 
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -44,7 +43,7 @@ func TestAssignment(t *testing.T) {
 func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	size := 5
 	// creates ids and twice chunks of the ids
-	ids := test.CreateIDs(size)
+	ids := unittest.IdentityListFixture(size)
 	chunks := a.CreateChunks(2*size, a.T())
 	assignment := chmodels.NewAssignment()
 
@@ -83,7 +82,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	size := 5
 	// creates ids and twice chunks of the ids
-	var ids flow.IdentityList = test.CreateIDs(size)
+	var ids flow.IdentityList = unittest.IdentityListFixture(size)
 	chunks := a.CreateChunks(2, a.T())
 	assignment := chmodels.NewAssignment()
 
@@ -121,7 +120,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 
 	// creates random ids
 	count := 10
-	var idList flow.IdentityList = test.CreateIDs(count)
+	var idList flow.IdentityList = unittest.IdentityListFixture(count)
 	var ids flow.IdentifierList = idList.NodeIDs()
 	original := make(flow.IdentifierList, count)
 	copy(original, ids)
@@ -166,7 +165,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	count := 10
 	subset := 4
 
-	var idList flow.IdentityList = test.CreateIDs(count)
+	var idList flow.IdentityList = unittest.IdentityListFixture(count)
 	var ids flow.IdentifierList = idList.NodeIDs()
 	original := make([]flow.Identifier, count)
 	copy(original, ids)
@@ -200,7 +199,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// creates two set of the same nodes
-	nodes1 := test.CreateIDs(n)
+	nodes1 := unittest.IdentityListFixture(n)
 	nodes2 := make([]*flow.Identity, n)
 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
@@ -267,7 +266,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// creates nodes and keeps a copy of them
-	nodes := test.CreateIDs(verNum)
+	nodes := unittest.IdentityListFixture(verNum)
 	original := make([]*flow.Identity, verNum)
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
@@ -294,7 +293,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
 
 	// creates nodes and keeps a copy of them
-	nodes := test.CreateIDs(5)
+	nodes := unittest.IdentityListFixture(5)
 	assigner, err := NewPublicAssignment(3, state)
 	require.NoError(a.T(), err)
 

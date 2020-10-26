@@ -3,8 +3,10 @@ package trie
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
@@ -382,6 +384,44 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 		return false
 	}
 	return o.PathLength() == mt.PathLength() && bytes.Equal(o.RootHash(), mt.RootHash())
+}
+
+// DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
+func (mt *MTrie) DumpAsJSON(w io.Writer) error {
+
+	// Use encoder to prevent building entire trie in memory
+	enc := json.NewEncoder(w)
+
+	err := mt.dumpAsJSON(mt.root, enc)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
+	if n.IsLeaf() {
+		err := encoder.Encode(n.Payload())
+		if err != nil {
+			return err
+		}
+	}
+
+	if lChild := n.LeftChild(); lChild != nil {
+		err := mt.dumpAsJSON(lChild, encoder)
+		if err != nil {
+			return err
+		}
+	}
+
+	if rChild := n.RigthChild(); rChild != nil {
+		err := mt.dumpAsJSON(rChild, encoder)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]

@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -33,14 +32,13 @@ type Engine struct {
 	conduit      network.Conduit
 	me           module.Local
 	state        protocol.State
-	pool         mempool.Transactions
 	collections  storage.Collections
 	transactions storage.Transactions
 
 	recipientCount uint // number of consensus nodes to push to
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "pusher").Logger(),
@@ -48,7 +46,6 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, engMetric
 		colMetrics:     colMetrics,
 		me:             me,
 		state:          state,
-		pool:           pool,
 		collections:    collections,
 		transactions:   transactions,
 		recipientCount: DefaultRecipientCount,

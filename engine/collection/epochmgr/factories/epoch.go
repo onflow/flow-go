@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/epochs"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
@@ -15,7 +15,7 @@ import (
 
 type EpochComponentsFactory struct {
 	me       module.Local
-	pool     mempool.Transactions // TODO make per-epoch
+	pools    *epochs.TransactionPools
 	builder  *BuilderFactory
 	state    *ClusterStateFactory
 	hotstuff *HotStuffFactory
@@ -25,7 +25,7 @@ type EpochComponentsFactory struct {
 
 func NewEpochComponentsFactory(
 	me module.Local,
-	pool mempool.Transactions, // TODO make per-epoch
+	pools *epochs.TransactionPools,
 	builder *BuilderFactory,
 	state *ClusterStateFactory,
 	hotstuff *HotStuffFactory,
@@ -35,7 +35,7 @@ func NewEpochComponentsFactory(
 
 	factory := &EpochComponentsFactory{
 		me:       me,
-		pool:     pool,
+		pools:    pools,
 		builder:  builder,
 		state:    state,
 		hotstuff: hotstuff,
@@ -98,7 +98,15 @@ func (factory *EpochComponentsFactory) Create(
 		}
 	}
 
-	builder, finalizer, err := factory.builder.Create(headers, payloads, factory.pool)
+	// get the transaction pool for the epoch
+	counter, err := epoch.Counter()
+	if err != nil {
+		err = fmt.Errorf("could not get epoch counter: %w", err)
+		return
+	}
+	pool := factory.pools.ForEpoch(counter)
+
+	builder, finalizer, err := factory.builder.Create(headers, payloads, pool)
 	if err != nil {
 		err = fmt.Errorf("could not create builder/finalizer: %w", err)
 		return

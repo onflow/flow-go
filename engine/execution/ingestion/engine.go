@@ -503,7 +503,10 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executed.ID())
 			if !exists {
-				return fmt.Errorf("fatal error - executed block not present in execution queue")
+				// when the block no longer exists in the queue, it means there was a race condition that
+				// two onBlockExecuted was called for the same block, and one process has already removed the
+				// block from the queue, so we will print an error here
+				return fmt.Errorf("block has been executed already, no long exists in the queue")
 			}
 
 			// dismount the executed block and all its children
@@ -514,6 +517,9 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			for _, queue := range newQueues {
 				added := executionQueues.Add(queue)
 				if !added {
+					// blocks should be unique in execution queues, if we dismount all the children blocks, then
+					// add it back to the queues, then it should always be able to add.
+					// If not, then there is a bug that the queues have duplicated blocks
 					return fmt.Errorf("fatal error - child block already in execution queue")
 				}
 
@@ -1021,6 +1027,20 @@ func (e *Engine) saveExecutionResults(
 		return nil, err
 	}
 
+	err = func() error {
+		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveExecutionReceipt)
+		defer span.Finish()
+
+		err = e.execState.PersistExecutionReceipt(ctx, receipt)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not persist execution receipt: %w", err)
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Hex("start_state", originalState).
@@ -1141,11 +1161,6 @@ func (e *Engine) generateExecutionReceipt(
 	}
 
 	receipt.ExecutorSignature = sig
-
-	err = e.execState.PersistExecutionReceipt(ctx, receipt)
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return nil, fmt.Errorf("could not persist execution result: %w", err)
-	}
 
 	return receipt, nil
 }

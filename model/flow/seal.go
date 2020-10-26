@@ -2,21 +2,11 @@
 
 package flow
 
-import (
-	"github.com/onflow/flow-go/crypto"
-)
-
-// AggregatedSignature contains all approvers attenstation signature and verifier IDs per chunk
-type AggregatedSignature struct {
-	VerifierSignatures []crypto.Signature // TODO: this will later be replaced by a sinlge aggregated signature once we have implemented BLS aggregation
-	SignerIDs          []Identifier       // The Identifiers of all the signers
-}
-
 type Seal struct {
 	BlockID                Identifier
 	ResultID               Identifier
 	FinalState             StateCommitment
-	AggregatedApprovalSigs []AggregatedSignature
+	AggregatedApprovalSigs []AggregatedSignature // one AggregatedSignature per chunk
 	ServiceEvents          []ServiceEvent
 }
 
