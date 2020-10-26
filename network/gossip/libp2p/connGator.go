@@ -1,6 +1,8 @@
 package libp2p
 
 import (
+	"sync"
+
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/control"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -14,6 +16,7 @@ var _ connmgr.ConnectionGater = (*connGater)(nil)
 // connGater is the implementatiion of the libp2p connmgr.ConnectionGater interface
 // It provides node allowlisting by libp2p peer.ID which is derived from the node public networking key
 type connGater struct {
+	sync.RWMutex
 	peerIDAllowlist map[peer.ID]struct{} // the in-memory map of approved peer IDs
 	log             zerolog.Logger
 }
@@ -38,7 +41,9 @@ func (c *connGater) update(peerInfos []peer.AddrInfo) {
 	}
 
 	// cache the new map
+	c.Lock()
 	c.peerIDAllowlist = peerIDs
+	c.Unlock()
 
 	c.log.Info().Msg("approved list of peers updated")
 }
@@ -85,6 +90,8 @@ func (c *connGater) InterceptUpgraded(network.Conn) (allow bool, reason control.
 }
 
 func (c *connGater) validPeerID(p peer.ID) bool {
+	c.RLock()
+	defer c.RUnlock()
 	_, ok := c.peerIDAllowlist[p]
 	return ok
 }
