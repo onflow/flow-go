@@ -737,6 +737,13 @@ func expectedID(expectedID flow.Identifier) interface{} {
 		})
 }
 
+func entityWithID(expectedID flow.Identifier) interface{} {
+	return mock.MatchedBy(
+		func(entity flow.Entity) bool {
+			return expectedID == entity.ID()
+		})
+}
+
 // try to get matched results with nothing in memory pools
 func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
 	results, err := ms.matching.sealableResults()
@@ -813,7 +820,7 @@ func (ms *MatchingSuite) TestSealableResultsInvalidSubgraph() {
 	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
 
 	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.resultsPL.On("Rem", incorporatedResult.ID()).Return(true).Once()
+	ms.resultsPL.On("Rem", entityWithID(incorporatedResult.ID())).Return(true).Once()
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
