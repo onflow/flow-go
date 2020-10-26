@@ -272,3 +272,6 @@ func (v Value) Equals(other Value) bool {
 func (v Value) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hex.EncodeToString(v))
 }
+
+// Migration defines how to convert the given slice of input payloads into an slice of output payloads
+type Migration func(payload []Payload) ([]Payload, error)
