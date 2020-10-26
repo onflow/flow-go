@@ -79,12 +79,14 @@ func (a *Accounts) Exists(address flow.Address) (bool, error) {
 	return false, nil
 }
 
-func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, generator flow.AddressGenerator) (flow.Address, error) {
-	// generate the new account address
-	var newAddress flow.Address
-	newAddress, err := generator.NextAddress()
+// Create account sets all required registers on an address.
+func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Address) error {
+	exists, err := a.Exists(newAddress)
 	if err != nil {
-		return flow.EmptyAddress, err
+		return err
+	}
+	if exists {
+		return fmt.Errorf("account already created on %s", newAddress.Hex())
 	}
 
 	// mark that this account exists
@@ -92,12 +94,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, generator flow.Add
 
 	a.ledger.Set(string(newAddress.Bytes()), string(newAddress.Bytes()), keyCode, nil)
 
-	err = a.SetAllPublicKeys(newAddress, publicKeys)
-	if err != nil {
-		return flow.EmptyAddress, err
-	}
-
-	return newAddress, nil
+	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {

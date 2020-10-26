@@ -410,9 +410,12 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		}
 	}
 
-	var flowAddress flow.Address
+	flowAddress, err := e.addressGenerator.NextAddress()
+	if err != nil {
+		return address, err
+	}
 
-	flowAddress, err = e.accounts.Create(nil, e.addressGenerator)
+	err = e.accounts.Create(nil, flowAddress)
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return address, err

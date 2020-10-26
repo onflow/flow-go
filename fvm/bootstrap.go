@@ -69,7 +69,12 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := b.accounts.Create(nil, b.addressGenerator)
+	address, err := b.addressGenerator.NextAddress()
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate address: %s", err))
+	}
+
+	err = b.accounts.Create(nil, address)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -78,7 +83,12 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := b.accounts.Create([]flow.AccountPublicKey{accountKey}, b.addressGenerator)
+	address, err := b.addressGenerator.NextAddress()
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate address: %s", err))
+	}
+
+	err = b.accounts.Create([]flow.AccountPublicKey{accountKey}, address)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}

@@ -14,8 +14,10 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 
 	accounts := state.NewAccounts(ledger)
 	addressGenerator := &flow.MonotonicAddressGenerator{}
+	address, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
 
-	address, err := accounts.Create(nil, addressGenerator)
+	err = accounts.Create(nil, address)
 	require.NoError(t, err)
 
 	require.NotPanics(t, func() {
@@ -30,8 +32,10 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 
 	accounts := state.NewAccounts(ledger)
 	addressGenerator := &flow.MonotonicAddressGenerator{}
+	address, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
 
-	address, err := accounts.Create(nil, addressGenerator)
+	err = accounts.Create(nil, address)
 	require.NoError(t, err)
 
 	ledger.Delete(
