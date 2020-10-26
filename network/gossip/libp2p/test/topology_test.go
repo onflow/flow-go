@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
@@ -80,13 +81,11 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 		adjencyMap[ids[i].NodeID] = subset
 	}
 
-	// TODO: change it to connectedness by topic
-	// check that nodes of the same role form a connected graph
-	checkConnectednessByRole(suite.T(), adjencyMap, ids, minorityRole)
+	// evaluates subgraph of nodes subscribed to a channelID is connected
+	for channelID := engine.ChannelIDs(){
+		checkConnectednessByChannelID()
+	}
 
-	// TODO: remove it once we have connectedness by topic
-	// check that nodes form a connected graph
-	checkConnectedness(suite.T(), adjencyMap, ids)
 }
 
 // createDistribution creates a count distribution of ~total number of nodes with 2% minority node count
@@ -113,12 +112,17 @@ func createDistribution(total int, minority flow.Role) map[flow.Role]int {
 	return countMap
 }
 
+// checkConnectednessByRole verifies that the subgraph of nodes of the same role is connected.
 func checkConnectednessByRole(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, role flow.Role) {
 	checkGraphConnected(t, adjMap, ids, filter.HasRole(role))
 }
 
-func checkConnectedness(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList) {
-	checkGraphConnected(t, adjMap, ids, filter.Any)
+// checkConnectednessByChannelID verifies that the subgraph of nodes subscribed to a channelID is connected.
+func checkConnectednessByChannelID(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList,
+	channelID string) {
+	roles, ok := engine.RolesByChannelID(channelID)
+	require.True(t, ok)
+	checkGraphConnected(t, adjMap, ids, filter.HasRole(roles...))
 }
 
 // checkGraphConnected checks if the graph represented by the adjacency matrix is connected.

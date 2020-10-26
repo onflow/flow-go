@@ -226,7 +226,7 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.Subs
 		sm.On("Register", mock3.Anything, mock3.Anything).Return(err)
 		sm.On("Unregister", mock3.Anything).Return(err)
 		sm.On("GetEngine", mock3.Anything).Return(err)
-		sm.On("GetChannelIDs").Return(engine.GetTopicsByRole(id.Role))
+		sm.On("GetChannelIDs").Return(engine.ChannelIDsByRole(id.Role))
 		sms[i] = sm
 	}
 

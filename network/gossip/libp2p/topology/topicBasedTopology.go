@@ -37,7 +37,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState)
 // construct a connected graph component among all the subscribers to the topic.
 func (t *TopicBasedTopology) Subset(ids flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
 	var subscribers flow.IdentityList
-	if engine.IsClusterTopic(topic) {
+	if engine.IsClusterChannelID(topic) {
 		// extracts cluster peer ids to which the node belongs to.
 		clusterPeers, err := t.clusterPeers()
 		if err != nil {
@@ -49,7 +49,7 @@ func (t *TopicBasedTopology) Subset(ids flow.IdentityList, fanout uint, topic st
 		// not a cluster-based topic.
 		//
 		// extracts flow roles subscribed to topic.
-		roles, ok := engine.GetRolesByTopic(topic)
+		roles, ok := engine.RolesByChannelID(topic)
 		if !ok {
 			return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", topic)
 		}
