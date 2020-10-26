@@ -241,6 +241,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
 			return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
 		}
+		if len(irSeal.Seal.FinalState) < 1 {
+			// respective Execution Result should have been rejected by matching engine
+			return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
+		}
 		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
 			sc1json, err := json.Marshal(irSeal)
 			if err != nil {
