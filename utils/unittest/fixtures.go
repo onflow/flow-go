@@ -454,9 +454,11 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
+		startState := result.Chunks[0].StartState
 		updatedResult := *ResultForBlockFixture(block)
 		result.BlockID = updatedResult.BlockID
 		result.Chunks = updatedResult.Chunks
+		result.Chunks[0].StartState = startState
 	}
 }
 

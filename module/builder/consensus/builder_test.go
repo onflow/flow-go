@@ -101,7 +101,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 	// block, and add it to the payload. The corresponding IncorporatedResult
 	// will be use to seal the parentBlock block, and to create an
 	// IncorporatedResultSeal for the seal mempool.
-	var incorporatedResult *flow.IncorporatedResult
+	var incorporatedResultForPrevBlock *flow.IncorporatedResult
 	if parentBlock != nil {
 		previousResult, found := bs.resultForBlock[parentBlock.ID()]
 		if !found {
@@ -110,7 +110,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(previousResult))
 		block.Payload.Receipts = append(block.Payload.Receipts, receipt)
 
-		incorporatedResultForPrevBlock := unittest.IncorporatedResult.Fixture(
+		incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(previousResult),
 			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 		)
@@ -130,7 +130,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 	// seal the parentBlock block with the result included in this block. Do not
 	// seal the first block because it is assumed that it is already sealed.
 	if parentBlock != nil && parentBlock.ID() != bs.firstID {
-		bs.chainSeal(incorporatedResult)
+		bs.chainSeal(incorporatedResultForPrevBlock)
 	}
 
 	return &block
@@ -200,10 +200,14 @@ func (bs *BuilderSuite) SetupTest() {
 	first := bs.createAndRecordBlock(nil)
 	bs.firstID = first.ID()
 	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
+	firstSealedState, ok := firstResult.FinalStateCommitment()
+	if !ok {
+		panic("missing first execution result's final state commitment")
+	}
 	bs.lastSeal = &flow.Seal{
 		BlockID:    first.ID(),
 		ResultID:   firstResult.ID(),
-		FinalState: unittest.StateCommitmentFixture(),
+		FinalState: firstSealedState,
 	}
 	bs.resultForBlock[firstResult.BlockID] = firstResult
 
