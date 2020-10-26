@@ -209,12 +209,19 @@ func (e *Engine) reloadFinalizedUnexecutedBlocks() error {
 		return fmt.Errorf("could not get finalized block: %w", err)
 	}
 
-	// find the last executed and finalized block
-	lastExecutedHeight := final.Height
-	for ; ; lastExecutedHeight-- {
-		header, err := e.state.AtHeight(lastExecutedHeight).Head()
+	// find the first unexecuted and finalized block
+	// we iterate from the last finalized, check if it has been executed,
+	// if not, keep going to the lower height, until we find an executed
+	// block, and then the next height is the first unexecuted.
+	// if there is only one finalized, and it's executed (i.e. genesis),
+	// then the firstUnexecuted is a unfinalized block, which is ok,
+	// because the next loop will ensure it only iterate through finalized
+	// block.
+	firstUnexecuted := final.Height
+	for ; ; firstUnexecuted-- {
+		header, err := e.state.AtHeight(firstUnexecuted).Head()
 		if err != nil {
-			return fmt.Errorf("could not get header at height: %v, %w", lastExecutedHeight, err)
+			return fmt.Errorf("could not get header at height: %v, %w", firstUnexecuted, err)
 		}
 
 		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ID())
@@ -223,15 +230,16 @@ func (e *Engine) reloadFinalizedUnexecutedBlocks() error {
 		}
 
 		if executed {
+			firstUnexecuted++
 			break
 		}
 	}
 
-	e.log.Info().Msgf("last finalized and executed height: %v", lastExecutedHeight)
+	e.log.Info().Msgf("last finalized and executed height: %v", firstUnexecuted)
 
 	// starting from the last executed block, go through each unexecuted and finalized block
 	// reload its block to execution queues
-	for height := lastExecutedHeight; height <= final.Height; height++ {
+	for height := firstUnexecuted; height <= final.Height; height++ {
 		header, err := e.state.AtHeight(height).Head()
 		if err != nil {
 			return fmt.Errorf("could not get header at height: %v, %w", height, err)
