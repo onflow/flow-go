@@ -593,28 +593,26 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *
 			continue
 		}
 
-		// check if the approver is assigned to this chunk.
-		ok = chmodule.IsValidVerifer(assignment, chunk, approverID)
-		if !ok {
-			// if the approval comes from a node that wasn't even a staked
-			// verifier at that block, remove the approval from the mempool.
-			err := e.ensureStakedNodeWithRole(approverID, block, flow.RoleVerification)
-			if err != nil {
-				if engine.IsInvalidInputError(err) {
-					_, err = e.approvals.RemApproval(approval)
-					if err != nil {
-						return false, fmt.Errorf("failed to remove approval from mempool: %w", err)
-					}
-					continue
+		// if the approval comes from a node that wasn't even a staked
+		// verifier at that block, remove the approval from the mempool.
+		err := e.ensureStakedNodeWithRole(approverID, block, flow.RoleVerification)
+		if err != nil {
+			if engine.IsInvalidInputError(err) {
+				_, err = e.approvals.RemApproval(approval)
+				if err != nil {
+					return false, fmt.Errorf("failed to remove approval from mempool: %w", err)
 				}
-				return false, fmt.Errorf("failed to match chunks: %w", err)
+				continue
 			}
+			return false, fmt.Errorf("failed to match chunks: %w", err)
+		}
+		// skip approval if verifier was not assigned to this chunk.
+		if !chmodule.IsValidVerifer(assignment, chunk, approverID) {
+			continue
 		}
 
-		// Add signature to incorporated result so that we don't have to check
-		// it again.
+		// Add signature to incorporated result so that we don't have to check it again.
 		incorporatedResult.AddSignature(chunk.Index, approverID, approval.Body.AttestationSignature)
-
 		validApprovals++
 	}
 

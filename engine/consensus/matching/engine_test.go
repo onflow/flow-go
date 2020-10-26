@@ -3,7 +3,6 @@
 package matching
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -132,6 +131,9 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.identities[ms.verID] = ver
 
 	ms.approvers = unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleVerification))
+	for _, verifier := range ms.approvers {
+		ms.identities[verifier.ID()] = verifier
+	}
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP BLOCKS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	// rootBlock <- latestSealedBlock <- latestFinalizedBlock <- unfinalizedBlock
@@ -672,76 +674,14 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 //  * R forms a valid sub-graph with its previous result (aka parent result)
 // Method Engine.sealableResults() should return R as an element of the sealable results
 func (ms *MatchingSuite) TestSealableResultsValid() {
-	// BLOCKS: <- previousBlock <- block
-	//previousBlock := unittest.BlockWithParentFixture(ms.unfinalizedBlock.Header)
-	previousBlock := unittest.BlockFixture()
-	block := unittest.BlockWithParentFixture(previousBlock.Header)
-
-	// RESULTS for blocks:
-	previousResult := unittest.ExecutionResultFixture(unittest.WithBlock(&previousBlock))
-	result := unittest.ExecutionResultFixture(
-		unittest.WithBlock(&block),
-		unittest.WithPreviousResult(previousResult.ID()),
-	)
-
-	// Exec Receipt for block with valid subgraph
-	incorporatedResult := unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(result))
-
-	// add entities to mempools and persistent storage mocks:
-	ms.blocks[block.Header.ID()] = &block
-	ms.persistedResults[previousResult.ID()] = previousResult
-	ms.persistedResults[result.ID()] = result
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
-
-	// assign each chunk to each approver
-	assignment := chunks.NewAssignment()
-	for _, chunk := range incorporatedResult.Result.Chunks {
-		assignment.Add(chunk, ms.approvers.NodeIDs())
-	}
-	ms.assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil).Once()
-
-	// add enough approvals for each chunk
-	print(fmt.Sprintf("%d\n", len(incorporatedResult.Result.Chunks)))
-	for index := 0; index < len(incorporatedResult.Result.Chunks); index++ {
-		chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)
-		for _, approver := range ms.approvers {
-			chunkApprovals[approver.NodeID] = approvalFor(incorporatedResult.Result, uint64(index), approver.NodeID)
-		}
-		ms.approvalsPL.On("ByChunk", incorporatedResult.Result.ID(), uint64(index)).Return(chunkApprovals).Once()
-	}
+	valSubgrph := ms.validSubgraphFixture()
+	ms.addSubgraphFixtureToMempools(valSubgrph)
 
 	// test output of Matching Engine's sealableResults()
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Equal(1, len(results), "expecting a single return value")
-	ms.Assert().Equal(incorporatedResult.ID(), results[0].ID(), "expecting a single return value")
-
-	ms.resultsDB.AssertExpectations(ms.T())
-	ms.assigner.AssertExpectations(ms.T())
-	ms.approvalsPL.AssertExpectations(ms.T())
-}
-
-func approvalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.Identifier) *flow.ResultApproval {
-	return unittest.ResultApprovalFixture(
-		unittest.WithBlockID(result.BlockID),
-		unittest.WithExecutionResultID(result.ID()),
-		unittest.WithApproverID(approverID),
-		unittest.WithChunk(chunkIdx),
-	)
-}
-
-func expectedID(expectedID flow.Identifier) interface{} {
-	return mock.MatchedBy(
-		func(actualID flow.Identifier) bool {
-			return expectedID == actualID
-		})
-}
-
-func entityWithID(expectedID flow.Identifier) interface{} {
-	return mock.MatchedBy(
-		func(entity flow.Entity) bool {
-			return expectedID == entity.ID()
-		})
+	ms.Assert().Equal(valSubgrph.IncorporatedResult.ID(), results[0].ID(), "expecting a single return value")
 }
 
 // try to get matched results with nothing in memory pools
@@ -758,8 +698,9 @@ func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
 // mempool, where _both_ the block that incorporates the result as well
 // as the block the result pertains to are known
 func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
-	incorporatedResult := unittest.IncorporatedResultFixture()
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+	valSubgrph := ms.validSubgraphFixture()
+	ms.addSubgraphFixtureToMempools(valSubgrph)
+	delete(ms.blocks, valSubgrph.Block.ID()) // remove block the execution receipt pertains to
 
 	_, err := ms.matching.sealableResults()
 	ms.Require().Error(err)
@@ -770,20 +711,9 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 //   * skip this result
 //   * this result should not be removed from the mempool
 func (ms *MatchingSuite) TestSealableResultUnknownPrevious() {
-	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
-	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
-
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
-
-	// check that it is looking for the previous result, but return nil as if
-	// not found
-	ms.resultsDB.On("ByID", mock.Anything).Run(
-		func(args mock.Arguments) {
-			previousResultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
-		},
-	).Return(nil, storerr.ErrNotFound)
+	subgrph := ms.validSubgraphFixture()
+	ms.addSubgraphFixtureToMempools(subgrph)
+	delete(ms.persistedResults, subgrph.PreviousResult.ID()) // remove previous execution result from storage layer
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
@@ -801,80 +731,95 @@ func (ms *MatchingSuite) TestSealableResultUnknownPrevious() {
 //   * neither consider R1 nor R2 sealable incorporated results and
 //   * remove R1 from IncorporatedResults mempool, i.e. `resultsPL`
 func (ms *MatchingSuite) TestSealableResultsInvalidSubgraph() {
-	blockA := unittest.BlockFixture() // the parent block's ID is randomly generated here
-
-	// RESULTS for blocks:
-	resultR2 := unittest.ExecutionResultFixture() // the result pertains to a block whose ID is random generated here
-	resultR1 := unittest.ExecutionResultFixture(
-		unittest.WithBlock(&blockA),
-		unittest.WithPreviousResult(resultR2.ID()),
-	)
-
-	// Exec Receipt for block with valid subgraph
-	incorporatedResult := unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(resultR1))
-
-	// add entities to mempools and persistent storage mocks:
-	ms.blocks[blockA.Header.ID()] = &blockA
-	ms.persistedResults[resultR2.ID()] = resultR2
-	ms.persistedResults[resultR1.ID()] = resultR1
-	ms.pendingResults[incorporatedResult.ID()] = incorporatedResult
+	subgrph := ms.validSubgraphFixture()
+	subgrph.PreviousResult.BlockID = unittest.IdentifierFixture() // invalidate subgraph
+	subgrph.Result.PreviousResultID = subgrph.PreviousResult.ID()
+	ms.addSubgraphFixtureToMempools(subgrph)
 
 	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.resultsPL.On("Rem", entityWithID(incorporatedResult.ID())).Return(true).Once()
+	ms.resultsPL.On("Rem", entityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "should not select result with invalid subgraph")
-
 	ms.resultsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
 }
 
-func (ms *MatchingSuite) TestSealResultInvalidChunks() {
+// TestSealableResultsInvalidChunks tests that matching.Engine.sealableResults()
+// performs the following chunk checks on the result:
+//   * the number k of chunks in the execution result equals to
+//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
+//   * for each index idx := 0, 1, ..., k
+//     there exists once chunk
+// Here we test that an IncorporatedResult with too _few_ chunks is not sealed and removed from the mempool
+func (ms *MatchingSuite) TestSealableResults_TooFewChunks() {
+	subgrph := ms.validSubgraphFixture()
+	chunks := subgrph.Result.Chunks
+	subgrph.Result.Chunks = chunks[0 : len(chunks)-2] // drop the last chunk
+	ms.addSubgraphFixtureToMempools(subgrph)
 
-	// try to seal a result with a mismatching chunk count (one too many)
-	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
-	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
-	previous := unittest.ExecutionResultFixture()
-	previous.BlockID = block.Header.ParentID
-	incorporatedResult.Result.PreviousResultID = previous.ID()
-
-	// add an extra chunk
-	chunk := unittest.ChunkFixture(block.ID())
-	chunk.Index = uint64(len(block.Payload.Guarantees))
-	incorporatedResult.Result.Chunks = append(incorporatedResult.Result.Chunks, chunk)
-
-	// add incorporated result to mempool
-	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
-
-	// check that it is looking for the previous result, and return previous
-	ms.resultsPL.On("ByResultID", mock.Anything).Run(
-		func(args mock.Arguments) {
-			previousResultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
-		},
-	).Return(previous, nil)
-
-	// check that we are trying to remove the incorporated result from mempool
-	ms.resultsPL.On("Rem", mock.Anything).Run(
-		func(args mock.Arguments) {
-			incResult := args.Get(0).(*flow.IncorporatedResult)
-			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
-		},
-	).Return(true)
+	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
+	ms.resultsPL.On("Rem", entityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "should not select result with too many chunks")
+	ms.resultsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
+}
 
-	ms.Assert().Empty(results, "should not select result with invalid number of chunks")
-	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Rem", 1)
+// TestSealableResults_TooManyChunks tests that matching.Engine.sealableResults()
+// performs the following chunk checks on the result:
+//   * the number k of chunks in the execution result equals to
+//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
+//   * for each index idx := 0, 1, ..., k
+//     there exists once chunk
+// Here we test that an IncorporatedResult with too _many_ chunks is not sealed and removed from the mempool
+func (ms *MatchingSuite) TestSealableResults_TooManyChunks() {
+	subgrph := ms.validSubgraphFixture()
+	chunks := subgrph.Result.Chunks
+	subgrph.Result.Chunks = append(chunks, chunks[len(chunks)-1]) // duplicate the last entry
+	ms.addSubgraphFixtureToMempools(subgrph)
+
+	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
+	ms.resultsPL.On("Rem", entityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "should not select result with too few chunks")
+	ms.resultsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
+}
+
+// TestSealableResults_InvalidChunks tests that matching.Engine.sealableResults()
+// performs the following chunk checks on the result:
+//   * the number k of chunks in the execution result equals to
+//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
+//   * for each index idx := 0, 1, ..., k
+//     there exists once chunk
+// Here we test that an IncorporatedResult with
+//   * correct number of chunks
+//   * but one missing chunk and one duplicated chunk
+// is not sealed and removed from the mempool
+func (ms *MatchingSuite) TestSealableResults_InvalidChunks() {
+	subgrph := ms.validSubgraphFixture()
+	chunks := subgrph.Result.Chunks
+	chunks[len(chunks)-2] = chunks[len(chunks)-1] // overwrite second-last with last entry, which is now duplicated
+	// yet we have the correct number of elements in the chunk list
+	ms.addSubgraphFixtureToMempools(subgrph)
+
+	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
+	ms.resultsPL.On("Rem", entityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "should not select result with invalid chunk list")
+	ms.resultsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
 }
 
 func (ms *MatchingSuite) TestSealableResultsNoPayload() {
-
+	ms.T().Fail()
 	block := unittest.BlockFixture()
 	block.Payload = nil // empty payload
-	ms.blocks[block.Header.ID()] = &block
+	ms.blocks[block.ID()] = &block
 	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
@@ -911,55 +856,30 @@ func (ms *MatchingSuite) TestSealableResultsNoPayload() {
 }
 
 func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
+	subgrph := ms.validSubgraphFixture()
 
-	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
-	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
-	previous := unittest.ExecutionResultFixture()
-	previous.BlockID = block.Header.ParentID
-	incorporatedResult.Result.PreviousResultID = previous.ID()
-
-	// add incorporated result to mempool
-	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
-
-	// check that it is looking for the previous result, and return previous
-	ms.resultsPL.On("ByResultID", mock.Anything).Run(
-		func(args mock.Arguments) {
-			previousResultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
-		},
-	).Return(previous, nil)
-
-	// list of 3 approvers
-	assignedApprovers := ms.approvers[:3]
-
-	// create assignment with 3 verification node assigned to every chunk
+	assignedVerifiersPerChunk := uint(len(ms.approvers) / 2)
 	assignment := chunks.NewAssignment()
-	for _, chunk := range incorporatedResult.Result.Chunks {
-		assignment.Add(chunk, assignedApprovers.NodeIDs())
-	}
-	// mock assigner
-	ms.assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil)
+	approvals := make(map[uint64]map[flow.Identifier]*flow.ResultApproval)
+	for _, chunk := range subgrph.IncorporatedResult.Result.Chunks {
+		assignment.Add(chunk, ms.approvers[0:assignedVerifiersPerChunk].NodeIDs()) // assign leading half verifiers
 
-	realApprovalPool, err := stdmap.NewApprovals(1000)
-	ms.Require().NoError(err)
-	ms.matching.approvals = realApprovalPool
-
-	// approve every chunk by an unassigned verifier.
-	unassignedApprover := ms.approvers[3]
-	for index := uint64(0); index < uint64(len(incorporatedResult.Result.Chunks)); index++ {
-		approval := unittest.ResultApprovalFixture()
-		approval.Body.BlockID = block.Header.ID()
-		approval.Body.ExecutionResultID = incorporatedResult.Result.ID()
-		approval.Body.ApproverID = unassignedApprover.NodeID
-		approval.Body.ChunkIndex = index
-		_, err := ms.matching.approvals.Add(approval)
-		ms.Require().NoError(err)
+		// generate approvals by _tailing_ half verifiers
+		chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)
+		for _, approver := range ms.approvers[assignedVerifiersPerChunk:len(ms.approvers)] {
+			chunkApprovals[approver.NodeID] = approvalFor(subgrph.IncorporatedResult.Result, chunk.Index, approver.NodeID)
+		}
+		approvals[chunk.Index] = chunkApprovals
 	}
+	subgrph.Assignment = assignment
+	subgrph.Approvals = approvals
+
+	ms.addSubgraphFixtureToMempools(subgrph)
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
-	ms.Assert().Len(results, 0, "should not count approvals from unassigned verifiers")
+	ms.Assert().Empty(results, "should not select result with ")
+	ms.approvalsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
 }
 
 // Insert an approval from a node that wasn't a staked verifier at that block
@@ -968,7 +888,7 @@ func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 // block becomes known.
 func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
 	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
+	ms.blocks[block.ID()] = &block
 	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
@@ -1001,7 +921,7 @@ func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
 	// add an approval from an unstaked verifier for the first chunk
 
 	approval := unittest.ResultApprovalFixture()
-	approval.Body.BlockID = block.Header.ID()
+	approval.Body.BlockID = block.ID()
 	approval.Body.ExecutionResultID = incorporatedResult.Result.ID()
 	approval.Body.ApproverID = unittest.IdentifierFixture() // this is not a staked verifier
 	approval.Body.ChunkIndex = 0
@@ -1021,7 +941,7 @@ func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
 func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 
 	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
+	ms.blocks[block.ID()] = &block
 	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
@@ -1085,7 +1005,7 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 func (ms *MatchingSuite) TestSealValid() {
 
 	block := unittest.BlockFixture()
-	ms.blocks[block.Header.ID()] = &block
+	ms.blocks[block.ID()] = &block
 	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
 	previous := unittest.ExecutionResultFixture()
 	previous.BlockID = block.Header.ParentID
@@ -1127,7 +1047,7 @@ func (ms *MatchingSuite) TestSealValid() {
 	for _, approver := range ms.approvers {
 		for index := uint64(0); index < uint64(len(incorporatedResult.Result.Chunks)); index++ {
 			approval := unittest.ResultApprovalFixture()
-			approval.Body.BlockID = block.Header.ID()
+			approval.Body.BlockID = block.ID()
 			approval.Body.ExecutionResultID = incorporatedResult.Result.ID()
 			approval.Body.ApproverID = approver.NodeID
 			approval.Body.ChunkIndex = index
@@ -1295,4 +1215,111 @@ func stateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 	)
 	snapshot.On("Head").Return(block, nil)
 	return snapshot
+}
+
+func approvalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.Identifier) *flow.ResultApproval {
+	return unittest.ResultApprovalFixture(
+		unittest.WithBlockID(result.BlockID),
+		unittest.WithExecutionResultID(result.ID()),
+		unittest.WithApproverID(approverID),
+		unittest.WithChunk(chunkIdx),
+	)
+}
+
+func expectedID(expectedID flow.Identifier) interface{} {
+	return mock.MatchedBy(
+		func(actualID flow.Identifier) bool {
+			return expectedID == actualID
+		})
+}
+
+func entityWithID(expectedID flow.Identifier) interface{} {
+	return mock.MatchedBy(
+		func(entity flow.Entity) bool {
+			return expectedID == entity.ID()
+		})
+}
+
+// subgraphFixture represents a subgraph of the blockchain:
+//  Result   -----------------------------------> Block
+//    |                                             |
+//    |                                             v
+//    |                                           ParentBlock
+//    v
+//  PreviousResult  ---> PreviousResult.BlockID
+//
+// Depending on validity of the subgraph:
+//   *  valid:   PreviousResult.BlockID == ParentBlock.ID()
+//   *  invalid: PreviousResult.BlockID != ParentBlock.ID()
+type subgraphFixture struct {
+	Block              *flow.Block
+	ParentBlock        *flow.Block
+	Result             *flow.ExecutionResult
+	PreviousResult     *flow.ExecutionResult
+	IncorporatedResult *flow.IncorporatedResult
+	Assignment         *chunks.Assignment
+	Approvals          map[uint64]map[flow.Identifier]*flow.ResultApproval // chunkIndex -> Verifier Node ID -> Approval
+}
+
+// Generates a valid subgraph:
+// let
+//  * R1 be a result which pertains to blockA
+//  * R2 be R1's previous result,
+//    where R2 pertains to blockB
+// The execution results form a valid subgraph if and only if:
+//    blockA.ParentID == blockB.ID
+func (ms *MatchingSuite) validSubgraphFixture() subgraphFixture {
+	// BLOCKS: <- previousBlock <- block
+	parentBlock := unittest.BlockFixture()
+	block := unittest.BlockWithParentFixture(parentBlock.Header)
+
+	// RESULTS for blocks:
+	previousResult := unittest.ExecutionResultFixture(unittest.WithBlock(&parentBlock))
+	result := unittest.ExecutionResultFixture(
+		unittest.WithBlock(&block),
+		unittest.WithPreviousResult(previousResult.ID()),
+	)
+
+	// Exec Receipt for block with valid subgraph
+	incorporatedResult := unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(result))
+
+	// assign each chunk to 50% of validation Nodes and generate respective approvals
+	assignment := chunks.NewAssignment()
+	assignedVerifiersPerChunk := uint(len(ms.approvers) / 2)
+	approvals := make(map[uint64]map[flow.Identifier]*flow.ResultApproval)
+	for _, chunk := range incorporatedResult.Result.Chunks {
+		assignedVerifiers := ms.approvers.Sample(assignedVerifiersPerChunk)
+		assignment.Add(chunk, assignedVerifiers.NodeIDs())
+
+		// generate approvals
+		chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)
+		for _, approver := range assignedVerifiers {
+			chunkApprovals[approver.NodeID] = approvalFor(incorporatedResult.Result, chunk.Index, approver.NodeID)
+		}
+		approvals[chunk.Index] = chunkApprovals
+	}
+
+	return subgraphFixture{
+		Block:              &block,
+		ParentBlock:        &parentBlock,
+		Result:             result,
+		PreviousResult:     previousResult,
+		IncorporatedResult: incorporatedResult,
+		Assignment:         assignment,
+		Approvals:          approvals,
+	}
+}
+
+// addSubgraphFixtureToMempools adds add entities in subgraph to mempools and persistent storage mocks
+func (ms *MatchingSuite) addSubgraphFixtureToMempools(subgraph subgraphFixture) {
+	ms.blocks[subgraph.ParentBlock.ID()] = subgraph.ParentBlock
+	ms.blocks[subgraph.Block.ID()] = subgraph.Block
+	ms.persistedResults[subgraph.PreviousResult.ID()] = subgraph.PreviousResult
+	ms.persistedResults[subgraph.Result.ID()] = subgraph.Result
+	ms.pendingResults[subgraph.IncorporatedResult.ID()] = subgraph.IncorporatedResult
+
+	ms.assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
+	for index := uint64(0); index < uint64(len(subgraph.IncorporatedResult.Result.Chunks)); index++ {
+		ms.approvalsPL.On("ByChunk", subgraph.IncorporatedResult.Result.ID(), index).Return(subgraph.Approvals[index]).Maybe()
+	}
 }
