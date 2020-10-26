@@ -203,6 +203,7 @@ func createNode(
 		headersDB,
 		sealsDB,
 		indexDB,
+		blocksDB,
 		guarantees,
 		seals,
 		receipts,

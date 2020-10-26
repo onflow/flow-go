@@ -534,15 +534,20 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 		return fmt.Errorf("could no retrieve sealed height: %w", err)
 	}
 
-	// build a list of all previously used guarantees on this part of the chain
-	ancestorID := header.ParentID
 	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
 	// use it to skip receipts that are not for blocks in the fork.
 	forkBlocks := make(map[flow.Identifier]struct{})
+
 	// Create a lookup table of all the receipts that are already in blocks.
 	// This will be used to filter out duplicates.
 	lookup := make(map[flow.Identifier]struct{})
+
+	// loop through the fork backwards, from parent to last sealed, and keep
+	// track of blocks and receipts visited on the way.
+	ancestorID := header.ParentID
 	for {
+
+		// keep track of blocks we iterate over
 		forkBlocks[ancestorID] = struct{}{}
 
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
@@ -555,10 +560,12 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
 		}
 
+		// keep track of all receipts we iterate over
 		for _, recID := range index.ReceiptIDs {
 			lookup[recID] = struct{}{}
 		}
 
+		// break out when we reach the sealed height
 		if ancestor.Height <= sealedHeight {
 			break
 		}
@@ -604,8 +611,8 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 		}
 
 		// check receipts are sorted by block height
-		if h.Height <= prevReceiptHeight {
-			return state.NewInvalidExtensionError("payload receipts should be sorted by block heigh")
+		if h.Height < prevReceiptHeight {
+			return state.NewInvalidExtensionError("payload receipts should be sorted by block height")
 		}
 
 		prevReceiptHeight = h.Height

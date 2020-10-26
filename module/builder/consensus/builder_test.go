@@ -116,7 +116,14 @@ func (bs *BuilderSuite) createAndRecordBlock(previous *flow.Block) *flow.Block {
 
 		// include a result of the previous block
 		incorporatedResult = &flow.IncorporatedResult{
-			IncorporatedBlockID: block.ID(),
+			// ATTENTION:
+			// Here, IncorporatedBlockID should be set to block.ID(), because
+			// that is the first block on its fork in which the ExecutionResult
+			// is contained. However, in phase 2 of the sealing roadmap, the
+			// consensus matching engine is still manually setting the
+			// IncorporatedBlockID of all IncorporatedResults to the block that
+			// the result commits to. This will be changed in phase 3.
+			IncorporatedBlockID: previousResult.BlockID,
 			Result:              previousResult,
 		}
 	}
@@ -386,6 +393,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.headerDB,
 		bs.sealDB,
 		bs.indexDB,
+		bs.blockDB,
 		bs.guarPool,
 		bs.sealPool,
 		bs.recPool,
@@ -565,8 +573,8 @@ func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
 	bs.Assert().ElementsMatch(bs.chain[:3], bs.assembled.Seals, "should have included only beginning of broken chain")
 }
 
-// // Receipts for unknown blocks should not be inserted, and should be removed
-// // from the mempool.
+// Receipts for unknown blocks should not be inserted, and should be removed
+// from the mempool.
 func (bs *BuilderSuite) TestPayloadReceiptUnknownBlock() {
 
 	bs.pendingReceipts = []*flow.ExecutionReceipt{}

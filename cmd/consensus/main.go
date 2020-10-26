@@ -258,6 +258,7 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
+				node.Storage.Blocks,
 				guarantees,
 				seals,
 				receipts,
