@@ -191,64 +191,6 @@ func (ms *MatchingSuite) SetupTest() {
 			return stateSnapshotForKnownBlock(block.Header, ms.identities)
 		},
 	)
-	//ms.finalSnapshot.On("Identity", mock.Anything).Return(
-	//	func(nodeID flow.Identifier) *flow.Identity {
-	//		identity := ms.identities[nodeID]
-	//		return identity
-	//	},
-	//	func(nodeID flow.Identifier) error {
-	//		_, found := ms.identities[nodeID]
-	//		if !found {
-	//			return fmt.Errorf("could not get identity (%x)", nodeID)
-	//		}
-	//		return nil
-	//	},
-	//)
-	//ms.finalSnapshot.On("Identities", mock.Anything).Return(
-	//	func(selector flow.IdentityFilter) flow.IdentityList {
-	//		return ms.approvers
-	//	},
-	//	func(selector flow.IdentityFilter) error {
-	//		return nil
-	//	},
-	//)
-	//
-	//ms.state.On("AtBlockID", mock.Anything).Return(
-	//	func(blockID flow.Identifier) realproto.Snapshot {
-	//		return ms.refBlockSnapshot
-	//	},
-	//	nil,
-	//)
-
-	//ms.refBlockHeader = &flow.Header{Height: 20} // only need height
-	//ms.refBlockSnapshot = &protocol.Snapshot{}
-	//ms.refBlockSnapshot.On("Identity", mock.Anything).Return(
-	//	func(nodeID flow.Identifier) *flow.Identity {
-	//		identity := ms.identities[nodeID]
-	//		return identity
-	//	},
-	//	func(nodeID flow.Identifier) error {
-	//		_, found := ms.identities[nodeID]
-	//		if !found {
-	//			return fmt.Errorf("could not get identity (%x)", nodeID)
-	//		}
-	//		return nil
-	//	},
-	//)
-	//ms.refBlockSnapshot.On("Identities", mock.Anything).Return(
-	//	func(selector flow.IdentityFilter) flow.IdentityList {
-	//		return ms.approvers
-	//	},
-	//	func(selector flow.IdentityFilter) error {
-	//		return nil
-	//	},
-	//)
-	//ms.refBlockSnapshot.On("Head").Return(
-	//	func() *flow.Header {
-	//		return ms.refBlockHeader
-	//	},
-	//	nil,
-	//)
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RESULTS STORAGE ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.persistedResults = make(map[flow.Identifier]*flow.ExecutionResult)
@@ -815,46 +757,68 @@ func (ms *MatchingSuite) TestSealableResults_InvalidChunks() {
 	ms.resultsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
 }
 
-func (ms *MatchingSuite) TestSealableResultsNoPayload() {
-	ms.T().Fail()
-	block := unittest.BlockFixture()
-	block.Payload = nil // empty payload
-	ms.blocks[block.ID()] = &block
-	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
-	previous := unittest.ExecutionResultFixture()
-	previous.BlockID = block.Header.ParentID
-	incorporatedResult.Result.PreviousResultID = previous.ID()
+// TestSealableResults_NoPayload_MissingChunk tests that matching.Engine.sealableResults()
+// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
+//  * execution receipt with missing system chunk should be rejected
+func (ms *MatchingSuite) TestSealableResults_NoPayload_MissingChunk() {
+	subgrph := ms.validSubgraphFixture()
+	subgrph.Block.Payload = nil                                                              // override block's payload to nil
+	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
+	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
+	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[0:0] // empty chunk list
+	ms.addSubgraphFixtureToMempools(subgrph)
 
-	// add incorporated result to mempool
-	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
-
-	// check that it is looking for the previous result, and return previous
-	ms.resultsPL.On("ByResultID", mock.Anything).Run(
-		func(args mock.Arguments) {
-			previousResultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
-		},
-	).Return(previous, nil)
-
-	// check that we are trying to remove the incorporated result from mempool
-	ms.resultsPL.On("Rem", mock.Anything).Run(
-		func(args mock.Arguments) {
-			incResult := args.Get(0).(*flow.IncorporatedResult)
-			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
-		},
-	).Return(true)
-
-	assignment := chunks.NewAssignment()
-	ms.assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil)
+	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
+	ms.resultsPL.On("Rem", entityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
-	if ms.Assert().Len(results, 1, "should select result for empty block") {
-		sealable := results[0]
-		ms.Assert().Equal(incorporatedResult, sealable)
-	}
+	ms.Assert().Empty(results, "should not select result with invalid chunk list")
+	ms.resultsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
 }
 
+// TestSealableResults_NoPayload_TooManyChunk tests that matching.Engine.sealableResults()
+// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
+//  * execution receipt with more than one chunk should be rejected
+func (ms *MatchingSuite) TestSealableResults_NoPayload_TooManyChunk() {
+	subgrph := ms.validSubgraphFixture()
+	subgrph.Block.Payload = nil                                                              // override block's payload to nil
+	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
+	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
+	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[0:2] // two chunks
+	ms.addSubgraphFixtureToMempools(subgrph)
+
+	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
+	ms.resultsPL.On("Rem", entityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "should not select result with invalid chunk list")
+	ms.resultsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
+}
+
+// TestSealableResults_NoPayload_WrongIndexChunk tests that matching.Engine.sealableResults()
+// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
+//  * execution receipt with a single chunk, but wrong chunk index, should be rejected
+func (ms *MatchingSuite) TestSealableResults_NoPayload_WrongIndexChunk() {
+	subgrph := ms.validSubgraphFixture()
+	subgrph.Block.Payload = nil                                                              // override block's payload to nil
+	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
+	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
+	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[2:2] // chunk with chunkIndex == 2
+	ms.addSubgraphFixtureToMempools(subgrph)
+
+	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
+	ms.resultsPL.On("Rem", entityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "should not select result with invalid chunk list")
+	ms.resultsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
+}
+
+// TestSealableResultsUnassignedVerifiers tests that matching.Engine.sealableResults():
+// only considers approvals from assigned verifiers
 func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 	subgrph := ms.validSubgraphFixture()
 
@@ -879,6 +843,29 @@ func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "should not select result with ")
+	ms.approvalsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
+}
+
+// TestSealableResults_UnknownVerifiers tests that matching.Engine.sealableResults():
+//   * removes approvals from unknown verification nodes from mempool
+// Note: we test a seenario here, were result is sealable; it just has additional approvals from invalid nodes
+func (ms *MatchingSuite) TestSealableResults_UnknownVerifiers() {
+	subgrph := ms.validSubgraphFixture()
+
+	// add invalid approvals to leading chunk:
+	app1 := approvalFor(subgrph.IncorporatedResult.Result, 0, unittest.IdentifierFixture()) // from unknown node
+	app2 := approvalFor(subgrph.IncorporatedResult.Result, 0, ms.exeID)                     // from known but non-VerificationNode
+	subgrph.Approvals[0][app1.Body.ApproverID] = app1
+	subgrph.Approvals[0][app2.Body.ApproverID] = app2
+
+	ms.addSubgraphFixtureToMempools(subgrph)
+
+	// we expect business logic to remove the approval from the unknown node
+	ms.approvalsPL.On("RemApproval", entityWithID(app1.ID())).Return(true, nil).Once()
+	ms.approvalsPL.On("RemApproval", entityWithID(app2.ID())).Return(true, nil).Once()
+
+	_, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
 	ms.approvalsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
 }
 
