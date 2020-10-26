@@ -1026,7 +1026,7 @@ func (ms *MatchingSuite) validSubgraphFixture() subgraphFixture {
 	previousResult := unittest.ExecutionResultFixture(unittest.WithBlock(&parentBlock))
 	result := unittest.ExecutionResultFixture(
 		unittest.WithBlock(&block),
-		unittest.WithPreviousResult(previousResult),
+		unittest.WithPreviousResult(*previousResult),
 	)
 
 	// Exec Receipt for block with valid subgraph
