@@ -1,4 +1,4 @@
-package topology_test
+package test
 
 import (
 	"math"
@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
-	"github.com/onflow/flow-go/network/gossip/libp2p/test"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -49,7 +48,7 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	keys := make([]crypto.PrivateKey, 0)
 	ids := make(flow.IdentityList, 0)
 	for role, count := range distribution {
-		roleIDs, roleKeys := test.GenerateIDs(suite.T(), count, test.RunNetwork, unittest.WithRole(role))
+		roleIDs, roleKeys := GenerateIDs(suite.T(), count, RunNetwork, unittest.WithRole(role))
 		ids = append(ids, roleIDs...)
 		keys = append(keys, roleKeys...)
 	}
@@ -62,16 +61,16 @@ func (suite *ConnectednessTestSuite) testTopology(total int, minorityRole flow.R
 	state := topology.CreateMockStateForCollectionNodes(suite.T(), ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
-	tops := test.GenerateTopologies(suite.T(), state, ids)
+	tops := GenerateTopologies(suite.T(), state, ids)
 
 	// creates topology instances for the nodes based on their roles
 	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws := test.GenerateMiddlewares(suite.T(), logger, ids, keys)
+	mws := GenerateMiddlewares(suite.T(), logger, ids, keys)
 
 	// mocks subscription manager and creates network in dryrun
-	sms := test.MockSubscriptionManager(suite.T(), ids)
-	suite.nets = test.GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, sms, test.DryRunNetwork)
+	sms := MockSubscriptionManager(suite.T(), ids)
+	suite.nets = GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, sms, DryRunNetwork)
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range suite.nets {
