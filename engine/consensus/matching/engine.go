@@ -812,7 +812,7 @@ func (e *Engine) requestPending() error {
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
 	// order to request them.
-	for height := sealed.Height; height < final.Height; height++ {
+	for height := sealed.Height + 1; height <= final.Height; height++ {
 		// add at most <maxUnsealedResults> number of results
 		if len(missingBlocksOrderedByHeight) >= e.maxUnsealedResults {
 			break

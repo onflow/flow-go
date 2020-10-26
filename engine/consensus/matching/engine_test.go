@@ -3,10 +3,8 @@
 package matching
 
 import (
-	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -17,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	realproto "github.com/onflow/flow-go/state/protocol"
@@ -609,6 +606,13 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+// try to get matched results with nothing in memory pools
+func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err, "should not error with empty mempools")
+	ms.Assert().Empty(results, "should not have matched results with empty mempools")
+}
+
 // TestSealableResultsValid tests matching.Engine.sealableResults():
 //  * a well-formed incorporated result R is in the mempool
 //  * sufficient number of valid result approvals for result R
@@ -624,13 +628,6 @@ func (ms *MatchingSuite) TestSealableResultsValid() {
 	ms.Require().NoError(err)
 	ms.Assert().Equal(1, len(results), "expecting a single return value")
 	ms.Assert().Equal(valSubgrph.IncorporatedResult.ID(), results[0].ID(), "expecting a single return value")
-}
-
-// try to get matched results with nothing in memory pools
-func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err, "should not error with empty mempools")
-	ms.Assert().Empty(results, "should not have matched results with empty mempools")
 }
 
 // Try to seal a result for which we don't have the block.
@@ -848,331 +845,96 @@ func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 
 // TestSealableResults_UnknownVerifiers tests that matching.Engine.sealableResults():
 //   * removes approvals from unknown verification nodes from mempool
-// Note: we test a seenario here, were result is sealable; it just has additional approvals from invalid nodes
-func (ms *MatchingSuite) TestSealableResults_UnknownVerifiers() {
+func (ms *MatchingSuite) TestSealableResults_ApprovalsForUnknownBlockRemain() {
+	// make child block for unfinalizedBlock, i.e.:
+	//   <- unfinalizedBlock <- block
+	// and create Execution result ands approval for this block
+	block := unittest.BlockWithParentFixture(ms.unfinalizedBlock.Header)
+	er := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+	app1 := approvalFor(er, 0, unittest.IdentifierFixture()) // from unknown node
+
+	ms.approvalsPL.On("All").Return([]*flow.ResultApproval{app1})
+	chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)
+	chunkApprovals[app1.Body.ApproverID] = app1
+	ms.approvalsPL.On("ByChunk", er.ID(), 0).Return(chunkApprovals)
+
+	_, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "RemApproval", 0)
+	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "RemChunk", 0)
+}
+
+// TestRemoveApprovalsFromInvalidVerifiers tests that matching.Engine.sealableResults():
+//   * removes approvals from invalid verification nodes from mempool
+// This may occur when the block wasn't know when the node received the approval.
+// Note: we test a scenario here, were result is sealable; it just has additional
+//      approvals from invalid nodes
+func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
 	subgrph := ms.validSubgraphFixture()
 
 	// add invalid approvals to leading chunk:
 	app1 := approvalFor(subgrph.IncorporatedResult.Result, 0, unittest.IdentifierFixture()) // from unknown node
 	app2 := approvalFor(subgrph.IncorporatedResult.Result, 0, ms.exeID)                     // from known but non-VerificationNode
+	ms.identities[ms.verID].Stake = 0
+	app3 := approvalFor(subgrph.IncorporatedResult.Result, 0, ms.verID) // from zero-weight VerificationNode
 	subgrph.Approvals[0][app1.Body.ApproverID] = app1
 	subgrph.Approvals[0][app2.Body.ApproverID] = app2
+	subgrph.Approvals[0][app3.Body.ApproverID] = app3
 
 	ms.addSubgraphFixtureToMempools(subgrph)
 
 	// we expect business logic to remove the approval from the unknown node
 	ms.approvalsPL.On("RemApproval", entityWithID(app1.ID())).Return(true, nil).Once()
 	ms.approvalsPL.On("RemApproval", entityWithID(app2.ID())).Return(true, nil).Once()
+	ms.approvalsPL.On("RemApproval", entityWithID(app3.ID())).Return(true, nil).Once()
 
 	_, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.approvalsPL.AssertExpectations(ms.T()) // asserts that resultsPL.Rem(incorporatedResult.ID()) was called
 }
 
-// Insert an approval from a node that wasn't a staked verifier at that block
-// (this may occur when the block wasn't know when the node received the
-// approval). Ensure that the approval is removed from the mempool when the
-// block becomes known.
-func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
-	block := unittest.BlockFixture()
-	ms.blocks[block.ID()] = &block
-	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
-	previous := unittest.ExecutionResultFixture()
-	previous.BlockID = block.Header.ParentID
-	incorporatedResult.Result.PreviousResultID = previous.ID()
-
-	// add incorporated result to mempool
-	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
-
-	// check that it is looking for the previous result, and return previous
-	ms.resultsPL.On("ByResultID", mock.Anything).Run(
-		func(args mock.Arguments) {
-			previousResultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
-		},
-	).Return(previous, nil)
-
-	// assign each chunk to each approver
-	assignment := chunks.NewAssignment()
-	for _, chunk := range incorporatedResult.Result.Chunks {
-		assignment.Add(chunk, ms.approvers.NodeIDs())
-	}
-	ms.assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil)
-
-	// not using mock for approvals pool because we need the internal indexing
-	// logic
-	realApprovalPool, err := stdmap.NewApprovals(1000)
-	ms.Require().NoError(err)
-	ms.matching.approvals = realApprovalPool
-
-	// add an approval from an unstaked verifier for the first chunk
-
-	approval := unittest.ResultApprovalFixture()
-	approval.Body.BlockID = block.ID()
-	approval.Body.ExecutionResultID = incorporatedResult.Result.ID()
-	approval.Body.ApproverID = unittest.IdentifierFixture() // this is not a staked verifier
-	approval.Body.ChunkIndex = 0
-	_, err = ms.matching.approvals.Add(approval)
-	ms.Require().NoError(err)
-
-	// with requireApprovals = true ( default test case ), it should not collect
-	// any results because we haven't added any approvals to the mempool
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with insufficient approvals")
-
-	// should have deleted the approval of the first chunk
-	ms.Assert().Empty(ms.matching.approvals.All(), "should have removed the approval")
-}
-
+// TestSealableResultsInsufficientApprovals tests matching.Engine.sealableResults():
+//  * a result where at least one chunk has not enough approvals (require
+//    currently at least one) should not be sealable
 func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
+	subgrph := ms.validSubgraphFixture()
+	delete(subgrph.Approvals, uint64(len(subgrph.Result.Chunks)-1))
+	ms.addSubgraphFixtureToMempools(subgrph)
 
-	block := unittest.BlockFixture()
-	ms.blocks[block.ID()] = &block
-	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
-	previous := unittest.ExecutionResultFixture()
-	previous.BlockID = block.Header.ParentID
-	incorporatedResult.Result.PreviousResultID = previous.ID()
-
-	// add incorporated result to mempool
-	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
-
-	// check that it is looking for the previous result, and return previous
-	ms.resultsPL.On("ByResultID", mock.Anything).Run(
-		func(args mock.Arguments) {
-			previousResultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
-		},
-	).Return(previous, nil)
-
-	// check that we are trying to remove the incorporated result from mempool
-	ms.resultsPL.On("Rem", mock.Anything).Run(
-		func(args mock.Arguments) {
-			incResult := args.Get(0).(*flow.IncorporatedResult)
-			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
-		},
-	).Return(true)
-
-	// assign each chunk to each approver
-	assignment := chunks.NewAssignment()
-	for _, chunk := range incorporatedResult.Result.Chunks {
-		assignment.Add(chunk, ms.approvers.NodeIDs())
-	}
-	ms.assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil)
-
-	// check that we are looking for chunk approvals, but return nil as if not
-	// found
-	ms.approvalsPL.On("ByChunk", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			resultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.Result.ID(), resultID)
-		},
-	).Return(nil)
-
-	// with requireApprovals = true ( default test case ), it should not collect
-	// any results because we haven't added any approvals to the mempool
+	// test output of Matching Engine's sealableResults()
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with insufficient approvals")
-
-	// with requireApprovals = false,  it should collect the result even if
-	// there are no corresponding approvals
-	ms.matching.requireApprovals = false
-	results, err = ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	if ms.Assert().Len(results, 1, "should select result when requireApprovals flag is false") {
-		sealable := results[0]
-		ms.Assert().Equal(incorporatedResult, sealable)
-	}
+	ms.Assert().Empty(results, "expecting no sealable result")
 }
 
-// insert a well-formed incorporated result in the mempool, as well as a
-// sufficient number of valid result approvals, and check that the seal is
-// correctly generated.
-func (ms *MatchingSuite) TestSealValid() {
-
-	block := unittest.BlockFixture()
-	ms.blocks[block.ID()] = &block
-	incorporatedResult := unittest.IncorporatedResultForBlockFixture(&block)
-	previous := unittest.ExecutionResultFixture()
-	previous.BlockID = block.Header.ParentID
-	incorporatedResult.Result.PreviousResultID = previous.ID()
-
-	// add incorporated result to mempool
-	ms.pendingResults[incorporatedResult.Result.ID()] = incorporatedResult
-
-	// check that it is looking for the previous result, and return previous
-	ms.resultsPL.On("ByResultID", mock.Anything).Run(
-		func(args mock.Arguments) {
-			previousResultID := args.Get(0).(flow.Identifier)
-			ms.Assert().Equal(incorporatedResult.Result.PreviousResultID, previousResultID)
-		},
-	).Return(previous, nil)
-
-	// check that we are trying to remove the incorporated result from mempool
-	ms.resultsPL.On("Rem", mock.Anything).Run(
-		func(args mock.Arguments) {
-			incResult := args.Get(0).(*flow.IncorporatedResult)
-			ms.Assert().Equal(incorporatedResult.ID(), incResult.ID())
-		},
-	).Return(true)
-
-	// assign each chunk to each approver
-	assignment := chunks.NewAssignment()
-	for _, chunk := range incorporatedResult.Result.Chunks {
-		assignment.Add(chunk, ms.approvers.NodeIDs())
-	}
-	ms.assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil)
-
-	// not using mock for approvals pool because we need the internal indexing
-	// logic
-	realApprovalPool, err := stdmap.NewApprovals(1000)
-	ms.Require().NoError(err)
-	ms.matching.approvals = realApprovalPool
-
-	// add enough approvals for each chunk
-	for _, approver := range ms.approvers {
-		for index := uint64(0); index < uint64(len(incorporatedResult.Result.Chunks)); index++ {
-			approval := unittest.ResultApprovalFixture()
-			approval.Body.BlockID = block.ID()
-			approval.Body.ExecutionResultID = incorporatedResult.Result.ID()
-			approval.Body.ApproverID = approver.NodeID
-			approval.Body.ChunkIndex = index
-			_, err := ms.matching.approvals.Add(approval)
-			ms.Require().NoError(err)
-		}
-	}
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Len(results, 1, "should select result with sufficient approvals")
-
-	sealable := results[0]
-	ms.Assert().Equal(incorporatedResult, sealable)
-
-	// the incorporated result should have collected 1 signature per chunk
-	// (happy path)
-	ms.Assert().Equal(
-		incorporatedResult.Result.Chunks.Len(),
-		len(sealable.GetAggregatedSignatures()),
-	)
-
-	// check match when we are storing entities
-	ms.resultsDB.On("Store", mock.Anything).Run(
-		func(args mock.Arguments) {
-			stored := args.Get(0).(*flow.ExecutionResult)
-			ms.Assert().Equal(incorporatedResult.Result, stored)
-		},
-	).Return(nil)
-	ms.sealsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			seal := args.Get(0).(*flow.IncorporatedResultSeal)
-			ms.Assert().Equal(incorporatedResult, seal.IncorporatedResult)
-			ms.Assert().Equal(incorporatedResult.Result.BlockID, seal.Seal.BlockID)
-			ms.Assert().Equal(incorporatedResult.Result.ID(), seal.Seal.ResultID)
-			ms.Assert().Equal(
-				incorporatedResult.Result.Chunks.Len(),
-				len(seal.Seal.AggregatedApprovalSigs),
-			)
-		},
-	).Return(true)
-
-	err = ms.matching.sealResult(incorporatedResult)
-	ms.Require().NoError(err, "should generate seal on correct sealable result")
-
-	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
-	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
-}
-
+// TestRequestReceiptsPendingBlocks tests matching.Engine.requestPending():
+//   * generate n=100 consecutive blocks, where the first one is sealed and the last one is final
 func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
+	// create blocks
 	n := 100
-
-	// Create n consecutive blocks
-	// the first one is sealed and the last one is final
-
-	headers := []flow.Header{}
-
-	parentHeader := flow.Header{
-		ChainID:        flow.Emulator,
-		ParentID:       unittest.IdentifierFixture(),
-		Height:         0,
-		PayloadHash:    unittest.IdentifierFixture(),
-		Timestamp:      time.Now().UTC(),
-		View:           uint64(rand.Intn(1000)),
-		ParentVoterIDs: unittest.IdentifierListFixture(4),
-		ParentVoterSig: unittest.SignatureFixture(),
-		ProposerID:     unittest.IdentifierFixture(),
-		ProposerSig:    unittest.SignatureFixture(),
-	}
-
+	orderedBlocks := make([]flow.Block, 0, n)
+	parentBlock := ms.unfinalizedBlock
 	for i := 0; i < n; i++ {
-		newHeader := unittest.BlockHeaderWithParentFixture(&parentHeader)
-		parentHeader = newHeader
-		headers = append(headers, newHeader)
-	}
-
-	orderedBlocks := []flow.Block{}
-	for i := 0; i < n; i++ {
-		payload := unittest.PayloadFixture()
-		header := headers[i]
-		header.PayloadHash = payload.Hash()
-		block := flow.Block{
-			Header:  &header,
-			Payload: payload,
-		}
+		block := unittest.BlockWithParentFixture(parentBlock.Header)
 		ms.blocks[block.ID()] = &block
 		orderedBlocks = append(orderedBlocks, block)
+		parentBlock = block
 	}
 
-	ms.state = &protocol.State{}
+	// progress latest sealed and latest finalized:
+	ms.latestSealedBlock = orderedBlocks[0]
+	ms.latestFinalizedBlock = orderedBlocks[n-1]
 
-	ms.state.On("Final").Return(
-		func() realproto.Snapshot {
-			snapshot := &protocol.Snapshot{}
-			snapshot.On("Head").Return(
-				func() *flow.Header {
-					return orderedBlocks[n-1].Header
-				},
-				nil,
-			)
-			return snapshot
-		},
-		nil,
-	)
-
-	ms.state.On("Sealed").Return(
-		func() realproto.Snapshot {
-			snapshot := &protocol.Snapshot{}
-			snapshot.On("Head").Return(
-				func() *flow.Header {
-					return orderedBlocks[0].Header
-				},
-				nil,
-			)
-			return snapshot
-		},
-		nil,
-	)
-
-	ms.matching.state = ms.state
-
-	// the results are not in the DB, which will trigger request
-	ms.resultsDB.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
-
-	// keep track of requested blocks
-	requestedBlocks := []flow.Identifier{}
-	ms.requester.On("EntityByID", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			blockID := args.Get(0).(flow.Identifier)
-			requestedBlocks = append(requestedBlocks, blockID)
-		},
-	).Return()
+	// Expecting all blocks to be requested: from sealed height + 1 up to (incl.) latest finalized
+	for i := 1; i < n; i++ {
+		id := orderedBlocks[i].ID()
+		ms.requester.On("EntityByID", id, mock.Anything).Return().Once()
+	}
+	ms.sealsPL.On("All").Return([]*flow.IncorporatedResultSeal{}).Maybe()
 
 	err := ms.matching.requestPending()
 	ms.Require().NoError(err, "should request results for pending blocks")
-
-	// should request n-1 blocks if n > requestReceiptThreshold
-	ms.Assert().Equal(len(requestedBlocks), n-1)
+	ms.requester.AssertExpectations(ms.T()) // asserts that requester.EntityByID(<blockID>, filter.Any) was called
 }
 
 func stateSnapshotForUnknownBlock() *protocol.Snapshot {
