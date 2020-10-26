@@ -28,11 +28,12 @@ type BuilderSuite struct {
 	suite.Suite
 
 	// test helpers
-	firstID           flow.Identifier   // first block in the range we look at
-	finalID           flow.Identifier   // last finalized block
-	parentID          flow.Identifier   // parent block we build on
-	finalizedBlockIDs []flow.Identifier // blocks between first and final
-	pendingBlockIDs   []flow.Identifier // blocks between final and parent
+	firstID           flow.Identifier                           // first block in the range we look at
+	finalID           flow.Identifier                           // last finalized block
+	parentID          flow.Identifier                           // parent block we build on
+	finalizedBlockIDs []flow.Identifier                         // blocks between first and final
+	pendingBlockIDs   []flow.Identifier                         // blocks between final and parent
+	resultForBlock    map[flow.Identifier]*flow.ExecutionResult // map: BlockID -> Execution Result
 
 	// used to populate and test the seal mempool
 	chain   []*flow.Seal                                     // chain of seals starting first
@@ -88,51 +89,51 @@ type BuilderSuite struct {
 // block, which is also used to create a seal for the previous block. The seal
 // and the result are combined in an IncorporatedResultSeal which is a candidate
 // for the seals mempool.
-func (bs *BuilderSuite) createAndRecordBlock(previous *flow.Block) *flow.Block {
-	var header flow.Header
-	if previous == nil {
-		header = unittest.BlockHeaderFixture()
+func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Block {
+	var block flow.Block
+	if parentBlock == nil {
+		block = unittest.BlockFixture()
 	} else {
-		header = unittest.BlockHeaderWithParentFixture(previous.Header)
+		block = unittest.BlockWithParentFixture(parentBlock.Header)
 	}
 
-	block := &flow.Block{
-		Header:  &header,
-		Payload: unittest.PayloadFixture(),
-	}
-
-	// if previous is not nil, create a receipt for a result of the previous
+	// if parentBlock is not nil, create a receipt for a result of the parentBlock
 	// block, and add it to the payload. The corresponding IncorporatedResult
-	// will be use to seal the previous block, and to create an
+	// will be use to seal the parentBlock block, and to create an
 	// IncorporatedResultSeal for the seal mempool.
 	var incorporatedResult *flow.IncorporatedResult
-
-	if previous != nil {
-		previousResult := unittest.ResultForBlockFixture(previous)
-		receipt := unittest.ExecutionReceiptFixture()
-		receipt.ExecutionResult = *previousResult
+	if parentBlock != nil {
+		previousResult, found := bs.resultForBlock[parentBlock.ID()]
+		if !found {
+			panic("missing execution result for parent")
+		}
+		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(previousResult))
 		block.Payload.Receipts = append(block.Payload.Receipts, receipt)
 
-		// include a result of the previous block
-		incorporatedResult = &flow.IncorporatedResult{
-			IncorporatedBlockID: block.ID(),
-			Result:              previousResult,
-		}
+		incorporatedResultForPrevBlock := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithResult(previousResult),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+		)
+		result := unittest.ExecutionResultFixture(
+			unittest.WithBlock(&block),
+			unittest.WithPreviousResult(*previousResult),
+		)
+		bs.resultForBlock[result.BlockID] = result
 	}
 
 	// record block in dbs
 	bs.headers[block.ID()] = block.Header
 	bs.heights[block.Header.Height] = block.Header
-	bs.blocks[block.ID()] = block
+	bs.blocks[block.ID()] = &block
 	bs.index[block.ID()] = block.Payload.Index()
 
-	// seal the previous block with the result included in this block. Do not
+	// seal the parentBlock block with the result included in this block. Do not
 	// seal the first block because it is assumed that it is already sealed.
-	if previous != nil && previous.ID() != bs.firstID {
+	if parentBlock != nil && parentBlock.ID() != bs.firstID {
 		bs.chainSeal(incorporatedResult)
 	}
 
-	return block
+	return &block
 }
 
 // Create a seal for the result's block. The corresponding
@@ -171,6 +172,7 @@ func (bs *BuilderSuite) SetupTest() {
 	// reset test helpers
 	bs.pendingBlockIDs = nil
 	bs.finalizedBlockIDs = nil
+	bs.resultForBlock = make(map[flow.Identifier]*flow.ExecutionResult)
 
 	bs.chain = nil
 	bs.irsMap = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
@@ -197,11 +199,13 @@ func (bs *BuilderSuite) SetupTest() {
 	// insert the first block in our range
 	first := bs.createAndRecordBlock(nil)
 	bs.firstID = first.ID()
+	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
 	bs.lastSeal = &flow.Seal{
 		BlockID:    first.ID(),
-		ResultID:   flow.ZeroID,
+		ResultID:   firstResult.ID(),
 		FinalState: unittest.StateCommitmentFixture(),
 	}
+	bs.resultForBlock[firstResult.BlockID] = firstResult
 
 	// insert the finalized blocks between first and final
 	previous := first

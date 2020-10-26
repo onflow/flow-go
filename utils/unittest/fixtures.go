@@ -441,9 +441,14 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 	return receipt
 }
 
-func WithPreviousResult(resultID flow.Identifier) func(*flow.ExecutionResult) {
+func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
-		result.PreviousResultID = resultID
+		result.PreviousResultID = prevResult.ID()
+		finalState, ok := prevResult.FinalStateCommitment()
+		if !ok {
+			panic("missing final state commitment")
+		}
+		result.Chunks[0].StartState = finalState
 	}
 }
 

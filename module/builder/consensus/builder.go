@@ -4,6 +4,7 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -233,38 +234,39 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// roadmap (https://github.com/dapperlabs/flow-go/issues/4872)
 
 	// create a mapping of block to seal for all seals in our pool
+	// We consider two seals as inconsistent, if they have different start or end states
 	encounteredInconsistentSealsForSameBlock := false
-	byBlock := make(map[flow.Identifier]*flow.SealContainer)
-	for _, sealContainer := range b.sealPool.All() {
-		seal := sealContainer.Seal
-		if sc2, found := byBlock[seal.BlockID]; found {
-			if len(sealContainer.ExecutionResult.Chunks) < 1 {
-				return nil, fmt.Errorf("ExecutionResult without chunks: %v", sealContainer.ExecutionResult.ID())
+	byBlock := make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	for _, irSeal := range b.sealPool.All() {
+		if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
+			return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
+		}
+		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
+			sc1json, err := json.Marshal(irSeal)
+			if err != nil {
+				return nil, err
 			}
-			if len(sc2.ExecutionResult.Chunks) < 1 {
-				return nil, fmt.Errorf("ExecutionResult without chunks: %v", sc2.ExecutionResult.ID())
+			sc2json, err := json.Marshal(irSeal2)
+			if err != nil {
+				return nil, err
 			}
-			// only continue if both seals have same start AND end state:
-			if !bytes.Equal(sealContainer.Seal.FinalState, sc2.Seal.FinalState) ||
-				!bytes.Equal(sealContainer.ExecutionResult.Chunks[0].StartState, sc2.ExecutionResult.Chunks[0].StartState) {
-				sc1json, err := json.Marshal(sealContainer)
-				if err != nil {
-					return nil, err
-				}
-				sc2json, err := json.Marshal(sc2)
-				if err != nil {
-					return nil, err
-				}
 
-				fmt.Printf("ERROR: multiple seals for the same block %v: %s and %s", seal.BlockID, string(sc1json), string(sc2json))
+			// check whether seals are inconsistent:
+			if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
+				!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
+				fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
 				encounteredInconsistentSealsForSameBlock = true
+			} else {
+				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
 			}
+
 		} else {
-			byBlock[seal.BlockID] = sealContainer
+			byBlock[irSeal.Seal.BlockID] = irSeal
 		}
 	}
 	if encounteredInconsistentSealsForSameBlock {
-		byBlock = make(map[flow.Identifier]*flow.SealContainer)
+		// in case we find inconsistent seals, do not seal anything
+		byBlock = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -309,13 +311,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			break
 		}
 
-		nextErToBeSealed := next.ExecutionResult
+		nextErToBeSealed := next.IncorporatedResult.Result
 		if len(nextErToBeSealed.Chunks) < 1 {
 			return nil, fmt.Errorf("ExecutionResult without chunks: %v", nextErToBeSealed.ID())
 		}
 		initialState := nextErToBeSealed.Chunks[0].StartState
 		if !bytes.Equal(initialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect in finalized")
+			return nil, fmt.Errorf("seal execution states do not connect in finalized sub-chain")
 		}
 
 		seals = append(seals, next.Seal)
