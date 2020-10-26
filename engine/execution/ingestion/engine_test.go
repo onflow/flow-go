@@ -515,8 +515,6 @@ func Test_SPOCKGeneration(t *testing.T) {
 			},
 		}
 
-		ctx.executionState.On("PersistExecutionReceipt", mock.Anything, mock.Anything).Return(nil)
-
 		executionReceipt, err := ctx.engine.generateExecutionReceipt(
 			context.Background(),
 			&flow.ExecutionResult{
