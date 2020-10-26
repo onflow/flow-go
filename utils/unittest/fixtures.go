@@ -421,9 +421,9 @@ func WithExecutorID(id flow.Identifier) func(*flow.ExecutionReceipt) {
 	}
 }
 
-func WithBlock(block *flow.Block) func(*flow.ExecutionReceipt) {
+func WithResult(result *flow.ExecutionResult) func(*flow.ExecutionReceipt) {
 	return func(receipt *flow.ExecutionReceipt) {
-		receipt.ExecutionResult = *ResultForBlockFixture(block)
+		receipt.ExecutionResult = *result
 	}
 }
 
@@ -441,9 +441,23 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 	return receipt
 }
 
-func ExecutionResultFixture() *flow.ExecutionResult {
+func WithPreviousResult(resultID flow.Identifier) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.PreviousResultID = resultID
+	}
+}
+
+func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		updatedResult := *ResultForBlockFixture(block)
+		result.BlockID = updatedResult.BlockID
+		result.Chunks = updatedResult.Chunks
+	}
+}
+
+func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
-	return &flow.ExecutionResult{
+	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          IdentifierFixture(),
@@ -454,14 +468,26 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 		},
 		Signatures: SignaturesFixture(6),
 	}
+
+	for _, apply := range opts {
+		apply(result)
+	}
+	return result
 }
 
-func IncorporatedResultFixture() *flow.IncorporatedResult {
+// TODO replace by usage unittest.IncorporatedResult
+func IncorporatedResultFixture(opts ...func(*flow.IncorporatedResult)) *flow.IncorporatedResult {
 	result := ExecutionResultFixture()
 	incorporatedBlockID := IdentifierFixture()
-	return flow.NewIncorporatedResult(incorporatedBlockID, result)
+	ir := flow.NewIncorporatedResult(incorporatedBlockID, result)
+
+	for _, apply := range opts {
+		apply(ir)
+	}
+	return ir
 }
 
+// TODO replace by usage unittest.IncorporatedResult
 func IncorporatedResultForBlockFixture(block *flow.Block) *flow.IncorporatedResult {
 	result := ResultForBlockFixture(block)
 	incorporatedBlockID := IdentifierFixture()
@@ -483,6 +509,12 @@ func WithApproverID(id flow.Identifier) func(*flow.ResultApproval) {
 func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
 		ra.Body.Attestation.BlockID = id
+	}
+}
+
+func WithChunk(chunkIdx uint64) func(*flow.ResultApproval) {
+	return func(approval *flow.ResultApproval) {
+		approval.Body.ChunkIndex = chunkIdx
 	}
 }
 
