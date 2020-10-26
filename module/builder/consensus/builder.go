@@ -371,7 +371,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		seals = append(seals, next.Seal)
 		sealCount++
 		delete(byBlock, pendingID)
-		last = next.Seal
 	}
 
 	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)

@@ -975,13 +975,6 @@ func approvalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.
 	)
 }
 
-func expectedID(expectedID flow.Identifier) interface{} {
-	return mock.MatchedBy(
-		func(actualID flow.Identifier) bool {
-			return expectedID == actualID
-		})
-}
-
 func entityWithID(expectedID flow.Identifier) interface{} {
 	return mock.MatchedBy(
 		func(entity flow.Entity) bool {
