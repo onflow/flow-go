@@ -35,7 +35,7 @@ func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 	checkSealingDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceConsensus,
 		Subsystem: subsystemMatchEngine,
-		Name:      "check_sealing_duration",
+		Name:      "check_sealing_duration_s",
 		Help:      "duration of consensus match engine sealing check in seconds",
 	})
 

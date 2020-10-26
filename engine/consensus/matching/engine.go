@@ -36,7 +36,7 @@ var ErrBlockNotFound = errors.New("block not found")
 type Engine struct {
 	unit                    *engine.Unit                    // used to control startup/shutdown
 	log                     zerolog.Logger                  // used to log relevant actions with context
-	collector               module.EngineMetrics            // used to track sent and received messages
+	engineMetrics           module.EngineMetrics            // used to track sent and received messages
 	tracer                  module.Tracer                   // used to trace execution
 	mempool                 module.MempoolMetrics           // used to track mempool size
 	metrics                 module.ConsensusMetrics         // used to track consensus metrics
@@ -82,7 +82,7 @@ func New(
 	e := &Engine{
 		unit:                    engine.NewUnit(),
 		log:                     log.With().Str("engine", "matching").Logger(),
-		collector:               collector,
+		engineMetrics:           collector,
 		tracer:                  tracer,
 		mempool:                 mempool,
 		metrics:                 conMetrics,
@@ -184,16 +184,16 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *flow.ExecutionReceipt:
-		e.collector.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		e.unit.Lock()
 		defer e.unit.Unlock()
-		defer e.collector.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
-		e.collector.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
 		e.unit.Lock()
 		defer e.unit.Unlock()
-		defer e.collector.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
