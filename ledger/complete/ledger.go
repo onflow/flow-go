@@ -262,6 +262,9 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 	// migrate payloads
 	for _, migrate := range migrations {
 		payloads, err = migrate(payloads)
+		if err != nil {
+			return nil, fmt.Errorf("error applying migration: %w", err)
+		}
 	}
 
 	// get paths
