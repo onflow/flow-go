@@ -498,7 +498,9 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 			var err error
 			previous, err = e.resultsDB.ByID(previousID)
 			if errors.Is(err, storage.ErrNotFound) {
-				log.Debug().Hex("previous_res_id", previousID[:]).Msg("skipping result with unknown previous result")
+				resID := result.ID()
+				finalStateCommitment := result.FinalStateCommit
+				log.Debug().Hex("previous_res_id", previousID[:]).Hex("state_commitment", finalStateCommitment[:]).Hex("res_id", resID[:]).Msg("skipping result with unknown previous result")
 				continue
 			}
 			if err != nil {
