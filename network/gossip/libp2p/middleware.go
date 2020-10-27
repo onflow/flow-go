@@ -46,6 +46,8 @@ const (
 	DefaultUnicastTimeout = 2 * time.Second
 )
 
+var unicastTimeout = DefaultUnicastTimeout
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -291,7 +293,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	}
 
 	// pass in a context with timeout to make the unicast call fail fast
-	ctx, cancel := context.WithTimeout(m.ctx, DefaultUnicastTimeout)
+	ctx, cancel := context.WithTimeout(m.ctx, unicastTimeout)
 	defer cancel()
 
 	// create new stream
