@@ -245,3 +245,18 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 	}
 	return checkpointer, nil
 }
+
+// ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations
+func (l *Ledger) ExportCheckpointAt(state ledger.State, outputPath string) error {
+
+	trie, err := l.forest.GetTrie(ledger.RootHash(state))
+	if err != nil {
+		return fmt.Errorf("cannot get try at the given state commitment: %w", err)
+	}
+
+	payloads := trie.AllPayloads()
+	paths := pathfiner.PathsFromPayloads()
+	// construct Paths
+
+	return nil
+}

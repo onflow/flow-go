@@ -95,6 +95,19 @@ func PayloadsToValues(payloads []*ledger.Payload) ([]ledger.Value, error) {
 	return ret, nil
 }
 
+// PathsFromPayloads constructs paths from an slice of payload
+func PathsFromPayloads(payloads []*ledger.Payload, version uint8) ([]ledger.Path, error) {
+	paths := make([]ledger.Path, 0)
+	for _, pay := range payloads {
+		p, err := KeyToPath(pay.Key, version)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p)
+	}
+	return paths, nil
+}
+
 // UpdateToPayloads constructs an slice of payloads given ledger update
 func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
 	keys := update.Keys()

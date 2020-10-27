@@ -193,10 +193,10 @@ func (n *Node) Payload() *ledger.Payload { return n.payload }
 // Do NOT MODIFY returned Node!
 func (n *Node) LeftChild() *Node { return n.lChild }
 
-// RigthChild returns the the Node's right child.
+// RightChild returns the the Node's right child.
 // Only INTERIOR nodes have children.
 // Do NOT MODIFY returned Node!
-func (n *Node) RigthChild() *Node { return n.rChild }
+func (n *Node) RightChild() *Node { return n.rChild }
 
 // IsLeaf returns true if and only if Node is a LEAF.
 func (n *Node) IsLeaf() bool {
@@ -221,4 +221,23 @@ func (n *Node) FmtStr(prefix string, subpath string) string {
 	hashStr := hex.EncodeToString(n.hashValue)
 	hashStr = hashStr[:3] + "..." + hashStr[len(hashStr)-3:]
 	return fmt.Sprintf("%v%v: (path:%v, payloadSize:%d hash:%v)[%s] (obj %p) %v %v ", prefix, n.height, n.path, payloadSize, hashStr, subpath, n, left, right)
+}
+
+// AllPayloads returns the payload of this node and all payloads of the subtrie
+func (n *Node) AllPayloads() []*ledger.Payload {
+	payloads := make([]*ledger.Payload, 0)
+	if n.IsLeaf() {
+		payloads = append(payloads, n.Payload())
+	}
+
+	if lChild := n.LeftChild(); lChild != nil {
+		cp := lChild.AllPayloads()
+		payloads = append(payloads, cp...)
+	}
+
+	if rChild := n.RightChild(); rChild != nil {
+		cp := rChild.AllPayloads()
+		payloads = append(payloads, cp...)
+	}
+	return payloads
 }

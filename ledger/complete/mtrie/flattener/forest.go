@@ -80,9 +80,9 @@ func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode,
 	if !found {
 		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(node.LeftChild().Hash()))
 	}
-	rightIndex, found := indexForNode[node.RigthChild()]
+	rightIndex, found := indexForNode[node.RightChild()]
 	if !found {
-		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(node.RigthChild().Hash()))
+		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(node.RightChild().Hash()))
 	}
 
 	storableNode := &StorableNode{

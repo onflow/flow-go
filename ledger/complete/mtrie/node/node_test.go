@@ -111,3 +111,15 @@ func Test_RegCount(t *testing.T) {
 	n5 := node.NewInterimNode(1, n4, n3)
 	require.Equal(t, n5.RegCount(), uint64(3))
 }
+
+func Test_AllPayloads(t *testing.T) {
+	path := utils.TwoBytesPath(1)
+	payload := utils.LightPayload(2, 3)
+	n1 := node.NewLeaf(path, payload, 0)
+	n2 := node.NewLeaf(path, payload, 0)
+	n3 := node.NewLeaf(path, payload, 0)
+
+	n4 := node.NewInterimNode(1, n1, n2)
+	n5 := node.NewInterimNode(1, n4, n3)
+	require.Equal(t, len(n5.AllPayloads()), 3)
+}

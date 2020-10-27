@@ -146,7 +146,7 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]*ledger.Payload, 
 	}
 
 	if len(rpaths) > 0 {
-		p, err := mt.read(head.RigthChild(), rpaths)
+		p, err := mt.read(head.RightChild(), rpaths)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +225,7 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 		defer wg.Done()
 		lChild, lErr = update(treeHeight, nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
 	}()
-	rChild, rErr = update(treeHeight, nodeHeight-1, parentNode.RigthChild(), rpaths, rpayloads)
+	rChild, rErr = update(treeHeight, nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
 	wg.Wait()
 	if lErr != nil || rErr != nil {
 		var merr *multierror.Error
@@ -335,7 +335,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	}
 
 	if len(lpaths) > 0 {
-		if rChild := head.RigthChild(); rChild != nil {
+		if rChild := head.RightChild(); rChild != nil {
 			nodeHash := rChild.Hash()
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
@@ -368,7 +368,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 				}
 			}
 		}
-		err := mt.proofs(head.RigthChild(), rpaths, rproofs)
+		err := mt.proofs(head.RightChild(), rpaths, rproofs)
 		if err != nil {
 			return err
 		}
@@ -415,7 +415,7 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 		}
 	}
 
-	if rChild := n.RigthChild(); rChild != nil {
+	if rChild := n.RightChild(); rChild != nil {
 		err := mt.dumpAsJSON(rChild, encoder)
 		if err != nil {
 			return err
@@ -427,4 +427,9 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]
 func EmptyTrieRootHash(pathByteSize int) []byte {
 	return node.NewEmptyTreeRoot(8 * pathByteSize).Hash()
+}
+
+// AllPayloads returns all payloads
+func (mt *MTrie) AllPayloads() []*ledger.Payload {
+	return mt.root.AllPayloads()
 }
