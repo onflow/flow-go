@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-
 func TestAccounts_Create_Sets_Registers(t *testing.T) {
 	ledger := state.NewMapLedger()
 
