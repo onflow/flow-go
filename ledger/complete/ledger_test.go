@@ -355,6 +355,39 @@ func TestLedgerFunctionality(t *testing.T) {
 	}
 }
 
+func Test_ExportCheckpointAt(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dbDir string) {
+		unittest.RunWithTempDir(t, func(dir2 string) {
+
+			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+			require.NoError(t, err)
+
+			state := led.InitialState()
+			u := utils.UpdateFixture()
+			u.SetState(state)
+
+			state, err = led.Set(u)
+			require.NoError(t, err)
+
+			err = led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, dir2+"/root.checkpoint")
+			require.NoError(t, err)
+
+			led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+			require.NoError(t, err)
+
+			q, err := ledger.NewQuery(state, u.Keys())
+			require.NoError(t, err)
+
+			retValues, err := led2.Get(q)
+			require.NoError(t, err)
+
+			for i, v := range u.Values() {
+				assert.Equal(t, v, retValues[i])
+			}
+		})
+	})
+}
+
 func valuesMatches(expected []ledger.Value, got []ledger.Value) bool {
 	if len(expected) != len(got) {
 		return false
@@ -369,4 +402,8 @@ func valuesMatches(expected []ledger.Value, got []ledger.Value) bool {
 		}
 	}
 	return true
+}
+
+func noOpMigration(p []ledger.Payload) ([]ledger.Payload, error) {
+	return p, nil
 }

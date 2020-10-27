@@ -430,6 +430,6 @@ func EmptyTrieRootHash(pathByteSize int) []byte {
 }
 
 // AllPayloads returns all payloads
-func (mt *MTrie) AllPayloads() []*ledger.Payload {
+func (mt *MTrie) AllPayloads() []ledger.Payload {
 	return mt.root.AllPayloads()
 }

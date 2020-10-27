@@ -15,7 +15,7 @@ type FlattenedTrie struct {
 
 // ToFlattenedForestWithASingleTrie converts the flattenedTrie into a FlattenedForest with only one trie included
 func (ft *FlattenedTrie) ToFlattenedForestWithASingleTrie() *FlattenedForest {
-	storableTries := make([]*StorableTrie, 0, 1)
+	storableTries := make([]*StorableTrie, 1, 1)
 	storableTries[0] = ft.Trie
 	return &FlattenedForest{
 		Nodes: ft.Nodes,

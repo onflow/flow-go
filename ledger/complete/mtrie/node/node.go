@@ -224,10 +224,10 @@ func (n *Node) FmtStr(prefix string, subpath string) string {
 }
 
 // AllPayloads returns the payload of this node and all payloads of the subtrie
-func (n *Node) AllPayloads() []*ledger.Payload {
-	payloads := make([]*ledger.Payload, 0)
+func (n *Node) AllPayloads() []ledger.Payload {
+	payloads := make([]ledger.Payload, 0)
 	if n.IsLeaf() {
-		payloads = append(payloads, n.Payload())
+		payloads = append(payloads, *n.Payload())
 	}
 
 	if lChild := n.LeftChild(); lChild != nil {

@@ -96,7 +96,7 @@ func PayloadsToValues(payloads []*ledger.Payload) ([]ledger.Value, error) {
 }
 
 // PathsFromPayloads constructs paths from an slice of payload
-func PathsFromPayloads(payloads []*ledger.Payload, version uint8) ([]ledger.Path, error) {
+func PathsFromPayloads(payloads []ledger.Payload, version uint8) ([]ledger.Path, error) {
 	paths := make([]ledger.Path, 0)
 	for _, pay := range payloads {
 		p, err := KeyToPath(pay.Key, version)
