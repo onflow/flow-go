@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -66,10 +67,25 @@ func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, messag
 
 	select {
 	case <-time.After(duration):
-		require.Fail(t, "function did not return in time: "+message)
+		require.Fail(t, "function did not return on time: "+message)
 	case <-done:
 		return
 	}
+}
+
+// RequireConcurrentCallsReturnBefore is a test helper that runs function `f` count-many times concurrently,
+// and requires all invocations to return within duration.
+func RequireConcurrentCallsReturnBefore(t *testing.T, f func(), count int, duration time.Duration, message string) {
+	wg := &sync.WaitGroup{}
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func() {
+			f()
+			wg.Done()
+		}()
+	}
+
+	RequireReturnsBefore(t, wg.Wait, duration, message)
 }
 
 // AssertErrSubstringMatch asserts that two errors match with substring
