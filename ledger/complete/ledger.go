@@ -258,12 +258,16 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 
 	// get all payloads
 	payloads := t.AllPayloads()
+	payloadSize := len(payloads)
 
 	// migrate payloads
-	for _, migrate := range migrations {
+	for i, migrate := range migrations {
 		payloads, err = migrate(payloads)
 		if err != nil {
 			return nil, fmt.Errorf("error applying migration: %w", err)
+		}
+		if payloadSize != len(payloads) {
+			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
 		}
 	}
 
@@ -299,6 +303,5 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 	}
 	writer.Close()
 
-	// TODO add assert on number of registers
 	return newTrie.RootHash(), nil
 }
