@@ -135,7 +135,7 @@ func New(
 func (e *Engine) Ready() <-chan struct{} {
 	err := e.reloadUnexecutedBlocks()
 	if err != nil {
-		e.log.Error().Err(err).Msg("failed to load all unexecuted blocks")
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
 	}
 
 	return e.unit.Ready()
@@ -218,7 +218,7 @@ func (e *Engine) reloadFinalizedUnexecutedBlocks() error {
 	// because the next loop will ensure it only iterate through finalized
 	// block.
 	firstUnexecuted := final.Height
-	for ; ; firstUnexecuted-- {
+	for ; firstUnexecuted >= 0; firstUnexecuted-- {
 		header, err := e.state.AtHeight(firstUnexecuted).Head()
 		if err != nil {
 			return fmt.Errorf("could not get header at height: %v, %w", firstUnexecuted, err)
