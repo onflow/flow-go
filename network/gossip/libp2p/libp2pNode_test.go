@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
@@ -22,7 +21,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -49,9 +47,8 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 
 // SetupTests initiates the test setups prior to each test
 func (l *LibP2PNodeTestSuite) SetupTest() {
-	l.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	l.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	l.ctx, l.cancel = context.WithCancel(context.Background())
-	golog.SetAllLoggers(golog.LevelDebug)
 }
 
 func (l *LibP2PNodeTestSuite) TearDownTest() {

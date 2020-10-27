@@ -31,7 +31,7 @@ func TestNetworkTestSuit(t *testing.T) {
 
 func (n *TopologyTestSuite) TestTopologySize() {
 	totalNodes := 100
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
 	// create totalNodes number of networks
 	_, _, nets := generateIDsMiddlewaresNetworks(n.T(), totalNodes, logger, 100, nil, true)
