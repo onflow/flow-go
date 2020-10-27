@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -13,8 +14,8 @@ const (
 	keyExists                   = "exists"
 	keyCode                     = "code"
 	keyPublicKeyCount           = "public_key_count"
-	StorageUsedRegisterName     = "storage_used"
-	StorageCapacityRegisterName = "storage_capacity"
+	storageUsedRegisterName     = "storage_used"
+	storageCapacityRegisterName = "storage_capacity"
 )
 
 var (
@@ -69,7 +70,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 }
 
 func (a *Accounts) Exists(address flow.Address) (bool, error) {
-	exists, err := a.ledger.Get(string(address.Bytes()), "", keyExists)
+	exists, err := a.get(address, false, keyExists)
 	if err != nil {
 		return false, newLedgerGetError(keyExists, address, err)
 	}
@@ -91,18 +92,27 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return fmt.Errorf("account already created on %s", newAddress.Hex())
 	}
 
-	// mark that this account exists
-	a.ledger.Set(string(newAddress.Bytes()), "", keyExists, []byte{1})
+	err = a.setStorageUsed(newAddress, 8) //set storage used to the size of storage used
+	if err != nil {
+		return err
+	}
 
-	a.ledger.Set(string(newAddress.Bytes()), string(newAddress.Bytes()), keyCode, nil)
+	// mark that this account exists
+	err = a.set(newAddress, false, keyExists, []byte{1})
+	if err != nil {
+		return err
+	}
+
+	err = a.set(newAddress, true, keyCode, nil)
+	if err != nil {
+		return err
+	}
 
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
-	publicKey, err := a.ledger.Get(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
-	)
+	publicKey, err := a.get(address, true, keyPublicKey(keyIndex))
 	if err != nil {
 		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
 	}
@@ -120,9 +130,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 }
 
 func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
-	countBytes, err := a.ledger.Get(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
-	)
+	countBytes, err := a.get(address, true, keyPublicKeyCount)
 	if err != nil {
 		return 0, newLedgerGetError(keyPublicKeyCount, address, err)
 	}
@@ -142,20 +150,15 @@ func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 	return countInt.Uint64(), nil
 }
 
-func (a *Accounts) SetPublicKeyCount(address flow.Address, count uint64) {
+func (a *Accounts) SetPublicKeyCount(address flow.Address, count uint64) error {
 	newCount := new(big.Int).SetUint64(count)
 
-	a.ledger.Set(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
-		newCount.Bytes(),
-	)
+	return a.set(address, true, keyPublicKeyCount, newCount.Bytes())
 }
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
 	var countBytes []byte
-	countBytes, err = a.ledger.Get(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
-	)
+	countBytes, err = a.get(address, true, keyPublicKeyCount)
 	if err != nil {
 		return nil, newLedgerGetError(keyPublicKeyCount, address, err)
 	}
@@ -204,12 +207,9 @@ func (a *Accounts) SetPublicKey(
 		return nil, fmt.Errorf("failed to encode public key: %w", err)
 	}
 
-	a.ledger.Set(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
-		encodedPublicKey,
-	)
+	err = a.set(address, true, keyPublicKey(keyIndex), encodedPublicKey)
 
-	return encodedPublicKey, nil
+	return encodedPublicKey, err
 }
 
 func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.AccountPublicKey) error {
@@ -223,9 +223,7 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 
 	count := uint64(len(publicKeys)) // len returns int and this will not exceed uint64
 
-	a.SetPublicKeyCount(address, count)
-
-	return nil
+	return a.SetPublicKeyCount(address, count)
 }
 
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
@@ -239,16 +237,12 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 		return err
 	}
 
-	a.SetPublicKeyCount(address, count+1)
-
-	return nil
+	return a.SetPublicKeyCount(address, count+1)
 }
 
 func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
 
-	code, err := a.ledger.Get(string(address.Bytes()),
-		string(address.Bytes()),
-		keyCode)
+	code, err := a.get(address, true, keyCode)
 	if err != nil {
 		return nil, newLedgerGetError(keyCode, address, err)
 	}
@@ -258,9 +252,7 @@ func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
 
 func (a *Accounts) TouchCode(address flow.Address) {
 
-	a.ledger.Touch(string(address.Bytes()),
-		string(address.Bytes()),
-		keyCode)
+	a.touch(address, true, keyCode)
 }
 
 func (a *Accounts) SetCode(address flow.Address, code []byte) error {
@@ -274,7 +266,7 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 	}
 
 	var prevCode []byte
-	prevCode, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyCode)
+	prevCode, err = a.get(address, true, keyCode)
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
@@ -284,9 +276,108 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 		return nil
 	}
 
-	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), keyCode, code)
+	err = a.set(address, true, keyCode, code)
+	if err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func (a *Accounts) GetStorageUsed(owner flow.Address) (uint64, error) {
+	oldSizeRegister, err := a.get(owner, false, storageUsedRegisterName)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(oldSizeRegister) == 0 {
+		return 0, fmt.Errorf("account %s storage used is not initialized", owner.Hex())
+	}
+
+	storageUsed := binary.LittleEndian.Uint64(oldSizeRegister)
+	return storageUsed, nil
+}
+
+func (a *Accounts) setStorageUsed(owner flow.Address, used uint64) error {
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, used)
+	return a.set(owner, false, storageUsedRegisterName, buffer)
+}
+
+func (a *Accounts) set(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
+	err := a.updateRegisterSizeChange(address, isController, key, value)
+	if err != nil {
+		return err
+	}
+	if isController {
+		a.ledger.Set(string(address.Bytes()), string(address.Bytes()), key, value)
+	} else {
+		a.ledger.Set(string(address.Bytes()), "", key, value)
+	}
+	return nil
+}
+
+func (a *Accounts) updateRegisterSizeChange(owner flow.Address, isController bool, key string, value flow.RegisterValue) error {
+	if key == storageUsedRegisterName {
+		// size of this register is always 8
+		return nil
+	}
+	oldValue, err := a.get(owner, isController, key)
+	if err != nil {
+		return err
+	}
+
+	sizeChange := int64(len(value) - len(oldValue))
+	if sizeChange == 0 {
+		// register size has not changed. Nothing to do
+		return nil
+	}
+
+	oldSize, err := a.GetStorageUsed(owner)
+	if err != nil {
+		return err
+	}
+
+	// two paths to avoid casting uint to int
+	var newSize uint64
+	if sizeChange < 0 {
+		absChange := uint64(-sizeChange)
+		if absChange > oldSize {
+			// should never happen
+			panic("account storage used would be negative")
+		}
+		newSize = oldSize - absChange
+	} else {
+		absChange := uint64(sizeChange)
+		newSize = oldSize + absChange
+	}
+
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, newSize)
+	// this will put us back in the Set method.
+	// The difference will be that sizeChange will always be 0 when setting storage_used
+	err = a.setStorageUsed(owner, newSize)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *Accounts) touch(address flow.Address, isController bool, key string) {
+	if isController {
+		a.ledger.Touch(string(address.Bytes()), string(address.Bytes()), key)
+	} else {
+		a.ledger.Touch(string(address.Bytes()), "", key)
+	}
+}
+
+func (a *Accounts) get(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
+	if isController {
+		return a.ledger.Get(string(address.Bytes()), string(address.Bytes()), key)
+	} else {
+		return a.ledger.Get(string(address.Bytes()), "", key)
+	}
 }
 
 func newLedgerGetError(key string, address flow.Address, err error) error {

@@ -18,7 +18,7 @@ func TestAccounts_Create_Sets_Registers(t *testing.T) {
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	require.Equal(t, len(ledger.RegisterTouches), 3) // exists + code + key count
+	require.Equal(t, len(ledger.RegisterTouches), 4) // storage_used + exists + code + key count
 }
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
