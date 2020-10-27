@@ -408,8 +408,8 @@ type ProposalKey struct {
 
 // ByteSize returns the byte size of the proposal key
 func (p ProposalKey) ByteSize() int {
-       keyIDLen := 8
-       sequenceNumberLen := 8
+	keyIDLen := 8
+	sequenceNumberLen := 8
 	return len(p.Address) + keyIDLen + sequenceNumberLen
 }
 
@@ -423,8 +423,8 @@ type TransactionSignature struct {
 
 // ByteSize returns the byte size of the transaction signature
 func (s TransactionSignature) ByteSize() int {
-        signerIndexLen := 8
-        keyIDLen := 8
+	signerIndexLen := 8
+	keyIDLen := 8
 	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature)
 }
 
