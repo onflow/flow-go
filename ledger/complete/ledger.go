@@ -294,7 +294,8 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 	if err != nil {
 		return nil, fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
-
 	writer.Close()
+
+	// TODO add assert on number of registers
 	return newTrie.RootHash(), nil
 }
