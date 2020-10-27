@@ -369,7 +369,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 			state, err = led.Set(u)
 			require.NoError(t, err)
 
-			err = led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, dir2+"/root.checkpoint")
+			err = led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, complete.DefaultPathFinderVersion, dir2+"/root.checkpoint")
 			require.NoError(t, err)
 
 			led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)

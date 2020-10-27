@@ -248,7 +248,7 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 }
 
 // ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations
-func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migration, outputFilePath string) error {
+func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migration, targetPathFinderVersion uint8, outputFilePath string) error {
 
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
@@ -265,7 +265,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 	}
 
 	// get paths
-	paths, err := pathfinder.PathsFromPayloads(payloads, l.pathFinderVersion)
+	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
 	if err != nil {
 		return fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
