@@ -338,16 +338,14 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
-	_, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err == nil {
-		// a statecommitment being stored indicates the block
-		// has been executed
-		log.Debug().Msg("block has been executed already")
-		return nil
+	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	if err != nil {
+		return fmt.Errorf("could not check whether block is executed: %w", err)
 	}
 
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not query state commitment for block: %w", err)
+	if executed {
+		log.Debug().Msg("block has been executed already")
+		return nil
 	}
 
 	// unexecuted block
@@ -385,10 +383,10 @@ func (e *Engine) enqueueBlockAndCheckExecutable(block *flow.Block, checkStateSyn
 				return nil
 			}
 
+			firstUnexecutedHeight := queue.Head.Item.Height()
 			if checkStateSync {
 				// whenever the queue grows, we need to check whether the state sync should be
 				// triggered.
-				firstUnexecutedHeight := queue.Head.Item.Height()
 				e.unit.Launch(func() {
 					e.checkStateSyncStart(firstUnexecutedHeight)
 				})
@@ -428,7 +426,14 @@ func (e *Engine) enqueueBlockAndCheckExecutable(block *flow.Block, checkStateSyn
 			}
 
 			// execute the block if the block is ready to be executed
-			e.executeBlockIfComplete(executableBlock)
+			completed := e.executeBlockIfComplete(executableBlock)
+
+			log.Info().
+				// if the execution is halt, but the queue keeps growing, we could check which block
+				// hasn't been executed.
+				Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
+				Bool("completed", completed).
+				Msg("block is enqueued")
 
 			return nil
 		},
@@ -1404,25 +1409,26 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 		}
 
 		blockID := header.ID()
-		_, err = e.execState.StateCommitmentByBlockID(ctx, blockID)
 
-		if err == nil {
-			// this block has been executed, we will send the delta
-			delta, err := e.execState.RetrieveStateDelta(ctx, blockID)
-			if err != nil {
-				return fmt.Errorf("could not retrieve state delta for block %v, %w", blockID, err)
-			}
-
-			onDelta(delta)
-
-		} else if errors.Is(err, storage.ErrNotFound) {
-			// this block has not been executed,
-			// it parent block hasn't been executed, the higher block won't be
-			// executed either, so we stop iterating through the heights
-			break
-		} else {
-			return fmt.Errorf("could not query statecommitment for height %v: %w", height, err)
+		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+		if err != nil {
+			return fmt.Errorf("could not check whether block is executed: %w", err)
 		}
+
+		if !executed {
+			// this block has not been executed,
+			// we could stop iterating through the heights, because
+			// if a parent block is not executed, its children won't be executed
+			break
+		}
+
+		// this block has been executed, we will send the delta
+		delta, err := e.execState.RetrieveStateDelta(ctx, blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve state delta for block %v, %w", blockID, err)
+		}
+
+		onDelta(delta)
 	}
 
 	return nil
@@ -1450,17 +1456,15 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 	// check if the block has been executed already
 	// delta ID is block ID
 	blockID := delta.ID()
-	_, err = e.execState.StateCommitmentByBlockID(e.unit.Ctx(), blockID)
-
-	if err == nil {
-		// the block has been executed, ignore
-		e.log.Info().Hex("block", logging.Entity(delta)).Msg("ignore executed state delta")
-		return nil
+	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	if err != nil {
+		return fmt.Errorf("could not check whether block is executed: %w", err)
 	}
 
-	// exception
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not get know block was executed or not: %w", err)
+	if executed {
+		// if the block has been executed, we don't need the delta, exit here
+		e.log.Info().Hex("block", logging.Entity(delta)).Msg("ignore executed state delta")
+		return nil
 	}
 
 	// block not executed yet, check if the block has been sealed
