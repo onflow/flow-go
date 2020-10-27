@@ -39,7 +39,7 @@ func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 			return ledger.Path(hasher.SumHash()), nil
 		}
 	}
-	return nil, fmt.Errorf("unsuported key to path version")
+	return nil, fmt.Errorf("unsupported key to path version")
 }
 
 // KeysToPaths converts an slice of keys into a paths
