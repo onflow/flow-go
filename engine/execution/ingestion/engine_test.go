@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	mathRand "math/rand"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -314,6 +316,15 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 		mocked.ReturnArguments = mock.Arguments{nil}
 	}
 
+}
+
+func TestChunkIndexIsSet(t *testing.T) {
+
+	i := mathRand.Int()
+	chunk := generateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture())
+
+	assert.Equal(t, i, chunk.Index)
+	assert.Equal(t, i, chunk.CollectionIndex)
 }
 
 func TestExecuteOneBlock(t *testing.T) {
