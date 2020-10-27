@@ -247,13 +247,13 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 	return checkpointer, nil
 }
 
-// ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations
-func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migration, targetPathFinderVersion uint8, outputFilePath string) error {
+// ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
+func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migration, targetPathFinderVersion uint8, outputFilePath string) (ledger.State, error) {
 
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
-		return fmt.Errorf("cannot get try at the given state commitment: %w", err)
+		return nil, fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
 	// get all payloads
@@ -267,34 +267,34 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 	// get paths
 	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
 	if err != nil {
-		return fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
 
 	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
 	if err != nil {
-		return fmt.Errorf("constructing empty trie failed: %w", err)
+		return nil, fmt.Errorf("constructing empty trie failed: %w", err)
 	}
 
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	if err != nil {
-		return fmt.Errorf("constructing updated trie failed: %w", err)
+		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
 	writer, err := wal.CreateCheckpointWriterForFile(outputFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to create a checkpoint writer: %w", err)
+		return nil, fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
 
 	flatedTrie, err := flattener.FlattenTrie(newTrie)
 	if err != nil {
-		return fmt.Errorf("failed to flatten the trie: %w", err)
+		return nil, fmt.Errorf("failed to flatten the trie: %w", err)
 	}
 
 	err = wal.StoreCheckpoint(flatedTrie.ToFlattenedForestWithASingleTrie(), writer)
 	if err != nil {
-		return fmt.Errorf("failed to store the checkpoint: %w", err)
+		return nil, fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
 
 	writer.Close()
-	return nil
+	return newTrie.RootHash(), nil
 }
