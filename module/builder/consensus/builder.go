@@ -315,7 +315,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			break
 		}
 
-		nextErToBeSealed := next.IncorporatedResult.Result
+		nextResultToBeSealed := next.IncorporatedResult.Result
 		if len(nextErToBeSealed.Chunks) < 1 {
 			return nil, fmt.Errorf("ExecutionResult without chunks: %v", nextErToBeSealed.ID())
 		}
