@@ -170,7 +170,7 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 		}
 
 		psOption := pubsub.WithDiscovery(d)
-		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootID, false, nil, psOption)
+		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootBlockID, false, nil, psOption)
 		require.NoError(psts.Suite.T(), err)
 		require.Eventuallyf(psts.Suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()

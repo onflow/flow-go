@@ -2,15 +2,11 @@ package extract
 
 import (
 	"encoding/hex"
-	"fmt"
-	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
@@ -21,7 +17,6 @@ var (
 	flagOutputDir         string
 	flagBlockHash         string
 	flagDatadir           string
-	flagMappingsFile      string
 )
 
 var Cmd = &cobra.Command{
@@ -46,10 +41,6 @@ func init() {
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")
 	_ = Cmd.MarkFlagRequired("datadir")
-
-	Cmd.Flags().StringVar(&flagMappingsFile, "mappings-file", "",
-		"file containing mappings from previous Sporks")
-	_ = Cmd.MarkFlagRequired("mappings-file")
 }
 
 func run(*cobra.Command, []string) {
@@ -72,68 +63,8 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment))
 
-	mappings, err := getMappingsFromDatabase(db)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get mapping for a database")
-	}
-
-	mappingFromFile, err := ReadMegamappings(flagMappingsFile)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot load mappings from a file")
-	}
-
-	for k, v := range mappingFromFile {
-		mappings[k] = v
-	}
-
-	fixedMappings, err := RecalculateMappings(mappings)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot fix mappings")
-	}
-
-	err = extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, fixedMappings)
+	err = extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate checkpoint with state commitment")
 	}
-}
-
-func fullKey(owner, controller, key string) string {
-	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
-	return strings.Join([]string{owner, controller, key}, "\x1F")
-}
-
-func fullKeyHash(owner, controller, key string) string {
-	hasher := hash.NewSHA2_256()
-	return string(hasher.ComputeHash([]byte(fullKey(owner, controller, key))))
-}
-
-// RecalculateMappings regenerates some possibly wrong mappings
-// Due to some errors generate mappings could be wrong. Sometimes the hashes key was calculated
-// correctly using empty `Controller` part, but the resulting mappings has a `Controller` duplicated
-// from `Owner` field.
-// Having the input we can re-hash and check if values matches and fix the eventual problems
-func RecalculateMappings(mappings map[string]delta.Mapping) (map[string]delta.Mapping, error) {
-	fixed := make(map[string]delta.Mapping, len(mappings))
-
-	for k, v := range mappings {
-		rehashed := fullKeyHash(v.Owner, v.Controller, v.Key)
-
-		if rehashed == k { //all good
-			fixed[k] = v
-			continue
-		}
-		rehashedNoController := fullKeyHash(v.Owner, "", v.Key)
-		if rehashedNoController == k {
-			fixed[k] = delta.Mapping{
-				Owner:      v.Owner,
-				Key:        v.Key,
-				Controller: "",
-			}
-			fixed[rehashed] = v
-			continue
-		}
-		return nil, fmt.Errorf("key %x cannot be reconstructed", k)
-	}
-
-	return fixed, nil
 }

@@ -215,8 +215,6 @@ func (p *P2PNode) AddPeer(ctx context.Context, peer NodeAddress) error {
 		return fmt.Errorf("failed to add peer %s: %w", peer.Name, err)
 	}
 
-	p.Lock()
-	defer p.Unlock()
 	err = p.libP2PHost.Connect(ctx, pInfo)
 	if err != nil {
 		return err
@@ -232,15 +230,9 @@ func (p *P2PNode) RemovePeer(ctx context.Context, peer NodeAddress) error {
 		return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
 	}
 
-	p.Lock()
-	defer p.Unlock()
-	conns := p.libP2PHost.Network().ConnsToPeer(pInfo.ID)
-	// close all connections with the peer
-	for _, c := range conns {
-		err = c.Close()
-		if err != nil {
-			return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
-		}
+	err = p.libP2PHost.Network().ClosePeer(pInfo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
 	}
 	return nil
 }
@@ -524,6 +516,17 @@ func (p *P2PNode) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
 	}
 	p.connGater.update(whilelistPInfos)
 	return nil
+}
+
+// IsConnected returns true is address is a direct peer of this node else false
+func (p *P2PNode) IsConnected(address NodeAddress) (bool, error) {
+	pInfo, err := GetPeerInfo(address)
+	if err != nil {
+		return false, err
+	}
+	// query libp2p for connectedness status of this peer
+	isConnected := p.libP2PHost.Network().Connectedness(pInfo.ID) == network.Connected
+	return isConnected, nil
 }
 
 func generateProtocolID(rootBlockID string) protocol.ID {

@@ -63,6 +63,7 @@ func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)               {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                               {}
 func (nc *NoopCollector) FinishBlockToSeal(blockID flow.Identifier)                              {}
+func (nc *NoopCollector) CheckSealingDuration(duration time.Duration)                            {}
 func (nc *NoopCollector) OnExecutionReceiptReceived()                                            {}
 func (nc *NoopCollector) OnExecutionResultSent()                                                 {}
 func (nc *NoopCollector) OnExecutionResultReceived()                                             {}
