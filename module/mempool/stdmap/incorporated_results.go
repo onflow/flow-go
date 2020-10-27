@@ -78,25 +78,15 @@ func (ir *IncorporatedResults) All() []*flow.IncorporatedResult {
 	// To guarantee concurrency safety, we need to copy the map via a locked operation in the backend.
 	// Otherwise, another routine might concurrently modify the maps stored as mempool entities.
 	res := make([]*flow.IncorporatedResult, 0)
-	err := ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	_ = ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		for _, entity := range backdata {
-			irMap, ok := entity.(model.IncorporatedResultMap)
-			if !ok {
-				// should never happen: as the mempool only stores IncorporatedResultMap
-				return fmt.Errorf("unexpected entity type %T", entity)
-			}
-			for _, ir := range irMap.IncorporatedResults {
+			// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
+			for _, ir := range entity.(model.IncorporatedResultMap).IncorporatedResults {
 				res = append(res, ir)
 			}
 		}
 		return nil
-	})
-	if err != nil {
-		// The current implementation never reaches this path, as it only stores
-		// IncorporatedResultMap as entities in the mempool. Reaching this error
-		// condition implies this code was inconsistently modified.
-		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
-	}
+	}) // error return impossible
 
 	return res
 }
@@ -113,11 +103,8 @@ func (ir *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.Execu
 		if !exists {
 			return storage.ErrNotFound
 		}
-		irMap, ok := entity.(model.IncorporatedResultMap)
-		if !ok {
-			// should never happen: as the mempoo
-			return fmt.Errorf("unexpected entity type %T", entity)
-		}
+		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
+		irMap := entity.(model.IncorporatedResultMap)
 		result = irMap.ExecutionResult
 		for i, res := range irMap.IncorporatedResults {
 			incResults[i] = res
@@ -127,9 +114,7 @@ func (ir *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.Execu
 	if errors.Is(err, storage.ErrNotFound) {
 		return nil, nil, false
 	} else if err != nil {
-		// The current implementation never reaches this path, as it only stores
-		// IncorporatedResultMap as entities in the mempool. Reaching this error
-		// condition implies this code was inconsistently modified.
+		// The current implementation never reaches this path
 		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
 	}
 
@@ -141,7 +126,7 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 	key := incorporatedResult.Result.ID()
 
 	removed := false
-	err := ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	_ = ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		var incResults map[flow.Identifier]*flow.IncorporatedResult
 
 		entity, ok := backdata[key]
@@ -149,12 +134,8 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 			// there are no items for this result
 			return nil
 		}
-		incorporatedResultMap, ok := entity.(model.IncorporatedResultMap)
-		if !ok {
-			return fmt.Errorf("unexpected entity type %T", entity)
-		}
-
-		incResults = incorporatedResultMap.IncorporatedResults
+		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
+		incResults = entity.(model.IncorporatedResultMap).IncorporatedResults
 		if _, ok := incResults[incorporatedResult.IncorporatedBlockID]; !ok {
 			// there are no items for this IncorporatedBlockID
 			return nil
@@ -171,13 +152,7 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 		removed = true
 		*ir.size--
 		return nil
-	})
-	if err != nil {
-		// The current implementation never reaches this path, as it only stores
-		// IncorporatedResultMap as entities in the mempool. Reaching this error
-		// condition implies this code was inconsistently modified.
-		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
-	}
+	}) // error return impossible
 
 	return removed
 }

@@ -315,13 +315,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			break
 		}
 
+		// enforce that execution results form chain
 		nextResultToBeSealed := next.IncorporatedResult.Result
-		if len(nextErToBeSealed.Chunks) < 1 {
-			return nil, fmt.Errorf("ExecutionResult without chunks: %v", nextErToBeSealed.ID())
+		initialState, ok := nextResultToBeSealed.InitialStateCommit()
+		if !ok {
+			return nil, fmt.Errorf("missing initial state commitment in execution result %v", nextResultToBeSealed.ID())
 		}
-		initialState := nextErToBeSealed.Chunks[0].StartState
 		if !bytes.Equal(initialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect in finalized sub-chain")
+			return nil, fmt.Errorf("execution results do not form chain")
 		}
 
 		seals = append(seals, next.Seal)

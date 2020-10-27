@@ -214,6 +214,21 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	log = log.With().Hex("final_state", resultFinalState).Logger()
 	log.Info().Msg("execution receipt received")
 
+	// CAUTION INCOMPLETE
+	// For many other messages, we check that the message's origin (as established by the
+	// networking layer) is equal to the message's creator as reported by the message itself.
+	// Thereby we rely on the networking layer for enforcing message integrity via the
+	// networking key.
+	// Unfortunately, this shortcut is _not_ applicable here for the following reason.
+	// Execution Nodes sync state between each other and have the ability so skip computing
+	// blocks. They could build on top of other nodes' execution results. When an Execution
+	// Node receives a request for a block it hasn't itself computed, it will forward
+	// receipts from other nodes (which it potentially used to continue its own computation).
+	// Therefore, message origin and message creator are not necessarily the same
+	// for Execution Receipts (in case an Exec Node forwards a receipt from a different node).
+
+	// TODO: check the ExecutionReceipt's cryptographic integrity using the staking key
+
 	// if the receipt is for an unknown block, skip it. It will be re-requested later.
 	head, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
 	if err != nil {
@@ -237,9 +252,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("failed to process execution receipt: %w", err)
 	}
 
-	// TODO: check the approval's cryptographic integrityt.
+	// TODO: check the approval's cryptographic integrity.
 	//				if !errors.Is(err
-
 	// store the result to make it persistent for later
 	result := &receipt.ExecutionResult
 	err = e.resultsDB.Store(result) // internally de-duplicates
@@ -282,7 +296,10 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		Logger()
 	log.Info().Msg("result approval received")
 
-	// check approver matches the origin ID
+	// Check that the message's origin (as established by the networking layer) is
+	// equal to the message's creator as reported by the message itself. Thereby,
+	// we rely on the networking layer for enforcing message integrity via the
+	// networking key.
 	if approval.Body.ApproverID != originID {
 		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
 	}

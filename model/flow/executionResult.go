@@ -27,12 +27,32 @@ func (er ExecutionResult) Checksum() Identifier {
 	return MakeID(er)
 }
 
-// FinalStateCommitment gets the final state of the result and returns false
-// if the number of chunks is 0 (used as a sanity check)
+// FinalStateCommitment returns the Execution Result's commitment to the final
+// execution state of the block, i.e. the last chunk's output state.
+//
+// By protocol definition, each ExecutionReceipt must contain at least one
+// chunk (system chunk). Convention: publishing an ExecutionReceipt without a
+// final state commitment is a slashable protocol violation.
+// TODO: change bool to error return with a sentinel error
 func (er ExecutionResult) FinalStateCommitment() (StateCommitment, bool) {
 	if er.Chunks.Len() == 0 {
 		return nil, false
 	}
+	s := er.Chunks[er.Chunks.Len()-1].EndState
+	return s, len(s) > 0 // empty state commitment -> second return value is false
+}
 
-	return er.Chunks[er.Chunks.Len()-1].EndState, true
+// InitialStateCommit returns a commitment to the execution state used as input
+// for computing the block the block, i.e. the leading chunk's input state.
+//
+// By protocol definition, each ExecutionReceipt must contain at least one
+// chunk (system chunk). Convention: publishing an ExecutionReceipt without an
+// initial state commitment is a slashable protocol violation.
+// TODO: change bool to error return with a sentinel error
+func (er ExecutionResult) InitialStateCommit() (StateCommitment, bool) {
+	if er.Chunks.Len() == 0 {
+		return nil, false
+	}
+	s := er.Chunks[0].StartState
+	return s, len(s) > 0 // empty state commitment -> second return value is false
 }

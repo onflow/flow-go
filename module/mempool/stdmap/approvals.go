@@ -176,26 +176,17 @@ func (a *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flo
 	// To guarantee concurrency safety, we need to copy the map via a locked operation in the backend.
 	// Otherwise, another routine might concurrently modify the map stored for the same resultID.
 	approvals := make(map[flow.Identifier]*flow.ResultApproval)
-	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	_ = a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[chunkKey]
 		if !exists {
 			return nil
 		}
-		approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
-		if !ok {
-			return fmt.Errorf("unexpected entity type %T", entity)
-		}
-		for i, app := range approvalMapEntity.Approvals {
+		// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
+		for i, app := range entity.(model.ApprovalMapEntity).Approvals {
 			approvals[i] = app
 		}
 		return nil
-	})
-	if err != nil {
-		// The current implementation never reaches this path, as it only stores
-		// ApprovalMapEntity as entities in the mempool. Reaching this error
-		// condition implies this code was inconsistently modified.
-		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
-	}
+	}) // error return impossible
 
 	return approvals
 }
@@ -204,25 +195,15 @@ func (a *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flo
 func (a *Approvals) All() []*flow.ResultApproval {
 	res := make([]*flow.ResultApproval, 0)
 
-	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+	_ = a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		for _, entity := range backdata {
-			approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
-			if !ok {
-				// should never happen: as the mempool only stores ApprovalMapEntity
-				return fmt.Errorf("unexpected entity type %T", entity)
-			}
-			for _, approval := range approvalMapEntity.Approvals {
+			// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
+			for _, approval := range entity.(model.ApprovalMapEntity).Approvals {
 				res = append(res, approval)
 			}
 		}
 		return nil
-	})
-	if err != nil {
-		// The current implementation never reaches this path, as it only stores
-		// ApprovalMapEntity as entities in the mempool. Reaching this error
-		// condition implies this code was inconsistently modified.
-		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
-	}
+	}) // error return impossible
 
 	return res
 }

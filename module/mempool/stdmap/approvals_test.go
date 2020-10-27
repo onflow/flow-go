@@ -22,7 +22,6 @@ func TestApprovals(t *testing.T) {
 		ok, err := approvalPL.Add(approval1)
 		require.True(t, ok)
 		require.NoError(t, err)
-		println("Foo")
 
 		// checks the existence of approval for key
 		approvals := approvalPL.ByChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
