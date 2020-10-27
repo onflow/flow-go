@@ -746,6 +746,20 @@ func (e *Engine) handleComputationResult(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
+	err = func() error {
+		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionReceipt)
+		defer span.Finish()
+
+		err = e.execState.PersistExecutionReceipt(ctx, receipt)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not persist execution receipt: %w", err)
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
 	err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 	if err != nil {
 		return nil, fmt.Errorf("could not send broadcast order: %w", err)
@@ -874,20 +888,6 @@ func (e *Engine) saveExecutionResults(
 		err = e.transactionResults.BatchStore(blockID, txResults)
 		if err != nil {
 			return fmt.Errorf("failed to store transaction result error: %w", err)
-		}
-		return nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveExecutionReceipt)
-		defer span.Finish()
-
-		err = e.execState.PersistExecutionReceipt(ctx, receipt)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not persist execution receipt: %w", err)
 		}
 		return nil
 	}()
