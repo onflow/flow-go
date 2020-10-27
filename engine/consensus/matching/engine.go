@@ -207,7 +207,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Logger()
 
 	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok || len(resultFinalState) < 1 {
+	if !ok { // return
 		log.Error().Msg("execution receipt without FinalStateCommit received")
 		return engine.NewInvalidInputErrorf("execution receipt without FinalStateCommit: %x", receipt.ID())
 	}
@@ -252,8 +252,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("failed to process execution receipt: %w", err)
 	}
 
-	// TODO: check the approval's cryptographic integrity.
-	//				if !errors.Is(err
 	// store the result to make it persistent for later
 	result := &receipt.ExecutionResult
 	err = e.resultsDB.Store(result) // internally de-duplicates
@@ -697,6 +695,7 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	// get final state of execution result
 	finalState, ok := incorporatedResult.Result.FinalStateCommitment()
 	if !ok {
+		// message correctness should have been checked before: failure here is an internal implementation bug
 		return fmt.Errorf("failed to get final state commitment from Execution Result")
 	}
 
