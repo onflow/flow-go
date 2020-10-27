@@ -323,8 +323,8 @@ func TestChunkIndexIsSet(t *testing.T) {
 	i := mathRand.Int()
 	chunk := generateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture())
 
-	assert.Equal(t, i, chunk.Index)
-	assert.Equal(t, i, chunk.CollectionIndex)
+	assert.Equal(t, i, int(chunk.Index))
+	assert.Equal(t, i, int(chunk.CollectionIndex))
 }
 
 func TestExecuteOneBlock(t *testing.T) {
