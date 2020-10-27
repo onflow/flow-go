@@ -1,0 +1,102 @@
+package trie_test
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
+)
+
+func Test_DumpJSON_Empty(t *testing.T) {
+
+	trie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
+	require.NoError(t, err)
+
+	var buffer bytes.Buffer
+
+	err = trie.DumpAsJSON(&buffer)
+	require.NoError(t, err)
+
+	json := buffer.String()
+
+	assert.Empty(t, json)
+}
+
+func Test_DumpJSON(t *testing.T) {
+
+	unittest.RunWithTempDir(t, func(dir string) {
+
+		forest, err := mtrie.NewForest(pathfinder.PathByteSize, dir, complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
+		require.NoError(t, err)
+
+		emptyRootHash := forest.GetEmptyRootHash()
+
+		key1 := ledger.NewKey([]ledger.KeyPart{
+			ledger.NewKeyPart(0, []byte("si")),
+			ledger.NewKeyPart(5, []byte("vis")),
+			ledger.NewKeyPart(3, []byte("pacem")),
+		})
+
+		key2 := ledger.NewKey([]ledger.KeyPart{
+			ledger.NewKeyPart(3, []byte("ex")),
+			ledger.NewKeyPart(6, []byte("navicula")),
+			ledger.NewKeyPart(9, []byte("navis")),
+		})
+
+		key3 := ledger.NewKey([]ledger.KeyPart{
+			ledger.NewKeyPart(9, []byte("lorem")),
+			ledger.NewKeyPart(0, []byte("ipsum")),
+			ledger.NewKeyPart(5, []byte("dolor")),
+		})
+
+		update, err := ledger.NewUpdate(emptyRootHash, []ledger.Key{key1, key2, key3}, []ledger.Value{{1}, {2}, {3}})
+		require.NoError(t, err)
+
+		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
+		require.NoError(t, err)
+
+		newHash, err := forest.Update(trieUpdate)
+		require.NoError(t, err)
+
+		newTrie, err := forest.GetTrie(newHash)
+		require.NoError(t, err)
+
+		var buffer bytes.Buffer
+
+		err = newTrie.DumpAsJSON(&buffer)
+		require.NoError(t, err)
+
+		json := buffer.String()
+		split := strings.Split(json, "\n")
+
+		//filter out empty strings
+		jsons := make([]string, 0)
+		for _, s := range split {
+			if len(s) > 0 {
+				jsons = append(jsons, s)
+			}
+		}
+
+		require.Len(t, jsons, 3)
+
+		// key 1
+		require.Contains(t, jsons, "{\"Key\":{\"KeyParts\":[{\"Type\":0,\"Value\":\"7369\"},{\"Type\":5,\"Value\":\"766973\"},{\"Type\":3,\"Value\":\"706163656d\"}]},\"Value\":\"01\"}")
+
+		// key 2
+		require.Contains(t, jsons, "{\"Key\":{\"KeyParts\":[{\"Type\":3,\"Value\":\"6578\"},{\"Type\":6,\"Value\":\"6e61766963756c61\"},{\"Type\":9,\"Value\":\"6e61766973\"}]},\"Value\":\"02\"}")
+
+		// key 3
+		require.Contains(t, jsons, "{\"Key\":{\"KeyParts\":[{\"Type\":9,\"Value\":\"6c6f72656d\"},{\"Type\":0,\"Value\":\"697073756d\"},{\"Type\":5,\"Value\":\"646f6c6f72\"}]},\"Value\":\"03\"}")
+	})
+
+}

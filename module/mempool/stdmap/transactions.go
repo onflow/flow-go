@@ -15,12 +15,12 @@ type Transactions struct {
 }
 
 // NewTransactions creates a new memory pool for transctions.
-func NewTransactions(limit uint) (*Transactions, error) {
+func NewTransactions(limit uint) *Transactions {
 	t := &Transactions{
 		Backend: NewBackend(WithLimit(limit)),
 	}
 
-	return t, nil
+	return t
 }
 
 // Add adds a transaction to the mempool.

@@ -77,7 +77,6 @@ func (g *GenericNode) CloseDB() error {
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode
-	Pool            mempool.Transactions
 	Collections     storage.Collections
 	Transactions    storage.Transactions
 	IngestionEngine *collectioningest.Engine
