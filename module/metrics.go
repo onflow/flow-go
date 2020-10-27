@@ -128,6 +128,9 @@ type ConsensusMetrics interface {
 
 	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	FinishBlockToSeal(blockID flow.Identifier)
+
+	// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
+	CheckSealingDuration(duration time.Duration)
 }
 
 type VerificationMetrics interface {
