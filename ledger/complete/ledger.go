@@ -285,12 +285,12 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 		return nil, fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
 
-	flatedTrie, err := flattener.FlattenTrie(newTrie)
+	flatTrie, err := flattener.FlattenTrie(newTrie)
 	if err != nil {
 		return nil, fmt.Errorf("failed to flatten the trie: %w", err)
 	}
 
-	err = wal.StoreCheckpoint(flatedTrie.ToFlattenedForestWithASingleTrie(), writer)
+	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
