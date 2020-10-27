@@ -95,9 +95,10 @@ func run(*cobra.Command, []string) {
 		return payload[0].Value, nil
 	})
 
-	accounts := state.NewAccounts(ldg, chain)
+	accounts := state.NewAccounts(ldg)
+	addressGeneratorState := state.NewAddressGeneratorState(ldg, chain)
 
-	finalGenerator, err := accounts.GetAddressGeneratorState()
+	finalGenerator, err := addressGeneratorState.GetGenerator()
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot get current address state")
 	}

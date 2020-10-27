@@ -208,14 +208,6 @@ func (h *handler) GetTransactionResult(
 		return nil, err
 	}
 
-	// lookup events by block id and transaction ID
-	blockEvents, err := h.events.ByBlockIDTransactionID(blockID, txID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
-	}
-
-	events := convert.EventsToMessages(blockEvents)
-
 	var statusCode uint32 = 0
 	errMsg := ""
 
@@ -232,6 +224,14 @@ func (h *handler) GetTransactionResult(
 		statusCode = 1 // for now a statusCode of 1 indicates an error and 0 indicates no error
 		errMsg = txResult.ErrorMessage
 	}
+
+	// lookup events by block id and transaction ID
+	blockEvents, err := h.events.ByBlockIDTransactionID(blockID, txID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+	}
+
+	events := convert.EventsToMessages(blockEvents)
 
 	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{
