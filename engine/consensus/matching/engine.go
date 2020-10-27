@@ -60,7 +60,7 @@ type Engine struct {
 // New creates a new collection propagation engine.
 func New(
 	log zerolog.Logger,
-	collector module.EngineMetrics,
+	engineMetrics module.EngineMetrics,
 	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	conMetrics module.ConsensusMetrics,
@@ -82,7 +82,7 @@ func New(
 	e := &Engine{
 		unit:                    engine.NewUnit(),
 		log:                     log.With().Str("engine", "matching").Logger(),
-		engineMetrics:           collector,
+		engineMetrics:           engineMetrics,
 		tracer:                  tracer,
 		mempool:                 mempool,
 		metrics:                 conMetrics,
