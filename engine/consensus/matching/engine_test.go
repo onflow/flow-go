@@ -287,8 +287,9 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.matching = &Engine{
 		unit:                    unit,
 		log:                     log,
-		metrics:                 metrics,
+		engineMetrics:           metrics,
 		mempool:                 metrics,
+		metrics:                 metrics,
 		state:                   ms.state,
 		requester:               ms.requester,
 		resultsDB:               ms.sealedResultsDB,
