@@ -129,9 +129,13 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 
 	connector := new(mock.Connector)
 	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
-	wg.Add(2)               // we expect it to be called twice at least
+	count, times := 0, 2    // we expect it to be called twice at least
+	wg.Add(times)
 	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		wg.Done()
+		if count < times {
+			count++
+			wg.Done()
+		}
 	}).Return(nil)
 	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
@@ -139,6 +143,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	PeerUpdateInterval = 5 * time.Millisecond
 	err := pm.Start()
 	assert.NoError(suite.T(), err)
+
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*PeerUpdateInterval,
 		"ConnectPeers is not running on UpdateIntervals")
 }
@@ -155,12 +160,15 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 
 	// creates mock connector
 	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
-	wg.Add(1)               // we expect it to be called once at least
-
+	times, count := 2, 0    // we expect it to be called twice overall
+	wg.Add(1)               // this accounts for one invocation, the other invocation is subsequent
 	connector := new(mock.Connector)
 	// captures the first periodic update initiated after start to complete
 	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		wg.Done()
+		if count < times {
+			count++
+			wg.Done()
+		}
 	}).Return(nil)
 	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
@@ -196,10 +204,15 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// creates mock connector
 	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
-	wg.Add(2)               // we expect it to be called twice, i.e.,
+	// we expect it to be called twice, i.e.,
 	// one for periodic update and one for the on-demand request
+	count, times := 0, 2
+	wg.Add(times)
 	connector.On("ConnectPeers", ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		wg.Done()
+		if count < times {
+			count++
+			wg.Done()
+		}
 	}).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
 	connector.On("DisconnectPeers", ctx, testifymock.Anything).Return(nil)
