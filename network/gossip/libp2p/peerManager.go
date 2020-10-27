@@ -3,6 +3,7 @@ package libp2p
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -53,14 +54,21 @@ func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func
 }
 
 // Start kicks off the ambient periodic connection updates
+// It gets blocking till all connection updates are kicking off
 func (pm *PeerManager) Start() error {
-	go pm.updateLoop()
-	go pm.periodicUpdate()
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+
+	go pm.updateLoop(wg)
+	go pm.periodicUpdate(wg)
+
+	wg.Wait()
 	return nil
 }
 
 // updateLoop triggers an update peer request when it has been requested
-func (pm *PeerManager) updateLoop() {
+func (pm *PeerManager) updateLoop(wg *sync.WaitGroup) {
+	wg.Done()
 	for {
 		select {
 		case <-pm.ctx.Done():
@@ -72,8 +80,8 @@ func (pm *PeerManager) updateLoop() {
 }
 
 // updateLoop request periodic connection update
-func (pm *PeerManager) periodicUpdate() {
-
+func (pm *PeerManager) periodicUpdate(wg *sync.WaitGroup) {
+	wg.Done()
 	// request initial discovery
 	pm.RequestPeerUpdate()
 
