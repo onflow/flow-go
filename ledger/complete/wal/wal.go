@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log"
+	prometheusWAL "github.com/m4ksio/wal"
 	"github.com/prometheus/client_golang/prometheus"
-	prometheusWAL "github.com/prometheus/tsdb/wal"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
