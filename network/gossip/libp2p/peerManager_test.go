@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -29,14 +30,14 @@ func TestPeerManagerTestSuite(t *testing.T) {
 	suite.Run(t, new(PeerManagerTestSuite))
 }
 
-func (ts *PeerManagerTestSuite) SetupTest() {
-	ts.log = ts.log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	ts.ctx = context.Background()
+func (suite *PeerManagerTestSuite) SetupTest() {
+	suite.log = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	suite.ctx = context.Background()
 }
 
 // TestUpdatePeers tests that updatePeers calls the connector with the expected list of ids to connect and disconnect
 // from. The tests are cumulative and ordered.
-func (ts *PeerManagerTestSuite) TestUpdatePeers() {
+func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 
 	// create some test ids
 	currentIDs := unittest.IdentityListFixture(10)
@@ -51,59 +52,59 @@ func (ts *PeerManagerTestSuite) TestUpdatePeers() {
 
 	// create the connector mock to check ids requested for connect and disconnect
 	connector := new(mock.Connector)
-	connector.On("ConnectPeers", ts.ctx, testifymock.AnythingOfType("flow.IdentityList")).
+	connector.On("ConnectPeers", suite.ctx, testifymock.AnythingOfType("flow.IdentityList")).
 		Run(func(args testifymock.Arguments) {
 			idArg := args[1].(flow.IdentityList)
-			assertListsEqual(ts.T(), currentIDs, idArg)
+			assertListsEqual(suite.T(), currentIDs, idArg)
 		}).
 		Return(nil)
-	connector.On("DisconnectPeers", ts.ctx, testifymock.AnythingOfType("flow.IdentityList")).
+	connector.On("DisconnectPeers", suite.ctx, testifymock.AnythingOfType("flow.IdentityList")).
 		Run(func(args testifymock.Arguments) {
 			idArg := args[1].(flow.IdentityList)
-			assertListsEqual(ts.T(), extraIDs, idArg)
+			assertListsEqual(suite.T(), extraIDs, idArg)
 			// assert that ids passed to disconnect have no id in common with those passed to connect
-			assertListsDisjoint(ts.T(), currentIDs, extraIDs)
+			assertListsDisjoint(suite.T(), currentIDs, extraIDs)
 		}).
 		Return(nil)
 
 	// create the peer manager (but don't start it)
-	pm := NewPeerManager(ts.ctx, ts.log, idProvider, connector)
+	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
 
 	// very first call to updatepeer
-	ts.Run("updatePeers only connects to all peers the first time", func() {
+	suite.Run("updatePeers only connects to all peers the first time", func() {
 
 		pm.updatePeers()
 
-		connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 1)
-		connector.AssertNotCalled(ts.T(), "DisconnectPeers")
+		connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 1)
+		connector.AssertNotCalled(suite.T(), "DisconnectPeers")
 	})
 
 	// a subsequent call to updatepeer should request a connect to existing ids and new ids
-	ts.Run("updatePeers connects to old and new peers", func() {
+	suite.Run("updatePeers connects to old and new peers", func() {
 		// create a new id
 		newIDs := unittest.IdentityListFixture(1)
 		currentIDs = append(currentIDs, newIDs...)
 
 		pm.updatePeers()
 
-		connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
-		connector.AssertNotCalled(ts.T(), "DisconnectPeers")
+		connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 2)
+		connector.AssertNotCalled(suite.T(), "DisconnectPeers")
 	})
 
 	// when ids are excluded, they should be requested to be disconnected
-	ts.Run("updatePeers disconnects from extra peers", func() {
+	suite.Run("updatePeers disconnects from extra peers", func() {
 		// delete an id
 		extraIDs = currentIDs.Sample(1)
 		currentIDs = currentIDs.Filter(filter.Not(filter.In(extraIDs)))
 
 		pm.updatePeers()
 
-		connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 3)
-		connector.AssertNumberOfCalls(ts.T(), "DisconnectPeers", 1)
+		connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 3)
+		connector.AssertNumberOfCalls(suite.T(), "DisconnectPeers", 1)
 	})
 
 	// addition and deletion of ids should result in appropriate connect and disconnect calls
-	ts.Run("updatePeers connects to new peers and disconnects from extra peers", func() {
+	suite.Run("updatePeers connects to new peers and disconnects from extra peers", func() {
 		// remove a couple of ids
 		extraIDs = currentIDs.Sample(2)
 		currentIDs = currentIDs.Filter(filter.Not(filter.In(extraIDs)))
@@ -114,79 +115,95 @@ func (ts *PeerManagerTestSuite) TestUpdatePeers() {
 
 		pm.updatePeers()
 
-		connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 4)
-		connector.AssertNumberOfCalls(ts.T(), "DisconnectPeers", 2)
+		connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 4)
+		connector.AssertNumberOfCalls(suite.T(), "DisconnectPeers", 2)
 	})
 }
 
-// TestPeriodicPeerUpdate tests that the peermanager runs periodically
-func (ts *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
+// TestPeriodicPeerUpdate tests that the peer manager runs periodically
+func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	currentIDs := unittest.IdentityListFixture(10)
 	idProvider := func() (flow.IdentityList, error) {
 		return currentIDs, nil
 	}
 
 	connector := new(mock.Connector)
-	connector.On("ConnectPeers", ts.ctx, testifymock.Anything).Return(nil)
-	connector.On("DisconnectPeers", ts.ctx, testifymock.Anything).Return(nil)
-	pm := NewPeerManager(ts.ctx, ts.log, idProvider, connector)
+	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
+	wg.Add(2)               // we expect it to be called twice at least
+	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
+		wg.Done()
+	}).Return(nil)
+	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
+	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
 
 	PeerUpdateInterval = 5 * time.Millisecond
 	err := pm.Start()
-	assert.NoError(ts.T(), err)
-	assert.Eventually(ts.T(), func() bool {
-		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
-	}, 2*PeerUpdateInterval+4*time.Millisecond, 2*PeerUpdateInterval)
+	assert.NoError(suite.T(), err)
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*PeerUpdateInterval,
+		"ConnectPeers is not running on UpdateIntervals")
 }
 
 // TestOnDemandPeerUpdate tests that the a peer update can be requested on demand and in between the periodic runs
-func (ts *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
+func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	currentIDs := unittest.IdentityListFixture(10)
 	idProvider := func() (flow.IdentityList, error) {
 		return currentIDs, nil
 	}
 
-	connector := new(mock.Connector)
-	connector.On("ConnectPeers", ts.ctx, testifymock.Anything).Return(nil)
-	connector.On("DisconnectPeers", ts.ctx, testifymock.Anything).Return(nil)
-	pm := NewPeerManager(ts.ctx, ts.log, idProvider, connector)
-
+	// chooses peer interval rate deliberately long to capture on demand peer update
 	PeerUpdateInterval = time.Hour
-	err := pm.Start()
-	assert.NoError(ts.T(), err)
 
-	// wait for the first periodic update initiated after start to complete
-	assert.Eventually(ts.T(), func() bool {
-		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 1)
-	}, 10*time.Millisecond, 1*time.Millisecond)
+	// creates mock connector
+	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
+	wg.Add(1)               // we expect it to be called once at least
 
-	// make a request for peer update
+	connector := new(mock.Connector)
+	// captures the first periodic update initiated after start to complete
+	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
+		wg.Done()
+	}).Return(nil)
+	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
+	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
+
+	// starts peer manager and waits for first periodic update
+	require.NoError(suite.T(), pm.Start())
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 10*time.Second,
+		"ConnectPeers is not running on startup")
+
+	// makes a request for peer update
+	wg.Add(1) // expects a call to `ConnectPeers` by requesting peer update
 	pm.RequestPeerUpdate()
 
 	// assert that a call to connect to peers is made
-	assert.Eventually(ts.T(), func() bool {
-		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
-	}, 10*time.Millisecond, 1*time.Millisecond)
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Millisecond,
+		"ConnectPeers is not running on request")
 }
 
 // TestConcurrentOnDemandPeerUpdate tests that concurrent on-demand peer update request never block
-func (ts *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
+func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	currentIDs := unittest.IdentityListFixture(10)
 	idProvider := func() (flow.IdentityList, error) {
 		return currentIDs, nil
 	}
 
-	ctx, cancel := context.WithCancel(ts.ctx)
+	ctx, cancel := context.WithCancel(suite.ctx)
 	defer cancel()
 
 	connector := new(mock.Connector)
 	// connectPeerGate channel gates the return of the connector
 	connectPeerGate := make(chan time.Time)
 	defer close(connectPeerGate)
-	connector.On("ConnectPeers", ctx, testifymock.Anything).Return(nil).WaitUntil(connectPeerGate)
-	connector.On("DisconnectPeers", ctx, testifymock.Anything).Return(nil)
 
-	pm := NewPeerManager(ctx, ts.log, idProvider, connector)
+	// creates mock connector
+	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
+	wg.Add(2)               // we expect it to be called twice, i.e.,
+	// one for periodic update and one for the on-demand request
+	connector.On("ConnectPeers", ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
+		wg.Done()
+	}).Return(nil).
+		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
+	connector.On("DisconnectPeers", ctx, testifymock.Anything).Return(nil)
+	pm := NewPeerManager(ctx, suite.log, idProvider, connector)
 
 	// set the periodic interval to a high value so that periodic runs don't interfere with this test
 	PeerUpdateInterval = time.Hour
@@ -194,28 +211,19 @@ func (ts *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	// start the peer manager
 	// this should trigger the first update and which will block on the ConnectPeers to return
 	err := pm.Start()
-	assert.NoError(ts.T(), err)
+	assert.NoError(suite.T(), err)
 
-	// make 10 concurrent request for peer update
-	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			pm.RequestPeerUpdate()
-			wg.Done()
-		}()
-	}
+	// makes 10 concurrent request for peer update
+	unittest.RequireConcurrentCallsReturnBefore(suite.T(), pm.RequestPeerUpdate, 10, time.Second,
+		"concurrent peer update requests could not return on time")
 
-	// assert that none of the request is blocked even if update is blocked
-	unittest.AssertReturnsBefore(ts.T(), wg.Wait, time.Second)
-
-	// allow the first update to finish
+	// allow the first and second updates to finish
+	connectPeerGate <- time.Now()
 	connectPeerGate <- time.Now()
 
-	// assert that only two calls to ConnectPeers were made (one for periodic update and one for the on-demand request)
-	assert.Eventually(ts.T(), func() bool {
-		return connector.AssertNumberOfCalls(ts.T(), "ConnectPeers", 2)
-	}, 10*time.Millisecond, 1*time.Millisecond)
+	// requires two calls to ConnectPeers were made
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 10*time.Second,
+		"required invocations on ConnectedPeers did not happen")
 }
 
 // assertListsEqual asserts that two identity list are equal ignoring the order
