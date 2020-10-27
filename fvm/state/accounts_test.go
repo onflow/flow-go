@@ -9,15 +9,26 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+
+func TestAccounts_Create_Sets_Registers(t *testing.T) {
+	ledger := state.NewMapLedger()
+
+	accounts := state.NewAccounts(ledger)
+	address := flow.HexToAddress("01")
+
+	err := accounts.Create(nil, address)
+	require.NoError(t, err)
+
+	require.Equal(t, len(ledger.RegisterTouches), 3) // exists + code + key count
+}
+
 func TestAccounts_GetWithNoKeys(t *testing.T) {
 	ledger := state.NewMapLedger()
 
 	accounts := state.NewAccounts(ledger)
-	addressGenerator := &flow.MonotonicAddressGenerator{}
-	address, err := addressGenerator.NextAddress()
-	require.NoError(t, err)
+	address := flow.HexToAddress("01")
 
-	err = accounts.Create(nil, address)
+	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
 	require.NotPanics(t, func() {
@@ -31,11 +42,9 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	ledger := state.NewMapLedger()
 
 	accounts := state.NewAccounts(ledger)
-	addressGenerator := &flow.MonotonicAddressGenerator{}
-	address, err := addressGenerator.NextAddress()
-	require.NoError(t, err)
+	address := flow.HexToAddress("01")
 
-	err = accounts.Create(nil, address)
+	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
 	ledger.Delete(
