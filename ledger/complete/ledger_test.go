@@ -37,7 +37,7 @@ func TestLedger_Update(t *testing.T) {
 			require.NoError(t, err)
 
 			// create empty update
-			currentState := l.InitState()
+			currentState := l.InitialState()
 			up, err := ledger.NewEmptyUpdate(currentState)
 			require.NoError(t, err)
 
@@ -56,7 +56,7 @@ func TestLedger_Update(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.InitState()
+			curSC := led.InitialState()
 
 			u := utils.UpdateFixture()
 			u.SetState(curSC)
@@ -84,7 +84,7 @@ func TestLedger_Get(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.InitState()
+			curSC := led.InitialState()
 			q, err := ledger.NewEmptyQuery(curSC)
 			require.NoError(t, err)
 
@@ -99,7 +99,7 @@ func TestLedger_Get(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
 			require.NoError(t, err)
 
-			curS := led.InitState()
+			curS := led.InitialState()
 
 			q := utils.QueryFixture()
 			q.SetState(curS)
@@ -120,7 +120,7 @@ func TestLedger_Proof(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.InitState()
+			curSC := led.InitialState()
 			q, err := ledger.NewEmptyQuery(curSC)
 			require.NoError(t, err)
 
@@ -138,7 +138,7 @@ func TestLedger_Proof(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
 			require.NoError(t, err)
 
-			curS := led.InitState()
+			curS := led.InitialState()
 			q := utils.QueryFixture()
 			q.SetState(curS)
 			require.NoError(t, err)
@@ -158,7 +158,7 @@ func TestLedger_Proof(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
 			require.NoError(t, err)
 
-			curS := led.InitState()
+			curS := led.InitialState()
 
 			u := utils.UpdateFixture()
 			u.SetState(curS)
@@ -197,7 +197,7 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(dir, size, metricsCollector, logger, nil)
 		require.NoError(t, err)
 
-		var state = led.InitState()
+		var state = led.InitialState()
 
 		//saved data after updates
 		savedData := make(map[string]map[string]ledger.Value)
@@ -279,7 +279,7 @@ func TestLedgerFunctionality(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			led, err := complete.NewLedger(dbDir, activeTries, metricsCollector, logger, nil)
 			assert.NoError(t, err)
-			state := led.InitState()
+			state := led.InitialState()
 			for i := 0; i < steps; i++ {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them

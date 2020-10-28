@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/proposal"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	network "github.com/onflow/flow-go/network/mock"
@@ -40,12 +40,12 @@ type Suite struct {
 		state    *clusterstate.State
 		snapshot *clusterstate.Snapshot
 		mutator  *clusterstate.Mutator
+		params   *clusterstate.Params
 	}
 
 	me           *module.Local
 	net          *module.Network
 	conduit      *network.Conduit
-	pool         *mempool.Transactions
 	transactions *storage.Transactions
 	headers      *storage.Headers
 	payloads     *storage.ClusterPayloads
@@ -80,27 +80,30 @@ func (suite *Suite) SetupTest() {
 	suite.proto.snapshot.On("Epochs").Return(suite.proto.query)
 	suite.proto.query.On("Current").Return(suite.proto.epoch)
 
+	// create a fake cluster
+	clusters := flow.ClusterList{flow.IdentityList{me}}
+	suite.proto.epoch.On("Clustering").Return(clusters, nil)
+	clusterID := flow.ChainID("cluster-id")
+
 	// mock out cluster state
 	suite.cluster.state = new(clusterstate.State)
 	suite.cluster.snapshot = new(clusterstate.Snapshot)
 	suite.cluster.mutator = new(clusterstate.Mutator)
+	suite.cluster.params = new(clusterstate.Params)
 	suite.cluster.state.On("Final").Return(suite.cluster.snapshot)
 	suite.cluster.state.On("Mutate").Return(suite.cluster.mutator)
 	suite.cluster.snapshot.On("Head").Return(&flow.Header{}, nil)
-
-	// create a fake cluster
-	clusters := flow.ClusterList{flow.IdentityList{me}}
-	suite.proto.epoch.On("Clustering").Return(clusters, nil)
+	suite.cluster.state.On("Params").Return(suite.cluster.params)
+	suite.cluster.params.On("ChainID").Return(clusterID, nil)
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.net = new(module.Network)
 	suite.conduit = new(network.Conduit)
-	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
+	suite.net.On("Register", engine.ChannelConsensusCluster(clusterID), mock.Anything).Return(suite.conduit, nil)
+	suite.conduit.On("Close").Return(nil).Maybe()
 
-	suite.pool = new(mempool.Transactions)
-	suite.pool.On("Size").Return(uint(0))
 	suite.transactions = new(storage.Transactions)
 	suite.headers = new(storage.Headers)
 	suite.payloads = new(storage.ClusterPayloads)
@@ -121,7 +124,6 @@ func (suite *Suite) SetupTest() {
 		metrics,
 		suite.proto.state,
 		suite.cluster.state,
-		suite.pool,
 		suite.transactions,
 		suite.headers,
 		suite.payloads,
@@ -141,8 +143,6 @@ func (suite *Suite) TestHandleProposal() {
 		Payload: block.Payload,
 	}
 
-	tx := unittest.TransactionBodyFixture()
-
 	// this is a new block
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
 	suite.pending.On("ByID", block.ID()).Return(nil, false)
@@ -151,10 +151,6 @@ func (suite *Suite) TestHandleProposal() {
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
-	// we have all transactions
-	suite.pool.On("Has", mock.Anything).Return(true)
-	// should store transactions
-	suite.pool.On("ByID", mock.Anything).Return(&tx, true)
 	suite.transactions.On("Store", mock.Anything).Return(nil)
 	// should store payload and header
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
@@ -173,42 +169,6 @@ func (suite *Suite) TestHandleProposal() {
 	suite.hotstuff.AssertExpectations(suite.T())
 }
 
-func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
-	originID := unittest.IdentifierFixture()
-	parent := unittest.ClusterBlockFixture()
-	block := unittest.ClusterBlockWithParent(&parent)
-
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
-
-	// this is a new block
-	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
-	suite.pending.On("ByID", block.ID()).Return(nil, false)
-
-	// we have already received and processed the parent
-	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
-	suite.pending.On("ByID", parent.ID()).Return(nil, false)
-	// we are missing all the transactions
-	suite.pool.On("Has", mock.Anything).Return(false)
-
-	// should extend state with new block
-	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
-	// should submit to consensus algo
-	suite.hotstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
-	// we don't have any cached children
-	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
-
-	err := suite.eng.Process(originID, proposal)
-	suite.Assert().Nil(err)
-
-	// should store block
-	suite.headers.AssertExpectations(suite.T())
-	suite.payloads.AssertExpectations(suite.T())
-	suite.hotstuff.AssertExpectations(suite.T())
-}
-
 func (suite *Suite) TestHandlePendingProposal() {
 	originID := unittest.IdentifierFixture()
 	block := unittest.ClusterBlockFixture()
@@ -222,8 +182,6 @@ func (suite *Suite) TestHandlePendingProposal() {
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
 	suite.pending.On("ByID", block.ID()).Return(nil, false)
 
-	// we have all transactions
-	suite.pool.On("Has", mock.Anything).Return(true)
 	// we do not have the parent yet
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
 	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
@@ -258,8 +216,6 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 	// this is a new block
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
 	suite.pending.On("ByID", block.ID()).Return(nil, false)
-	// we have all transactions
-	suite.pool.On("Has", mock.Anything).Return(true)
 
 	// we have the parent, it is in pending cache
 	pendingParent := &cluster.PendingBlock{
@@ -313,8 +269,6 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	// this is a new block
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
 	suite.pending.On("ByID", block.ID()).Return(nil, false)
-	// we have all transactions
-	suite.pool.On("Has", mock.Anything).Return(true)
 
 	// we have already received and stored the parent
 	headersDB[parent.ID()] = parent.Header

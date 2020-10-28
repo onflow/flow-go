@@ -63,6 +63,7 @@ func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)               {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                               {}
 func (nc *NoopCollector) FinishBlockToSeal(blockID flow.Identifier)                              {}
+func (nc *NoopCollector) CheckSealingDuration(duration time.Duration)                            {}
 func (nc *NoopCollector) OnExecutionReceiptReceived()                                            {}
 func (nc *NoopCollector) OnExecutionResultSent()                                                 {}
 func (nc *NoopCollector) OnExecutionResultReceived()                                             {}
@@ -107,4 +108,5 @@ func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                                {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                           {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                                {}
-func (ec *NoopCollector) ExecutionSync(syncing bool)                                             {}
+func (nc *NoopCollector) ExecutionSync(syncing bool)                                             {}
+func (nc *NoopCollector) DiskSize(uint64)                                                        {}

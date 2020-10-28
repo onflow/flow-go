@@ -128,6 +128,9 @@ type ConsensusMetrics interface {
 
 	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	FinishBlockToSeal(blockID flow.Identifier)
+
+	// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
+	CheckSealingDuration(duration time.Duration)
 }
 
 type VerificationMetrics interface {
@@ -227,6 +230,9 @@ type LedgerMetrics interface {
 
 	// ReadDurationPerItem records read time for single value (total duration / number of read values)
 	ReadDurationPerItem(duration time.Duration)
+
+	// DiskSize records the amount of disk space used by the storage (in bytes)
+	DiskSize(uint64)
 }
 
 type RuntimeMetrics interface {
@@ -265,9 +271,6 @@ type ExecutionMetrics interface {
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)
 
-	// ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
-	ExecutionStateStorageDiskTotal(bytes int64)
-
 	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
 	ExecutionStorageStateCommitment(bytes int64)
 
@@ -277,10 +280,13 @@ type ExecutionMetrics interface {
 	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
 	ExecutionTotalExecutedTransactions(numExecuted int)
 
+	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
 
+	// Unused
 	ExecutionCollectionRequestRetried()
 
+	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
 }
 

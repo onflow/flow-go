@@ -26,7 +26,7 @@ func TestDeterministicKeyGen(t *testing.T) {
 
 // test the deterministicity of the relic PRG (used by the DKG polynomials)
 func TestPRGseeding(t *testing.T) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	// 2 scalars generated with the same seed should be equal
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
@@ -48,7 +48,7 @@ func TestPRGseeding(t *testing.T) {
 
 // TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
 	seedRelic(seed)
@@ -61,7 +61,7 @@ func TestG1(t *testing.T) {
 
 // G1 bench
 func BenchmarkG1(b *testing.B) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
 	seedRelic(seed)
@@ -79,7 +79,7 @@ func BenchmarkG1(b *testing.B) {
 
 // G2 bench
 func BenchmarkG2(b *testing.B) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
 	seedRelic(seed)
@@ -97,8 +97,8 @@ func BenchmarkG2(b *testing.B) {
 
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
-	_ = newBLSBLS12381()
-	input := make([]byte, opSwUInputLenBLSBLS12381)
+	blsInstance.reInit()
+	input := make([]byte, minHashSizeBLSBLS12381)
 	for i := 0; i < len(input); i++ {
 		input[i] = byte(i)
 	}
@@ -115,7 +115,7 @@ func BenchmarkHashToG1(b *testing.B) {
 // https://github.com/kwantam/bls12-381_hash from the author of
 // https://eprint.iacr.org/2019/403.pdf.
 func TestOpSwuHashToG1(t *testing.T) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	inputs := []string{
 		"0e58bd6d947af8aec009ff396cd83a3636614f917423db76e8948e9c25130ae04e721beb924efca3ce585540b2567cf6",
 		"0082bd2ed5473b191da55420c9b4df9031a50445b28c17115d614ad6993d7037d6792dd2211e4b485761a6fe2df17582",
@@ -140,7 +140,7 @@ func TestOpSwuHashToG1(t *testing.T) {
 // test Bowe subgroup check in G1
 // The test compares Bowe's check result to multiplying by the group order
 func TestSubgroupCheckG1(t *testing.T) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
@@ -163,7 +163,7 @@ func TestSubgroupCheckG1(t *testing.T) {
 
 // G1 membership check bench
 func BenchmarkCheckG1(b *testing.B) {
-	_ = newBLSBLS12381()
+	blsInstance.reInit()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		benchG1Test()

@@ -25,54 +25,39 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db                *badger.DB
-	mainHeaders       storage.Headers
-	clusterHeaders    storage.Headers
-	payloads          storage.ClusterPayloads
-	transactions      mempool.Transactions
-	tracer            module.Tracer
-	maxCollectionSize uint
-	expiryBuffer      uint
-}
-
-type Opt func(*Builder)
-
-func WithMaxCollectionSize(size uint) Opt {
-	return func(b *Builder) {
-		b.maxCollectionSize = size
-	}
-}
-
-func WithExpiryBuffer(buf uint) Opt {
-	return func(b *Builder) {
-		b.expiryBuffer = buf
-	}
+	db             *badger.DB
+	mainHeaders    storage.Headers
+	clusterHeaders storage.Headers
+	payloads       storage.ClusterPayloads
+	transactions   mempool.Transactions
+	tracer         module.Tracer
+	config         Config
 }
 
 func NewBuilder(
 	db *badger.DB,
+	tracer module.Tracer,
 	mainHeaders storage.Headers,
 	clusterHeaders storage.Headers,
 	payloads storage.ClusterPayloads,
 	transactions mempool.Transactions,
-	tracer module.Tracer,
 	opts ...Opt,
 ) *Builder {
 
 	b := Builder{
-		db:                db,
-		mainHeaders:       mainHeaders,
-		clusterHeaders:    clusterHeaders,
-		payloads:          payloads,
-		transactions:      transactions,
-		tracer:            tracer,
-		maxCollectionSize: 100,
-		expiryBuffer:      15,
+		db:             db,
+		tracer:         tracer,
+		mainHeaders:    mainHeaders,
+		clusterHeaders: clusterHeaders,
+		payloads:       payloads,
+		transactions:   transactions,
+		config:         DefaultConfig(),
 	}
 
 	for _, apply := range opts {
-		apply(&b)
+		apply(&b.config)
 	}
+
 	return &b
 }
 
@@ -90,6 +75,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 		// STEP ONE: Load some things we need to do our work.
 		b.tracer.StartSpan(parentID, trace.COLBuildOnSetup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
 
 		var parent flow.Header
 		err := operation.RetrieveHeader(parentID, &parent)(tx)
@@ -121,12 +107,24 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// part of the chain we care about. We do this separately for
 		// un-finalized and finalized sections of the chain to decide whether to
 		// remove conflicting transactions from the mempool.
+
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+
+		// RATE LIMITING: the builder module can be configured to limit the
+		// rate at which transactions with a common payer are included in
+		// blocks. Depending on the configured limit, we either allow 1
+		// transaction every N sequential collections, or we allow K transactions
+		// per collection.
+
+		// keep track of transactions in the ancestry to avoid duplicates
+		lookup := newTransactionLookup()
+		// keep track of transactions to enforce rate limiting
+		limiter := newRateLimiter(b.config, parent.Height+1)
 
 		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
-		unfinalizedLookup := make(map[flow.Identifier]struct{})
 		clusterFinalID := clusterFinal.ID()
 		for ancestorID != clusterFinalID {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
@@ -145,13 +143,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			collection := payload.Collection
 			for _, tx := range collection.Transactions {
-				unfinalizedLookup[tx.ID()] = struct{}{}
+				lookup.addUnfinalizedAncestor(tx.ID())
+				limiter.addAncestor(ancestor.Height, tx)
 			}
 			ancestorID = ancestor.ParentID
 		}
 
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnFinalizedLookup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 
 		//TODO for now we check a fixed # of finalized ancestors - we should
 		// instead look back based on reference block ID and expiry
@@ -162,7 +162,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// look up previously included transactions in FINALIZED ancestors
-		finalizedLookup := make(map[flow.Identifier]struct{})
 		ancestorID = clusterFinal.ID()
 		ancestorHeight := clusterFinal.Height
 		for ancestorHeight > limit {
@@ -177,7 +176,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			collection := payload.Collection
 			for _, tx := range collection.Transactions {
-				finalizedLookup[tx.ID()] = struct{}{}
+				lookup.addFinalizedAncestor(tx.ID())
+				limiter.addAncestor(ancestor.Height, tx)
 			}
 
 			ancestorID = ancestor.ParentID
@@ -188,6 +188,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// time figuring out the correct reference block ID for the collection.
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
 
 		minRefHeight := uint64(math.MaxUint64)
 		// start with the finalized reference ID (longest expiry time)
@@ -197,7 +198,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		for _, tx := range b.transactions.All() {
 
 			// if we have reached maximum number of transactions, stop
-			if uint(len(transactions)) >= b.maxCollectionSize {
+			if uint(len(transactions)) >= b.config.MaxCollectionSize {
 				break
 			}
 
@@ -217,23 +218,26 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			// ensure the reference block is not too old
 			txID := tx.ID()
-			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.expiryBuffer) {
+			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.config.ExpiryBuffer) {
 				// the transaction is expired, it will never be valid
 				b.transactions.Rem(txID)
 				continue
 			}
 
 			// check that the transaction was not already used in un-finalized history
-			_, duplicated := unfinalizedLookup[txID]
-			if duplicated {
+			if lookup.isUnfinalizedAncestor(txID) {
 				continue
 			}
 
 			// check that the transaction was not already included in finalized history.
-			_, duplicated = finalizedLookup[txID]
-			if duplicated {
+			if lookup.isFinalizedAncestor(txID) {
 				// remove from mempool, conflicts with finalized block will never be valid
 				b.transactions.Rem(txID)
+				continue
+			}
+
+			// enforce rate limiting rules
+			if limiter.shouldRateLimit(tx) {
 				continue
 			}
 
@@ -243,6 +247,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 				minRefID = tx.ReferenceBlockID
 			}
 
+			// update per-payer transaction count
+			limiter.transactionIncluded(tx)
+
 			transactions = append(transactions, tx)
 		}
 
@@ -251,6 +258,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// used in the payload and construct the final proposal model
 		b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
 		b.tracer.StartSpan(parentID, trace.COLBuildOnCreateHeader)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
 		// build the payload from the transactions
 		payload := cluster.PayloadFromTransactions(minRefID, transactions...)

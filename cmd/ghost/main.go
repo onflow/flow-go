@@ -27,7 +27,7 @@ func main() {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, rpcConf)
+			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, node.State, rpcConf)
 			return rpcEng, err
 		}).
 		Run()

@@ -2,38 +2,47 @@ package chunks
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/crypto/random"
 	chunkmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
-// PublicAssignment implements an instance of the Public Chunk Assignment algorithm
-// for assigning chunks to verifier nodes in a deterministic but unpredictable manner.
+// DefaultChunkAssignmentAlpha is the default number of verifiers that should be
+// assigned to each chunk.
+// DISCLAIMER: alpha down there is not a production-level value
+const DefaultChunkAssignmentAlpha = 5
+
+// PublicAssignment implements an instance of the Public Chunk Assignment
+// algorithm for assigning chunks to verifier nodes in a deterministic but
+// unpredictable manner. It implements the ChunkAssigner interface.
 type PublicAssignment struct {
-	alpha       int // used to indicate the number of verifiers should be assigned to each chunk
+	alpha       int // used to indicate the number of verifiers that should be assigned to each chunk
 	assignments mempool.Assignments
+
+	protocolState protocol.ReadOnlyState
 }
 
-// NewPublicAssignment generates and returns an instance of the Public Chunk Assignment algorithm
-// ids is the list of verifier nodes' identities
-// chunks is the list of chunks aimed to assign
-// rng is an instance of a random generator
-// alpha is the number of assigned verifier nodes to each chunk
-func NewPublicAssignment(alpha int) (*PublicAssignment, error) {
+// NewPublicAssignment generates and returns an instance of the Public Chunk
+// Assignment algorithm. Parameter alpha is the number of verifiers that should
+// be assigned to each chunk.
+func NewPublicAssignment(alpha int, protocolState protocol.ReadOnlyState) (*PublicAssignment, error) {
 	// TODO to have limit of assignment mempool as a parameter (2703)
 	assignment, err := stdmap.NewAssignments(1000)
 	if err != nil {
 		return nil, fmt.Errorf("could not create an assignment mempool: %w", err)
 	}
 	return &PublicAssignment{
-		alpha:       alpha,
-		assignments: assignment,
+		alpha:         alpha,
+		assignments:   assignment,
+		protocolState: protocolState,
 	}, nil
 }
 
@@ -42,12 +51,10 @@ func (p *PublicAssignment) Size() uint {
 	return p.assignments.Size()
 }
 
-// Assign receives identity list of verifier nodes, chunk lists and a random generator
-// it returns a chunk assignment
-func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkmodels.Assignment, error) {
-	// computes a finger print for identities||chunks
-	ids := identities.NodeIDs()
-	hash, err := fingerPrint(ids, chunks, rng, p.alpha)
+// Assign generates the assignment
+func (p *PublicAssignment) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
+	// computes a finger print for blockID||resultID||alpha
+	hash, err := fingerPrint(blockID, result.ID(), p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
 	}
@@ -59,22 +66,48 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 		return a, nil
 	}
 
+	// Get a list of verifiers
+	snapshot := p.protocolState.AtBlockID(blockID)
+	verifiers, err := snapshot.Identities(filter.HasRole(flow.RoleVerification))
+	if err != nil {
+		return nil, fmt.Errorf("could not get verifiers: %w", err)
+	}
+
+	// create RNG for assignment
+	rng, err := p.rngByBlockID(snapshot)
+	if err != nil {
+		return nil, err
+	}
+
 	// otherwise, it computes the assignment and caches it for future calls
-	a, err = chunkAssignment(ids, chunks, rng, p.alpha)
+	a, err = chunkAssignment(verifiers.NodeIDs(), result.Chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not complete chunk assignment: %w", err)
 	}
 
 	// adds assignment to mempool
-	added := p.assignments.Add(assignmentFingerprint, a)
-	if !added {
-		return nil, fmt.Errorf("could not add generated assignment to mempool")
-	}
+	_ = p.assignments.Add(assignmentFingerprint, a)
 
 	return a, nil
 }
 
-// chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
+func (p *PublicAssignment) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
+	// TODO: rng could be cached to optimize performance
+
+	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
+	if err != nil {
+		return nil, err
+	}
+
+	rng, err := random.NewRand(seed)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+
+	return rng, nil
+}
+
+// ChunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
 func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkmodels.Assignment, error) {
 	if len(ids) < alpha {
@@ -128,29 +161,8 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	return assignment, nil
 }
 
-// Fingerprint computes the SHA3-256 hash value of the inputs to the assignment algorithm:
-// - sorted version of identifier list
-// - sorted version of chunk list
-// - internal state of random generator
-// - alpha
-// the generated fingerprint is deterministic in the set of aforementioned parameters
-func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (hash.Hash, error) {
-	// sorts and encodes ids
-	sort.Sort(ids)
-	encIDs, err := encoding.DefaultEncoder.Encode(ids)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode identifier list: %w", err)
-	}
-
-	// sorts and encodes chunks
-	sort.Sort(chunks)
-	encChunks, err := encoding.DefaultEncoder.Encode(chunks)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode chunk list: %w", err)
-	}
-
-	// encodes random generator
-	encRng := rng.State()
+func fingerPrint(blockID flow.Identifier, resultID flow.Identifier, alpha int) (hash.Hash, error) {
+	hasher := hash.NewSHA3_256()
 
 	// encodes alpha parameteer
 	encAlpha, err := encoding.DefaultEncoder.Encode(alpha)
@@ -158,26 +170,30 @@ func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand
 		return nil, fmt.Errorf("could not encode alpha: %w", err)
 	}
 
-	// computes and returns hash(encIDs || encChunks || encRng || encAlpha)
-	hasher := hash.NewSHA3_256()
-	_, err = hasher.Write(encIDs)
+	_, err = hasher.Write(blockID[:])
 	if err != nil {
-		return nil, fmt.Errorf("could not hash ids: %w", err)
+		return nil, fmt.Errorf("could not hash blockID: %w", err)
 	}
-	_, err = hasher.Write(encChunks)
+	_, err = hasher.Write(resultID[:])
 	if err != nil {
-		return nil, fmt.Errorf("could not hash chunks: %w", err)
+		return nil, fmt.Errorf("could not hash result: %w", err)
 	}
-
-	_, err = hasher.Write(encRng)
-	if err != nil {
-		return nil, fmt.Errorf("could not random generator: %w", err)
-	}
-
 	_, err = hasher.Write(encAlpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not hash alpha: %w", err)
 	}
 
 	return hasher.SumHash(), nil
+}
+
+// IsValidVerifer returns true if the approver was assigned to the chunk
+func IsValidVerifer(assignment *chunkmodels.Assignment, chunk *flow.Chunk, approver flow.Identifier) bool {
+	verifiers := assignment.Verifiers(chunk)
+	for _, verifier := range verifiers {
+		if verifier == approver {
+			return true
+		}
+	}
+
+	return false
 }

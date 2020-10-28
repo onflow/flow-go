@@ -218,6 +218,10 @@ func (e *EventHandler) Start() error {
 // startNewView will only be called when there is a view change from pacemaker.
 // It reads the current view, and check if it needs to propose or vote in this view.
 func (e *EventHandler) startNewView() error {
+
+	// track the start time
+	start := time.Now()
+
 	curView := e.paceMaker.CurView()
 
 	err := e.persist.PutStarted(curView)
@@ -267,7 +271,14 @@ func (e *EventHandler) startNewView() error {
 
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
-		err = e.communicator.BroadcastProposalWithDelay(header, e.paceMaker.BlockRateDelay())
+		delay := e.paceMaker.BlockRateDelay()
+		elapsed := time.Since(start)
+		if elapsed > delay {
+			delay = 0
+		} else {
+			delay = delay - elapsed
+		}
+		err = e.communicator.BroadcastProposalWithDelay(header, delay)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not forward proposal")
 		}

@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,15 +15,19 @@ import (
 const blockStateTimeout = 60 * time.Second
 
 type BlockState struct {
-	// TODO add locks to prevent concurrent map access bugs
+	sync.Mutex
 	blocksByID        map[flow.Identifier]*messages.BlockProposal
 	finalizedByHeight map[uint64]*messages.BlockProposal
 	highestFinalized  uint64
 	highestProposed   uint64
+	highestSealed     *messages.BlockProposal
 }
 
 // TODO refactor to remove deep indentation
 func (bs *BlockState) Add(b *messages.BlockProposal) {
+	bs.Lock()
+	defer bs.Unlock()
+
 	if bs.blocksByID == nil {
 		bs.blocksByID = make(map[flow.Identifier]*messages.BlockProposal) // TODO: initialize this map in constructor
 	}
@@ -42,12 +47,28 @@ func (bs *BlockState) Add(b *messages.BlockProposal) {
 
 			// if ancestor is confirmed put it into the finalized map
 			if h <= confirmsHeight {
-				bs.finalizedByHeight[h] = ancestor
+
+				finalized := ancestor
+				bs.finalizedByHeight[h] = finalized
 
 				// if ancestor confirms a heigher height than highestFinalized, increase highestFinalized
 				if h > bs.highestFinalized {
 					bs.highestFinalized = h
 				}
+
+				// update last sealed height
+				for _, seal := range finalized.Payload.Seals {
+					sealed, ok := bs.blocksByID[seal.BlockID]
+					if !ok {
+						continue
+					}
+
+					if bs.highestSealed == nil ||
+						sealed.Header.Height > bs.highestSealed.Header.Height {
+						bs.highestSealed = sealed
+					}
+				}
+
 			}
 
 			// find parent
@@ -119,4 +140,27 @@ func (bs *BlockState) HighestFinalized() (*messages.BlockProposal, bool) {
 	}
 	block, ok := bs.finalizedByHeight[bs.highestFinalized]
 	return block, ok
+}
+
+// WaitForSealed returns the sealed block after a certain height has been sealed.
+func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.BlockProposal {
+	require.Eventually(t,
+		func() bool {
+			if bs.highestSealed != nil {
+				fmt.Println("waiting for sealed", bs.highestSealed.Header.Height, height)
+			}
+			return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
+		},
+		blockStateTimeout,
+		100*time.Millisecond,
+		fmt.Sprintf("did not receive sealed block for height (%v) within %v seconds", height, blockStateTimeout))
+
+	return bs.highestSealed
+}
+
+func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
+	if bs.highestSealed == nil {
+		return nil, false
+	}
+	return bs.highestSealed, true
 }

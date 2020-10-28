@@ -137,7 +137,7 @@ func createNode(
 	statusesDB := storage.NewEpochStatuses(metrics, db)
 	consumer := events.NewNoop()
 
-	state, err := protocol.NewState(metrics, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
+	state, err := protocol.NewState(metrics, tracer, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(root, result, seal)
@@ -153,8 +153,10 @@ func createNode(
 	}
 
 	// log with node index an ID
-	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("node_id", localID[:]).Logger()
+	log := unittest.Logger().With().
+		Int("index", index).
+		Hex("node_id", localID[:]).
+		Logger()
 
 	stopConsumer := stopper.AddNode(node)
 
@@ -185,11 +187,11 @@ func createNode(
 	guaranteeLimit, sealLimit := uint(1000), uint(1000)
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
-	seals, err := stdmap.NewSeals(sealLimit)
-	require.NoError(t, err)
+
+	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals)
+	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals, tracer)
 
 	signer := &Signer{identity.ID()}
 

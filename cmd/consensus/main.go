@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
+	chmodule "github.com/onflow/flow-go/module/chunks"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/ejectors"
@@ -61,14 +62,16 @@ func main() {
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
+		requireOneApproval                     bool
+		chunkAlpha                             uint
 
 		err            error
 		privateDKGData *bootstrap.DKGParticipantPriv
 		guarantees     mempool.Guarantees
-		results        mempool.Results
+		results        mempool.IncorporatedResults
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
-		seals          mempool.Seals
+		seals          mempool.IncorporatedResultSeals
 		prov           *provider.Engine
 		requesterEng   *requester.Engine
 		syncCore       *synchronization.Core
@@ -92,6 +95,8 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+			flags.BoolVar(&requireOneApproval, "require-one-approval", false, "require one approval per chunk when sealing execution results")
+			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -102,8 +107,8 @@ func main() {
 			return err
 		}).
 		Module("execution results mempool", func(node *cmd.FlowNodeBuilder) error {
-			results, err = stdmap.NewResults(resultLimit)
-			return err
+			results = stdmap.NewIncorporatedResults(resultLimit)
+			return nil
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			receipts, err = stdmap.NewReceipts(receiptLimit)
@@ -126,12 +131,12 @@ func main() {
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
-			ejector := ejectors.NewLatestSeal(node.Storage.Headers)
-			seals, err = stdmap.NewSeals(sealLimit, stdmap.WithEject(ejector.Eject))
-			return err
+			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
+			seals = stdmap.NewIncorporatedResultSeals(sealLimit, stdmap.WithEject(ejector.Eject))
+			return nil
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
-			conMetrics = metrics.NewConsensusCollector(node.Tracer)
+			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -143,8 +148,7 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			resultsDB := bstorage.NewExecutionResults(node.DB)
-			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
+			sealedResultsDB := bstorage.NewExecutionResults(node.DB)
 			requesterEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -159,23 +163,30 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
+
+			assigner, err := chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create public assignment: %w", err)
+			}
+
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
+				conMetrics,
 				node.Network,
 				node.State,
 				node.Me,
 				requesterEng,
-				resultsDB,
-				sealsDB,
+				sealedResultsDB,
 				node.Storage.Headers,
 				node.Storage.Index,
 				results,
-				receipts,
 				approvals,
 				seals,
+				assigner,
+				requireOneApproval,
 			)
 			requesterEng.WithHandle(match.HandleReceipt)
 			return match, err
@@ -248,6 +259,7 @@ func main() {
 				node.Storage.Index,
 				guarantees,
 				seals,
+				node.Tracer,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)

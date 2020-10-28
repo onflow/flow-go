@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -45,6 +46,7 @@ type SyncSuite struct {
 	me           *module.Local
 	state        *cluster.State
 	snapshot     *cluster.Snapshot
+	params       *cluster.Params
 	blocks       *storage.ClusterBlocks
 	comp         *network.Engine
 	core         *module.SyncCore
@@ -66,10 +68,11 @@ func (ss *SyncSuite) SetupTest() {
 	// create maps to enable block returns
 	ss.heights = make(map[uint64]*model.Block)
 	ss.blockIDs = make(map[flow.Identifier]*model.Block)
+	clusterID := header.ChainID
 
 	// set up the network module mock
 	ss.net = &module.Network{}
-	ss.net.On("Register", mock.Anything, mock.Anything).Return(
+	ss.net.On("Register", engine.ChannelSyncCluster(clusterID), mock.Anything).Return(
 		func(code string, engine netint.Engine) netint.Conduit {
 			return ss.conduit
 		},
@@ -78,6 +81,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// set up the network conduit mock
 	ss.conduit = &network.Conduit{}
+	ss.conduit.On("Close").Return(nil).Maybe()
 
 	// set up the local module mock
 	ss.me = &module.Local{}
@@ -94,6 +98,14 @@ func (ss *SyncSuite) SetupTest() {
 			return ss.snapshot
 		},
 	)
+
+	ss.params = &cluster.Params{}
+	ss.state.On("Params").Return(
+		func() clusterint.Params {
+			return ss.params
+		},
+	)
+	ss.params.On("ChainID").Return(ss.head.ChainID, nil)
 
 	// set up the snapshot mock
 	ss.snapshot = &cluster.Snapshot{}

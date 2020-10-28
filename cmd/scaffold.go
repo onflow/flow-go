@@ -18,9 +18,9 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -120,6 +120,7 @@ type FlowNodeBuilder struct {
 	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
 	MsgValidators     []validators.MessageValidator
+	FvmOptions        []fvm.Option
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
@@ -174,16 +175,16 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 		fnb.Middleware = mw
 
-		participants, err := fnb.State.Final().Identities(filter.Any)
-		if err != nil {
-			return nil, fmt.Errorf("could not get network identities: %w", err)
-		}
-
 		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get node id: %w", err)
 		}
 		nodeRole := nodeID.Role
+
+		participants, err := libp2p.IDsFromState(fnb.State)
+		if err != nil {
+			return nil, fmt.Errorf("could not get network identities: %w", err)
+		}
 
 		var nodeTopology topology.Topology
 		if nodeRole == flow.RoleCollection {
@@ -201,6 +202,10 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		fnb.Network = net
+
+		idRefresher := libp2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
+		fnb.ProtocolEvents.AddConsumer(idRefresher)
+
 		return net, err
 	})
 }
@@ -387,6 +392,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	distributor := events.NewDistributor()
 	state, err := protocol.NewState(
 		fnb.Metrics.Compliance,
+		fnb.Tracer,
 		fnb.DB,
 		fnb.Storage.Headers,
 		fnb.Storage.Seals,
@@ -529,6 +535,20 @@ func (fnb *FlowNodeBuilder) initState() {
 
 	fnb.State = state
 	fnb.ProtocolEvents = distributor
+}
+
+func (fnb *FlowNodeBuilder) initFvmOptions() {
+	vmOpts := []fvm.Option{
+		fvm.WithChain(fnb.RootChainID.Chain()),
+		fvm.WithBlocks(fnb.Storage.Blocks),
+	}
+	if fnb.RootChainID == flow.Testnet {
+		vmOpts = append(vmOpts,
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithRestrictedDeployment(false),
+		)
+	}
+	fnb.FvmOptions = vmOpts
 }
 
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
@@ -678,6 +698,8 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.initStorage()
 
 	fnb.initState()
+
+	fnb.initFvmOptions()
 
 	for _, f := range fnb.postInitFns {
 		fnb.handlePostInit(f)

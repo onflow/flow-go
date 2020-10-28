@@ -297,13 +297,15 @@ static int ep_upk_generic(ep_t r, const ep_t p) {
 
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
 // len is the allocated size of the buffer bin for sanity check
-// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib 
+// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) 
+// with a small change to accomodate Relic lib 
 //
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
 // Otherwise, the point is in uncompressed form.
 // The second-most significant bit, when set, indicates that the point is at infinity. 
 // If this bit is set, the remaining bits of the group element's encoding should be set to zero.
-// The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
+// The third-most significant bit is set if (and only if) this point is in compressed form and it is not 
+// the point at infinity and its y-coordinate is odd.
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
     ep_null(t);
@@ -348,19 +350,16 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     const int G1size = (G1_BYTES/(SERIALIZATION+1));
     if (len!=G1size) {
-        THROW(ERR_NO_BUFFER);
         return RLC_ERR;
     }
     // check if the point is infinity
     if (bin[0] & 0x40) {
         // check if the remaining bits are cleared
         if (bin[0] & 0x3F) {
-            THROW(ERR_NO_VALID);
             return RLC_ERR;
         }
         for (int i=1; i<G1size-1; i++) {
             if (bin[i]) {
-                THROW(ERR_NO_VALID);
                 return RLC_ERR;
             } 
         }
@@ -372,7 +371,6 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     int y_is_odd = (bin[0] >> 5) & 1;
 
     if (y_is_odd && (!compressed)) {
-        THROW(ERR_NO_VALID);
         return RLC_ERR;
     } 
 
@@ -496,7 +494,6 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
-        THROW(ERR_NO_VALID);
         return RLC_ERR;
     }
 
@@ -504,12 +501,10 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     if (bin[0] & 0x40) {
         // the remaining bits need to be cleared
         if (bin[0] & 0x3F) {
-            THROW(ERR_NO_VALID);
             return RLC_ERR;
         }
         for (int i=1; i<G2size-1; i++) {
             if (bin[i]) {
-                THROW(ERR_NO_VALID);
                 return RLC_ERR;
             } 
         }
@@ -519,7 +514,6 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     byte compressed = bin[0] >> 7;
     byte y_is_odd = (bin[0] >> 5) & 1;
     if (y_is_odd && (!compressed)) {
-        THROW(ERR_NO_VALID);
         return RLC_ERR;
     } 
 	a->norm = 1;
@@ -536,7 +530,6 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     fp2_read_bin(a->x, temp, 2*Fp_BYTES);
     free(temp);
 
-    
     if (SERIALIZATION == UNCOMPRESSED) {
         fp2_read_bin(a->y, bin + 2*Fp_BYTES, 2*Fp_BYTES);
         return RLC_OK;
@@ -553,7 +546,7 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 
 // computes the sum of the array elements x and writes the sum in jointx
 // the sum is computed in Zr
-void bn_sum_vector(bn_t jointx, bn_st* x, int len) {
+void bn_sum_vector(bn_t jointx, const bn_st* x, const int len) {
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
@@ -568,7 +561,7 @@ void bn_sum_vector(bn_t jointx, bn_st* x, int len) {
 }
 
 // computes the sum of the G2 array elements y and writes the sum in jointy
-void ep2_sum_vector(ep2_t jointy, ep2_st* y, int len){
+void ep2_sum_vector(ep2_t jointy, ep2_st* y, const int len){
     ep2_set_infty(jointy);
     for (int i=0; i<len; i++){
         ep2_add_projc(jointy, jointy, &y[i]);
@@ -580,34 +573,46 @@ void ep2_sum_vector(ep2_t jointy, ep2_st* y, int len){
 
 // Subtracts the sum of a G2 array elements y from an element x and writes the 
 // result in res
-void ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, int len){
+void ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len){
     ep2_sum_vector(res, y, len);
     ep2_neg(res, res);
     ep2_add_projc(res, x, res);
 }
 
+// computes the sum of the G1 array elements y and writes the sum in jointy
+void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
+    ep_set_infty(jointx);
+    for (int i=0; i<len; i++){
+        ep_add_projc(jointx, jointx, &x[i]);
+    }
+}
+
 // Computes the sum of the signatures (G1 elements) flattened in an single sigs array
 // and store the sum bytes in dest
-// The function assmues sigs is correctly allocated with regards to len.
-int ep_sum_vector(byte* dest, const byte* sigs, const int len) {
+// The function assumes sigs is correctly allocated with regards to len.
+int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     // temp variables
-    ep_t acc, sig;        
+    ep_t acc;        
     ep_new(acc);
-    ep_new(sig);
     ep_set_infty(acc);
+    ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
 
-    // sum the points
+    // import the points from the array
     for (int i=0; i < len; i++) {
-        if (ep_read_bin_compact(sig, &sigs[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK)
+        ep_new(sigs[i]);
+        // deserialize each point from the input array
+        if (ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK)
             return INVALID;
-        ep_add_projc(acc, acc, sig);
     }
+    // sum the points
+    ep_sum_vector(acc, sigs, len);
     // export the result
     ep_write_bin_compact(dest, acc, SIGNATURE_LEN);
 
     // free the temp memory
     ep_free(acc);
-    ep_free(sig);
+    for (int i=0; i < len; i++) ep_free(sig[i]);
+    free(sigs);
     return VALID;
 }
 

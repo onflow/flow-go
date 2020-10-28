@@ -48,6 +48,7 @@ type ExecutionCollector struct {
 	transactionInterpretTime         prometheus.Histogram
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
+	executionStateDiskUsage          prometheus.Gauge
 }
 
 func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -309,6 +310,13 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 			Name:      "state_sync_active",
 			Help:      "indicates if the state sync is active",
 		}),
+
+		executionStateDiskUsage: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "execution_state_disk_usage",
+			Help:      "disk usage of execution state",
+		}),
 	}
 
 	return ec
@@ -471,4 +479,8 @@ func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
 		return
 	}
 	ec.stateSyncActive.Set(float64(0))
+}
+
+func (ec *ExecutionCollector) DiskSize(bytes uint64) {
+	ec.executionStateDiskUsage.Set(float64(bytes))
 }

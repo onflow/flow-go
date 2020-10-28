@@ -37,11 +37,15 @@ const (
 	SignatureLenBLSBLS12381 = fieldSize * (2 - compression) // the length is divided by 2 if compression is on
 	PrKeyLenBLSBLS12381     = 32
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
-	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - compression) // the length is divided by 2 if compression is on
-	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1
-	opSwUInputLenBLSBLS12381    = 2 * (fieldSize + (securityBits / 8))
+	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - compression) // the length is divided by 2 if compression is on
 	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
 	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
+	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1
+	opSwUInputLenBLSBLS12381 = 2 * (fieldSize + (securityBits / 8))
+	// minimum output size as required by the chosen implementation of hash to curve
+	minHashSizeBLSBLS12381 = opSwUInputLenBLSBLS12381
+	// Cipher suite with all the settings
+	BLSCipherSuite = "BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_"
 
 	// ECDSA
 

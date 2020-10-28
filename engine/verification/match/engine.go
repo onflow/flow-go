@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification"
-	"github.com/onflow/flow-go/engine/verification/utils"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -206,6 +207,12 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	//    ^-- G (er_A_2)
 
 	chunks, err := e.myChunkAssignments(ctx, result)
+	if state.IsNoValidChildBlockError(err) {
+		// This is a special sentinel error that just means we need to wait for
+		// the child block
+		log.Debug().Msg(fmt.Sprintf("could not calculate chunk assignment: %v", err))
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
@@ -243,20 +250,22 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	return nil
 }
 
-// myChunkAssignments returns the list of chunks in the chunk list that this verification node
-// is assigned to.
+// myChunkAssignments returns the list of chunks in the chunk list that this
+// verification node is assigned to.
 func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionResult) (flow.ChunkList, error) {
 	var span opentracing.Span
-	span, ctx = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
+	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.Finish()
 
-	verifiers, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleVerification))
+	// TODO: As a temporary shortcut, we can just use the block the Execution receipt is for, i.e. blockID = result.BlockID
+	// However, in the full protocol, blockID is the first block in its fork, which references an
+	// Execution Receipt with an Execution Result identical to result. (were blockID != result.BlockID)
+	assignment, err := e.assigner.Assign(result, result.BlockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
+		return nil, err
 	}
 
-	mine, err := myAssignements(ctx, e.assigner, e.me.NodeID(), verifiers, result)
+	mine, err := myChunks(e.me.NodeID(), assignment, result.Chunks)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine my assignments: %w", err)
 	}
@@ -264,36 +273,22 @@ func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionR
 	return mine, nil
 }
 
-func myAssignements(ctx context.Context, assigner module.ChunkAssigner, myID flow.Identifier,
-	verifiers flow.IdentityList, result *flow.ExecutionResult) (flow.ChunkList, error) {
-
-	// The randomness of the assignment is taken from the result.
-	// TODO: taking the randomness from the random beacon, which is included in it's next block
-	rng, err := utils.NewChunkAssignmentRNG(result)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
-	}
-
-	assignment, err := assigner.Assign(verifiers, result.Chunks, rng)
-	if err != nil {
-		return nil, fmt.Errorf("could not create chunk assignment %w", err)
-	}
-
-	// indices of chunks assigned to this node
+func myChunks(myID flow.Identifier, assignment *chunks.Assignment, chunks flow.ChunkList) (flow.ChunkList, error) {
+	// indices of chunks assigned to verifier
 	chunkIndices := assignment.ByNodeID(myID)
 
-	// mine keeps the list of chunks assigned to this node
-	mine := make(flow.ChunkList, 0, len(chunkIndices))
+	// chunks keeps the list of chunks assigned to the verifier
+	myChunks := make(flow.ChunkList, 0, len(chunkIndices))
 	for _, index := range chunkIndices {
-		chunk, ok := result.Chunks.ByIndex(index)
+		chunk, ok := chunks.ByIndex(index)
 		if !ok {
 			return nil, fmt.Errorf("chunk out of range requested: %v", index)
 		}
 
-		mine = append(mine, chunk)
+		myChunks = append(myChunks, chunk)
 	}
 
-	return mine, nil
+	return myChunks, nil
 }
 
 // onTimer runs periodically, it goes through all pending chunks, and fetches
@@ -487,8 +482,13 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	var endState flow.StateCommitment
 	if int(status.Chunk.Index) == len(result.ExecutionResult.Chunks)-1 {
 		// last chunk in a result is the system chunk and takes final state commitment
+		finalState, ok := result.ExecutionResult.FinalStateCommitment()
+		if !ok {
+			return fmt.Errorf("could not get final state: no chunks found")
+		}
+
 		isSystemChunk = true
-		endState = result.ExecutionResult.FinalStateCommit
+		endState = finalState
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
 		isSystemChunk = false

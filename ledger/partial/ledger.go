@@ -41,7 +41,7 @@ func NewLedger(proof ledger.Proof, s ledger.State) (*Ledger, error) {
 		return nil, ledger.NewErrLedgerConstruction(err)
 	}
 
-	return &Ledger{ptrie: psmt, proof: proof}, nil
+	return &Ledger{ptrie: psmt, proof: proof, state: s}, nil
 }
 
 // Ready implements interface module.ReadyDoneAware
@@ -58,8 +58,8 @@ func (l *Ledger) Done() <-chan struct{} {
 	return done
 }
 
-// InitState returns the initial state of the ledger
-func (l *Ledger) InitState() ledger.State {
+// InitialState returns the initial state of the ledger
+func (l *Ledger) InitialState() ledger.State {
 	return l.state
 }
 
@@ -71,9 +71,23 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO deal with failedPaths
-	payloads, _, err := l.ptrie.Get(paths)
+	payloads, err := l.ptrie.Get(paths)
 	if err != nil {
+		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
+			//store mappings and restore keys from missing paths
+			pathToKey := make(map[string]ledger.Key)
+
+			for i, key := range query.Keys() {
+				path := paths[i]
+				pathToKey[string(path)] = key
+			}
+
+			keys := make([]ledger.Key, 0, len(pErr.Paths))
+			for _, path := range pErr.Paths {
+				keys = append(keys, pathToKey[string(path)])
+			}
+			return nil, &ledger.ErrMissingKeys{Keys: keys}
+		}
 		return nil, err
 	}
 	values, err = pathfinder.PayloadsToValues(payloads)
@@ -97,9 +111,29 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return nil, err
 	}
 
-	// TODO handle failed paths
-	newRootHash, _, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
+	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
 	if err != nil {
+		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
+
+			paths, err := pathfinder.KeysToPaths(update.Keys(), PathFinderVersion)
+			if err != nil {
+				return nil, err
+			}
+
+			//store mappings and restore keys from missing paths
+			pathToKey := make(map[string]ledger.Key)
+
+			for i, key := range update.Keys() {
+				path := paths[i]
+				pathToKey[string(path)] = key
+			}
+
+			keys := make([]ledger.Key, 0, len(pErr.Paths))
+			for _, path := range pErr.Paths {
+				keys = append(keys, pathToKey[string(path)])
+			}
+			return nil, &ledger.ErrMissingKeys{Keys: keys}
+		}
 		return nil, err
 	}
 

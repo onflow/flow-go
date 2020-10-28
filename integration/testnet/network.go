@@ -482,8 +482,16 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
+		case flow.RoleConsensus:
+			// use 1 here instead of the default 5, because the integration
+			// tests only start 1 verification node
+			nodeContainer.addFlag("chunk-alpha", "1")
+
 		case flow.RoleVerification:
-			nodeContainer.addFlag("alpha", "1")
+			// use 1 here instead of the default 5, because the integration
+			// tests only start 1 verification node
+			nodeContainer.addFlag("chunk-alpha", "1")
+
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)

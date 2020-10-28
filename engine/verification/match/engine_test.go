@@ -12,9 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -51,6 +53,18 @@ type MatchEngineTestSuite struct {
 	verifier         *network.Engine
 	chunks           *match.Chunks
 	assigner         *module.ChunkAssigner
+}
+
+func hashResult(res *flow.ExecutionResult) []byte {
+	h := hash.NewSHA3_384()
+
+	// encodes result approval body to byte slice
+	b, _ := encoding.DefaultEncoder.Encode(res.ExecutionResultBody)
+
+	// takes hash of result approval body
+	hash := h.ComputeHash(b)
+
+	return hash
 }
 
 // TestMatchEngine executes all MatchEngineTestSuite tests.
@@ -207,6 +221,9 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 		),
 	)
 
+	seed := hashResult(result)
+	suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
 	// metrics
 	// receiving an execution result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
@@ -216,7 +233,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	suite.assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// assigned chunk IDs successfully attached to their result ID
 	resultID := result.ID()
@@ -287,12 +304,16 @@ func (suite *MatchEngineTestSuite) TestNoAssignment() {
 		),
 	)
 
+	seed := hashResult(result)
+	suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
 	// metrics
+
 	// receiving an execution result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
 
-	// add assignment to assigner
-	suite.assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+	// add MyChunk method to return to assigner
+	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// block header has been received
 	suite.headerDB[result.BlockID] = suite.head
@@ -327,6 +348,9 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 		),
 	)
 
+	seed := hashResult(result)
+	suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
 	// metrics
 	// receiving an execution result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
@@ -336,7 +360,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	suite.metrics.On("OnChunkDataPackReceived").Return().Twice()
 
 	// add assignment to assigner
-	suite.assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// assigned chunk IDs successfully attached to their result ID
 	resultID := result.ID()
@@ -383,6 +407,85 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 		suite.chunkIDsByResult)
 }
 
+// TestDuplication checks that when the engine receives 2 ER for the same block,
+// which only has 1 chunk, only 1 verifiable chunk will be produced.
+func (suite *MatchEngineTestSuite) TestDuplication() {
+	e := suite.NewTestMatchEngine(3)
+
+	// create a execution result that assigns to me
+	result, assignment := createExecutionResult(
+		suite.head.ID(),
+		WithChunks(
+			WithAssignee(suite.myID),
+		),
+	)
+
+	seed := hashResult(result)
+	suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
+	// metrics
+	// receiving an execution result
+	suite.metrics.On("OnExecutionResultReceived").Return().Twice()
+	// sending one verifiable chunks
+	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
+	// receiving one chunk data packs
+	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+
+	// add assignment to assigner
+	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+
+	// assigned chunk IDs successfully attached to their result ID
+	resultID := result.ID()
+	for _, chunkIndex := range assignment.ByNodeID(suite.myID) {
+		chunkID := result.Chunks[chunkIndex].ID()
+		suite.chunkIDsByResult.On("Append", resultID, chunkID).
+			Return(nil).Once()
+		// mocks resource clean up for assigned chunks
+		suite.chunkIDsByResult.On("RemIdFromKey", resultID, chunkID).Return(nil).Once()
+	}
+	suite.chunkIDsByResult.On("Has", resultID).Return(true)
+
+	// block header has been received
+	suite.headerDB[result.BlockID] = suite.head
+
+	// find the execution node id that created the execution result
+	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+
+	// setup conduit to return requested chunk data packs
+	// return received requests
+	called := 0
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3,
+		func(req *messages.ChunkDataRequest) {
+			called++
+			if called >= 3 {
+				suite.RespondChunkDataPack(e, en.ID())(req)
+			}
+		})
+
+	// check verifier's method is called
+	vchunkC := suite.VerifierCalledNTimes(5*time.Second, 1)
+
+	<-e.Ready()
+
+	// engine processes the execution result
+	err := e.Process(en.ID(), result)
+	require.NoError(suite.T(), err)
+
+	// engine processes the execution result again
+	err = e.Process(en.ID(), result)
+	require.NoError(suite.T(), err)
+
+	<-vchunkC
+
+	<-e.Done()
+	mock.AssertExpectationsForObjects(suite.T(),
+		suite.assigner,
+		suite.con,
+		suite.verifier,
+		suite.metrics,
+		suite.chunkIDsByResult)
+}
+
 // Retry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 3,
 // the execution node fails to return data for the first 2 requests,
 // and successful to return in the 3rd try, a verifiable chunk will be produced
@@ -397,6 +500,9 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 		),
 	)
 
+	seed := hashResult(result)
+	suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
 	// metrics
 	// receiving an execution result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
@@ -406,7 +512,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
-	suite.assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// assigned chunk IDs successfully attached to their result ID
 	resultID := result.ID()
@@ -467,12 +573,16 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 		),
 	)
 
+	seed := hashResult(result)
+	suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
 	// metrics
 	// receiving an execution result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
 
 	// add assignment to assigner
-	suite.assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
+
 	// assigned chunk IDs successfully attached to their result ID
 	resultID := result.ID()
 	for _, chunkIndex := range assignment.ByNodeID(suite.myID) {
@@ -532,8 +642,12 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 				WithAssignee(suite.myID),
 			),
 		)
+
+		seed := hashResult(result)
+		suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
 		// add assignment to assigner
-		suite.assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+		suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 		// assigned chunk IDs successfully attached to their result ID
 		resultID := result.ID()
@@ -599,6 +713,9 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 		),
 	)
 
+	seed := hashResult(result)
+	suite.snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+
 	// metrics
 	// receiving `len(result.Chunk)`-many result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
@@ -608,7 +725,7 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
 
 	// add assignment to assigner
-	suite.assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 
 	// assigned chunk IDs successfully attached to their result ID
 	resultID := result.ID()
@@ -718,6 +835,7 @@ func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(index),
 			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
+			BlockID:         blockID,
 		},
 	}
 	return chunk
