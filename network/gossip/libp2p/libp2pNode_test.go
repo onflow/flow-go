@@ -327,7 +327,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 	defer cancel()
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
-	grace := 10 * time.Millisecond
+	grace := 1 * time.Second
 	var err error
 	unittest.AssertReturnsBefore(suite.T(),
 		func() {
