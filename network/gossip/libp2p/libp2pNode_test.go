@@ -373,7 +373,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 
 	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
 	// good address
-	unittest.RequireNeverClosedWithin(suite.T(), streamCreated, 1*time.Millisecond,
+	unittest.RequireNeverClosedWithin(suite.T(), blockedCallCh, 1*time.Millisecond,
 		"CreateStream attempt to the unresponsive peer did not block after connecting to good node")
 
 }
