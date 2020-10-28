@@ -175,7 +175,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 
 	// starts peer manager and waits for first periodic update
 	require.NoError(suite.T(), pm.Start())
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 10*time.Second,
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
 		"ConnectPeers is not running on startup")
 
 	// makes a request for peer update
@@ -183,7 +183,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	pm.RequestPeerUpdate()
 
 	// assert that a call to connect to peers is made
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Millisecond,
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
 		"ConnectPeers is not running on request")
 }
 
