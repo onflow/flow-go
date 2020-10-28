@@ -221,7 +221,6 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// allow the first and second updates to finish
 	connectPeerGate <- time.Now()
-	connectPeerGate <- time.Now()
 
 	// requires two calls to ConnectPeers were made
 	assert.Eventually(suite.T(), func() bool {
