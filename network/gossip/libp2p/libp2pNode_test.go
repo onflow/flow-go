@@ -356,7 +356,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	}()
 
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
-	streamCreated := unittest.RequireNeverReturnBefore(suite.T(),
+	blockedCallCh := unittest.RequireNeverReturnBefore(suite.T(),
 		func() {
 			_, _ = goodPeers[0].CreateStream(suite.ctx, silentNodeAddress) // this call will block
 		},
