@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
@@ -32,6 +33,7 @@ func TestPeerManagerTestSuite(t *testing.T) {
 
 func (suite *PeerManagerTestSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	golog.SetAllLoggers(golog.LevelError)
 	suite.ctx = context.Background()
 }
 

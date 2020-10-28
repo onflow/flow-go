@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,6 +43,7 @@ func (s *EchoEngineTestSuite) SetupTest() {
 	const count = 2
 
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	golog.SetAllLoggers(golog.LevelError)
 	s.ids, s.mws, s.nets = generateIDsMiddlewaresNetworks(s.T(), count, logger, 100, nil, false)
 }
 

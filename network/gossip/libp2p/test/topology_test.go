@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
@@ -32,6 +33,7 @@ func TestNetworkTestSuit(t *testing.T) {
 func (n *TopologyTestSuite) TestTopologySize() {
 	totalNodes := 100
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	golog.SetAllLoggers(golog.LevelError)
 
 	// create totalNodes number of networks
 	_, _, nets := generateIDsMiddlewaresNetworks(n.T(), totalNodes, logger, 100, nil, true)

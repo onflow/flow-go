@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
@@ -41,6 +42,7 @@ func TestMiddlewareTestSuit(t *testing.T) {
 // SetupTest initiates the test setups prior to each test
 func (m *MiddlewareTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	golog.SetAllLoggers(golog.LevelError)
 
 	m.size = 2 // operates on two middlewares
 

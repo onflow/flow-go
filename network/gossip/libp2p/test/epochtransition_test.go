@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
@@ -47,6 +48,7 @@ func (ts *EpochTransitionTestSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
 	ts.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	golog.SetAllLoggers(golog.LevelError)
 
 	// create ids
 	ids, mws := generateIDsAndMiddlewares(ts.T(), nodeCount, ts.logger)
