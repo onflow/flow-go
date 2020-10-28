@@ -21,8 +21,8 @@ type View struct {
 	// SpocksSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing SpocksSecret
 	// for views other than collection views to improve performance
-	spockSecretHasher       hash.Hasher
-	readFunc                GetRegisterFunc
+	spockSecretHasher hash.Hasher
+	readFunc          GetRegisterFunc
 }
 
 // Snapshot is set of interactions with the register
@@ -35,10 +35,10 @@ type Snapshot struct {
 // NewView instantiates a new ledger view with the provided read function.
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
-		delta:                   NewDelta(),
-		regTouchSet:             make(map[string]flow.RegisterID),
-		readFunc:                readFunc,
-		spockSecretHasher:       hash.NewSHA3_256(),
+		delta:             NewDelta(),
+		regTouchSet:       make(map[string]flow.RegisterID),
+		readFunc:          readFunc,
+		spockSecretHasher: hash.NewSHA3_256(),
 	}
 }
 

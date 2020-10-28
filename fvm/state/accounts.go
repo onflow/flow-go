@@ -11,11 +11,10 @@ import (
 )
 
 const (
-	keyExists                   = "exists"
-	keyCode                     = "code"
-	keyPublicKeyCount           = "public_key_count"
-	storageUsedRegisterName     = "storage_used"
-	storageCapacityRegisterName = "storage_capacity"
+	keyExists               = "exists"
+	keyCode                 = "code"
+	keyPublicKeyCount       = "public_key_count"
+	storageUsedRegisterName = "storage_used"
 )
 
 var (
