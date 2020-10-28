@@ -89,7 +89,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return err
 	}
 	if exists {
-		return fmt.Errorf("account already created on %s", newAddress.Hex())
+		return fmt.Errorf("account with address %s already exists", newAddress.Hex())
 	}
 
 	err = a.setStorageUsed(newAddress, 8) //set storage used to the size of storage used
