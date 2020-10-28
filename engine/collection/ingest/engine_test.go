@@ -167,6 +167,31 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.T().Skip()
 	})
 
+	suite.Run("invalid address", func() {
+		suite.Run("objective check", func() {
+			invalid := unittest.InvalidAddressFixture()
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = invalid
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
+		})
+
+		suite.Run("subjective check with max index", func() {
+			invalid, err := flow.Testnet.Chain().AddressAtIndex(suite.conf.MaxAddressIndex + 1)
+			suite.Require().Nil(err)
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = invalid
+
+			err = suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
+		})
+	})
+
 	suite.Run("expired reference block ID", func() {
 		// "finalize" a sufficiently high block that root block is expired
 		final := unittest.BlockFixture()

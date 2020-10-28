@@ -95,6 +95,11 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 
 	// TODO check account/payer signatures
 
+	err = v.checkAddresses(tx)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

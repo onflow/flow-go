@@ -37,6 +37,15 @@ func RandomAddressFixture() flow.Address {
 	return addr
 }
 
+func InvalidAddressFixture() flow.Address {
+	addr := AddressFixture()
+	addr[0] ^= 1 // alter one bit to obtain an invalid address
+	if flow.Testnet.Chain().IsValid(addr) {
+		panic("invalid address fixture generated valid address")
+	}
+	return addr
+}
+
 func TransactionSignatureFixture() flow.TransactionSignature {
 	return flow.TransactionSignature{
 		Address:     AddressFixture(),
