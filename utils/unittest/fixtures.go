@@ -398,23 +398,6 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	return executableBlock
 }
 
-func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
-	chunks := 0
-	if block.Payload != nil {
-		// +1 for system chunk
-		chunks = len(block.Payload.Guarantees) + 1
-	}
-
-	return &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: IdentifierFixture(),
-			BlockID:          block.ID(),
-			Chunks:           ChunksFixture(uint(chunks), block.ID()),
-		},
-		Signatures: SignaturesFixture(6),
-	}
-}
-
 func WithExecutorID(id flow.Identifier) func(*flow.ExecutionReceipt) {
 	return func(receipt *flow.ExecutionReceipt) {
 		receipt.ExecutorID = id
@@ -453,12 +436,17 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 }
 
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
+	chunks := 1 // tailing chunk is always system chunk
+	if block.Payload != nil {
+		chunks += len(block.Payload.Guarantees)
+	}
+	blockID := block.ID()
+
 	return func(result *flow.ExecutionResult) {
-		startState := result.Chunks[0].StartState
-		updatedResult := *ResultForBlockFixture(block)
-		result.BlockID = updatedResult.BlockID
-		result.Chunks = updatedResult.Chunks
-		result.Chunks[0].StartState = startState
+		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
+		result.BlockID = blockID
+		result.Chunks = ChunksFixture(uint(chunks), block.ID())
+		result.Chunks[0].StartState = startState // set start state to value before update
 	}
 }
 
@@ -468,10 +456,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          IdentifierFixture(),
-			Chunks: flow.ChunkList{
-				ChunkFixture(blockID),
-				ChunkFixture(blockID),
-			},
+			Chunks:           ChunksFixture(2, blockID),
 		},
 		Signatures: SignaturesFixture(6),
 	}
@@ -496,7 +481,7 @@ func IncorporatedResultFixture(opts ...func(*flow.IncorporatedResult)) *flow.Inc
 
 // TODO replace by usage unittest.IncorporatedResult
 func IncorporatedResultForBlockFixture(block *flow.Block) *flow.IncorporatedResult {
-	result := ResultForBlockFixture(block)
+	result := ExecutionResultFixture(WithBlock(block))
 	incorporatedBlockID := IdentifierFixture()
 	return flow.NewIncorporatedResult(incorporatedBlockID, result)
 }
