@@ -24,16 +24,47 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID = unittest.IdentifierFixture().String()
+var rootBlockID string
+
+// allocatedPorts keeps track of ports allocated to different tests
+var allocatedPorts map[int]struct{}
+
+// init is a built-in golang function getting called first time this
+// package is imported. It initializes package-scoped variables.
+func init() {
+	allocatedPorts = make(map[int]struct{})
+	rootBlockID = unittest.IdentifierFixture().String()
+}
+
+// getFreePorts finds `n` free ports on the machine and marks them as allocated.
+func getFreePorts(t *testing.T, n int) []int {
+	ports := make([]int, n)
+	// keeps track of discovered ports
+	for count := 0; count < n; {
+		// get free ports
+		freePorts, err := freeport.GetFreePorts(1)
+		require.NoError(t, err)
+		port := freePorts[0]
+
+		if _, ok := allocatedPorts[port]; ok {
+			// port has already been allocated
+			continue
+		}
+
+		// records port address and mark it as allocated
+		ports[count] = port
+		allocatedPorts[port] = struct{}{}
+		count++
+	}
+
+	return ports
+}
 
 // generateIDs generate flow Identities with a valid port and networking key
 func generateIDs(t *testing.T, n int) (flow.IdentityList, []crypto.PrivateKey) {
 	identities := make([]*flow.Identity, n)
 	privateKeys := make([]crypto.PrivateKey, n)
-
-	// get free ports
-	freePorts, err := freeport.GetFreePorts(n)
-	require.NoError(t, err)
+	freePorts := getFreePorts(t, n)
 
 	for i := 0; i < n; i++ {
 
