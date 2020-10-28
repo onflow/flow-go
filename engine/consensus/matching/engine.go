@@ -9,7 +9,6 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
@@ -51,7 +50,7 @@ type Engine struct {
 	assigner                module.ChunkAssigner            // chunk assignment object
 	checkingSealing         *atomic.Bool                    // used to rate limit the checksealing call
 	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
-	maxUnsealedResults      int                             // how many unsealed results to check when check sealing
+	maxResultsToRequest     int                             // max number of finalized blocks for which we request execution results
 	requireApprovals        bool                            // flag to disable verifying chunk approvals
 }
 
@@ -96,7 +95,7 @@ func New(
 		missing:                 make(map[flow.Identifier]uint),
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
-		maxUnsealedResults:      200,
+		maxResultsToRequest:     200,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
 	}
@@ -266,7 +265,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// resultsDB is persistent storage while Mempools are in-memory only.
 	// After a crash, the replica still needs to be able to generate a seal
 	// for an Result even if it had stored the Result before the crash.
-	// Otherwise, a stored result might never get sealed, and 
+	// Otherwise, a stored result might never get sealed, and
 	// liveness of sealing is undermined.
 
 	// store the result belonging to the receipt in the memory pool
@@ -276,14 +275,14 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// that contains a receipt committing to this result.
 	added, err := e.incorporatedResults.Add(flow.NewIncorporatedResult(result.BlockID, result))
 	if err != nil {
-		e.log.Err(err).Msg("error inserting incorporated result in mempool")
+		log.Err(err).Msg("error inserting incorporated result in mempool")
 	}
 	if !added {
-		e.log.Debug().Msg("skipping result already in mempool")
+		log.Debug().Msg("skipping result already in mempool")
 		return nil
 	}
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
-	e.log.Info().Msg("execution result added to mempool")
+	log.Info().Msg("execution result added to mempool")
 
 	// kick off a check for potential seal formation
 	e.unit.Launch(e.checkSealing)
@@ -341,7 +340,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return err
 	}
 	if !added {
-		e.log.Debug().Msg("skipping approval already in mempool")
+		log.Debug().Msg("skipping approval already in mempool")
 		return nil
 	}
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
@@ -504,7 +503,7 @@ RES_LOOP:
 		previousID := incorporatedResult.Result.PreviousResultID
 		previous, err := e.resultsDB.ByID(previousID)
 		if errors.Is(err, storage.ErrNotFound) {
-			log.Debug().Msg("skipping sealable result with unknown previous result")
+			e.log.Debug().Msg("skipping sealable result with unknown previous result")
 			continue
 		}
 		if err != nil {
@@ -514,7 +513,7 @@ RES_LOOP:
 		// check sub-graph
 		if block.ParentID != previous.BlockID {
 			_ = e.incorporatedResults.Rem(incorporatedResult)
-			log.Warn().
+			e.log.Warn().
 				Str("block_parent_id", block.ParentID.String()).
 				Str("previous_result_block_id", previous.BlockID.String()).
 				Msg("removing result with invalid sub-graph")
@@ -540,7 +539,7 @@ RES_LOOP:
 
 		if incorporatedResult.Result.Chunks.Len() != requiredChunks {
 			_ = e.incorporatedResults.Rem(incorporatedResult)
-			log.Warn().
+			e.log.Warn().
 				Int("result_chunks", len(incorporatedResult.Result.Chunks)).
 				Int("required_chunks", requiredChunks).
 				Msg("removing result with invalid number of chunks")
@@ -568,7 +567,7 @@ RES_LOOP:
 			// get chunk at position i
 			chunk, ok := incorporatedResult.Result.Chunks.ByIndex(uint64(i))
 			if !ok {
-				log.Warn().Msgf("chunk out of range requested: %d", i)
+				e.log.Warn().Msgf("chunk out of range requested: %d", i)
 				_ = e.incorporatedResults.Rem(incorporatedResult)
 				continue RES_LOOP
 			}
@@ -576,7 +575,7 @@ RES_LOOP:
 			// Check if chunk index matches its position. This ensures that the
 			// result contains all chunks and no duplicates.
 			if chunk.Index != uint64(i) {
-				log.Warn().Msgf("chunk out of place: pos = %d, index = %d", i, chunk.Index)
+				e.log.Warn().Msgf("chunk out of place: pos = %d, index = %d", i, chunk.Index)
 				_ = e.incorporatedResults.Rem(incorporatedResult)
 				continue RES_LOOP
 			}
@@ -822,7 +821,7 @@ func (e *Engine) requestPending() error {
 	// right order. The right order gives the priority to the execution result
 	// of lower height blocks to be requested first, since a gap in the sealing
 	// heights would stop the sealing.
-	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, e.maxUnsealedResults)
+	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, e.maxResultsToRequest)
 
 	// turn mempool into Lookup table: BlockID -> Result
 	knownResultForBlock := make(map[flow.Identifier]struct{})
@@ -838,7 +837,7 @@ func (e *Engine) requestPending() error {
 	// order to request them.
 	for height := sealed.Height + 1; height <= final.Height; height++ {
 		// add at most <maxUnsealedResults> number of results
-		if len(missingBlocksOrderedByHeight) >= e.maxUnsealedResults {
+		if len(missingBlocksOrderedByHeight) >= e.maxResultsToRequest {
 			break
 		}
 
@@ -856,23 +855,20 @@ func (e *Engine) requestPending() error {
 		}
 	}
 
-	e.log.Info().
-		Uint64("final", final.Height).
-		Uint64("sealed", sealed.Height).
-		Uint("request_receipt_threshold", e.requestReceiptThreshold).
-		Int("missing", len(missingBlocksOrderedByHeight)).
-		Msg("check missing receipts")
-
 	// request missing execution results, if sealed height is low enough
+	log := e.log.With().
+		Uint64("finalized_height", final.Height).
+		Uint64("sealed_height", sealed.Height).
+		Uint("request_receipt_threshold", e.requestReceiptThreshold).
+		Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
+		Logger()
 	if uint(final.Height-sealed.Height) >= e.requestReceiptThreshold {
-		requestedCount := 0
 		for _, blockID := range missingBlocksOrderedByHeight {
 			e.requester.EntityByID(blockID, filter.Any)
-			requestedCount++
 		}
-		e.log.Info().
-			Int("count", requestedCount).
-			Msg("requested missing results")
+		log.Info().Msg("requesting receipts")
+	} else {
+		log.Debug().Msg("skip requesting receipts as difference between sealed and finalized height does not exceed threshold")
 	}
 
 	return nil
