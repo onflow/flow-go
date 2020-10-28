@@ -419,7 +419,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 	close(gate)
 
 	// no call should block
-	unittest.AssertReturnsBefore(l.T(), wg.Wait, 10*time.Millisecond)
+	unittest.AssertReturnsBefore(l.T(), wg.Wait, 10*time.Second)
 }
 
 // TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
