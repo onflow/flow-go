@@ -430,7 +430,7 @@ static inline void map_to_E1_swu(ep_t p, const fp_t t) {
     fp_mul(p->x, fp_tmp[2], fp_tmp[1]);  // X = N*D
     fp_mul(p->y, fp_tmp[5], fp_tmp[3]);  // Y = y*D^3
     fp_copy(p->z, fp_tmp[1]);
-    p->coord = BASIC;
+    p->coord = JACOB;
     
     for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
     free(fp_tmp);
