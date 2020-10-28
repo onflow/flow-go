@@ -373,7 +373,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 			_, err := goodPeers[0].CreateStream(suite.ctx, goodAddrs[1])
 			require.NoError(suite.T(), err)
 		},
-		1 *time.Second, "creating stream to a responsive node failed while concurrently blocked on an unresponsive"+node")
+		1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
 
 	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
 	// good address
