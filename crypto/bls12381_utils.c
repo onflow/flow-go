@@ -209,25 +209,27 @@ void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
     bn_free(tmp);
 }
 
-// reads a bit in a prime field element at a given index
-// whether the field element is in Montgomery domain or not
-static int fp_get_bit_generic(const fp_t a, int bit) {
-#if (FP_RDC == MONTY)
-    bn_t tmp;
-    bn_new(tmp);
-    fp_prime_back(tmp, a);
-    int res = bn_get_bit(tmp, bit);
-    bn_free(tmp);
-    return res;
-#else
-    return fp_get_bit(a, bit);
-#endif
+// returns the sign of y.
+// 1 if y > (p - 1) and 0 otherwise.
+static int fp_get_sign(fp_t y) {
+    // (p-1)/2
+    bn_t p_by_2;
+    bn_new(p_by_2);
+    p_by_2->used = RLC_FP_DIGS;
+	dv_copy(p_by_2->dp, fp_prime_get(), RLC_FP_DIGS);
+	bn_rsh(p_by_2, p_by_2, 1);	
+    
+    bn_t bn_y;
+    bn_new(bn_y);
+    fp_prime_back(bn_y, y);
+    return bn_cmp(bn_y, p_by_2) == RLC_GT;		
 }
 
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
-// len is the allocated size of the buffer bin for sanity check
+// len is the allocated size of the buffer bin.
 // The serialization is following:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
+// The code is a modified version of Relic ep_write_bin
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
     ep_null(t);
@@ -251,10 +253,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
         fp_write_bin(bin, Fp_BYTES, t->x);
 
         if (SERIALIZATION == COMPRESSED) {
-            // keep x and get the sign of y
-            ep_pck(t,t);
-            bin[0] |= (fp_get_bit(t->y, 0) << 5);
-            // TODO: bin[0] |= (fp_get_sign_y(t->y) << 5);
+            bin[0] |= (fp_get_sign(t->y) << 5);
         } else {
             fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
         }
@@ -268,9 +267,9 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 
 
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// len is the size of the input buffer
-// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
-// look at the comments of ep_write_bin_compact for a detailed description
+// len is the size of the input buffer.
+// The serialization is following:
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_read_bin
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     const int G1_size = (G1_BYTES/(SERIALIZATION+1));
@@ -323,62 +322,20 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     return RLC_ERR;
 }
 
-// uncompress a G2 point p into r taking into account the coordinate x
-// and the LS bit of the y lower coordinate.
-//
-// (taken and modifed from Relic ep2_upk function)
-// Change: the square root (y) is chosen regardless of the modular multiplication used.
-// If montgomery multiplication is used, the square root is reduced to check the LS bit.
-//
-// Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
-// https://github.com/relic-toolkit/relic
-static  int ep2_upk_generic(ep2_t r, ep2_t p) {
-    fp2_t t;
-    int result = 0;
-    fp2_null(t);
-    RLC_TRY {
-        fp2_new(t);
-        ep2_rhs(t, p);
-        /* t0 = sqrt(x1^3 + a * x1 + b). */
-        result = fp2_srt(t, t);
-        if (result) {
-            /* Verify if least significant bit of the result matches the
-             * compressed y-coordinate. */
-            #if (FP_RDC == MONTY)
-            bn_t tmp;
-            bn_new(tmp);
-            fp_prime_back(tmp, t[0]);
-            if (bn_get_bit(tmp, 0) != fp_get_bit(p->y[0], 0)) {
-                fp2_neg(t, t);
-            }
-            bn_free(tmp);
-            #else
-            if (fp_get_bit(t[0], 0) != fp_get_bit(p->y[0], 0)) {
-                fp2_neg(t, t);
-            }
-            #endif
-            fp2_copy(r->x, p->x);
-            fp2_copy(r->y, t);
-            fp_set_dig(r->z[0], 1);
-            fp_zero(r->z[1]);
-            r->coord = BASIC;
-        }
+// returns the sign of y.
+// sign(y_0) if y_1 = 0, else sign(y_1)
+static int fp2_get_sign(fp2_t y) {
+    if (fp_is_zero(y[1])) { // no need to convert back as the montgomery form of 0 is 0
+        return fp_get_sign(y[0]);
     }
-    RLC_CATCH_ANY {
-        RLC_THROW(ERR_CAUGHT);
-    }
-    RLC_FINALLY {
-        fp2_free(t);
-    }
-    return result;
+    return fp_get_sign(y[1]);
 }
 
 // ep2_write_bin_compact exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
-// The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
-// Otherwise, the point is in uncompressed form.
-// The second-most significant bit indicates that the point is at infinity. 
-// If this bit is set, the remaining bits of the group element's encoding should be set to zero.
-// The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
+// len is the allocated size of the buffer bin.
+// The serialization is following:
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
+// The code is a modified version of Relic ep2_write_bin 
 void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     ep2_t t;
     ep2_null(t);
@@ -402,7 +359,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
         fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
 
         if (SERIALIZATION == COMPRESSED) {
-            bin[0] |= (fp_get_bit_generic(t->y[0], 0) << 5);
+            bin[0] |= (fp2_get_sign(t->y) << 5);
         } else {
             fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
         }
@@ -415,7 +372,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// The code is a modified version of Relic ep_read_bin
+// The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
@@ -463,7 +420,7 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     fp2_zero(a->y);
     fp_set_bit(a->y[0], 0, y_is_odd);
     fp_zero(a->y[1]);
-    if (ep2_upk_generic(a, a) == 1) {
+    if (ep2_upk(a, a) == 1) {
         return RLC_OK;
     }
     return RLC_ERR;

@@ -72,28 +72,33 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 
-	// Key generation seed
-	seed := make([]byte, seedMinLength)
-	read, err := mrand.Read(seed)
-	require.Equal(t, read, seedMinLength)
-	require.NoError(t, err)
-	sk, err := GeneratePrivateKey(salg, seed)
-	assert.Nil(t, err, "the key generation has failed")
+	loops := 50
+	for j := 0; j < loops; j++ {
+		// generate a private key
+		seed := make([]byte, seedMinLength)
+		read, err := mrand.Read(seed)
+		require.Equal(t, read, seedMinLength)
+		require.NoError(t, err)
+		sk, err := GeneratePrivateKey(salg, seed)
+		assert.Nil(t, err, "the key generation has failed")
 
-	skBytes := sk.Encode()
-	skCheck, err := DecodePrivateKey(salg, skBytes)
-	require.Nil(t, err, "the key decoding has failed")
-	assert.True(t, sk.Equals(skCheck), "key equality check failed")
-	skCheckBytes := skCheck.Encode()
-	assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
+		// check private key encoding
+		skBytes := sk.Encode()
+		skCheck, err := DecodePrivateKey(salg, skBytes)
+		require.Nil(t, err, "the key decoding has failed")
+		assert.True(t, sk.Equals(skCheck), "key equality check failed")
+		skCheckBytes := skCheck.Encode()
+		assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
 
-	pk := sk.PublicKey()
-	pkBytes := pk.Encode()
-	pkCheck, err := DecodePublicKey(salg, pkBytes)
-	require.Nil(t, err, "the key decoding has failed")
-	assert.True(t, pk.Equals(pkCheck), "key equality check failed")
-	pkCheckBytes := pkCheck.Encode()
-	assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+		// check public key encoding
+		pk := sk.PublicKey()
+		pkBytes := pk.Encode()
+		pkCheck, err := DecodePublicKey(salg, pkBytes)
+		require.Nil(t, err, "the key decoding has failed")
+		assert.True(t, pk.Equals(pkCheck), "key equality check failed")
+		pkCheckBytes := pkCheck.Encode()
+		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+	}
 
 	// test invalid private keys (equal to the curve group order)
 	groupOrder := make(map[SigningAlgorithm][]byte)
@@ -108,7 +113,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	groupOrder[BLSBLS12381] = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
 		0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
 		0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
-	_, err = DecodePrivateKey(salg, groupOrder[salg])
+	_, err := DecodePrivateKey(salg, groupOrder[salg])
 	require.Error(t, err, "the key decoding should fail - private key value is too large")
 }
 
