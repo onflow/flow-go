@@ -67,8 +67,9 @@ func TestApprovals(t *testing.T) {
 
 	// tests against removing a chunk's approvals
 	t.Run("removing chunk", func(t *testing.T) {
-		ok := approvalPL.Rem(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
+		ok, err := approvalPL.RemChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
 		require.True(t, ok)
+		require.NoError(t, err)
 
 		// getting chunk should return empty map
 		approvals := approvalPL.ByChunk(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex)
@@ -92,5 +93,17 @@ func TestApprovals(t *testing.T) {
 		size := approvalPL.Size()
 		require.Equal(t, uint(1), size)
 	})
+}
 
+// Test that size gets decremented when items are automatically ejected
+func TestApprovalsEjectSize(t *testing.T) {
+	approvalPL, _ := NewApprovals(10)
+
+	// insert 20 items (10 above limit)
+	for i := 0; i < 20; i++ {
+		_, _ = approvalPL.Add(unittest.ResultApprovalFixture())
+	}
+
+	// 10 items should have been evicted, so size 10
+	require.Equal(t, uint(10), approvalPL.Size())
 }

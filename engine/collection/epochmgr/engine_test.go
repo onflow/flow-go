@@ -13,6 +13,9 @@ import (
 	epochmgr "github.com/onflow/flow-go/engine/collection/epochmgr/mock"
 	"github.com/onflow/flow-go/model/flow"
 	realmodule "github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/epochs"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	module "github.com/onflow/flow-go/module/mock"
 	realcluster "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
@@ -110,8 +113,10 @@ func (suite *Suite) SetupTest() {
 	suite.AddEpoch(suite.counter)
 	suite.AddEpoch(suite.counter + 1)
 
+	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
+
 	var err error
-	suite.engine, err = New(log, suite.me, suite.state, suite.voter, suite.factory, suite.heights)
+	suite.engine, err = New(log, suite.me, suite.state, pools, suite.voter, suite.factory, suite.heights)
 	suite.Require().Nil(err)
 }
 

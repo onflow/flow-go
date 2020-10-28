@@ -297,13 +297,15 @@ static int ep_upk_generic(ep_t r, const ep_t p) {
 
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
 // len is the allocated size of the buffer bin for sanity check
-// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib 
+// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) 
+// with a small change to accomodate Relic lib 
 //
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
 // Otherwise, the point is in uncompressed form.
 // The second-most significant bit, when set, indicates that the point is at infinity. 
 // If this bit is set, the remaining bits of the group element's encoding should be set to zero.
-// The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
+// The third-most significant bit is set if (and only if) this point is in compressed form and it is not 
+// the point at infinity and its y-coordinate is odd.
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
     ep_null(t);
