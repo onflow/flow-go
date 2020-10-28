@@ -136,7 +136,7 @@ func main() {
 			return nil
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
-			conMetrics = metrics.NewConsensusCollector(node.Tracer)
+			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -175,6 +175,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
+				conMetrics,
 				node.Network,
 				node.State,
 				node.Me,
