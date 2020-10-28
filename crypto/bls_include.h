@@ -25,8 +25,7 @@
 
 // algorithm choice for the hashing to G1 
 #define HASHCHECK 1
-#define SWU 2
-#define OPSWU 3
+#define OPSWU 2
 #define hashToPoint OPSWU
 
 

@@ -24,7 +24,7 @@ prec_st* bls_prec = NULL;
 
 #if (hashToPoint == OPSWU)
 extern const uint64_t p_3div4_data[Fp_DIGITS];
-extern const uint64_t p_1div2_data[Fp_DIGITS];
+extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
 extern const uint64_t a1_data[Fp_DIGITS];
 extern const uint64_t b1_data[Fp_DIGITS];
 extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
@@ -38,6 +38,12 @@ extern const uint64_t beta_data[Fp_DIGITS];
 extern const uint64_t z2_1_by3_data[2];
 #endif
 
+const uint64_t p_1div2_data[Fp_DIGITS] = {
+   0xdcff7fffffffd555, 0x0f55ffff58a9ffff, 0xb39869507b587b12, 
+   0xb23ba5c279c2895f, 0x258dd3db21a5d66b, 0x0d0088f51cbff34d,
+};
+
+
 // sets the global variable to input
 void precomputed_data_set(prec_st* p) {
     bls_prec = p;
@@ -50,13 +56,14 @@ void precomputed_data_set(prec_st* p) {
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
+
     #if (hashToPoint == OPSWU)
     fp_read_raw(bls_prec->a1, a1_data);
     fp_read_raw(bls_prec->b1, b1_data);
     // (p-3)/4
     bn_read_raw(&bls_prec->p_3div4, p_3div4_data, Fp_DIGITS);
     // (p-1)/2
-    fp_read_raw(bls_prec->p_1div2, p_1div2_data);
+    fp_read_raw(bls_prec->fp_p_1div2, fp_p_1div2_data);
     for (int i=0; i<ELLP_Dx_LEN; i++)  
         fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i]);
     for (int i=0; i<ELLP_Nx_LEN; i++)  
@@ -66,10 +73,13 @@ prec_st* init_precomputed_data_BLS12_381() {
     for (int i=0; i<ELLP_Ny_LEN; i++)  
         fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i]);
     #endif
+
     #if (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_read_raw(&bls_prec->beta, beta_data, Fp_DIGITS);
     bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
+
+    bn_read_raw(&bls_prec->p_1div2, p_1div2_data, Fp_DIGITS);
     return bls_prec;
 }
 
@@ -212,17 +222,10 @@ void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
 // returns the sign of y.
 // 1 if y > (p - 1) and 0 otherwise.
 static int fp_get_sign(fp_t y) {
-    // (p-1)/2
-    bn_t p_by_2;
-    bn_new(p_by_2);
-    p_by_2->used = RLC_FP_DIGS;
-	dv_copy(p_by_2->dp, fp_prime_get(), RLC_FP_DIGS);
-	bn_rsh(p_by_2, p_by_2, 1);	
-    
     bn_t bn_y;
     bn_new(bn_y);
     fp_prime_back(bn_y, y);
-    return bn_cmp(bn_y, p_by_2) == RLC_GT;		
+    return bn_cmp(bn_y, &bls_prec->p_1div2) == RLC_GT;		
 }
 
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
