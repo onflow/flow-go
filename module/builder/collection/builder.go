@@ -195,7 +195,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		minRefID := refChainFinalizedID
 
 		var transactions []*flow.TransactionBody
-		var totalByteSize uint
+		var totalByteSize uint64
 		var totalGas uint64
 		for _, tx := range b.transactions.All() {
 
@@ -204,15 +204,27 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 				break
 			}
 
-			// we can break cause
-			// max byte size per tx << the max collection byte size
+			txByteSize := uint64(tx.ByteSize())
+			// ignore transactions with tx byte size bigger that the max amount per collection
+			// this case shouldn't happen ever since we keep a limit on tx byte size but in case
+			// we keep this condition
+			if txByteSize > b.config.MaxCollectionByteSize {
+				continue
+			}
+
+			// because the max byte size per tx is way smaller than the max collection byte size, we can stop here and not continue.
 			// to make it more effective in the future we can continue adding smaller ones
-			if totalByteSize+tx.ByteSize() > b.config.MaxCollectionByteSize {
+			if totalByteSize+txByteSize > b.config.MaxCollectionByteSize {
 				break
 			}
 
-			// we can break cause
-			// max gas limit per tx << the total max gas per collection
+			// ignore transactions with max gas bigger that the max total gas per collection
+			// this case shouldn't happen ever but in case we keep this condition
+			if tx.GasLimit > b.config.MaxCollectionTotalGas {
+				continue
+			}
+
+			// cause the max gas limit per tx is way smaller than the total max gas per collection, we can stop here and not continue.
 			// to make it more effective in the future we can continue adding smaller ones
 			if totalGas+tx.GasLimit > b.config.MaxCollectionTotalGas {
 				break
@@ -267,7 +279,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			limiter.transactionIncluded(tx)
 
 			transactions = append(transactions, tx)
-			totalByteSize += tx.ByteSize()
+			totalByteSize += txByteSize
 			totalGas += tx.GasLimit
 		}
 
