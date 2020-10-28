@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
@@ -49,7 +48,7 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 // SetupTests initiates the test setups prior to each test
 func (suite *LibP2PNodeTestSuite) SetupTest() {
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-	golog.SetAllLoggers(golog.LevelError)
+	// golog.SetAllLoggers(golog.LevelError)
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 }
 
@@ -358,7 +357,8 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
 	blockedCallCh := unittest.RequireNeverReturnBefore(suite.T(),
 		func() {
-			_, _ = goodPeers[0].CreateStream(suite.ctx, silentNodeAddress) // this call will block
+			_, err := goodPeers[0].CreateStream(suite.ctx, silentNodeAddress) // this call will block
+			assert.NoError(suite.T(), err)
 		},
 		1*time.Second,
 		"CreateStream attempt to the unresponsive peer did not block")
