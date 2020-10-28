@@ -320,7 +320,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 
 	// create a silent node which never replies
 	listener, silentNodeAddress := newSilentNode(suite.T())
-	defer listener.Close()
+	defer require.NoError(suite.T(), listener.Close())
 
 	// setup the context to expire after the default timeout
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
@@ -351,9 +351,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 
 	// create a silent node which never replies
 	listener, silentNodeAddress := newSilentNode(suite.T())
-	defer func() {
-		require.NoError(suite.T(), listener.Close())
-	}()
+	defer require.NoError(suite.T(), listener.Close())
 
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
 	blockedCallCh := unittest.RequireNeverReturnBefore(suite.T(),
