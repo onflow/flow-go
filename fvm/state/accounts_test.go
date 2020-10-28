@@ -19,7 +19,7 @@ func TestAccounts_Create_SetsRegisters(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
-		require.Equal(t, len(ledger.RegisterTouches), 4) // exists + code + key count
+		require.Equal(t, len(ledger.RegisterTouches), 4) // storage_used + exists + code + key count
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
