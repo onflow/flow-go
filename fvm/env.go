@@ -38,8 +38,7 @@ type hostEnv struct {
 
 func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
 	accounts := state.NewAccounts(ledger)
-	generatorState := state.NewAddressGeneratorState(ledger, ctx.Chain)
-	generator, err := generatorState.GetGenerator()
+	generator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
