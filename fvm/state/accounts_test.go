@@ -9,16 +9,32 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestAccounts_Create_Sets_Registers(t *testing.T) {
-	ledger := state.NewMapLedger()
+func TestAccounts_Create_SetsRegisters(t *testing.T) {
+	t.Run("Sets registers", func(t *testing.T) {
+		ledger := state.NewMapLedger()
 
-	accounts := state.NewAccounts(ledger)
-	address := flow.HexToAddress("01")
+		accounts := state.NewAccounts(ledger)
+		address := flow.HexToAddress("01")
 
-	err := accounts.Create(nil, address)
-	require.NoError(t, err)
+		err := accounts.Create(nil, address)
+		require.NoError(t, err)
 
-	require.Equal(t, len(ledger.RegisterTouches), 3) // exists + code + key count
+		require.Equal(t, len(ledger.RegisterTouches), 3) // exists + code + key count
+	})
+
+	t.Run("Fails if account exists", func(t *testing.T) {
+		ledger := state.NewMapLedger()
+
+		accounts := state.NewAccounts(ledger)
+		address := flow.HexToAddress("01")
+
+		err := accounts.Create(nil, address)
+		require.NoError(t, err)
+
+		err = accounts.Create(nil, address)
+
+		require.Error(t, err)
+	})
 }
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
