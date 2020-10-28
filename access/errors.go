@@ -48,3 +48,13 @@ type InvalidGasLimitError struct {
 func (e InvalidGasLimitError) Error() string {
 	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Actual, e.Maximum)
 }
+
+// InvalidTxByteSizeError indicates that a transaction byte size exceeds the maximum.
+type InvalidTxByteSizeError struct {
+	Maximum uint64
+	Actual  uint64
+}
+
+func (e InvalidTxByteSizeError) Error() string {
+	return fmt.Sprintf("transaction byte size (%d) exceeds the maximum byte size allowed for a transaction (%d)", e.Actual, e.Maximum)
+}
