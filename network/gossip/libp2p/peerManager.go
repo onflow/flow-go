@@ -54,7 +54,7 @@ func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func
 }
 
 // Start kicks off the ambient periodic connection updates
-// It gets blocking till all connection updates are kicking off
+// It is blocked till the connection update is kicked off
 func (pm *PeerManager) Start() error {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
