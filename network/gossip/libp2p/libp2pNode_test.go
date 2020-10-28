@@ -321,7 +321,9 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 
 	// create a silent node which never replies
 	listener, silentNodeAddress := newSilentNode(suite.T())
-	defer require.NoError(suite.T(), listener.Close())
+	defer func() {
+		require.NoError(suite.T(), listener.Close())
+	}()
 
 	// setup the context to expire after the default timeout
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
@@ -352,7 +354,9 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 
 	// create a silent node which never replies
 	listener, silentNodeAddress := newSilentNode(suite.T())
-	defer require.NoError(suite.T(), listener.Close())
+	defer func() {
+		require.NoError(suite.T(), listener.Close())
+	}()
 
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
 	blockedCallCh := unittest.RequireNeverReturnBefore(suite.T(),
@@ -369,7 +373,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 			_, err := goodPeers[0].CreateStream(suite.ctx, goodAddrs[1])
 			require.NoError(suite.T(), err)
 		},
-		1*time.Second, "creating stream to a responsive node failed while concurrently blocked on an unresponsive node")
+		1 *time.Second, "creating stream to a responsive node failed while concurrently blocked on an unresponsive"+node")
 
 	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
 	// good address
