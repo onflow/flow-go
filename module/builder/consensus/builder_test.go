@@ -119,10 +119,9 @@ func (bs *BuilderSuite) createAndRecordBlock(previous *flow.Block) *flow.Block {
 			// ATTENTION:
 			// Here, IncorporatedBlockID should be set to block.ID(), because
 			// that is the first block on its fork in which the ExecutionResult
-			// is contained. However, in phase 2 of the sealing roadmap, the
-			// consensus matching engine is still manually setting the
-			// IncorporatedBlockID of all IncorporatedResults to the block that
-			// the result commits to. This will be changed in phase 3.
+			// is contained. However, in phase 2 of the sealing roadmap, we are
+			// still using a temporary sealing logic where the
+			// IncorporatedBlockID is expected to be the result's block ID.
 			IncorporatedBlockID: previousResult.BlockID,
 			Result:              previousResult,
 		}

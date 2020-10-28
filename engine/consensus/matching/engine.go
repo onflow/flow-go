@@ -281,13 +281,19 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
 	// store the result belonging to the receipt in the memory pool
-	// TODO: This is a temporary step. In future, the incorporated results
-	// mempool will be populated by the finalizer when blocks are validated, and
-	// the IncorporatedBlockID will be the ID of the first block on its fork
-	// that contains a receipt committing to this result.
+	//
+	// ATTENTION:
+	//
+	// In phase 2, we artificially create IncorporatedResults from incoming
+	// receipts and set the IncorporatedBlockID to the result's block ID.
+	//
+	// In phase 3, the incorporated results mempool will be populated by the
+	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
+	// will be the ID of the first block on its fork that contains a receipt
+	// committing to this result.
 	added, err = e.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
-			receipt.ExecutionResult.BlockID, // TODO: should be incorporated block
+			receipt.ExecutionResult.BlockID,
 			&receipt.ExecutionResult,
 		),
 	)

@@ -192,7 +192,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node := GenericNode(t, hub, identity, identities, chainID)
 
-	sealedResultsDB := storage.NewExecutionResults(node.DB)
+	resultsDB := storage.NewExecutionResults(node.DB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -230,7 +230,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		node.Me,
 		requesterEng,
-		sealedResultsDB,
+		resultsDB,
 		node.Headers,
 		node.Index,
 		results,

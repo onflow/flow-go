@@ -397,10 +397,9 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 				// ATTENTION:
 				// Here, IncorporatedBlockID should be set to ancestorID,
 				// because that is the block in which the ExecutionResult is
-				// contained. However, in phase 2 of the sealing roadmap, the
-				// consensus matching engine is still manually setting the
-				// IncorporatedBlockID to the block that the result commits to.
-				// This will be changed in phase 3.
+				// contained. However, in phase 2 of the sealing roadmap, we are
+				// still using a temporary sealing logic where the
+				// IncorporatedBlockID is expected to be the result's block ID.
 				IncorporatedBlockID: receipt.ExecutionResult.BlockID,
 				Result:              &receipt.ExecutionResult,
 			}
