@@ -202,18 +202,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	connectPeerGate := make(chan time.Time)
 	defer close(connectPeerGate)
 
-	// creates mock connector
-	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
-	// we expect it to be called twice, i.e.,
-	// one for periodic update and one for the on-demand request
-	count, times := 0, 2
-	wg.Add(times)
-	connector.On("ConnectPeers", ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		if count < times {
-			count++
-			wg.Done()
-		}
-	}).Return(nil).
+	connector.On("ConnectPeers", ctx, testifymock.Anything).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
 	connector.On("DisconnectPeers", ctx, testifymock.Anything).Return(nil)
 	pm := NewPeerManager(ctx, suite.log, idProvider, connector)
@@ -235,8 +224,9 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	connectPeerGate <- time.Now()
 
 	// requires two calls to ConnectPeers were made
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 10*time.Second,
-		"required invocations on ConnectedPeers did not happen")
+	assert.Eventually(suite.T(), func() bool {
+		return connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 2)
+	}, 1*time.Second, 100*time.Millisecond)
 }
 
 // assertListsEqual asserts that two identity list are equal ignoring the order
