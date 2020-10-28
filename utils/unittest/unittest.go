@@ -88,6 +88,42 @@ func RequireConcurrentCallsReturnBefore(t *testing.T, f func(), count int, durat
 	RequireReturnsBefore(t, wg.Wait, duration, message)
 }
 
+// RequireNeverReturnBefore is a test helper that tries invoking function `f` and fails the test if either:
+// - function `f` is not invoked within 1 second.
+// - function `f` returns before specified `duration`.
+//
+// It also returns a channel that is closed once the function `f` returns and hence its openness can evaluate
+// return status of function `f` for intervals longer than duration.
+func RequireNeverReturnBefore(t *testing.T, f func(), duration time.Duration, message string) <-chan struct{} {
+	ch := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		wg.Done()
+		f()
+		close(ch)
+	}()
+
+	// requires function invoked within next 1 second
+	RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not invoke the function: "+message)
+
+	// requires function never returns within duration
+	RequireNeverClosedWithin(t, ch, duration, "unexpected return: "+message)
+
+	return ch
+}
+
+// RequireNeverClosedWithin is a test helper function that fails the test if channel `ch` is closed before the
+// determined duration.
+func RequireNeverClosedWithin(t *testing.T, ch <-chan struct{}, duration time.Duration, message string) {
+	select {
+	case <-time.After(duration):
+	case <-ch:
+		require.Fail(t, "channel closed before timeout: "+message)
+	}
+}
+
 // AssertErrSubstringMatch asserts that two errors match with substring
 // checking on the Error method (`expected` must be a substring of `actual`, to
 // account for the actual error being wrapped). Fails the test if either error
