@@ -70,7 +70,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 }
 
 func (a *Accounts) Exists(address flow.Address) (bool, error) {
-	exists, err := a.get(address, false, keyExists)
+	exists, err := a.getValue(address, false, keyExists)
 	if err != nil {
 		return false, newLedgerGetError(keyExists, address, err)
 	}
@@ -98,12 +98,12 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 	}
 
 	// mark that this account exists
-	err = a.set(newAddress, false, keyExists, []byte{1})
+	err = a.setValue(newAddress, false, keyExists, []byte{1})
 	if err != nil {
 		return err
 	}
 
-	err = a.set(newAddress, true, keyCode, nil)
+	err = a.setValue(newAddress, true, keyCode, nil)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 }
 
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
-	publicKey, err := a.get(address, true, keyPublicKey(keyIndex))
+	publicKey, err := a.getValue(address, true, keyPublicKey(keyIndex))
 	if err != nil {
 		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
 	}
@@ -130,7 +130,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 }
 
 func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
-	countBytes, err := a.get(address, true, keyPublicKeyCount)
+	countBytes, err := a.getValue(address, true, keyPublicKeyCount)
 	if err != nil {
 		return 0, newLedgerGetError(keyPublicKeyCount, address, err)
 	}
@@ -153,12 +153,12 @@ func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 func (a *Accounts) SetPublicKeyCount(address flow.Address, count uint64) error {
 	newCount := new(big.Int).SetUint64(count)
 
-	return a.set(address, true, keyPublicKeyCount, newCount.Bytes())
+	return a.setValue(address, true, keyPublicKeyCount, newCount.Bytes())
 }
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
 	var countBytes []byte
-	countBytes, err = a.get(address, true, keyPublicKeyCount)
+	countBytes, err = a.getValue(address, true, keyPublicKeyCount)
 	if err != nil {
 		return nil, newLedgerGetError(keyPublicKeyCount, address, err)
 	}
@@ -207,7 +207,7 @@ func (a *Accounts) SetPublicKey(
 		return nil, fmt.Errorf("failed to encode public key: %w", err)
 	}
 
-	err = a.set(address, true, keyPublicKey(keyIndex), encodedPublicKey)
+	err = a.setValue(address, true, keyPublicKey(keyIndex), encodedPublicKey)
 
 	return encodedPublicKey, err
 }
@@ -242,7 +242,7 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 
 func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
 
-	code, err := a.get(address, true, keyCode)
+	code, err := a.getValue(address, true, keyCode)
 	if err != nil {
 		return nil, newLedgerGetError(keyCode, address, err)
 	}
@@ -251,7 +251,6 @@ func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
 }
 
 func (a *Accounts) TouchCode(address flow.Address) {
-
 	a.touch(address, true, keyCode)
 }
 
@@ -266,7 +265,7 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 	}
 
 	var prevCode []byte
-	prevCode, err = a.get(address, true, keyCode)
+	prevCode, err = a.getValue(address, true, keyCode)
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
@@ -276,7 +275,7 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 		return nil
 	}
 
-	err = a.set(address, true, keyCode, code)
+	err = a.setValue(address, true, keyCode, code)
 	if err != nil {
 		return err
 	}
@@ -285,7 +284,7 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 }
 
 func (a *Accounts) GetStorageUsed(owner flow.Address) (uint64, error) {
-	oldSizeRegister, err := a.get(owner, false, storageUsedRegisterName)
+	oldSizeRegister, err := a.getValue(owner, false, storageUsedRegisterName)
 	if err != nil {
 		return 0, err
 	}
@@ -301,10 +300,26 @@ func (a *Accounts) GetStorageUsed(owner flow.Address) (uint64, error) {
 func (a *Accounts) setStorageUsed(owner flow.Address, used uint64) error {
 	buffer := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buffer, used)
-	return a.set(owner, false, storageUsedRegisterName, buffer)
+	return a.setValue(owner, false, storageUsedRegisterName, buffer)
 }
 
-func (a *Accounts) set(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
+func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
+	return a.getValue(address, false, key)
+}
+
+func (a *Accounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
+	if isController {
+		return a.ledger.Get(string(address.Bytes()), string(address.Bytes()), key)
+	} else {
+		return a.ledger.Get(string(address.Bytes()), "", key)
+	}
+}
+
+func (a *Accounts) SetValue(address flow.Address, key string, value flow.RegisterValue) error {
+	return a.setValue(address, false, key, value)
+}
+
+func (a *Accounts) setValue(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
 	err := a.updateRegisterSizeChange(address, isController, key, value)
 	if err != nil {
 		return err
@@ -322,7 +337,7 @@ func (a *Accounts) updateRegisterSizeChange(owner flow.Address, isController boo
 		// size of this register is always 8
 		return nil
 	}
-	oldValue, err := a.get(owner, isController, key)
+	oldValue, err := a.getValue(owner, isController, key)
 	if err != nil {
 		return err
 	}
@@ -369,14 +384,6 @@ func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 		a.ledger.Touch(string(address.Bytes()), string(address.Bytes()), key)
 	} else {
 		a.ledger.Touch(string(address.Bytes()), "", key)
-	}
-}
-
-func (a *Accounts) get(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
-	if isController {
-		return a.ledger.Get(string(address.Bytes()), string(address.Bytes()), key)
-	} else {
-		return a.ledger.Get(string(address.Bytes()), "", key)
 	}
 }
 
