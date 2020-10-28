@@ -52,6 +52,7 @@ type TransactionValidationOptions struct {
 	// transactions referencing an address with index newer than the specified
 	// maximum. A zero value indicates no address checking.
 	MaxAddressIndex uint64
+	MaxTxSizeLimit  uint64
 }
 
 type TransactionValidator struct {
@@ -73,6 +74,11 @@ func NewTransactionValidator(
 }
 
 func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
+	err = v.checkTxSizeLimit(tx)
+	if err != nil {
+		return err
+	}
+
 	err = v.checkMissingFields(tx)
 	if err != nil {
 		return err
@@ -100,6 +106,17 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 		return err
 	}
 
+	return nil
+}
+
+func (v *TransactionValidator) checkTxSizeLimit(tx *flow.TransactionBody) error {
+	txSize := uint64(tx.ByteSize())
+	if txSize > v.options.MaxTxSizeLimit {
+		return InvalidTxByteSizeError{
+			Actual:  txSize,
+			Maximum: v.options.MaxTxSizeLimit,
+		}
+	}
 	return nil
 }
 

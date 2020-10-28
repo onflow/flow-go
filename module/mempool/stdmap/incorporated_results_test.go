@@ -20,7 +20,8 @@ func TestIncorporatedResults(t *testing.T) {
 		require.NoError(t, err)
 
 		// check the existence of incorporated result
-		res, incorporatedResults := pool.ByResultID(ir1.Result.ID())
+		res, incorporatedResults, found := pool.ByResultID(ir1.Result.ID())
+		require.True(t, found)
 		require.Equal(t, ir1.Result, res)
 		require.Contains(t, incorporatedResults, ir1.IncorporatedBlockID)
 	})
@@ -35,7 +36,8 @@ func TestIncorporatedResults(t *testing.T) {
 		require.NoError(t, err)
 
 		// check the existence of incorporated result
-		res, incorporatedResults := pool.ByResultID(ir2.Result.ID())
+		res, incorporatedResults, found := pool.ByResultID(ir2.Result.ID())
+		require.True(t, found)
 		require.Equal(t, ir1.Result, res)
 		require.Contains(t, incorporatedResults, ir1.IncorporatedBlockID)
 		require.Contains(t, incorporatedResults, ir2.IncorporatedBlockID)
@@ -48,7 +50,8 @@ func TestIncorporatedResults(t *testing.T) {
 		require.NoError(t, err)
 
 		// check the existence of incorporated result
-		res, incorporatedResults := pool.ByResultID(ir3.Result.ID())
+		res, incorporatedResults, found := pool.ByResultID(ir3.Result.ID())
+		require.True(t, found)
 		require.Equal(t, ir3.Result, res)
 		require.Contains(t, incorporatedResults, ir3.IncorporatedBlockID)
 	})
@@ -64,7 +67,8 @@ func TestIncorporatedResults(t *testing.T) {
 		ok := pool.Rem(ir1)
 		require.True(t, ok)
 
-		res, incorporatedResults := pool.ByResultID(ir1.Result.ID())
+		res, incorporatedResults, found := pool.ByResultID(ir1.Result.ID())
+		require.True(t, found)
 		require.Equal(t, ir1.Result, res)
 		require.Contains(t, incorporatedResults, ir2.IncorporatedBlockID)
 	})

@@ -60,6 +60,7 @@ func New(
 			MaxGasLimit:                  flow.DefaultMaxGasLimit,
 			MaxAddressIndex:              config.MaxAddressIndex,
 			CheckScriptsParse:            config.CheckScriptsParse,
+			MaxTxSizeLimit:               flow.DefaultMaxTxSizeLimit,
 		},
 	)
 
