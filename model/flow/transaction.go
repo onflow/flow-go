@@ -408,7 +408,9 @@ type ProposalKey struct {
 
 // ByteSize returns the byte size of the proposal key
 func (p ProposalKey) ByteSize() int {
-	return len(p.Address) + 8 + 8
+	keyIDLen := 8
+	sequenceNumberLen := 8
+	return len(p.Address) + keyIDLen + sequenceNumberLen
 }
 
 // A TransactionSignature is a signature associated with a specific account key.
@@ -421,7 +423,9 @@ type TransactionSignature struct {
 
 // ByteSize returns the byte size of the transaction signature
 func (s TransactionSignature) ByteSize() int {
-	return len(s.Address) + 8 + 8 + len(s.Signature)
+	signerIndexLen := 8
+	keyIDLen := 8
+	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature)
 }
 
 func (s TransactionSignature) Fingerprint() []byte {

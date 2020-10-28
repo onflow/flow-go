@@ -57,6 +57,7 @@ func New(
 			AllowUnknownReferenceBlockID: config.AllowUnknownReference,
 			MaxGasLimit:                  flow.DefaultMaxGasLimit,
 			CheckScriptsParse:            config.CheckScriptsParse,
+			MaxTxSizeLimit:               flow.DefaultMaxTxSizeLimit,
 		},
 	)
 
