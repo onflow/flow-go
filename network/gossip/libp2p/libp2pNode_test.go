@@ -351,29 +351,19 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 
 	// create a silent node which never replies
 	listener, silentNodeAddress := newSilentNode(suite.T())
-	defer listener.Close()
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	ch := make(chan struct{})
-	// spin off a go routine to create a stream to the unresponsive node
-	go func() {
-		wg.Done()
-		_, _ = goodPeers[0].CreateStream(suite.ctx, silentNodeAddress) // this call will block
-		close(ch)
+	defer func() {
+		require.NoError(suite.T(), listener.Close())
 	}()
 
-	// make sure the go routine to create a stream with the unresponsive node actually started
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "creating stream to unresponsive node")
-	// make sure the go routine to create a stream did not finish
-	select {
-	case <-time.After(1 * time.Second):
-	case <-ch:
-		assert.Fail(suite.T(), "CreateStream attempt to the unresponsive peer did not block")
-	}
+	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
+	streamCreated := unittest.RequireNeverReturnBefore(suite.T(),
+		func() {
+			_, _ = goodPeers[0].CreateStream(suite.ctx, silentNodeAddress) // this call will block
+		},
+		1*time.Second,
+		"CreateStream attempt to the unresponsive peer did not block")
 
-	// assert that the same peer can still connect to the other regular peer without being blocked
+	// requires same peer can still connect to the other regular peer without being blocked
 	unittest.RequireReturnsBefore(suite.T(),
 		func() {
 			_, err := goodPeers[0].CreateStream(suite.ctx, goodAddrs[1])
@@ -381,13 +371,11 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 		},
 		1*time.Second, "creating stream to a good node")
 
-	// assert that the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
+	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
 	// good address
-	select {
-	case <-ch:
-		assert.Fail(suite.T(), "CreateStream attempt to the unresponsive peer did not block")
-	default:
-	}
+	unittest.RequireNeverClosedWithin(suite.T(), streamCreated, 1*time.Millisecond,
+		"CreateStream attempt to the unresponsive peer did not block after connecting to good node")
+
 }
 
 // TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
@@ -409,6 +397,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 		assert.NoError(suite.T(), err) // assert that stream was successfully created
 		wg.Done()
 	}
+
 	// kick off 10 concurrent calls to CreateStream
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -485,13 +474,13 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 		wg.Wait()
 
 		// wait for the message to be received
-		select {
-		case rcv := <-ch:
-			require.Equal(suite.T(), msg, rcv)
-		case <-time.After(10 * time.Second):
-			require.Fail(suite.T(), fmt.Sprintf("message %s not received", msg))
-			break
-		}
+		unittest.RequireReturnsBefore(suite.T(),
+			func() {
+				rcv := <-ch
+				require.Equal(suite.T(), msg, rcv)
+			},
+			10*time.Second,
+			fmt.Sprintf("message %s not received", msg))
 	}
 }
 
