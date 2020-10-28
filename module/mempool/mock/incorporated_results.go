@@ -51,7 +51,7 @@ func (_m *IncorporatedResults) All() []*flow.IncorporatedResult {
 }
 
 // ByResultID provides a mock function with given fields: resultID
-func (_m *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult) {
+func (_m *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult, bool) {
 	ret := _m.Called(resultID)
 
 	var r0 *flow.ExecutionResult
@@ -72,7 +72,14 @@ func (_m *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.Execu
 		}
 	}
 
-	return r0, r1
+	var r2 bool
+	if rf, ok := ret.Get(2).(func(flow.Identifier) bool); ok {
+		r2 = rf(resultID)
+	} else {
+		r2 = ret.Get(2).(bool)
+	}
+
+	return r0, r1, r2
 }
 
 // Rem provides a mock function with given fields: incorporatedResult
