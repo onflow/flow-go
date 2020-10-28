@@ -328,7 +328,7 @@ func (ms *MatchingSuite) SetupTest() {
 		seals:                   ms.sealsPL,
 		checkingSealing:         atomic.NewBool(false),
 		requestReceiptThreshold: 10,
-		maxUnsealedResults:      200,
+		maxResultsToRequest:     200,
 		assigner:                ms.assigner,
 		requireApprovals:        true,
 	}
