@@ -474,12 +474,12 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	suite.Require().Nil(err)
 	builtCollection := built.Payload.Collection
 
-	// should be only 1 transaction in the collection
+	// should be only 2 transactions in the collection, since each tx is ~273 bytes and the limit is 600 bytes
 	suite.Assert().Equal(builtCollection.Len(), 2)
 }
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
-	// set the max gas to 200,000
+	// set the max gas to 20,000
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(20000))
 
 	// build a block
@@ -492,7 +492,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	suite.Require().Nil(err)
 	builtCollection := built.Payload.Collection
 
-	// should be only 1 transaction in the collection
+	// should be only 2 transactions in collection, since each transaction has gas limit of 9,999 and collection limit is set to 20,000
 	suite.Assert().Equal(builtCollection.Len(), 2)
 }
 
