@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +30,9 @@ var rootBlockID string
 // allocatedPorts keeps track of ports allocated to different tests
 var allocatedPorts map[int]struct{}
 
+// mu makes allocatedPorts access concurrency safe
+var mu sync.Mutex
+
 // init is a built-in golang function getting called first time this
 // package is imported. It initializes package-scoped variables.
 func init() {
@@ -38,6 +42,9 @@ func init() {
 
 // getFreePorts finds `n` free ports on the machine and marks them as allocated.
 func getFreePorts(t *testing.T, n int) []int {
+	mu.Lock()
+	defer mu.Unlock()
+
 	ports := make([]int, n)
 	// keeps track of discovered ports
 	for count := 0; count < n; {
