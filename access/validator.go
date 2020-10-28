@@ -67,6 +67,7 @@ func NewTransactionValidator(
 ) *TransactionValidator {
 	return &TransactionValidator{
 		blocks:  blocks,
+		chain:   chain,
 		options: options,
 	}
 }

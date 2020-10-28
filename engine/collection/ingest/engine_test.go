@@ -117,7 +117,8 @@ func (suite *Suite) SetupTest() {
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), 1, epoch)
 
 	suite.conf = DefaultConfig()
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pools, suite.conf)
+	chain := flow.Testnet.Chain()
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
 	suite.Require().Nil(err)
 }
 

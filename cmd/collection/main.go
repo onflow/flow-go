@@ -231,6 +231,7 @@ func main() {
 				node.Metrics.Engine,
 				colMetrics,
 				node.Me,
+				node.RootChainID.Chain(),
 				pools,
 				ingestConf,
 			)
