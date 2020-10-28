@@ -224,7 +224,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// Thereby we rely on the networking layer for enforcing message integrity via the
 	// networking key.
 	// Unfortunately, this shortcut is _not_ applicable here for the following reason.
-	// Execution Nodes sync state between each other and have the ability so skip computing
+	// Execution Nodes sync state between each other and have the ability to skip computing
 	// blocks. They could build on top of other nodes' execution results. When an Execution
 	// Node receives a request for a block it hasn't itself computed, it will forward
 	// receipts from other nodes (which it potentially used to continue its own computation).
@@ -266,7 +266,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// resultsDB is persistent storage while Mempools are in-memory only.
 	// After a crash, the replica still needs to be able to generate a seal
 	// for an Result even if it had stored the Result before the crash.
-	// Otherwise, liveness of sealing is undermined.
+	// Otherwise, a stored result might never get sealed, and 
+	// liveness of sealing is undermined.
 
 	// store the result belonging to the receipt in the memory pool
 	// TODO: This is a temporary step. In future, the incorporated results
