@@ -21,7 +21,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	input := make([]byte, 100)
 	mrand.Seed(time.Now().UnixNano())
 
-	loops := 50
+	loops := 3
 	for j := 0; j < loops; j++ {
 		n, err := mrand.Read(seed)
 		require.Equal(t, n, seedMinLength)

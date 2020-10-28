@@ -3,7 +3,7 @@
 package crypto
 
 // BLS signature scheme implementation using BLS12-381 curve
-// ([zcash]https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#bls12-381)
+// ([zcash]https://electriccoin.co/blog/new-snark-curve/)
 // Pairing, ellipic curve and modular arithmetic is using Relic library.
 // This implementation does not include any security against side-channel attacks.
 
@@ -11,7 +11,7 @@ package crypto
 //  - the implementation is optimized for shorter signatures (on G1)
 //  - public keys are longer (on G2)
 //  - serialization of points on G1 and G2 is compressed ([zcash]
-//     https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization)
+//     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
 //  - hash to curve is using the optimized SWU map
 //    (https://eprint.iacr.org/2019/403.pdf section 4)
 //  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag

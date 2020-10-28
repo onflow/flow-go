@@ -48,10 +48,10 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * supports NIST P-256 (secp256r1) and secp256k1 curves.
 
  * BLS
-    * supports [BLS 12-381](https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md) curve.
+    * supports [BLS 12-381](https://electriccoin.co/blog/new-snark-curve/) curve.
     * is optimized for shorter signatures (on G1) 
     * public keys are longer (on G2)
-    * supports [compressed](https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization) and uncompressed serialization of G1/G2 points.
+    * supports [compressed](https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) and uncompressed serialization of G1/G2 points.
     * hash to curve is using the [optimized SWU map](https://eprint.iacr.org/2019/403.pdf).
     * expanding the message is using KMAC 128 with a domain separation tag.
     * signature verification includes the signature membership check in G1. 
