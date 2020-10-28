@@ -15,7 +15,7 @@ static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
 	fp_null(t2);
 	fp_null(t3);
 
-	TRY {
+	RLC_TRY {
 		fp_new(t0);
 		fp_new(t1);
 		fp_new(t2);
@@ -74,12 +74,12 @@ static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
 			fp_neg(p->y, p->y);
 		}
 		fp_set_dig(p->z, 1);
-		p->norm = 1;
+		p->coord = BASIC;
 	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+	RLC_CATCH_ANY {
+		RLC_THROW(ERR_CAUGHT);
 	}
-	FINALLY {
+	RLC_FINALLY {
 		fp_free(t0);
 		fp_free(t1);
 		fp_free(t2);
@@ -103,7 +103,7 @@ static void map_to_G1_swu(ep_t p, const uint8_t *digest, const int len) {
 	fp_null(t);
 	ep_null(q);
 
-	TRY {
+	RLC_TRY {
 		bn_new(k);
 		bn_new(pm1o2);
 		fp_new(t);
@@ -136,10 +136,10 @@ static void map_to_G1_swu(ep_t p, const uint8_t *digest, const int len) {
             ep_mul(p, p, k);
         }
 	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+	RLC_CATCH_ANY {
+		RLC_THROW(ERR_CAUGHT);
 	}
-	FINALLY {
+	RLC_FINALLY {
 		bn_free(k);
 		bn_free(pm1o2);
 		fp_free(t);
@@ -161,7 +161,7 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 	fp_null(t);
 	ep_null(q);
 
-	TRY {
+	RLC_TRY {
 		bn_new(k);
 		bn_new(pm1o2);
 		fp_new(t);
@@ -183,7 +183,7 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
         while (1) {
             ep_rhs(t, p);
             if (fp_srt(p->y, t)) {
-                p->norm = 1;
+                p->coord = BASIC;
                 break;
             }
             fp_add_dig(p->x, p->x, 1);
@@ -197,10 +197,10 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
             ep_mul_basic(p, p, k);
         }
 	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+	RLC_CATCH_ANY {
+		RLC_THROW(ERR_CAUGHT);
 	}
-	FINALLY {
+	RLC_FINALLY {
 		bn_free(k);
 		bn_free(pm1o2);
 		fp_free(t);
@@ -430,7 +430,7 @@ static inline void map_to_E1_swu(ep_t p, const fp_t t) {
     fp_mul(p->x, fp_tmp[2], fp_tmp[1]);  // X = N*D
     fp_mul(p->y, fp_tmp[5], fp_tmp[3]);  // Y = y*D^3
     fp_copy(p->z, fp_tmp[1]);
-    p->norm = 0;
+    p->coord = BASIC;
     
     for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
     free(fp_tmp);
@@ -533,7 +533,7 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     fp_sqr(fp_tmp[12], r->z);                // Zo^2
     fp_mul(r->y, fp_tmp[16], fp_tmp[14]);  // Ny Dx
     fp_mul(r->y, r->y, fp_tmp[12]);   // Yo = Ny Dx Zo^2
-    r->norm = 0;
+    r->coord = JACOB;
     
     for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
     free(fp_tmp);
@@ -556,9 +556,9 @@ static void clear_cofactor(ep_t out, const ep_t in) {
 // the result is stored in p
 // msg is the input message to hash, must be at least 2*(FP_BYTES+16) = 128 bytes
 static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
-    TRY {
+    RLC_TRY {
         if (len < 2*(Fp_BYTES+16)) {
-            THROW(ERR_NO_BUFFER);
+            RLC_THROW(ERR_NO_BUFFER);
         }
 
         fp_t t1, t2;
@@ -572,22 +572,28 @@ static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
 
         ep_t p_temp;
         ep_new(p_temp);
+        // first mapping
         map_to_E1_swu(p_temp, t1); // map to E1
+        eval_iso11(p_temp, p_temp); // map to E
+        // second mapping
         map_to_E1_swu(p, t2); // map to E1
-        ep_add_projc(p, p, p_temp);
-        eval_iso11(p_temp, p); // map to E
+        eval_iso11(p, p); // map to E
+        // sum and clear the cofactor
+        // TODO: implement point addition in E1 and apply the isogeny map
+        // only once.
+        ep_add_jacob(p, p, p_temp);
         clear_cofactor(p, p_temp); // map to G1
         ep_free(p_temp);
     }
-    CATCH_ANY {
-		THROW(ERR_CAUGHT);
+    RLC_CATCH_ANY {
+		RLC_THROW(ERR_CAUGHT);
 	}
 }
 
 // This is a testing funstion for the Optimized SwU core
 void opswu_test(uint8_t *out, const uint8_t *msg, int len){
     if (len != Fp_BYTES) {
-            THROW(ERR_NO_BUFFER);
+            RLC_THROW(ERR_NO_BUFFER);
     }
     fp_t t;
     bn_t tmp;

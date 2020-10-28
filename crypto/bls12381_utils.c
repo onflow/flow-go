@@ -108,12 +108,8 @@ void seed_relic(byte* seed, int len) {
 
 // Exponentiation of a generic point p in G1
 void ep_mult(ep_t res, const ep_t p, const bn_t expo) {
-    // Using window NAF of size 2
-    #if (EP_MUL	== LWNAF)
-        g1_mul(res, p, expo);
-    #else 
-        ep_mul_lwnaf(res, p, expo);
-    #endif
+    // Using window NAF of size 2 
+    ep_mul_lwnaf(res, p, expo);
 }
 
 // Exponentiation of generator g1 in G1
@@ -126,18 +122,14 @@ void ep_mult_gen(ep_t res, const bn_t expo) {
     ep_mult(res, &core_get()->ep_g, expo);
 #elif FIXED_MULT
     // Using precomputed table of size 4
-    g1_mul_gen(res, expo);
+    ep_mul_gen(res, (bn_st *)expo);
 #endif
 }
 
 // Exponentiation of a generic point p in G2
 void ep2_mult(ep2_t res, ep2_t p, bn_t expo) {
     // Using window NAF of size 2
-    #if (EP_MUL	== LWNAF)
-        g2_mul(res, p, expo);
-    #else 
-        ep2_mul_lwnaf(res, p, expo);
-    #endif
+    ep2_mul_lwnaf(res, p, expo);
 }
 
 // Exponentiation of fixed g2 in G2
@@ -258,7 +250,7 @@ static int ep_upk_generic(ep_t r, const ep_t p) {
     fp_t t;
     int result = 0;
     fp_null(t);
-    TRY {
+    RLC_TRY {
         fp_new(t);
         ep_rhs(t, p);
         /* t0 = sqrt(x1^3 + a * x1 + b). */
@@ -282,13 +274,13 @@ static int ep_upk_generic(ep_t r, const ep_t p) {
             fp_copy(r->x, p->x);
             fp_copy(r->y, t);
             fp_set_dig(r->z, 1);
-            r->norm = 1;
+            r->coord = BASIC;
         }
     }
-    CATCH_ANY {
-        THROW(ERR_CAUGHT);
+    RLC_CATCH_ANY {
+        RLC_THROW(ERR_CAUGHT);
     }
-    FINALLY {
+    RLC_FINALLY {
         fp_free(t);
     }
     return result;
@@ -312,7 +304,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     const int G1size = (G1_BYTES/(SERIALIZATION+1));
 
     if (len!=G1size) {
-        THROW(ERR_NO_BUFFER);
+        RLC_THROW(ERR_NO_BUFFER);
         return;
     }
  
@@ -323,7 +315,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
             return;
     }
 
-    TRY {
+    RLC_TRY {
         ep_new(t);
         ep_norm(t, a);
         fp_write_bin(bin, Fp_BYTES, t->x);
@@ -333,8 +325,8 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
         } else {
             fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
         }
-    } CATCH_ANY {
-        THROW(ERR_CAUGHT);
+    } RLC_CATCH_ANY {
+        RLC_THROW(ERR_CAUGHT);
     }
 
     bin[0] |= (SERIALIZATION << 7);
@@ -374,11 +366,11 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
         return RLC_ERR;
     } 
 
-	a->norm = 1;
+	a->coord = BASIC;
 	fp_set_dig(a->z, 1);
     byte* temp = (byte*)malloc(Fp_BYTES);
     if (!temp) {
-        THROW(ERR_NO_MEMORY);
+        RLC_THROW(ERR_NO_MEMORY);
         return RLC_ERR;
     }
     memcpy(temp, bin, Fp_BYTES);
@@ -411,7 +403,7 @@ static  int ep2_upk_generic(ep2_t r, ep2_t p) {
     fp2_t t;
     int result = 0;
     fp2_null(t);
-    TRY {
+    RLC_TRY {
         fp2_new(t);
         ep2_rhs(t, p);
         /* t0 = sqrt(x1^3 + a * x1 + b). */
@@ -436,13 +428,13 @@ static  int ep2_upk_generic(ep2_t r, ep2_t p) {
             fp2_copy(r->y, t);
             fp_set_dig(r->z[0], 1);
             fp_zero(r->z[1]);
-            r->norm = 1;
+            r->coord = BASIC;
         }
     }
-    CATCH_ANY {
-        THROW(ERR_CAUGHT);
+    RLC_CATCH_ANY {
+        RLC_THROW(ERR_CAUGHT);
     }
-    FINALLY {
+    RLC_FINALLY {
         fp2_free(t);
     }
     return result;
@@ -460,7 +452,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
 
     if (len!=G2size) {
-        THROW(ERR_NO_BUFFER);
+        RLC_THROW(ERR_NO_BUFFER);
         return;
     }
  
@@ -471,7 +463,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
             return;
     }
 
-    TRY {
+    RLC_TRY {
         ep2_new(t);
         ep2_norm(t, (ep2_st *)a);
         fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
@@ -481,8 +473,8 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
         } else {
             fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
         }
-    } CATCH_ANY {
-        THROW(ERR_CAUGHT);
+    } RLC_CATCH_ANY {
+        RLC_THROW(ERR_CAUGHT);
     }
 
     bin[0] |= (SERIALIZATION << 7);
@@ -516,12 +508,12 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     if (y_is_odd && (!compressed)) {
         return RLC_ERR;
     } 
-	a->norm = 1;
+	a->coord = BASIC;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
     byte* temp = (byte*)malloc(2*Fp_BYTES);
     if (!temp) {
-        THROW(ERR_NO_MEMORY);
+        RLC_THROW(ERR_NO_MEMORY);
         return RLC_ERR;
     }
     memcpy(temp, bin, 2*Fp_BYTES);
@@ -580,7 +572,7 @@ void ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len){
 void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
     ep_set_infty(jointx);
     for (int i=0; i<len; i++){
-        ep_add_projc(jointx, jointx, &x[i]);
+        ep_add_jacob(jointx, jointx, &x[i]);
     }
 }
 
@@ -711,7 +703,7 @@ void ep_rand_G1(ep_t p) {
 // generates a random point in E1\G1 and stores it in p
 void ep_rand_G1complement(ep_t p) {
     // generate a random point in E1
-    p->norm = 1;
+    p->coord = BASIC;
     fp_set_dig(p->z, 1);
     do {
         fp_rand(p->x); // set x to a random field element
@@ -735,7 +727,7 @@ int subgroup_check_G1_test(int inG1, int method) {
 	if (inG1) ep_rand_G1(p); // p in G1
 	else ep_rand_G1complement(p); // p in E1\G1
 
-    if (!ep_is_valid(p)) { // sanity check to make sure p is in E1
+    if (!ep_on_curve(p)) { // sanity check to make sure p is in E1
         return UNDEFINED; // this should not happen
     }
         

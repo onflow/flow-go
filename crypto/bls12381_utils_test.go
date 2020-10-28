@@ -56,7 +56,6 @@ func TestG1(t *testing.T) {
 	randZr(&expo)
 	var res pointG1
 	genScalarMultG1(&res, &expo)
-
 }
 
 // G1 bench
