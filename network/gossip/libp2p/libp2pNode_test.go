@@ -90,7 +90,7 @@ func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 
 	for _, tc := range tt {
 		actualAddress := MultiaddressStr(tc.address)
-		assert.Equal(suite.Suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
+		assert.Equal(suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 
 }
@@ -101,7 +101,7 @@ func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 
 	// stops the created node
 	done, err := nodes[0].Stop()
-	assert.NoError(suite.Suite.T(), err)
+	assert.NoError(suite.T(), err)
 	<-done
 }
 
@@ -112,7 +112,7 @@ func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("node%d", i)
 		key, err := generateNetworkingKey(name)
-		require.NoError(suite.Suite.T(), err)
+		require.NoError(suite.T(), err)
 
 		// creates node-i address
 		address := NodeAddress{
@@ -124,13 +124,13 @@ func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 
 		// translates node-i address into info
 		info, err := GetPeerInfo(address)
-		require.NoError(suite.Suite.T(), err)
+		require.NoError(suite.T(), err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
 			rinfo, err := GetPeerInfo(address)
-			require.NoError(suite.Suite.T(), err)
-			assert.True(suite.Suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
+			require.NoError(suite.T(), err)
+			assert.True(suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
 		}
 	}
 }
@@ -146,11 +146,11 @@ func (suite *LibP2PNodeTestSuite) TestAddPeers() {
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, p := range addrs[1:] {
-		require.NoError(suite.Suite.T(), nodes[0].AddPeer(suite.ctx, p))
+		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, p))
 	}
 
 	// Checks if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.Suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
+	assert.Len(suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
 
 	// Checks whether the first node is connected to the rest
 	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
@@ -158,7 +158,7 @@ func (suite *LibP2PNodeTestSuite) TestAddPeers() {
 		if nodes[0].libP2PHost.ID().String() == peer.String() {
 			continue
 		}
-		assert.Eventuallyf(suite.Suite.T(), func() bool {
+		assert.Eventuallyf(suite.T(), func() bool {
 			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
 		}, 2*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
 	}
@@ -175,11 +175,11 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 
 	// add nodes two and three to the first node as its peers
 	for _, p := range addrs[1:] {
-		require.NoError(suite.Suite.T(), nodes[0].AddPeer(suite.ctx, p))
+		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, p))
 	}
 
 	// check if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.Suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
+	assert.Len(suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
 
 	// check whether the first node is connected to the rest
 	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
@@ -187,17 +187,17 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 		if nodes[0].libP2PHost.ID().String() == peer.String() {
 			continue
 		}
-		assert.Eventually(suite.Suite.T(), func() bool {
+		assert.Eventually(suite.T(), func() bool {
 			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
 		}, 2*time.Second, tickForAssertEventually)
 	}
 
 	// disconnect from each peer and assert that the connection no longer exists
 	for _, p := range addrs[1:] {
-		require.NoError(suite.Suite.T(), nodes[0].RemovePeer(suite.ctx, p))
+		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, p))
 		pInfo, err := GetPeerInfo(p)
-		assert.NoError(suite.Suite.T(), err)
-		assert.Equal(suite.Suite.T(), network.NotConnected, nodes[0].libP2PHost.Network().Connectedness(pInfo.ID))
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), network.NotConnected, nodes[0].libP2PHost.Network().Connectedness(pInfo.ID))
 	}
 }
 
@@ -594,7 +594,7 @@ func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamH
 
 		name := fmt.Sprintf("node%d", i+1)
 		pkey, err := generateNetworkingKey(name)
-		require.NoError(suite.Suite.T(), err)
+		require.NoError(suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
 		n, nodeID := suite.CreateNode(name, pkey, "0.0.0.0", "0", rootBlockID, handler, allowList)
@@ -646,7 +646,7 @@ func (suite *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
 
 func (suite *LibP2PNodeTestSuite) StopNode(node *P2PNode) {
 	done, err := node.Stop()
-	assert.NoError(suite.Suite.T(), err)
+	assert.NoError(suite.T(), err)
 	<-done
 }
 
