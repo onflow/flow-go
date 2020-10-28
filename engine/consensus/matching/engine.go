@@ -164,13 +164,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// HandleReceipt pipes explicitely requested receipts to the process function.
+// HandleReceipt pipes explicitly requested receipts to the process function.
 // Receipts can come from this function or the receipt provider setup in the
 // engine constructor.
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
-
 	e.log.Debug().Msg("received receipt from requester engine")
 
+	// TODO: wrap following call to e.process into e.unit.Launch (?)
+	// to parallelize engines in terms of threading
 	err := e.process(originID, receipt)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not process receipt")

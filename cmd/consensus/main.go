@@ -188,7 +188,7 @@ func main() {
 				assigner,
 				requireOneApproval,
 			)
-			requesterEng.WithHandle(match.HandleReceipt) // TODO: use match.Process here (?) to parallelize engines in terms of threading
+			requesterEng.WithHandle(match.HandleReceipt)
 			return match, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
