@@ -14,8 +14,8 @@ import (
 // keygenCmd represents the key gen command
 var keygenCmd = &cobra.Command{
 	Use:   "keygen",
-	Short: "Create all keys on ansible machine for the new network",
-	Long:  ``,
+	Short: "Generate Staking and Networking keys for a list of nodes",
+	Long:  `Generate Staking and Networking keys for a list of nodes provided by the flag '--config'`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// check if out directory exists
 		exists, err := exists(flagOutdir)
