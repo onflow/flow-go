@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,23 +32,24 @@ var (
 	flagGenesisTokenSupply          string
 )
 
+// PartnerStakes ...
 type PartnerStakes map[flow.Identifier]uint64
 
 // finalizeCmd represents the finalize command
 var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
-	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
-running the DKG for the generation of the random beacon keys and generating the root block, QC, execution result
-and block seal.`,
+	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon 
+	keys and generating the root block, QC, execution result and block seal.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		log.Info().Msg("collecting partner network and staking keys")
 		partnerNodes := assemblePartnerNodes()
 		log.Info().Msg("")
 
-		log.Info().Msg("generating internal private networking and staking keys")
-		internalNodes := genNetworkAndStakingKeys(partnerNodes)
+		log.Info().Msg("reading internal nodes configuration from config file")
+		var internalNodes []model.NodeConfig
+		readJSON(flagConfig, &internalNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("checking constraints on consensus/cluster nodes")
@@ -113,6 +115,12 @@ and block seal.`,
 		log.Info().Msg("constructing root execution result and block seal")
 		constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
 		log.Info().Msg("")
+
+		// print count of all nodes
+		roleCounts := nodeCountByRole(stakingNodes)
+		for role, count := range roleCounts {
+			log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
+		}
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
 	},
