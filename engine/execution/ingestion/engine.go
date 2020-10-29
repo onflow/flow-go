@@ -292,11 +292,11 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		// saving an executed block is currently not transactional, so it's possible
 		// the block is marked as executed but the receipt might not be saved during a crash.
 		// in order to mitigate this problem, we always re-execute the last executed and finalized
-		// block
-		// there is an exception, if the last executed final is a root block, then don't execute it,
+		// block.
+		// there is an exception, if the last executed block is a root block, then don't execute it,
 		// because the root has already been executed during bootstrapping phase. And re-executing
 		// a root block will fail, because the root block doesn't have a parent block, and could not
-		// get the result of it
+		// get the result of it.
 		// TODO: remove this, when saving a executed block is transactional
 		lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
 		if err != nil {
