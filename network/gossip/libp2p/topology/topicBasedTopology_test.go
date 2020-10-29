@@ -21,10 +21,11 @@ import (
 // theory assumptions behind the schemes, e.g., random oracle model of hashes
 type TopicAwareTopologyTestSuite struct {
 	suite.Suite
-	state  protocol2.State   // represents a mocked protocol state
-	ids    flow.IdentityList // represents the identity list of all nodes in the system
-	me     flow.Identity     // represents identity of single instance of node that creates topology
-	fanout uint              // represents maximum number of connections this peer allows to have
+	state    protocol2.State   // represents a mocked protocol state
+	ids      flow.IdentityList // represents the identity list of all nodes in the system
+	me       flow.Identity     // represents identity of single instance of node that creates topology
+	clusters flow.ClusterList  // represents list of cluster ids of collection nodes
+	fanout   uint              // represents maximum number of connections this peer allows to have
 }
 
 // TestTopicAwareTopologyTestSuite starts all the tests in this test suite
@@ -38,7 +39,18 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	// TODO: optimize value of fanout.
 	suite.fanout = 100
 
-	suite.ids, _ = test.GenerateIDs(suite.T(), 100, test.RunNetwork, unittest.WithAllRoles())
+	nClusters := 3
+	nCollectors := 100
+	nTotal := 1000
+
+	collectors, _ := test.GenerateIDs(suite.T(), nCollectors, test.RunNetwork, unittest.WithRole(flow.RoleCollection))
+	others, _ := test.GenerateIDs(suite.T(), nTotal, test.RunNetwork,
+		unittest.WithAllRolesExcept(flow.RoleCollection))
+	suite.ids = append(others, collectors...)
+
+	// mocks state for collector nodes topology
+	suite.state, suite.clusters = topology.CreateMockStateForCollectionNodes(suite.T(),
+		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
 
 	// takes firs id as the current nodes id
 	suite.me = *suite.ids[0]
@@ -160,4 +172,70 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		// assert that a different seed generates a different topology
 		require.NotEqual(suite.T(), previous, current)
 	}
+}
+
+func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterTopics() {
+	channelID := engine.TestNetwork
+	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+
+	for _, id := range suite.ids {
+		// creates a topic-based topology for node
+		top, err := topology.NewTopicBasedTopology(id.NodeID, suite.state)
+		require.NoError(suite.T(), err)
+
+		// samples subset of topology
+		subset, err := top.Subset(suite.ids, suite.fanout, channelID)
+		require.NoError(suite.T(), err)
+
+		channelIDAdjMap[id.NodeID] = subset
+	}
+
+	topology.CheckConnectednessByChannelID(suite.T(), channelIDAdjMap, suite.ids, channelID)
+}
+
+func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterTopics() {
+	channelID := clusterChannelIDs(suite.T())[0]
+	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+
+	// iterates over collection nodes
+	for _, id := range suite.ids.Filter(filter.HasRole(flow.RoleCollection)) {
+		// creates a topic-based topology for node
+		top, err := topology.NewTopicBasedTopology(id.NodeID, suite.state)
+		require.NoError(suite.T(), err)
+
+		// samples subset of topology
+		subset, err := top.Subset(suite.ids, suite.fanout, channelID)
+		require.NoError(suite.T(), err)
+
+		channelIDAdjMap[id.NodeID] = subset
+	}
+
+	// check that each of the collection clusters forms a connected graph
+	for _, cluster := range suite.clusters {
+		suite.checkConnectednessByCluster(suite.T(), channelIDAdjMap, cluster)
+	}
+}
+
+// clusterChannelIDs is a test helper method that returns all cluster-based channel ids.
+func clusterChannelIDs(t *testing.T) []string {
+	ccids := make([]string, 0)
+	for _, channelID := range engine.ChannelIDs() {
+		if !engine.IsClusterChannelID(channelID) {
+			continue
+		}
+		ccids = append(ccids, channelID)
+	}
+
+	require.NotEmpty(t, ccids)
+	return ccids
+}
+
+// checkConnectednessByCluster is a test helper that checks all nodes belong to a cluster are connected.
+func (suite *TopicAwareTopologyTestSuite) checkConnectednessByCluster(t *testing.T,
+	adjMap map[flow.Identifier]flow.IdentityList,
+	cluster flow.IdentityList) {
+	topology.CheckGraphConnected(t,
+		adjMap,
+		suite.ids.Filter(filter.HasRole(flow.RoleCollection)),
+		filter.In(cluster))
 }
