@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,7 +22,9 @@ type SporkingTestSuite struct {
 }
 
 func TestHardSpooningTestSuite(t *testing.T) {
-	suite.Run(t, new(SporkingTestSuite))
+	t.Skip("skip until https://github.com/onflow/flow-go/pull/99 is merged")
+	_ = SporkingTestSuite{}
+	// suite.Run(t, new(SporkingTestSuite))
 }
 
 // TestNetworkKeyChangedAfterHardSpoon tests that a node from the old chain cannot talk to a node in the new chain if it's

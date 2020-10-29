@@ -20,7 +20,9 @@ type LibP2PUtilsTestSuite struct {
 }
 
 func TestLibP2PUtilsTestSuite(t *testing.T) {
-	suite.Run(t, new(LibP2PUtilsTestSuite))
+	t.Skip("skip until https://github.com/onflow/flow-go/pull/99 is merged")
+	_ = LibP2PUtilsTestSuite{}
+	// suite.Run(t, new(LibP2PUtilsTestSuite))
 }
 
 // TestPeerInfoFromID tests that PeerInfoFromID converts a flow.Identity to peer.AddrInfo correctly
