@@ -58,6 +58,7 @@ func init() {
 		StringVar(&flagConfig, "config", "--node-config.json", "path to a JSON file containing multiple node configurations (Role, Address, Stake)")
 	_ = keygenCmd.MarkFlagRequired("config")
 
+}
 
 // isEmptyDir returns True if the directory contains children
 func isEmptyDir(path string) (bool, error) {
