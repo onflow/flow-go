@@ -34,7 +34,7 @@ var allocatedPorts map[int]struct{}
 var mu sync.Mutex
 
 // init is a built-in golang function getting called first time this
-// package is imported. It initializes package-scoped variables.
+// initialize the allocated ports map and the root block ID
 func init() {
 	allocatedPorts = make(map[int]struct{})
 	rootBlockID = unittest.IdentifierFixture().String()
