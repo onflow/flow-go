@@ -221,7 +221,7 @@ func (e *Engine) finalizedUnexecutedBlocks() ([]flow.Identifier, error) {
 
 	firstUnexecuted := lastExecuted + 1
 
-	e.log.Info().Msgf("last finalized and executed height: %v", firstUnexecuted)
+	e.log.Info().Msgf("last finalized and executed height: %v", lastExecuted)
 
 	unexecuted := make([]flow.Identifier, 0)
 
