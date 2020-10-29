@@ -13,30 +13,30 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// ES is a mocked version of execution state that
+// ExecutionState is a mocked version of execution state that
 // simulates some of its behavior for testing purpose
-type ES struct {
+type ExecutionState struct {
 	sync.Mutex
 	state.ExecutionState
 	commits map[flow.Identifier]flow.StateCommitment
 }
 
-func NewES(seal *flow.Seal) *ES {
+func NewExecutionState(seal *flow.Seal) *ExecutionState {
 	commits := make(map[flow.Identifier]flow.StateCommitment)
 	commits[seal.BlockID] = seal.FinalState
-	return &ES{
+	return &ExecutionState{
 		commits: commits,
 	}
 }
 
-func (es *ES) PersistStateCommitment(ctx context.Context, blockID flow.Identifier, commit flow.StateCommitment) error {
+func (es *ExecutionState) PersistStateCommitment(ctx context.Context, blockID flow.Identifier, commit flow.StateCommitment) error {
 	es.Lock()
 	defer es.Unlock()
 	es.commits[blockID] = commit
 	return nil
 }
 
-func (es *ES) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
+func (es *ExecutionState) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
 	commit, ok := es.commits[blockID]
 	if !ok {
 		return nil, storage.ErrNotFound
@@ -45,7 +45,7 @@ func (es *ES) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identif
 	return commit, nil
 }
 
-func ExecuteBlock(t *testing.T, es *ES, block *flow.Block) {
+func (es *ExecutionState) ExecuteBlock(t *testing.T, block *flow.Block) {
 	_, ok := es.commits[block.Header.ParentID]
 	require.True(t, ok, "parent block not executed")
 	require.NoError(t,

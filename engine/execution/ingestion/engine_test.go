@@ -567,7 +567,7 @@ func TestShouldTriggerStateSync(t *testing.T) {
 	require.True(t, shouldTriggerStateSync(20, 29, 10))
 }
 
-func newIngestionEngine(t *testing.T, ps *mocks.PS, es *mocks.ES) *Engine {
+func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.ExecutionState) *Engine {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 	tracer, err := trace.NewTracer(log, "test")
@@ -635,7 +635,7 @@ func logChain(chain []*flow.Block) {
 
 func TestLoadingUnexecutedBlocks(t *testing.T) {
 	t.Run("only genesis", func(t *testing.T) {
-		ps := mocks.NewPS()
+		ps := mocks.NewProtocolState()
 
 		chain, result, seal := unittest.ChainFixture(0)
 		genesis := chain[0]
@@ -644,7 +644,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
 
-		es := mocks.NewES(seal)
+		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
 		finalized, pending, err := engine.unexecutedBlocks()
@@ -655,7 +655,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 	})
 
 	t.Run("no finalized, nor pending unexected", func(t *testing.T) {
-		ps := mocks.NewPS()
+		ps := mocks.NewProtocolState()
 
 		chain, result, seal := unittest.ChainFixture(4)
 		genesis, blockA, blockB, blockC, blockD :=
@@ -669,7 +669,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Mutate().Extend(blockC))
 		require.NoError(t, ps.Mutate().Extend(blockD))
 
-		es := mocks.NewES(seal)
+		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
 		finalized, pending, err := engine.unexecutedBlocks()
@@ -680,7 +680,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 	})
 
 	t.Run("no finalized, some pending executed", func(t *testing.T) {
-		ps := mocks.NewPS()
+		ps := mocks.NewProtocolState()
 
 		chain, result, seal := unittest.ChainFixture(4)
 		genesis, blockA, blockB, blockC, blockD :=
@@ -694,11 +694,11 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Mutate().Extend(blockC))
 		require.NoError(t, ps.Mutate().Extend(blockD))
 
-		es := mocks.NewES(seal)
+		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
-		mocks.ExecuteBlock(t, es, blockA)
-		mocks.ExecuteBlock(t, es, blockB)
+		es.ExecuteBlock(t, blockA)
+		es.ExecuteBlock(t, blockB)
 
 		finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
@@ -708,7 +708,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 	})
 
 	t.Run("all finalized have been executed, and no pending executed", func(t *testing.T) {
-		ps := mocks.NewPS()
+		ps := mocks.NewProtocolState()
 
 		chain, result, seal := unittest.ChainFixture(4)
 		genesis, blockA, blockB, blockC, blockD :=
@@ -724,12 +724,12 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
 
-		es := mocks.NewES(seal)
+		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
-		mocks.ExecuteBlock(t, es, blockA)
-		mocks.ExecuteBlock(t, es, blockB)
-		mocks.ExecuteBlock(t, es, blockC)
+		es.ExecuteBlock(t, blockA)
+		es.ExecuteBlock(t, blockB)
+		es.ExecuteBlock(t, blockC)
 
 		finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
@@ -739,7 +739,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 	})
 
 	t.Run("some finalized are executed and conflicting are executed", func(t *testing.T) {
-		ps := mocks.NewPS()
+		ps := mocks.NewProtocolState()
 
 		chain, result, seal := unittest.ChainFixture(4)
 		genesis, blockA, blockB, blockC, blockD :=
@@ -755,12 +755,12 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
 
-		es := mocks.NewES(seal)
+		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
-		mocks.ExecuteBlock(t, es, blockA)
-		mocks.ExecuteBlock(t, es, blockB)
-		mocks.ExecuteBlock(t, es, blockC)
+		es.ExecuteBlock(t, blockA)
+		es.ExecuteBlock(t, blockB)
+		es.ExecuteBlock(t, blockC)
 
 		finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
@@ -770,7 +770,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 	})
 
 	t.Run("all pending executed", func(t *testing.T) {
-		ps := mocks.NewPS()
+		ps := mocks.NewProtocolState()
 
 		chain, result, seal := unittest.ChainFixture(4)
 		genesis, blockA, blockB, blockC, blockD :=
@@ -785,13 +785,13 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Mutate().Extend(blockD))
 		require.NoError(t, ps.Mutate().Finalize(blockA.ID()))
 
-		es := mocks.NewES(seal)
+		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
 
-		mocks.ExecuteBlock(t, es, blockA)
-		mocks.ExecuteBlock(t, es, blockB)
-		mocks.ExecuteBlock(t, es, blockC)
-		mocks.ExecuteBlock(t, es, blockD)
+		es.ExecuteBlock(t, blockA)
+		es.ExecuteBlock(t, blockB)
+		es.ExecuteBlock(t, blockC)
+		es.ExecuteBlock(t, blockD)
 
 		finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
@@ -801,7 +801,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 	})
 
 	t.Run("some fork is executed", func(t *testing.T) {
-		ps := mocks.NewPS()
+		ps := mocks.NewProtocolState()
 
 		// Genesis <- A <- B <- C (finalized) <- D <- E <- F
 		//                                       ^--- G <- H
@@ -840,16 +840,16 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
 
-		es := mocks.NewES(seal)
+		es := mocks.NewExecutionState(seal)
 
 		engine := newIngestionEngine(t, ps, es)
 
-		mocks.ExecuteBlock(t, es, blockA)
-		mocks.ExecuteBlock(t, es, blockB)
-		mocks.ExecuteBlock(t, es, blockC)
-		mocks.ExecuteBlock(t, es, blockD)
-		mocks.ExecuteBlock(t, es, blockG)
-		mocks.ExecuteBlock(t, es, blockJ)
+		es.ExecuteBlock(t, blockA)
+		es.ExecuteBlock(t, blockB)
+		es.ExecuteBlock(t, blockC)
+		es.ExecuteBlock(t, blockD)
+		es.ExecuteBlock(t, blockG)
+		es.ExecuteBlock(t, blockJ)
 
 		finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)

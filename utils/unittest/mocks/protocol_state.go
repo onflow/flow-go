@@ -12,13 +12,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// PS is a mocked version of protocol state, which
+// ProtocolState is a mocked version of protocol state, which
 // has very close behavior to the real implementation
 // but for testing purpose.
 // If you are testing a module that depends on protocol state's
 // behavior, but you don't want to mock up the methods and its return
 // value, then just use this module
-type PS struct {
+type ProtocolState struct {
 	sync.Mutex
 	protocol.State
 	blocks    map[flow.Identifier]*flow.Block
@@ -29,20 +29,20 @@ type PS struct {
 	seal      *flow.Seal
 }
 
-func NewPS() *PS {
-	return &PS{
+func NewProtocolState() *ProtocolState {
+	return &ProtocolState{
 		blocks:   make(map[flow.Identifier]*flow.Block),
 		children: make(map[flow.Identifier][]flow.Identifier),
 		heights:  make(map[uint64]*flow.Block),
 	}
 }
 
-type PSMutator struct {
+type ProtocolStateMutator struct {
 	protocolmock.Mutator
-	ps *PS
+	ps *ProtocolState
 }
 
-func (ps *PS) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
+func (ps *ProtocolState) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	ps.Lock()
 	defer ps.Unlock()
 
@@ -56,7 +56,7 @@ func (ps *PS) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	return snapshot
 }
 
-func (ps *PS) AtHeight(height uint64) protocol.Snapshot {
+func (ps *ProtocolState) AtHeight(height uint64) protocol.Snapshot {
 	ps.Lock()
 	defer ps.Unlock()
 
@@ -70,7 +70,7 @@ func (ps *PS) AtHeight(height uint64) protocol.Snapshot {
 	return snapshot
 }
 
-func (ps *PS) Final() protocol.Snapshot {
+func (ps *ProtocolState) Final() protocol.Snapshot {
 	ps.Lock()
 	defer ps.Unlock()
 
@@ -91,7 +91,7 @@ func (ps *PS) Final() protocol.Snapshot {
 	return snapshot
 }
 
-func pending(ps *PS, blockID flow.Identifier) []flow.Identifier {
+func pending(ps *ProtocolState, blockID flow.Identifier) []flow.Identifier {
 	var pendingIDs []flow.Identifier
 	pendingIDs, ok := ps.children[blockID]
 
@@ -107,14 +107,14 @@ func pending(ps *PS, blockID flow.Identifier) []flow.Identifier {
 	return pendingIDs
 }
 
-func (ps *PS) Mutate() protocol.Mutator {
-	return &PSMutator{
+func (ps *ProtocolState) Mutate() protocol.Mutator {
+	return &ProtocolStateMutator{
 		protocolmock.Mutator{},
 		ps,
 	}
 }
 
-func (m *PSMutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
+func (m *ProtocolStateMutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
 	m.ps.Lock()
 	defer m.ps.Unlock()
 
@@ -130,7 +130,7 @@ func (m *PSMutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, se
 	return nil
 }
 
-func (m *PSMutator) Extend(block *flow.Block) error {
+func (m *ProtocolStateMutator) Extend(block *flow.Block) error {
 	m.ps.Lock()
 	defer m.ps.Unlock()
 
@@ -157,7 +157,7 @@ func (m *PSMutator) Extend(block *flow.Block) error {
 	return nil
 }
 
-func (m *PSMutator) Finalize(blockID flow.Identifier) error {
+func (m *ProtocolStateMutator) Finalize(blockID flow.Identifier) error {
 	m.ps.Lock()
 	defer m.ps.Unlock()
 
