@@ -28,7 +28,7 @@ var rootBlockID string
 var allocator *portAllocator
 
 // init is a built-in golang function getting called first time this
-// package is imported. It initializes package-scoped variables.
+// initialize the allocated ports map and the root block ID
 func init() {
 	allocator = newPortAllocator()
 	rootBlockID = unittest.IdentifierFixture().String()
