@@ -1122,7 +1122,7 @@ func generateChunk(colIndex int,
 			// TODO: record number of txs
 			NumberOfTransactions: 0,
 		},
-		Index:    0,
+		Index:    uint64(colIndex),
 		EndState: endState,
 	}
 }
