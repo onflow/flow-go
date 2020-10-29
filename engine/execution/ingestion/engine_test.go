@@ -647,9 +647,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		es := mocks.NewES(seal)
 		engine := newIngestionEngine(t, ps, es)
 
-		finalized, pending, err := engine.unexecutedBlocks()
+		lastExecutedFinal, finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
 
+		unittest.IDEqual(t, genesis.ID(), lastExecutedFinal)
 		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
 		unittest.IDsEqual(t, []flow.Identifier{}, pending)
 	})
@@ -672,9 +673,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		es := mocks.NewES(seal)
 		engine := newIngestionEngine(t, ps, es)
 
-		finalized, pending, err := engine.unexecutedBlocks()
+		lastExecutedFinal, finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
 
+		unittest.IDEqual(t, genesis.ID(), lastExecutedFinal)
 		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
 		unittest.IDsEqual(t, []flow.Identifier{blockA.ID(), blockB.ID(), blockC.ID(), blockD.ID()}, pending)
 	})
@@ -700,9 +702,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		mocks.ExecuteBlock(t, es, blockA)
 		mocks.ExecuteBlock(t, es, blockB)
 
-		finalized, pending, err := engine.unexecutedBlocks()
+		lastExecutedFinal, finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
 
+		unittest.IDEqual(t, genesis.ID(), lastExecutedFinal)
 		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
 		unittest.IDsEqual(t, []flow.Identifier{blockC.ID(), blockD.ID()}, pending)
 	})
@@ -722,8 +725,6 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Mutate().Extend(blockC))
 		require.NoError(t, ps.Mutate().Extend(blockD))
 
-		require.NoError(t, ps.Mutate().Finalize(blockA.ID()))
-		require.NoError(t, ps.Mutate().Finalize(blockB.ID()))
 		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
 
 		es := mocks.NewES(seal)
@@ -733,9 +734,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		mocks.ExecuteBlock(t, es, blockB)
 		mocks.ExecuteBlock(t, es, blockC)
 
-		finalized, pending, err := engine.unexecutedBlocks()
+		lastExecutedFinal, finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
 
+		unittest.IDEqual(t, blockC.ID(), lastExecutedFinal)
 		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
 		unittest.IDsEqual(t, []flow.Identifier{blockD.ID()}, pending)
 	})
@@ -764,9 +766,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		mocks.ExecuteBlock(t, es, blockB)
 		mocks.ExecuteBlock(t, es, blockC)
 
-		finalized, pending, err := engine.unexecutedBlocks()
+		lastExecutedFinal, finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
 
+		unittest.IDEqual(t, blockC.ID(), lastExecutedFinal)
 		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
 		unittest.IDsEqual(t, []flow.Identifier{blockD.ID()}, pending)
 	})
@@ -795,9 +798,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		mocks.ExecuteBlock(t, es, blockC)
 		mocks.ExecuteBlock(t, es, blockD)
 
-		finalized, pending, err := engine.unexecutedBlocks()
+		lastExecutedFinal, finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
 
+		unittest.IDEqual(t, blockA.ID(), lastExecutedFinal)
 		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
 		unittest.IDsEqual(t, []flow.Identifier{}, pending)
 	})
@@ -853,9 +857,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		mocks.ExecuteBlock(t, es, blockG)
 		mocks.ExecuteBlock(t, es, blockJ)
 
-		finalized, pending, err := engine.unexecutedBlocks()
+		lastExecutedFinal, finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
 
+		unittest.IDEqual(t, blockC.ID(), lastExecutedFinal)
 		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
 		unittest.IDsEqual(t, []flow.Identifier{
 			blockI.ID(), // I is still pending, and unexecuted

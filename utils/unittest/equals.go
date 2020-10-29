@@ -16,6 +16,10 @@ func toHex(ids []flow.Identifier) []string {
 	return hex
 }
 
+func IDEqual(t *testing.T, id1, id2 flow.Identifier) {
+	require.Equal(t, id1.String(), id2.String())
+}
+
 func IDsEqual(t *testing.T, id1, id2 []flow.Identifier) {
 	require.Equal(t, toHex(id1), toHex(id2))
 }
