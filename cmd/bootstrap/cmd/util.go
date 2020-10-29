@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/flow-go/crypto"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -89,4 +91,19 @@ func pathExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+func nodeCountByRole(nodes []model.NodeInfo) map[flow.Role]uint16 {
+	roleCounts := map[flow.Role]uint16{
+		flow.RoleCollection:   0,
+		flow.RoleConsensus:    0,
+		flow.RoleExecution:    0,
+		flow.RoleVerification: 0,
+		flow.RoleAccess:       0,
+	}
+	for _, node := range nodes {
+		roleCounts[node.Role] = roleCounts[node.Role] + 1
+	}
+
+	return roleCounts
 }

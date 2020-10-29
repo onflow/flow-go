@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // keygenCmd represents the key gen command
@@ -40,21 +39,11 @@ var keygenCmd = &cobra.Command{
 
 		// create keys
 		log.Info().Msg("generating internal private networking and staking keys")
-		nodeConfigs := genNetworkAndStakingKeys([]model.NodeInfo{})
+		nodes := genNetworkAndStakingKeys([]model.NodeInfo{})
 		log.Info().Msg("")
 
 		// count roles
-		roleCounts := map[flow.Role]uint32{
-			flow.RoleCollection:   0,
-			flow.RoleConsensus:    0,
-			flow.RoleExecution:    0,
-			flow.RoleVerification: 0,
-			flow.RoleAccess:       0,
-		}
-		for _, node := range nodeConfigs {
-			roleCounts[node.Role] = roleCounts[node.Role] + 1
-		}
-
+		roleCounts := nodeCountByRole(nodes)
 		for role, count := range roleCounts {
 			log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
 		}
