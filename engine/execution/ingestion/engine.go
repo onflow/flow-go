@@ -186,11 +186,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-func (e *Engine) finalizedUnexecutedBlocks() (flow.Identifier, []flow.Identifier, error) {
+func (e *Engine) finalizedUnexecutedBlocks() ([]flow.Identifier, error) {
 	// get finalized height
 	final, err := e.state.Final().Head()
 	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("could not get finalized block: %w", err)
+		return nil, fmt.Errorf("could not get finalized block: %w", err)
 	}
 
 	// find the first unexecuted and finalized block
@@ -202,21 +202,19 @@ func (e *Engine) finalizedUnexecutedBlocks() (flow.Identifier, []flow.Identifier
 	// because the next loop will ensure it only iterate through finalized
 	// block.
 	lastExecuted := final.Height
-	lastExecutedID := final.ID()
 
 	for ; lastExecuted > 0; lastExecuted-- {
 		header, err := e.state.AtHeight(lastExecuted).Head()
 		if err != nil {
-			return flow.ZeroID, nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
+			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
 		}
 
 		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ID())
 		if err != nil {
-			return flow.ZeroID, nil, fmt.Errorf("could not check whether block is executed: %w", err)
+			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
 		}
 
 		if executed {
-			lastExecutedID = header.ID()
 			break
 		}
 	}
@@ -232,13 +230,13 @@ func (e *Engine) finalizedUnexecutedBlocks() (flow.Identifier, []flow.Identifier
 	for height := firstUnexecuted; height <= final.Height; height++ {
 		header, err := e.state.AtHeight(height).Head()
 		if err != nil {
-			return flow.ZeroID, nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
+			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
 
 		unexecuted = append(unexecuted, header.ID())
 	}
 
-	return lastExecutedID, unexecuted, nil
+	return unexecuted, nil
 }
 
 func (e *Engine) pendingUnexecutedBlocks() ([]flow.Identifier, error) {
@@ -263,18 +261,18 @@ func (e *Engine) pendingUnexecutedBlocks() ([]flow.Identifier, error) {
 	return unexecuted, nil
 }
 
-func (e *Engine) unexecutedBlocks() (lastExecutedFinal flow.Identifier, finalized []flow.Identifier, pending []flow.Identifier, err error) {
-	lastExecutedFinal, finalized, err = e.finalizedUnexecutedBlocks()
+func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
+	finalized, err = e.finalizedUnexecutedBlocks()
 	if err != nil {
-		return flow.ZeroID, nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
+		return nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
 	}
 
 	pending, err = e.pendingUnexecutedBlocks()
 	if err != nil {
-		return flow.ZeroID, nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
+		return nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
 	}
 
-	return lastExecutedFinal, finalized, pending, nil
+	return finalized, pending, nil
 }
 
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
@@ -291,20 +289,6 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		blockByCollection *stdmap.BlockByCollectionBackdata,
 		executionQueues *stdmap.QueuesBackdata) error {
 
-		lastExecutedFinal, finalized, pending, err := e.unexecutedBlocks()
-		if err != nil {
-			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
-		}
-
-		unexecuted := append(finalized, pending...)
-
-		log := e.log.With().
-			Int("total", len(unexecuted)).
-			Int("finalized", len(finalized)).
-			Int("pending", len(pending)).Logger()
-
-		log.Info().Msg("reloading unexecuted blocks")
-
 		// saving an executed block is currently not transactional, so it's possible
 		// the block is marked as executed but the receipt might not be saved during a crash.
 		// in order to mitigate this problem, we always re-execute the last executed and finalized
@@ -314,17 +298,41 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		// a root block will fail, because the root block doesn't have a parent block, and could not
 		// get the result of it
 		// TODO: remove this, when saving a executed block is transactional
-		last, err := e.state.AtBlockID(lastExecutedFinal).Head()
+		lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
+		if err != nil {
+			return fmt.Errorf("could not get last executed: %w", err)
+		}
+
+		last, err := e.state.AtBlockID(lastExecutedID).Head()
 		if err != nil {
 			return fmt.Errorf("could not get last executed final by ID: %w", err)
 		}
 
-		if last.ParentID != flow.ZeroID {
-			err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedFinal)
+		// don't reload root block
+		isRoot := last.ParentID == flow.ZeroID
+		if !isRoot {
+			err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
 			if err != nil {
-				return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedFinal, err)
+				return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
 			}
 		}
+
+		finalized, pending, err := e.unexecutedBlocks()
+		if err != nil {
+			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
+		}
+
+		unexecuted := append(finalized, pending...)
+
+		log := e.log.With().
+			Int("total", len(unexecuted)).
+			Int("finalized", len(finalized)).
+			Int("pending", len(pending)).
+			Uint64("last_executed", lastExecutedHeight).
+			Hex("last_executed_id", lastExecutedID[:]).
+			Logger()
+
+		log.Info().Msg("reloading unexecuted blocks")
 
 		for _, blockID := range unexecuted {
 			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
