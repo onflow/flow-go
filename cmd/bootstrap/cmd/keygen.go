@@ -58,10 +58,6 @@ func init() {
 		StringVar(&flagConfig, "config", "", "path to a JSON file containing multiple node configurations (Role, Address, Stake)")
 	_ = keygenCmd.MarkFlagRequired("config")
 
-	// optional parameters
-	keygenCmd.Flags().
-		BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation instead of DKG")
-}
 
 // isEmptyDir returns True if the directory contains children
 func isEmptyDir(path string) (bool, error) {
