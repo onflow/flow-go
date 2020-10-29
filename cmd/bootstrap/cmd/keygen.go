@@ -55,7 +55,7 @@ func init() {
 
 	// required parameters
 	keygenCmd.Flags().
-		StringVar(&flagConfig, "config", "", "path to a JSON file containing multiple node configurations (Role, Address, Stake)")
+		StringVar(&flagConfig, "config", "--node-config.json", "path to a JSON file containing multiple node configurations (Role, Address, Stake)")
 	_ = keygenCmd.MarkFlagRequired("config")
 
 
