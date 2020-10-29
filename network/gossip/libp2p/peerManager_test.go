@@ -131,9 +131,14 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 
 	connector := new(mock.Connector)
 	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
-	count, times := 0, 2    // we expect it to be called twice at least
+	mu := &sync.Mutex{}     // provides mutual exclusion on calls to `ConnectPeers`
+	count := 0
+	times := 2 // we expect it to be called twice at least
 	wg.Add(times)
 	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		if count < times {
 			count++
 			wg.Done()
@@ -162,11 +167,16 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 
 	// creates mock connector
 	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
-	times, count := 2, 0    // we expect it to be called twice overall
-	wg.Add(1)               // this accounts for one invocation, the other invocation is subsequent
+	mu := &sync.Mutex{}     // provides mutual exclusion on calls to `ConnectPeers`
+	count := 0
+	times := 2 // we expect it to be called twice overall
+	wg.Add(1)  // this accounts for one invocation, the other invocation is subsequent
 	connector := new(mock.Connector)
 	// captures the first periodic update initiated after start to complete
 	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		if count < times {
 			count++
 			wg.Done()
