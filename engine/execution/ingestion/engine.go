@@ -306,12 +306,24 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		log.Info().Msg("reloading unexecuted blocks")
 
 		// saving an executed block is currently not transactional, so it's possible
-		// the block is marked as executed but the receipt is not saved during a crash
-		// in order to mitigate the problem, we always re-execute the last executed and finalized
+		// the block is marked as executed but the receipt might not be saved during a crash.
+		// in order to mitigate this problem, we always re-execute the last executed and finalized
 		// block
-		err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedFinal)
+		// there is an exception, if the last executed final is a root block, then don't execute it,
+		// because the root has already been executed during bootstrapping phase. And re-executing
+		// a root block will fail, because the root block doesn't have a parent block, and could not
+		// get the result of it
+		// TODO: remove this, when saving a executed block is transactional
+		last, err := e.state.AtBlockID(lastExecutedFinal).Head()
 		if err != nil {
-			return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedFinal, err)
+			return fmt.Errorf("could not get last executed final by ID: %w")
+		}
+
+		if last.ParentID != flow.ZeroID {
+			err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedFinal)
+			if err != nil {
+				return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedFinal, err)
+			}
 		}
 
 		for _, blockID := range unexecuted {
@@ -559,7 +571,7 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 				// when the block no longer exists in the queue, it means there was a race condition that
 				// two onBlockExecuted was called for the same block, and one process has already removed the
 				// block from the queue, so we will print an error here
-				return fmt.Errorf("block has been executed already, no long exists in the queue")
+				return fmt.Errorf("block has been executed already, no longer exists in the queue")
 			}
 
 			// dismount the executed block and all its children
