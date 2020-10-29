@@ -31,11 +31,8 @@ go generate
 
 `crypto/hash` provides the hashing and MAC algorithms required for Flow. All algorithm implement the generic interface `Hasher`. All digests are of the generic type `Hash`.
 
-*Hashing* :
  * Sha3: 256 and 384 output sizes
  * Sha2: 256 and 384 output sizes
-
-*MAC* :
  * KMAC: 128 variant
 
 ### Signature schemes 
@@ -62,10 +59,9 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * multi-signature verification of an aggregated signature of multiple messages under multiple public keys.
     * batch verification of multiple signatures of a single message under multiple
     public keys: use a binary tree of aggregations to find the invalid signatures.
+    * SPoCK scheme based on BLS, to verify two signatures have been generated from the same message that is unknown to the verifier. 
 
  * Future features:
-    * more tools for BLS multi signature and batch verification.
-    * BLS-based SPoCK.
     * membership checks in G2 using [Bowe's method](https://eprint.iacr.org/2019/814.pdf).
     * support a G1/G2 swap (signatures on G2 and public keys on G1).
  
