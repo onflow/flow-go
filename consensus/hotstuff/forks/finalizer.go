@@ -1,10 +1,11 @@
 package forks
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
+// Finalizer is responsible for block finalization.
 type Finalizer interface {
 	VerifyBlock(*model.Block) error
 	IsSafeBlock(*model.Block) bool

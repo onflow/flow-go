@@ -4,13 +4,13 @@ package json
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model/coldstuff"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/libp2p/message"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 // decode will decode the envelope into an entity.
@@ -25,10 +25,6 @@ func decode(env Envelope) (interface{}, error) {
 		v = &messages.BlockProposal{}
 	case CodeBlockVote:
 		v = &messages.BlockVote{}
-
-	// coldstuff specific
-	case CodeBlockCommit:
-		v = &coldstuff.Commit{}
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
@@ -50,6 +46,7 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeBlockResponse:
 		v = &messages.BlockResponse{}
 
+	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
 		v = &flow.CollectionGuarantee{}
 	case CodeTransactionBody:
@@ -57,32 +54,33 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeTransaction:
 		v = &flow.Transaction{}
 
-	case CodeCollectionRequest:
-		v = &messages.CollectionRequest{}
-	case CodeCollectionResponse:
-		v = &messages.CollectionResponse{}
-
-	case CodeEcho:
-		v = &message.Echo{}
-
+	// core messages for execution & verification
 	case CodeExecutionReceipt:
 		v = &flow.ExecutionReceipt{}
-	//case CodeExecutionStateRequest:
-	//	v = &messages.ExecutionStateRequest{}
-	//case CodeExecutionStateResponse:
-	//	v = &messages.ExecutionStateResponse{}
+	case CodeResultApproval:
+		v = &flow.ResultApproval{}
+
+	// execution state synchronization
 	case CodeExecutionStateSyncRequest:
 		v = &messages.ExecutionStateSyncRequest{}
 	case CodeExecutionStateDelta:
 		v = &messages.ExecutionStateDelta{}
 
+	// data exchange for execution of blocks
 	case CodeChunkDataRequest:
 		v = &messages.ChunkDataRequest{}
 	case CodeChunkDataResponse:
 		v = &messages.ChunkDataResponse{}
 
-	case CodeResultApproval:
-		v = &flow.ResultApproval{}
+	// generic entity exchange engines
+	case CodeEntityRequest:
+		v = &messages.EntityRequest{}
+	case CodeEntityResponse:
+		v = &messages.EntityResponse{}
+
+	// testing
+	case CodeEcho:
+		v = &message.TestMessage{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)
@@ -91,7 +89,7 @@ func decode(env Envelope) (interface{}, error) {
 	// unmarshal the payload
 	err := json.Unmarshal(env.Data, v)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode payload")
+		return nil, fmt.Errorf("could not decode payload: %w", err)
 	}
 
 	return v, nil

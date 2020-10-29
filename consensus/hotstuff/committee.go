@@ -1,8 +1,8 @@
-// (c) 2020 Dapper Labs - ALL RIGHTS RESERVED
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Committee accounts for the fact that we might have multiple HotStuff instances
@@ -44,6 +44,13 @@ type Committee interface {
 	//       Ideally, we would move the method for checking whether an Identifier refers to this node to the signer.
 	//       This would require some refactoring of EventHandler (postponed to later)
 	Self() flow.Identifier
+
+	// DKG returns the DKG info for the given block.
+	DKG(blockID flow.Identifier) (DKG, error)
+}
+
+type DKG interface {
+	protocol.DKG
 }
 
 // ComputeStakeThresholdForBuildingQC returns the stake that is minimally required for building a QC

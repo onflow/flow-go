@@ -8,11 +8,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	sdk "github.com/onflow/flow-go-sdk"
+
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 // These tests are just examples of how to use the ghost node in an integration tests.
@@ -134,18 +135,18 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	tx := generateTransaction(t, net, realCollNode.Identifier)
 
 	// send the transaction as an event to the real collection node
-	err = ghostClient.Send(ctx, engine.CollectionIngest, &tx, realCollNode.Identifier)
+	err = ghostClient.Send(ctx, engine.PushTransactions, &tx, realCollNode.Identifier)
 	assert.NoError(t, err)
 }
 
 func sendTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.Identifier) {
 	colContainer1 := net.ContainerByID(collectionID)
 
-	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort), net.Genesis().Header.ChainID.Chain())
+	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort), net.Root().Header.ChainID.Chain())
 	assert.Nil(t, err)
 
-	tx := unittest.TransactionBodyFixture()
-	tx, err = collectionClient.SignTransaction(tx)
+	txFixture := SDKTransactionFixture()
+	tx, err := collectionClient.SignTransaction(&txFixture)
 	assert.Nil(t, err)
 
 	t.Log("sending transaction: ", tx.ID())
@@ -157,14 +158,14 @@ func sendTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.I
 	assert.Nil(t, err)
 }
 
-func generateTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.Identifier) flow.TransactionBody {
+func generateTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.Identifier) *sdk.Transaction {
 	colContainer1 := net.ContainerByID(collectionID)
 
-	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort), net.Genesis().Header.ChainID.Chain())
+	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort), net.Root().Header.ChainID.Chain())
 	assert.Nil(t, err)
 
-	tx := unittest.TransactionBodyFixture()
-	tx, err = collectionClient.SignTransaction(tx)
+	txFixture := SDKTransactionFixture()
+	tx, err := collectionClient.SignTransaction(&txFixture)
 	assert.Nil(t, err)
 
 	return tx

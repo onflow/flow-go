@@ -1,9 +1,9 @@
 package messages
 
 import (
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
 // ChunkDataRequest represents a request for the a chunk data pack
@@ -21,9 +21,13 @@ type ChunkDataResponse struct {
 	Nonce         uint64 // so that we aren't deduplicated by the network layer
 }
 
+// ExecutionStateSyncRequest represents a request for state deltas between
+// the block at the `FromHeight` and the block at the `ToHeight`
+// since the state sync request only requests for sealed blocks, heights
+// should be enough to specify the block deterministically.
 type ExecutionStateSyncRequest struct {
-	CurrentBlockID flow.Identifier
-	TargetBlockID  flow.Identifier
+	FromHeight uint64
+	ToHeight   uint64
 }
 
 type ExecutionStateDelta struct {

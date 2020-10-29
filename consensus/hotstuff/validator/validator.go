@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -30,7 +30,7 @@ func New(committee hotstuff.Committee, forks hotstuff.ForksReader, verifier hots
 // ValidateQC validates the QC
 // qc - the qc to be validated
 // block - the block that the qc is pointing to
-func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) error {
+func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
 	if qc.BlockID != block.BlockID {
 		// Sanity check! Failing indicates a bug in the higher-level logic
 		return fmt.Errorf("qc.BlockID %s doesn't match block's ID %s", qc.BlockID, block.BlockID)
@@ -80,20 +80,20 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 
 	// validate the proposer's vote and get his identity
 	_, err := v.ValidateVote(proposal.ProposerVote(), block)
-	if errors.Is(err, model.ErrorInvalidVote{}) {
+	if model.IsInvalidVoteError(err) {
 		return newInvalidBlockError(block, fmt.Errorf("invalid proposer signature: %w", err))
 	}
 	if err != nil {
-		return fmt.Errorf("error verifying primary signature for block %x: %w", block.BlockID, err)
+		return fmt.Errorf("error verifying leader signature for block %x: %w", block.BlockID, err)
 	}
 
 	// check the proposer is the leader for the proposed block's view
 	leader, err := v.committee.LeaderForView(block.View)
 	if err != nil {
-		return fmt.Errorf("error determining primary for block %x: %w", block.BlockID, err)
+		return fmt.Errorf("error determining leader for block %x: %w", block.BlockID, err)
 	}
 	if leader != block.ProposerID {
-		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not primary for view %d", block.ProposerID, block.View))
+		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View))
 	}
 
 	// check that we have the parent for the proposal
@@ -102,7 +102,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		// Forks is _allowed_ to (but obliged to) prune blocks whose view is below the newest finalized block.
 		if qc.View >= v.forks.FinalizedView() {
 			// If the parent block is equal or above the finalized view, then Forks should have it. Otherwise, we are missing a block!
-			return &model.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
+			return model.MissingBlockError{View: qc.View, BlockID: qc.BlockID}
 		}
 
 		// Forks has already pruned the parent block. I.e., we can't validate that the qc matches
@@ -160,7 +160,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 }
 
 func newInvalidBlockError(block *model.Block, err error) error {
-	return &model.ErrorInvalidBlock{
+	return model.InvalidBlockError{
 		BlockID: block.BlockID,
 		View:    block.View,
 		Err:     err,
@@ -168,7 +168,7 @@ func newInvalidBlockError(block *model.Block, err error) error {
 }
 
 func newInvalidVoteError(vote *model.Vote, err error) error {
-	return &model.ErrorInvalidVote{
+	return model.InvalidVoteError{
 		VoteID: vote.ID(),
 		View:   vote.View,
 		Err:    err,

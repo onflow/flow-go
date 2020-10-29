@@ -3,13 +3,21 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// Snapshot represents an immutable snapshot at a specific point of the
-// protocol state history. It allows us to read the parameters at the selected
-// point in a deterministic manner.
+// Snapshot represents an immutable snapshot of the protocol state
+// at a specific block, denoted as the Head block.
+// The Snapshot is fork-specific and only accounts for the information contained
+// in blocks along this fork up to (including) Head.
+// It allows us to read the parameters at the selected block in a deterministic manner.
 type Snapshot interface {
+
+	// Head returns the latest block at the selected point of the protocol state
+	// history. It can represent either a finalized or ambiguous block,
+	// depending on our selection criteria. Either way, it's the block on which
+	// we should build the next block in the context of the selected state.
+	Head() (*flow.Header, error)
 
 	// Identities returns a list of identities at the selected point of
 	// the protocol state history. It allows us to provide optional upfront
@@ -24,20 +32,26 @@ type Snapshot interface {
 	// Commit return the sealed execution state commitment at this block.
 	Commit() (flow.StateCommitment, error)
 
-	// Cluster selects the given cluster from the node selection. You have to
-	// manually filter the identities to the desired set of nodes before
-	// clustering them.
-	Clusters() (*flow.ClusterList, error)
-
-	// Head returns the latest block at the selected point of the protocol state
-	// history. It can represent either a finalized or ambiguous block,
-	// depending on our selection criteria. Either way, it's the block on which
-	// we should build the next block in the context of the selected state.
-	Head() (*flow.Header, error)
-
-	// Pending returns all children IDs for the snapshot head, which thus were
-	// potential extensions of the protocol state at this snapshot. The result
-	// is ordered such that parents are included before their children. These
+	// Pending returns the IDs of all descendants of the Head block. The IDs
+	// are ordered such that parents are included before their children. These
 	// are NOT guaranteed to have been validated by HotStuff.
 	Pending() ([]flow.Identifier, error)
+
+	// Seed returns a deterministic seed for a pseudo random number generator.
+	// The seed is derived from the source of randomness for the Head block.
+	// In order to deterministically derive task specific seeds, indices must
+	// be specified. Refer to module/indices/rand.go for different indices.
+	// NOTE: not to be confused with the epoch source of randomness!
+	Seed(indices ...uint32) ([]byte, error)
+
+	// Phase returns the epoch phase for the current epoch, as of the Head block.
+	Phase() (flow.EpochPhase, error)
+
+	// Epochs returns a query object enabling querying detailed information about
+	// various epochs.
+	//
+	// For epochs that are in the future w.r.t. the Head block, some of Epoch's
+	// methods may return errors, since the Epoch Preparation Protocol may be
+	// in-progress and incomplete for the epoch.
+	Epochs() EpochQuery
 }

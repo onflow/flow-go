@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
@@ -19,19 +19,22 @@ const (
 	codeVotedView   = 11 // latest view hotstuff voted on
 
 	// code for heights with special meaning
-	codeFinalizedHeight = 20 // latest finalized block height
-	codeSealedHeight    = 21 // latest sealed block height
-	codeClusterHeight   = 22 // latest finalized height on cluster
-	codeExecutedBlock   = 23 // latest executed block with max height
+	codeFinalizedHeight         = 20 // latest finalized block height
+	codeSealedHeight            = 21 // latest sealed block height
+	codeClusterHeight           = 22 // latest finalized height on cluster
+	codeExecutedBlock           = 23 // latest executed block with max height
+	codeRootHeight              = 24 // the height of the first loaded block
+	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 
 	// codes for single entity storage
-	codeHeader          = 30
-	codeIdentity        = 31
-	codeGuarantee       = 32
-	codeSeal            = 33
-	codeTransaction     = 34
-	codeCollection      = 35
-	codeExecutionResult = 36
+	// 31 was used for identities before epochs
+	codeHeader               = 30
+	codeGuarantee            = 32
+	codeSeal                 = 33
+	codeTransaction          = 34
+	codeCollection           = 35
+	codeExecutionResult      = 36
+	codeExecutionReceiptMeta = 36
 
 	// codes for indexing single identifier by identifier
 	codeHeightToBlock       = 40 // index mapping height to block ID
@@ -40,11 +43,17 @@ const (
 	codeBlockValidity       = 43 // validity of block per HotStuff
 
 	// codes for indexing multiple identifiers by identifier
-	codeBlockChildren     = 50 // index mapping block ID to children blocks
-	codePayloadIdentities = 51 // index mapping block ID to payload identities
-	codePayloadGuarantees = 52 // index mapping block ID to payload guarantees
-	codePayloadSeals      = 53 // index mapping block ID to payload seals
-	codeCollectionBlock   = 54 // index mapping collection ID to block ID
+	// NOTE: 51 was used for identity indexes before epochs
+	codeBlockChildren         = 50 // index mapping block ID to children blocks
+	codePayloadGuarantees     = 52 // index mapping block ID to payload guarantees
+	codePayloadSeals          = 53 // index mapping block ID to payload seals
+	codeCollectionBlock       = 54 // index mapping collection ID to block ID
+	codeBlockExecutionReceipt = 55 // index mapping block ID to execution receipt ID
+	codeBlockEpochStatus      = 56 // index mapping block ID to epoch status
+
+	// codes related to epoch information
+	codeEpochSetup  = 60 // EpochSetup service event, keyed by ID
+	codeEpochCommit = 61 // EpochCommit service event, keyed by ID
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

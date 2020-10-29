@@ -14,19 +14,21 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
-	ingestion "github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
-	"github.com/dapperlabs/flow-go/model/flow"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	ingestion "github.com/onflow/flow-go/engine/execution/ingestion/mock"
+	"github.com/onflow/flow-go/model/flow"
+	realstorage "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
 	suite.Suite
-	log       zerolog.Logger
-	events    *storage.Events
-	txResults *storage.TransactionResults
-	blocks    *storage.Blocks
+	log        zerolog.Logger
+	events     *storage.Events
+	exeResults *storage.ExecutionResults
+	txResults  *storage.TransactionResults
+	blocks     *storage.Blocks
 }
 
 func TestHandler(t *testing.T) {
@@ -36,6 +38,7 @@ func TestHandler(t *testing.T) {
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.Logger{}
 	suite.events = new(storage.Events)
+	suite.exeResults = new(storage.ExecutionResults)
 	suite.txResults = new(storage.TransactionResults)
 	suite.blocks = new(storage.Blocks)
 }
@@ -62,6 +65,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			eventsForBlock[j] = e
 			eventMessages[j] = convert.EventToMessage(e)
 		}
+		// expect one call to lookup result for each block ID
+		suite.exeResults.On("ByBlockID", id).Return(nil, nil).Once()
+
 		// expect one call to lookup events for each block ID
 		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Once()
 
@@ -80,7 +86,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	handler := &handler{
 		blocks:             suite.blocks,
 		events:             suite.events,
+		exeResults:         suite.exeResults,
 		transactionResults: suite.txResults,
+		chain:              flow.Mainnet,
 	}
 
 	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
@@ -147,7 +155,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		id := unittest.IdentifierFixture()
 
 		// expect a storage call for the invalid id but return an error
-		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(nil, errors.New("")).Once()
+		suite.exeResults.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
 
 		// create an API request with the invalid block id
 		req := concoctReq(string(flow.EventAccountCreated), [][]byte{id[:]})
@@ -156,7 +164,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 		// check that an error was received
 		suite.Require().Error(err)
-		errors.Is(err, status.Error(codes.Internal, ""))
+		errors.Is(err, status.Error(codes.NotFound, ""))
 
 		// check that no storage calls was made
 		suite.events.AssertExpectations(suite.T())
@@ -178,6 +186,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	// create the handler
 	handler := &handler{
 		engine: mockEngine,
+		chain:  flow.Mainnet,
 	}
 
 	createReq := func(id []byte, address []byte) *execution.GetAccountAtBlockIDRequest {
@@ -253,6 +262,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			blocks:             suite.blocks,
 			events:             suite.events,
 			transactionResults: txResults,
+			chain:              flow.Mainnet,
 		}
 		return handler
 	}
@@ -351,7 +361,12 @@ func (suite *Suite) TestGetTransactionResult() {
 		// create an API request with transaction ID as nil
 		req := concoctReq(bID[:], nil)
 
-		handler := createHandler(nil)
+		// expect a call to lookup transaction result by block ID and transaction ID, return an error
+		txResults := new(storage.TransactionResults)
+
+		txResults.On("ByBlockIDTransactionID", bID, nil).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
+
+		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 
@@ -369,7 +384,11 @@ func (suite *Suite) TestGetTransactionResult() {
 		// create an API request with a nil block id
 		req := concoctReq(nil, txID[:])
 
-		handler := createHandler(nil)
+		txResults := new(storage.TransactionResults)
+
+		txResults.On("ByBlockIDTransactionID", nil, txID).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
+
+		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 
@@ -386,13 +405,14 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		wrongTxID := unittest.IdentifierFixture()
 
-		// expect a storage call for the invalid bID but return an error
-		suite.events.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, errors.New("")).Once()
-
 		// create an API request with the invalid transaction ID
 		req := concoctReq(bID[:], wrongTxID[:])
 
-		handler := createHandler(nil)
+		// expect a storage call for the invalid tx ID but return an error
+		txResults := new(storage.TransactionResults)
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, status.Error(codes.Internal, "")).Once()
+
+		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 

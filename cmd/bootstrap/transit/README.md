@@ -1,12 +1,15 @@
--# Transit Bootstrap scripts
+# Transit Bootstrap scripts
+
 The transit script facilitates nodes uploading their public keys to dapper servers.
 
-It also then handles securely recieving their RB Keys and network metadata after genesis is created.
+It also then handles securely recieving their RB Keys and network metadata after bootstrap data is created.
 
 ## Server token
-The server token is needed with the `-t` flag for both commands. It authenticates the script to the server so that only trusted parties with the token may upload their node info and be included in Genesis.
+
+The server token is needed with the `-t` flag for both commands. It authenticates the script to the server so that only trusted parties with the token may upload their node info and be included in the bootstrap data.
 
 ## Usage
+
 ```bash
 $ ./transit -push -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
 $ ./transit -pull -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
@@ -23,12 +26,16 @@ Running `-push` will perform the following actions:
    - `<id>.node-info.pub.json`
 
 ## Pull
-After Genesis, running `-pull` will:
+
+After bootstrapping, running `-pull` will:
 
 1. Fetch the following files:
    - `dkg-data.pub.json`
    - `node-infos.pub.json`
-   - `genesis-block.json`
+   - `root-block.json`
+   - `root-qc.json`
+   - `root-result.json`
+   - `root-seal.json`
    - `execution-state [dir]`
    - `<id>.random-beacon.priv.json.enc`
 

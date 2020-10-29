@@ -3,10 +3,10 @@
 package local
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 type Local struct {
@@ -36,4 +36,13 @@ func (l *Local) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
 
 func (l *Local) NotMeFilter() flow.IdentityFilter {
 	return filter.Not(filter.HasNodeID(l.NodeID()))
+}
+
+// SignFunc provides a signature oracle that given a message, a hasher, and a signing function, it
+// generates and returns a signature over the message using the node's private key
+// as well as the input hasher by invoking the given signing function. The overall idea of this function
+// is to not expose the private key to the caller.
+func (l *Local) SignFunc(data []byte, hasher hash.Hasher, f func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature,
+	error)) (crypto.Signature, error) {
+	return f(l.sk, data, hasher)
 }

@@ -3,14 +3,20 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
+// Hold all the missing collections.
+// Each entry is a missing collection, and all the blocks that contain
+// this collection
 type BlockByCollections struct {
 	*Backend
 }
 
+// BlockByCollectionBackdata contains all the collections is being requested,
+// for each collection it stores the blocks that contains the collection.
+// the Backdata is essentially map<collectionID>map<blockID>*ExecutableBlock
 type BlockByCollectionBackdata struct {
 	*Backdata
 }

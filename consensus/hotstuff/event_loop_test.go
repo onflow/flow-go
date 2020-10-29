@@ -1,4 +1,4 @@
-package hotstuff
+package hotstuff_test
 
 import (
 	"io/ioutil"
@@ -9,8 +9,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 func TestReadyDone(t *testing.T) {
@@ -23,14 +24,14 @@ func TestReadyDone(t *testing.T) {
 
 	log := zerolog.New(ioutil.Discard)
 
-	eventLoop, err := NewEventLoop(log, metrics, eh)
+	eventLoop, err := hotstuff.NewEventLoop(log, metrics, eh)
 	require.NoError(t, err)
 
 	<-eventLoop.Ready()
 	time.Sleep(1 * time.Second)
 	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		<-eventLoop.Done()
 		wg.Done()
 	}()

@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // lengthSize is how many bytes we use to encode the length of each signature.
@@ -14,8 +14,7 @@ const lengthSize = 4
 // on a level above the cryptographic implementation. It simply concatenates
 // signatures together with their length information and uses this information
 // to split the concatenated bytes into its signature parts again.
-type Combiner struct {
-}
+type Combiner struct{}
 
 // NewCombiner creates a new combiner to join and split signatures.
 func NewCombiner() *Combiner {

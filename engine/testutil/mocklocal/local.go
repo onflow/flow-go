@@ -4,10 +4,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // MockLocal represents a mock of Local
@@ -46,4 +46,9 @@ func (m *MockLocal) MockNodeID(id flow.Identifier) {
 
 func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
 	return filter.Not(filter.HasNodeID(m.id))
+}
+
+func (m *MockLocal) SignFunc(data []byte, hasher hash.Hasher, f func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature,
+	error)) (crypto.Signature, error) {
+	return f(m.sk, data, hasher)
 }

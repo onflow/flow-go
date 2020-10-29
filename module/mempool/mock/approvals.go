@@ -3,7 +3,7 @@
 package mempool
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -14,7 +14,7 @@ type Approvals struct {
 }
 
 // Add provides a mock function with given fields: approval
-func (_m *Approvals) Add(approval *flow.ResultApproval) bool {
+func (_m *Approvals) Add(approval *flow.ResultApproval) (bool, error) {
 	ret := _m.Called(approval)
 
 	var r0 bool
@@ -24,7 +24,14 @@ func (_m *Approvals) Add(approval *flow.ResultApproval) bool {
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*flow.ResultApproval) error); ok {
+		r1 = rf(approval)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // All provides a mock function with given fields:
@@ -43,55 +50,62 @@ func (_m *Approvals) All() []*flow.ResultApproval {
 	return r0
 }
 
-// ByID provides a mock function with given fields: approvalID
-func (_m *Approvals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, bool) {
-	ret := _m.Called(approvalID)
+// ByChunk provides a mock function with given fields: resultID, chunkIndex
+func (_m *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flow.Identifier]*flow.ResultApproval {
+	ret := _m.Called(resultID, chunkIndex)
 
-	var r0 *flow.ResultApproval
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ResultApproval); ok {
-		r0 = rf(approvalID)
+	var r0 map[flow.Identifier]*flow.ResultApproval
+	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64) map[flow.Identifier]*flow.ResultApproval); ok {
+		r0 = rf(resultID, chunkIndex)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ResultApproval)
+			r0 = ret.Get(0).(map[flow.Identifier]*flow.ResultApproval)
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
-		r1 = rf(approvalID)
+	return r0
+}
+
+// RemApproval provides a mock function with given fields: approval
+func (_m *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
+	ret := _m.Called(approval)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.ResultApproval) bool); ok {
+		r0 = rf(approval)
 	} else {
-		r1 = ret.Get(1).(bool)
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*flow.ResultApproval) error); ok {
+		r1 = rf(approval)
+	} else {
+		r1 = ret.Error(1)
 	}
 
 	return r0, r1
 }
 
-// Has provides a mock function with given fields: approvalID
-func (_m *Approvals) Has(approvalID flow.Identifier) bool {
-	ret := _m.Called(approvalID)
+// RemChunk provides a mock function with given fields: resultID, chunkIndex
+func (_m *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) (bool, error) {
+	ret := _m.Called(resultID, chunkIndex)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(approvalID)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64) bool); ok {
+		r0 = rf(resultID, chunkIndex)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
-}
-
-// Rem provides a mock function with given fields: approvalID
-func (_m *Approvals) Rem(approvalID flow.Identifier) bool {
-	ret := _m.Called(approvalID)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(approvalID)
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64) error); ok {
+		r1 = rf(resultID, chunkIndex)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r1 = ret.Error(1)
 	}
 
-	return r0
+	return r0, r1
 }
 
 // Size provides a mock function with given fields:

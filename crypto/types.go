@@ -8,8 +8,7 @@ type SigningAlgorithm int
 
 const (
 	// Supported signing algorithms
-
-	unknownSigningAlgorithm SigningAlgorithm = iota
+	UnknownSigningAlgorithm SigningAlgorithm = iota
 	// BLSBLS12381 is BLS on BLS 12-381 curve
 	BLSBLS12381
 	// ECDSAP256 is ECDSA on NIST P-256 curve
@@ -21,20 +20,6 @@ const (
 // String returns the string representation of this signing algorithm.
 func (f SigningAlgorithm) String() string {
 	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1"}[f]
-}
-
-// StringToSignatureAlgorithm converts a string to a SignatureAlgorithm.
-func StringToSignatureAlgorithm(s string) SigningAlgorithm {
-	switch s {
-	case BLSBLS12381.String():
-		return BLSBLS12381
-	case ECDSAP256.String():
-		return ECDSAP256
-	case ECDSASecp256k1.String():
-		return ECDSASecp256k1
-	default:
-		return unknownSigningAlgorithm
-	}
 }
 
 const (
@@ -52,11 +37,15 @@ const (
 	SignatureLenBLSBLS12381 = fieldSize * (2 - compression) // the length is divided by 2 if compression is on
 	PrKeyLenBLSBLS12381     = 32
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
-	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - compression) // the length is divided by 2 if compression is on
-	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1
-	opSwUInputLenBLSBLS12381    = 2 * (fieldSize + (securityBits / 8))
+	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - compression) // the length is divided by 2 if compression is on
 	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
 	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
+	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1
+	opSwUInputLenBLSBLS12381 = 2 * (fieldSize + (securityBits / 8))
+	// minimum output size as required by the chosen implementation of hash to curve
+	minHashSizeBLSBLS12381 = opSwUInputLenBLSBLS12381
+	// Cipher suite with all the settings
+	BLSCipherSuite = "BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_"
 
 	// ECDSA
 

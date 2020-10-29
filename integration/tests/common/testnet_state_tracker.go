@@ -8,15 +8,16 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 type TestnetStateTracker struct {
 	ghostTracking bool
 	BlockState    BlockState
 	ReceiptState  ReceiptState
+	ApprovalState ResultApprovalState
 	MsgState      MsgState
 }
 
@@ -75,11 +76,27 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			switch m := msg.(type) {
 			case *messages.BlockProposal:
 				tst.BlockState.Add(m)
-				t.Logf("block proposal received from %s at height %v: %x", sender, m.Header.Height, m.Header.ID())
+				t.Logf("block proposal received from %s at height %v: %x",
+					sender,
+					m.Header.Height,
+					m.Header.ID())
+			case *flow.ResultApproval:
+				tst.ApprovalState.Add(sender, m)
+				t.Logf("result approval received from %s for execution result ID %x and chunk index %v",
+					sender,
+					m.Body.ExecutionResultID,
+					m.Body.ChunkIndex)
 			case *flow.ExecutionReceipt:
+				finalState, ok := m.ExecutionResult.FinalStateCommitment()
+				require.True(t, ok)
+
 				tst.ReceiptState.Add(m)
-				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with SC %x", sender,
-					m.ExecutionResult.BlockID, m.ExecutorID, m.ExecutionResult.FinalStateCommit)
+				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with SC %x resultID %x",
+					sender,
+					m.ExecutionResult.BlockID,
+					m.ExecutorID,
+					finalState,
+					m.ExecutionResult.ID())
 			default:
 				t.Logf("other msg received from %s: %#v", sender, msg)
 				continue

@@ -4,10 +4,12 @@ package metrics
 const (
 	namespaceNetwork      = "network"
 	namespaceStorage      = "storage"
+	namespaceAccess       = "access"
 	namespaceCollection   = "collection"
 	namespaceConsensus    = "consensus"
 	namespaceVerification = "verification"
 	namespaceExecution    = "execution"
+	namespaceLoader       = "loader"
 )
 
 // Network subsystems represent the various layers of networking.
@@ -15,6 +17,7 @@ const (
 	// subsystemLibp2p = "libp2p"
 	subsystemGossip = "gossip"
 	subsystemEngine = "engine"
+	subsystemQueue  = "queue"
 )
 
 // Storage subsystems represent the various components of the storage layer.
@@ -22,6 +25,12 @@ const (
 	subsystemBadger  = "badger"
 	subsystemMempool = "mempool"
 	subsystemCache   = "cache"
+)
+
+// Access subsystem
+const (
+	subsystemTransactionTiming     = "transaction_timing"
+	subsystemTransactionSubmission = "transaction_submission"
 )
 
 // Collection subsystem
@@ -41,6 +50,14 @@ const (
 	subsystemMTrie        = "mtrie"
 	subsystemIngestion    = "ingestion"
 	subsystemRuntime      = "runtime"
+	subsystemProvider     = "provider"
+)
+
+// Verification Subsystems
+const (
+	subsystemFinderEngine   = "finder"
+	subsystemMatchEngine    = "match"
+	subsystemVerifierEngine = "verifier"
 )
 
 // METRIC NAMING GUIDELINES

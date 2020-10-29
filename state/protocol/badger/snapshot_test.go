@@ -11,12 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	"github.com/dapperlabs/flow-go/state/protocol/util"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func init() {
@@ -26,22 +25,12 @@ func init() {
 func TestHead(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		// setup
-		header := unittest.BlockHeaderFixture()
-		header.Height = 42
-
-		err := db.Update(operation.InsertHeader(header.ID(), &header))
+		identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+		root, result, seal := unittest.BootstrapFixture(identities)
+		err := state.Mutate().Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
-		err = db.Update(operation.IndexBlockHeight(header.Height, header.ID()))
-		require.NoError(t, err)
-
-		// add a second, outdated boundary to ensure the latest is taken
-		err = db.Update(operation.InsertFinalizedHeight(header.Height - 1))
-		require.NoError(t, err)
-
-		err = db.Update(operation.UpdateFinalizedHeight(header.Height))
-		require.NoError(t, err)
+		header := root.Header
 
 		t.Run("works with block number", func(t *testing.T) {
 			retrieved, err := state.AtHeight(header.Height).Head()
@@ -63,63 +52,12 @@ func TestHead(t *testing.T) {
 	})
 }
 
-func TestIdentity(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		identity := unittest.IdentityFixture()
-		blockID := unittest.IdentifierFixture()
-
-		err := db.Update(operation.InsertFinalizedHeight(0))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexBlockHeight(0, blockID))
-		require.NoError(t, err)
-
-		err = db.Update(operation.InsertIdentity(identity.ID(), identity))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadIdentities(blockID, []flow.Identifier{identity.NodeID}))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
-		require.NoError(t, err)
-
-		actual, err := state.Final().Identity(identity.NodeID)
-		require.NoError(t, err)
-		assert.EqualValues(t, identity, actual)
-
-		_, err = state.Final().Identity(unittest.IdentifierFixture())
-		require.Error(t, err)
-	})
-}
-
 func TestIdentities(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		blockID := unittest.IdentifierFixture()
-		identities := unittest.IdentityListFixture(8)
-
-		err := db.Update(operation.InsertFinalizedHeight(0))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexBlockHeight(0, blockID))
-		require.NoError(t, err)
-
-		for _, identity := range identities {
-			err = db.Update(operation.InsertIdentity(identity.ID(), identity))
-			require.NoError(t, err)
-		}
-
-		err = db.Update(operation.IndexPayloadIdentities(blockID, flow.GetIDs(identities)))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
+		identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+		root, result, seal := unittest.BootstrapFixture(identities)
+		err := state.Mutate().Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
 		actual, err := state.Final().Identities(filter.Any)
@@ -131,37 +69,39 @@ func TestIdentities(t *testing.T) {
 func TestClusters(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		blockID := unittest.IdentifierFixture()
-		identities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleCollection))
+		nClusters := 3
+		nCollectors := 7
 
-		err := db.Update(operation.InsertFinalizedHeight(0))
-		require.NoError(t, err)
+		collectors := unittest.IdentityListFixture(nCollectors, unittest.WithRole(flow.RoleCollection))
+		identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
 
-		err = db.Update(operation.IndexBlockHeight(0, blockID))
-		require.NoError(t, err)
-
-		for _, identity := range identities {
-			err = db.Update(operation.InsertIdentity(identity.ID(), identity))
-			require.NoError(t, err)
+		root, result, seal := unittest.BootstrapFixture(identities)
+		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
+		commit.ClusterQCs = make([]*flow.QuorumCertificate, nClusters)
+		for i := 0; i < nClusters; i++ {
+			commit.ClusterQCs[i] = unittest.QuorumCertificateFixture()
 		}
-
-		err = db.Update(operation.IndexPayloadIdentities(blockID, flow.GetIDs(identities)))
+		err := state.Mutate().Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
-		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
+		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
+		require.NoError(t, err)
+		actualClusters, err := state.Final().Epochs().Current().Clustering()
 		require.NoError(t, err)
 
-		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
-		require.NoError(t, err)
+		require.Equal(t, nClusters, len(expectedClusters))
+		require.Equal(t, len(expectedClusters), len(actualClusters))
 
-		actual, err := state.Final().Clusters()
-		require.NoError(t, err)
+		for i := 0; i < nClusters; i++ {
+			expected := expectedClusters[i]
+			actual := actualClusters[i]
 
-		require.Equal(t, 3, actual.Size())
-		assert.Len(t, actual.ByIndex(0), 3)
-		assert.Len(t, actual.ByIndex(1), 2)
-		assert.Len(t, actual.ByIndex(2), 2)
-	}, protocol.SetClusters(3))
+			assert.Equal(t, len(expected), len(actual))
+			assert.Equal(t, expected.Fingerprint(), actual.Fingerprint())
+		}
+	})
 }
 
 func TestSeed(t *testing.T) {
@@ -171,11 +111,9 @@ func TestSeed(t *testing.T) {
 		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-			genesis := unittest.GenesisFixture(identities)
-			commit := unittest.StateCommitmentFixture()
-
-			err := state.Mutate().Bootstrap(commit, genesis)
-			assert.Nil(t, err)
+			root, result, seal := unittest.BootstrapFixture(identities)
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.NoError(t, err)
 
 			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
@@ -189,14 +127,13 @@ func TestSeed(t *testing.T) {
 		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-			genesis := unittest.GenesisFixture(identities)
-			commit := unittest.StateCommitmentFixture()
+			root, result, seal := unittest.BootstrapFixture(identities)
 
-			err := state.Mutate().Bootstrap(commit, genesis)
-			assert.Nil(t, err)
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.NoError(t, err)
 
 			// add child
-			unvalidatedChild := unittest.BlockWithParentFixture(genesis.Header)
+			unvalidatedChild := unittest.BlockWithParentFixture(root.Header)
 			unvalidatedChild.Payload.Guarantees = nil
 			unvalidatedChild.Header.PayloadHash = unvalidatedChild.Payload.Hash()
 			err = state.Mutate().Extend(&unvalidatedChild)

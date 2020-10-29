@@ -3,22 +3,31 @@ package module
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
+// Network Metrics
 type NetworkMetrics interface {
-	// Network Metrics
 	// NetworkMessageSent size in bytes and count of the network message sent
-	NetworkMessageSent(sizeBytes int, topic string)
+	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
-	// Network Metrics
 	// NetworkMessageReceived size in bytes and count of the network message received
-	NetworkMessageReceived(sizeBytes int, topic string)
+	NetworkMessageReceived(sizeBytes int, topic string, messageType string)
 
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
-	NetworkDuplicateMessagesDropped(topic string)
+	NetworkDuplicateMessagesDropped(topic string, messageType string)
+
+	// Message receive queue metrics
+	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
+	MessageAdded(priority int)
+
+	// MessageRemoved decrements the metric tracking the number of messages in the queue with the given priority
+	MessageRemoved(priority int)
+
+	// QueueDuration tracks the time spent by a message with the given priority in the queue
+	QueueDuration(duration time.Duration, priority int)
 }
 
 type EngineMetrics interface {
@@ -119,28 +128,55 @@ type ConsensusMetrics interface {
 
 	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	FinishBlockToSeal(blockID flow.Identifier)
+
+	// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
+	CheckSealingDuration(duration time.Duration)
 }
 
 type VerificationMetrics interface {
-	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
-	// it starts the timer to record the execution time
-	OnChunkVerificationStarted(chunkID flow.Identifier)
+	// Finder Engine
+	//
+	// OnExecutionReceiptReceived is called whenever a new execution receipt arrives
+	// at Finder engine. It increments total number of received receipts.
+	OnExecutionReceiptReceived()
+	// OnExecutionResultSent is called whenever a new execution result is sent by
+	// Finder engine to the match engine. It increments total number of sent execution results.
+	OnExecutionResultSent()
 
-	// OnChunkVerificationFinished is called whenever chunkID verification gets finished
-	// it records the duration of execution and increases number of checked chunks
-	OnChunkVerificationFinished(chunkID flow.Identifier)
+	// Match Engine
+	//
+	// OnExecutionResultReceived is called whenever a new execution result is successfully received
+	// by Match engine from Finder engine.
+	// It increments the total number of received execution results.
+	OnExecutionResultReceived()
+	// OnVerifiableChunkSent is called on a successful submission of matched chunk
+	// by Match engine to Verifier engine.
+	// It increments the total number of chunks matched by match engine.
+	OnVerifiableChunkSent()
 
-	// OnResultApproval is called whenever a result approval for is emitted
-	// it increases the result approval counter for this chunk
+	// OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
+	// It increments the total number of chunk data packs received.
+	OnChunkDataPackReceived()
+
+	// OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
+	// It increments the total number of chunk data packs requested.
+	OnChunkDataPackRequested()
+
+	// Verifier Engine
+	//
+	// OnVerifiableChunkReceived is called whenever a verifiable chunk is received by Verifier engine
+	// from Match engine.It increments the total number of sent verifiable chunks.
+	OnVerifiableChunkReceived()
+	// OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
+	// It increases the total number of result approvals.
 	OnResultApproval()
 
-	// OnVerifiableChunkSubmitted is called whenever a verifiable chunk is shaped for a specific
+	// LogVerifiableChunkSize is called whenever a verifiable chunk is shaped for a specific
 	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
 	// to capture all the resources needed to verify a chunk.
 	// The purpose of this function is to track the overall chunk resources size on disk.
-	// Todo wire this up to do monitoring
-	// https://github.com/dapperlabs/flow-go/issues/3183
-	OnVerifiableChunkSubmitted(size float64)
+	// Todo wire this up to do monitoring (3183)
+	LogVerifiableChunkSize(size float64)
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
@@ -152,6 +188,18 @@ type LedgerMetrics interface {
 
 	// ForestNumberOfTrees current number of trees in a forest (in memory)
 	ForestNumberOfTrees(number uint64)
+
+	// LatestTrieRegCount records the number of unique register allocated (the lastest created trie)
+	LatestTrieRegCount(number uint64)
+
+	// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
+	LatestTrieRegCountDiff(number uint64)
+
+	// LatestTrieMaxDepth records the maximum depth of the last created trie
+	LatestTrieMaxDepth(number uint64)
+
+	// LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
+	LatestTrieMaxDepthDiff(number uint64)
 
 	// UpdateCount increase a counter of performed updates
 	UpdateCount()
@@ -182,10 +230,32 @@ type LedgerMetrics interface {
 
 	// ReadDurationPerItem records read time for single value (total duration / number of read values)
 	ReadDurationPerItem(duration time.Duration)
+
+	// DiskSize records the amount of disk space used by the storage (in bytes)
+	DiskSize(uint64)
+}
+
+type RuntimeMetrics interface {
+	// TransactionParsed reports the time spent parsing a single transaction
+	TransactionParsed(dur time.Duration)
+
+	// TransactionChecked reports the time spent checking a single transaction
+	TransactionChecked(dur time.Duration)
+
+	// TransactionInterpreted reports the time spent interpreting a single transaction
+	TransactionInterpreted(dur time.Duration)
+}
+
+type ProviderMetrics interface {
+	// ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
+	// It increases the request counter by one.
+	ChunkDataPackRequested()
 }
 
 type ExecutionMetrics interface {
 	LedgerMetrics
+	RuntimeMetrics
+	ProviderMetrics
 
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished
@@ -201,19 +271,44 @@ type ExecutionMetrics interface {
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)
 
-	// ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
-	ExecutionStateStorageDiskTotal(bytes int64)
-
 	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
 	ExecutionStorageStateCommitment(bytes int64)
 
-	// ExecutionLastExecutedBlockView reports last executed block view
-	ExecutionLastExecutedBlockView(view uint64)
+	// ExecutionLastExecutedBlockHeight reports last executed block height
+	ExecutionLastExecutedBlockHeight(height uint64)
 
 	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
 	ExecutionTotalExecutedTransactions(numExecuted int)
 
+	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
 
+	// Unused
 	ExecutionCollectionRequestRetried()
+
+	// ExecutionSync reports when the state syncing is triggered or stopped.
+	ExecutionSync(syncing bool)
+}
+
+type TransactionMetrics interface {
+	// TransactionReceived starts tracking of transaction execution/finalization/sealing
+	TransactionReceived(txID flow.Identifier, when time.Time)
+
+	// TransactionFinalized reports the time spent between the transaction being received and finalized. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionFinalized(txID flow.Identifier, when time.Time)
+
+	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionExecuted(txID flow.Identifier, when time.Time)
+
+	// TransactionExpired tracks number of expired transactions
+	TransactionExpired(txID flow.Identifier)
+
+	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
+	TransactionSubmissionFailed()
+}
+
+type PingMetrics interface {
+	NodeReachable(node *flow.Identity, reachable bool)
 }

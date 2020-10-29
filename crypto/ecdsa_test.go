@@ -7,7 +7,7 @@ import (
 	"crypto/rand"
 	"math/big"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,10 +18,10 @@ func TestECDSA(t *testing.T) {
 		ECDSAP256,
 		ECDSASecp256k1,
 	}
-	for i, curve := range ecdsaCurves {
+	for _, curve := range ecdsaCurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 		halg := hash.NewSHA3_256()
-		testGenSignVerify(t, ecdsaCurves[i], halg)
+		testGenSignVerify(t, curve, halg)
 	}
 }
 
@@ -108,8 +108,8 @@ func TestECDSAUtils(t *testing.T) {
 // This is only a sanity check meant to make sure the curve implemented
 // is checked against an independant test vector
 func TestScalarMult(t *testing.T) {
-	secp256k1 := newECDSASecp256k1().curve
-	p256 := newECDSAP256().curve
+	secp256k1 := secp256k1Instance.curve
+	p256 := p256Instance.curve
 	genericMultTests := []struct {
 		curve elliptic.Curve
 		Px    string
@@ -180,5 +180,18 @@ func TestScalarMult(t *testing.T) {
 		Rx, Ry = test.curve.ScalarMult(Px, Py, k.Bytes())
 		assert.Equal(t, Rx.Cmp(Qx), 0)
 		assert.Equal(t, Ry.Cmp(Qy), 0)
+	}
+}
+
+// ECDSA Proof of Possession test
+func TestECDSAPOP(t *testing.T) {
+	ecdsaCurves := []SigningAlgorithm{
+		ECDSAP256,
+		ECDSASecp256k1,
+	}
+	for _, curve := range ecdsaCurves {
+		t.Logf("Testing ECDSA for curve %s", curve)
+		halg := hash.NewSHA3_256()
+		testPOP(t, curve, halg)
 	}
 }

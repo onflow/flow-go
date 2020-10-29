@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestQueue(t *testing.T) {
@@ -205,4 +205,51 @@ func TestQueue(t *testing.T) {
 		assert.Equal(t, 6, queue.Size())
 		assert.Equal(t, uint64(3), queue.Height())
 	})
+
+	// Creating queue:
+	//    f--d--c-a
+	// Addingan element should be an idempotent operation:
+	//   * adding c a second time
+	//   * Dequeueing single head:
+	//     we should only get one child queue f--d--c
+	t.Run("Adding_Idempotent", func(t *testing.T) {
+		queue := NewQueue(a)
+		assert.True(t, queue.TryAdd(c))
+		assert.True(t, queue.TryAdd(d))
+		assert.True(t, queue.TryAdd(f))
+
+		assert.Equal(t, 4, queue.Size())
+		assert.Equal(t, uint64(3), queue.Height())
+
+		// adding c a second time
+		assert.True(t, queue.TryAdd(c))
+
+		// Dequeueing a
+		head, childQueues := queue.Dismount()
+		assert.Equal(t, a, head)
+		assert.Equal(t, 1, len(childQueues), "There should only be a single child queue")
+		assert.Equal(t, c.ID(), childQueues[0].Head.Item.ID())
+	})
+
+	// Testing attaching overlapping queues:
+	// queue A:
+	//   g-b
+	//      \
+	//       c
+	// queue B:
+	//    d--c-a
+	// attach queueA to queueB: we expect an error as the queues have nodes in common
+	t.Run("Attaching_partially_overlapped_queue", func(t *testing.T) {
+		queueA := NewQueue(c)
+		assert.True(t, queueA.TryAdd(b))
+		assert.True(t, queueA.TryAdd(g))
+
+		queueB := NewQueue(a)
+		assert.True(t, queueB.TryAdd(c))
+		assert.True(t, queueB.TryAdd(d))
+
+		err := queueB.Attach(queueA)
+		assert.Error(t, err)
+	})
+
 }

@@ -3,18 +3,18 @@ package common
 import (
 	"context"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/examples"
 
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
-	"github.com/dapperlabs/flow-go/integration/convert"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/dsl"
+	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/dsl"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var (
@@ -45,9 +45,9 @@ var (
 
 // CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
 // authorizing account NOTE: the counter contract must be deployed first
-func CreateCounterTx(chain flow.Chain) dsl.Transaction {
+func CreateCounterTx(counterAddress sdk.Address) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: chain.ServiceAddress()},
+		Import: dsl.Import{Address: counterAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
@@ -66,18 +66,19 @@ func CreateCounterTx(chain flow.Chain) dsl.Transaction {
 }
 
 // ReadCounterScript is a read-only script for reading the current value of the counter contract
-func ReadCounterScript(chain flow.Chain) dsl.Main {
+func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) dsl.Main {
 	return dsl.Main{
 		Import: dsl.Import{
 			Names:   []string{"Testing"},
-			Address: chain.ServiceAddress()},
+			Address: contractAddress,
+		},
 		ReturnType: "Int",
 		Code: fmt.Sprintf(`
 			let account = getAccount(0x%s)
 			if let cap = account.getCapability(/public/counter) {
 				return cap.borrow<&Testing.Counter>()?.count ?? -3
 			}
-			return -3`, chain.ServiceAddress().String()),
+			return -3`, accountAddress.Hex()),
 	}
 }
 
@@ -86,7 +87,7 @@ func ReadCounterScript(chain flow.Chain) dsl.Main {
 // contract must be deployed first
 func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: chain.ServiceAddress()},
+		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
@@ -106,45 +107,16 @@ func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 	}
 }
 
-func createAccount(ctx context.Context, client *testnet.Client, genesis flow.Block) error {
-	var createAccountScript = []byte(`
-	transaction {
-		prepare(signer: AuthAccount) {
-			let acct = AuthAccount(payer: signer)
-		}
-	}
-	`)
-
-	tx := flow.NewTransactionBody().
-		SetScript([]byte(createAccountScript)).
-		SetReferenceBlockID(genesis.ID()).
-		SetProposalKey(client.Chain.ServiceAddress(), 0, client.GetSeqNumber()).
-		SetPayer(client.Chain.ServiceAddress()).
-		AddAuthorizer(client.Chain.ServiceAddress())
-
-	err := client.SignAndSendTransaction(ctx, *tx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // readCounter executes a script to read the value of a counter. The counter
 // must have been deployed and created.
-func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+func readCounter(ctx context.Context, client *testnet.Client, address sdk.Address) (int, error) {
 
-	res, err := client.ExecuteScript(ctx, ReadCounterScript(client.Chain))
+	res, err := client.ExecuteScript(ctx, ReadCounterScript(address, address))
 	if err != nil {
 		return 0, err
 	}
 
-	v, err := jsoncdc.Decode(res)
-	if err != nil {
-		return 0, err
-	}
-
-	return v.(cadence.Int).Int(), nil
+	return res.(cadence.Int).Int(), nil
 }
 
 func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, error) {
@@ -166,9 +138,9 @@ func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, err
 // GetAccount returns a new account address, key, and signer.
 func GetAccount(chain flow.Chain) (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
 
-	addr := convert.ToSDKAddress(chain.ServiceAddress())
+	addr := sdk.Address(chain.ServiceAddress())
 
-	key := examples.RandomPrivateKey()
+	key := RandomPrivateKey()
 	signer := sdkcrypto.NewInMemorySigner(key, sdkcrypto.SHA3_256)
 
 	acct := sdk.NewAccountKey().
@@ -177,4 +149,52 @@ func GetAccount(chain flow.Chain) (sdk.Address, *sdk.AccountKey, sdkcrypto.Signe
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
 	return addr, acct, signer
+}
+
+// RandomPrivateKey returns a randomly generated ECDSA P-256 private key.
+func RandomPrivateKey() sdkcrypto.PrivateKey {
+	seed := make([]byte, sdkcrypto.MinSeedLength)
+
+	_, err := rand.Read(seed)
+	if err != nil {
+		panic(err)
+	}
+
+	privateKey, err := sdkcrypto.GeneratePrivateKey(sdkcrypto.ECDSA_P256, seed)
+	if err != nil {
+		panic(err)
+	}
+
+	return privateKey
+}
+
+func SDKTransactionFixture(opts ...func(*sdk.Transaction)) sdk.Transaction {
+	tx := sdk.Transaction{
+		Script:             []byte("pub fun main() {}"),
+		ReferenceBlockID:   sdk.Identifier(unittest.IdentifierFixture()),
+		GasLimit:           10,
+		ProposalKey:        convert.ToSDKProposalKey(unittest.ProposalKeyFixture()),
+		Payer:              sdk.Address(unittest.AddressFixture()),
+		Authorizers:        []sdk.Address{sdk.Address(unittest.AddressFixture())},
+		PayloadSignatures:  []sdk.TransactionSignature{convert.ToSDKTransactionSignature(unittest.TransactionSignatureFixture())},
+		EnvelopeSignatures: []sdk.TransactionSignature{convert.ToSDKTransactionSignature(unittest.TransactionSignatureFixture())},
+	}
+
+	for _, apply := range opts {
+		apply(&tx)
+	}
+
+	return tx
+}
+
+func WithTransactionDSL(txDSL dsl.Transaction) func(tx *sdk.Transaction) {
+	return func(tx *sdk.Transaction) {
+		tx.Script = []byte(txDSL.ToCadence())
+	}
+}
+
+func WithReferenceBlock(id sdk.Identifier) func(tx *sdk.Transaction) {
+	return func(tx *sdk.Transaction) {
+		tx.ReferenceBlockID = id
+	}
 }

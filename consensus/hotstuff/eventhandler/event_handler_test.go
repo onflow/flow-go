@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/eventhandler"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
@@ -43,7 +43,7 @@ func NewTestPaceMaker(t *testing.T, startView uint64, timeoutController *timeout
 	return &TestPaceMaker{p, t}
 }
 
-func (p *TestPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool) {
+func (p *TestPaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	oldView := p.CurView()
 	newView, changed := p.PaceMaker.UpdateCurViewWithQC(qc)
 	p.t.Logf("pacemaker.UpdateCurViewWithQC old view: %v, new view: %v\n", oldView, p.CurView())
@@ -79,7 +79,7 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 	}
 	pm := NewTestPaceMaker(t, view, timeout.NewController(tc), notifier)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
-	notifier.On("OnSkippedAhead", mock.Anything).Return()
+	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnReachedTimeout", mock.Anything).Return()
 	pm.Start()
 	return pm
@@ -88,33 +88,33 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 // VoteAggregator is a mock for testing eventhandler
 type VoteAggregator struct {
 	// if a blockID exists in qcs field, then a vote can be made into a QC
-	qcs map[flow.Identifier]*model.QuorumCertificate
+	qcs map[flow.Identifier]*flow.QuorumCertificate
 	t   *testing.T
 }
 
 func NewVoteAggregator(t *testing.T) *VoteAggregator {
 	return &VoteAggregator{
-		qcs: make(map[flow.Identifier]*model.QuorumCertificate),
+		qcs: make(map[flow.Identifier]*flow.QuorumCertificate),
 		t:   t,
 	}
 }
 
-func (v *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*model.QuorumCertificate, bool, error) {
+func (v *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*flow.QuorumCertificate, bool, error) {
 	qc, ok := v.qcs[block.BlockID]
 	v.t.Logf("voteaggregator.StoreVoteAndBuildQC, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
 
 	return qc, ok, nil
 }
 
-func (v *VoteAggregator) StorePendingVote(vote *model.Vote) bool {
-	return false
+func (v *VoteAggregator) StorePendingVote(vote *model.Vote) (bool, error) {
+	return false, nil
 }
 
 func (v *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
 	return true
 }
 
-func (v *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*model.QuorumCertificate, bool, error) {
+func (v *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error) {
 	qc, ok := v.qcs[block.BlockID]
 	v.t.Logf("voteaggregator.BuildQCOnReceivedBlock, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
 
@@ -168,7 +168,7 @@ func NewVoter(t *testing.T, lastVotedView uint64) *Voter {
 func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model.Vote, error) {
 	_, ok := v.votable[block.BlockID]
 	if !ok {
-		return nil, &model.NoVoteError{}
+		return nil, model.NoVoteError{Msg: "block not found"}
 	}
 	return createVote(block), nil
 }
@@ -180,9 +180,9 @@ type Forks struct {
 	blocks    map[flow.Identifier]*model.Block
 	finalized uint64
 	t         *testing.T
-	qc        *model.QuorumCertificate
+	qc        *flow.QuorumCertificate
 	// addQC is to customize the logic to change finalized view
-	addQC func(qc *model.QuorumCertificate) error
+	addQC func(qc *flow.QuorumCertificate) error
 	// addBlock is to customize the logic to change finalized view
 	addBlock func(block *model.Block) error
 }
@@ -194,7 +194,7 @@ func NewForks(t *testing.T, finalized uint64) *Forks {
 		t:         t,
 	}
 
-	f.addQC = func(qc *model.QuorumCertificate) error {
+	f.addQC = func(qc *flow.QuorumCertificate) error {
 		if f.qc == nil || qc.View > f.qc.View {
 			f.qc = qc
 		}
@@ -214,7 +214,7 @@ func (f *Forks) AddBlock(block *model.Block) error {
 	return f.addBlock(block)
 }
 
-func (f *Forks) AddQC(qc *model.QuorumCertificate) error {
+func (f *Forks) AddQC(qc *flow.QuorumCertificate) error {
 	f.t.Logf("forks.AddQC received QC for view: %v\n", qc.View)
 	return f.addQC(qc)
 }
@@ -244,7 +244,7 @@ func (f *Forks) GetBlocksForView(view uint64) []*model.Block {
 	return blocks
 }
 
-func (f *Forks) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error) {
+func (f *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
 	if f.qc == nil {
 		f.t.Fatalf("cannot make fork choice for curview: %v", curView)
 	}
@@ -260,7 +260,7 @@ func (f *Forks) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model
 // BlockProducer mock will always make a valid block
 type BlockProducer struct{}
 
-func (b *BlockProducer) MakeBlockProposal(qc *model.QuorumCertificate, view uint64) (*model.Proposal, error) {
+func (b *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64) (*model.Proposal, error) {
 	return createProposal(view, qc.View), nil
 }
 
@@ -286,7 +286,7 @@ func (v *BlacklistValidator) ValidateProposal(proposal *model.Proposal) error {
 	_, ok := v.invalidProposals[proposal.Block.BlockID]
 	if ok {
 		v.t.Logf("invalid proposal: %v\n", proposal.Block.View)
-		return &model.ErrorInvalidBlock{
+		return model.InvalidBlockError{
 			BlockID: proposal.Block.BlockID,
 			View:    proposal.Block.View,
 			Err:     fmt.Errorf("some error"),
@@ -327,7 +327,7 @@ type EventHandlerSuite struct {
 	endView     uint64
 	vote        *model.Vote
 	votingBlock *model.Block
-	qc          *model.QuorumCertificate
+	qc          *flow.QuorumCertificate
 	newview     *model.NewViewEvent
 }
 
@@ -374,7 +374,7 @@ func (es *EventHandlerSuite) SetupTest() {
 		SignerID: flow.ZeroID,
 		SigData:  nil,
 	}
-	es.qc = &model.QuorumCertificate{
+	es.qc = &flow.QuorumCertificate{
 		BlockID:   es.votingBlock.BlockID,
 		View:      es.votingBlock.View,
 		SignerIDs: nil,
@@ -820,8 +820,8 @@ func createBlockWithQC(view uint64, qcview uint64) *model.Block {
 	return block
 }
 
-func createQC(parent *model.Block) *model.QuorumCertificate {
-	qc := &model.QuorumCertificate{
+func createQC(parent *model.Block) *flow.QuorumCertificate {
+	qc := &flow.QuorumCertificate{
 		BlockID:   parent.BlockID,
 		View:      parent.View,
 		SignerIDs: nil,

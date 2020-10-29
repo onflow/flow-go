@@ -3,7 +3,7 @@
 package mock
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -12,13 +12,13 @@ type Mutator struct {
 	mock.Mock
 }
 
-// Bootstrap provides a mock function with given fields: state, genesis
-func (_m *Mutator) Bootstrap(state []byte, genesis *flow.Block) error {
-	ret := _m.Called(state, genesis)
+// Bootstrap provides a mock function with given fields: root, result, seal
+func (_m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
+	ret := _m.Called(root, result, seal)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]byte, *flow.Block) error); ok {
-		r0 = rf(state, genesis)
+	if rf, ok := ret.Get(0).(func(*flow.Block, *flow.ExecutionResult, *flow.Seal) error); ok {
+		r0 = rf(root, result, seal)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -42,6 +42,34 @@ func (_m *Mutator) Extend(block *flow.Block) error {
 
 // Finalize provides a mock function with given fields: blockID
 func (_m *Mutator) Finalize(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// HeaderExtend provides a mock function with given fields: block
+func (_m *Mutator) HeaderExtend(block *flow.Block) error {
+	ret := _m.Called(block)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
+		r0 = rf(block)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MarkValid provides a mock function with given fields: blockID
+func (_m *Mutator) MarkValid(blockID flow.Identifier) error {
 	ret := _m.Called(blockID)
 
 	var r0 error

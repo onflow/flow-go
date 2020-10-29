@@ -7,15 +7,16 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Engine represents the provider engine, used to spread block proposals across
@@ -27,25 +28,34 @@ type Engine struct {
 	unit    *engine.Unit         // used for concurrency & shutdown
 	log     zerolog.Logger       // used to log relevant actions with context
 	message module.EngineMetrics // used to track sent & received messages
-	con     network.Conduit      // used to talk to other nodes on the network
-	state   protocol.State       // used to access the  protocol state
-	me      module.Local         // used to access local node information
+	tracer  module.Tracer
+	con     network.Conduit // used to talk to other nodes on the network
+	state   protocol.State  // used to access the  protocol state
+	me      module.Local    // used to access local node information
 }
 
 // New creates a new block provider engine.
-func New(log zerolog.Logger, message module.EngineMetrics, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	message module.EngineMetrics,
+	tracer module.Tracer,
+	net module.Network,
+	state protocol.State,
+	me module.Local,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "provider").Logger(),
 		message: message,
+		tracer:  tracer,
 		state:   state,
 		me:      me,
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.BlockProvider, e)
+	con, err := net.Register(engine.PushBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -110,9 +120,19 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-// onBlockProposal is used when a block has been finalized locally and we want to
-// broadcast it to the network.
+// onBlockProposal is used when we want to broadcast a local block to the network.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+	if span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock); ok {
+		childSpan := e.tracer.StartSpanFromParent(span, trace.CONProvOnBlockProposal)
+		defer childSpan.Finish()
+	}
+
+	for _, g := range proposal.Payload.Guarantees {
+		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONProvOnBlockProposal)
+			defer childSpan.Finish()
+		}
+	}
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
@@ -130,14 +150,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return engine.NewInvalidInputErrorf("non-local block (nodeID: %x)", originID)
 	}
 
-	// get all non-consensus nodes in the system
-	identities, err := e.state.Final().Identities(filter.Not(filter.HasRole(flow.RoleConsensus)))
+	// determine the nodes we should send the block to
+	recipients, err := e.recipientList()
 	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
+		return fmt.Errorf("could not get recipients: %w", err)
 	}
 
-	// submit the blocks to the targets
-	err = e.con.Submit(proposal, identities.NodeIDs()...)
+	// submit the block to the targets
+	err = e.con.Publish(proposal, recipients.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not broadcast block: %w", err)
 	}
@@ -147,4 +167,40 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 
 	return nil
+}
+
+// recipientList returns a list of nodes which we should include when publishing
+// blocks. We include:
+// * all staked non-consensus nodes in the current epoch
+// * all non-consensus nodes registered for the next epoch, if known
+func (e *Engine) recipientList() (flow.IdentityList, error) {
+
+	final := e.state.Final()
+
+	// we always include non-consensus nodes from the current epoch
+	currentEpochRecipients, err := final.Identities(filter.Not(filter.HasRole(flow.RoleConsensus)))
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch recipients: %w", err)
+	}
+
+	phase, err := final.Phase()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch phase: %w", err)
+	}
+
+	// we don't know the nodes for the next epoch yet
+	if phase == flow.EpochPhaseStaking {
+		return currentEpochRecipients, nil
+	}
+
+	// once the next epoch has been set up, include those nodes
+	nextEpochIdentities, err := final.Epochs().Next().InitialIdentities()
+	if err != nil {
+		return nil, fmt.Errorf("could not get next epoch recipients: %w", err)
+	}
+
+	// filter to only include non-consensus nodes
+	nextEpochRecipients := nextEpochIdentities.Filter(filter.Not(filter.HasRole(flow.RoleConsensus)))
+
+	return currentEpochRecipients.Union(nextEpochRecipients), nil
 }

@@ -7,23 +7,21 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/dkg"
-	dkgmock "github.com/dapperlabs/flow-go/state/dkg/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/signature"
 )
 
-func MakeSigners(t *testing.T, committee hotstuff.Committee, dkg dkg.State, signerIDs []flow.Identifier, stakingKeys []crypto.PrivateKey, beaconKeys []crypto.PrivateKey) []hotstuff.Signer {
+func MakeSigners(t *testing.T, committee hotstuff.Committee, signerIDs []flow.Identifier, stakingKeys []crypto.PrivateKey, beaconKeys []crypto.PrivateKey) []hotstuff.SignerVerifier {
 
 	// generate our consensus node identities
 	require.NotEmpty(t, signerIDs)
 
-	var signers []hotstuff.Signer
+	var signers []hotstuff.SignerVerifier
 	if len(beaconKeys) != len(stakingKeys) {
 		for i, signerID := range signerIDs {
 			signer := MakeStakingSigner(t, committee, signerID, stakingKeys[i])
@@ -31,7 +29,7 @@ func MakeSigners(t *testing.T, committee hotstuff.Committee, dkg dkg.State, sign
 		}
 	} else {
 		for i, signerID := range signerIDs {
-			signer := MakeBeaconSigner(t, committee, dkg, signerID, stakingKeys[i], beaconKeys[i])
+			signer := MakeBeaconSigner(t, committee, signerID, stakingKeys[i], beaconKeys[i])
 			signers = append(signers, signer)
 		}
 	}
@@ -39,28 +37,25 @@ func MakeSigners(t *testing.T, committee hotstuff.Committee, dkg dkg.State, sign
 	return signers
 }
 
-func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
+func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSignerVerifier {
 	local, err := local.New(nil, priv)
 	require.NoError(t, err)
 	staking := signature.NewAggregationProvider("test_staking", local)
-	signer := NewSingleSigner(committee, staking, signerID)
+	signer := NewSingleSignerVerifier(committee, staking, signerID)
 	return signer
 }
 
-func MakeBeaconSigner(t *testing.T, committee hotstuff.Committee, dkg dkg.State, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
+func MakeBeaconSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
 	local, err := local.New(nil, stakingPriv)
 	require.NoError(t, err)
 	staking := signature.NewAggregationProvider("test_staking", local)
 	beacon := signature.NewThresholdProvider("test_beacon", beaconPriv)
 	combiner := signature.NewCombiner()
-	signer := NewCombinedSigner(committee, dkg, staking, beacon, combiner, signerID)
+	signer := NewCombinedSigner(committee, staking, beacon, combiner, signerID)
 	return signer
 }
 
-func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beaconEnabled bool) (hotstuff.Committee, dkg.State, []crypto.PrivateKey, []crypto.PrivateKey) {
-
-	// initialize the dkg snapshot
-	dkg := &dkgmock.State{}
+func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beaconEnabled bool) (hotstuff.Committee, []crypto.PrivateKey, []crypto.PrivateKey) {
 
 	// program the MembersSnapshot
 	committee := &mocks.Committee{}
@@ -91,15 +86,20 @@ func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beac
 		n, err := rand.Read(seed)
 		require.NoError(t, err)
 		require.Equal(t, n, crypto.SeedMinLenDKG)
-		beaconSKs, beaconPKs, beaconGroupPK, err = crypto.ThresholdSignKeyGen(len(identities), seed)
+		beaconSKs, beaconPKs, beaconGroupPK, err = crypto.ThresholdSignKeyGen(len(identities),
+			signature.RandomBeaconThreshold(len(identities)), seed)
 		require.NoError(t, err)
-		dkg.On("GroupSize").Return(uint(len(beaconSKs)), nil)
-		dkg.On("GroupKey").Return(beaconGroupPK, nil)
-		for i, identity := range identities {
-			dkg.On("HasParticipant", identity.NodeID).Return(true, nil)
-			dkg.On("ParticipantIndex", identity.NodeID).Return(uint(i), nil)
-			dkg.On("ParticipantKey", identity.NodeID).Return(beaconPKs[i], nil)
+
+		dkg := &mocks.DKG{}
+		committee.On("DKG", mock.Anything).Return(dkg, nil)
+		dkg.On("Size").Return(uint(len(identities)))
+		dkg.On("GroupKey").Return(beaconGroupPK)
+		for i, node := range identities {
+			share := beaconPKs[i]
+			dkg.On("KeyShare", node.NodeID).Return(share, nil)
+			dkg.On("Index", node.NodeID).Return(uint(i), nil)
 		}
 	}
-	return committee, dkg, stakingKeys, beaconSKs
+
+	return committee, stakingKeys, beaconSKs
 }

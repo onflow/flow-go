@@ -6,9 +6,10 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // NitroPaceMaker implements the hotstuff.PaceMaker
@@ -22,9 +23,13 @@ type NitroPaceMaker struct {
 	started        *atomic.Bool
 }
 
+// New creates a new NitroPaceMaker instance
+// startView is the view for the pacemaker to start from
+// timeoutController controls the timeout trigger.
+// notifier provides callbacks for pacemaker events.
 func New(startView uint64, timeoutController *timeout.Controller, notifier hotstuff.Consumer) (*NitroPaceMaker, error) {
 	if startView < 1 {
-		return nil, &model.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
+		return nil, &model.ConfigurationError{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
 	}
 	pm := NitroPaceMaker{
 		currentView:    startView,
@@ -47,9 +52,6 @@ func (p *NitroPaceMaker) gotoView(newView uint64) *model.NewViewEvent {
 		// STRICTLY monotonously increasing view numbers.
 		panic(fmt.Sprintf("cannot move from view %d to %d: currentView must be strictly monotonously increasing", p.currentView, newView))
 	}
-	if newView > p.currentView+1 {
-		p.notifier.OnSkippedAhead(newView)
-	}
 	p.currentView = newView
 	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
@@ -61,11 +63,17 @@ func (p *NitroPaceMaker) CurView() uint64 {
 	return p.currentView
 }
 
+// TimeoutChannel returns the timeout channel for current active timeout.
+// Note the returned timeout channel returns only one timeout, which is the current
+// timeout.
+// To get the timeout for the next timeout, you need to call TimeoutChannel() again.
 func (p *NitroPaceMaker) TimeoutChannel() <-chan time.Time {
 	return p.timeoutControl.Channel()
 }
 
-func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool) {
+// UpdateCurViewWithQC notifies the pacemaker with a new QC, which might allow pacemaker to
+// fast forward its view.
+func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	if qc.View < p.currentView {
 		return nil, false
 	}
@@ -74,9 +82,14 @@ func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*mode
 	// => 2/3 of replicas are at least in view qc.view + 1.
 	// => replica can skip ahead to view qc.view + 1
 	p.timeoutControl.OnProgressBeforeTimeout()
-	return p.gotoView(qc.View + 1), true
+
+	newView := qc.View + 1
+	p.notifier.OnQcTriggeredViewChange(qc, newView)
+	return p.gotoView(newView), true
 }
 
+// UpdateCurViewWithBlock indicates the pacermaker that the block for the current view has received.
+// and isLeaderForNextView indicates whether or not this replica is the primary for the NEXT view.
 func (p *NitroPaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
 	// use block's QC to fast-forward if possible
 	newViewOnQc, newViewOccurredOnQc := p.UpdateCurViewWithQC(block.QC)
@@ -117,6 +130,8 @@ func (p *NitroPaceMaker) actOnBlockForCurView(block *model.Block, isLeaderForNex
 	return p.gotoView(p.currentView + 1), true
 }
 
+// OnTimeout notifies the pacemaker that the timeout event has looped through the event loop.
+// It always trigger a view change, and the new view will be returned as NewViewEvent
 func (p *NitroPaceMaker) OnTimeout() *model.NewViewEvent {
 	p.emitTimeoutNotifications(p.timeoutControl.TimerInfo())
 	p.timeoutControl.OnTimeout()
@@ -127,6 +142,7 @@ func (p *NitroPaceMaker) emitTimeoutNotifications(timeout *model.TimerInfo) {
 	p.notifier.OnReachedTimeout(timeout)
 }
 
+// Start starts the pacemaker
 func (p *NitroPaceMaker) Start() {
 	if p.started.Swap(true) {
 		return
@@ -135,6 +151,7 @@ func (p *NitroPaceMaker) Start() {
 	p.notifier.OnStartingTimeout(timerInfo)
 }
 
+// BlockRateDelay returns the delay for broadcasting its own proposals.
 func (p *NitroPaceMaker) BlockRateDelay() time.Duration {
 	return p.timeoutControl.BlockRateDelay()
 }

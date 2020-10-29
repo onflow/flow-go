@@ -8,12 +8,14 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 // Builder is the builder for collection block payloads. Upon providing a
@@ -23,44 +25,39 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db                *badger.DB
-	mainHeaders       storage.Headers
-	clusterHeaders    storage.Headers
-	payloads          storage.ClusterPayloads
-	transactions      mempool.Transactions
-	maxCollectionSize uint
-	expiryBuffer      uint
+	db             *badger.DB
+	mainHeaders    storage.Headers
+	clusterHeaders storage.Headers
+	payloads       storage.ClusterPayloads
+	transactions   mempool.Transactions
+	tracer         module.Tracer
+	config         Config
 }
 
-type Opt func(*Builder)
-
-func WithMaxCollectionSize(size uint) Opt {
-	return func(b *Builder) {
-		b.maxCollectionSize = size
-	}
-}
-
-func WithExpiryBuffer(buf uint) Opt {
-	return func(b *Builder) {
-		b.expiryBuffer = buf
-	}
-}
-
-func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, opts ...Opt) *Builder {
+func NewBuilder(
+	db *badger.DB,
+	tracer module.Tracer,
+	mainHeaders storage.Headers,
+	clusterHeaders storage.Headers,
+	payloads storage.ClusterPayloads,
+	transactions mempool.Transactions,
+	opts ...Opt,
+) *Builder {
 
 	b := Builder{
-		db:                db,
-		mainHeaders:       headers,
-		clusterHeaders:    headers,
-		payloads:          payloads,
-		transactions:      transactions,
-		maxCollectionSize: 100,
-		expiryBuffer:      15,
+		db:             db,
+		tracer:         tracer,
+		mainHeaders:    mainHeaders,
+		clusterHeaders: clusterHeaders,
+		payloads:       payloads,
+		transactions:   transactions,
+		config:         DefaultConfig(),
 	}
 
 	for _, apply := range opts {
-		apply(&b)
+		apply(&b.config)
 	}
+
 	return &b
 }
 
@@ -69,11 +66,16 @@ func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.Cluster
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 	var proposal cluster.Block
 
+	b.tracer.StartSpan(parentID, trace.COLBuildOn)
+	defer b.tracer.FinishSpan(parentID, trace.COLBuildOn)
+
 	// first we construct a proposal in-memory, ensuring it is a valid extension
 	// of chain state -- this can be done in a read-only transaction
 	err := b.db.View(func(tx *badger.Txn) error {
 
 		// STEP ONE: Load some things we need to do our work.
+		b.tracer.StartSpan(parentID, trace.COLBuildOnSetup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
 
 		var parent flow.Header
 		err := operation.RetrieveHeader(parentID, &parent)(tx)
@@ -106,10 +108,25 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// un-finalized and finalized sections of the chain to decide whether to
 		// remove conflicting transactions from the mempool.
 
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
+		b.tracer.StartSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+
+		// RATE LIMITING: the builder module can be configured to limit the
+		// rate at which transactions with a common payer are included in
+		// blocks. Depending on the configured limit, we either allow 1
+		// transaction every N sequential collections, or we allow K transactions
+		// per collection.
+
+		// keep track of transactions in the ancestry to avoid duplicates
+		lookup := newTransactionLookup()
+		// keep track of transactions to enforce rate limiting
+		limiter := newRateLimiter(b.config, parent.Height+1)
+
 		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
-		unfinalizedLookup := make(map[flow.Identifier]struct{})
-		for ancestorID != clusterFinal.ID() {
+		clusterFinalID := clusterFinal.ID()
+		for ancestorID != clusterFinalID {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
 				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
@@ -126,10 +143,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			collection := payload.Collection
 			for _, tx := range collection.Transactions {
-				unfinalizedLookup[tx.ID()] = struct{}{}
+				lookup.addUnfinalizedAncestor(tx.ID())
+				limiter.addAncestor(ancestor.Height, tx)
 			}
 			ancestorID = ancestor.ParentID
 		}
+
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+		b.tracer.StartSpan(parentID, trace.COLBuildOnFinalizedLookup)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 
 		//TODO for now we check a fixed # of finalized ancestors - we should
 		// instead look back based on reference block ID and expiry
@@ -140,7 +162,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// look up previously included transactions in FINALIZED ancestors
-		finalizedLookup := make(map[flow.Identifier]struct{})
 		ancestorID = clusterFinal.ID()
 		ancestorHeight := clusterFinal.Height
 		for ancestorHeight > limit {
@@ -155,7 +176,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			collection := payload.Collection
 			for _, tx := range collection.Transactions {
-				finalizedLookup[tx.ID()] = struct{}{}
+				lookup.addFinalizedAncestor(tx.ID())
+				limiter.addAncestor(ancestor.Height, tx)
 			}
 
 			ancestorID = ancestor.ParentID
@@ -164,16 +186,47 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 		// STEP THREE: build a payload of valid transactions, while at the same
 		// time figuring out the correct reference block ID for the collection.
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
+		b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
 
 		minRefHeight := uint64(math.MaxUint64)
 		// start with the finalized reference ID (longest expiry time)
 		minRefID := refChainFinalizedID
 
 		var transactions []*flow.TransactionBody
+		var totalByteSize uint64
+		var totalGas uint64
 		for _, tx := range b.transactions.All() {
 
 			// if we have reached maximum number of transactions, stop
-			if uint(len(transactions)) >= b.maxCollectionSize {
+			if uint(len(transactions)) >= b.config.MaxCollectionSize {
+				break
+			}
+
+			txByteSize := uint64(tx.ByteSize())
+			// ignore transactions with tx byte size bigger that the max amount per collection
+			// this case shouldn't happen ever since we keep a limit on tx byte size but in case
+			// we keep this condition
+			if txByteSize > b.config.MaxCollectionByteSize {
+				continue
+			}
+
+			// because the max byte size per tx is way smaller than the max collection byte size, we can stop here and not continue.
+			// to make it more effective in the future we can continue adding smaller ones
+			if totalByteSize+txByteSize > b.config.MaxCollectionByteSize {
+				break
+			}
+
+			// ignore transactions with max gas bigger that the max total gas per collection
+			// this case shouldn't happen ever but in case we keep this condition
+			if tx.GasLimit > b.config.MaxCollectionTotalGas {
+				continue
+			}
+
+			// cause the max gas limit per tx is way smaller than the total max gas per collection, we can stop here and not continue.
+			// to make it more effective in the future we can continue adding smaller ones
+			if totalGas+tx.GasLimit > b.config.MaxCollectionTotalGas {
 				break
 			}
 
@@ -193,23 +246,26 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			// ensure the reference block is not too old
 			txID := tx.ID()
-			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.expiryBuffer) {
+			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.config.ExpiryBuffer) {
 				// the transaction is expired, it will never be valid
 				b.transactions.Rem(txID)
 				continue
 			}
 
 			// check that the transaction was not already used in un-finalized history
-			_, duplicated := unfinalizedLookup[txID]
-			if duplicated {
+			if lookup.isUnfinalizedAncestor(txID) {
 				continue
 			}
 
 			// check that the transaction was not already included in finalized history.
-			_, duplicated = finalizedLookup[txID]
-			if duplicated {
+			if lookup.isFinalizedAncestor(txID) {
 				// remove from mempool, conflicts with finalized block will never be valid
 				b.transactions.Rem(txID)
+				continue
+			}
+
+			// enforce rate limiting rules
+			if limiter.shouldRateLimit(tx) {
 				continue
 			}
 
@@ -219,12 +275,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 				minRefID = tx.ReferenceBlockID
 			}
 
+			// update per-payer transaction count
+			limiter.transactionIncluded(tx)
+
 			transactions = append(transactions, tx)
+			totalByteSize += txByteSize
+			totalGas += tx.GasLimit
 		}
 
 		// STEP FOUR: we have a set of transactions that are valid to include
 		// on this fork. Now we need to create the collection that will be
 		// used in the payload and construct the final proposal model
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
+		b.tracer.StartSpan(parentID, trace.COLBuildOnCreateHeader)
+		defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
 		// build the payload from the transactions
 		payload := cluster.PayloadFromTransactions(minRefID, transactions...)
@@ -251,11 +315,16 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			Payload: &payload,
 		}
 
+		b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
+
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not build block: %w", err)
 	}
+
+	b.tracer.StartSpan(parentID, trace.COLBuildOnDBInsert)
+	defer b.tracer.FinishSpan(parentID, trace.COLBuildOnDBInsert)
 
 	// finally we insert the block in a write transaction
 	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))

@@ -3,12 +3,14 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // Blocks implements a simple block storage around a badger DB.
@@ -27,7 +29,7 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) storeTx(block *flow.Block) func(*badger.Txn) error {
+func (b *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		err := b.headers.storeTx(block.Header)(tx)
 		if err != nil {
@@ -60,7 +62,7 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 }
 
 func (b *Blocks) Store(block *flow.Block) error {
-	return operation.RetryOnConflict(b.db.Update, b.storeTx(block))
+	return operation.RetryOnConflict(b.db.Update, b.StoreTx(block))
 }
 
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
@@ -95,4 +97,37 @@ func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flo
 		}
 	}
 	return nil
+}
+
+// UpdateLastFullBlockHeight upsert (update or insert) the last full block height
+func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
+	return operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
+
+		// try to update
+		err := operation.UpdateLastCompleteBlockHeight(height)(tx)
+		if err == nil {
+			return nil
+		}
+
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not update LastFullBlockHeight: %w", err)
+		}
+
+		// if key does not exist, try insert.
+		err = operation.InsertLastCompleteBlockHeight(height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert LastFullBlockHeight: %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (b *Blocks) GetLastFullBlockHeight() (uint64, error) {
+	var h uint64
+	err := b.db.View(operation.RetrieveLastCompleteBlockHeight(&h))
+	if err != nil {
+		return 0, fmt.Errorf("failed to retrieve LastFullBlockHeight: %w", err)
+	}
+	return h, nil
 }

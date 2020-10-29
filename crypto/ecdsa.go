@@ -14,11 +14,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // ecdsaAlgo embeds SignAlgo
@@ -29,36 +26,12 @@ type ecdsaAlgo struct {
 	algo SigningAlgorithm
 }
 
-//  Once variables to use a unique instance
+//  ECDSA contexts for each supported curve
+// NIST P-256 curve
 var p256Instance *ecdsaAlgo
-var p256Once sync.Once
 
-// returns NIST P-256 curve
-func newECDSAP256() *ecdsaAlgo {
-	p256Once.Do(func() {
-		p256Instance = &(ecdsaAlgo{
-			curve: elliptic.P256(),
-			algo:  ECDSAP256,
-		})
-	})
-	return p256Instance
-}
-
-//  Once variables to use a unique instance
+// SECG secp256k1 curve https://www.secg.org/sec2-v2.pdf
 var secp256k1Instance *ecdsaAlgo
-var secp256k1Once sync.Once
-
-// returns SECG secp256k1 curve.
-// https://www.secg.org/sec2-v2.pdf
-func newECDSASecp256k1() *ecdsaAlgo {
-	secp256k1Once.Do(func() {
-		secp256k1Instance = &(ecdsaAlgo{
-			curve: btcec.S256(),
-			algo:  ECDSASecp256k1,
-		})
-	})
-	return secp256k1Instance
-}
 
 func bitsToBytes(bits int) int {
 	return (bits + 7) >> 3
@@ -88,6 +61,8 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 // the resulting signature is the concatenation bytes(r)||bytes(s)
 // where r and s are padded to the curve order size
 func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
+	// no need to check the hasher output size as all supported hash algos
+	// have at lease 32 bytes output
 	if alg == nil {
 		return nil, errors.New("Sign requires a Hasher")
 	}
@@ -97,9 +72,14 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 
 // verifyHash implements ECDSA signature verification
 func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
+	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
+
+	if len(sig) != 2*Nlen {
+		return false, nil
+	}
+
 	var r big.Int
 	var s big.Int
-	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
 	r.SetBytes(sig[:Nlen])
 	s.SetBytes(sig[Nlen:])
 	return goecdsa.Verify(pk.goPubKey, h, &r, &s), nil
@@ -109,11 +89,28 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 // It only reads the public key. hashers sha2 and sha3 are
 // modified temporarily
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
+	// no need to check the hasher output size as all supported hash algos
+	// have at lease 32 bytes output
 	if alg == nil {
 		return false, errors.New("Verify requires a Hasher")
 	}
+
 	h := alg.ComputeHash(data)
 	return pk.verifyHash(sig, h)
+}
+
+// GeneratePOP returns a proof of possession (PoP) for the receiver private key
+// using the given hasher.
+func (sk *PrKeyECDSA) GeneratePOP(h hash.Hasher) (Signature, error) {
+	// sign the public key
+	return sk.Sign(sk.PublicKey().Encode(), h)
+}
+
+// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
+// using the given hasher.
+func (pk *PubKeyECDSA) VerifyPOP(s Signature, h hash.Hasher) (bool, error) {
+	// verify the signature against the public key
+	return pk.Verify(s, pk.Encode(), h)
 }
 
 var one = new(big.Int).SetInt64(1)

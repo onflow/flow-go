@@ -6,7 +6,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Backdata implements a generic memory pool backed by a Go map.
@@ -86,6 +86,11 @@ func (b *Backdata) All() []flow.Entity {
 	return entities
 }
 
+// Clear removes all entities from the pool.
+func (b *Backdata) Clear() {
+	b.entities = make(map[flow.Identifier]flow.Entity)
+}
+
 // Hash will use a merkle root hash to hash all items.
 func (b *Backdata) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
@@ -158,6 +163,7 @@ func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) er
 	b.Lock()
 	defer b.Unlock()
 	err := f(b.Backdata.entities)
+	b.reduce()
 	return err
 }
 
@@ -178,6 +184,13 @@ func (b *Backend) All() []flow.Entity {
 	b.RLock()
 	defer b.RUnlock()
 	return b.Backdata.All()
+}
+
+// Clear removes all entities from the pool.
+func (b *Backend) Clear() {
+	b.Lock()
+	defer b.Unlock()
+	b.Backdata.Clear()
 }
 
 // Hash will use a merkle root hash to hash all items.

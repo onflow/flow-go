@@ -1,7 +1,7 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // Merger is responsible for combining two signatures, but it must be done

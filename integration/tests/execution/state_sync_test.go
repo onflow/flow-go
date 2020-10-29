@@ -4,16 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rs/zerolog"
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/integration/tests/common"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 func TestExecutionStateSync(t *testing.T) {
@@ -22,23 +21,9 @@ func TestExecutionStateSync(t *testing.T) {
 
 type StateSyncSuite struct {
 	Suite
-	exe2ID flow.Identifier
-}
-
-func (s *StateSyncSuite) SetupTest() {
-
-	// need second execution nodes
-	s.exe2ID = unittest.IdentifierFixture()
-	exe2Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.ErrorLevel))
-	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 }
 
 func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
-
-	// pause execution node 2
-	err := s.net.ContainerByID(s.exe2ID).Pause()
-	require.NoError(s.T(), err, "could not pause execution node 2")
 
 	// wait for first finalized block, called blockA
 	blockA := s.BlockState.WaitForFirstFinalized(s.T())
@@ -46,10 +31,12 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockA from execution node 1
 	erExe1BlockA := s.ReceiptState.WaitForReceiptFrom(s.T(), blockA.Header.ID(), s.exe1ID)
-	s.T().Logf("got erExe1BlockA with SC %x", erExe1BlockA.ExecutionResult.FinalStateCommit)
+	finalStateExe1BlockA, ok := erExe1BlockA.ExecutionResult.FinalStateCommitment()
+	require.True(s.T(), ok)
+	s.T().Logf("got erExe1BlockA with SC %x", finalStateExe1BlockA)
 
 	// send transaction
-	err = s.AccessClient().DeployContract(context.Background(), s.net.Genesis().ID(), common.CounterContract)
+	err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), common.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
@@ -58,15 +45,12 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockB from execution node 1
 	erExe1BlockB := s.ReceiptState.WaitForReceiptFrom(s.T(), blockB.Header.ID(), s.exe1ID)
-	s.T().Logf("got erExe1BlockB with SC %x", erExe1BlockB.ExecutionResult.FinalStateCommit)
+	finalStateExe1BlockB, ok := erExe1BlockB.ExecutionResult.FinalStateCommitment()
+	require.True(s.T(), ok)
+	s.T().Logf("got erExe1BlockB with SC %x", finalStateExe1BlockB)
 
 	// require that state between blockA and blockB has changed
-	require.NotEqual(s.T(), erExe1BlockA.ExecutionResult.FinalStateCommit,
-		erExe1BlockB.ExecutionResult.FinalStateCommit)
-
-	// unpause execution node 2
-	err = s.net.ContainerByID(s.exe2ID).Start()
-	require.NoError(s.T(), err)
+	require.NotEqual(s.T(), finalStateExe1BlockA, finalStateExe1BlockB)
 
 	// wait until the next proposed block is finalized, called blockC
 	blockC := s.BlockState.WaitUntilNextHeightFinalized(s.T())
@@ -74,40 +58,25 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockC from execution node 1
 	erExe1BlockC := s.ReceiptState.WaitForReceiptFrom(s.T(), blockC.Header.ID(), s.exe1ID)
-	s.T().Logf("got erExe1BlockC with SC %x", erExe1BlockC.ExecutionResult.FinalStateCommit)
+	finalStateExe1BlockC, ok := erExe1BlockC.ExecutionResult.FinalStateCommitment()
+	require.True(s.T(), ok)
+	s.T().Logf("got erExe1BlockC with SC %x", finalStateExe1BlockC)
 
 	// require that state between blockB and blockC has not changed
-	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe1BlockC.ExecutionResult.FinalStateCommit)
+	require.Equal(s.T(), finalStateExe1BlockB, finalStateExe1BlockC)
 
-	// wait for execution receipt for blockA from execution node 2 (this one must have been synced)
-	erExe2BlockA := s.ReceiptState.WaitForReceiptFrom(s.T(), blockA.Header.ID(), s.exe2ID)
-	s.T().Logf("got erExe2BlockA with SC %x", erExe2BlockA.ExecutionResult.FinalStateCommit)
-
-	// require that state for blockA is the same for execution node 1 and 2
-	require.Equal(s.T(), erExe1BlockA.ExecutionResult.FinalStateCommit, erExe2BlockA.ExecutionResult.FinalStateCommit)
-
-	// wait for execution receipt for blockB from execution node 2 (this one must have been synced)
-	erExe2BlockB := s.ReceiptState.WaitForReceiptFrom(s.T(), blockB.Header.ID(), s.exe2ID)
-	s.T().Logf("got erExe2BlockB with SC %x", erExe2BlockB.ExecutionResult.FinalStateCommit)
-
-	// require that state for blockB is the same for execution node 1 and 2
-	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe2BlockB.ExecutionResult.FinalStateCommit)
-
-	// wait for execution receipt for blockC from execution node 2 (this one must have been synced)
-	erExe2BlockC := s.ReceiptState.WaitForReceiptFrom(s.T(), blockC.Header.ID(), s.exe2ID)
-	s.T().Logf("got erExe2BlockC with SC %x", erExe2BlockC.ExecutionResult.FinalStateCommit)
-
-	// require that state for blockC is the same for execution node 1 and 2
-	require.Equal(s.T(), erExe1BlockC.ExecutionResult.FinalStateCommit, erExe2BlockC.ExecutionResult.FinalStateCommit)
+	// wait for block C has been sealed
+	sealed := s.BlockState.WaitForSealed(s.T(), blockC.Header.Height)
+	s.T().Logf("block C has been sealed: %v", sealed.Header.ID())
 
 	// send a ExecutionStateSyncRequest from Ghost node
-	err = s.Ghost().Send(context.Background(), engine.ExecutionSync,
-		&messages.ExecutionStateSyncRequest{CurrentBlockID: blockA.Header.ID(), TargetBlockID: blockB.Header.ID()},
+	err = s.Ghost().Send(context.Background(), engine.SyncExecution,
+		&messages.ExecutionStateSyncRequest{FromHeight: blockA.Header.Height, ToHeight: blockC.Header.Height},
 		[]flow.Identifier{s.exe1ID}...)
 	require.NoError(s.T(), err)
 
 	// wait for ExecutionStateDelta
-	msg2 := s.MsgState.WaitForMsgFrom(s.T(), common.MsgIsExecutionStateDeltaWithChanges, s.exe1ID)
+	msg2 := s.MsgState.WaitForMsgFrom(s.T(), common.MsgIsExecutionStateDeltaWithChanges, s.exe1ID, "state delta from execution node")
 	executionStateDelta := msg2.(*messages.ExecutionStateDelta)
-	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, executionStateDelta.EndState)
+	require.Equal(s.T(), finalStateExe1BlockB, executionStateDelta.EndState)
 }

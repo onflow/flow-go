@@ -6,10 +6,10 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestInsertRetrieveClusterBlock(t *testing.T) {
@@ -30,6 +30,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 func TestFinalizeClusterBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		parent := unittest.ClusterBlockFixture()
+
 		block := unittest.ClusterBlockWithParent(&parent)
 
 		err := db.Update(InsertClusterBlock(&block))

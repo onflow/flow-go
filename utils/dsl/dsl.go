@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	sdk "github.com/onflow/flow-go-sdk"
 )
 
 type CadenceCode interface {
@@ -54,12 +54,16 @@ func (r Resource) ToCadence() string {
 }
 
 type Import struct {
-	Address flow.Address
+	Names   []string
+	Address sdk.Address
 }
 
 func (i Import) ToCadence() string {
-	if i.Address != flow.EmptyAddress {
-		return fmt.Sprintf("import 0x%s", i.Address.Short())
+	if i.Address != sdk.EmptyAddress {
+		if len(i.Names) > 0 {
+			return fmt.Sprintf("import %s from 0x%s\n", strings.Join(i.Names, ", "), i.Address)
+		}
+		return fmt.Sprintf("import 0x%s\n", i.Address)
 	}
 	return ""
 }
@@ -81,12 +85,13 @@ func (u UpdateAccountCode) ToCadence() string {
 }
 
 type Main struct {
+	Import     Import
 	ReturnType string
 	Code       string
 }
 
 func (m Main) ToCadence() string {
-	return fmt.Sprintf("import 0x01\npub fun main(): %s { %s }", m.ReturnType, m.Code)
+	return fmt.Sprintf("%s \npub fun main(): %s { %s }", m.Import.ToCadence(), m.ReturnType, m.Code)
 }
 
 type Code string

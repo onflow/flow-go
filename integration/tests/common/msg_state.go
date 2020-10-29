@@ -3,56 +3,73 @@ package common
 import (
 	"bytes"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 const msgStateTimeout = 20 * time.Second
 
 type MsgState struct {
-	// TODO add lock to prevent concurrent map access bugs
-	msgs map[flow.Identifier][]interface{}
+	msgs sync.Map
 }
 
 func (ms *MsgState) Add(sender flow.Identifier, msg interface{}) {
-	if ms.msgs == nil {
-		ms.msgs = make(map[flow.Identifier][]interface{}) // TODO: initialize this map in constructor
+	var list []interface{}
+	value, ok := ms.msgs.Load(sender)
+
+	if !ok {
+		list = make([]interface{}, 0)
+	} else {
+		list = value.([]interface{})
 	}
 
-	ms.msgs[sender] = append(ms.msgs[sender], msg)
+	list = append(list, msg)
+	ms.msgs.Store(sender, list)
 }
 
 // From returns a slice with all the msgs received from the given node and a boolean whether any messages existed
 func (ms *MsgState) From(node flow.Identifier) ([]interface{}, bool) {
-	msgs, ok := ms.msgs[node]
-	return msgs, ok
+	msgs, ok := ms.msgs.Load(node)
+	if !ok {
+		return nil, ok
+	}
+	return msgs.([]interface{}), ok
 }
 
 // LenFrom returns the number of msgs received from the given node
 func (ms *MsgState) LenFrom(node flow.Identifier) int {
-	return len(ms.msgs[node])
+	msgs, ok := ms.msgs.Load(node)
+	if !ok {
+		return 0
+	}
+
+	return len(msgs.([]interface{}))
 }
 
 // WaitForMsgFrom waits for a msg satisfying the predicate from the given node and returns it
-func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier) interface{} {
+func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier, msg string) interface{} {
 	var m interface{}
 	i := 0
 	require.Eventually(t, func() bool {
-		for ; i < len(ms.msgs[node]); i++ {
-			if predicate(ms.msgs[node][i]) {
-				m = ms.msgs[node][i]
-				return true
+		if value, ok := ms.msgs.Load(node); ok {
+			list := value.([]interface{})
+			for ; i < len(list); i++ {
+				if predicate(list[i]) {
+					m = list[i]
+					return true
+				}
 			}
 		}
 
 		return false
 	}, msgStateTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive msg satisfying predicate from %x within %v seconds", node,
+		fmt.Sprintf("did not receive msg %s from %x within %v seconds", msg, node,
 			msgStateTimeout))
 	return m
 }
@@ -64,6 +81,11 @@ func MsgIsChunkDataRequest(msg interface{}) bool {
 
 func MsgIsChunkDataPackResponse(msg interface{}) bool {
 	_, ok := msg.(*messages.ChunkDataResponse)
+	return ok
+}
+
+func MsgIsResultApproval(msg interface{}) bool {
+	_, ok := msg.(*flow.ResultApproval)
 	return ok
 }
 

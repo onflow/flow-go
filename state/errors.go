@@ -17,9 +17,7 @@ func NewInvalidExtensionError(msg string) error {
 }
 
 func NewInvalidExtensionErrorf(msg string, args ...interface{}) error {
-	return InvalidExtensionError{
-		msg: fmt.Sprintf(msg, args...),
-	}
+	return NewInvalidExtensionError(fmt.Sprintf(msg, args...))
 }
 
 func (e InvalidExtensionError) Error() string {
@@ -47,9 +45,7 @@ func NewOutdatedExtensionError(msg string) error {
 }
 
 func NewOutdatedExtensionErrorf(msg string, args ...interface{}) error {
-	return OutdatedExtensionError{
-		msg: fmt.Sprintf(msg, args...),
-	}
+	return NewOutdatedExtensionError(fmt.Sprintf(msg, args...))
 }
 
 func (e OutdatedExtensionError) Error() string {
@@ -59,4 +55,25 @@ func (e OutdatedExtensionError) Error() string {
 func IsOutdatedExtensionError(err error) bool {
 	var errOutdatedExtensionError OutdatedExtensionError
 	return errors.As(err, &errOutdatedExtensionError)
+}
+
+// NoValidChildBlockError is a sentinal error when the case where a certain block has
+// no valid child.
+type NoValidChildBlockError struct {
+	msg string
+}
+
+func NewNoValidChildBlockError(msg string) error {
+	return NoValidChildBlockError{
+		msg: msg,
+	}
+}
+
+func (e NoValidChildBlockError) Error() string {
+	return e.msg
+}
+
+func IsNoValidChildBlockError(err error) bool {
+	var errNoValidChildBlockError NoValidChildBlockError
+	return errors.As(err, &errNoValidChildBlockError)
 }

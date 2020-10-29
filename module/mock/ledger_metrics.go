@@ -13,6 +13,11 @@ type LedgerMetrics struct {
 	mock.Mock
 }
 
+// DiskSize provides a mock function with given fields: _a0
+func (_m *LedgerMetrics) DiskSize(_a0 uint64) {
+	_m.Called(_a0)
+}
+
 // ForestApproxMemorySize provides a mock function with given fields: bytes
 func (_m *LedgerMetrics) ForestApproxMemorySize(bytes uint64) {
 	_m.Called(bytes)
@@ -20,6 +25,26 @@ func (_m *LedgerMetrics) ForestApproxMemorySize(bytes uint64) {
 
 // ForestNumberOfTrees provides a mock function with given fields: number
 func (_m *LedgerMetrics) ForestNumberOfTrees(number uint64) {
+	_m.Called(number)
+}
+
+// LatestTrieMaxDepth provides a mock function with given fields: number
+func (_m *LedgerMetrics) LatestTrieMaxDepth(number uint64) {
+	_m.Called(number)
+}
+
+// LatestTrieMaxDepthDiff provides a mock function with given fields: number
+func (_m *LedgerMetrics) LatestTrieMaxDepthDiff(number uint64) {
+	_m.Called(number)
+}
+
+// LatestTrieRegCount provides a mock function with given fields: number
+func (_m *LedgerMetrics) LatestTrieRegCount(number uint64) {
+	_m.Called(number)
+}
+
+// LatestTrieRegCountDiff provides a mock function with given fields: number
+func (_m *LedgerMetrics) LatestTrieRegCountDiff(number uint64) {
 	_m.Called(number)
 }
 

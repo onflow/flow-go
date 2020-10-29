@@ -5,27 +5,37 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type State struct {
-	db       *badger.DB
-	chainID  flow.ChainID // aka cluster ID
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
+	db        *badger.DB
+	tracer    module.Tracer
+	clusterID flow.ChainID
+	headers   storage.Headers
+	payloads  storage.ClusterPayloads
 }
 
-func NewState(db *badger.DB, chainID flow.ChainID, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
+func NewState(db *badger.DB, tracer module.Tracer, clusterID flow.ChainID, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
 	state := &State{
-		db:       db,
-		chainID:  chainID,
-		headers:  headers,
-		payloads: payloads,
+		db:        db,
+		tracer:    tracer,
+		clusterID: clusterID,
+		headers:   headers,
+		payloads:  payloads,
 	}
 	return state, nil
+}
+
+func (s *State) Params() cluster.Params {
+	params := &Params{
+		state: s,
+	}
+	return params
 }
 
 func (s *State) Final() cluster.Snapshot {
@@ -34,12 +44,12 @@ func (s *State) Final() cluster.Snapshot {
 	var blockID flow.Identifier
 	err := s.db.View(func(tx *badger.Txn) error {
 		var boundary uint64
-		err := operation.RetrieveClusterFinalizedHeight(s.chainID, &boundary)(tx)
+		err := operation.RetrieveClusterFinalizedHeight(s.clusterID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized boundary: %w", err)
 		}
 
-		err = operation.LookupClusterBlockHeight(s.chainID, boundary, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(s.clusterID, boundary, &blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized ID: %w", err)
 		}

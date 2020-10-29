@@ -8,24 +8,27 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/examples"
 	"github.com/onflow/flow-go-sdk/templates"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/integration/tests/execution"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/execution"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -37,20 +40,26 @@ const (
 
 // Output file which records the transaction per second for a test run
 const (
-	ResultFile = "/tmp/tx_per_second_test_%s.txt"
+	ResultFile = "tx_per_second_test_%s.txt"
 )
 
 const (
 	// total test accounts to create
 	// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3)
-	TotalAccounts = 10
+	TotalAccounts = 20
 	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
+	// threshold for TPS
+	TPSThreshold = float64(1)
 )
 
 var (
 	fungibleTokenAddress flowsdk.Address
 	flowTokenAddress     flowsdk.Address
+
+	fileCache = map[string][]byte{}
+
+	tmpDir string
 )
 
 // TestTransactionsPerSecondBenchmark measures the average number of transactions executed per second by an execution node
@@ -83,6 +92,16 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 	gs.accessAddr = fmt.Sprintf(":%s", gs.AccessPort())
 	gs.privateKeyHex = gs.privateKey()
 	gs.metricsAddr = fmt.Sprintf("http://localhost:%s/metrics", gs.MetricsPort())
+
+	// Get tmp dir
+	tmpDir = os.Getenv("TMP")
+	if len(tmpDir) == 0 {
+		tmpDir = "/tmp"
+	}
+
+	// Cache file
+	_, err := DownloadFile(FungibleTokenTransactionsBaseURL + TransferTokens)
+	handle(err)
 }
 
 func (gs *TransactionsPerSecondSuite) privateKey() string {
@@ -156,7 +175,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	transferWG := sync.WaitGroup{}
 	prevAddr := flowTokenAddress
 	gs.ref, err = flowClient.GetLatestBlockHeader(context.Background(), false)
-	examples.Handle(err)
+	handle(err)
 
 	for accountAddr, accountKey := range gs.accounts {
 		if prevAddr != flowTokenAddress {
@@ -180,7 +199,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	transferWG.Wait()
 
 	close(done) // stop the sampler
-	require.FileExists(gs.T(), resultFileName, "did not log TPS to file, may need to increase timeout")
+	require.FileExists(gs.T(), filepath.Join(tmpDir, resultFileName), "did not log TPS to file, may need to increase timeout")
 }
 
 // SetTokenAddresses sets the addresses for the Fungible token and the Flow token contract that were bootstrapped as part of genesis state
@@ -196,44 +215,52 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	fmt.Println("Flow Address:", flowTokenAddress)
 }
 
+const createAccountTemplate = `
+transaction(publicKeys: [[UInt8]], code: [UInt8]) {
+  prepare(signer: AuthAccount) {
+	let acct = AuthAccount(payer: signer)
+	for key in publicKeys {
+		acct.addPublicKey(key)
+	}
+	acct.setCode(code)
+  }
+}
+`
+
 // CreateAccountAndTransfer will create an account and transfer 1000 tokens to it
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()
 
-	myPrivateKey := examples.RandomPrivateKey()
+	myPrivateKey := common.RandomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
 		FromPrivateKey(myPrivateKey).
 		SetHashAlgo(crypto.SHA3_256).
 		SetWeight(flowsdk.AccountKeyWeightThreshold)
 	mySigner := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
 
-	// Generate an account creation script
-	createAccountScript, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
-	examples.Handle(err)
-
-	createAccountTx := flowsdk.NewTransaction().
+	// Generate the account creation transaction
+	createAccountTx := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr).
 		SetReferenceBlockID(gs.ref.ID).
-		AddAuthorizer(gs.rootAcctAddr).
-		SetScript(createAccountScript).
 		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.sequenceNumbers[keyIndex]).
 		SetPayer(gs.rootAcctAddr)
 
 	gs.rootSignerLock.Lock()
-	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
-	examples.Handle(err)
+	err := createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
+	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
-	examples.Handle(err)
+	handle(err)
 
+	// execute the CreateAccount transaction
 	err = gs.flowClient.SendTransaction(ctx, *createAccountTx)
-	examples.Handle(err)
+	handle(err)
 
 	createAccountTxID := createAccountTx.ID()
 
 	gs.rootSignerLock.Unlock()
 
 	accountCreationTxRes := WaitForFinalized(ctx, gs.flowClient, createAccountTxID)
-	examples.Handle(accountCreationTxRes.Error)
+	handle(accountCreationTxRes.Error)
 
 	// Successful Tx, increment sequence number
 	gs.sequenceNumbers[keyIndex]++
@@ -267,19 +294,19 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 
 	gs.rootSignerLock.Lock()
 	err = transferTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
-	examples.Handle(err)
+	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
-	examples.Handle(err)
+	handle(err)
 
 	err = gs.flowClient.SendTransaction(ctx, *transferTx)
-	examples.Handle(err)
+	handle(err)
 
 	transferTxID := transferTx.ID()
 	gs.rootSignerLock.Unlock()
 
 	transferTxResp := WaitForFinalized(ctx, gs.flowClient, transferTxID)
-	examples.Handle(transferTxResp.Error)
+	handle(transferTxResp.Error)
 
 	// Successful Tx, increment sequence number
 	gs.sequenceNumbers[keyIndex]++
@@ -300,10 +327,10 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 		AddAuthorizer(fromAddr)
 
 	err := transferTx.SignEnvelope(fromAddr, fromKey.ID, gs.signers[fromAddr])
-	examples.Handle(err)
+	handle(err)
 
 	err = flowClient.SendTransaction(ctx, *transferTx)
-	examples.Handle(err)
+	handle(err)
 
 	transferTxResp := WaitForFinalized(ctx, flowClient, transferTx.ID())
 
@@ -319,7 +346,9 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 
 // logTPSToFile records the instantaneous as average values to the output file
 func logTPSToFile(msg string, resultFileName string) error {
-	resultFile, err := os.OpenFile(resultFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fullResultFilePath := filepath.Join(tmpDir, resultFileName)
+
+	resultFile, err := os.OpenFile(fullResultFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -334,15 +363,17 @@ func logTPSToFile(msg string, resultFileName string) error {
 
 // DownloadFile will download a url a byte slice
 func DownloadFile(url string) ([]byte, error) {
-
+	if file, ok := fileCache[url]; ok {
+		return file, nil
+	}
 	// Get the data
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	return ioutil.ReadAll(resp.Body)
+	fileCache[url], err = ioutil.ReadAll(resp.Body)
+	return fileCache[url], err
 }
 
 func ServiceAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address, *flowsdk.AccountKey, crypto.Signer) {
@@ -367,7 +398,7 @@ func ServiceAccountWithKey(flowClient *client.Client, key string) (flowsdk.Addre
 
 func WaitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifier) *flowsdk.TransactionResult {
 	result, err := c.GetTransactionResult(ctx, id)
-	// Handle(err)
+	handle(err)
 
 	fmt.Printf("Waiting for transaction %s to be finalized...\n", id)
 	errCount := 0
@@ -385,7 +416,6 @@ func WaitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 		} else {
 			fmt.Print(".")
 		}
-		// Handle(err)
 	}
 
 	fmt.Println()
@@ -397,7 +427,7 @@ func WaitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 // GenerateTransferScript Creates a script that transfer some amount of FTs
 func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount int) []byte {
 	mintCode, err := DownloadFile(FungibleTokenTransactionsBaseURL + TransferTokens)
-	examples.Handle(err)
+	handle(err)
 
 	withFTAddr := strings.ReplaceAll(string(mintCode), "0x02", "0x"+ftAddr.Hex())
 	withFlowTokenAddr := strings.Replace(string(withFTAddr), "0x03", "0x"+flowToken.Hex(), 1)
@@ -408,13 +438,14 @@ func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount in
 	return []byte(withAmount)
 }
 
-// languageEncodeBytes converts a byte slice to a comma-separated list of uint8 integers.
-func languageEncodeBytes(b []byte) string {
-	if len(b) == 0 {
-		return "[]"
+func bytesToCadenceArray(b []byte) cadence.Array {
+	values := make([]cadence.Value, len(b))
+
+	for i, v := range b {
+		values[i] = cadence.NewUInt8(v)
 	}
 
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
+	return cadence.NewArray(values)
 }
 
 func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
@@ -422,15 +453,14 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 
 	gs.sequenceNumbers = make([]uint64, TotalAccounts)
 	publicKeysStr := strings.Builder{}
+	accountKeyBytes := gs.rootAcctKey.Encode()
 
 	for i := 0; i < TotalAccounts; i++ {
-		publicKeysStr.WriteString("signer.addPublicKey(")
-		publicKeysStr.WriteString(languageEncodeBytes(gs.rootAcctKey.Encode()))
-		publicKeysStr.WriteString(")\n")
+		publicKeysStr.WriteString("signer.addPublicKey(publicKey)\n")
 	}
 	script := fmt.Sprintf(`
-	transaction {
-	  prepare(signer: AuthAccount) {
+	transaction(publicKey: [UInt8]) {
+		prepare(signer: AuthAccount) {
 			%s
 		}
 	}
@@ -443,14 +473,17 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
-	err := addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
-	examples.Handle(err)
+	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
+	handle(err)
+
+	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
+	handle(err)
 
 	err = flowClient.SendTransaction(ctx, *addKeysTx)
-	examples.Handle(err)
+	handle(err)
 
 	addKeysTxResp := WaitForFinalized(ctx, flowClient, addKeysTx.ID())
-	examples.Handle(addKeysTxResp.Error)
+	handle(addKeysTxResp.Error)
 
 	// Successful Tx, increment sequence number
 	gs.rootAcctKey.SequenceNumber++
@@ -485,7 +518,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		return 0
 	}
 
-	avg := func() {
+	logAvg := func() {
 		total := 0.0
 		for _, inst := range instantaneous {
 			total = total + inst
@@ -497,6 +530,11 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 
 		fmt.Printf("Total transactions ===========> : %d\n", totalExecutedTx)
 		logTPSToFile(fmt.Sprintf("total transactions %d", totalExecutedTx), resultFileName)
+
+		require.Greater(gs.T(), avg, TPSThreshold)
+		if os.Getenv("ENV") == "TEAMCITY" {
+			logTPSToFile(fmt.Sprintf("##teamcity[buildStatisticValue key='BenchmarkTPS' value='%f']", avg), fmt.Sprintf(ResultFile, "teamcity"))
+		}
 	}
 
 	// sample every 1 minute
@@ -508,7 +546,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		select {
 		case <-done:
 			minTicker.Stop()
-			avg()
+			logAvg()
 			return
 		case <-minTicker.C:
 			endTime := time.Now()
@@ -532,5 +570,11 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 			gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
 			require.NoError(gs.T(), err, "could not update finalized block")
 		}
+	}
+}
+
+func handle(err error) {
+	if err != nil {
+		panic(err)
 	}
 }

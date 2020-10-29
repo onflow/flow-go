@@ -1,128 +1,205 @@
 package stub
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Network is a mocked network layer made for testing Engine's behavior.
-// When an Engine is installed on a Network, the mocked network will deliver
-// all Engine's events synchronously in memory to another Engine, so that tests can run
-// fast and easy to assert errors.
+// Network is a mocked Network layer made for testing engine's behavior.
+// It represents the Network layer of a single node. A node can attach several engines of
+// itself to the Network, and hence enabling them send and receive message.
+// When an engine is attached on a Network instance, the mocked Network delivers
+// all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
+	ctx context.Context
 	sync.Mutex
-	state        protocol.State
-	me           module.Local
-	hub          *Hub
-	engines      map[uint8]network.Engine
-	seenEventIDs sync.Map
-	qCD          chan struct{} // used to stop continous delivery mode of the network
+	state        protocol.State            // used to represent full protocol state of the attached node.
+	me           module.Local              // used to represent information of the attached node.
+	hub          *Hub                      // used to attach Network layers of nodes together.
+	engines      map[string]network.Engine // used to keep track of attached engines of the node.
+	seenEventIDs sync.Map                  // used to keep track of event IDs seen by attached engines.
+	qCD          chan struct{}             // used to stop continuous delivery mode of the Network.
 }
 
-// NewNetwork create a mocked network.
+// NewNetwork create a mocked Network.
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
 func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
-	o := &Network{
+	net := &Network{
+		ctx:     context.Background(),
 		state:   state,
 		me:      me,
 		hub:     hub,
-		engines: make(map[uint8]network.Engine),
+		engines: make(map[string]network.Engine),
 		qCD:     make(chan struct{}),
 	}
-	// Plug the network to a hub so that networks can find each other.
-	hub.Plug(o)
-	return o
+	// AddNetwork the Network to a hub so that Networks can find each other.
+	hub.AddNetwork(net)
+	return net
 }
 
-// GetID returns the identity of the node.
-func (mn *Network) GetID() flow.Identifier {
-	return mn.me.NodeID()
+// GetID returns the identity of the attached node.
+func (n *Network) GetID() flow.Identifier {
+	return n.me.NodeID()
 }
 
-// Register implements pkg/module/Network's interface
-func (mn *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
-	_, ok := mn.engines[channelID]
+// Register registers an Engine of the attached node to the channel ID via a Conduit, and returns the
+// Conduit instance.
+func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
+	n.Lock()
+	defer n.Unlock()
+	_, ok := n.engines[channelID]
 	if ok {
-		return nil, errors.Errorf("engine code already taken (%d)", channelID)
+		return nil, errors.Errorf("engine code already taken (%s)", channelID)
 	}
+	ctx, cancel := context.WithCancel(n.ctx)
 	conduit := &Conduit{
+		ctx:       ctx,
+		cancel:    cancel,
 		channelID: channelID,
-		submit:    mn.submit,
+		submit:    n.submit,
+		publish:   n.publish,
+		unicast:   n.unicast,
+		multicast: n.multicast,
 	}
-	mn.engines[channelID] = engine
+	n.engines[channelID] = engine
 	return conduit, nil
 }
 
-// submit is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) Unregister(channelID string) error {
+	n.Lock()
+	defer n.Unlock()
+	delete(n.engines, channelID)
+	return nil
+}
+
+// submit is called when the attached Engine to the channel ID is sending an event to an
+// Engine attached to the same channel ID on another node or nodes.
+func (n *Network) submit(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
 	m := &PendingMessage{
-		From:      mn.GetID(),
+		From:      n.GetID(),
 		ChannelID: channelID,
 		Event:     event,
 		TargetIDs: targetIDs,
 	}
 
-	mn.buffer(m)
+	n.buffer(m)
 
 	return nil
 }
 
-// return a certain node has seen a certain key
-func (mn *Network) haveSeen(key string) bool {
-	seen, ok := mn.seenEventIDs.Load(key)
+// unicast is called when the attached Engine to the channel ID is sending an event to a single target
+// Engine attached to the same channel ID on another node.
+func (n *Network) unicast(channelID string, event interface{}, targetID flow.Identifier) error {
+	m := &PendingMessage{
+		From:      n.GetID(),
+		ChannelID: channelID,
+		Event:     event,
+		TargetIDs: []flow.Identifier{targetID},
+	}
+
+	n.buffer(m)
+	return nil
+}
+
+// publish is called when the attached Engine is sending an event to a group of Engines attached to the
+// same channel ID on other nodes based on selector.
+// In this test helper implementation, publish uses submit method under the hood.
+func (n *Network) publish(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
+
+	if len(targetIDs) == 0 {
+		return fmt.Errorf("publish found empty target ID list for the message")
+	}
+
+	return n.submit(channelID, event, targetIDs...)
+}
+
+// multicast is called when an engine attached to the channel ID is sending an event to a number of randomly chosen
+// Engines attached to the same channel ID on other nodes. The targeted nodes are selected based on the selector.
+// In this test helper implementation, multicast uses submit method under the hood.
+func (n *Network) multicast(channelID string, event interface{}, num uint, targetIDs ...flow.Identifier) error {
+	targetIDs = flow.Sample(num, targetIDs...)
+	return n.submit(channelID, event, targetIDs...)
+}
+
+// haveSeen returns true if the node attached to this Network instance has seen the event ID.
+// Otherwise, it returns false.
+//
+// Note: eventIDs are computed in a collision-resistant manner using channel IDs, hence, an event ID
+// is uniquely bound to a channel ID. Seeing an event ID by a node implies receiving its corresponding
+// event by any of the attached engines of that node.
+func (n *Network) haveSeen(eventID string) bool {
+	seen, ok := n.seenEventIDs.Load(eventID)
 	if !ok {
 		return false
 	}
 	return seen.(bool)
 }
 
-// mark a certain node has seen a certain event for a certain engine
-func (mn *Network) seen(key string) {
-	mn.seenEventIDs.Store(key, true)
+// seen marks the eventID as seen for the node attached to this instance of Network.
+// This method is mainly utilized for deduplicating message delivery.
+//
+// Note: eventIDs are computed in a collision-resistant manner using channel IDs, hence, an event ID
+// is uniquely bound to a channel ID. Seeing an event ID by a node implies receiving its corresponding
+// event by any of the attached engines of that node.
+func (n *Network) seen(eventID string) {
+	n.seenEventIDs.Store(eventID, true)
 }
 
-// buffer saves the request into pending buffer
-func (mn *Network) buffer(m *PendingMessage) {
-	mn.hub.Buffer.Save(m)
+// buffer saves the message into the pending buffer of the Network hub.
+// Buffering process of a message imitates its transmission over an unreliable Network.
+// In specific, it emulates the process of dispatching the message out of the sender.
+func (n *Network) buffer(msg *PendingMessage) {
+	n.hub.Buffer.Save(msg)
 }
 
 // DeliverAll sends all pending messages to the receivers. The receivers
 // might be triggered to forward messages to its peers, so this function will
-// block until all receivers have done their forwarding.
-func (mn *Network) DeliverAll(recursive bool) {
-	mn.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
-		_ = mn.sendToAllTargets(m, recursive)
+// block until all receivers have done their forwarding, and there is no more message
+// in the Network to deliver.
+func (n *Network) DeliverAll(syncOnProcess bool) {
+	n.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
+		_ = n.sendToAllTargets(m, syncOnProcess)
 	})
 }
 
-// DeliverAllRecursiveExcept flushes all pending messages in the buffer except
+// DeliverAllExcept flushes all pending messages in the buffer except
 // those that satisfy the shouldDrop predicate function. All messages that
-// satisfy the shouldDrop predicate are permanently dropped. This function will
-// block until all receivers have done their forwarding.
-func (mn *Network) DeliverAllExcept(recursive bool, shouldDrop func(*PendingMessage) bool) {
-	mn.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
+// satisfy the shouldDrop predicate are permanently dropped.
+// The message receivers might be triggered to forward some messages to their peers,
+// so this function will block until all receivers have done their forwarding,
+// and there is no more message in the Network to deliver.
+//
+// If syncOnProcess is true, the sender and receiver are synchronized on processing the message.
+// Otherwise they sync on delivery of the message.
+func (n *Network) DeliverAllExcept(syncOnProcess bool, shouldDrop func(*PendingMessage) bool) {
+	n.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
 		if shouldDrop(m) {
 			return
 		}
-		_ = mn.sendToAllTargets(m, recursive)
+		_ = n.sendToAllTargets(m, syncOnProcess)
 	})
 }
 
 // DeliverSome delivers all messages in the buffer that satisfy the
 // shouldDeliver predicate. Any messages that are not delivered remain in the
 // buffer.
-func (mn *Network) DeliverSome(recursive bool, shouldDeliver func(*PendingMessage) bool) {
-	mn.hub.Buffer.Deliver(func(m *PendingMessage) bool {
+//
+// If syncOnProcess is true, the sender and receiver are synchronized on processing the message.
+// Otherwise they sync on delivery of the message.
+func (n *Network) DeliverSome(syncOnProcess bool, shouldDeliver func(*PendingMessage) bool) {
+	n.hub.Buffer.Deliver(func(m *PendingMessage) bool {
 		if shouldDeliver(m) {
-			return mn.sendToAllTargets(m, recursive) != nil
+			return n.sendToAllTargets(m, syncOnProcess) != nil
 		}
 		return false
 	})
@@ -130,42 +207,51 @@ func (mn *Network) DeliverSome(recursive bool, shouldDeliver func(*PendingMessag
 
 // sendToAllTargets send a message to all its targeted nodes if the targeted
 // node has not yet seen it.
-func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
-	mn.Lock()
-	defer mn.Unlock()
+// sync parameter defines whether the sender and receiver are synced over processing or delivery of
+// message.
+// If syncOnProcess is set true, sender and receiver are synced over processing of the message, i.e., the method call
+// gets blocking till the message is processed at destination.
+// If syncOnProcess is set false, sender and receiver are synced over delivery of the message, i.e., the method call
+// returns once the message is delivered at destination (and not necessarily processed).
+func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error {
+	n.Lock()
+	defer n.Unlock()
 
 	key, err := eventKey(m.From, m.ChannelID, m.Event)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not generate event key for event: %w", err)
 	}
+
 	for _, nodeID := range m.TargetIDs {
-		// Find the network of the targeted node
-		receiverNetwork, exist := mn.hub.GetNetwork(nodeID)
+		// finds the Network of the targeted node
+		receiverNetwork, exist := n.hub.GetNetwork(nodeID)
 		if !exist {
 			continue
 		}
 
-		// Check if the given engine already received the event.
-		// This prevents a node receiving the same event twice.
+		// checks if the given engine already received the event.
+		// this prevents a node receiving the same event twice.
 		if receiverNetwork.haveSeen(key) {
 			continue
 		}
 
-		// mark the peer has seen the event
+		// marks the peer has seen the event
 		receiverNetwork.seen(key)
 
-		// Find the engine of the targeted network
+		// finds the engine of the targeted Network
 		receiverEngine, ok := receiverNetwork.engines[m.ChannelID]
 		if !ok {
-			return errors.Errorf("Network can not find engine ID: %v for node: %v", m.ChannelID, nodeID)
+			return fmt.Errorf("could find engine ID: %v for node: %v", m.ChannelID, nodeID)
 		}
 
-		if recursive {
-			err := receiverEngine.Process(m.From, m.Event)
-			if err != nil {
-				return errors.Wrapf(err, "senderEngine failed to process event: %v", m.Event)
+		if syncOnProcess {
+			// sender and receiver are synced over processing the message
+			if err := receiverEngine.Process(m.From, m.Event); err != nil {
+				return fmt.Errorf("receiver engine failed to process event (%v): %w", m.Event, err)
 			}
 		} else {
+			// sender and receiver are synced over delivery of message
+			//
 			// Call `Submit` to let receiver engine receive the event directly.
 			// Submit is supposed to process event asynchronously, but if it doesn't we are risking
 			// deadlock (if it trigger another message sending we might end up calling this very function again)
@@ -177,12 +263,12 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 	return nil
 }
 
-// StartConDev starts the continuous delivery mode of the network.
-// In this mode, the network continuously checks the nodes' buffer
+// StartConDev starts the continuous delivery mode of the Network.
+// In this mode, the Network continuously checks the nodes' buffer
 // every `updateInterval` milliseconds, and delivers all the pending
 // messages. `recursive` determines whether the delivery is in recursive mode or not
-func (mn *Network) StartConDev(updateInterval uint, recursive bool) {
-	timer := time.NewTicker(time.Duration(updateInterval))
+func (n *Network) StartConDev(updateInterval time.Duration, recursive bool) {
+	timer := time.NewTicker(updateInterval)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -192,8 +278,8 @@ func (mn *Network) StartConDev(updateInterval uint, recursive bool) {
 		for {
 			select {
 			case <-timer.C:
-				mn.DeliverAll(recursive)
-			case <-mn.qCD:
+				n.DeliverAll(recursive)
+			case <-n.qCD:
 				// stops continuous delivery mode
 				break
 			}
@@ -204,7 +290,7 @@ func (mn *Network) StartConDev(updateInterval uint, recursive bool) {
 	wg.Wait()
 }
 
-// StopConDev stops the continuous deliver mode of the network
-func (mn *Network) StopConDev() {
-	close(mn.qCD)
+// StopConDev stops the continuous deliver mode of the Network.
+func (n *Network) StopConDev() {
+	close(n.qCD)
 }

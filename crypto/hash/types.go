@@ -21,7 +21,6 @@ func (f HashingAlgorithm) String() string {
 }
 
 const (
-
 	// Lengths of hash outputs in bytes
 	HashLenSha2_256 = 32
 	HashLenSha2_384 = 48

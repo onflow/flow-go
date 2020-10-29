@@ -1,11 +1,13 @@
+// +build relic
+
 package signature
 
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/module"
 )
 
 // AggregationVerifier is an aggregating verifier that can verify signatures and

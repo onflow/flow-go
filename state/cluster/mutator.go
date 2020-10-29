@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/cluster"
 )
 
 // Mutator represents an interface to modify the persistent cluster state in a
@@ -15,7 +15,7 @@ type Mutator interface {
 	// and an empty collection as payload.
 	Bootstrap(genesis *cluster.Block) error
 
-	// Extend introduces the block with the given ID into the persistent
-	// cluster state without modifying the current finalized state.
+	// Extend introduces the given block into the cluster state as a pending
+	// without modifying the current finalized state.
 	Extend(block *cluster.Block) error
 }

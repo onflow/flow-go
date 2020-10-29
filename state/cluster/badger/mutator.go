@@ -1,15 +1,19 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
+	"math"
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
@@ -17,18 +21,18 @@ type Mutator struct {
 }
 
 func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
-	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
+
+	// check constraints
+	err := m.state.db.View(func(tx *badger.Txn) error {
 
 		// check chain ID
-		if genesis.Header.ChainID != m.state.chainID {
-			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.Header.ChainID, m.state.chainID)
+		if genesis.Header.ChainID != m.state.clusterID {
+			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.Header.ChainID, m.state.clusterID)
 		}
-
 		// check header number
 		if genesis.Header.Height != 0 {
 			return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Header.Height)
 		}
-
 		// check header parent ID
 		if genesis.Header.ParentID != flow.ZeroID {
 			return fmt.Errorf("genesis parent ID must be zero hash (got %x)", genesis.Header.ParentID)
@@ -40,38 +44,69 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// bootstrap cluster state
+	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
+
+		chainID := genesis.Header.ChainID
 		// insert the block
 		err := procedure.InsertClusterBlock(genesis)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
-
 		// insert block number -> ID mapping
-		err = operation.IndexClusterBlockHeight(genesis.Header.ChainID, genesis.Header.Height, genesis.ID())(tx)
+		err = operation.IndexClusterBlockHeight(chainID, genesis.Header.Height, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis number: %w", err)
 		}
-
 		// insert boundary
-		err = operation.InsertClusterFinalizedHeight(genesis.Header.ChainID, genesis.Header.Height)(tx)
+		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Header.Height)(tx)
+		// insert started view for hotstuff
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
+		}
+		err = operation.InsertStartedView(chainID, genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert started view: %w", err)
+		}
+		// insert voted view for hotstuff
+		err = operation.InsertVotedView(chainID, genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert started view: %w", err)
 		}
 
 		return nil
 	})
+	return err
 }
 
 func (m *Mutator) Extend(block *cluster.Block) error {
+
+	blockID := block.ID()
+
+	m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtend)
+	defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtend)
+
 	err := m.state.db.View(func(tx *badger.Txn) error {
 
+		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendSetup)
+		defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendSetup)
+
+		header := block.Header
+		payload := block.Payload
+
 		// check chain ID
-		if block.Header.ChainID != m.state.chainID {
-			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
+		if header.ChainID != m.state.clusterID {
+			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.clusterID)
 		}
 
 		// get the chain ID, which determines which cluster state to query
-		chainID := block.Header.ChainID
+		chainID := header.ChainID
 
 		// get the latest finalized block
 		var final flow.Header
@@ -81,14 +116,14 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		}
 
 		// get the header of the parent of the new block
-		parent, err := m.state.headers.ByBlockID(block.Header.ParentID)
+		parent, err := m.state.headers.ByBlockID(header.ParentID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
 		}
 
 		// the extending block must increase height by 1 from parent
-		if block.Header.Height != parent.Height+1 {
-			return state.NewOutdatedExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
+		if header.Height != parent.Height+1 {
+			return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
 				block.Header.Height, parent.Height)
 		}
 
@@ -96,8 +131,12 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		// do this by tracing back until we see a parent block that is the
 		// latest finalized block, or reach height below the finalized boundary
 
+		m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendSetup)
+		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendCheckAncestry)
+		defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckAncestry)
+
 		// start with the extending block's parent
-		parentID := block.Header.ParentID
+		parentID := header.ParentID
 		for parentID != final.ID() {
 
 			// get the parent of current block
@@ -109,16 +148,65 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 			// if its number is below current boundary, the block does not connect
 			// to the finalized protocol state and would break database consistency
 			if ancestor.Height < final.Height {
-				return state.NewInvalidExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%v), final.Height (%v)",
+				return state.NewOutdatedExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%v), final.Height (%v)",
 					ancestor.Height, final.Height)
 			}
 
 			parentID = ancestor.ParentID
 		}
 
+		m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckAncestry)
+		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
+		defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
+
+		// check that all transactions within the collection are valid
+		minRefID := flow.ZeroID
+		minRefHeight := uint64(math.MaxUint64)
+		for _, flowTx := range payload.Collection.Transactions {
+			refBlock, err := m.state.headers.ByBlockID(flowTx.ReferenceBlockID)
+			if errors.Is(err, storage.ErrNotFound) {
+				// unknown reference blocks are invalid
+				return state.NewInvalidExtensionErrorf("unknown reference block (id=%x): %v", flowTx.ReferenceBlockID, err)
+			}
+			if err != nil {
+				return fmt.Errorf("could not check reference block (id=%x): %w", flowTx.ReferenceBlockID, err)
+			}
+
+			if refBlock.Height < minRefHeight {
+				minRefHeight = refBlock.Height
+				minRefID = flowTx.ReferenceBlockID
+			}
+		}
+
+		// a valid collection must reference the oldest reference block among
+		// its constituent transactions
+		if payload.Collection.Len() > 0 && minRefID != payload.ReferenceBlockID {
+			return state.NewInvalidExtensionErrorf(
+				"reference block (id=%x) must match oldest transaction's reference block (id=%x)",
+				payload.ReferenceBlockID, minRefID,
+			)
+		}
+
+		// a valid collection must reference a valid reference block
+		// NOTE: it is valid for a collection to be expired at this point,
+		// otherwise we would compromise liveness of the cluster.
+		refBlock, err := m.state.headers.ByBlockID(payload.ReferenceBlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			return state.NewInvalidExtensionErrorf("unknown reference block (id=%x)", payload.ReferenceBlockID)
+		}
+		if err != nil {
+			return fmt.Errorf("could not check reference block: %w", err)
+		}
+
+		m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
+		m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsDupes)
+		defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendCheckTransactionsDupes)
+
+		// TODO ensure the reference block is part of the main chain
+		_ = refBlock
+
 		// we go back a fixed number of  blocks to check payload for now
-		//TODO look back based on reference block ID and expiry
-		// ref: https://github.com/dapperlabs/flow-go/issues/3556
+		// TODO look back based on reference block ID and expiry https://github.com/dapperlabs/flow-go/issues/3556
 		limit := block.Header.Height - flow.DefaultTransactionExpiry
 		if limit > block.Header.Height { // overflow check
 			limit = 0
@@ -169,19 +257,13 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		return fmt.Errorf("could not validate extending block: %w", err)
 	}
 
-	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
-		// insert the block
-		err := procedure.InsertClusterBlock(block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert block: %w", err)
-		}
+	m.state.tracer.StartSpan(blockID, trace.COLClusterStateMutatorExtendDBInsert)
+	defer m.state.tracer.FinishSpan(blockID, trace.COLClusterStateMutatorExtendDBInsert)
 
-		// add this block to its parent's child index
-		err = procedure.IndexBlockChild(block.Header.ParentID, block.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not add to parent index: %w", err)
-		}
-
-		return nil
-	})
+	// insert the new block
+	err = m.state.db.Update(procedure.InsertClusterBlock(block))
+	if err != nil {
+		return fmt.Errorf("could not insert cluster block: %w", err)
+	}
+	return nil
 }

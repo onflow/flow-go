@@ -5,10 +5,10 @@ package mock
 import (
 	context "context"
 
-	delta "github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	delta "github.com/onflow/flow-go/engine/execution/state/delta"
+	flow "github.com/onflow/flow-go/model/flow"
 
-	messages "github.com/dapperlabs/flow-go/model/messages"
+	messages "github.com/onflow/flow-go/model/messages"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -57,27 +57,6 @@ func (_m *ExecutionState) CommitDelta(_a0 context.Context, _a1 delta.Delta, _a2 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, delta.Delta, []byte) error); ok {
 		r1 = rf(_a0, _a1, _a2)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// DiskSize provides a mock function with given fields:
-func (_m *ExecutionState) DiskSize() (int64, error) {
-	ret := _m.Called()
-
-	var r0 int64
-	if rf, ok := ret.Get(0).(func() int64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(int64)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -161,21 +140,21 @@ func (_m *ExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64
 	return r0, r1, r2
 }
 
-// GetRegisters provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, error) {
+// GetProof provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ExecutionState) GetProof(_a0 context.Context, _a1 []byte, _a2 []flow.RegisterID) ([]byte, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, []flow.RegisterID) []byte); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]byte)
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, []flow.RegisterID) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
@@ -184,12 +163,12 @@ func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 [][]
 	return r0, r1
 }
 
-// GetRegistersWithProofs provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, [][]byte, error) {
+// GetRegisters provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 []flow.RegisterID) ([][]byte, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, []flow.RegisterID) [][]byte); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
@@ -197,23 +176,14 @@ func (_m *ExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 []byte
 		}
 	}
 
-	var r1 [][]byte
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, []flow.RegisterID) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([][]byte)
-		}
+		r1 = ret.Error(1)
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte) error); ok {
-		r2 = rf(_a0, _a1, _a2)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // NewView provides a mock function with given fields: _a0
@@ -246,13 +216,13 @@ func (_m *ExecutionState) PersistChunkDataPack(_a0 context.Context, _a1 *flow.Ch
 	return r0
 }
 
-// PersistExecutionResult provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) PersistExecutionResult(_a0 context.Context, _a1 flow.Identifier, _a2 flow.ExecutionResult) error {
-	ret := _m.Called(_a0, _a1, _a2)
+// PersistExecutionReceipt provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionState) PersistExecutionReceipt(_a0 context.Context, _a1 *flow.ExecutionReceipt) error {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.ExecutionResult) error); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecutionReceipt) error); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -1,65 +1,31 @@
 package protocol
 
 import (
-	"fmt"
-	"sort"
-
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// ClusterFilterFor returns a filter to retrieve all nodes within the cluster
-// that the node with the given ID belongs to.
-func ClusterFilterFor(sn Snapshot, id flow.Identifier) (flow.IdentityFilter, error) {
+// Cluster represents the detailed information for a particular cluster,
+// for a given epoch. This information represents the INITIAL state of the
+// cluster, as defined by the Epoch Preparation Protocol. It DOES NOT take
+// into account state changes over the course of the epoch (ie. slashing).
+type Cluster interface {
 
-	clusters, err := sn.Clusters()
-	if err != nil {
-		return nil, fmt.Errorf("could not get clusters: %w", err)
-	}
-	cluster, ok := clusters.ByNodeID(id)
-	if !ok {
-		return nil, fmt.Errorf("could not get cluster for node")
-	}
+	// Index returns the index for this cluster.
+	Index() uint
 
-	return filter.In(cluster), nil
-}
+	// ChainID returns chain ID for the cluster's chain.
+	ChainID() flow.ChainID
 
-// ClusterFor returns the cluster that the node with given ID belongs to.
-func ClusterFor(sn Snapshot, id flow.Identifier) (flow.IdentityList, error) {
+	// EpochCounter returns the epoch counter for this cluster.
+	EpochCounter() uint64
 
-	clusterFilter, err := ClusterFilterFor(sn, id)
-	if err != nil {
-		return nil, fmt.Errorf("could not get cluster filter: %w", err)
-	}
-	participants, err := sn.Identities(clusterFilter)
-	if err != nil {
-		return nil, fmt.Errorf("could not get nodes in cluster: %w", err)
-	}
+	// Members returns the initial set of collector nodes in this cluster.
+	Members() flow.IdentityList
 
-	return participants, nil
-}
+	// RootBlock returns the root block for this cluster.
+	RootBlock() *cluster.Block
 
-// ChainIDForCluster returns the canonical chain ID for a collection node cluster.
-func ChainIDForCluster(cluster flow.IdentityList) flow.ChainID {
-	return flow.ChainID(cluster.Fingerprint().String())
-}
-
-func Clusters(nClusters uint, identities flow.IdentityList) *flow.ClusterList {
-
-	filtered := identities.Filter(filter.HasRole(flow.RoleCollection))
-
-	// order the identities by node ID
-	sort.Slice(filtered, func(i, j int) bool {
-		return order.ByNodeIDAsc(filtered[i], filtered[j])
-	})
-
-	// create the desired number of clusters and assign nodes
-	clusters := flow.NewClusterList(nClusters)
-	for i, identity := range filtered {
-		index := uint(i) % nClusters
-		clusters.Add(index, identity)
-	}
-
-	return clusters
+	// RootQC returns the quorum certificate for this cluster.
+	RootQC() *flow.QuorumCertificate
 }

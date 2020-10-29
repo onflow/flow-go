@@ -8,7 +8,11 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: collection-tests consensus-tests common-tests execution-tests
+integration-test: common-tests execution-tests verification-tests collection-tests consensus-tests
+
+# NOTE: Currently skipping collection and consensus tests due to them not passing properly on CI
+.PHONY: ci-integration-test
+ci-integration-test: common-tests execution-tests # collection-tests # consensus-tests # verification-tests
 
 .PHONY: collection-tests
 collection-tests:
@@ -26,6 +30,14 @@ common-tests:
 execution-tests:
 	GO111MODULE=on go test -tags relic -count=1 ./tests/execution
 
+.PHONY: verification-tests
+verification-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/verification
+
 .PHONY: benchmark
 benchmark:
 	GO111MODULE=on go test -tags relic -count=1 -timeout 30m ./benchmark -run Benchmark
+
+.PHONY: ci-benchmark
+ci-benchmark:
+	GO111MODULE=on ENV=TEAMCITY go test -tags relic -count=1 -timeout 15m ./benchmark -run Benchmark

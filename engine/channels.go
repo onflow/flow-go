@@ -2,73 +2,72 @@
 
 package engine
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
 
-// Enum of channel IDs to avoid accidental conflicts.
-const (
-
-	// Reserved 000-009
-
-	// Collection 010-029
-	CollectionProvider             = 10 // providing collections/transactions to non-collection nodes
-	CollectionIngest               = 11 // ingesting transactions and routing to appropriate cluster
-	ProtocolClusterConsensus       = 20 // cluster-specific consensus protocol
-	ProtocolClusterSynchronization = 21 // cluster-specific consensus synchronization
-
-	// Observation 030-049
-
-	// Consensus 050-099
-	BlockProvider           = 50 // providing blocks to non-consensus nodes
-	BlockPropagation        = 51 // propagating entities to be included in blocks between consensus nodes
-	ProtocolConsensus       = 60 // consensus protocol
-	ProtocolSynchronization = 66 // synchronization protocol
-
-	// Execution 100-199
-	ExecutionReceiptProvider = 100
-	ExecutionStateProvider   = 101
-	ExecutionComputer        = 102
-	ChunkDataPackProvider    = 103
-	ExecutionSync            = 104
-
-	// Verification 150-199
-	ApprovalProvider = 150
-
-	// Testing 200-255
-	SimulationColdstuff = 200
+	"github.com/onflow/flow-go/model/flow"
 )
 
-func ChannelName(channelID uint8) string {
-	switch channelID {
-	case CollectionProvider:
-		return "CollectionProvider"
-	case CollectionIngest:
-		return "CollectionIngest"
-	case ProtocolClusterConsensus:
-		return "ProtocolClusterConsensus"
-	case ProtocolClusterSynchronization:
-		return "ProtocolClusterSynchronization"
-	case BlockProvider:
-		return "BlockProvider"
-	case BlockPropagation:
-		return "BlockPropagation"
-	case ProtocolConsensus:
-		return "ProtocolConsensus"
-	case ProtocolSynchronization:
-		return "ProtocolSynchronization"
-	case ExecutionReceiptProvider:
-		return "ExecutionReceiptProvider"
-	case ExecutionStateProvider:
-		return "ExecutionStateProvider"
-	case ExecutionComputer:
-		return "ExecutionComputer"
-	case ChunkDataPackProvider:
-		return "ChunkDataPackProvider"
-	case ExecutionSync:
-		return "ExecutionSync"
-	case ApprovalProvider:
-		return "ApprovalProvider"
-	case SimulationColdstuff:
-		return "SimulationColdstuff"
+// channel IDs
+const (
+
+	// Channels used for testing
+	TestNetwork = "test-network"
+	TestMetrics = "test-metrics"
+
+	// Channels for consensus protocols
+	ConsensusCommittee     = "consensus-committee"
+	consensusClusterPrefix = "consensus-cluster" // dynamic channel, use ChannelConsensusCluster function
+
+	// Channels for protocols actively synchronizing state across nodes
+	SyncCommittee     = "sync-committee"
+	syncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
+	SyncExecution     = "sync-execution"
+
+	// Channels for actively pushing entities to subscribers
+	PushTransactions = "push-transactions"
+	PushGuarantees   = "push-guarantees"
+	PushBlocks       = "push-blocks"
+	PushReceipts     = "push-receipts"
+	PushApprovals    = "push-approvals"
+
+	// Channels for actively requesting missing entities
+	RequestCollections       = "request-collections"
+	RequestChunks            = "request-chunks"
+	RequestReceiptsByBlockID = "request-receipts-by-block-id"
+
+	// Channel aliases to make the code more readable / more robust to errors
+	ReceiveTransactions = PushTransactions
+	ReceiveGuarantees   = PushGuarantees
+	ReceiveBlocks       = PushBlocks
+	ReceiveReceipts     = PushReceipts
+	ReceiveApprovals    = PushApprovals
+
+	ProvideCollections       = RequestCollections
+	ProvideChunks            = RequestChunks
+	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
+)
+
+// FullyQualifiedChannelName returns the unique channel name made up of channel name string suffixed with root block id
+// The root block id is used to prevent cross talks between nodes on different sporks
+func FullyQualifiedChannelName(channelID string, rootBlockID string) string {
+	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
+	// unique for each epoch
+	if strings.HasPrefix(channelID, syncClusterPrefix) || strings.HasPrefix(channelID, consensusClusterPrefix) {
+		return channelID
 	}
-	return fmt.Sprintf("unknown-channel-%d", channelID)
+	return fmt.Sprintf("%s/%s", channelID, rootBlockID)
+}
+
+// ChannelConsensusCluster returns a dynamic cluster consensus channel based on
+// the chain ID of the cluster in question.
+func ChannelConsensusCluster(clusterID flow.ChainID) string {
+	return fmt.Sprintf("%s-%s", consensusClusterPrefix, clusterID)
+}
+
+// ChannelSyncCluster returns a dynamic cluster sync channel based on the chain
+// ID of the cluster in question.
+func ChannelSyncCluster(clusterID flow.ChainID) string {
+	return fmt.Sprintf("%s-%s", syncClusterPrefix, clusterID)
 }

@@ -1,7 +1,7 @@
 package mempool
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Identifiers represents a concurrency-safe memory pool for identifiers
@@ -15,6 +15,9 @@ type Identifiers interface {
 
 	// Rem removes the given identifier
 	Rem(id flow.Identifier) bool
+
+	// Size returns total number of identifiers in mempool
+	Size() uint
 
 	// All will retrieve all identifiers that are currently in the memory pool
 	// as an IdentityList

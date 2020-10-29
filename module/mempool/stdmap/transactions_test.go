@@ -6,10 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestTransactionPool(t *testing.T) {
@@ -19,8 +18,7 @@ func TestTransactionPool(t *testing.T) {
 	tx2 := unittest.TransactionBodyFixture()
 	item2 := &tx2
 
-	pool, err := stdmap.NewTransactions(1000)
-	require.NoError(t, err)
+	pool := stdmap.NewTransactions(1000)
 
 	t.Run("should be able to add first", func(t *testing.T) {
 		added := pool.Add(item1)
@@ -52,5 +50,11 @@ func TestTransactionPool(t *testing.T) {
 		items := pool.All()
 		assert.Len(t, items, 1)
 		assert.Equal(t, item1, items[0])
+	})
+
+	t.Run("should be able to clear", func(t *testing.T) {
+		assert.True(t, pool.Size() > 0)
+		pool.Clear()
+		assert.Equal(t, uint(0), pool.Size())
 	})
 }

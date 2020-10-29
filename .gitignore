@@ -4,6 +4,7 @@
 /cmd/execution/execution
 /cmd/verification/verification
 /cmd/testclient/testclient
+/cmd/util/util
 
 # Test binary, build with `go test -c`
 *.test

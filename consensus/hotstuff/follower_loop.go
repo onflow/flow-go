@@ -5,10 +5,10 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/runner"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/runner"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // FollowerLoop implements interface FollowerLoop
@@ -65,10 +65,11 @@ func (fl *FollowerLoop) loop() {
 		case p := <-fl.proposals:
 			err := fl.followerLogic.AddBlock(p)
 			if err != nil { // all errors are fatal
-				fl.log.Error().Hex("block_id", logging.ID(p.Block.BlockID)).
+				fl.log.Error().
+					Hex("block_id", logging.ID(p.Block.BlockID)).
 					Uint64("view", p.Block.View).
-					Msg("fatal error processing proposal")
-				fl.log.Error().Msgf("terminating FollowerLoop: %s", err.Error())
+					Err(err).
+					Msg("terminating FollowerLoop")
 				return
 			}
 		case <-shutdownSignal:

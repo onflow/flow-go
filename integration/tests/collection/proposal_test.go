@@ -5,11 +5,12 @@ import (
 	"math/rand"
 
 	"github.com/onflow/flow-go-sdk/client"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/integration/convert"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Run consensus on a multi-cluster setup. Ensure that transactions
@@ -52,7 +53,9 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 			forCluster := make([]flow.Identifier, 0, nTransactions)
 
 			for txIdx := 0; txIdx < nTransactions; txIdx++ {
-				tx := suite.TxForCluster(clusters.ByIndex(uint(clusterIdx)))
+				cluster, ok := clusters.ByIndex(uint(clusterIdx))
+				require.True(suite.T(), ok)
+				tx := suite.TxForCluster(cluster)
 				forCluster = append(forCluster, convert.IDFromSDK(tx.ID()))
 
 				// pick a client from this cluster
@@ -85,7 +88,9 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 			forCluster := make([]flow.Identifier, 0, nTransactions)
 
 			for txIdx := 0; txIdx < nTransactions; txIdx++ {
-				tx := suite.TxForCluster(clusters.ByIndex(uint(clusterIdx)))
+				cluster, ok := clusters.ByIndex(uint(clusterIdx))
+				require.True(suite.T(), ok)
+				tx := suite.TxForCluster(cluster)
 				forCluster = append(forCluster, convert.IDFromSDK(tx.ID()))
 
 				// pick two clients from this cluster (to introduce dupes)
@@ -122,7 +127,9 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 			forCluster := make([]flow.Identifier, 0, nTransactions)
 
 			for txIdx := 0; txIdx < nTransactions; txIdx++ {
-				tx := suite.TxForCluster(clusters.ByIndex(uint(clusterIdx)))
+				cluster, ok := clusters.ByIndex(uint(clusterIdx))
+				require.True(suite.T(), ok)
+				tx := suite.TxForCluster(cluster)
 				forCluster = append(forCluster, convert.IDFromSDK(tx.ID()))
 
 				// pick a client from a different cluster
@@ -160,7 +167,9 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 			forCluster := make([]flow.Identifier, 0, nTransactions)
 
 			for txIdx := 0; txIdx < nTransactions; txIdx++ {
-				tx := suite.TxForCluster(clusters.ByIndex(uint(clusterIdx)))
+				cluster, ok := clusters.ByIndex(uint(clusterIdx))
+				require.True(suite.T(), ok)
+				tx := suite.TxForCluster(cluster)
 				forCluster = append(forCluster, convert.IDFromSDK(tx.ID()))
 
 				for senderIdx := 0; senderIdx < nClusters; senderIdx++ {

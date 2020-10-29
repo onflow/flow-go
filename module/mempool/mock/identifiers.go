@@ -3,7 +3,7 @@
 package mempool
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -66,6 +66,20 @@ func (_m *Identifiers) Rem(id flow.Identifier) bool {
 		r0 = rf(id)
 	} else {
 		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// Size provides a mock function with given fields:
+func (_m *Identifiers) Size() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
 	}
 
 	return r0

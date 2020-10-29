@@ -10,23 +10,23 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/eventhandler"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/forkchoice"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
-	"github.com/dapperlabs/flow-go/model/flow"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
+	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks/forkchoice"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/consensus/hotstuff/voter"
+	"github.com/onflow/flow-go/model/flow"
+	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Instance struct {
@@ -49,7 +49,7 @@ type Instance struct {
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	persist      *mocks.Persister
-	signer       *mocks.Signer
+	signer       *mocks.SignerVerifier
 	verifier     *mocks.Verifier
 	communicator *mocks.Communicator
 
@@ -119,7 +119,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		committee:    &mocks.Committee{},
 		builder:      &module.Builder{},
 		persist:      &mocks.Persister{},
-		signer:       &mocks.Signer{},
+		signer:       &mocks.SignerVerifier{},
 		verifier:     &mocks.Verifier{},
 		communicator: &mocks.Communicator{},
 		finalizer:    &module.Finalizer{},
@@ -200,12 +200,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		nil,
 	)
 	in.signer.On("CreateQC", mock.Anything).Return(
-		func(votes []*model.Vote) *model.QuorumCertificate {
+		func(votes []*model.Vote) *flow.QuorumCertificate {
 			voterIDs := make([]flow.Identifier, 0, len(votes))
 			for _, vote := range votes {
 				voterIDs = append(voterIDs, vote.SignerID)
 			}
-			qc := &model.QuorumCertificate{
+			qc := &flow.QuorumCertificate{
 				View:      votes[0].View,
 				BlockID:   votes[0].BlockID,
 				SignerIDs: voterIDs,
@@ -296,7 +296,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
-	rootQC := &model.QuorumCertificate{
+	rootQC := &flow.QuorumCertificate{
 		View:      rootBlock.View,
 		BlockID:   rootBlock.BlockID,
 		SignerIDs: in.participants.NodeIDs(),

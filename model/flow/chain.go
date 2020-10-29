@@ -1,6 +1,12 @@
 package flow
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/pkg/errors"
+
+	"github.com/onflow/flow-go/utils/slices"
+)
 
 // A ChainID is a unique identifier for a specific Flow network instance.
 //
@@ -16,96 +22,143 @@ const Testnet ChainID = "flow-testnet"
 // Emulator is the chain ID for the emulated node chain.
 const Emulator ChainID = "flow-emulator"
 
-// networkType is the type of network for which account addresses
-// are generated and checked.
-//
-// A valid address in one network is invalid in the other networks.
-type networkType uint64
+// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
+const MonotonicEmulator ChainID = "flow-emulator-monotonic"
 
-// getNetworkType derives the network type used for address generation from the globally
+// getChainCodeWord derives the network type used for address generation from the globally
 // configured chain ID.
-func (c ChainID) getNetworkType() networkType {
+func (c ChainID) getChainCodeWord() uint64 {
 	switch c {
 	case Mainnet:
-		return networkType(0)
+		return 0
 	case Testnet:
-		return networkType(invalidCodeTestnet)
+		return invalidCodeTestnet
 	case Emulator:
-		return networkType(invalidCodeEmulator)
+		return invalidCodeEmulator
 	default:
-		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
+		panic(fmt.Sprintf("chain ID [%s] is invalid or does not support linear code address generation", c))
 	}
 }
 
 type chainImpl interface {
-	newAddressGeneratorAtState(state uint64) AddressGenerator
-	isValid(address Address) bool
+	newAddressGeneratorAtIndex(index uint64) AddressGenerator
+	// IsValid returns true if a given address is a valid account address on a given chain,
+	// and false otherwise.
+	//
+	// This is an off-chain check that only tells whether the address format is
+	// valid. If the function returns true, this does not mean
+	// a Flow account with this address has been generated. Such a test would
+	// require an on-chain check.
+	// zeroAddress() fails the check. Although it has a valid format, no account
+	// in Flow is assigned to zeroAddress().
+	IsValid(address Address) bool
+	// IndexFromAddress extracts the index used to generate the given address
+	IndexFromAddress(address Address) (uint64, error)
+	chain() ChainID
 }
 
-type MonotonicImpl struct{}
+// monotonicImpl is a simple implementation of adress generation
+// where addresses are simply the index of the account.
+type monotonicImpl struct{}
 
-func (m *MonotonicImpl) newAddressGeneratorAtState(state uint64) AddressGenerator {
+func (m *monotonicImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
 	return &MonotonicAddressGenerator{
-		state: state,
+		index: index,
 	}
 }
-func (m *MonotonicImpl) isValid(address Address) bool {
-	return address.uint64() > 0 && address.uint64() < maxState
+
+// IsValid checks the validity of an address
+func (m *monotonicImpl) IsValid(address Address) bool {
+	return address.uint64() > 0 && address.uint64() <= maxIndex
 }
 
-type LinearCodeImpl struct {
+// IndexFromAddress returns the index used to generate the address
+func (m *monotonicImpl) IndexFromAddress(address Address) (uint64, error) {
+	if !m.IsValid(address) {
+		return 0, errors.New("address is invalid")
+	}
+	return address.uint64(), nil
+}
+
+func (m *monotonicImpl) chain() ChainID {
+	return MonotonicEmulator
+}
+
+// linearCodeImpl is an implementation of the address generation
+// using linear codes.
+type linearCodeImpl struct {
 	chainID ChainID
 }
 
-func (l *LinearCodeImpl) newAddressGeneratorAtState(state uint64) AddressGenerator {
-	return &LinearCodeAddressGenerator{
-		state:   state,
-		chainID: l.chainID,
+func (l *linearCodeImpl) newAddressGeneratorAtIndex(index uint64) AddressGenerator {
+	return &linearCodeAddressGenerator{
+		index:         index,
+		chainCodeWord: l.chainID.getChainCodeWord(),
 	}
 }
-func (m *LinearCodeImpl) isValid(address Address) bool {
-	codeWord := address.uint64()
-	codeWord ^= uint64(m.chainID.getNetworkType())
 
+// IsValid checks the validity of an address
+func (l *linearCodeImpl) IsValid(address Address) bool {
+	codeWord := address.uint64()
+	codeWord ^= uint64(l.chainID.getChainCodeWord())
+
+	// zero is not a valid address
 	if codeWord == 0 {
 		return false
 	}
+	// check if address is a valid codeWord
+	return isValidCodeWord(codeWord)
+}
 
-	// Multiply the code word GF(2)-vector by the parity-check matrix
-	parity := uint(0)
-	for i := 0; i < linearCodeN; i++ {
-		if codeWord&1 == 1 {
-			parity ^= parityCheckMatrixColumns[i]
-		}
-		codeWord >>= 1
+// IndexFromAddress returns the index used to generate the address.
+// It returns an error if the input is not a valid address.
+func (l *linearCodeImpl) IndexFromAddress(address Address) (uint64, error) {
+	codeWord := address.uint64()
+	codeWord ^= uint64(l.chainID.getChainCodeWord())
+
+	// zero is not a valid address
+	if codeWord == 0 {
+		return 0, errors.New("address is invalid")
 	}
-	return parity == 0
+
+	// check the address is valid code word
+	if !isValidCodeWord(codeWord) {
+		return 0, errors.New("address is invalid")
+	}
+	return decodeCodeWord(codeWord), nil
+}
+
+func (l *linearCodeImpl) chain() ChainID {
+	return l.chainID
 }
 
 type addressedChain struct {
-	impl    chainImpl
-	chainID ChainID
+	chainImpl
 }
 
 var mainnet = &addressedChain{
-	chainID: Mainnet,
-	impl: &LinearCodeImpl{
+	chainImpl: &linearCodeImpl{
 		chainID: Mainnet,
 	},
 }
 
 var testnet = &addressedChain{
-	chainID: Testnet,
-	impl: &LinearCodeImpl{
+	chainImpl: &linearCodeImpl{
 		chainID: Testnet,
 	},
 }
 
 var emulator = &addressedChain{
-	chainID: Emulator,
-	impl:    &MonotonicImpl{},
+	chainImpl: &linearCodeImpl{
+		chainID: Emulator,
+	},
 }
 
+var monotonicEmulator = &addressedChain{
+	chainImpl: &monotonicImpl{},
+}
+
+// Chain returns the Chain corresponding to the string input
 func (c ChainID) Chain() Chain {
 	switch c {
 	case Mainnet:
@@ -114,6 +167,8 @@ func (c ChainID) Chain() Chain {
 		return testnet
 	case Emulator:
 		return emulator
+	case MonotonicEmulator:
+		return monotonicEmulator
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
 	}
@@ -123,83 +178,56 @@ func (c ChainID) String() string {
 	return string(c)
 }
 
+// Chain is the interface for address generation implementations.
 type Chain interface {
 	NewAddressGenerator() AddressGenerator
 	AddressAtIndex(index uint64) (Address, error)
 	ServiceAddress() Address
-	ZeroAddress() Address
-	BytesToAddressState(b []byte) AddressGenerator
+	BytesToAddressGenerator(b []byte) AddressGenerator
 	IsValid(Address) bool
-	newAddressGeneratorAtState(state uint64) AddressGenerator
+	IndexFromAddress(address Address) (uint64, error)
+	String() string
+	// required for tests
+	zeroAddress() Address
+	newAddressGeneratorAtIndex(index uint64) AddressGenerator
 }
 
 // NewAddressGenerator returns a new AddressGenerator with an
-// initialized state.
+// initialized index.
 func (id *addressedChain) NewAddressGenerator() AddressGenerator {
-	return id.newAddressGeneratorAtState(0)
+	return id.newAddressGeneratorAtIndex(0)
 }
 
-func (id *addressedChain) newAddressGeneratorAtState(state uint64) AddressGenerator {
-	return id.impl.newAddressGeneratorAtState(state)
-}
-
-// AddressAtIndex returns the nth generated account address.
+// AddressAtIndex returns the index-th generated account address.
 func (id *addressedChain) AddressAtIndex(index uint64) (Address, error) {
-	if index >= maxState {
-		return EmptyAddress, fmt.Errorf("index must be less than %x", maxState)
+	if index > maxIndex {
+		return EmptyAddress, fmt.Errorf("index must be less or equal to %x", maxIndex)
 	}
-	return id.newAddressGeneratorAtState(index).CurrentAddress(), nil
+	return id.newAddressGeneratorAtIndex(index).CurrentAddress(), nil
 }
 
 // ServiceAddress returns the root (first) generated account address.
 func (id *addressedChain) ServiceAddress() Address {
 	// returned error is guaranteed to be nil
 	address, _ := id.AddressAtIndex(1)
-	fmt.Printf("getting service address: %s\n", address)
 	return address
 }
 
 // zeroAddress returns the "zero address" (account that no one owns).
-func (id *addressedChain) ZeroAddress() Address {
+func (id *addressedChain) zeroAddress() Address {
 	// returned error is guaranteed to be nil
 	address, _ := id.AddressAtIndex(0)
 	return address
 }
 
-// BytesToAddressState converts an array of bytes into an address state
-func (id *addressedChain) BytesToAddressState(b []byte) AddressGenerator {
-	if len(b) > addressStateLength {
-		b = b[len(b)-addressStateLength:]
-	}
-	var stateBytes [addressStateLength]byte
-	copy(stateBytes[addressStateLength-len(b):], b)
-	state := uint48(stateBytes[:])
-	return id.newAddressGeneratorAtState(state)
-}
+// BytesToAddressGenerator converts an array of bytes into an address index
+func (id *addressedChain) BytesToAddressGenerator(b []byte) AddressGenerator {
+	bytes := slices.EnsureByteSliceSize(b, addressIndexLength)
 
-// IsValid returns true if a given address is a valid account address on given chain,
-// and false otherwise.
-//
-// This is an off-chain check that only tells whether the address format is
-// valid. If the function returns true, this does not mean
-// a Flow account with this address has been generated. Such a test would
-// require on on-chain check.
-// zeroAddress() fails the check. Although it has a valid format, no account
-// in Flow is assigned to zeroAddress().
-func (id *addressedChain) IsValid(address Address) bool {
-	return id.impl.isValid(address)
+	index := uint48(bytes[:])
+	return id.newAddressGeneratorAtIndex(index)
 }
-
-// IsValid returns true if a given address is a valid account address on given chain,
-// and false otherwise.
-//
-// This is an off-chain check that only tells whether the address format is
-// valid. If the function returns true, this does not mean
-// a Flow account with this address has been generated. Such a test would
-// require on on-chain check.
-// zeroAddress() fails the check. Although it has a valid format, no account
-// in Flow is assigned to zeroAddress().
 
 func (id *addressedChain) String() string {
-	return string(id.chainID)
+	return string(id.chain())
 }

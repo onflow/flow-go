@@ -7,30 +7,28 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // Finalizer is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
 type Finalizer struct {
-	db       *badger.DB
-	headers  storage.Headers
-	payloads storage.Payloads
-	proto    protocol.State
-	cleanup  CleanupFunc
+	db      *badger.DB
+	headers storage.Headers
+	state   protocol.State
+	cleanup CleanupFunc
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB, headers storage.Headers, payloads storage.Payloads, proto protocol.State, options ...func(*Finalizer)) *Finalizer {
+func NewFinalizer(db *badger.DB, headers storage.Headers, state protocol.State, options ...func(*Finalizer)) *Finalizer {
 	f := &Finalizer{
-		db:       db,
-		proto:    proto,
-		headers:  headers,
-		payloads: payloads,
-		cleanup:  CleanupNothing(),
+		db:      db,
+		state:   state,
+		headers: headers,
+		cleanup: CleanupNothing(),
 	}
 	for _, option := range options {
 		option(f)
@@ -104,7 +102,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
 		pendingID := pendingIDs[i]
-		err = f.proto.Mutate().Finalize(pendingID)
+		err = f.state.Mutate().Finalize(pendingID)
 		if err != nil {
 			return fmt.Errorf("could not finalize block (%x): %w", pendingID, err)
 		}
@@ -119,10 +117,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 // MakeValid marks a block as having passed HotStuff validation.
 func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
-	return operation.RetryOnConflict(
-		f.db.Update,
-		operation.SkipDuplicates(
-			operation.InsertBlockValidity(blockID, true),
-		),
-	)
+	err := f.state.Mutate().MarkValid(blockID)
+	if err != nil {
+		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
+	}
+	return nil
 }

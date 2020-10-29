@@ -7,17 +7,17 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/events"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type Engine struct {
@@ -33,7 +33,7 @@ type Engine struct {
 	pending        module.PendingBlockBuffer
 	follower       module.HotStuffFollower
 	con            network.Conduit
-	sync           module.Synchronization
+	sync           module.BlockRequester
 }
 
 func New(
@@ -48,6 +48,7 @@ func New(
 	state protocol.State,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
+	sync module.BlockRequester,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -62,9 +63,10 @@ func New(
 		state:          state,
 		pending:        pending,
 		follower:       follower,
+		sync:           sync,
 	}
 
-	con, err := net.Register(engine.BlockProvider, e)
+	con, err := net.Register(engine.ReceiveBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}
@@ -73,23 +75,11 @@ func New(
 	return e, nil
 }
 
-// WithSynchronization injects the given synchronization protocol into the
-// hotstuff follower, providing it with blocks proactively, while also allowing
-// it to explicitly request blocks by ID.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
-	e.sync = sync
-	return e
-}
-
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.sync == nil {
-		panic("follower engine requires injected synchronization module")
-	}
 	return e.unit.Ready(func() {
-		<-e.sync.Ready()
 		<-e.follower.Ready()
 	})
 }
@@ -99,7 +89,6 @@ func (e *Engine) Ready() <-chan struct{} {
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
 		<-e.follower.Done()
-		<-e.sync.Done()
 	})
 }
 
@@ -310,7 +299,10 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Payload: proposal.Payload,
 	}
 
-	err := e.state.Mutate().Extend(block)
+	// check whether the block is a valid extension of the chain.
+	// it only checks the block header, since checking block body is expensive.
+	// The full block check is done by the consensus participants.
+	err := e.state.Mutate().HeaderExtend(block)
 	// if the error is a known invalid extension of the protocol state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {

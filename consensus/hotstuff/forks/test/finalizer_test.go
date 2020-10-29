@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	mockm "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	mockm "github.com/onflow/flow-go/module/mock"
 )
 
 // denotion:
@@ -560,9 +560,10 @@ func TestNotification(t *testing.T) {
 	genesisBQ := makeGenesis()
 
 	fin, err := finalizer.New(genesisBQ, finalizationCallback, notifier)
+	require.NoError(t, err)
 
 	err = addBlocksToFinalizer(fin, blocks)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	notifier.AssertExpectations(t)
 	finalizationCallback.AssertExpectations(t)
 }

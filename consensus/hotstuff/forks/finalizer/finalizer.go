@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer/forest"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer/forest"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // Finalizer implements HotStuff finalization logic
@@ -34,7 +34,7 @@ var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestry")
 
 func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Finalizer, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
-		return nil, &model.ErrorConfiguration{Msg: "invalid root: root qc is not pointing to root block"}
+		return nil, &model.ConfigurationError{Msg: "invalid root: root qc is not pointing to root block"}
 	}
 
 	fnlzr := Finalizer{
@@ -61,11 +61,11 @@ func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, noti
 	return &fnlzr, nil
 }
 
-func (r *Finalizer) LockedBlock() *model.Block                  { return r.lastLocked.Block }
-func (r *Finalizer) LockedBlockQC() *model.QuorumCertificate    { return r.lastLocked.QC }
-func (r *Finalizer) FinalizedBlock() *model.Block               { return r.lastFinalized.Block }
-func (r *Finalizer) FinalizedView() uint64                      { return r.lastFinalized.Block.View }
-func (r *Finalizer) FinalizedBlockQC() *model.QuorumCertificate { return r.lastFinalized.QC }
+func (r *Finalizer) LockedBlock() *model.Block                 { return r.lastLocked.Block }
+func (r *Finalizer) LockedBlockQC() *flow.QuorumCertificate    { return r.lastLocked.QC }
+func (r *Finalizer) FinalizedBlock() *model.Block              { return r.lastFinalized.Block }
+func (r *Finalizer) FinalizedView() uint64                     { return r.lastFinalized.Block.View }
+func (r *Finalizer) FinalizedBlockQC() *flow.QuorumCertificate { return r.lastFinalized.QC }
 
 // GetBlock returns block for given ID
 func (r *Finalizer) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
@@ -156,7 +156,7 @@ func (r *Finalizer) AddBlock(block *model.Block) error {
 }
 
 // checkForConflictingQCs checks if qc conflicts with a stored Quorum Certificate.
-// In case a conflicting QC is found, an ErrorByzantineThresholdExceeded is returned.
+// In case a conflicting QC is found, an ByzantineThresholdExceededError is returned.
 //
 // Two Quorum Certificates q1 and q2 are defined as conflicting iff:
 //     * q1.View == q2.View
@@ -164,7 +164,7 @@ func (r *Finalizer) AddBlock(block *model.Block) error {
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
 // conflicting QCs can exists if and onluy of the Byzantine threshold is exceeded.
-func (r *Finalizer) checkForConflictingQCs(qc *model.QuorumCertificate) error {
+func (r *Finalizer) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 	it := r.forest.GetVerticesAtLevel(qc.View)
 	for it.HasNext() {
 		otherBlock := it.NextVertex() // by construction, must have same view as qc.View
@@ -178,7 +178,7 @@ func (r *Finalizer) checkForConflictingQCs(qc *model.QuorumCertificate) error {
 			if otherChildren.HasNext() {
 				otherChild := otherChildren.NextVertex()
 				conflictingQC := otherChild.(*BlockContainer).Block.QC
-				return &model.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
+				return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 					"conflicting QCs at view %d: %v and %v",
 					qc.View, qc.BlockID, conflictingQC.BlockID,
 				)}
@@ -270,7 +270,7 @@ func (r *Finalizer) getNextAncestryLevel(block *model.Block) (*forks.BlockQC, er
 	}
 	parentVertex, parentBlockKnown := r.forest.GetVertex(block.QC.BlockID)
 	if !parentBlockKnown {
-		return nil, &model.ErrorMissingBlock{View: block.QC.View, BlockID: block.QC.BlockID}
+		return nil, model.MissingBlockError{View: block.QC.View, BlockID: block.QC.BlockID}
 	}
 	newBlock := parentVertex.(*BlockContainer).Block
 	if newBlock.BlockID != block.QC.BlockID || newBlock.View != block.QC.View {
@@ -321,9 +321,9 @@ func (r *Finalizer) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 // finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `blockQC`.
 // Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock on the newly finalized blocks in the respective order
-func (r *Finalizer) finalizeUpToBlock(qc *model.QuorumCertificate) error {
+func (r *Finalizer) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	if qc.View < r.lastFinalized.Block.View {
-		return &model.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
+		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 			"finalizing blocks with view %d which is lower than previously finalized block at view %d",
 			qc.View, r.lastFinalized.Block.View,
 		)}
@@ -331,7 +331,7 @@ func (r *Finalizer) finalizeUpToBlock(qc *model.QuorumCertificate) error {
 	if qc.View == r.lastFinalized.Block.View {
 		// Sanity check: the previously last Finalized Block must be an ancestor of `block`
 		if r.lastFinalized.Block.BlockID != qc.BlockID {
-			return &model.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
+			return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 				"finalizing blocks at conflicting forks: %v and %v",
 				qc.BlockID, r.lastFinalized.Block.BlockID,
 			)}
@@ -388,7 +388,7 @@ func (r *Finalizer) VerifyBlock(block *model.Block) error {
 	}
 	// for block whose parents are _not_ below the pruning height, we expect the parent to be known.
 	if _, isParentKnown := r.forest.GetVertex(block.QC.BlockID); !isParentKnown { // we are missing the parent
-		return &model.ErrorMissingBlock{
+		return model.MissingBlockError{
 			View:    block.QC.View,
 			BlockID: block.QC.BlockID,
 		}

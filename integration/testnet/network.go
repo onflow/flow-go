@@ -20,15 +20,14 @@ import (
 
 	"github.com/dapperlabs/testingdock"
 
-	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -52,6 +51,8 @@ const (
 	ExeNodeAPIPort = "exe-api-port"
 	// AccessNodeAPIPort is the name used for the access node API port.
 	AccessNodeAPIPort = "access-api-port"
+	// AccessNodeAPIProxyPort is the name used for the access node API HTTP proxy port.
+	AccessNodeAPIProxyPort = "access-api-http-proxy-port"
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
 
@@ -72,7 +73,8 @@ type FlowNetwork struct {
 	network     *testingdock.Network
 	Containers  map[string]*Container
 	AccessPorts map[string]string
-	genesis     flow.Block
+	root        *flow.Block
+	seal        *flow.Seal
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -84,9 +86,14 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 	return il
 }
 
-// Genesis returns the genesis block generated for the network.
-func (net *FlowNetwork) Genesis() flow.Block {
-	return net.genesis
+// Root returns the root block generated for the network.
+func (net *FlowNetwork) Root() *flow.Block {
+	return net.root
+}
+
+// Seal returns the root block seal generated for the network.
+func (net *FlowNetwork) Seal() *flow.Seal {
+	return net.seal
 }
 
 // Start starts the network.
@@ -109,6 +116,9 @@ func (net *FlowNetwork) Remove() {
 // StopContainers stops all containers in the network, without removing them. This allows containers to be
 // restarted. To remove them, call `RemoveContainers`.
 func (net *FlowNetwork) StopContainers() {
+	if net == nil || net.suite == nil {
+		return
+	}
 
 	err := net.suite.Close()
 	if err != nil {
@@ -118,16 +128,21 @@ func (net *FlowNetwork) StopContainers() {
 
 // RemoveContainers removes all the containers in the network. Containers need to be stopped first using `Stop`.
 func (net *FlowNetwork) RemoveContainers() {
+	if net == nil || net.suite == nil {
+		return
+	}
 
 	err := net.suite.Remove()
 	if err != nil {
-
+		net.t.Log("failed to remove containers", err)
 	}
 }
 
 // Cleanup cleans up all temporary files used by the network.
 func (net *FlowNetwork) Cleanup() {
-
+	if net == nil || net.suite == nil {
+		return
+	}
 	// remove data directories
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
@@ -191,6 +206,14 @@ func (n *NetworkConfig) Len() int {
 }
 
 func (n *NetworkConfig) Less(i, j int) bool {
+	// Always move execution to the front
+	if n.Nodes[i].Role == n.Nodes[j].Role {
+		return false
+	} else if n.Nodes[j].Role == flow.RoleExecution {
+		return false
+	} else if n.Nodes[i].Role == flow.RoleExecution {
+		return true
+	}
 	return n.Nodes[i].Role < n.Nodes[j].Role
 }
 
@@ -311,7 +334,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
 	require.Nil(t, err)
 
-	genesis, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
+	root, seal, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
@@ -322,7 +345,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		network:     network,
 		Containers:  make(map[string]*Container, nNodes),
 		AccessPorts: make(map[string]string),
-		genesis:     *genesis,
+		root:        root,
+		seal:        seal,
 	}
 
 	// add each node to the network
@@ -349,7 +373,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
-				fmt.Sprintf("--nclusters=%d", net.config.NClusters),
 			}, nodeConf.AdditionalFlags...),
 		},
 		HostConfig: &container.HostConfig{},
@@ -417,8 +440,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			if !nodeContainer.Config.Ghost {
-			}
+
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			net.AccessPorts[ExeNodeAPIPort] = hostPort
@@ -439,21 +461,37 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
-			hostPort := testingdock.RandomPort(t)
-			containerPort := "9000/tcp"
+			hostGRPCPort := testingdock.RandomPort(t)
+			hostHTTPProxyPort := testingdock.RandomPort(t)
+			containerGRPCPort := "9000/tcp"
+			containerHTTPProxyPort := "8000/tcp"
 
-			nodeContainer.bindPort(hostPort, containerPort)
+			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
+			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			// Should always have at least 1 collection and execution node
-			nodeContainer.addFlag("ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+			// uncomment line below to point the access node exclusively to a single collection node
+			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("collection-ingress-port", "9000")
+			// should always have at least 1 execution node
 			nodeContainer.addFlag("script-addr", "execution_1:9000")
-			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
-			nodeContainer.Ports[AccessNodeAPIPort] = hostPort
-			net.AccessPorts[AccessNodeAPIPort] = hostPort
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
+			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
+			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
+			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
+			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
+
+		case flow.RoleConsensus:
+			// use 1 here instead of the default 5, because the integration
+			// tests only start 1 verification node
+			nodeContainer.addFlag("chunk-alpha", "1")
 
 		case flow.RoleVerification:
-			nodeContainer.addFlag("alpha", "1")
+			// use 1 here instead of the default 5, because the integration
+			// tests only start 1 verification node
+			nodeContainer.addFlag("chunk-alpha", "1")
+
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)
@@ -467,10 +505,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	suiteContainer := net.suite.Container(*opts)
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
-	if nodeConf.Role == flow.RoleAccess {
-		// collection1, _ := net.ContainerByName("collection_1")
+	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
 		execution1 := net.ContainerByName("execution_1")
-		// collection1.After(suiteContainer)
 		execution1.After(suiteContainer)
 	} else {
 		net.network.After(suiteContainer)
@@ -478,7 +514,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	return nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, []ContainerConfig, error) {
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.Seal, []ContainerConfig, error) {
 	// Setup as Testnet
 	chainID := flow.Testnet
 	chain := chainID.Chain()
@@ -486,7 +522,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
-		return nil, nil, fmt.Errorf("must specify at least one node")
+		return nil, nil, nil, fmt.Errorf("must specify at least one node")
 	}
 
 	// Sort so that access nodes start up last
@@ -495,71 +531,20 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate staking and networking keys for each configured node
 	confs, err := setupKeys(networkConf)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to setup keys: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
 	// run DKG for all consensus nodes
 	dkg, err := runDKG(confs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to run DKG: %w", err)
-	}
-
-	// generate the initial execution state
-	dbDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// generate genesis block
-	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), chainID)
-
-	// generate QC
-	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
-	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
-
-	qc, err := bootstraprun.GenerateGenesisQC(signerData, genesis)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), unittest.ServiceAccountPublicKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisCommit), commit)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisBlock), genesis)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisQC), qc)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisTokenSupply), unittest.GenesisTokenSupply)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// write public DKG data
-	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public(consensusNodes))
-	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
 	// write private key files for each DKG participant
+	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
-		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{PrivateKey: sk}
+		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
 		privParticpant := bootstrap.DKGParticipantPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encodableSk,
@@ -568,7 +553,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
 		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
@@ -579,43 +564,92 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		// retrieve private representation of the node
 		private, err := nodeConfig.NodeInfo.Private()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		err = writeJSON(path, private)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
-	// generate genesis blocks for each collector cluster
-	clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, genesis)
+	// generate the initial execution state
+	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
+	commit, err := run.GenerateExecutionState(trieDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	// write collector-specific genesis bootstrap files for each cluster
-	for i := 0; i < len(clusterBlocks); i++ {
-		clusterGenesis := clusterBlocks[i]
-		clusterQC := clusterQCs[i]
+	// define root block parameters
+	parentID := flow.ZeroID
+	height := uint64(0)
+	timestamp := time.Now().UTC()
+	epochCounter := uint64(0)
+	participants := bootstrap.ToIdentityList(toNodeInfos(confs))
 
-		// cluster ID is equivalent to chain ID
-		clusterID := clusterGenesis.Header.ChainID
+	// generate root block
+	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
+	rootID := root.Header.ID()
 
-		clusterGenesisPath := fmt.Sprintf(bootstrap.PathGenesisClusterBlock, clusterID)
-		err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		clusterQCPath := fmt.Sprintf(bootstrap.PathGenesisClusterQC, clusterID)
-		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
-		if err != nil {
-			return nil, nil, err
-		}
+	// generate QC
+	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
+	signerData, err := run.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	qc, err := run.GenerateRootQC(root, signerData)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	return genesis, confs, nil
+	// generate root blocks for each collector cluster
+	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, confs)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// generate epoch service events
+	epochSetup := &flow.EpochSetup{
+		Counter:      epochCounter,
+		FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
+		Participants: participants,
+		Assignments:  clusterAssignments,
+		RandomSource: rootID[:],
+	}
+
+	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)
+	epochCommit := &flow.EpochCommit{
+		Counter:         epochCounter,
+		ClusterQCs:      clusterQCs,
+		DKGGroupKey:     dkg.PubGroupKey,
+		DKGParticipants: dkgLookup,
+	}
+
+	// generate execution result and block seal
+	result := run.GenerateRootResult(root, commit)
+	seal := run.GenerateRootSeal(result, epochSetup, epochCommit)
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootBlock), root)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootQC), qc)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootResult), result)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootSeal), seal)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return root, seal, confs, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured
@@ -680,7 +714,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 
 	// filter by consensus nodes
-	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	nConsensusNodes := len(consensusNodes)
 
 	// run the core dkg algorithm
@@ -689,7 +723,7 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 		return bootstrap.DKGData{}, err
 	}
 
-	dkg, err := bootstraprun.RunFastKG(nConsensusNodes, dkgSeed)
+	dkg, err := run.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
@@ -707,28 +741,33 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 }
 
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
-//   * a cluster-specific genesis block
-//   * a cluster-specific genesis QC
-func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, genesis *flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate, error) {
+//   * a cluster-specific root block
+//   * a cluster-specific root QC
+func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) (flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
-	identities := toIdentityList(confs)
-	clusters := protocol.Clusters(nClusters, identities)
+	participants := toParticipants(confs)
+	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
+	assignments := unittest.ClusterAssignment(nClusters, collectors)
+	clusters, err := flow.NewClusterList(assignments, collectors)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not create cluster list: %w", err)
+	}
 
-	blocks := make([]*cluster.Block, 0, nClusters)
-	qcs := make([]*hotstuff.QuorumCertificate, 0, nClusters)
+	qcs := make([]*flow.QuorumCertificate, 0, nClusters)
 
-	for _, cluster := range clusters.All() {
-		// generate genesis cluster block
-		block := bootstraprun.GenerateGenesisClusterBlock(cluster)
+	for _, cluster := range clusters {
+		// generate root cluster block
+		block := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+
+		lookup := make(map[flow.Identifier]struct{})
+		for _, node := range cluster {
+			lookup[node.NodeID] = struct{}{}
+		}
 
 		// gather cluster participants
-		// ToDo: optimize. This has quadratic scaling with the number of collectors:
-		//       Let N be the number of collectors. The number of clusters Xi = N / c where c is nearly a constant.
-		//       Furthermore, cluster.ByNodeID iterate over all c cluster members to check whether their ID matches.
-		//       Hence, we get a runtime cost: Xi * N * c = N^2. This could probably be reduced to linear cost of O(N).
 		participants := make([]bootstrap.NodeInfo, 0, len(cluster))
 		for _, conf := range confs {
-			_, exists := cluster.ByNodeID(conf.NodeID)
+			_, exists := lookup[conf.NodeID]
 			if exists {
 				participants = append(participants, conf.NodeInfo)
 			}
@@ -737,16 +776,15 @@ func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, genesi
 			return nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
 		}
 
-		// generate qc for genesis cluster block
-		qc, err := bootstraprun.GenerateClusterGenesisQC(participants, genesis, block)
+		// generate qc for root cluster block
+		qc, err := run.GenerateClusterRootQC(participants, block)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// add block and qc to list
-		blocks = append(blocks, block)
 		qcs = append(qcs, qc)
 	}
 
-	return blocks, qcs, nil
+	return assignments, qcs, nil
 }

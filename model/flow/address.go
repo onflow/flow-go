@@ -19,22 +19,22 @@ type AddressGenerator interface {
 }
 
 type MonotonicAddressGenerator struct {
-	state uint64
+	index uint64
 }
 
-// LinearCodeAddressGenerator represents the internal state of the linear code address generation mechanism
-type LinearCodeAddressGenerator struct {
-	chainID ChainID
-	state   uint64
+// linearCodeAddressGenerator represents the internal index of the linear code address generation mechanism
+type linearCodeAddressGenerator struct {
+	chainCodeWord uint64
+	index         uint64
 }
 
 const (
 	// AddressLength is the size of an account address in bytes.
 	// (n) is the size of an account address in bits.
 	AddressLength = (linearCodeN + 7) >> 3
-	// addressStateLength is the size of an account address state in bytes.
+	// addressIndexLength is the size of an account address state in bytes.
 	// (k) is the size of an account address in bits.
-	addressStateLength = (linearCodeK + 7) >> 3
+	addressIndexLength = (linearCodeK + 7) >> 3
 )
 
 // EmptyAddress is the default value of a variable of type Address
@@ -67,6 +67,12 @@ func (a Address) Bytes() []byte {
 // Hex returns the hex string representation of the address.
 func (a Address) Hex() string {
 	return hex.EncodeToString(a.Bytes())
+}
+
+// HexWithPrefix returns the hex string representation of the address,
+// including the 0x prefix.
+func (a Address) HexWithPrefix() string {
+	return "0x" + a.Hex()
 }
 
 // String returns the string representation of the address.
@@ -112,20 +118,95 @@ func putUint48(b []byte, v uint64) {
 	b[5] = byte(v)
 }
 
-func stateToBytes(state uint64) []byte {
-	stateBytes := make([]byte, addressStateLength)
-	putUint48(stateBytes, state)
-	return stateBytes
+func indexToBytes(index uint64) []byte {
+	indexBytes := make([]byte, addressIndexLength)
+	putUint48(indexBytes, index)
+	return indexBytes
 }
 
-// Bytes converts an address state into a slice of bytes
+// Bytes converts an address index into a slice of bytes
 func (gen *MonotonicAddressGenerator) Bytes() []byte {
-	return stateToBytes(gen.state)
+	return indexToBytes(gen.index)
 }
 
-// Bytes converts an address state into a slice of bytes
-func (gen *LinearCodeAddressGenerator) Bytes() []byte {
-	return stateToBytes(gen.state)
+// Bytes converts an address index into a slice of bytes
+func (gen *linearCodeAddressGenerator) Bytes() []byte {
+	return indexToBytes(gen.index)
+}
+
+// NextAddress increments the internal index and generates the new address
+// corresponding to the new index.
+func (gen *MonotonicAddressGenerator) NextAddress() (Address, error) {
+	gen.index++
+	if uint64(gen.index) > maxIndex {
+		return EmptyAddress, fmt.Errorf("the new index value is not valid, it must be less or equal to %x", maxIndex)
+	}
+	return gen.CurrentAddress(), nil
+}
+
+// CurrentAddress returns the address corresponding to the internal index.
+func (gen *MonotonicAddressGenerator) CurrentAddress() Address {
+	return uint64ToAddress(gen.index)
+}
+
+// NextAddress generates an account address from the addressing index.
+//
+// The address is generated for a specific network (Flow mainnet, testnet..)
+// The second returned value is the new updated addressing index. The new
+// addressing index should replace the old index to keep generating account
+// addresses in a sequential way.
+// Each index is mapped to exactly one address. There are as many addresses
+// as indices.
+// zeroAddress() corresponds to the index "0" while ServiceAddress() corresponds to the
+// index "1".
+func (gen *linearCodeAddressGenerator) NextAddress() (Address, error) {
+	err := gen.nextIndex()
+	if err != nil {
+		return EmptyAddress, err
+	}
+	index := gen.index
+	address := encodeWord(index)
+	// customize the code word for a specific network
+	address ^= gen.chainCodeWord
+	return uint64ToAddress(address), nil
+}
+
+// CurrentAddress returns the current account address.
+//
+// The returned address is the address of the latest created account.
+func (gen *linearCodeAddressGenerator) CurrentAddress() Address {
+	index := gen.index
+	address := encodeWord(index)
+	// customize the code word for a specific network
+	address ^= gen.chainCodeWord
+	return uint64ToAddress(address)
+}
+
+// increments the internal index of the generator.
+//
+// In this implemntation, the index values are simply
+// incremented from 0 to 2^k-1.
+func (gen *linearCodeAddressGenerator) nextIndex() error {
+	gen.index++
+	if uint64(gen.index) > maxIndex {
+		return fmt.Errorf("the new index value is not valid, it must be less or equal to %x", maxIndex)
+	}
+	return nil
+}
+
+// uint64ToAddress returns an address with value v.
+//
+// The value v fits into the address as the address size is 8
+func uint64ToAddress(v uint64) Address {
+	var b [AddressLength]byte
+	binary.BigEndian.PutUint64(b[:], v)
+	return Address(b)
+}
+
+// uint64 converts an address into a uint64
+func (a *Address) uint64() uint64 {
+	v := binary.BigEndian.Uint64(a[:])
+	return v
 }
 
 const (
@@ -149,100 +230,60 @@ const (
 	// d is also the minimum hamming weight of all account addresses (the zero address is not an account address).
 	linearCodeD = 7
 
-	// the maximum value of the internal state, 2^k.
-	maxState = (1 << linearCodeK) - 1
+	// the maximum value of the internal state, 2^k - 1.
+	maxIndex = (1 << linearCodeK) - 1
 )
-
-func (s *MonotonicAddressGenerator) NextAddress() (Address, error) {
-	if uint64(s.state) > maxState {
-		return EmptyAddress, fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
-	}
-	s.state++
-	return s.CurrentAddress(), nil
-}
-
-func (s *MonotonicAddressGenerator) CurrentAddress() Address {
-	return uint64ToAddress(s.state)
-}
-
-// NextAddress generates an account address from the addressing state.
-//
-// The address is generated for a specific network (Flow mainnet, testnet..)
-// The second returned value is the new updated addressing state. The new
-// addressing state should replace the old state to keep generating account
-// addresses in a sequential way.
-// Each state is mapped to exactly one address. There are as many addresses
-// as states.
-// ZeroAddress() corresponds to the state "0" while ServiceAddress() corresponds to the
-// state "1".
-func (gen *LinearCodeAddressGenerator) NextAddress() (Address, error) {
-	err := gen.nextState()
-	if err != nil {
-		return EmptyAddress, err
-	}
-	address := gen.generateAddress()
-	return address, nil
-}
-
-// CurrentAddress returns the current account address.
-//
-// The returned address is the address of the latest created account.
-func (gen *LinearCodeAddressGenerator) CurrentAddress() Address {
-	address := gen.generateAddress()
-	return address
-}
-
-// returns the next state given an addressing state.
-//
-// The state values are incremented from 0 to 2^k-1
-func (gen *LinearCodeAddressGenerator) nextState() error {
-	if uint64(gen.state) > maxState {
-		return fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
-	}
-	gen.state += 1
-	return nil
-}
-
-// uint64ToAddress returns an address with value v.
-//
-// The value v fits into the address as the address size is 8
-func uint64ToAddress(v uint64) Address {
-	var b [AddressLength]byte
-	binary.BigEndian.PutUint64(b[:], v)
-	return Address(b)
-}
-
-// uint64 converts an address into a uint64
-func (a *Address) uint64() uint64 {
-	v := binary.BigEndian.Uint64(a[:])
-	return v
-}
-
-// generateAddress returns an account address given an addressing state.
-// (network) specifies the network to generate the address for (Flow Mainnet, testent..)
-// The function assumes the state is valid (<2^k) which means
-// a check on the state should be done before calling this function.
-func (gen *LinearCodeAddressGenerator) generateAddress() Address {
-	index := gen.state
-
-	// Multiply the index GF(2) vector by the code generator matrix
-	address := uint64(0)
-	for i := 0; i < linearCodeK; i++ {
-		if index&1 == 1 {
-			address ^= generatorMatrixRows[i]
-		}
-		index >>= 1
-	}
-
-	// customize the code word for a specific network
-	address ^= uint64(gen.chainID.getNetworkType())
-	return uint64ToAddress(address)
-}
 
 // invalid code-words in the [64,45] code
 // these constants are used to generate non-Flow-Mainnet addresses
 const invalidCodeTestnet = uint64(0x6834ba37b3980209)
 const invalidCodeEmulator = uint64(0x1cb159857af02018)
+
+// encodeWord encodes a word into a code word.
+// In Flow, the word is the account index while the code word
+// is the corresponding address.
+//
+// The function assumes the word is valid (<2^k)
+func encodeWord(word uint64) uint64 {
+	// Multiply the index GF(2) vector by the code generator matrix
+	codeWord := uint64(0)
+	for i := 0; i < linearCodeK; i++ {
+		if word&1 == 1 {
+			codeWord ^= generatorMatrixRows[i]
+		}
+		word >>= 1
+	}
+	return codeWord
+}
+
+// checks if the input is a valid code word of the linear code
+func isValidCodeWord(codeWord uint64) bool {
+	// Multiply the code word GF(2)-vector by the parity-check matrix
+	parity := uint(0)
+	for i := 0; i < linearCodeN; i++ {
+		if codeWord&1 == 1 {
+			parity ^= parityCheckMatrixColumns[i]
+		}
+		codeWord >>= 1
+	}
+	return parity == 0
+}
+
+// reverse the linear code assuming the input is a valid
+// codeWord.
+func decodeCodeWord(codeWord uint64) uint64 {
+	// truncate the address GF(2) vector (last K bits) and multiply it by the inverse matrix of
+	// the partial code generator.
+	word := uint64(0)
+	codeWord >>= (linearCodeN - linearCodeK)
+	for i := 0; i < linearCodeK; i++ {
+		if codeWord&1 == 1 {
+			word ^= inverseMatrixRows[i]
+		}
+		codeWord >>= 1
+	}
+	return word
+}
 
 // Rows of the generator matrix G of the [64,45]-code used for Flow addresses.
 // G is a (k x n) matrix with coefficients in GF(2), each row is converted into
@@ -283,4 +324,25 @@ var parityCheckMatrixColumns = [linearCodeN]uint{
 	0x03807, 0x007d2, 0x00727, 0x0068e,
 	0x0067c, 0x0059d, 0x004eb, 0x003b4,
 	0x0036a, 0x002d9, 0x001c7, 0x0003f,
+}
+
+// Rows of the inverse I of the generator matrix I = sub(G)^(-1).
+// sub(G) is a square sub-matrix of G formed by the first (k) columns. This makes sub(G)
+// an inversible (k x k) matrix.
+// I is a (k x k) matrix with coefficients in GF(2), each row is converted into
+// a big endian integer representation of the GF(2) raw vector.
+// I is used to retrieve indices from account addresses.
+var inverseMatrixRows = [linearCodeK]uint64{
+	0x14b4ae9336c9, 0x1a5a57499b64, 0x0d2d2ba4cdb2, 0x069695d266d9,
+	0x134b4ae9336c, 0x09a5a57499b6, 0x04d2d2ba4cdb, 0x1269695d266d,
+	0x1934b4ae9336, 0x0c9a5a57499b, 0x164d2d2ba4cd, 0x1b269695d266,
+	0x0d934b4ae933, 0x16c9a5a57499, 0x1b64d2d2ba4c, 0x0db269695d26,
+	0x06d934b4ae93, 0x136c9a5a5749, 0x19b64d2d2ba4, 0x0cdb269695d2,
+	0x066d934b4ae9, 0x1336c9a5a574, 0x099b64d2d2ba, 0x04cdb269695d,
+	0x1266d934b4ae, 0x09336c9a5a57, 0x1499b64d2d2b, 0x1a4cdb269695,
+	0x1d266d934b4a, 0x0e9336c9a5a5, 0x17499b64d2d2, 0x0ba4cdb26969,
+	0x15d266d934b4, 0x0ae9336c9a5a, 0x057499b64d2d, 0x12ba4cdb2696,
+	0x095d266d934b, 0x14ae9336c9a5, 0x1a57499b64d2, 0x0d2ba4cdb269,
+	0x1695d266d934, 0x0b4ae9336c9a, 0x05a57499b64d, 0x12d2ba4cdb26,
+	0x09695d266d93,
 }

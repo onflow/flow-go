@@ -10,17 +10,18 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	model "github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/finalizer/collection"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	networkmock "github.com/dapperlabs/flow-go/network/mock"
-	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	model "github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/finalizer/collection"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
+	networkmock "github.com/onflow/flow-go/network/mock"
+	cluster "github.com/onflow/flow-go/state/cluster/badger"
+	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFinalizer(t *testing.T) {
@@ -30,19 +31,18 @@ func TestFinalizer(t *testing.T) {
 		rand.Seed(time.Now().UnixNano())
 
 		genesis := model.Genesis()
-		chainID := genesis.Header.ChainID
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 
 		headers := storage.NewHeaders(metrics, db)
 		payloads := storage.NewClusterPayloads(metrics, db)
 
-		state, err := cluster.NewState(db, chainID, headers, payloads)
+		state, err := cluster.NewState(db, tracer, genesis.Header.ChainID, headers, payloads)
 		require.NoError(t, err)
 		mutator := state.Mutate()
 
-		pool, err := stdmap.NewTransactions(1000)
-		require.NoError(t, err)
+		pool := stdmap.NewTransactions(1000)
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
@@ -73,7 +73,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			fakeBlockID := unittest.IdentifierFixture()
 			err := finalizer.MakeFinal(fakeBlockID)
@@ -86,7 +86,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -112,7 +112,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -129,7 +129,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			prov := new(networkmock.Engine)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -155,7 +155,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -202,7 +202,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -258,7 +258,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -310,7 +310,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })

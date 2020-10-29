@@ -6,10 +6,10 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // FollowerLogic runs in non-consensus nodes. It informs other components within the node
@@ -22,32 +22,32 @@ type FollowerLogic struct {
 	log               zerolog.Logger
 	validator         hotstuff.Validator
 	finalizationLogic forks.Finalizer
-	notifier          hotstuff.FinalizationConsumer
 }
 
+// New creates a new FollowerLogic instance
 func New(
 	log zerolog.Logger,
 	validator hotstuff.Validator,
 	finalizationLogic forks.Finalizer,
-	notifier hotstuff.FinalizationConsumer,
 ) (*FollowerLogic, error) {
 	return &FollowerLogic{
 		log:               log.With().Str("hotstuff", "follower").Logger(),
 		validator:         validator,
 		finalizationLogic: finalizationLogic,
-		notifier:          notifier,
 	}, nil
 }
 
+// FinalizedBlock returns the latest finalized block
 func (f *FollowerLogic) FinalizedBlock() *model.Block {
 	return f.finalizationLogic.FinalizedBlock()
 }
 
+// AddBlock processes the given block proposal
 func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
 	// validate the block. skip if the proposal is invalid
 	err := f.validator.ValidateProposal(blockProposal)
-	if errors.Is(err, model.ErrorInvalidBlock{}) {
-		f.log.Warn().AnErr("err", err).Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
+	if model.IsInvalidBlockError(err) {
+		f.log.Warn().Err(err).Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
 			Msg("invalid proposal")
 		return nil
 	}

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
 type ChunkStatus struct {
@@ -24,7 +24,8 @@ func (s *ChunkStatus) Checksum() flow.Identifier {
 	return s.Chunk.ID()
 }
 
-func NewChunkStatus(chunk *flow.Chunk, resultID flow.Identifier, executorID flow.Identifier) *ChunkStatus {
+func NewChunkStatus(chunk *flow.Chunk, resultID flow.Identifier,
+	executorID flow.Identifier) *ChunkStatus {
 	return &ChunkStatus{
 		Chunk:             chunk,
 		ExecutionResultID: resultID,

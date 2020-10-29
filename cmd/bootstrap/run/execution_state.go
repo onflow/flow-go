@@ -1,14 +1,18 @@
 package run
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
+// NOTE: this is now unused and should become part of another tool.
 func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 	priv, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 	if err != nil {
@@ -22,12 +26,20 @@ func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, erro
 	}, nil
 }
 
-func GenerateExecutionState(dbDir string, accountKey flow.AccountPublicKey, genesisTokenSupply uint64, chain flow.Chain) (flow.StateCommitment, error) {
+// NOTE: this is now unused and should become part of another tool.
+func GenerateExecutionState(
+	dbDir string,
+	accountKey flow.AccountPublicKey,
+	tokenSupply cadence.UFix64,
+	chain flow.Chain,
+) (flow.StateCommitment, error) {
 	metricsCollector := &metrics.NoopCollector{}
-	ledgerStorage, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
-	defer ledgerStorage.CloseStorage()
+
+	ledgerStorage, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
 	if err != nil {
 		return nil, err
 	}
-	return bootstrap.BootstrapLedger(ledgerStorage, accountKey, genesisTokenSupply, chain)
+	defer ledgerStorage.CloseStorage()
+
+	return bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapLedger(ledgerStorage, accountKey, tokenSupply, chain)
 }

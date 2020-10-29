@@ -3,22 +3,18 @@ package ingestion
 //revive:disable:unexported-return
 
 import (
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
 type Mempool struct {
-	BlockByCollection *stdmap.BlockByCollections
 	ExecutionQueue    *stdmap.Queues
-	OrphanQueue       *stdmap.Queues
-	SyncQueues        *stdmap.Queues
+	BlockByCollection *stdmap.BlockByCollections
 }
 
-func (m *Mempool) Run(f func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueue *stdmap.QueuesBackdata, orphanQueue *stdmap.QueuesBackdata) error) error {
+func (m *Mempool) Run(f func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueue *stdmap.QueuesBackdata) error) error {
 	return m.ExecutionQueue.Run(func(queueBackdata *stdmap.QueuesBackdata) error {
 		return m.BlockByCollection.Run(func(blockByCollectionBackdata *stdmap.BlockByCollectionBackdata) error {
-			return m.OrphanQueue.Run(func(orphanBackdata *stdmap.QueuesBackdata) error {
-				return f(blockByCollectionBackdata, queueBackdata, orphanBackdata)
-			})
+			return f(blockByCollectionBackdata, queueBackdata)
 		})
 	})
 }
@@ -27,8 +23,6 @@ func newMempool() *Mempool {
 	m := &Mempool{
 		BlockByCollection: stdmap.NewBlockByCollections(),
 		ExecutionQueue:    stdmap.NewQueues(),
-		OrphanQueue:       stdmap.NewQueues(),
-		SyncQueues:        stdmap.NewQueues(),
 	}
 
 	return m

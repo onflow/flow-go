@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -18,28 +17,28 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/dkg"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/trace"
-	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
-	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	"github.com/dapperlabs/flow-go/storage"
-	storerr "github.com/dapperlabs/flow-go/storage"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	sutil "github.com/dapperlabs/flow-go/storage/util"
-	"github.com/dapperlabs/flow-go/utils/debug"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
+	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/network/gossip/libp2p/validators"
+	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/storage"
+	storerr "github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	sutil "github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/utils/debug"
+	"github.com/onflow/flow-go/utils/io"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const notSet = "not set"
@@ -53,7 +52,6 @@ type BaseConfig struct {
 	datadir          string
 	level            string
 	metricsPort      uint
-	nClusters        uint
 	BootstrapDir     string
 	profilerEnabled  bool
 	profilerDir      string
@@ -79,6 +77,9 @@ type Storage struct {
 	Blocks       storage.Blocks
 	Transactions storage.Transactions
 	Collections  storage.Collections
+	Setups       storage.EpochSetups
+	Commits      storage.EpochCommits
+	Statuses     storage.EpochStatuses
 }
 
 type namedModuleFunc struct {
@@ -100,7 +101,6 @@ type namedDoneObject struct {
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
-//   GenesisHandler, if any and if genesis was generated
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
@@ -115,27 +115,26 @@ type FlowNodeBuilder struct {
 	Metrics           Metrics
 	DB                *badger.DB
 	Storage           Storage
+	ProtocolEvents    *events.Distributor
 	State             *protocol.State
-	DKGState          *wrapper.State
+	Middleware        *libp2p.Middleware
 	Network           *libp2p.Network
+	MsgValidators     []validators.MessageValidator
+	FvmOptions        []fvm.Option
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
 	sig               chan os.Signal
-	genesisHandler    func(node *FlowNodeBuilder, block *flow.Block)
-	genesisBootstrap  bool
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
-	MsgValidators     []validators.MessageValidator
 
-	// genesis information
-	GenesisCommit           flow.StateCommitment
-	GenesisBlock            *flow.Block
-	GenesisQC               *model.QuorumCertificate
-	GenesisAccountPublicKey *flow.AccountPublicKey
-	GenesisTokenSupply      uint64
-	GenesisChainID          flow.ChainID
+	// root state information
+	RootBlock   *flow.Block
+	RootQC      *flow.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -149,11 +148,12 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
-	fnb.flags.UintVar(&fnb.BaseConfig.nClusters, "nclusters", 2, "number of collection node clusters")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", false, "whether to enable the auto-profiler")
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute, "the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute,
+		"the interval between auto-profiler runs")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second,
+		"the duration to run the auto-profile for")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -167,29 +167,45 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxPubSubMsgSize, fnb.MsgValidators...)
+			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxUnicastMsgSize, libp2p.DefaultMaxPubSubMsgSize,
+			fnb.RootBlock.ID().String(),
+			fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
-
-		participants, err := fnb.State.Final().Identities(filter.Any)
-		if err != nil {
-			return nil, fmt.Errorf("could not get network identities: %w", err)
-		}
+		fnb.Middleware = mw
 
 		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get node id: %w", err)
 		}
 		nodeRole := nodeID.Role
-		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e6, topology, fnb.Metrics.Network)
+		participants, err := libp2p.IDsFromState(fnb.State)
+		if err != nil {
+			return nil, fmt.Errorf("could not get network identities: %w", err)
+		}
+
+		var nodeTopology topology.Topology
+		if nodeRole == flow.RoleCollection {
+			nodeTopology, err = topology.NewCollectionTopology(nodeID.NodeID, fnb.State)
+		} else {
+			nodeTopology, err = topology.NewRandPermTopology(nodeRole, nodeID.NodeID)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not create topology: %w", err)
+		}
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, fnb.Middleware, 10e6, nodeTopology, fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
 
 		fnb.Network = net
+
+		idRefresher := libp2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
+		fnb.ProtocolEvents.AddConsumer(idRefresher)
+
 		return net, err
 	})
 }
@@ -211,6 +227,20 @@ func (fnb *FlowNodeBuilder) enqueueTracer() {
 	})
 }
 
+func (fnb *FlowNodeBuilder) parseAndPrintFlags() {
+	// parse configuration parameters
+	pflag.Parse()
+
+	// print all flags
+	log := fnb.Logger.Info()
+
+	pflag.VisitAll(func(flag *pflag.Flag) {
+		log = log.Str(flag.Name, flag.Value.String())
+	})
+
+	log.Msg("flags loaded")
+}
+
 func (fnb *FlowNodeBuilder) initNodeInfo() {
 	if fnb.BaseConfig.nodeIDHex == notSet {
 		fnb.Logger.Fatal().Msg("cannot start without node ID")
@@ -218,7 +248,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 
 	nodeID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	if err != nil {
-		fnb.Logger.Fatal().Err(err).Msg("could not parse hex ID")
+		fnb.Logger.Fatal().Err(err).Msgf("could not parse node ID from string: %v", fnb.BaseConfig.nodeIDHex)
 	}
 
 	info, err := loadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
@@ -264,7 +294,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(fnb.GenesisChainID),
+		Cache:      metrics.NewCacheCollector(fnb.RootChainID),
 		Mempool:    mempools,
 	}
 
@@ -305,8 +335,15 @@ func (fnb *FlowNodeBuilder) initDB() {
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithLogger(log).
-		WithValueLogFileSize(128 << 20). // Default is 1 GB
-		WithValueLogMaxEntries(100000)   // Default is 1000000
+
+		// the ValueLogFileSize option specifies how big the value of a
+		// key-value pair is allowed to be saved into badger.
+		// exceeding this limit, will fail with an error like this:
+		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
+		// Maximum value size is 10G, needed by execution node
+		// TODO: finding a better max value for each node type
+		WithValueLogFileSize(128 << 23).
+		WithValueLogMaxEntries(100000) // Default is 1000000
 
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
@@ -324,18 +361,19 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	identities := bstorage.NewIdentities(fnb.Metrics.Cache, fnb.DB)
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
-	payloads := bstorage.NewPayloads(fnb.DB, index, identities, guarantees, seals)
+	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
+	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
+	commits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
+	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:      headers,
-		Identities:   identities,
 		Guarantees:   guarantees,
 		Seals:        seals,
 		Index:        index,
@@ -343,112 +381,138 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Blocks:       blocks,
 		Transactions: transactions,
 		Collections:  collections,
+		Setups:       setups,
+		Commits:      commits,
+		Statuses:     statuses,
 	}
 }
 
 func (fnb *FlowNodeBuilder) initState() {
 
+	distributor := events.NewDistributor()
 	state, err := protocol.NewState(
 		fnb.Metrics.Compliance,
+		fnb.Tracer,
 		fnb.DB,
 		fnb.Storage.Headers,
-		fnb.Storage.Identities,
 		fnb.Storage.Seals,
 		fnb.Storage.Index,
 		fnb.Storage.Payloads,
 		fnb.Storage.Blocks,
-		protocol.SetClusters(fnb.BaseConfig.nClusters),
+		fnb.Storage.Setups,
+		fnb.Storage.Commits,
+		fnb.Storage.Statuses,
+		distributor,
 	)
+
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	// check if database is initialized
-	head, err := state.Final().Head()
+	_, err = state.Final().Head()
 	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
 
-		// Mark that we need to run the genesis handler
-		fnb.genesisBootstrap = true
-
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
-		// Load the genesis account public key
-		fnb.GenesisAccountPublicKey, err = loadGenesisAccountPublicKey(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis account public key")
-		}
+		// load the root block from bootstrap files and set the chain ID based on it
+		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root block")
 
-		// Load the genesis state commitment
-		fnb.GenesisCommit, err = loadGenesisCommit(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis commit")
-		}
+		// set the root chain ID based on the root block
+		fnb.RootChainID = fnb.RootBlock.Header.ChainID
 
-		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
-		}
+		// load the root QC data from bootstrap files
+		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root QC")
 
-		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
+		// load the root execution result from bootstrap files
+		fnb.RootResult, err = loadRootResult(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root execution result")
 
-		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
-		}
+		// load the root block seal from bootstrap files
+		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root seal")
 
-		// load token supply from bootstrap config
-		fnb.GenesisTokenSupply, err = loadGenesisTokenSupply(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis token supply")
-		}
+		// bootstrap the protocol state with the loaded data
+		err = state.Mutate().Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
+		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 
-		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-		}
+		fnb.Logger.Info().
+			Hex("root_result_id", logging.Entity(fnb.RootResult)).
+			Hex("root_state_commitment", fnb.RootSeal.FinalState).
+			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
+			Uint64("root_block_height", fnb.RootBlock.Header.Height).
+			Msg("genesis state bootstrapped")
 
-		// TODO: this always needs to be available, so we need to persist it
-		fnb.DKGState = wrapper.NewState(dkgPubData)
-
-		err = state.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
-		}
 	} else if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("could not check existing database")
 	} else {
-		fnb.Logger.Info().
-			Hex("final_id", logging.ID(head.ID())).
-			Uint64("final_height", head.Height).
-			Msg("using existing database")
 
-		// Load the genesis info for recovery
-		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
-		}
+		// TODO: we shouldn't have to load any files again after bootstrapping; in
+		// order to make it unnecessary, we need to changes:
+		// 1) persist the root QC along the root block so it can be loaded from DB
+		// => https://github.com/dapperlabs/flow-go/issues/4166
+		// 2) bootstrap and persist DKG state in a similar fashion to protocol state
+		// => https://github.com/dapperlabs/flow-go/issues/4165
 
-		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
+		// load the root block from bootstrap files and set the chain ID based on it
+		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root block")
 
-		// load genesis QC and DKG data from bootstrap files for recovery
-		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
-		}
+		// set the chain ID based on the root header
+		// TODO: as the root header can now be loaded from protocol state, we should
+		// not use a global variable for chain ID anymore, but rely on the protocol
+		// state as final authority on what the chain ID is
+		// => https://github.com/dapperlabs/flow-go/issues/4167
+		fnb.RootChainID = fnb.RootBlock.Header.ChainID
 
-		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-		}
-		fnb.DKGState = wrapper.NewState(dkgPubData)
+		// load the root QC data from bootstrap files
+		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root QC")
+
+		// load the root execution result from bootstrap files
+		fnb.RootResult, err = loadRootResult(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root execution result")
+
+		// load the root block seal from bootstrap files
+		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root seal")
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
+	rootBlockHeader, err := state.Params().Root()
+	fnb.MustNot(err).Msg("could not get root block from protocol state")
+
+	// this happens when the bootstrap root block is updated (because of new spork),
+	// but the protocol state is not updated, so they don't match
+	// when this happens during a spork, we could try deleting the protocol state database.
+	// TODO: revisit this check when implementing Epoch
+	if rootBlockHeader.ID() != fnb.RootBlock.ID() {
+		fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
+			rootBlockHeader.ID(),
+			fnb.RootBlock.ID())
+	}
+
 	self, err := state.Final().Identity(myID)
-	fnb.MustNot(err).Msg("could not get identity")
+	// there are two cases that will cause the following error:
+	// 1) used the wrong node id, which is not part of the identity list of the finalized state
+	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
+	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
+
+	if self.Role.String() != fnb.BaseConfig.nodeRole {
+		if rootBlockHeader.ChainID == flow.Mainnet {
+			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
+				self.Role.String(),
+				fnb.BaseConfig.nodeRole)
+		} else {
+			// This allows ghost node to run as any role when not on mainnet
+			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
+				self.Role.String(),
+				fnb.BaseConfig.nodeRole)
+		}
+	}
 
 	// ensure that the configured staking/network keys are consistent with the protocol state
 	if !self.NetworkPubKey.Equals(fnb.networkKey.PublicKey()) {
@@ -461,7 +525,30 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.Me, err = local.New(self, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
 
+	lastFinalized, err := state.Final().Head()
+	fnb.MustNot(err).Msg("could not get last finalized state")
+
+	fnb.Logger.Info().
+		Hex("block_id", logging.Entity(lastFinalized)).
+		Uint64("height", lastFinalized.Height).
+		Msg("last finalized block")
+
 	fnb.State = state
+	fnb.ProtocolEvents = distributor
+}
+
+func (fnb *FlowNodeBuilder) initFvmOptions() {
+	vmOpts := []fvm.Option{
+		fvm.WithChain(fnb.RootChainID.Chain()),
+		fvm.WithBlocks(fnb.Storage.Blocks),
+	}
+	if fnb.RootChainID == flow.Testnet {
+		vmOpts = append(vmOpts,
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithRestrictedDeployment(false),
+		)
+	}
+	fnb.FvmOptions = vmOpts
 }
 
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
@@ -555,12 +642,6 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) (mod
 	return fnb
 }
 
-// GenesisHandler sets up handler which will be executed when a genesis block is generated
-func (fnb *FlowNodeBuilder) GenesisHandler(handler func(node *FlowNodeBuilder, block *flow.Block)) *FlowNodeBuilder {
-	fnb.genesisHandler = handler
-	return fnb
-}
-
 func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBuilder {
 	fnb.postInitFns = append(fnb.postInitFns, f)
 	return fnb
@@ -599,8 +680,7 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.sig = make(chan os.Signal, 1)
 	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
 
-	// parse configuration parameters
-	pflag.Parse()
+	fnb.parseAndPrintFlags()
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -619,6 +699,8 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.initState()
 
+	fnb.initFvmOptions()
+
 	for _, f := range fnb.postInitFns {
 		fnb.handlePostInit(f)
 	}
@@ -626,10 +708,6 @@ func (fnb *FlowNodeBuilder) Run() {
 	// set up all modules
 	for _, f := range fnb.modules {
 		fnb.handleModule(f)
-	}
-
-	if fnb.genesisBootstrap && fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
-		fnb.genesisHandler(fnb, fnb.GenesisBlock)
 	}
 
 	// initialize all components
@@ -669,74 +747,54 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathDKGDataPub))
+func loadRootBlock(dir string) (*flow.Block, error) {
+	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootBlock))
 	if err != nil {
 		return nil, err
 	}
-	dkgPubData := &bootstrap.EncodableDKGDataPub{}
-	err = json.Unmarshal(data, dkgPubData)
-	return dkgPubData.ForHotStuff(), err
-}
-
-func loadGenesisAccountPublicKey(dir string) (*flow.AccountPublicKey, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathServiceAccountPublicKey))
-	if err != nil {
-		return nil, err
-	}
-	publicKey := new(flow.AccountPublicKey)
-	err = json.Unmarshal(data, publicKey)
-	return publicKey, err
-}
-
-func loadGenesisCommit(dir string) (flow.StateCommitment, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisCommit))
-	if err != nil {
-		return nil, err
-	}
-	var commit flow.StateCommitment
-	err = json.Unmarshal(data, &commit)
-	return commit, err
-}
-
-func loadGenesisBlock(dir string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisBlock))
-	if err != nil {
-		return nil, err
-	}
-	var genesisBlock flow.Block
-	err = json.Unmarshal(data, &genesisBlock)
-	return &genesisBlock, err
+	var block flow.Block
+	err = json.Unmarshal(data, &block)
+	return &block, err
 
 }
 
-func loadRootBlockQC(dir string) (*model.QuorumCertificate, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisQC))
+func loadRootQC(dir string) (*flow.QuorumCertificate, error) {
+	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootQC))
 	if err != nil {
 		return nil, err
 	}
-	qc := &model.QuorumCertificate{}
-	err = json.Unmarshal(data, qc)
-	return qc, err
+	var qc flow.QuorumCertificate
+	err = json.Unmarshal(data, &qc)
+	return &qc, err
+}
+
+func loadRootResult(dir string) (*flow.ExecutionResult, error) {
+	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootResult))
+	if err != nil {
+		return nil, err
+	}
+	var result flow.ExecutionResult
+	err = json.Unmarshal(data, &result)
+	return &result, err
+}
+
+func loadRootSeal(dir string) (*flow.Seal, error) {
+	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootSeal))
+	if err != nil {
+		return nil, err
+	}
+	var seal flow.Seal
+	err = json.Unmarshal(data, &seal)
+	return &seal, err
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
 func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID)))
+	data, err := io.ReadFile(filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID)))
 	if err != nil {
 		return nil, err
 	}
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
-}
-
-func loadGenesisTokenSupply(dir string) (uint64, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisTokenSupply))
-	if err != nil {
-		return 0, err
-	}
-	var supply uint64
-	err = json.Unmarshal(data, &supply)
-	return supply, err
 }

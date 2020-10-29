@@ -10,17 +10,18 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSubmitTransaction(t *testing.T) {
 	engine := mock.Engine{}
 
 	h := handler{
-		engine: &engine,
+		chainID: flow.Testnet,
+		engine:  &engine,
 	}
 
 	tx := unittest.TransactionBodyFixture()

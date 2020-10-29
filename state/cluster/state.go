@@ -1,14 +1,19 @@
 package cluster
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // State represents the chain state for collection node cluster consensus. It
-// tracks which blocks are finalized and indexes blocks by number and ID.
+// tracks which blocks are finalized and indexes blocks by number and ID. The
+// purpose of cluster consensus is to agree on collections of transactions, so
+// each block within the cluster state corresponds to a proposed collection.
 //
 // NOTE: This is modelled after, and is a simpler version of, protocol.State.
 type State interface {
+
+	// Params returns constant information about the cluster state.
+	Params() Params
 
 	// Final returns the snapshot of the cluster state at the latest finalized
 	// block. The returned snapshot is therefore immutable over time.

@@ -7,8 +7,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/crypto"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
@@ -36,7 +37,8 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 	// create DKG instances for all nodes
 	for i := 0; i < n; i++ {
 		var err error
-		processors[i].dkg, err = crypto.NewDKG(crypto.JointFeldman, n, i, &processors[i], 0)
+		processors[i].dkg, err = crypto.NewJointFeldman(n,
+			signature.RandomBeaconThreshold(n), i, &processors[i])
 		if err != nil {
 			return model.DKGData{}, err
 		}

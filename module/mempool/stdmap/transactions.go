@@ -5,7 +5,7 @@ package stdmap
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Transactions implements the transactions memory pool of the consensus nodes,
@@ -15,12 +15,12 @@ type Transactions struct {
 }
 
 // NewTransactions creates a new memory pool for transctions.
-func NewTransactions(limit uint) (*Transactions, error) {
+func NewTransactions(limit uint) *Transactions {
 	t := &Transactions{
 		Backend: NewBackend(WithLimit(limit)),
 	}
 
-	return t, nil
+	return t
 }
 
 // Add adds a transaction to the mempool.

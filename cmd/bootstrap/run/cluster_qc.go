@@ -3,32 +3,23 @@ package run
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/signature"
-	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/signature"
 )
 
-func GenerateClusterGenesisQC(participants []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (
-	*model.QuorumCertificate, error) {
+func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
 
-	ps, db, err := NewProtocolState(block)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-
-	validators, signers, err := createClusterValidators(ps, participants, block)
+	validators, signers, err := createClusterValidators(participants)
 	if err != nil {
 		return nil, err
 	}
@@ -63,20 +54,15 @@ func GenerateClusterGenesisQC(participants []bootstrap.NodeInfo, block *flow.Blo
 	return qc, err
 }
 
-func createClusterValidators(ps *protoBadger.State, participants []bootstrap.NodeInfo, block *flow.Block) (
-	[]hotstuff.Validator, []hotstuff.Signer, error) {
-	n := len(participants)
+func createClusterValidators(participants []bootstrap.NodeInfo) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 
-	signers := make([]hotstuff.Signer, n)
+	n := len(participants)
+	identities := bootstrap.ToIdentityList(participants)
+
+	signers := make([]hotstuff.SignerVerifier, n)
 	validators := make([]hotstuff.Validator, n)
 
 	forks := &mocks.ForksReader{}
-
-	nodeIDs := make([]flow.Identifier, 0, len(participants))
-	for _, participant := range participants {
-		nodeIDs = append(nodeIDs, participant.NodeID)
-	}
-	selector := filter.And(filter.HasNodeID(nodeIDs...), filter.HasStake(true))
 
 	for i, participant := range participants {
 		// get the participant keys
@@ -86,25 +72,19 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 		}
 
 		// create local module
-		local, err := local.New(participant.Identity(), keys.StakingKey)
+		me, err := local.New(participant.Identity(), keys.StakingKey)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		// create cluster committee state
-		genesisBlockID := block.ID()
-		// just use the genesis block as the reference for bootstrapping
-		blockTranslator := committee.NewBlockTranslator(
-			func(clusterBlock flow.Identifier) (flow.Identifier, error) {
-				return genesisBlockID, nil
-			},
-		)
-
-		committee := committee.New(ps, blockTranslator, participant.NodeID, selector, nodeIDs)
+		committee, err := committee.NewStaticCommittee(identities, me.NodeID(), nil, nil)
+		if err != nil {
+			return nil, nil, err
+		}
 
 		// create signer for participant
-		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, local)
-		signer := verification.NewSingleSigner(committee, provider, participant.NodeID)
+		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, me)
+		signer := verification.NewSingleSignerVerifier(committee, provider, participant.NodeID)
 		signers[i] = signer
 
 		// create validator

@@ -3,7 +3,7 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/onflow/flow-go/network"
 )
 
 // Network represents the network layer of the node. It allows processes that
@@ -12,9 +12,9 @@ import (
 // the same engine on other nodes across the network in a network-agnostic way.
 type Network interface {
 
-	// Register will make the network aware of a new process in the business logic
-	// of the node that wants to communicate across the network. It will return a
-	// conduit which connects the process to a bus allowing it to communicate with
-	// all other engines on the network that are on the same channel.
-	Register(channelID uint8, engine network.Engine) (network.Conduit, error)
+	// Register will subscribe to the channelID with the given engine and
+	// the engine will be notified with incoming messages on the channel.
+	// The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
+	// Only one engine can be subscribed to a channel at any given time
+	Register(channelID string, engine network.Engine) (network.Conduit, error)
 }

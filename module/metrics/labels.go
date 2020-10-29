@@ -6,6 +6,9 @@ const (
 	EngineLabel   = "engine"
 	LabelResource = "resource"
 	LabelMessage  = "message"
+	LabelNodeID   = "nodeid"
+	LabelNodeRole = "noderole"
+	LabelPriority = "priority"
 )
 
 const (
@@ -30,23 +33,34 @@ const (
 )
 
 const (
-	ResourceUndefined       = "undefined"
-	ResourceProposal        = "proposal"
-	ResourceHeader          = "header"
-	ResourceIndex           = "index"
-	ResourceIdentity        = "identity"
-	ResourceGuarantee       = "guarantee"
-	ResourceResult          = "result"
-	ResourceReceipt         = "receipt"
-	ResourcePendingReceipt  = "pending_receipt" // used at verification node
-	ResourceCollection      = "collection"
-	ResourceApproval        = "approval"
-	ResourceSeal            = "seal"
-	ResourceCommit          = "commit"
-	ResourceTransaction     = "transaction"
-	ResourceClusterPayload  = "cluster_payload"
-	ResourceClusterProposal = "cluster_proposal"
-	ResourceChunkDataPack   = "chunk_data_pack"
+	ResourceUndefined                = "undefined"
+	ResourceProposal                 = "proposal"
+	ResourceHeader                   = "header"
+	ResourceIndex                    = "index"
+	ResourceIdentity                 = "identity"
+	ResourceGuarantee                = "guarantee"
+	ResourceResult                   = "result"
+	ResourceReceipt                  = "receipt"
+	ResourceCollection               = "collection"
+	ResourceApproval                 = "approval"
+	ResourceSeal                     = "seal"
+	ResourceCommit                   = "commit"
+	ResourceTransaction              = "transaction"
+	ResourceClusterPayload           = "cluster_payload"
+	ResourceClusterProposal          = "cluster_proposal"
+	ResourceProcessedResultID        = "processed_result_ids"         // verification node, finder engine
+	ResourcePendingReceipt           = "pending_receipt"              // verification node, finder engine
+	ResourceReceiptIDsByResult       = "receipt_ids_by_result"        // verification node, finder engine
+	ResourcePendingReceiptIDsByBlock = "pending_receipt_ids_by_block" // verification node, finder engine
+	ResourcePendingResult            = "pending_result"               // verification node, match engine
+	ResourceChunkIDsByResult         = "chunk_ids_by_result"          // verification node, match engine
+	ResourcePendingChunk             = "pending_chunk"                // verification node, match engine
+	ResourcePendingBlock             = "pending_block"                // verification node, match engine
+	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
+	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
+	ResourceEpochSetup               = "epoch_setup"
+	ResourceEpochCommit              = "epoch_commit"
+	ResourceEpochStatus              = "epoch_status"
 )
 
 const (
@@ -69,4 +83,6 @@ const (
 	MessageSubmitGuarantee      = "submit_guarantee"
 	MessageCollectionRequest    = "collection_request"
 	MessageCollectionResponse   = "collection_response"
+	MessageEntityRequest        = "entity_request"
+	MessageEntityResponse       = "entity_response"
 )

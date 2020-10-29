@@ -1,8 +1,8 @@
 package cluster
 
 import (
-	"github.com/dapperlabs/flow-go/model/fingerprint"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Payload is the payload for blocks in collection node cluster consensus.
@@ -11,6 +11,12 @@ type Payload struct {
 
 	// Collection is the collection being created.
 	Collection flow.Collection
+
+	// ReferenceEpoch is the epoch counter to use as reference. This is only
+	// valid for root blocks, since these are generated in advance of a reference
+	// block being available.
+	// TODO needs more thought: https://github.com/dapperlabs/flow-go/issues/4655
+	ReferenceEpoch uint64
 
 	// ReferenceBlockID is the ID of a reference block on the main chain. It
 	// is defined as the ID of the reference block with the lowest height

@@ -5,16 +5,25 @@ import (
 	"fmt"
 
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
+	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/logging"
 )
+
+const SystemChunkASTCacheSize = 64
+
+type VirtualMachine interface {
+	Run(fvm.Context, fvm.Procedure, state.Ledger) error
+}
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
@@ -22,18 +31,43 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	tracer module.Tracer
-	vm     virtualmachine.VirtualMachine
-	blocks storage.Blocks
+	vm             VirtualMachine
+	vmCtx          fvm.Context
+	metrics        module.ExecutionMetrics
+	tracer         module.Tracer
+	log            zerolog.Logger
+	systemChunkCtx fvm.Context
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
-	return &blockComputer{
-		tracer: tracer,
-		vm:     vm,
-		blocks: blocks,
+func NewBlockComputer(
+	vm VirtualMachine,
+	vmCtx fvm.Context,
+	metrics module.ExecutionMetrics,
+	tracer module.Tracer,
+	logger zerolog.Logger,
+) (BlockComputer, error) {
+	systemChunkASTCache, err := fvm.NewLRUASTCache(SystemChunkASTCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create system chunk AST cache: %w", err)
 	}
+
+	systemChunkCtx := fvm.NewContextFromParent(
+		vmCtx,
+		fvm.WithASTCache(systemChunkASTCache),
+		fvm.WithRestrictedAccountCreation(false),
+		fvm.WithRestrictedDeployment(false),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+	)
+
+	return &blockComputer{
+		vm:             vm,
+		vmCtx:          vmCtx,
+		metrics:        metrics,
+		tracer:         tracer,
+		log:            logger,
+		systemChunkCtx: systemChunkCtx,
+	}, nil
 }
 
 // ExecuteBlock executes a block and returns the resulting chunks.
@@ -64,13 +98,13 @@ func (e *blockComputer) executeBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	blockCtx := e.vm.NewBlockContext(block.Block.Header, e.blocks)
+	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
 
 	collections := block.Collections()
 
 	var gasUsed uint64
 
-	interactions := make([]*delta.Snapshot, len(collections))
+	interactions := make([]*delta.Snapshot, len(collections)+1)
 
 	events := make([]flow.Event, 0)
 	blockTxResults := make([]flow.TransactionResult, 0)
@@ -80,6 +114,8 @@ func (e *blockComputer) executeBlock(
 	for i, collection := range collections {
 
 		collectionView := stateView.NewChild()
+
+		e.log.Debug().Hex("block_id", logging.Entity(block)).Hex("collection_id", logging.Entity(collection.Guarantee)).Msg("executing collection")
 
 		collEvents, txResults, nextIndex, gas, err := e.executeCollection(
 			ctx, txIndex, blockCtx, collectionView, collection,
@@ -99,6 +135,33 @@ func (e *blockComputer) executeBlock(
 		stateView.MergeView(collectionView)
 	}
 
+	// system chunk
+	systemChunkView := stateView.NewChild()
+	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
+
+	var colSpan opentracing.Span
+	if e.tracer != nil {
+		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeSystemCollection)
+		defer colSpan.Finish()
+	}
+
+	serviceAddress := e.vmCtx.Chain.ServiceAddress()
+
+	tx := fvm.SystemChunkTransaction(serviceAddress)
+
+	txMetrics := fvm.NewMetricsCollector()
+
+	txEvents, txResult, txGas, err := e.executeTransaction(tx, colSpan, txMetrics, systemChunkView, e.systemChunkCtx, txIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
+	}
+
+	events = append(events, txEvents...)
+	blockTxResults = append(blockTxResults, txResult)
+	gasUsed += txGas
+	interactions[len(interactions)-1] = systemChunkView.Interactions()
+	stateView.MergeView(systemChunkView)
+
 	return &execution.ComputationResult{
 		ExecutableBlock:   block,
 		StateSnapshots:    interactions,
@@ -112,7 +175,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
-	blockCtx virtualmachine.BlockContext,
+	blockCtx fvm.Context,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
@@ -129,47 +192,17 @@ func (e *blockComputer) executeCollection(
 		gasUsed   uint64
 	)
 
-	for _, tx := range collection.Transactions {
-		err := func(tx *flow.TransactionBody) error {
-			if e.tracer != nil {
-				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-				defer txSpan.Finish()
-			}
+	txMetrics := fvm.NewMetricsCollector()
 
-			txView := collectionView.NewChild()
+	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx)
-			if err != nil {
-				txIndex++
-				return fmt.Errorf("failed to execute transaction: %w", err)
-			}
+	for _, txBody := range collection.Transactions {
+		txEvents, txResult, txGasUsed, err := e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
 
-			txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
-			txIndex++
-			gasUsed += result.GasUsed
-
-			if err != nil {
-				return fmt.Errorf("failed to create flow events: %w", err)
-			}
-
-			events = append(events, txEvents...)
-
-			txResult := flow.TransactionResult{
-				TransactionID: tx.ID(),
-			}
-
-			if result.Error != nil {
-				txResult.ErrorMessage = result.Error.ErrorMessage()
-			}
-
-			txResults = append(txResults, txResult)
-
-			if result.Succeeded() {
-				collectionView.MergeView(txView)
-			}
-
-			return nil
-		}(tx)
+		txIndex++
+		events = append(events, txEvents...)
+		txResults = append(txResults, txResult)
+		gasUsed += txGasUsed
 
 		if err != nil {
 			return nil, nil, txIndex, 0, err
@@ -177,4 +210,77 @@ func (e *blockComputer) executeCollection(
 	}
 
 	return events, txResults, txIndex, gasUsed, nil
+}
+
+func (e *blockComputer) executeTransaction(
+	txBody *flow.TransactionBody,
+	colSpan opentracing.Span,
+	txMetrics *fvm.MetricsCollector,
+	collectionView *delta.View,
+	ctx fvm.Context,
+	txIndex uint32,
+) ([]flow.Event, flow.TransactionResult, uint64, error) {
+	if e.tracer != nil {
+		txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+
+		defer func() {
+			// Attach runtime metrics to the transaction span.
+			//
+			// Each duration is the sum of all sub-programs in the transaction.
+			//
+			// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
+			// as well as any imported programs.
+			txSpan.LogFields(
+				log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
+				log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
+				log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),
+			)
+			txSpan.Finish()
+		}()
+	}
+
+	txView := collectionView.NewChild()
+
+	tx := fvm.Transaction(txBody)
+
+	err := e.vm.Run(ctx, tx, txView)
+
+	if e.metrics != nil {
+		e.metrics.TransactionParsed(txMetrics.Parsed())
+		e.metrics.TransactionChecked(txMetrics.Checked())
+		e.metrics.TransactionInterpreted(txMetrics.Interpreted())
+	}
+
+	if err != nil {
+		return nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to execute transaction: %w", err)
+	}
+
+	txEvents, err := tx.ConvertEvents(txIndex)
+
+	if err != nil {
+		return nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to create flow events: %w", err)
+	}
+
+	txResult := flow.TransactionResult{
+		TransactionID: tx.ID,
+	}
+
+	if tx.Err != nil {
+		txResult.ErrorMessage = tx.Err.Error()
+		e.log.Debug().
+			Hex("tx_id", logging.Entity(txBody)).
+			Str("error_message", tx.Err.Error()).
+			Uint32("error_code", tx.Err.Code()).
+			Msg("transaction execution failed")
+	} else {
+		e.log.Debug().
+			Hex("tx_id", logging.Entity(txBody)).
+			Msg("transaction executed successfully")
+	}
+
+	if tx.Err == nil {
+		collectionView.MergeView(txView)
+	}
+
+	return txEvents, txResult, tx.GasUsed, nil
 }

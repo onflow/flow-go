@@ -3,10 +3,10 @@ package validator
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // ValidatorMetricsWrapper implements the hotstuff.Validator interface.
@@ -26,7 +26,7 @@ func NewMetricsWrapper(validator hotstuff.Validator, metrics module.HotstuffMetr
 	}
 }
 
-func (w ValidatorMetricsWrapper) ValidateQC(qc *model.QuorumCertificate, block *model.Block) error {
+func (w ValidatorMetricsWrapper) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
 	processStart := time.Now()
 	err := w.validator.ValidateQC(qc, block)
 	w.metrics.ValidatorProcessingDuration(time.Since(processStart))

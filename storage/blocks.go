@@ -3,14 +3,20 @@
 package storage
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dgraph-io/badger/v2"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Blocks represents persistent storage for blocks.
 type Blocks interface {
 
-	// Store stores the block. If the exactly same block is already in a storage, return successfully
+	// Store will atomically store a block with all its dependencies.
 	Store(block *flow.Block) error
+
+	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
+	// still going through the caching layer.
+	StoreTx(block *flow.Block) func(*badger.Txn) error
 
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.
@@ -26,4 +32,11 @@ type Blocks interface {
 	// IndexBlockForCollections indexes the block each collection was
 	// included in.
 	IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error
+
+	// UpdateLastFullBlockHeight updates the FullBlockHeight index
+	// The FullBlockHeight index indicates that block for which all collections have been received
+	UpdateLastFullBlockHeight(height uint64) error
+
+	// GetLastFullBlockHeight retrieves the FullBlockHeight
+	GetLastFullBlockHeight() (height uint64, err error)
 }

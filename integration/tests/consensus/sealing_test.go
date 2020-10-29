@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"context"
-	"encoding/hex"
 	"math/rand"
 	"testing"
 	"time"
@@ -10,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/integration/tests/common"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionStateSealing(t *testing.T) {
@@ -181,23 +180,22 @@ SearchLoop:
 			CollectionIndex:      0,           // irrelevant for consensus node
 			StartState:           nil,         // irrelevant for consensus node
 			EventCollection:      flow.ZeroID, // irrelevant for consensus node
-			TotalComputationUsed: 0,           // irrelevant for consensus node
-			NumberOfTransactions: 0,           // irrelevant for consensus node
+			BlockID:              targetID,
+			TotalComputationUsed: 0, // irrelevant for consensus node
+			NumberOfTransactions: 0, // irrelevant for consensus node
 		},
 		Index:    0,                                 // should start at zero
 		EndState: unittest.StateCommitmentFixture(), // random end execution state
 	}
 
-	// hard-coded genesis result
-	resultID, _ := hex.DecodeString("80ef756372ebde1b6b873ba16522b7b132d74f46610aea34fc3f9a4dfd04f5fc")
+	resultID := ss.net.Seal().ResultID
 
 	// create the execution result for the target block
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.HashToID(resultID), // need genesis result
-			BlockID:          targetID,                // refer the target block
-			FinalStateCommit: chunk.EndState,          // end state of only chunk
-			Chunks:           flow.ChunkList{&chunk},  // include only chunk
+			PreviousResultID: resultID,               // need genesis result
+			BlockID:          targetID,               // refer the target block
+			Chunks:           flow.ChunkList{&chunk}, // include only chunk
 		},
 		Signatures: nil,
 	}
@@ -217,7 +215,7 @@ ReceiptLoop:
 	for time.Now().Before(deadline) {
 		conID := ss.conIDs[0]
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Execution().Send(ctx, engine.ExecutionReceiptProvider, &receipt, conID)
+		err := ss.Execution().Send(ctx, engine.PushReceipts, &receipt, conID)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send execution receipt: %s", err)
@@ -248,7 +246,7 @@ ApprovalLoop:
 	for time.Now().Before(deadline) {
 		conID := ss.conIDs[0]
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Verification().Send(ctx, engine.ApprovalProvider, &approval, conID)
+		err := ss.Verification().Send(ctx, engine.PushApprovals, &approval, conID)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send result approval: %s", err)

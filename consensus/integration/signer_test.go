@@ -1,10 +1,8 @@
-// +build timesensitivetest
-
 package integration_test
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type Signer struct {
@@ -27,12 +25,12 @@ func (s *Signer) CreateVote(block *model.Block) (*model.Vote, error) {
 	}
 	return vote, nil
 }
-func (*Signer) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, error) {
+func (*Signer) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 	voterIDs := make([]flow.Identifier, 0, len(votes))
 	for _, vote := range votes {
 		voterIDs = append(voterIDs, vote.SignerID)
 	}
-	qc := &model.QuorumCertificate{
+	qc := &flow.QuorumCertificate{
 		View:      votes[0].View,
 		BlockID:   votes[0].BlockID,
 		SignerIDs: voterIDs,

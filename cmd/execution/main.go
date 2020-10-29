@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,39 +11,70 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/provider"
-	"github.com/dapperlabs/flow-go/engine/execution/rpc"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-	"github.com/dapperlabs/flow-go/engine/execution/sync"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/provider"
+	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion"
+	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/engine/execution/rpc"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/fvm"
+	ledger "github.com/onflow/flow-go/ledger/complete"
+	wal "github.com/onflow/flow-go/ledger/complete/wal"
+	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/buffer"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
+	chainsync "github.com/onflow/flow-go/module/synchronization"
+	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 func main() {
 
 	var (
-		ledgerStorage      *ledger.MTrieStorage
-		events             storage.Events
-		txResults          storage.TransactionResults
-		providerEngine     *provider.Engine
-		computationManager *computation.Manager
-		ingestionEng       *ingestion.Engine
-		rpcConf            rpc.Config
-		err                error
-		executionState     state.ExecutionState
-		triedir            string
-		collector          module.ExecutionMetrics
-		mTrieCacheSize     uint32
+		ledgerStorage         *ledger.Ledger
+		events                *storage.Events
+		txResults             *storage.TransactionResults
+		results               *storage.ExecutionResults
+		receipts              *storage.ExecutionReceipts
+		providerEngine        *exeprovider.Engine
+		syncCore              *chainsync.Core
+		pendingBlocks         *buffer.PendingBlocks // used in follower engine
+		deltas                *ingestion.Deltas
+		syncEngine            *synchronization.Engine
+		followerEng           *followereng.Engine // to sync blocks from consensus nodes
+		computationManager    *computation.Manager
+		collectionRequester   *requester.Engine
+		ingestionEng          *ingestion.Engine
+		rpcConf               rpc.Config
+		err                   error
+		executionState        state.ExecutionState
+		triedir               string
+		collector             module.ExecutionMetrics
+		mTrieCacheSize        uint32
+		checkpointDistance    uint
+		stateDeltasLimit      uint
+		requestInterval       time.Duration
+		preferredExeNodeIDStr string
+		syncByBlocks          bool
+		syncFast              bool
+		syncThreshold         int
+		extensiveLog          bool
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -53,55 +85,92 @@ func main() {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
+			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
+			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
+			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
+			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
+			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
+			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
+			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
+			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt, node.GenesisChainID.Chain())
-			if err != nil {
-				return err
-			}
 
-			computationManager = computation.New(
+			vm := fvm.New(rt)
+			vmCtx := fvm.NewContext(node.FvmOptions...)
+
+			manager, err := computation.New(
 				node.Logger,
+				collector,
 				node.Tracer,
 				node.Me,
 				node.State,
 				vm,
-				node.Storage.Blocks,
+				vmCtx,
 			)
+			computationManager = manager
 
-			return nil
+			return err
 		}).
 		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		// Trie storage is required to bootstrap, but also should be handled while shutting down
-		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
 		}).
-		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			if node.GenesisAccountPublicKey == nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
-			}
-
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.GenesisChainID.Chain())
-			if err != nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
-			}
-
-			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
-				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
-			}
-
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
-			if err != nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
-			}
+		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
+			results = storage.NewExecutionResults(node.DB)
+			receipts = storage.NewExecutionReceipts(node.DB, results)
+			return nil
+		}).
+		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
+			return nil
+		}).
+		Module("state deltas mempool", func(node *cmd.FlowNodeBuilder) error {
+			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
+			return err
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			return ledgerStorage, nil
+
+			// check if the execution database already exists
+			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+
+			commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
+			if err != nil {
+				return nil, fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
+			}
+
+			// if the execution database does not exist, then we need to bootstrap the execution database.
+			if !bootstrapped {
+				// when bootstrapping, the bootstrap folder must have a checkpoint file
+				// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+				err = copyBootstrapState(node.BaseConfig.BootstrapDir, triedir)
+				if err != nil {
+					return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
+				}
+
+				// TODO: check that the checkpoint file contains the root block's statecommit hash
+
+				err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+				if err != nil {
+					return nil, fmt.Errorf("could not bootstrap execution database: %w", err)
+				}
+			} else {
+				// if execution database has been bootstrapped, then the root statecommit must equal to the one
+				// in the bootstrap folder
+				if !bytes.Equal(commit, node.RootSeal.FinalState) {
+					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %v, "+
+						"bootstap has statecommitment: %v",
+						commit, node.RootSeal.FinalState)
+				}
+			}
+
+			ledgerStorage, err = ledger.NewLedger(triedir, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), node.MetricsRegisterer)
+			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -109,14 +178,13 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance)
 
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
-			executionResults := badger.NewExecutionResults(node.DB)
-			stateCommitments := badger.NewCommits(node.Metrics.Cache, node.DB)
+			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
+			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			executionState = state.NewExecutionState(
 				ledgerStorage,
@@ -124,55 +192,249 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				chunkDataPacks,
-				executionResults,
+				results,
+				receipts,
 				node.DB,
 				node.Tracer,
 			)
 
-			stateSync := sync.NewStateSynchronizer(executionState)
-
-			providerEngine, err = provider.New(
+			providerEngine, err = exeprovider.New(
 				node.Logger,
 				node.Tracer,
 				node.Network,
 				node.State,
 				node.Me,
 				executionState,
-				stateSync,
+				collector,
 			)
 
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+				engine.RequestCollections,
+				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
+				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
+				requester.WithBatchInterval(requestInterval),
+			)
+
+			preferredExeFilter := filter.Any
+			preferredExeNodeID, err := flow.HexStringToIdentifier(preferredExeNodeIDStr)
+			if err == nil {
+				node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
+				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
+			} else if err != nil && preferredExeNodeIDStr != "" {
+				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
+			}
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
-			events = badger.NewEvents(node.DB)
-			txResults = badger.NewTransactionResults(node.DB)
+			events = storage.NewEvents(node.DB)
+			txResults = storage.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
+				collectionRequester,
 				node.State,
 				node.Storage.Blocks,
-				node.Storage.Payloads,
 				node.Storage.Collections,
 				events,
 				txResults,
 				computationManager,
 				providerEngine,
 				executionState,
-				6, // TODO - config param maybe?
 				collector,
 				node.Tracer,
-				true,
-				time.Second, //TODO - config param
-				10,          // TODO - config param
+				extensiveLog,
+				preferredExeFilter,
+				deltas,
+				syncThreshold,
+				syncFast,
 			)
+
+			// TODO: we should solve these mutual dependencies better
+			// => https://github.com/dapperlabs/flow-go/issues/4360
+			collectionRequester = collectionRequester.WithHandle(ingestionEng.OnCollection)
+
+			node.ProtocolEvents.AddConsumer(ingestionEng)
+
 			return ingestionEng, err
 		}).
+		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+
+			// create a finalizer that handles updating the protocol
+			// state when the follower detects newly finalized blocks
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// initialize and pre-generate leader selections from the seed
+			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
+			}
+
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
+			if err != nil {
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+			}
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
+
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			if err != nil {
+				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
+			}
+
+			// creates a consensus follower with ingestEngine as the notifier
+			// so that it gets notified upon each new finalized block
+			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, ingestionEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower core logic: %w", err)
+			}
+
+			followerEng, err = followereng.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				pendingBlocks,
+				followerCore,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower engine: %w", err)
+			}
+
+			return followerEng, nil
+		}).
+		Component("collection requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return collectionRequester, nil
+		}).
+		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
+				return receipts.ByBlockID(blockID)
+			}
+			eng, err := provider.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.ProvideReceiptsByBlockID,
+				filter.HasRole(flow.RoleConsensus),
+				retrieve,
+			)
+			return eng, err
+		}).
+		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// initialize the synchronization engine
+			syncEngine, err = synchronization.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				followerEng,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
+
+			return syncEngine, nil
+		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
+}
 
+// copy the checkpoint files from the bootstrap folder to the execution state folder
+// Checkpoint file is required to restore the trie, and has to be placed in the execution
+// state folder.
+// There are two ways to generate a checkpoint file:
+// 1) From a clean state.
+// 		Refer to the code in the testcase: TestGenerateExecutionState
+// 2) From a previous execution state
+// 		This is often used when sporking the network.
+//    Use the execution-state-extract util commandline to generate a checkpoint file from
+// 		a previous checkpoint file
+func copyBootstrapState(dir, trie string) error {
+	filename := ""
+	firstCheckpointFilename := "00000000"
+
+	fileExists := func(fileName string) bool {
+		_, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, fileName))
+		return err == nil
+	}
+
+	// if there is a root checkpoint file, then copy that file over
+	if fileExists(wal.RootCheckpointFilename) {
+		filename = wal.RootCheckpointFilename
+	} else if fileExists(firstCheckpointFilename) {
+		// else if there is a checkpoint file, then copy that file over
+		filename = firstCheckpointFilename
+	} else {
+		filePath := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, firstCheckpointFilename)
+
+		// include absolute path of the missing file in the error message
+		absPath, err := filepath.Abs(filePath)
+		if err != nil {
+			absPath = filePath
+		}
+
+		return fmt.Errorf("execution state file not found: %v", absPath)
+	}
+
+	// copy from the bootstrap folder to the execution state folder
+	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
+	dst := filepath.Join(trie, filename)
+
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	err = os.MkdirAll(trie, 0700)
+	if err != nil {
+		return err
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
+
+	return out.Close()
 }

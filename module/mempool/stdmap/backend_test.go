@@ -4,12 +4,16 @@ package stdmap
 
 import (
 	"crypto/sha256"
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type fake []byte
@@ -95,4 +99,38 @@ func TestAdjust(t *testing.T) {
 		assert.True(t, found)
 		assert.Equal(t, value2, item2)
 	})
+}
+
+// TestBackend_RunLimitChecking defines a backend with size limit of `limit`. It then
+// starts adding `swarm`-many items concurrently to the backend each on a separate goroutine,
+// where `swarm` > `limit`,
+// and evaluates that size of the map stays within the limit.
+func TestBackend_RunLimitChecking(t *testing.T) {
+	const (
+		limit = 10
+		swarm = 20
+	)
+	pool := NewBackend(WithLimit(limit))
+
+	wg := sync.WaitGroup{}
+	wg.Add(swarm)
+
+	for i := 0; i < swarm; i++ {
+		go func(x int) {
+			// creates and adds a fake item to the mempool
+			item := fake(fmt.Sprintf("item%d", x))
+			_ = pool.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+				backdata[item.ID()] = item
+				return nil
+			})
+
+			// evaluates that the size remains in the permissible range
+			require.True(t, pool.Size() <= uint(limit),
+				fmt.Sprintf("size violation: should be at most: %d, got: %d", limit, pool.Size()))
+			wg.Done()
+		}(i)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
+
 }

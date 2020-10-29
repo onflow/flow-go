@@ -5,25 +5,16 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestGenerateClusterGenesisQC(t *testing.T) {
+func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
 	block := unittest.BlockFixture()
-	block.Payload.Identities = flow.IdentityList{
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection)),
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus)),
-	}
-	for _, participant := range participants {
-		block.Payload.Identities = append(block.Payload.Identities, participant.Identity())
-	}
 
 	block.Payload.Seals = nil
 	block.Payload.Guarantees = nil
@@ -41,7 +32,7 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	_, err := GenerateClusterGenesisQC(participants, &block, &clusterBlock)
+	_, err := GenerateClusterRootQC(participants, &clusterBlock)
 	require.NoError(t, err)
 }
 

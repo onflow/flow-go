@@ -10,18 +10,19 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/events"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Engine is the consensus engine, responsible for handling communication for
@@ -30,6 +31,7 @@ type Engine struct {
 	unit     *engine.Unit   // used to control startup/shutdown
 	log      zerolog.Logger // used to log relevant actions with context
 	metrics  module.EngineMetrics
+	tracer   module.Tracer
 	mempool  module.MempoolMetrics
 	spans    module.ConsensusMetrics
 	me       module.Local
@@ -40,7 +42,7 @@ type Engine struct {
 	con      network.Conduit
 	prov     network.Engine
 	pending  module.PendingBlockBuffer // pending block cache
-	sync     module.Synchronization
+	sync     module.BlockRequester
 	hotstuff module.HotStuff
 }
 
@@ -48,6 +50,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	collector module.EngineMetrics,
+	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	spans module.ConsensusMetrics,
 	net module.Network,
@@ -58,7 +61,7 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
-	blockRateDelay time.Duration,
+	sync module.BlockRequester,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -66,6 +69,7 @@ func New(
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "compliance").Logger(),
 		metrics:  collector,
+		tracer:   tracer,
 		mempool:  mempool,
 		spans:    spans,
 		me:       me,
@@ -75,27 +79,20 @@ func New(
 		state:    state,
 		prov:     prov,
 		pending:  pending,
-		sync:     nil, // use `WithSynchronization`
+		sync:     sync,
 		hotstuff: nil, // use `WithConsensus`
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolConsensus, e)
+	con, err := net.Register(engine.ConsensusCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
 
 	return e, nil
-}
-
-// WithSynchronization adds the synchronization engine responsible for bringing the node
-// up to speed to the compliance engine.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
-	e.sync = sync
-	return e
 }
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
@@ -109,14 +106,10 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.sync == nil {
-		panic("must initialize compliance engine with synchronization module")
-	}
 	if e.hotstuff == nil {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
 	return e.unit.Ready(func() {
-		<-e.sync.Ready()
 		<-e.hotstuff.Ready()
 	})
 }
@@ -125,8 +118,6 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.log.Debug().Msg("shutting down synchronization engine")
-		<-e.sync.Done()
 		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
 		e.log.Debug().Msg("all components have been shut down")
@@ -167,11 +158,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
 	log := e.log.With().
-		Uint64("block_view", view).
 		Hex("block_id", blockID[:]).
-		Hex("voter", logging.ID(e.me.NodeID())).
+		Uint64("block_view", view).
+		Hex("recipient_id", recipientID[:]).
 		Logger()
-
 	log.Info().Msg("processing vote transmission request from hotstuff")
 
 	// build the vote message
@@ -181,15 +171,17 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	// send the vote the desired recipient
-	err := e.con.Submit(vote, recipientID)
-	if err != nil {
-		return fmt.Errorf("could not send vote: %w", err)
-	}
-
-	e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
-
-	log.Info().Msg("block vote transmitted")
+	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
+	e.unit.Launch(func() {
+		// send the vote the desired recipient
+		err := e.con.Unicast(vote, recipientID)
+		if err != nil {
+			log.Warn().Err(err).Msg("could not send vote")
+			return
+		}
+		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
+		log.Info().Msg("block vote transmitted")
+	})
 
 	return nil
 }
@@ -234,6 +226,13 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
 
+	for _, g := range payload.Guarantees {
+		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompBroadcastProposalWithDelay)
+			defer childSpan.Finish()
+		}
+	}
+
 	// retrieve all consensus nodes without our ID
 	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
@@ -256,7 +255,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		// broadcast the proposal to consensus nodes
-		err = e.con.Submit(proposal, recipients.NodeIDs()...)
+		err = e.con.Publish(proposal, recipients.NodeIDs()...)
 		if err != nil {
 			log.Error().Err(err).Msg("could not send proposal message")
 		}
@@ -282,10 +281,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
-	// process one event at a time for now
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
 	// skip any message as long as we don't have the dependencies
 	if e.hotstuff == nil || e.sync == nil {
 		return fmt.Errorf("still initializing")
@@ -293,12 +288,22 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *events.SyncedBlock:
+		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+		e.unit.Lock()
+		defer e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+		defer e.unit.Unlock()
 		return e.onSyncedBlock(originID, ev)
 	case *messages.BlockProposal:
 		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		e.unit.Lock()
+		defer e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		defer e.unit.Unlock()
 		return e.onBlockProposal(originID, ev)
 	case *messages.BlockVote:
+		// we don't lock the engine on vote messages, because votes are passed
+		// directly to HotStuff with no extra validation by compliance layer.
 		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+		defer e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockVote)
 		return e.onBlockVote(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -324,6 +329,23 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+
+	span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
+	if !ok {
+		span = e.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
+		span.SetTag("block_id", proposal.Header.ID())
+		span.SetTag("view", proposal.Header.View)
+		span.SetTag("proposer", proposal.Header.ProposerID.String())
+	}
+	childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
+	defer childSpan.Finish()
+
+	for _, g := range proposal.Payload.Guarantees {
+		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
+			defer childSpan.Finish()
+		}
+	}
 
 	header := proposal.Header
 
@@ -541,7 +563,7 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 		Msg("processing pending children")
 
 	// then try to process children only this once
-	var result *multierror.Error
+	result := new(multierror.Error)
 	for _, child := range children {
 		proposal := &messages.BlockProposal{
 			Header:  child.Header,
@@ -558,6 +580,8 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
+	// flatten out the error tree before returning the error
+	result = multierror.Flatten(result).(*multierror.Error)
 	return result.ErrorOrNil()
 }
 

@@ -1,10 +1,11 @@
 package model
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 )
 
+// Vote is the HotStuff algorithm's concept of a vote for a block proposal.
 type Vote struct {
 	View     uint64
 	BlockID  flow.Identifier
@@ -12,6 +13,7 @@ type Vote struct {
 	SigData  []byte
 }
 
+// ID returns the identifier for the vote.
 func (uv *Vote) ID() flow.Identifier {
 	return flow.MakeID(uv)
 }

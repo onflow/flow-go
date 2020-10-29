@@ -7,13 +7,14 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/engine"
-	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
-	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
-	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/engine"
+	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
+	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/state/protocol"
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -39,7 +40,7 @@ type RPC struct {
 }
 
 // New returns a new RPC engine.
-func New(net module.Network, log zerolog.Logger, me module.Local, config Config) (*RPC, error) {
+func New(net module.Network, log zerolog.Logger, me module.Local, state protocol.State, config Config) (*RPC, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -65,7 +66,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 		codec:    codec,
 	}
 
-	conduitMap, err := registerConduits(net, eng)
+	conduitMap, err := registerConduits(net, state, eng)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize RPC: %w", err)
 	}
@@ -79,26 +80,50 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 }
 
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
-func registerConduits(net module.Network, eng network.Engine) (map[uint8]network.Conduit, error) {
+func registerConduits(net module.Network, state protocol.State, eng network.Engine) (map[string]network.Conduit, error) {
 
-	allEngineIDs := []uint8{engine.CollectionProvider,
-		engine.ApprovalProvider,
-		engine.BlockPropagation,
-		engine.BlockProvider,
-		engine.ChunkDataPackProvider,
-		engine.CollectionIngest,
-		engine.ExecutionReceiptProvider,
-		engine.ExecutionStateProvider,
-		engine.ExecutionSync,
-		engine.ProtocolClusterConsensus,
-		engine.ProtocolConsensus,
-		engine.ProtocolSynchronization,
+	// create a list of all channel IDs that don't change over time
+	channelIDs := []string{
+		engine.ConsensusCommittee,
+		engine.SyncCommittee,
+		engine.SyncExecution,
+		engine.PushTransactions,
+		engine.PushGuarantees,
+		engine.PushBlocks,
+		engine.PushReceipts,
+		engine.PushApprovals,
+		engine.RequestCollections,
+		engine.RequestChunks,
 	}
 
-	conduitMap := make(map[uint8]network.Conduit, len(allEngineIDs))
+	// add channel IDs that are dependent on protocol state and change over time
+	// TODO need to update to register dynamic channels that are created on later epoch transitions
+	epoch := state.Final().Epochs().Current()
+
+	clusters, err := epoch.Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	for i := range clusters {
+		cluster, err := epoch.Cluster(uint(i))
+		if err != nil {
+			return nil, fmt.Errorf("could not get cluster: %w", err)
+		}
+		clusterID := cluster.RootBlock().Header.ChainID
+
+		// add the dynamic channels for the cluster
+		channelIDs = append(
+			channelIDs,
+			engine.ChannelConsensusCluster(clusterID),
+			engine.ChannelSyncCluster(clusterID),
+		)
+	}
+
+	conduitMap := make(map[string]network.Conduit, len(channelIDs))
 
 	// Register for ALL channels here and return a map of conduits
-	for _, e := range allEngineIDs {
+	for _, e := range channelIDs {
 		c, err := net.Register(e, eng)
 		if err != nil {
 			return nil, fmt.Errorf("could not register collection provider engine: %w", err)

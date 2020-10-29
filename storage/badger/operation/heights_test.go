@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
@@ -54,6 +54,30 @@ func TestSealedInsertUpdateRetrieve(t *testing.T) {
 		require.Nil(t, err)
 
 		err = db.View(RetrieveSealedHeight(&retrieved))
+		require.Nil(t, err)
+
+		assert.Equal(t, retrieved, height)
+	})
+}
+
+func TestLastCompleteBlockHeightInsertUpdateRetrieve(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		height := uint64(1337)
+
+		err := db.Update(InsertLastCompleteBlockHeight(height))
+		require.Nil(t, err)
+
+		var retrieved uint64
+		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
+		require.Nil(t, err)
+
+		assert.Equal(t, retrieved, height)
+
+		height = 9999
+		err = db.Update(UpdateLastCompleteBlockHeight(height))
+		require.Nil(t, err)
+
+		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
 		require.Nil(t, err)
 
 		assert.Equal(t, retrieved, height)

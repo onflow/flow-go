@@ -5,8 +5,8 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type Events struct {
@@ -23,7 +23,7 @@ func NewEvents(db *badger.DB) *Events {
 func (e *Events) Store(blockID flow.Identifier, events []flow.Event) error {
 	return operation.RetryOnConflict(e.db.Update, func(btx *badger.Txn) error {
 		for _, event := range events {
-			err := operation.InsertEvent(blockID, event)(btx)
+			err := operation.SkipDuplicates(operation.InsertEvent(blockID, event))(btx)
 			if err != nil {
 				return fmt.Errorf("could not insert event: %w", err)
 			}

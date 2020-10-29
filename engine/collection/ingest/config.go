@@ -1,9 +1,10 @@
 package ingest
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
+// Config defines configuration for the transaction ingest engine.
 type Config struct {
 	// how much buffer time there is between a transaction being ingested by a
 	// collection node and being included in a collection and block
@@ -22,7 +23,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		ExpiryBuffer:          30,
+		ExpiryBuffer:          flow.DefaultTransactionExpiryBuffer,
 		MaxGasLimit:           flow.DefaultMaxGasLimit,
 		AllowUnknownReference: false,
 		CheckScriptsParse:     true,

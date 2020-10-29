@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/cadence"
 	encoding "github.com/onflow/cadence/encoding/json"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type Events struct {
@@ -25,7 +25,7 @@ func (g *Events) New() flow.Event {
 	identifier := fmt.Sprintf("FooEvent%d", g.count)
 	typeID := "test." + identifier
 
-	testEventType := cadence.EventType{
+	testEventType := &cadence.EventType{
 		TypeID:     typeID,
 		Identifier: identifier,
 		Fields: []cadence.Field{

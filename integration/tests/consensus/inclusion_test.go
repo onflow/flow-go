@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/integration/tests/common"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestCollectionGuaranteeInclusion(t *testing.T) {
@@ -104,7 +104,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
 	sentinel.SignerIDs = []flow.Identifier{is.collID}
-	sentinel.ReferenceBlockID = is.net.Genesis().ID()
+	sentinel.ReferenceBlockID = is.net.Root().ID()
 
 	is.T().Logf("collection guarantee generated: %x", sentinel.CollectionID)
 
@@ -113,7 +113,7 @@ SendingLoop:
 	for time.Now().Before(deadline) {
 		conID := is.conIDs[rand.Intn(len(is.conIDs))]
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := is.Collection().Send(ctx, engine.CollectionProvider, sentinel, conID)
+		err := is.Collection().Send(ctx, engine.PushGuarantees, sentinel, conID)
 		cancel()
 		if err != nil {
 			is.T().Logf("could not send collection guarantee: %s", err)

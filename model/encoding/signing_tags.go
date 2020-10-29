@@ -1,15 +1,36 @@
 package encoding
 
-// List of string constants, aka 'tags' for signature typing
-// Each Protocol-level signature, essentially signs the hash of an entity. To prevent
-// type-malleability attacks, the signed data must also include a tag which specifies the
-// type of the hashed-and-signed object.
+import (
+	"github.com/onflow/flow-go/crypto"
+)
 
-const (
-	RandomBeaconTag     = "RandomBeacon"
-	ConsensusVoteTag    = "ConsensusVote"
-	CollectorVoteTag    = "CollectorVote"
-	ExecutionReceiptTag = "ExecutionReceipt"
-	ResultApprovalTag   = "ResultApproval"
-	SPOCKTag            = "SPoCK"
+// List of domain separation tags for protocol signatures.
+//
+// Each Protocol-level signature involves hashing an entity.
+// To prevent domain malleability attacks and to simulate multiple
+// independent random oracles, the hashing process includes
+// a domain tag that specifies the type of the signed object.
+
+func tag(domain string) string {
+	return protocolPrefix + domain + crypto.BLSCipherSuite
+}
+
+// Flow protocol version and prefix
+const protocolPrefix = "FLOW-V0.0_"
+
+var (
+	// RandomBeaconTag is used for threshold signatures in the random beacon
+	RandomBeaconTag = tag("Random-Beacon")
+	// ConsensusVoteTag is used for Consensus Hotstuff votes
+	ConsensusVoteTag = tag("Consensus-Vote")
+	// CollectorVoteTag is used for Collection Hotstuff votes
+	CollectorVoteTag = tag("Collector-Vote")
+	// ExecutionReceiptTag is used for execution receipts
+	ExecutionReceiptTag = tag("Execution-Receipt")
+	// ResultApprovalTag is used for result approvals
+	ResultApprovalTag = tag("Result-Approval")
+	// SPOCKTag is used to generate SPoCK proofs
+	SPOCKTag = tag("SPoCK")
+	// POPTag is used to generate proofs of possessions of the private key
+	POPTag = tag("Proof-of-Possession")
 )

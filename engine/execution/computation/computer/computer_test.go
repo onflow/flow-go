@@ -7,59 +7,88 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	vmmock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
-		vm := new(vmmock.VirtualMachine)
-		bc := new(vmmock.BlockContext)
-		blocks := new(storage.Blocks)
 
-		exe := computer.NewBlockComputer(vm, nil, blocks)
+		execCtx := fvm.NewContext()
+
+		vm := new(computermock.VirtualMachine)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
-		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Times(2 + 1) // 2 txs in collection + system chunk
 
-		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
-			Return(&virtualmachine.TransactionResult{}, nil).
-			Twice()
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
+
+		vm.AssertExpectations(t)
+	})
+
+	t.Run("empty block still computes system chunk", func(t *testing.T) {
+
+		execCtx := fvm.NewContext()
+
+		vm := new(computermock.VirtualMachine)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
+
+		// create an empty block
+		block := generateBlock(0, 0)
+
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Once() // just system chunk
+
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TransactionResult, 1)
 
 		vm.AssertExpectations(t)
-		bc.AssertExpectations(t)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
-		vm := new(vmmock.VirtualMachine)
-		bc := new(vmmock.BlockContext)
-		blocks := new(storage.Blocks)
+		execCtx := fvm.NewContext()
 
-		exe := computer.NewBlockComputer(vm, nil, blocks)
+		vm := new(computermock.VirtualMachine)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
 		eventsPerTransaction := 2
-		totalTransactionCount := collectionCount * transactionsPerCollection
+		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
 		totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
@@ -68,13 +97,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create dummy events
 		events := generateEvents(eventsPerTransaction)
 
-		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				tx := args[1].(*fvm.TransactionProcedure)
 
-		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
-			Return(&virtualmachine.TransactionResult{Events: events, Error: &virtualmachine.MissingPayerError{}}, nil).
+				tx.Err = &fvm.MissingPayerError{}
+				tx.Events = events
+			}).
+			Return(nil).
 			Times(totalTransactionCount)
 
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -82,7 +115,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
-		assert.Len(t, result.StateSnapshots, collectionCount)
+		assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
 
 		// all events should have been collected
 		assert.Len(t, result.Events, totalEventCount)
@@ -108,10 +141,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.ElementsMatch(t, expectedResults, result.TransactionResult)
+		assert.ElementsMatch(t, expectedResults, result.TransactionResult[0:len(result.TransactionResult)-1]) //strip system chunk
 
 		vm.AssertExpectations(t)
-		bc.AssertExpectations(t)
 	})
 }
 
@@ -166,7 +198,7 @@ func generateEvents(eventCount int) []cadence.Event {
 	events := make([]cadence.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := cadence.Event{EventType: cadence.EventType{
+		event := cadence.Event{EventType: &cadence.EventType{
 			Identifier: "whatever",
 		}}
 		events[i] = event

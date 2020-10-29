@@ -3,8 +3,8 @@
 package mock
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
-	message "github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
+	flow "github.com/onflow/flow-go/model/flow"
+	message "github.com/onflow/flow-go/network/gossip/libp2p/message"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -52,15 +52,15 @@ func (_m *Overlay) Receive(nodeID flow.Identifier, msg *message.Message) error {
 }
 
 // Topology provides a mock function with given fields:
-func (_m *Overlay) Topology() (map[flow.Identifier]flow.Identity, error) {
+func (_m *Overlay) Topology() (flow.IdentityList, error) {
 	ret := _m.Called()
 
-	var r0 map[flow.Identifier]flow.Identity
-	if rf, ok := ret.Get(0).(func() map[flow.Identifier]flow.Identity); ok {
+	var r0 flow.IdentityList
+	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identifier]flow.Identity)
+			r0 = ret.Get(0).(flow.IdentityList)
 		}
 	}
 

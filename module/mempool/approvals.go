@@ -3,29 +3,29 @@
 package mempool
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Approvals represents a concurrency-safe memory pool for result approvals.
 type Approvals interface {
 
-	// Has will check if the given approval is in the memory pool.
-	Has(approvalID flow.Identifier) bool
-
 	// Add will add the given result approval to the memory pool. It will return
 	// false if it was already in the mempool.
-	Add(approval *flow.ResultApproval) bool
+	Add(approval *flow.ResultApproval) (bool, error)
 
-	// Rem will attempt to remove the approval from the memory pool.
-	Rem(approvalID flow.Identifier) bool
+	// RemApproval removes a specific approval.
+	RemApproval(approval *flow.ResultApproval) (bool, error)
 
-	// ByID retrieve the result approval with the given ID from the memory pool.
-	// It will return false if it was not found in the mempool.
-	ByID(approvalID flow.Identifier) (*flow.ResultApproval, bool)
+	// Rem will attempt to remove all the approvals associated with a chunk.
+	RemChunk(resultID flow.Identifier, chunkIndex uint64) (bool, error)
 
-	// Size will return the current size of the memory pool.
-	Size() uint
+	// ByChunk returns all the approvals associated with a chunk. It returns an
+	// empty map if there is nothing.
+	ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flow.Identifier]*flow.ResultApproval
 
 	// All will return a list of all approvals in the memory pool.
 	All() []*flow.ResultApproval
+
+	// Size will return the current size of the memory pool.
+	Size() uint
 }

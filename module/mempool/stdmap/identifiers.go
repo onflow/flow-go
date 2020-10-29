@@ -1,8 +1,8 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/model"
 )
 
 // Identifiers represents a concurrency-safe memory pool for IDs.
@@ -44,7 +44,7 @@ func (i *Identifiers) All() flow.IdentifierList {
 	entities := i.Backend.All()
 	idEntities := make([]flow.Identifier, 0, len(entities))
 	for _, entity := range entities {
-		idEntity := entity.(model.IdEntity)
+		idEntity := entity.(*model.IdEntity)
 		idEntities = append(idEntities, idEntity.Id)
 	}
 	return idEntities

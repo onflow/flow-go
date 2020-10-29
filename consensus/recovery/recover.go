@@ -6,10 +6,10 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Recover implements the core logic for recovering HotStuff state after a restart.
@@ -39,7 +39,7 @@ func Recover(log zerolog.Logger, finalized *flow.Header, pending []*flow.Header,
 
 		// verify the proposal
 		err := validator.ValidateProposal(proposal)
-		if errors.Is(err, model.ErrorInvalidBlock{}) {
+		if model.IsInvalidBlockError(err) {
 			log.Warn().
 				Hex("block_id", logging.ID(proposal.Block.BlockID)).
 				Err(err).

@@ -5,9 +5,9 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // This file implements storage functions for blocks in cluster consensus.
@@ -35,12 +35,11 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}
 
-		// start the new block with an empty child index
-		err = operation.InsertBlockChildren(blockID, nil)(tx)
+		// index the child block for recovery
+		err = IndexNewBlock(blockID, block.Header.ParentID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not create empty child index: %w", err)
+			return fmt.Errorf("could not index new block: %w", err)
 		}
-
 		return nil
 	}
 }

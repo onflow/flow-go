@@ -3,20 +3,20 @@ package voter
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // Voter produces votes for the given block
 type Voter struct {
-	signer        hotstuff.Signer
+	signer        hotstuff.SignerVerifier
 	forks         hotstuff.ForksReader
 	persist       hotstuff.Persister
 	lastVotedView uint64 // need to keep track of the last view we voted for so we don't double vote accidentally
 }
 
 // New creates a new Voter instance
-func New(signer hotstuff.Signer, forks hotstuff.ForksReader, persist hotstuff.Persister, lastVotedView uint64) *Voter {
+func New(signer hotstuff.SignerVerifier, forks hotstuff.ForksReader, persist hotstuff.Persister, lastVotedView uint64) *Voter {
 	return &Voter{
 		signer:        signer,
 		forks:         forks,
@@ -34,15 +34,15 @@ func New(signer hotstuff.Signer, forks hotstuff.ForksReader, persist hotstuff.Pe
 // (including repeated calls with the initial block we voted for also return `nil, error`).
 func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model.Vote, error) {
 	if !v.forks.IsSafeBlock(block) {
-		return nil, &model.NoVoteError{Msg: "not safe block"}
+		return nil, model.NoVoteError{Msg: "not safe block"}
 	}
 
 	if curView != block.View {
-		return nil, &model.NoVoteError{Msg: "not for current view"}
+		return nil, model.NoVoteError{Msg: "not for current view"}
 	}
 
 	if curView <= v.lastVotedView {
-		return nil, &model.NoVoteError{Msg: "not above the last voted view"}
+		return nil, model.NoVoteError{Msg: "not above the last voted view"}
 	}
 
 	vote, err := v.signer.CreateVote(block)

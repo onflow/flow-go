@@ -12,7 +12,7 @@ import "C"
 import (
 	"errors"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // SPOCKProve generates a spock poof for data under the private key sk.
@@ -45,18 +45,16 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 	if !(ok1 && ok2) {
 		return false, errors.New("public keys must be BLS keys.")
 	}
-	// verify the spock proof using the secret data
-	return spockVerify(&blsPk1.point, proof1, &blsPk2.point, proof2), nil
-}
 
-func spockVerify(pk1 *pointG2, proof1 Signature, pk2 *pointG2, proof2 Signature) bool {
 	if len(proof1) != signatureLengthBLSBLS12381 || len(proof2) != signatureLengthBLSBLS12381 {
-		return false
+		return false, nil
 	}
-	verif := C.bls_spock_verify((*C.ep2_st)(pk1),
+
+	// verify the spock proof using the secret data
+	verif := C.bls_spock_verify((*C.ep2_st)(&blsPk1.point),
 		(*C.uchar)(&proof1[0]),
-		(*C.ep2_st)(pk2),
+		(*C.ep2_st)(&blsPk2.point),
 		(*C.uchar)(&proof2[0]))
 
-	return (verif == valid)
+	return (verif == valid), nil
 }

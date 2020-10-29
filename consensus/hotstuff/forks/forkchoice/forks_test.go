@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
-	mockfinalizer "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
+	mockfinalizer "github.com/onflow/flow-go/module/mock"
 )
 
 // TestForks_ImplementsInterface tests that forks.Forks implements hotstuff.Forks
@@ -161,11 +161,11 @@ func makeRootBlock(t *testing.T, view uint64) *forks.BlockQC {
 	return &root
 }
 
-func qc(view uint64, id flow.Identifier) *model.QuorumCertificate {
-	return &model.QuorumCertificate{View: view, BlockID: id}
+func qc(view uint64, id flow.Identifier) *flow.QuorumCertificate {
+	return &flow.QuorumCertificate{View: view, BlockID: id}
 }
 
-func makeBlock(blockView uint64, blockQC *model.QuorumCertificate, payloadHash flow.Identifier) *model.Block {
+func makeBlock(blockView uint64, blockQC *flow.QuorumCertificate, payloadHash flow.Identifier) *model.Block {
 	if blockQC == nil {
 		blockQC = qc(0, flow.Identifier{})
 	}
@@ -182,7 +182,7 @@ func makeBlock(blockView uint64, blockQC *model.QuorumCertificate, payloadHash f
 // When computing the Block's ID, this implementation only considers
 // the fields used by Forks.
 // TODO need full implementation
-func computeID(view uint64, qc *model.QuorumCertificate, payloadHash flow.Identifier) flow.Identifier {
+func computeID(view uint64, qc *flow.QuorumCertificate, payloadHash flow.Identifier) flow.Identifier {
 	id := make([]byte, 0)
 
 	viewBytes := make([]byte, 8)

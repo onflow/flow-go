@@ -3,12 +3,14 @@ package crypto
 import (
 	"crypto/rand"
 	"fmt"
+	mrand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // tests sign and verify are consistent for multiple generated keys and messages
@@ -18,6 +20,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	seedMinLength := 48
 	seed := make([]byte, seedMinLength)
 	input := make([]byte, 100)
+	mrand.Seed(time.Now().UnixNano())
 
 	loops := 50
 	for j := 0; j < loops; j++ {
@@ -35,13 +38,13 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		result, err := pk.Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.True(t, result, fmt.Sprintf(
-			"Verification should succeed:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 		// test with a different message
 		input[0] ^= 1
 		result, err = pk.Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 		input[0] ^= 1
 		// test with a valid but different key
 		seed[0] ^= 1
@@ -50,7 +53,17 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		result, err = wrongSk.PublicKey().Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
+			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+		// test a wrong signature length
+		invalidLen := mrand.Intn(2 * len(s)) // try random invalid lengths
+		if invalidLen == len(s) {            // map to an invalid length
+			invalidLen = 0
+		}
+		invalidSig := make([]byte, invalidLen)
+		result, err = pk.Verify(invalidSig, input, halg)
+		require.NoError(t, err)
+		assert.False(t, result, fmt.Sprintf(
+			"Verification should fail:\n signature:%s\n with invalid length %d", invalidSig, invalidLen))
 	}
 }
 
@@ -58,6 +71,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	t.Logf("Testing encode/decode for %s", salg)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
+
 	// Key generation seed
 	seed := make([]byte, seedMinLength)
 	read, err := rand.Read(seed)
@@ -80,6 +94,22 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	assert.True(t, pk.Equals(pkCheck), "key equality check failed")
 	pkCheckBytes := pkCheck.Encode()
 	assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+
+	// test invalid private keys (equal to the curve group order)
+	groupOrder := make(map[SigningAlgorithm][]byte)
+	groupOrder[ECDSAP256] = []byte{255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 
+		255, 255, 255, 255, 255, 188, 230, 250, 173, 167, 
+		23, 158, 132, 243, 185, 202, 194, 252, 99, 37, 81}
+		
+	groupOrder[ECDSASecp256k1] = []byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 
+		255, 255, 255, 255, 255, 254, 186, 174, 220, 230, 
+		175, 72, 160, 59, 191, 210, 94, 140, 208, 54, 65, 65}
+	
+	groupOrder[BLSBLS12381] = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39, 
+		0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE, 
+		0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
+	_, err = DecodePrivateKey(salg, groupOrder[salg])
+	require.Error(t, err, "the key decoding should fail - private key value is too large")
 }
 
 func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorithm) {
@@ -166,4 +196,40 @@ func benchSign(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 		sk.Sign(input, halg)
 	}
 	b.StopTimer()
+}
+
+// testPOP tests proofs of possession
+func testPOP(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
+	t.Logf("Testing proof of possession for %s", salg)
+	// make sure the length is larger than minimum lengths of all the signaure algos
+	seedMinLength := 48
+	seed := make([]byte, seedMinLength)
+	input := make([]byte, 100)
+
+	loops := 10
+	for j := 0; j < loops; j++ {
+		n, err := rand.Read(seed)
+		require.Equal(t, n, seedMinLength)
+		require.NoError(t, err)
+		sk, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		_, err = rand.Read(input)
+		require.NoError(t, err)
+		s, err := sk.GeneratePOP(halg)
+		require.NoError(t, err)
+		pk := sk.PublicKey()
+		// test a valid PoP
+		result, err := pk.VerifyPOP(s, halg)
+		require.NoError(t, err)
+		assert.True(t, result, fmt.Sprintf(
+			"Verification should succeed:\n signature:%s\n private key:%s", s, sk))
+		// test with a valid but different key
+		seed[0] ^= 1
+		wrongSk, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
+		result, err = wrongSk.PublicKey().VerifyPOP(s, halg)
+		require.NoError(t, err)
+		assert.False(t, result, fmt.Sprintf(
+			"Verification should fail:\n signature:%s\n private key:%s", s, sk))
+	}
 }

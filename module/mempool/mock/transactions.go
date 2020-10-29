@@ -3,7 +3,7 @@
 package mempool
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -64,6 +64,11 @@ func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool)
 	}
 
 	return r0, r1
+}
+
+// Clear provides a mock function with given fields:
+func (_m *Transactions) Clear() {
+	_m.Called()
 }
 
 // Has provides a mock function with given fields: txID

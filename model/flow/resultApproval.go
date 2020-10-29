@@ -1,7 +1,7 @@
 package flow
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // Attestation confirms correctness of a chunk of an exec result
@@ -21,7 +21,7 @@ type ResultApprovalBody struct {
 	Attestation
 	ApproverID           Identifier       // node id generating this result approval
 	AttestationSignature crypto.Signature // signature over attestation, this has been separated for BLS aggregation
-	Spock                Spock            // proof of re-computation, one per each chunk
+	Spock                crypto.Signature // proof of re-computation, one per each chunk
 }
 
 // ID generates a unique identifier using ResultApprovalBody

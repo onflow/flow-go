@@ -5,18 +5,18 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestComputeBlockWithStorage(t *testing.T) {
@@ -24,13 +24,13 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
-	require.NoError(t, err)
+	vm := fvm.New(rt)
+	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
 
-	ledger := testutil.RootBootstrappedLedger(chain)
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
@@ -85,7 +85,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer := computer.NewBlockComputer(vm, nil, new(storage.Blocks))
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	require.NoError(t, err)
 
 	engine := &Manager{
 		blockComputer: blockComputer,
@@ -99,6 +100,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotEmpty(t, blockView.Delta())
-	require.Len(t, returnedComputationResult.StateSnapshots, 1)
+	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
 }

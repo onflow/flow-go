@@ -8,18 +8,17 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/sync"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type ProviderEngine interface {
@@ -38,6 +37,7 @@ type Engine struct {
 	execState     state.ReadOnlyExecutionState
 	me            module.Local
 	chunksConduit network.Conduit
+	metrics       module.ExecutionMetrics
 }
 
 func New(
@@ -47,7 +47,7 @@ func New(
 	state protocol.ReadOnlyState,
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
-	stateSync sync.StateSynchronizer,
+	metrics module.ExecutionMetrics,
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
@@ -59,16 +59,17 @@ func New(
 		state:     state,
 		me:        me,
 		execState: execState,
+		metrics:   metrics,
 	}
 
 	var err error
 
-	eng.receiptCon, err = net.Register(engine.ExecutionReceiptProvider, &eng)
+	eng.receiptCon, err = net.Register(engine.PushReceipts, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
-	chunksConduit, err := net.Register(engine.ChunkDataPackProvider, &eng)
+	chunksConduit, err := net.Register(engine.ProvideChunks, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
@@ -116,7 +117,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	ctx := context.Background()
 	switch v := event.(type) {
 	case *messages.ChunkDataRequest:
-		return e.onChunkDataRequest(ctx, originID, v)
+		err := e.onChunkDataRequest(ctx, originID, v)
+		if err != nil {
+			return fmt.Errorf("could not answer chunk data request: %w", err)
+		}
+		return err
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -141,6 +146,9 @@ func (e *Engine) onChunkDataRequest(
 
 	log.Debug().Msg("received chunk data pack request")
 
+	// increases collector metric
+	e.metrics.ChunkDataPackRequested()
+
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
@@ -163,29 +171,40 @@ func (e *Engine) onChunkDataRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
 	}
 
-	collection, err := e.execState.GetCollection(cdp.CollectionID)
-	if err != nil {
-		return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
+	var collection flow.Collection
+	if cdp.CollectionID != flow.ZeroID {
+		// retrieves collection of non-zero chunks
+		coll, err := e.execState.GetCollection(cdp.CollectionID)
+		if err != nil {
+			return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
+		}
+		collection = *coll
 	}
 
 	response := &messages.ChunkDataResponse{
 		ChunkDataPack: *cdp,
 		Nonce:         rand.Uint64(),
-		Collection:    *collection,
+		Collection:    collection,
 	}
 
-	log.Debug().Msg("sending chunk data pack response")
-
 	// sends requested chunk data pack to the requester
-	err = e.chunksConduit.Submit(response, originID)
+	err = e.chunksConduit.Unicast(response, originID)
 	if err != nil {
 		return fmt.Errorf("could not send requested chunk data pack to (%s): %w", origin, err)
 	}
+
+	log.Debug().
+		Hex("collection_id", logging.ID(response.Collection.ID())).
+		Msg("chunk data pack request successfully replied")
 
 	return nil
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
+	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		return fmt.Errorf("could not get final state: no chunks found")
+	}
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
 	defer span.Finish()
@@ -193,15 +212,16 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
+		Hex("final_state", finalState).
 		Msg("broadcasting execution receipt")
 
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus, flow.RoleVerification))
+	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,
+		flow.RoleVerification))
 	if err != nil {
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	err = e.receiptCon.Submit(receipt, identities.NodeIDs()...)
+	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit execution receipts: %w", err)
 	}

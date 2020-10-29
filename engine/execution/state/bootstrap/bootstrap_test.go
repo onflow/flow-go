@@ -4,25 +4,26 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestGenerateGenesisState(t *testing.T) {
+func TestBootstrapLedger(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
 		require.NoError(t, err)
 
-		stateCommitment, err := BootstrapLedger(
+		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
@@ -30,28 +31,43 @@ func TestGenerateGenesisState(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		if !assert.Equal(t, unittest.GenesisStateCommitment, stateCommitment) {
-			t.Logf("Actual state commitment: %s", hex.EncodeToString(stateCommitment))
+		expectedStateCommitment := unittest.GenesisStateCommitment
+
+		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
+			t.Logf(
+				"Incorrect state commitment: got %s, expected %s",
+				hex.EncodeToString(stateCommitment),
+				hex.EncodeToString(expectedStateCommitment),
+			)
 		}
 	})
 }
 
-func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("f8ce9e9f774b401b8d4e4c1cacf7b2047136df5897b95f6f4f282f83f2cdf5c7")
+func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
+	var expectedStateCommitment, _ = hex.DecodeString("207ef54cec1605ff02a82d0382fe9a8851971007d2ef4a2e94426fd76cf8f133")
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
 		require.NoError(t, err)
 
-		stateCommitment, err := BootstrapLedger(ls, unittest.ServiceAccountPublicKey, 0, chain)
+		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
+			ls,
+			unittest.ServiceAccountPublicKey,
+			0,
+			chain,
+		)
 		require.NoError(t, err)
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
-			t.Logf("Actual state commitment: %s", hex.EncodeToString(stateCommitment))
+			t.Logf(
+				"Incorrect state commitment: got %s, expected %s",
+				hex.EncodeToString(stateCommitment),
+				hex.EncodeToString(expectedStateCommitment),
+			)
 		}
 	})
 }
