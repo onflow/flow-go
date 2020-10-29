@@ -316,7 +316,7 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		// TODO: remove this, when saving a executed block is transactional
 		last, err := e.state.AtBlockID(lastExecutedFinal).Head()
 		if err != nil {
-			return fmt.Errorf("could not get last executed final by ID: %w")
+			return fmt.Errorf("could not get last executed final by ID: %w", err)
 		}
 
 		if last.ParentID != flow.ZeroID {
