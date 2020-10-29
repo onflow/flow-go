@@ -27,8 +27,7 @@ type PeerManagerTestSuite struct {
 
 func TestPeerManagerTestSuite(t *testing.T) {
 	t.Skip("skip until https://github.com/onflow/flow-go/pull/99 is merged")
-	_ = PeerManagerTestSuite{}
-	// suite.Run(t, new(PeerManagerTestSuite))
+	suite.Run(t, new(PeerManagerTestSuite))
 }
 
 func (ts *PeerManagerTestSuite) SetupTest() {
