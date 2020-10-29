@@ -28,6 +28,7 @@ type LoadCase struct {
 func main() {
 
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
+	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\")")
 	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
@@ -119,6 +120,7 @@ func main() {
 					&fungibleTokenAddress,
 					&flowTokenAddress,
 					c.tps,
+					utils.LoadType(*loadTypeFlag),
 				)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("unable to create new cont load generator")
