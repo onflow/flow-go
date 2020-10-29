@@ -40,12 +40,10 @@ var keygenCmd = &cobra.Command{
 
 		// create keys
 		log.Info().Msg("generating internal private networking and staking keys")
-		_ = genNetworkAndStakingKeys([]model.NodeInfo{})
+		nodeConfigs := genNetworkAndStakingKeys([]model.NodeInfo{})
 		log.Info().Msg("")
 
 		// count roles
-		var nodeConfigs []model.NodeConfig
-		readJSON(flagConfig, &nodeConfigs)
 		roleCounts := map[flow.Role]uint32{
 			flow.RoleCollection:   0,
 			flow.RoleConsensus:    0,
