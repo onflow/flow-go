@@ -1,4 +1,4 @@
-package ejectors_test
+package ejectors
 
 import (
 	"testing"
@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/ejectors"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -20,10 +19,9 @@ func TestLatestSealEjector(t *testing.T) {
 		const N = 10
 
 		headers := storage.NewHeaders(metrics.NewNoopCollector(), db)
-		ejector := ejectors.NewLatestSeal(headers)
+		ejector := NewLatestIncorporatedResultSeal(headers)
 
-		pool, err := stdmap.NewSeals(N, stdmap.WithEject(ejector.Eject))
-		require.Nil(t, err)
+		pool := stdmap.NewIncorporatedResultSeals(N, stdmap.WithEject(ejector.Eject))
 
 		var (
 			maxHeader flow.Header
@@ -38,7 +36,17 @@ func TestLatestSealEjector(t *testing.T) {
 
 			seal := unittest.SealFixture()
 			seal.BlockID = header.ID()
-			ok := pool.Add(seal)
+
+			er := unittest.ExecutionResultFixture()
+			er.BlockID = header.ID()
+			ir := &flow.IncorporatedResultSeal{
+				IncorporatedResult: &flow.IncorporatedResult{
+					IncorporatedBlockID: header.ID(),
+					Result:              er,
+				},
+				Seal: seal,
+			}
+			ok := pool.Add(ir)
 			assert.True(t, ok)
 
 			if header.Height >= maxHeader.Height {
