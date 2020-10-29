@@ -55,8 +55,8 @@ func (suite *TopologyTestSuite) testTopology(total int, minorityRole flow.Role) 
 	adjencyMap := make(map[flow.Identifier]flow.IdentityList, total)
 
 	// mocks state for collector nodes topology
-
-	state := topology.CreateMockStateForCollectionNodes(suite.T(), ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
+	state, _ := topology.CreateMockStateForCollectionNodes(suite.T(),
+		ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
 	tops := GenerateTopologies(suite.T(), state, ids)
