@@ -18,7 +18,7 @@ var keygenCmd = &cobra.Command{
 	Long:  `Generate Staking and Networking keys for a list of nodes provided by the flag '--config'`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// check if out directory exists
-		exists, err := exists(flagOutdir)
+		exists, err := pathExists(flagOutdir)
 		if err != nil {
 			log.Error().Msg("could not check if directory exists")
 			return
@@ -87,16 +87,4 @@ func isEmptyDir(path string) (bool, error) {
 		return true, nil
 	}
 	return false, err // Either not empty or error, suits both cases
-}
-
-// exists
-func exists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
 }
