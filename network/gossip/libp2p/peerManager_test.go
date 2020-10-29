@@ -221,7 +221,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	unittest.RequireConcurrentCallsReturnBefore(suite.T(), pm.RequestPeerUpdate, 10, time.Second,
 		"concurrent peer update requests could not return on time")
 
-	// allow the first and second updates to finish
+	// allow the first (periodic/on-demand) and the second (on-demand) update to finish
 	connectPeerGate <- time.Now()
 
 	// requires two calls to ConnectPeers were made
