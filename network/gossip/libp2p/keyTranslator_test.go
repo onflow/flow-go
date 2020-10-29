@@ -23,7 +23,6 @@ type KeyTranslatorTestSuite struct {
 
 // TestKeyTranslatorTestSuite runs all the test methods in this test suite
 func TestKeyTranslatorTestSuite(t *testing.T) {
-	t.Skip("skip until https://github.com/onflow/flow-go/pull/99 is merged")
 	suite.Run(t, new(KeyTranslatorTestSuite))
 }
 

@@ -20,7 +20,6 @@ type LibP2PUtilsTestSuite struct {
 }
 
 func TestLibP2PUtilsTestSuite(t *testing.T) {
-	t.Skip("skip until https://github.com/onflow/flow-go/pull/99 is merged")
 	suite.Run(t, new(LibP2PUtilsTestSuite))
 }
 

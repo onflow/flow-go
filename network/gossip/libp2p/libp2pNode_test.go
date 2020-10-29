@@ -44,7 +44,6 @@ type LibP2PNodeTestSuite struct {
 
 // TestLibP2PNodesTestSuite runs all the test methods in this test suit
 func TestLibP2PNodesTestSuite(t *testing.T) {
-	t.Skip("skip until https://github.com/onflow/flow-go/pull/99 is merged")
 	suite.Run(t, new(LibP2PNodeTestSuite))
 }
 

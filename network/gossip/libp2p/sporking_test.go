@@ -23,7 +23,6 @@ type SporkingTestSuite struct {
 }
 
 func TestHardSpooningTestSuite(t *testing.T) {
-	t.Skip("skip until https://github.com/onflow/flow-go/pull/99 is merged")
 	suite.Run(t, new(SporkingTestSuite))
 }
 
