@@ -32,6 +32,7 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 var (
@@ -553,4 +554,305 @@ func TestShouldTriggerStateSync(t *testing.T) {
 	// there are 10 sealed and unexecuted blocks between height 20 and 29,
 	// reached the threshold 10, so should trigger
 	require.True(t, shouldTriggerStateSync(20, 29, 10))
+}
+
+func newIngestionEngine(t *testing.T, ps *mocks.PS, es *mocks.ES) *Engine {
+	log := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+	tracer, err := trace.NewTracer(log, "test")
+	require.NoError(t, err)
+	ctrl := gomock.NewController(t)
+	net := module.NewMockNetwork(ctrl)
+	request := module.NewMockRequester(ctrl)
+	syncConduit := network.NewMockConduit(ctrl)
+	var engine *Engine
+	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+
+	// generates signing identity including staking key for signing
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	require.NoError(t, err)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	require.NoError(t, err)
+	myIdentity.StakingPubKey = sk.PublicKey()
+	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
+
+	blocks := storage.NewMockBlocks(ctrl)
+	collections := storage.NewMockCollections(ctrl)
+	events := storage.NewMockEvents(ctrl)
+	txResults := storage.NewMockTransactionResults(ctrl)
+
+	computationManager := new(computation.ComputationManager)
+	providerEngine := new(provider.ProviderEngine)
+
+	deltas, err := NewDeltas(10)
+	require.NoError(t, err)
+
+	engine, err = New(
+		log,
+		net,
+		me,
+		request,
+		ps,
+		blocks,
+		collections,
+		events,
+		txResults,
+		computationManager,
+		providerEngine,
+		es,
+		metrics,
+		tracer,
+		false,
+		filter.Any,
+		deltas,
+		10,
+		false,
+	)
+
+	require.NoError(t, err)
+	return engine
+}
+
+func logChain(chain []*flow.Block) {
+	log := unittest.Logger()
+	for i, block := range chain {
+		log.Info().Msgf("block %v, height: %v, ID: %v", i, block.Header.Height, block.ID())
+	}
+}
+
+func TestLoadingUnexecutedBlocks(t *testing.T) {
+	t.Run("only genesis", func(t *testing.T) {
+		ps := mocks.NewPS()
+
+		chain, result, seal := unittest.ChainFixture(0)
+		genesis := chain[0]
+
+		logChain(chain)
+
+		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+
+		es := mocks.NewES(seal)
+		engine := newIngestionEngine(t, ps, es)
+
+		finalized, pending, err := engine.unexecutedBlocks()
+		require.NoError(t, err)
+
+		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
+		unittest.IDsEqual(t, []flow.Identifier{}, pending)
+	})
+
+	t.Run("no finalized, nor pending unexected", func(t *testing.T) {
+		ps := mocks.NewPS()
+
+		chain, result, seal := unittest.ChainFixture(4)
+		genesis, blockA, blockB, blockC, blockD :=
+			chain[0], chain[1], chain[2], chain[3], chain[4]
+
+		logChain(chain)
+
+		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Mutate().Extend(blockA))
+		require.NoError(t, ps.Mutate().Extend(blockB))
+		require.NoError(t, ps.Mutate().Extend(blockC))
+		require.NoError(t, ps.Mutate().Extend(blockD))
+
+		es := mocks.NewES(seal)
+		engine := newIngestionEngine(t, ps, es)
+
+		finalized, pending, err := engine.unexecutedBlocks()
+		require.NoError(t, err)
+
+		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
+		unittest.IDsEqual(t, []flow.Identifier{blockA.ID(), blockB.ID(), blockC.ID(), blockD.ID()}, pending)
+	})
+
+	t.Run("no finalized, some pending executed", func(t *testing.T) {
+		ps := mocks.NewPS()
+
+		chain, result, seal := unittest.ChainFixture(4)
+		genesis, blockA, blockB, blockC, blockD :=
+			chain[0], chain[1], chain[2], chain[3], chain[4]
+
+		logChain(chain)
+
+		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Mutate().Extend(blockA))
+		require.NoError(t, ps.Mutate().Extend(blockB))
+		require.NoError(t, ps.Mutate().Extend(blockC))
+		require.NoError(t, ps.Mutate().Extend(blockD))
+
+		es := mocks.NewES(seal)
+		engine := newIngestionEngine(t, ps, es)
+
+		mocks.ExecuteBlock(t, es, blockA)
+		mocks.ExecuteBlock(t, es, blockB)
+
+		finalized, pending, err := engine.unexecutedBlocks()
+		require.NoError(t, err)
+
+		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
+		unittest.IDsEqual(t, []flow.Identifier{blockC.ID(), blockD.ID()}, pending)
+	})
+
+	t.Run("all finalized have been executed, and no pending executed", func(t *testing.T) {
+		ps := mocks.NewPS()
+
+		chain, result, seal := unittest.ChainFixture(4)
+		genesis, blockA, blockB, blockC, blockD :=
+			chain[0], chain[1], chain[2], chain[3], chain[4]
+
+		logChain(chain)
+
+		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Mutate().Extend(blockA))
+		require.NoError(t, ps.Mutate().Extend(blockB))
+		require.NoError(t, ps.Mutate().Extend(blockC))
+		require.NoError(t, ps.Mutate().Extend(blockD))
+
+		require.NoError(t, ps.Mutate().Finalize(blockA.ID()))
+		require.NoError(t, ps.Mutate().Finalize(blockB.ID()))
+		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+
+		es := mocks.NewES(seal)
+		engine := newIngestionEngine(t, ps, es)
+
+		mocks.ExecuteBlock(t, es, blockA)
+		mocks.ExecuteBlock(t, es, blockB)
+		mocks.ExecuteBlock(t, es, blockC)
+
+		finalized, pending, err := engine.unexecutedBlocks()
+		require.NoError(t, err)
+
+		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
+		unittest.IDsEqual(t, []flow.Identifier{blockD.ID()}, pending)
+	})
+
+	t.Run("some finalized are executed and conflicting are executed", func(t *testing.T) {
+		ps := mocks.NewPS()
+
+		chain, result, seal := unittest.ChainFixture(4)
+		genesis, blockA, blockB, blockC, blockD :=
+			chain[0], chain[1], chain[2], chain[3], chain[4]
+
+		logChain(chain)
+
+		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Mutate().Extend(blockA))
+		require.NoError(t, ps.Mutate().Extend(blockB))
+		require.NoError(t, ps.Mutate().Extend(blockC))
+		require.NoError(t, ps.Mutate().Extend(blockD))
+
+		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+
+		es := mocks.NewES(seal)
+		engine := newIngestionEngine(t, ps, es)
+
+		mocks.ExecuteBlock(t, es, blockA)
+		mocks.ExecuteBlock(t, es, blockB)
+		mocks.ExecuteBlock(t, es, blockC)
+
+		finalized, pending, err := engine.unexecutedBlocks()
+		require.NoError(t, err)
+
+		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
+		unittest.IDsEqual(t, []flow.Identifier{blockD.ID()}, pending)
+	})
+
+	t.Run("all pending executed", func(t *testing.T) {
+		ps := mocks.NewPS()
+
+		chain, result, seal := unittest.ChainFixture(4)
+		genesis, blockA, blockB, blockC, blockD :=
+			chain[0], chain[1], chain[2], chain[3], chain[4]
+
+		logChain(chain)
+
+		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Mutate().Extend(blockA))
+		require.NoError(t, ps.Mutate().Extend(blockB))
+		require.NoError(t, ps.Mutate().Extend(blockC))
+		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Mutate().Finalize(blockA.ID()))
+
+		es := mocks.NewES(seal)
+		engine := newIngestionEngine(t, ps, es)
+
+		mocks.ExecuteBlock(t, es, blockA)
+		mocks.ExecuteBlock(t, es, blockB)
+		mocks.ExecuteBlock(t, es, blockC)
+		mocks.ExecuteBlock(t, es, blockD)
+
+		finalized, pending, err := engine.unexecutedBlocks()
+		require.NoError(t, err)
+
+		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
+		unittest.IDsEqual(t, []flow.Identifier{}, pending)
+	})
+
+	t.Run("some fork is executed", func(t *testing.T) {
+		ps := mocks.NewPS()
+
+		// Genesis <- A <- B <- C (finalized) <- D <- E <- F
+		//                                       ^--- G <- H
+		//                      ^-- I
+		//						     ^--- J <- K
+		chain, result, seal := unittest.ChainFixture(6)
+		genesis, blockA, blockB, blockC, blockD, blockE, blockF :=
+			chain[0], chain[1], chain[2], chain[3], chain[4], chain[5], chain[6]
+
+		fork1 := unittest.ChainFixtureFrom(2, blockD.Header)
+		blockG, blockH := fork1[0], fork1[1]
+
+		fork2 := unittest.ChainFixtureFrom(1, blockC.Header)
+		blockI := fork2[0]
+
+		fork3 := unittest.ChainFixtureFrom(2, blockB.Header)
+		blockJ, blockK := fork3[0], fork3[1]
+
+		logChain(chain)
+		logChain(fork1)
+		logChain(fork2)
+		logChain(fork3)
+
+		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Mutate().Extend(blockA))
+		require.NoError(t, ps.Mutate().Extend(blockB))
+		require.NoError(t, ps.Mutate().Extend(blockC))
+		require.NoError(t, ps.Mutate().Extend(blockI))
+		require.NoError(t, ps.Mutate().Extend(blockJ))
+		require.NoError(t, ps.Mutate().Extend(blockK))
+		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Mutate().Extend(blockE))
+		require.NoError(t, ps.Mutate().Extend(blockF))
+		require.NoError(t, ps.Mutate().Extend(blockG))
+		require.NoError(t, ps.Mutate().Extend(blockH))
+
+		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+
+		es := mocks.NewES(seal)
+
+		engine := newIngestionEngine(t, ps, es)
+
+		mocks.ExecuteBlock(t, es, blockA)
+		mocks.ExecuteBlock(t, es, blockB)
+		mocks.ExecuteBlock(t, es, blockC)
+		mocks.ExecuteBlock(t, es, blockD)
+		mocks.ExecuteBlock(t, es, blockG)
+		mocks.ExecuteBlock(t, es, blockJ)
+
+		finalized, pending, err := engine.unexecutedBlocks()
+		require.NoError(t, err)
+
+		unittest.IDsEqual(t, []flow.Identifier{}, finalized)
+		unittest.IDsEqual(t, []flow.Identifier{
+			blockI.ID(), // I is still pending, and unexecuted
+			blockE.ID(),
+			blockF.ID(),
+			// note K is not a pending block, but a conflicting block, even if it's not executed,
+			// it won't included
+			blockH.ID()},
+			pending)
+	})
 }

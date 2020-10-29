@@ -186,27 +186,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-// on nodes startup, we need to load all the unexecuted blocks to the execution queues.
-// blocks have to be loaded in the way that the parent has been loaded before loading its children
-func (e *Engine) reloadUnexecutedBlocks() error {
-	err := e.reloadFinalizedUnexecutedBlocks()
-	if err != nil {
-		return fmt.Errorf("could not reload finalized unexecuted blocks")
-	}
-
-	err = e.reloadPendingUnexecutedBlocks()
-	if err != nil {
-		return fmt.Errorf("could not reload pending unexecuted blocks")
-	}
-
-	return nil
-}
-
-func (e *Engine) reloadFinalizedUnexecutedBlocks() error {
+func (e *Engine) finalizedUnexecutedBlocks() ([]flow.Identifier, error) {
 	// get finalized height
 	final, err := e.state.Final().Head()
 	if err != nil {
-		return fmt.Errorf("could not get finalized block: %w", err)
+		return nil, fmt.Errorf("could not get finalized block: %w", err)
 	}
 
 	// find the first unexecuted and finalized block
@@ -217,82 +201,109 @@ func (e *Engine) reloadFinalizedUnexecutedBlocks() error {
 	// then the firstUnexecuted is a unfinalized block, which is ok,
 	// because the next loop will ensure it only iterate through finalized
 	// block.
-	firstUnexecuted := final.Height
-	for ; firstUnexecuted >= 0; firstUnexecuted-- {
-		header, err := e.state.AtHeight(firstUnexecuted).Head()
+	lastExecuted := final.Height
+
+	for ; lastExecuted > 0; lastExecuted-- {
+		header, err := e.state.AtHeight(lastExecuted).Head()
 		if err != nil {
-			return fmt.Errorf("could not get header at height: %v, %w", firstUnexecuted, err)
+			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
 		}
 
 		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ID())
 		if err != nil {
-			return fmt.Errorf("could not check whether block is executed: %w", err)
+			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
 		}
 
 		if executed {
-			firstUnexecuted++
 			break
 		}
 	}
 
+	firstUnexecuted := lastExecuted + 1
+
 	e.log.Info().Msgf("last finalized and executed height: %v", firstUnexecuted)
+
+	unexecuted := make([]flow.Identifier, 0)
 
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
 	for height := firstUnexecuted; height <= final.Height; height++ {
 		header, err := e.state.AtHeight(height).Head()
 		if err != nil {
-			return fmt.Errorf("could not get header at height: %v, %w", height, err)
+			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
 
-		err = e.reloadBlock(header.ID())
-		if err != nil {
-			return fmt.Errorf("could not reload block %v, %w", height, err)
-		}
-
-		e.log.Info().Msgf("reloaded block at height: %v", height)
-
+		unexecuted = append(unexecuted, header.ID())
 	}
 
-	return nil
+	return unexecuted, nil
 }
 
-func (e *Engine) reloadPendingUnexecutedBlocks() error {
+func (e *Engine) pendingUnexecutedBlocks() ([]flow.Identifier, error) {
+	unexecuted := make([]flow.Identifier, 0)
+
 	pendings, err := e.state.Final().Pending()
 	if err != nil {
-		return fmt.Errorf("could not get pending blocks: %w", err)
+		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
 
 	for _, pending := range pendings {
-		reloaded, err := e.reloadBlockIfNotExecuted(pending)
+		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, pending)
 		if err != nil {
-			return fmt.Errorf("could not reload block for block %w", err)
+			return nil, fmt.Errorf("could not check block executed or not: %w", err)
 		}
 
-		e.log.Info().Bool("reloaded", reloaded).Msgf("reloaded block %v", pending)
+		if !executed {
+			unexecuted = append(unexecuted, pending)
+		}
 	}
 
-	return nil
+	return unexecuted, nil
 }
 
-// reload the block to execution queues if has not been executed.
-// return whether the block was reloaded.
-func (e *Engine) reloadBlockIfNotExecuted(blockID flow.Identifier) (bool, error) {
-	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
+	finalized, err = e.finalizedUnexecutedBlocks()
 	if err != nil {
-		return false, fmt.Errorf("could not check block executed or not: %w", err)
+		return nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
 	}
 
-	if executed {
-		return false, nil
-	}
-
-	err = e.reloadBlock(blockID)
+	pending, err = e.pendingUnexecutedBlocks()
 	if err != nil {
-		return false, fmt.Errorf("could not reload block: %w", err)
+		return nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
 	}
 
-	return true, nil
+	return finalized, pending, nil
+}
+
+// on nodes startup, we need to load all the unexecuted blocks to the execution queues.
+// blocks have to be loaded in the way that the parent has been loaded before loading its children
+func (e *Engine) reloadUnexecutedBlocks() error {
+	finalized, pending, err := e.unexecutedBlocks()
+	if err != nil {
+		return fmt.Errorf("could not reload unexecuted blocks: %w", err)
+	}
+
+	unexecuted := append(finalized, pending...)
+
+	log := e.log.With().
+		Int("total", len(unexecuted)).
+		Int("finalized", len(finalized)).
+		Int("pending", len(pending)).Logger()
+
+	log.Info().Msg("reloading unexecuted blocks")
+
+	for _, blockID := range unexecuted {
+		err := e.reloadBlock(blockID)
+		if err != nil {
+			return fmt.Errorf("could not reload block: %v, %w", blockID, err)
+		}
+
+		e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
+	}
+
+	log.Info().Msg("all unexecuted have been successfully reloaded")
+
+	return nil
 }
 
 func (e *Engine) reloadBlock(blockID flow.Identifier) error {
