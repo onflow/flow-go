@@ -1,10 +1,12 @@
 package stdmap
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/model"
+	"github.com/onflow/flow-go/storage"
 )
 
 // IncorporatedResults implements the incorporated results memory pool of the
@@ -42,34 +44,27 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 			// no record with key is available in the mempool, initialise
 			// incResults.
 			incResults = make(map[flow.Identifier]*flow.IncorporatedResult)
+			// add the new map to mempool for holding all incorporated results for the same result.ID
+			backdata[key] = model.IncorporatedResultMap{
+				ExecutionResult:     incorporatedResult.Result,
+				IncorporatedResults: incResults,
+			}
 		} else {
 			incorporatedResultMap, ok := entity.(model.IncorporatedResultMap)
 			if !ok {
-				return fmt.Errorf("could not assert entity to IncorporatedResultMap")
+				return fmt.Errorf("unexpected entity type %T", entity)
 			}
 
 			incResults = incorporatedResultMap.IncorporatedResults
-
 			if _, ok := incResults[incorporatedResult.IncorporatedBlockID]; ok {
 				// incorporated result is already associated with result and
 				// incorporated block.
 				return nil
 			}
-
-			// removes map entry associated with key for update
-			delete(backdata, key)
 		}
 
 		// appends incorporated result to the map
 		incResults[incorporatedResult.IncorporatedBlockID] = incorporatedResult
-
-		// adds the new incorporated results map associated with key to mempool
-		incorporatedResultMap := model.IncorporatedResultMap{
-			ExecutionResult:     incorporatedResult.Result,
-			IncorporatedResults: incResults,
-		}
-
-		backdata[key] = incorporatedResultMap
 		appended = true
 		*ir.size++
 		return nil
@@ -80,35 +75,50 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 
 // All returns all the items in the mempool.
 func (ir *IncorporatedResults) All() []*flow.IncorporatedResult {
+	// To guarantee concurrency safety, we need to copy the map via a locked operation in the backend.
+	// Otherwise, another routine might concurrently modify the maps stored as mempool entities.
 	res := make([]*flow.IncorporatedResult, 0)
-
-	entities := ir.backend.All()
-	for _, entity := range entities {
-		irMap, _ := entity.(model.IncorporatedResultMap)
-
-		for _, ir := range irMap.IncorporatedResults {
-			res = append(res, ir)
+	_ = ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		for _, entity := range backdata {
+			// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
+			for _, ir := range entity.(model.IncorporatedResultMap).IncorporatedResults {
+				res = append(res, ir)
+			}
 		}
-	}
+		return nil
+	}) // error return impossible
 
 	return res
 }
 
 // ByResultID returns all the IncorporatedResults that contain a specific
 // ExecutionResult, indexed by IncorporatedBlockID.
-func (ir *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult) {
-
-	entity, exists := ir.backend.ByID(resultID)
-	if !exists {
-		return nil, nil
+func (ir *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult, bool) {
+	// To guarantee concurrency safety, we need to copy the map via a locked operation in the backend.
+	// Otherwise, another routine might concurrently modify the map stored for the same resultID.
+	var result *flow.ExecutionResult
+	incResults := make(map[flow.Identifier]*flow.IncorporatedResult)
+	err := ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, exists := backdata[resultID]
+		if !exists {
+			return storage.ErrNotFound
+		}
+		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
+		irMap := entity.(model.IncorporatedResultMap)
+		result = irMap.ExecutionResult
+		for i, res := range irMap.IncorporatedResults {
+			incResults[i] = res
+		}
+		return nil
+	})
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, nil, false
+	} else if err != nil {
+		// The current implementation never reaches this path
+		panic("unexpected internal error in IncorporatedResults mempool: " + err.Error())
 	}
 
-	irMap, ok := entity.(model.IncorporatedResultMap)
-	if !ok {
-		return nil, nil
-	}
-
-	return irMap.ExecutionResult, irMap.IncorporatedResults
+	return result, incResults, true
 }
 
 // Rem removes an IncorporatedResult from the mempool.
@@ -123,45 +133,37 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 		if !ok {
 			// there are no items for this result
 			return nil
-		} else {
-			incorporatedResultMap, ok := entity.(model.IncorporatedResultMap)
-			if !ok {
-				return fmt.Errorf("could not assert entity to IncorporatedResultMap")
-			}
-
-			incResults = incorporatedResultMap.IncorporatedResults
-
-			if _, ok := incResults[incorporatedResult.IncorporatedBlockID]; !ok {
-				// there are no items for this IncorporatedBlockID
-				return nil
-			}
-
-			// removes map entry associated with key for update
-			delete(backdata, key)
 		}
-
-		// remove item from map
-		delete(incResults, incorporatedResult.IncorporatedBlockID)
-
-		if len(incResults) > 0 {
-			// adds the new incorporated results map associated with key to mempool
-			incorporatedResultMap := model.IncorporatedResultMap{
-				ExecutionResult:     incorporatedResult.Result,
-				IncorporatedResults: incResults,
-			}
-
-			backdata[key] = incorporatedResultMap
+		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
+		incResults = entity.(model.IncorporatedResultMap).IncorporatedResults
+		if _, ok := incResults[incorporatedResult.IncorporatedBlockID]; !ok {
+			// there are no items for this IncorporatedBlockID
+			return nil
+		}
+		if len(incResults) == 1 {
+			// special case: there is only a single Incorporated result stored for this Result.ID()
+			// => remove entire map
+			delete(backdata, key)
+		} else {
+			// remove item from map
+			delete(incResults, incorporatedResult.IncorporatedBlockID)
 		}
 
 		removed = true
 		*ir.size--
 		return nil
-	})
+	}) // error return impossible
 
 	return removed
 }
 
 // Size returns the number of incorporated results in the mempool.
 func (ir *IncorporatedResults) Size() uint {
+	// To guarantee concurrency safety, i.e. that the read retrieves the latest size value,
+	// we need run the read through a locked operation in the backend.
+	// To guarantee concurrency safety, i.e. that the read retrieves the latest size value,
+	// we need run utilize the backend's lock.
+	ir.backend.RLock()
+	defer ir.backend.RUnlock()
 	return *ir.size
 }
