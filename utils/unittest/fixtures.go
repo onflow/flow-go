@@ -404,9 +404,9 @@ func WithExecutorID(executorID flow.Identifier) func(*flow.ExecutionReceipt) {
 	}
 }
 
-func WithBlock(block *flow.Block) func(*flow.ExecutionReceipt) {
-	return func(er *flow.ExecutionReceipt) {
-		er.ExecutionResult = *ResultForBlockFixture(block)
+func WithResult(result *flow.ExecutionResult) func(*flow.ExecutionReceipt) {
+	return func(receipt *flow.ExecutionReceipt) {
+		receipt.ExecutionResult = *result
 	}
 }
 
@@ -427,24 +427,51 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 
 func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
 	return ExecutionReceiptFixture(
-		WithBlock(block),
+		WithResult(ResultForBlockFixture(block)),
 	)
 }
 
-func ExecutionResultFixture() *flow.ExecutionResult {
-	blockID := IdentifierFixture()
+func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.PreviousResultID = prevResult.ID()
+		finalState, ok := prevResult.FinalStateCommitment()
+		if !ok {
+			panic("missing final state commitment")
+		}
+		result.Chunks[0].StartState = finalState
+	}
+}
 
-	return &flow.ExecutionResult{
+func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
+	chunks := 1 // tailing chunk is always system chunk
+	if block.Payload != nil {
+		chunks += len(block.Payload.Guarantees)
+	}
+	blockID := block.ID()
+
+	return func(result *flow.ExecutionResult) {
+		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
+		result.BlockID = blockID
+		result.Chunks = ChunksFixture(uint(chunks), block.ID())
+		result.Chunks[0].StartState = startState // set start state to value before update
+	}
+}
+
+func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
+	blockID := IdentifierFixture()
+	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
-			BlockID:          blockID,
-			Chunks: flow.ChunkList{
-				ChunkFixture(blockID),
-				ChunkFixture(blockID),
-			},
+			BlockID:          IdentifierFixture(),
+			Chunks:           ChunksFixture(2, blockID),
 		},
 		Signatures: SignaturesFixture(6),
 	}
+
+	for _, apply := range opts {
+		apply(result)
+	}
+	return result
 }
 
 func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
@@ -476,21 +503,21 @@ func WithIRPrevious(previousResID flow.Identifier) func(*flow.IncorporatedResult
 	}
 }
 
+// TODO replace by usage unittest.IncorporatedResult
 func IncorporatedResultFixture(opts ...func(*flow.IncorporatedResult)) *flow.IncorporatedResult {
 	result := ExecutionResultFixture()
 	incorporatedBlockID := IdentifierFixture()
-
-	res := flow.NewIncorporatedResult(incorporatedBlockID, result)
+	ir := flow.NewIncorporatedResult(incorporatedBlockID, result)
 
 	for _, apply := range opts {
-		apply(res)
+		apply(ir)
 	}
-
-	return res
+	return ir
 }
 
+// TODO replace by usage unittest.IncorporatedResult
 func IncorporatedResultForBlockFixture(block *flow.Block) *flow.IncorporatedResult {
-	result := ResultForBlockFixture(block)
+	result := ExecutionResultFixture(WithBlock(block))
 	incorporatedBlockID := IdentifierFixture()
 	return flow.NewIncorporatedResult(incorporatedBlockID, result)
 }
@@ -510,6 +537,18 @@ func WithAttestationBlock(block *flow.Block) func(*flow.ResultApproval) {
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
 		ra.Body.ExecutionResultID = id
+	}
+}
+
+func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.Body.Attestation.BlockID = id
+	}
+}
+
+func WithChunk(chunkIdx uint64) func(*flow.ResultApproval) {
+	return func(approval *flow.ResultApproval) {
+		approval.Body.ChunkIndex = chunkIdx
 	}
 }
 

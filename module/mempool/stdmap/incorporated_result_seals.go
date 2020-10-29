@@ -25,6 +25,7 @@ func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 	entities := ir.Backend.All()
 	res := make([]*flow.IncorporatedResultSeal, 0, len(ir.entities))
 	for _, entity := range entities {
+		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultSeal:
 		res = append(res, entity.(*flow.IncorporatedResultSeal))
 	}
 	return res
@@ -36,11 +37,8 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 	if !ok {
 		return nil, false
 	}
-	res, ok := entity.(*flow.IncorporatedResultSeal)
-	if !ok {
-		return nil, false
-	}
-	return res, true
+	// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultSeal:
+	return entity.(*flow.IncorporatedResultSeal), true
 }
 
 // Rem removes an IncorporatedResultSeal from the mempool

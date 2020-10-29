@@ -3,6 +3,8 @@
 package consensus
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -373,7 +375,11 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// filteredSeals is an index of block-height to seal, where we collect only
 	// those seals from the mempool that correspond to IncorporatedResults on
 	// this fork.
-	filteredSeals := make(map[uint64]*flow.Seal)
+	filteredSeals := make(map[uint64]*flow.IncorporatedResultSeal)
+
+	// We consider two seals as inconsistent, if they refer to the same block
+	// and have different start or end states
+	encounteredInconsistentSealsForSameBlock := false
 
 	// loop through the fork, from parent to last sealed, inspect the payloads'
 	// ExecutionResults, and check for matching IncorporatedResultSeals in the
@@ -408,23 +414,56 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// result. This tells us that the seal is for a result on this fork,
 			// and that it was calculated using the correct block ID for chunk
 			// assignment (the IncorporatedBlockID).
-			incorporatedResultSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
+			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
 			if ok {
+
+				if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
+					return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
+				}
+				if len(irSeal.Seal.FinalState) < 1 {
+					// respective Execution Result should have been rejected by matching engine
+					return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
+				}
 
 				header, err := b.headers.ByBlockID(incorporatedResult.Result.BlockID)
 				if err != nil {
 					return nil, fmt.Errorf("could not get block for id (%x): %w", incorporatedResult.Result.BlockID, err)
 				}
 
-				filteredSeals[header.Height] = incorporatedResultSeal.Seal
+				// Check for other inconsistent seal
+				irSeal2, found := filteredSeals[header.Height]
+				if found && irSeal.Seal.BlockID != irSeal2.Seal.BlockID {
+
+					sc1json, err := json.Marshal(irSeal)
+					if err != nil {
+						return nil, err
+					}
+					sc2json, err := json.Marshal(irSeal2)
+					if err != nil {
+						return nil, err
+					}
+
+					// check whether seals are inconsistent:
+					if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
+						!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
+						fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+						encounteredInconsistentSealsForSameBlock = true
+					} else {
+						fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+					}
+
+				} else {
+					filteredSeals[header.Height] = irSeal
+				}
 			}
 		}
 
 		ancestorID = ancestor.Header.ParentID
 	}
 
-	// return immediadely if there are no seals to collect
-	if len(filteredSeals) == 0 {
+	// return immediadely if there are no seals to collect or if we found
+	// inconsistent seals.
+	if len(filteredSeals) == 0 || encounteredInconsistentSealsForSameBlock {
 		return nil, nil
 	}
 
@@ -437,7 +476,19 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	nextSealHeight := sealed.Height + 1
 	nextSeal, ok := filteredSeals[nextSealHeight]
 	for ok {
-		chain = append(chain, nextSeal)
+
+		//  enforce that execution results form chain
+		nextResultToBeSealed := nextSeal.IncorporatedResult.Result
+		initialState, isOK := nextResultToBeSealed.InitialStateCommit()
+		if !isOK {
+			return nil, fmt.Errorf("missing initial state commitment in execution result %v", nextResultToBeSealed.ID())
+		}
+		if !bytes.Equal(initialState, last.FinalState) {
+			return nil, fmt.Errorf("execution results do not form chain")
+		}
+
+		last = nextSeal.Seal
+		chain = append(chain, nextSeal.Seal)
 		nextSealHeight++
 		nextSeal, ok = filteredSeals[nextSealHeight]
 	}

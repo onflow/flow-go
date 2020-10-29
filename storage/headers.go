@@ -24,7 +24,4 @@ type Headers interface {
 	// be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
-
-	// GetLastSealed returns the header of the heighest sealed block
-	GetLastSealed() (*flow.Header, error)
 }
