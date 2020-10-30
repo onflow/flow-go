@@ -859,10 +859,11 @@ func (e *Engine) handleComputationResult(
 		return nil, err
 	}
 
-	err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
-	if err != nil {
-		return nil, fmt.Errorf("could not send broadcast order: %w", err)
-	}
+	// stop broadcasting for debugging purpose
+	// err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("could not send broadcast order: %w", err)
+	// }
 
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
