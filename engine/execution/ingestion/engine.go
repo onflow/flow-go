@@ -194,16 +194,21 @@ func (e *Engine) finalizedUnexecutedBlocks() ([]flow.Identifier, error) {
 	}
 
 	// find the first unexecuted and finalized block
-	// we iterate from the last finalized, check if it has been executed,
+	// We iterate from the last finalized, check if it has been executed,
 	// if not, keep going to the lower height, until we find an executed
 	// block, and then the next height is the first unexecuted.
-	// if there is only one finalized, and it's executed (i.e. genesis),
+	// If there is only one finalized, and it's executed (i.e. root block),
 	// then the firstUnexecuted is a unfinalized block, which is ok,
-	// because the next loop will ensure it only iterate through finalized
-	// block.
+	// because the next loop will ensure it only iterates through finalized
+	// blocks.
 	lastExecuted := final.Height
 
-	for ; lastExecuted > 0; lastExecuted-- {
+	rootBlock, err := e.state.Params().Root()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
+	}
+
+	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
 		header, err := e.state.AtHeight(lastExecuted).Head()
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
