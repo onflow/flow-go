@@ -3,12 +3,12 @@ package libp2p
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
@@ -32,6 +32,7 @@ var PeerUpdateInterval = 1 * time.Minute
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
+	unit        *engine.Unit
 	ctx         context.Context
 	logger      zerolog.Logger
 	idsProvider func() (flow.IdentityList, error) // callback to retrieve list of peers to connect to
@@ -43,9 +44,11 @@ type PeerManager struct {
 
 // NewPeerManager creates a new peer manager which calls the idsProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func() (flow.IdentityList, error), connector Connector) *PeerManager {
+func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func() (flow.IdentityList, error),
+	connector Connector) *PeerManager {
 	return &PeerManager{
 		ctx:          ctx,
+		unit:         engine.NewUnit(),
 		logger:       logger,
 		idsProvider:  idsProvider,
 		connector:    connector,
@@ -53,46 +56,32 @@ func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func
 	}
 }
 
-// Start kicks off the ambient periodic connection updates
-// It is blocked till the connection update is kicked off
-func (pm *PeerManager) Start() error {
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
+// Ready kicks off the ambient periodic connection updates
+// It is blocked till the connection update is kicked off.
+func (pm *PeerManager) Ready() <-chan struct{} {
+	// makes sure that peer update request is invoked
+	// once before returning
+	pm.RequestPeerUpdate()
 
-	go pm.updateLoop(wg)
-	go pm.periodicUpdate(wg)
+	// also starts running it periodically
+	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, PeerUpdateInterval, time.Duration(0))
 
-	wg.Wait()
-	return nil
+	pm.unit.Launch(pm.updateLoop)
+
+	return pm.unit.Ready()
+}
+
+func (pm *PeerManager) Done() <-chan struct{} {
+	return pm.unit.Done()
 }
 
 // updateLoop triggers an update peer request when it has been requested
-func (pm *PeerManager) updateLoop(wg *sync.WaitGroup) {
-	wg.Done()
+func (pm *PeerManager) updateLoop() {
 	for {
 		select {
-		case <-pm.ctx.Done():
-			return
 		case <-pm.peerRequestQ:
 			pm.updatePeers()
-		}
-	}
-}
-
-// updateLoop request periodic connection update
-func (pm *PeerManager) periodicUpdate(wg *sync.WaitGroup) {
-	wg.Done()
-	// request initial discovery
-	pm.RequestPeerUpdate()
-
-	ticker := time.NewTicker(PeerUpdateInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			pm.RequestPeerUpdate()
-		case <-pm.ctx.Done():
+		case <-pm.unit.Ctx().Done():
 			return
 		}
 	}

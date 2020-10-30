@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -146,10 +145,8 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	}).Return(nil)
 	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
-
 	PeerUpdateInterval = 5 * time.Millisecond
-	err := pm.Start()
-	assert.NoError(suite.T(), err)
+	<-pm.Ready()
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*PeerUpdateInterval,
 		"ConnectPeers is not running on UpdateIntervals")
@@ -183,10 +180,10 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 		}
 	}).Return(nil)
 	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
-	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
 
-	// starts peer manager and waits for first periodic update
-	require.NoError(suite.T(), pm.Start())
+	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
+	<-pm.Ready()
+
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
 		"ConnectPeers is not running on startup")
 
@@ -224,8 +221,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// start the peer manager
 	// this should trigger the first update and which will block on the ConnectPeers to return
-	err := pm.Start()
-	assert.NoError(suite.T(), err)
+	<-pm.Ready()
 
 	// makes 10 concurrent request for peer update
 	unittest.RequireConcurrentCallsReturnBefore(suite.T(), pm.RequestPeerUpdate, 10, time.Second,
@@ -237,7 +233,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	// requires two calls to ConnectPeers were made
 	assert.Eventually(suite.T(), func() bool {
 		return connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 2)
-	}, 1*time.Second, 100*time.Millisecond)
+	}, 3*time.Second, 100*time.Millisecond)
 }
 
 // assertListsEqual asserts that two identity list are equal ignoring the order
