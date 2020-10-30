@@ -59,40 +59,34 @@ func TestG1(t *testing.T) {
 
 }
 
-// G1 bench
-func BenchmarkG1(b *testing.B) {
+// G1 and G2 scalar multiplication
+func BenchmarkScalarMult(b *testing.B) {
 	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
 	seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
-	var res pointG1
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		genScalarMultG1(&res, &expo)
-	}
-	b.StopTimer()
-	return
-}
+	// G1 bench
+	b.Run("G1", func(b *testing.B) {
+		var res pointG1
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			genScalarMultG1(&res, &expo)
+		}
+		b.StopTimer()
+	})
 
-// G2 bench
-func BenchmarkG2(b *testing.B) {
-	blsInstance.reInit()
-	seed := make([]byte, securityBits/8)
-	rand.Read(seed)
-	seedRelic(seed)
-	var expo scalar
-	randZr(&expo)
-	var res pointG2
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		genScalarMultG2(&res, &expo)
-	}
-	b.StopTimer()
-	return
+	// G2 bench
+	b.Run("G2", func(b *testing.B) {
+		var res pointG2
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			genScalarMultG2(&res, &expo)
+		}
+		b.StopTimer()
+	})
 }
 
 // Hashing to G1 bench
@@ -146,19 +140,23 @@ func TestSubgroupCheckG1(t *testing.T) {
 	rand.Read(seed)
 	seedRelic(seed)
 
-	simple := 0
-	bowe := 1
 	// tests for simple membership check
-	check := checkG1Test(1, simple) // point in G1
-	assert.True(t, check)
-	check = checkG1Test(0, simple) // point in E1\G1
-	assert.False(t, check)
+	t.Run("simple check", func(t *testing.T) {
+		simple := 0
+		check := checkG1Test(1, simple) // point in G1
+		assert.True(t, check)
+		check = checkG1Test(0, simple) // point in E1\G1
+		assert.False(t, check)
+	})
 
 	// tests for Bowe membership check
-	check = checkG1Test(1, bowe) // point in G1
-	assert.True(t, check)
-	check = checkG1Test(0, bowe) // point in E1\G1
-	assert.False(t, check)
+	t.Run("bowe check", func(t *testing.T) {
+		bowe := 1
+		check := checkG1Test(1, bowe) // point in G1
+		assert.True(t, check)
+		check = checkG1Test(0, bowe) // point in E1\G1
+		assert.False(t, check)
+	})
 }
 
 // G1 membership check bench
