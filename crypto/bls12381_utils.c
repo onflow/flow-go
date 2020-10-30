@@ -574,7 +574,7 @@ void ep2_sum_vector(ep2_t jointy, ep2_st* y, int len){
         ep2_add_projc(jointy, jointy, &y[i]);
     }
     ep2_norm(jointy, jointy); // not necessary but left here to optimize the 
-                            // the multiple pairing computations with the same 
+                            // multiple pairing computations with the same 
                             // public key
 }
 

@@ -69,7 +69,7 @@ static void G2_polynomialImage(ep2_t y, const ep2_st* A, const int len_A,
     }
 
     ep2_norm(y, y); // not necessary but left here to optimize the 
-                    // the multiple pairing computations with the same public key
+                    // multiple pairing computations with the same public key
     bn_free(bn_x);
 }
 
