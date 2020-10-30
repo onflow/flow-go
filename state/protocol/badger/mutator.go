@@ -300,7 +300,7 @@ func (m *Mutator) headerExtend(candidate *flow.Block) error {
 			// block G is not a valid block, because it does not include C which has been finalized.
 			// block H and I are a valid, because its their includes C.
 			return state.NewOutdatedExtensionErrorf(
-				"candidate block (height: %v) conflicts with finalized state (ancestor: %d final: %d)",
+				"candidate block (height: %d) conflicts with finalized state (ancestor: %d final: %d)",
 				header.Height, ancestor.Height, finalizedHeight)
 		}
 		ancestorID = ancestor.ParentID
