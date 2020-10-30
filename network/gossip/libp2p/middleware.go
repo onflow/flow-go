@@ -193,8 +193,12 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	m.peerManager = NewPeerManager(m.ctx, m.log, m.ov.Topology, libp2pConnector)
-	<-m.peerManager.Ready()
-	m.log.Debug().Msg("peer manager successfully started")
+	select {
+	case <-m.peerManager.Ready():
+		m.log.Debug().Msg("peer manager successfully started")
+	case <-time.After(30 * time.Second):
+		return fmt.Errorf("could not start peer manager")
+	}
 
 	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
 	m.host, m.port, err = m.libP2PNode.GetIPPort()

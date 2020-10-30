@@ -80,7 +80,7 @@ func (pm *PeerManager) updateLoop() {
 		select {
 		case <-pm.peerRequestQ:
 			pm.updatePeers()
-		case <-pm.unit.Ctx().Done():
+		case <-pm.unit.Quit():
 			return
 		}
 	}
