@@ -56,10 +56,10 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 }
 
 // Sign signs an array of bytes
-// It only reads the private key without modifiying it while hashers sha2 and sha3 are
+// The private key is read only without modifiying it while sha2 and sha3 hashers are
 // modified temporarily.
-// the resulting signature is the concatenation bytes(r)||bytes(s)
-// where r and s are padded to the curve order size
+// The resulting signature is the concatenation bytes(r)||bytes(s),
+// where r and s are padded to the curve order size.
 func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
@@ -86,7 +86,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 }
 
 // Verify verifies a signature of a byte array
-// It only reads the public key. hashers sha2 and sha3 are
+// Public keys are just read.sha2 and sha3 hashers are
 // modified temporarily
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
 	// no need to check the hasher output size as all supported hash algos
@@ -97,6 +97,36 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool
 
 	h := alg.ComputeHash(data)
 	return pk.verifyHash(sig, h)
+}
+
+// signatureFormatCheck verifies the format of a serialized signature,
+// regardless of messages or public keys.
+// If FormatCheck returns false then the input is not a valid ECDSA
+// signature and will fail a verification against any message and public key.
+func (a *ecdsaAlgo) signatureFormatCheck(sig Signature) bool {
+	N := a.curve.Params().N
+	Nlen := bitsToBytes(N.BitLen())
+
+	if len(sig) != 2*Nlen {
+		return false
+	}
+
+	var r big.Int
+	var s big.Int
+	r.SetBytes(sig[:Nlen])
+	s.SetBytes(sig[Nlen:])
+
+	if r.Sign() == 0 || s.Sign() == 0 {
+		return false
+	}
+
+	if r.Cmp(N) >= 0 || s.Cmp(N) >= 0 {
+		return false
+	}
+
+	// We could also check whether r and r+N are quadratic residues modulo (p)
+	// using Euler's criterion.
+	return true
 }
 
 // GeneratePOP returns a proof of possession (PoP) for the receiver private key

@@ -32,7 +32,7 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	case ECDSASecp256k1:
 		return secp256k1Instance, nil
 	default:
-		return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
+		return nil, fmt.Errorf("the signature scheme %s is not supported", algo)
 	}
 }
 
@@ -49,6 +49,30 @@ func initNonRelic() {
 		curve: btcec.S256(),
 		algo:  ECDSASecp256k1,
 	})
+}
+
+// Signature format Check for non-relic algos (ECDSA)
+func signatureFormatCheckNonRelic(algo SigningAlgorithm, s Signature) (bool, error) {
+	switch algo {
+	case ECDSAP256:
+		return p256Instance.signatureFormatCheck(s), nil
+	case ECDSASecp256k1:
+		return secp256k1Instance.signatureFormatCheck(s), nil
+	default:
+		return false, fmt.Errorf("the signature scheme %s is not supported", algo)
+	}
+}
+
+// SignatureFormatCheck verifies the format of a serialized signature,
+// regardless of messages or public keys.
+//
+// This function is only defined for ECDSA algos for now.
+//
+// If SignatureFormatCheck returns false then the input is not a valid
+// signature and will fail a verification against any message and public key.
+func SignatureFormatCheck(algo SigningAlgorithm, s Signature) (bool, error) {
+	// For now, signatureFormatCheckNonRelic is only defined for non-Relic algos.
+	return signatureFormatCheckNonRelic(algo, s)
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed.
