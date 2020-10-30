@@ -34,13 +34,13 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		s, err := sk.Sign(input, halg)
 		require.NoError(t, err)
 		pk := sk.PublicKey()
-		
+
 		// test a valid signature
 		result, err := pk.Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.True(t, result, fmt.Sprintf(
 			"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
-		
+
 		// test with a different message
 		input[0] ^= 1
 		result, err = pk.Verify(s, input, halg)

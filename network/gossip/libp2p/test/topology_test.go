@@ -39,6 +39,27 @@ func (suite *TopologyTestSuite) TestTopologyMatureScaleCollectionMinority() {
 	suite.testTopology(1000, flow.RoleCollection)
 }
 
+func (suite *TopologyTestSuite) TestTopologySize() {
+	totalNodes := 100
+	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	golog.SetAllLoggers(golog.LevelError)
+
+	// create totalNodes number of networks
+	_, _, nets := GenerateIDsMiddlewaresNetworks(suite.T(), totalNodes, logger, 100, nil, DryRunNetwork)
+
+	// determine the expected size of the id list that should be returned by RandPermTopology
+	rndSubsetSize := int(math.Ceil(float64(totalNodes+1) / 2))
+	oneOfEachNodetype := 0 // there is only one node type in this test
+	remaining := totalNodes - rndSubsetSize - oneOfEachNodetype
+	halfOfRemainingNodes := int(math.Ceil(float64(remaining+1) / 2))
+	expectedSize := rndSubsetSize + oneOfEachNodetype + halfOfRemainingNodes
+
+	top, err := nets[0].Topology()
+	require.NoError(suite.T(), err)
+	// assert id list returned is of expected size
+	require.Len(suite.T(), top, expectedSize)
+}
+
 // testTopology tests overall node connectedness and connectedness by channel ID by keeping nodes of one role type in
 // minority (~2%).
 // It is also evaluating the validity of identities in the generated topology as well as overall size of topology.

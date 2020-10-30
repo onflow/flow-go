@@ -12,7 +12,6 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -44,8 +43,8 @@ func TestMeshNetTestSuite(t *testing.T) {
 func (suite *MeshEngineTestSuite) SetupTest() {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
+	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	var err error
 	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, RunNetwork)
 	require.NoError(suite.T(), err)

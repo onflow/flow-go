@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/phayes/freeport"
 	"github.com/rs/zerolog"
 	mock3 "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -28,24 +27,31 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID = unittest.IdentifierFixture().String()
+var rootBlockID string
 
 const (
 	DryRunNetwork = "dry-run-network" // does not run network
 	RunNetwork    = "run-network"     // runs network
 )
 
+var allocator *portAllocator
+
+// init is a built-in golang function getting called first time this
+// initialize the allocated ports map and the root block ID
+func init() {
+	allocator = newPortAllocator()
+	rootBlockID = unittest.IdentifierFixture().String()
+}
+
 // GenerateIDs generate flow Identities with a valid port and networking key
 func GenerateIDs(t *testing.T, n int, runningMode string, opts ...func(*flow.Identity)) (flow.IdentityList,
 	[]crypto.PrivateKey) {
 	privateKeys := make([]crypto.PrivateKey, n)
 	var freePorts []int
-	var err error
 
 	if !strings.EqualFold(runningMode, DryRunNetwork) {
 		// get free ports
-		freePorts, err = freeport.GetFreePorts(n)
-		require.NoError(t, err)
+		freePorts = allocator.getFreePorts(t, n)
 	}
 
 	identities := unittest.IdentityListFixture(n, opts...)
