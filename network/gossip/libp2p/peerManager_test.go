@@ -233,7 +233,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	// requires two calls to ConnectPeers were made
 	assert.Eventually(suite.T(), func() bool {
 		return connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 2)
-	}, 3*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 100*time.Millisecond)
 }
 
 // assertListsEqual asserts that two identity list are equal ignoring the order

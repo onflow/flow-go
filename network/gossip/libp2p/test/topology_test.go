@@ -40,6 +40,7 @@ func (suite *TopologyTestSuite) TestTopologyMatureScaleCollectionMinority() {
 }
 
 func (suite *TopologyTestSuite) TestTopologySize() {
+	suite.T().Skip("this test requires fanout to be set")
 	totalNodes := 100
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
