@@ -56,8 +56,7 @@ func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func
 	}
 }
 
-// Ready kicks off the ambient periodic connection updates
-// It is blocked till the connection update is kicked off.
+// Ready kicks off the ambient periodic connection updates.
 func (pm *PeerManager) Ready() <-chan struct{} {
 	// makes sure that peer update request is invoked
 	// once before returning
