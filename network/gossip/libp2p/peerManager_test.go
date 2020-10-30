@@ -146,7 +146,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
 	PeerUpdateInterval = 5 * time.Millisecond
-	unittest.RequireClosesBefore(suite.T(), pm.Ready(), 2*time.Second)
+	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*PeerUpdateInterval,
 		"ConnectPeers is not running on UpdateIntervals")
@@ -182,7 +182,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
 
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
-	unittest.RequireClosesBefore(suite.T(), pm.Ready(), 2*time.Second)
+	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
 		"ConnectPeers is not running on startup")
@@ -221,7 +221,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// start the peer manager
 	// this should trigger the first update and which will block on the ConnectPeers to return
-	unittest.RequireClosesBefore(suite.T(), pm.Ready(), 2*time.Second)
+	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	// makes 10 concurrent request for peer update
 	unittest.RequireConcurrentCallsReturnBefore(suite.T(), pm.RequestPeerUpdate, 10, time.Second,
