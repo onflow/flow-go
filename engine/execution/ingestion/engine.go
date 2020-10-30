@@ -186,9 +186,9 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-func (e *Engine) finalizedUnexecutedBlocks() ([]flow.Identifier, error) {
+func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
 	// get finalized height
-	final, err := e.state.Final().Head()
+	final, err := finalized.Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get finalized block: %w", err)
 	}
@@ -244,13 +244,13 @@ func (e *Engine) finalizedUnexecutedBlocks() ([]flow.Identifier, error) {
 	return unexecuted, nil
 }
 
-func (e *Engine) pendingUnexecutedBlocks() ([]flow.Identifier, error) {
-	unexecuted := make([]flow.Identifier, 0)
-
-	pendings, err := e.state.Final().Pending()
+func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+	pendings, err := finalized.Pending()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
+
+	unexecuted := make([]flow.Identifier, 0)
 
 	for _, pending := range pendings {
 		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, pending)
@@ -267,12 +267,16 @@ func (e *Engine) pendingUnexecutedBlocks() ([]flow.Identifier, error) {
 }
 
 func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
-	finalized, err = e.finalizedUnexecutedBlocks()
+	// pin the snapshot so that finalizedUnexecutedBlocks and pendingUnexecutedBlocks are based
+	// on the same snapshot.
+	snapshot := e.state.Final()
+
+	finalized, err = e.finalizedUnexecutedBlocks(snapshot)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
 	}
 
-	pending, err = e.pendingUnexecutedBlocks()
+	pending, err = e.pendingUnexecutedBlocks(snapshot)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
 	}
@@ -314,7 +318,12 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		}
 
 		// don't reload root block
-		isRoot := last.ParentID == flow.ZeroID
+		rootBlock, err := e.state.Params().Root()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve root block: %w", err)
+		}
+
+		isRoot := rootBlock.ID() == last.ID()
 		if !isRoot {
 			err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
 			if err != nil {
