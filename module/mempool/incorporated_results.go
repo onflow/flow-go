@@ -14,7 +14,7 @@ type IncorporatedResults interface {
 	// ByResultID returns all the IncorporatedResults that contain a specific
 	// ExecutionResult, indexed by IncorporatedBlockID, along with the
 	// ExecutionResult.
-	ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult)
+	ByResultID(resultID flow.Identifier) (*flow.ExecutionResult, map[flow.Identifier]*flow.IncorporatedResult, bool)
 
 	// Rem removes an IncorporatedResult from the mempool
 	Rem(incorporatedResult *flow.IncorporatedResult) bool

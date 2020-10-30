@@ -34,11 +34,13 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		s, err := sk.Sign(input, halg)
 		require.NoError(t, err)
 		pk := sk.PublicKey()
+		
 		// test a valid signature
 		result, err := pk.Verify(s, input, halg)
 		require.NoError(t, err)
 		assert.True(t, result, fmt.Sprintf(
 			"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+		
 		// test with a different message
 		input[0] ^= 1
 		result, err = pk.Verify(s, input, halg)
@@ -46,6 +48,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		assert.False(t, result, fmt.Sprintf(
 			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
 		input[0] ^= 1
+
 		// test with a valid but different key
 		seed[0] ^= 1
 		wrongSk, err := GeneratePrivateKey(salg, seed)
@@ -54,6 +57,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
 			"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+
 		// test a wrong signature length
 		invalidLen := mrand.Intn(2 * len(s)) // try random invalid lengths
 		if invalidLen == len(s) {            // map to an invalid length
@@ -116,28 +120,34 @@ func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorit
 	t.Logf("Testing Equals for %s", salg)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
+
 	// generate a key pair
 	seed := make([]byte, seedMinLength)
 	n, err := rand.Read(seed)
 	require.Equal(t, n, seedMinLength)
 	require.NoError(t, err)
+
 	// first pair
 	sk1, err := GeneratePrivateKey(salg, seed)
 	require.NoError(t, err)
 	pk1 := sk1.PublicKey()
+
 	// second pair without changing the seed
 	sk2, err := GeneratePrivateKey(salg, seed)
 	require.NoError(t, err)
 	pk2 := sk2.PublicKey()
+
 	// unrelated algo pair
 	sk3, err := GeneratePrivateKey(otherSigAlgo, seed)
 	require.NoError(t, err)
 	pk3 := sk3.PublicKey()
+
 	// fourth pair with same algo but a different seed
 	seed[0] ^= 1
 	sk4, err := GeneratePrivateKey(salg, seed)
 	require.NoError(t, err)
 	pk4 := sk4.PublicKey()
+
 	// tests
 	assert.True(t, sk1.Equals(sk2), "key equality should return true")
 	assert.True(t, pk1.Equals(pk2), "key equality should return true")
@@ -218,11 +228,13 @@ func testPOP(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 		s, err := sk.GeneratePOP(halg)
 		require.NoError(t, err)
 		pk := sk.PublicKey()
+
 		// test a valid PoP
 		result, err := pk.VerifyPOP(s, halg)
 		require.NoError(t, err)
 		assert.True(t, result, fmt.Sprintf(
 			"Verification should succeed:\n signature:%s\n private key:%s", s, sk))
+
 		// test with a valid but different key
 		seed[0] ^= 1
 		wrongSk, err := GeneratePrivateKey(salg, seed)
