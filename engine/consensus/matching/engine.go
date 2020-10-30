@@ -219,7 +219,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return engine.NewInvalidInputErrorf("execution receipt without FinalStateCommit: %x", receipt.ID())
 	}
 	log = log.With().Hex("final_state", resultFinalState).Logger()
-	log.Info().Msg("execution receipt received")
 
 	// CAUTION INCOMPLETE
 	// For many other messages, we check that the message's origin (as established by the
@@ -243,6 +242,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		log.Debug().Msg("discarding receipt for unknown block")
 		return nil
 	}
+
+	log = log.With().
+		Uint64("block_view", head.View).
+		Uint64("block_height", head.Height).
+		Logger()
+	log.Info().Msg("execution receipt received")
 
 	// if Execution Receipt is for block whose height is lower or equal to already sealed height
 	//  => drop Receipt
