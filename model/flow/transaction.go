@@ -421,6 +421,12 @@ type TransactionSignature struct {
 	Signature   []byte
 }
 
+// String returns the string representation of a transaction signature.
+func (s TransactionSignature) String() string {
+	return fmt.Sprintf("Address: %s\n SignerIndex: %d\n KeyID: %d\n Signature: %s\n",
+		s.Address, s.SignerIndex, s.KeyID, s.Signature)
+}
+
 // ByteSize returns the byte size of the transaction signature
 func (s TransactionSignature) ByteSize() int {
 	signerIndexLen := 8
