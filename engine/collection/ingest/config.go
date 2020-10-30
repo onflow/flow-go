@@ -16,6 +16,8 @@ type Config struct {
 	AllowUnknownReference bool
 	// whether or not we check that transaction scripts are parse-able
 	CheckScriptsParse bool
+	// the maximum address index we accept
+	MaxAddressIndex uint64
 	// how many extra nodes in the responsible cluster we propagate transactions to
 	// (we always send to at least one)
 	PropagationRedundancy uint
@@ -27,6 +29,7 @@ func DefaultConfig() Config {
 		MaxGasLimit:           flow.DefaultMaxGasLimit,
 		AllowUnknownReference: false,
 		CheckScriptsParse:     true,
+		MaxAddressIndex:       1_000_000,
 		PropagationRedundancy: 2,
 	}
 }
