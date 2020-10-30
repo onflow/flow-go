@@ -5,11 +5,11 @@ import (
 )
 
 func GenerateRootSeal(result *flow.ExecutionResult, setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.Seal {
+	finalState, _ := result.FinalStateCommitment()
 	seal := &flow.Seal{
 		BlockID:       result.BlockID,
 		ResultID:      result.ID(),
-		InitialState:  nil,
-		FinalState:    result.FinalStateCommit,
+		FinalState:    finalState,
 		ServiceEvents: []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()},
 	}
 	return seal

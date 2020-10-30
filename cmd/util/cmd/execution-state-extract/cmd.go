@@ -1,7 +1,7 @@
 package extract
 
 import (
-	"fmt"
+	"encoding/hex"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -61,7 +61,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("cannot get state commitment for block")
 	}
 
-	fmt.Printf("%x\n", stateCommitment)
+	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment))
 
 	err = extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
 	if err != nil {

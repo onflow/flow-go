@@ -32,6 +32,7 @@ import (
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
+	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -45,7 +46,11 @@ func main() {
 	var (
 		txLimit                                uint
 		maxCollectionSize                      uint
+		maxCollectionByteSize                  uint64
+		maxCollectionTotalGas                  uint64
 		builderExpiryBuffer                    uint
+		builderPayerRateLimit                  float64
+		builderUnlimitedPayers                 []string
 		hotstuffTimeout                        time.Duration
 		hotstuffMinTimeout                     time.Duration
 		hotstuffTimeoutIncreaseFactor          float64
@@ -56,8 +61,8 @@ func main() {
 		ingestConf  ingest.Config
 		ingressConf ingress.Config
 
-		pool           mempool.Transactions  // shared tx pool
-		followerBuffer *buffer.PendingBlocks // pending block cache for follower
+		pools          *epochpool.TransactionPools // epoch-scoped transaction pools
+		followerBuffer *buffer.PendingBlocks       // pending block cache for follower
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -85,8 +90,16 @@ func main() {
 				"how many additional cluster members we propagate transactions to")
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 25,
 				"expiry buffer for transactions in proposed collections")
+			flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", 0, // no rate limiting
+				"rate limit for each payer (transactions/collection)")
+			flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
+				"set of payer addresses which are omitted from rate limiting")
 			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 200,
 				"maximum number of transactions in proposed collections")
+			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", 1000000,
+				"maximum byte size of the proposed collection")
+			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", 1000000,
+				"maximum total amount of maxgas of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
 				"the initial timeout for the hotstuff pacemaker")
 			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
@@ -104,7 +117,9 @@ func main() {
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
-			pool, err = stdmap.NewTransactions(txLimit)
+			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
+			pools = epochpool.NewTransactionPools(create)
+			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -222,7 +237,7 @@ func main() {
 				node.Metrics.Engine,
 				colMetrics,
 				node.Me,
-				pool,
+				pools,
 				ingestConf,
 			)
 			return ing, err
@@ -250,7 +265,6 @@ func main() {
 				node.Metrics.Engine,
 				colMetrics,
 				node.Me,
-				pool,
 				node.Storage.Collections,
 				node.Storage.Transactions,
 			)
@@ -260,9 +274,16 @@ func main() {
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
+			}
+
+			// convert hex string flag values to addresses
+			unlimitedPayers := make([]flow.Address, 0, len(builderUnlimitedPayers))
+			for _, payerStr := range builderUnlimitedPayers {
+				payerAddr := flow.HexToAddress(payerStr)
+				unlimitedPayers = append(unlimitedPayers, payerAddr)
 			}
 
 			builderFactory, err := factories.NewBuilderFactory(
@@ -272,7 +293,11 @@ func main() {
 				colMetrics,
 				push,
 				builder.WithMaxCollectionSize(maxCollectionSize),
+				builder.WithMaxCollectionByteSize(maxCollectionByteSize),
+				builder.WithMaxCollectionTotalGas(maxCollectionTotalGas),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
+				builder.WithMaxPayerTransactionRate(builderPayerRateLimit),
+				builder.WithUnlimitedPayers(unlimitedPayers...),
 			)
 			if err != nil {
 				return nil, err
@@ -286,7 +311,6 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.State,
-				pool,
 				node.Storage.Transactions,
 			)
 			if err != nil {
@@ -332,7 +356,7 @@ func main() {
 
 			factory := factories.NewEpochComponentsFactory(
 				node.Me,
-				pool,
+				pools,
 				builderFactory,
 				clusterStateFactory,
 				hotstuffFactory,
@@ -347,6 +371,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
+				pools,
 				rootQCVoter,
 				factory,
 				heightEvents,

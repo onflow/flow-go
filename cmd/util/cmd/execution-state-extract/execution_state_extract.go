@@ -9,14 +9,17 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/wal"
+
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/mtrie"
-	"github.com/onflow/flow-go/storage/ledger/mtrie/flattener"
-	"github.com/onflow/flow-go/storage/ledger/mtrie/trie"
-	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
@@ -25,7 +28,7 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, ledger.RegisterKeySize, wal.SegmentSize)
+	w, err := wal.NewWAL(nil, nil, dir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -33,7 +36,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		_ = w.Close()
 	}()
 
-	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, outputDir, 1000, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, outputDir, complete.DefaultCacheSize, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
 	if err != nil {
 		return fmt.Errorf("cannot create mForest: %w", err)
 	}
@@ -48,33 +51,35 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 
 	FoundHashError := fmt.Errorf("found hash %s", targetHash)
 
+	log.Info().Msg("Replaying WAL")
+
 	err = w.ReplayLogsOnly(
 		func(forestSequencing *flattener.FlattenedForest) error {
 			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
 			}
-			err = mForest.AddTries(rebuiltTries)
+			err = forest.AddTries(rebuiltTries)
 			if err != nil {
 				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
 			}
 			return nil
 		},
-		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+		func(update *ledger.TrieUpdate) error {
 
-			newTrie, err := mForest.Update(stateCommitment, keys, values)
+			newTrieHash, err := forest.Update(update)
 
-			for _, value := range values {
-				valuesSize += len(value)
+			for _, payload := range update.Payloads {
+				valuesSize += len(payload.Value)
 			}
 
-			valuesCount += len(values)
+			valuesCount += len(update.Payloads)
 
 			if err != nil {
 				return fmt.Errorf("error while updating mForest: %w", err)
 			}
 
-			if bytes.Equal(targetHash, newTrie.RootHash()) {
+			if bytes.Equal(targetHash, newTrieHash) {
 				found = true
 				return FoundHashError
 			}
@@ -86,7 +91,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 
 			return err
 		},
-		func(commitment flow.StateCommitment) error {
+		func(commitment ledger.RootHash) error {
 			return nil
 		})
 
@@ -100,12 +105,35 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		return fmt.Errorf("no value found: %w", err)
 	}
 
-	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished seeking")
+	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished replaying")
+
+	//remove other tries
+	tries, err := forest.GetTries()
+	if err != nil {
+		return fmt.Errorf("cannot get tries: %w", err)
+	}
+
+	for _, mTrie := range tries {
+		if !bytes.Equal(mTrie.RootHash(), targetHash) {
+			forest.RemoveTrie(mTrie.RootHash())
+		}
+	}
+
+	// check if we have only one trie
+	tries, err = forest.GetTries()
+	if err != nil {
+		return fmt.Errorf("cannot get tries again: %w", err)
+	}
+
+	if len(tries) != 1 {
+		return fmt.Errorf("too many tries left after filtering: %w", err)
+	}
+
 	log.Info().Msg("writing root checkpoint")
 
 	startTime = time.Now()
 
-	flattenForest, err := flattener.FlattenForest(mForest)
+	flattenForest, err := flattener.FlattenForest(forest)
 	if err != nil {
 		return fmt.Errorf("cannot flatten forest: %w", err)
 	}

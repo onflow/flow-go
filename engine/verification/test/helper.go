@@ -76,6 +76,7 @@ func VerificationHappyPath(t *testing.T,
 	// creates an execution receipt and its associated data
 	// with `chunkNum` chunks
 	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain())
+	result := &completeER.Receipt.ExecutionResult
 
 	// mocks the assignment to only assign "some" chunks to the verIdentity
 	// the assignment is done based on `isAssgined` function
@@ -90,16 +91,14 @@ func VerificationHappyPath(t *testing.T,
 		}
 		a.Add(chunk, assignees)
 	}
-	assigner.On("Assign",
-		testifymock.Anything,
-		completeER.Receipt.ExecutionResult.Chunks,
-		testifymock.Anything).
-		Return(a, nil)
 
 	// nodes and engines
 	//
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
+
+	assigner.On("Assign", result, result.BlockID).Return(a, nil)
+
 	for _, verIdentity := range verIdentities {
 		verNode := testutil.VerificationNode(t,
 			hub,
@@ -273,7 +272,7 @@ func SetupMockExeNode(t *testing.T,
 								res.Collection = *completeER.Collections[i]
 							}
 
-							err := exeChunkDataConduit.Submit(res, originID)
+							err := exeChunkDataConduit.Unicast(res, originID)
 							assert.Nil(t, err)
 
 							log.Debug().
@@ -465,11 +464,13 @@ func SetupMockVerifierEng(t testing.TB,
 	return eng, &wg
 }
 
-func VerifiableDataChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunkData {
+func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunkData {
 	var endState flow.StateCommitment
 	// last chunk
 	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
-		endState = er.Receipt.ExecutionResult.FinalStateCommit
+		finalState, ok := er.Receipt.ExecutionResult.FinalStateCommitment()
+		require.True(t, ok)
+		endState = finalState
 	} else {
 		endState = er.Receipt.ExecutionResult.Chunks[chunkIndex+1].StartState
 	}

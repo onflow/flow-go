@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/finalizer/collection"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	networkmock "github.com/onflow/flow-go/network/mock"
 	cluster "github.com/onflow/flow-go/state/cluster/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -32,16 +33,16 @@ func TestFinalizer(t *testing.T) {
 		genesis := model.Genesis()
 
 		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
 
 		headers := storage.NewHeaders(metrics, db)
 		payloads := storage.NewClusterPayloads(metrics, db)
 
-		state, err := cluster.NewState(db, genesis.Header.ChainID, headers, payloads)
+		state, err := cluster.NewState(db, tracer, genesis.Header.ChainID, headers, payloads)
 		require.NoError(t, err)
 		mutator := state.Mutate()
 
-		pool, err := stdmap.NewTransactions(1000)
-		require.NoError(t, err)
+		pool := stdmap.NewTransactions(1000)
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {

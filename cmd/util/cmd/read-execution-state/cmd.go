@@ -8,10 +8,11 @@ import (
 
 	list_accounts "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-accounts"
 	list_tries "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-tries"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/mtrie"
-	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 var (
@@ -38,31 +39,31 @@ func addSubcommands() {
 	Cmd.AddCommand(list_accounts.Init(loadExecutionState))
 }
 
-func loadExecutionState() *mtrie.MForest {
+func loadExecutionState() *mtrie.Forest {
 
 	w, err := wal.NewWAL(
 		nil,
 		nil,
 		flagExecutionStateDir,
-		ledger.CacheSize,
-		ledger.RegisterKeySize,
+		complete.DefaultCacheSize,
+		pathfinder.PathByteSize,
 		wal.SegmentSize,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating WAL")
 	}
 
-	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, flagExecutionStateDir, ledger.CacheSize, metrics.NewNoopCollector(), nil)
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, flagExecutionStateDir, complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating mForest")
 	}
 
-	err = w.ReplayOnMForest(mForest)
+	err = w.ReplayOnForest(forest)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while replaying execution state")
 	}
 
-	return mForest
+	return forest
 }
 
 func run(*cobra.Command, []string) {

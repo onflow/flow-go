@@ -4,6 +4,7 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -23,13 +25,14 @@ import (
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
 	metrics  module.MempoolMetrics
+	tracer   module.Tracer
 	db       *badger.DB
 	state    protocol.State
 	seals    storage.Seals
 	headers  storage.Headers
 	index    storage.Index
 	guarPool mempool.Guarantees
-	sealPool mempool.Seals
+	sealPool mempool.IncorporatedResultSeals
 	cfg      Config
 }
 
@@ -42,7 +45,8 @@ func NewBuilder(
 	seals storage.Seals,
 	index storage.Index,
 	guarPool mempool.Guarantees,
-	sealPool mempool.Seals,
+	sealPool mempool.IncorporatedResultSeals,
+	tracer module.Tracer,
 	options ...func(*Config),
 ) *Builder {
 
@@ -62,6 +66,7 @@ func NewBuilder(
 	b := &Builder{
 		metrics:  metrics,
 		db:       db,
+		tracer:   tracer,
 		state:    state,
 		headers:  headers,
 		seals:    seals,
@@ -77,9 +82,15 @@ func NewBuilder(
 // custom setter function to allow the caller to make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 
+	b.tracer.StartSpan(parentID, trace.CONBuildOn)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
+
 	// STEP ONE: Create a lookup of all previously used guarantees on the part
 	// of the chain that we are building on. We do this separately for pending
 	// and finalized ancestors, so we can differentiate what to do about it.
+
+	b.tracer.StartSpan(parentID, trace.CONBuildOnSetup)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnSetup)
 
 	var finalized uint64
 	err := b.db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -91,6 +102,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnSetup)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
 
 	ancestorID := parentID
 	pendingLookup := make(map[flow.Identifier]struct{})
@@ -111,6 +126,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 		ancestorID = ancestor.ParentID
 	}
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnFinalizedLookup)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnFinalizedLookup)
 
 	// we look back only as far as the expiry limit for the current height we
 	// are building for; any guarantee with a reference block before that can
@@ -156,6 +175,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		ancestorID = ancestor.ParentID
 	}
 
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnFinalizedLookup)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+
 	// STEP TWO: Go through the guarantees in our memory pool.
 	// 1) If it was already included on the finalized part of the chain, remove
 	// it from the memory pool and skip.
@@ -194,18 +217,60 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
 
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
+
 	// STEP FOUR: We try to get all ancestors from last sealed block all the way
 	// to the parent. Then we try to get seals for each of them until we don't
 	// find one. This creates a valid chain of seals from the last sealed block
 	// to at most the parent.
 
+	// TODO: The following logic for selecting seals will be replaced to match
+	// seals to incorporated results, looping through the fork, from parent to
+	// last sealed, to inspect incorporated receipts and check if the mempool
+	// contains corresponding seals.
+	// This will be implemented in phase 2 of the verification and sealing
+	// roadmap (https://github.com/dapperlabs/flow-go/issues/4872)
+
 	// create a mapping of block to seal for all seals in our pool
-	byBlock := make(map[flow.Identifier]*flow.Seal)
-	for _, seal := range b.sealPool.All() {
-		byBlock[seal.BlockID] = seal
+	// We consider two seals as inconsistent, if they have different start or end states
+	encounteredInconsistentSealsForSameBlock := false
+	byBlock := make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	for _, irSeal := range b.sealPool.All() {
+		if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
+			return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
+		}
+		if len(irSeal.Seal.FinalState) < 1 {
+			// respective Execution Result should have been rejected by matching engine
+			return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
+		}
+		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
+			sc1json, err := json.Marshal(irSeal)
+			if err != nil {
+				return nil, err
+			}
+			sc2json, err := json.Marshal(irSeal2)
+			if err != nil {
+				return nil, err
+			}
+
+			// check whether seals are inconsistent:
+			if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
+				!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
+				fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+				encounteredInconsistentSealsForSameBlock = true
+			} else {
+				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+			}
+
+		} else {
+			byBlock[irSeal.Seal.BlockID] = irSeal
+		}
 	}
-	if int(b.sealPool.Size()) > len(byBlock) {
-		return nil, fmt.Errorf("multiple seals for the same block")
+	if encounteredInconsistentSealsForSameBlock {
+		// in case we find inconsistent seals, do not seal anything
+		byBlock = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -249,13 +314,21 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			unchained = true
 			break
 		}
-		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect in finalized")
+
+		// enforce that execution results form chain
+		nextResultToBeSealed := next.IncorporatedResult.Result
+		initialState, ok := nextResultToBeSealed.InitialStateCommit()
+		if !ok {
+			return nil, fmt.Errorf("missing initial state commitment in execution result %v", nextResultToBeSealed.ID())
 		}
-		seals = append(seals, next)
+		if !bytes.Equal(initialState, last.FinalState) {
+			return nil, fmt.Errorf("execution results do not form chain")
+		}
+
+		seals = append(seals, next.Seal)
 		sealCount++
 		delete(byBlock, blockID)
-		last = next
+		last = next.Seal
 	}
 
 	// NOTE: We should only run the next part in case we did not use up all
@@ -282,6 +355,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if len(byBlock) == 0 {
 			break
 		}
+		// add at most <maxSealCount> number of seals in a new block proposal
+		// in order to prevent the block payload from being too big.
+		if sealCount >= b.cfg.maxSealCount {
+			break
+		}
 		if unchained {
 			break
 		}
@@ -290,13 +368,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if !found {
 			break
 		}
-		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect in pending")
-		}
-		seals = append(seals, next)
+
+		seals = append(seals, next.Seal)
+		sealCount++
 		delete(byBlock, pendingID)
-		last = next
 	}
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
 
 	// STEP FOUR: We now have guarantees and seals we can validly include
 	// in the payload built on top of the given parent. Now we need to build
@@ -350,6 +430,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		Header:  header,
 		Payload: payload,
 	}
+
+	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
+	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
 
 	err = b.state.Mutate().Extend(proposal)
 	if err != nil {

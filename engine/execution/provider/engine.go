@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/sync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -48,7 +47,6 @@ func New(
 	state protocol.ReadOnlyState,
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
-	stateSync sync.StateSynchronizer,
 	metrics module.ExecutionMetrics,
 ) (*Engine, error) {
 
@@ -190,7 +188,7 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	// sends requested chunk data pack to the requester
-	err = e.chunksConduit.Submit(response, originID)
+	err = e.chunksConduit.Unicast(response, originID)
 	if err != nil {
 		return fmt.Errorf("could not send requested chunk data pack to (%s): %w", origin, err)
 	}
@@ -203,6 +201,10 @@ func (e *Engine) onChunkDataRequest(
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
+	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		return fmt.Errorf("could not get final state: no chunks found")
+	}
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
 	defer span.Finish()
@@ -210,7 +212,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
+		Hex("final_state", finalState).
 		Msg("broadcasting execution receipt")
 
 	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,
@@ -219,7 +221,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	err = e.receiptCon.Submit(receipt, identities.NodeIDs()...)
+	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit execution receipts: %w", err)
 	}
