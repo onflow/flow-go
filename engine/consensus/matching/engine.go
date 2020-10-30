@@ -252,9 +252,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	if err != nil {
 		return fmt.Errorf("failed to determine whether receipt is from allowed executor")
 	}
-	if !allowedExecutor {
-		return nil
-	}
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
@@ -265,6 +262,11 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("executor_id", receipt.ExecutorID[:]).
 		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Logger()
+
+	if !allowedExecutor {
+		log.Warn().Msg("dropping execution receipt from non-allowed EN")
+		return nil
+	}
 
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
