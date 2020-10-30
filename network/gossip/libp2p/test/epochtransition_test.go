@@ -10,7 +10,6 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -48,8 +47,8 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 func (ts *EpochTransitionTestSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
+	ts.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
-	ts.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	// create ids
 	ids, mws := generateIDsAndMiddlewares(ts.T(), nodeCount, ts.logger)
@@ -106,7 +105,6 @@ func (ts *EpochTransitionTestSuite) TearDownTest() {
 // TestNewNodeAdded tests that an additional node in the next epoch gets connected to other nodes and can exchange messages
 // in the current epoch
 func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
-
 	// create the id, middleware and network for a new node
 	ids, mws, nets := generateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, false)
 	newMiddleware := mws[0]
@@ -143,7 +141,6 @@ func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 // TestNodeRemoved tests that a node that is removed in the next epoch remains connected for the current epoch
 func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
-
 	// choose a random node to remove
 	removeIndex := rand.Intn(len(ts.ids))
 	removedID := ts.ids[removeIndex]
