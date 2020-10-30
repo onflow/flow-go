@@ -43,6 +43,7 @@ func New(
 	engMetrics module.EngineMetrics,
 	colMetrics module.CollectionMetrics,
 	me module.Local,
+	chain flow.Chain,
 	pools *epochs.TransactionPools,
 	config Config,
 ) (*Engine, error) {
@@ -51,11 +52,13 @@ func New(
 
 	transactionValidator := access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),
+		chain,
 		access.TransactionValidationOptions{
 			Expiry:                       flow.DefaultTransactionExpiry,
 			ExpiryBuffer:                 config.ExpiryBuffer,
 			AllowUnknownReferenceBlockID: config.AllowUnknownReference,
 			MaxGasLimit:                  flow.DefaultMaxGasLimit,
+			MaxAddressIndex:              config.MaxAddressIndex,
 			CheckScriptsParse:            config.CheckScriptsParse,
 			MaxTxSizeLimit:               flow.DefaultMaxTxSizeLimit,
 		},
