@@ -600,7 +600,7 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     ep2_copy(elemsG2[1], (ep2_st*)pk1);
 
     // elemsG2[0] = pk2
-    ep2_new(&elemsG2[0]);
+    ep2_new(elemsG2[0]);
     ep2_copy(elemsG2[0], (ep2_st*)pk2);
 
 #if DOUBLE_PAIRING  

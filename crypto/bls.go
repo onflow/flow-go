@@ -20,7 +20,7 @@ package crypto
 //  - membership check in G1 is implemented using fast Bowe's check (https://eprint.iacr.org/2019/814.pdf)
 //  - membership check in G2 is using a simple scalar multiplication with the group order.
 //  - multi-signature tools are defined in bls_multisg.go
-//  - SPoCK scheme based on BLS to verify two signatures have been generated from the same message,
+//  - SPoCK scheme based on BLS: verifies two signatures have been generated from the same message,
 //    that is unknown to the verifier.
 
 // future features:
