@@ -156,31 +156,36 @@ func TestScalarMult(t *testing.T) {
 		},
 	}
 
-	for _, test := range genericMultTests {
-		Px, _ := new(big.Int).SetString(test.Px, 16)
-		Py, _ := new(big.Int).SetString(test.Py, 16)
-		k, _ := new(big.Int).SetString(test.k, 16)
-		Qx, _ := new(big.Int).SetString(test.Qx, 16)
-		Qy, _ := new(big.Int).SetString(test.Qy, 16)
-		Rx, Ry := test.curve.ScalarMult(Px, Py, k.Bytes())
-		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0)
-	}
-	for _, test := range baseMultTests {
-		k, _ := new(big.Int).SetString(test.k, 16)
-		Qx, _ := new(big.Int).SetString(test.Qx, 16)
-		Qy, _ := new(big.Int).SetString(test.Qy, 16)
-		// base mult
-		Rx, Ry := test.curve.ScalarBaseMult(k.Bytes())
-		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0)
-		// generic mult with base point
-		Px := new(big.Int).Set(test.curve.Params().Gx)
-		Py := new(big.Int).Set(test.curve.Params().Gy)
-		Rx, Ry = test.curve.ScalarMult(Px, Py, k.Bytes())
-		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0)
-	}
+	t.Run("scalar mult check", func(t *testing.T) {
+		for _, test := range genericMultTests {
+			Px, _ := new(big.Int).SetString(test.Px, 16)
+			Py, _ := new(big.Int).SetString(test.Py, 16)
+			k, _ := new(big.Int).SetString(test.k, 16)
+			Qx, _ := new(big.Int).SetString(test.Qx, 16)
+			Qy, _ := new(big.Int).SetString(test.Qy, 16)
+			Rx, Ry := test.curve.ScalarMult(Px, Py, k.Bytes())
+			assert.Equal(t, Rx.Cmp(Qx), 0)
+			assert.Equal(t, Ry.Cmp(Qy), 0)
+		}
+	})
+
+	t.Run("base scalar mult check", func(t *testing.T) {
+		for _, test := range baseMultTests {
+			k, _ := new(big.Int).SetString(test.k, 16)
+			Qx, _ := new(big.Int).SetString(test.Qx, 16)
+			Qy, _ := new(big.Int).SetString(test.Qy, 16)
+			// base mult
+			Rx, Ry := test.curve.ScalarBaseMult(k.Bytes())
+			assert.Equal(t, Rx.Cmp(Qx), 0)
+			assert.Equal(t, Ry.Cmp(Qy), 0)
+			// generic mult with base point
+			Px := new(big.Int).Set(test.curve.Params().Gx)
+			Py := new(big.Int).Set(test.curve.Params().Gy)
+			Rx, Ry = test.curve.ScalarMult(Px, Py, k.Bytes())
+			assert.Equal(t, Rx.Cmp(Qx), 0)
+			assert.Equal(t, Ry.Cmp(Qy), 0)
+		}
+	})
 }
 
 // ECDSA Proof of Possession test
