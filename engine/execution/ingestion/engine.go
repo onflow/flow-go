@@ -134,7 +134,7 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	// last sealed
-	lastSealed := uint64(7651976)
+	lastSealed := uint64(8203291)
 
 	head, err := e.state.AtHeight(lastSealed).Head()
 	if err != nil {
@@ -151,10 +151,7 @@ func (e *Engine) Ready() <-chan struct{} {
 		e.log.Fatal().Err(err).Msg("failed to set highest executed")
 	}
 
-	err = e.loadAllFinalizedAndUnexecutedBlocks()
-	if err != nil {
-		e.log.Error().Err(err).Msg("failed to load all unexecuted blocks")
-	}
+	e.log.Fatal().Msg("finish cleanup the results")
 
 	return e.unit.Ready()
 }
@@ -205,10 +202,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) removeBadData(lastSealed uint64) error {
+	var lastHeight uint64
 	for height := lastSealed; ; height++ {
 		head, err := e.state.AtHeight(height).Head()
 		if err != nil {
-			return err
+			break
 		}
 
 		blockID := head.ID()
@@ -218,8 +216,25 @@ func (e *Engine) removeBadData(lastSealed uint64) error {
 			return fmt.Errorf("could not remove by block ID: %v, %w", blockID, err)
 		}
 		e.log.Info().Msgf("execution state at height :%v has been removed", height)
+
+		lastHeight = height
 	}
 
+	pendings, err := e.state.AtHeight(lastHeight).Pending()
+	if err != nil {
+		return fmt.Errorf("could not get pending block at height: %d, %w", lastHeight, err)
+	}
+
+	for _, pending := range pendings {
+		err = e.execState.RemoveByBlockID(pending)
+		if err != nil {
+			return fmt.Errorf("could not remove by block ID: %v, %w", pending, err)
+		}
+		e.log.Info().Msgf("execution state for pending block :%v has been removed", pending)
+	}
+
+	e.log.Info().Msgf("all pending blocks' result have been removed, total: ", len(pendings))
+	return nil
 }
 
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
@@ -231,7 +246,7 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 	}
 
 	finalizedHeight := header.Height
-	futureHeight := uint64(8655590)
+	futureHeight := uint64(9655590)
 
 	// get the last executed height
 	lastExecutedHeight, _, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
@@ -338,20 +353,20 @@ func (e *Engine) loadAllFinalizedAndUnexecutedBlocks() error {
 // have passed consensus validation) received from the consensus nodes
 // Note: BlockProcessable might be called multiple times for the same block.
 func (e *Engine) BlockProcessable(b *flow.Header) {
-	blockID := b.ID()
-	newBlock, err := e.blocks.ByID(blockID)
-	if err != nil {
-		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", blockID, err)
-	}
-
-	e.log.Info().Hex("block_id", blockID[:]).
-		Uint64("height", b.Height).
-		Msg("handling new block")
-
-	err = e.handleBlock(e.unit.Ctx(), newBlock)
-	if err != nil {
-		e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
-	}
+	// blockID := b.ID()
+	// newBlock, err := e.blocks.ByID(blockID)
+	// if err != nil {
+	// 	e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", blockID, err)
+	// }
+	//
+	// e.log.Info().Hex("block_id", blockID[:]).
+	// 	Uint64("height", b.Height).
+	// 	Msg("handling new block")
+	//
+	// err = e.handleBlock(e.unit.Ctx(), newBlock)
+	// if err != nil {
+	// 	e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
+	// }
 }
 
 // Main handling
@@ -895,10 +910,11 @@ func (e *Engine) handleComputationResult(
 		return nil, err
 	}
 
-	err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
-	if err != nil {
-		return nil, fmt.Errorf("could not send broadcast order: %w", err)
-	}
+	// don't broadcast the receipt for now
+	// err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("could not send broadcast order: %w", err)
+	// }
 
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
