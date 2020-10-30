@@ -86,7 +86,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 }
 
 // Verify verifies a signature of a byte array
-// Public keys are just read.sha2 and sha3 hashers are
+// Public keys are read only, sha2 and sha3 hashers are
 // modified temporarily
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
 	// no need to check the hasher output size as all supported hash algos

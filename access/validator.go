@@ -106,11 +106,11 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 		return err
 	}
 
-	// TODO check account/payer signatures
 	err = v.checkSignatureFormat(tx)
 	if err != nil {
 		return err
 	}
+	// TODO replace checkSignatureFormat by verifying the account/payer signatures
 
 	return nil
 }
@@ -261,6 +261,7 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 		if valid {
 			continue
 		}
+
 		return InvalidSignatureError{Signature: signature}
 	}
 
