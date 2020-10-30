@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TopicAwareTopologyTestSuite tests the bare minimum requirements of a randomized
+// TopicAwareTopologyTestSuite tests the bare minimum requirements of a
 // topology that is needed for our network. It should not replace the information
 // theory assumptions behind the schemes, e.g., random oracle model of hashes
 type TopicAwareTopologyTestSuite struct {
@@ -52,7 +52,7 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	suite.state, suite.clusters = topology.CreateMockStateForCollectionNodes(suite.T(),
 		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
 
-	// takes firs id as the current nodes id
+	// takes first id as the current nodes id
 	suite.me = *suite.ids[0]
 }
 
