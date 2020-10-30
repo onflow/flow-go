@@ -79,7 +79,7 @@ func New(
 			collections:          collections,
 			blocks:               blocks,
 			transactions:         transactions,
-			transactionValidator: configureTransactionValidator(state),
+			transactionValidator: configureTransactionValidator(state, chainID),
 			transactionMetrics:   transactionMetrics,
 			retry:                retry,
 			collectionGRPCPort:   collectionGRPCPort,
@@ -112,9 +112,10 @@ func New(
 	return b
 }
 
-func configureTransactionValidator(state protocol.State) *access.TransactionValidator {
+func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *access.TransactionValidator {
 	return access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),
+		chainID.Chain(),
 		access.TransactionValidationOptions{
 			Expiry:                       flow.DefaultTransactionExpiry,
 			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
@@ -122,6 +123,7 @@ func configureTransactionValidator(state protocol.State) *access.TransactionVali
 			AllowUnknownReferenceBlockID: false,
 			MaxGasLimit:                  flow.DefaultMaxGasLimit,
 			CheckScriptsParse:            true,
+			MaxTxSizeLimit:               flow.DefaultMaxTxSizeLimit,
 		},
 	)
 }

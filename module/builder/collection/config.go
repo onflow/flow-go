@@ -28,6 +28,12 @@ type Config struct {
 	// UnlimitedPayer is a set of addresses which are not affected by per-payer
 	// rate limiting.
 	UnlimitedPayers map[flow.Address]struct{}
+
+	// MaxCollectionByteSize is the maximum byte size of a collection.
+	MaxCollectionByteSize uint64
+
+	// MaxCollectionTotalGas is the maximum of total of gas per collection (sum of maxGasLimit over transactions)
+	MaxCollectionTotalGas uint64
 }
 
 func DefaultConfig() Config {
@@ -36,6 +42,8 @@ func DefaultConfig() Config {
 		ExpiryBuffer:            15,                              // 15 blocks for collections to be included
 		MaxPayerTransactionRate: 0,                               // no rate limiting
 		UnlimitedPayers:         make(map[flow.Address]struct{}), // no unlimited payers
+		MaxCollectionByteSize:   uint64(1000000),                 // ~1MB
+		MaxCollectionTotalGas:   uint64(1000000),                 // 1M
 	}
 }
 
@@ -69,5 +77,17 @@ func WithUnlimitedPayers(payers ...flow.Address) Opt {
 	}
 	return func(c *Config) {
 		c.UnlimitedPayers = lookup
+	}
+}
+
+func WithMaxCollectionByteSize(limit uint64) Opt {
+	return func(c *Config) {
+		c.MaxCollectionByteSize = limit
+	}
+}
+
+func WithMaxCollectionTotalGas(limit uint64) Opt {
+	return func(c *Config) {
+		c.MaxCollectionTotalGas = limit
 	}
 }
