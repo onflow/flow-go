@@ -3,10 +3,15 @@ package libp2p
 // All utilities for libp2p not natively provided by the library.
 
 import (
+	"fmt"
+	"net"
+
 	core "github.com/libp2p/go-libp2p-core"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -85,4 +90,45 @@ func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 		}
 	}
 	return filteredStreams
+}
+
+// PeerInfoFromID converts the flow.Identity to peer.AddrInfo.
+// A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
+// flow.Identity           ---> peer.AddrInfo
+//    |-- Address          --->   |-- []multiaddr.Multiaddr
+//    |-- NetworkPublicKey --->   |-- ID
+func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
+
+	nodeAddress, err := nodeAddressFromIdentity(id)
+	if err != nil {
+		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
+	}
+
+	addr, err := GetPeerInfo(nodeAddress)
+	if err != nil {
+		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
+	}
+
+	return addr, nil
+}
+
+// nodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
+func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
+
+	// split the node address into ip and port
+	ip, port, err := net.SplitHostPort(flowIdentity.Address)
+	if err != nil {
+		return NodeAddress{}, fmt.Errorf("could not parse address %s: %w", flowIdentity.Address, err)
+	}
+
+	// convert the Flow key to a LibP2P key
+	lkey, err := PublicKey(flowIdentity.NetworkPubKey)
+	if err != nil {
+		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
+	}
+
+	// create a new NodeAddress
+	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
+
+	return nodeAddress, nil
 }

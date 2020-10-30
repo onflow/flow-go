@@ -69,7 +69,20 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys
 func TestBLSEncodeDecode(t *testing.T) {
+
+	// generic tests
 	testEncodeDecode(t, BLSBLS12381)
+
+	// specific tests for BLS
+	//  zero private key
+	skBytes := make([]byte, PrKeyLenBLSBLS12381)
+	_, err := DecodePrivateKey(BLSBLS12381, skBytes)
+	require.Error(t, err, "the key decoding should fail - key value is zero")
+	//  identity public key
+	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
+	pkBytes[0] = 0xC0
+	_, err = DecodePublicKey(BLSBLS12381, pkBytes)
+	require.Error(t, err, "the key decoding should fail - key value is identity")
 }
 
 // TestBLSEquals tests equal for BLS keys

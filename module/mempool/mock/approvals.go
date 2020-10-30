@@ -66,8 +66,29 @@ func (_m *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[fl
 	return r0
 }
 
-// Rem provides a mock function with given fields: resultID, chunkIndex
-func (_m *Approvals) Rem(resultID flow.Identifier, chunkIndex uint64) bool {
+// RemApproval provides a mock function with given fields: approval
+func (_m *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
+	ret := _m.Called(approval)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.ResultApproval) bool); ok {
+		r0 = rf(approval)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*flow.ResultApproval) error); ok {
+		r1 = rf(approval)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RemChunk provides a mock function with given fields: resultID, chunkIndex
+func (_m *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) (bool, error) {
 	ret := _m.Called(resultID, chunkIndex)
 
 	var r0 bool
@@ -77,7 +98,14 @@ func (_m *Approvals) Rem(resultID flow.Identifier, chunkIndex uint64) bool {
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64) error); ok {
+		r1 = rf(resultID, chunkIndex)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Size provides a mock function with given fields:

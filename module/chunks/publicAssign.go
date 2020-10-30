@@ -68,7 +68,7 @@ func (p *PublicAssignment) Assign(result *flow.ExecutionResult, blockID flow.Ide
 
 	// Get a list of verifiers
 	snapshot := p.protocolState.AtBlockID(blockID)
-	verifiers, err := snapshot.Identities(filter.HasRole(flow.RoleVerification))
+	verifiers, err := snapshot.Identities(filter.And(filter.HasRole(flow.RoleVerification), filter.HasStake(true)))
 	if err != nil {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
 	}
@@ -186,7 +186,7 @@ func fingerPrint(blockID flow.Identifier, resultID flow.Identifier, alpha int) (
 	return hasher.SumHash(), nil
 }
 
-// IsValidVerifer ...
+// IsValidVerifer returns true if the approver was assigned to the chunk
 func IsValidVerifer(assignment *chunkmodels.Assignment, chunk *flow.Chunk, approver flow.Identifier) bool {
 	verifiers := assignment.Verifiers(chunk)
 	for _, verifier := range verifiers {

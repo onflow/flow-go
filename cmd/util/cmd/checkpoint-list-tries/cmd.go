@@ -6,8 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	mtrie "github.com/onflow/flow-go/storage/ledger/mtrie/trie"
-	"github.com/onflow/flow-go/storage/ledger/wal"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
 var (
@@ -35,6 +34,6 @@ func run(*cobra.Command, []string) {
 	}
 
 	for _, trie := range flattenedForest.Tries {
-		fmt.Println(mtrie.RootHashToString(trie.RootHash))
+		fmt.Printf("%x\n", trie.RootHash)
 	}
 }

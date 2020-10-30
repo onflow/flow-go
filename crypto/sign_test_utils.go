@@ -75,6 +75,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	t.Logf("Testing encode/decode for %s", salg)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
+
 	// Key generation seed
 	seed := make([]byte, seedMinLength)
 	read, err := rand.Read(seed)
@@ -97,6 +98,22 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	assert.True(t, pk.Equals(pkCheck), "key equality check failed")
 	pkCheckBytes := pkCheck.Encode()
 	assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+
+	// test invalid private keys (equal to the curve group order)
+	groupOrder := make(map[SigningAlgorithm][]byte)
+	groupOrder[ECDSAP256] = []byte{255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 
+		255, 255, 255, 255, 255, 188, 230, 250, 173, 167, 
+		23, 158, 132, 243, 185, 202, 194, 252, 99, 37, 81}
+		
+	groupOrder[ECDSASecp256k1] = []byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 
+		255, 255, 255, 255, 255, 254, 186, 174, 220, 230, 
+		175, 72, 160, 59, 191, 210, 94, 140, 208, 54, 65, 65}
+	
+	groupOrder[BLSBLS12381] = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39, 
+		0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE, 
+		0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
+	_, err = DecodePrivateKey(salg, groupOrder[salg])
+	require.Error(t, err, "the key decoding should fail - private key value is too large")
 }
 
 func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorithm) {
