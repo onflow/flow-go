@@ -135,7 +135,7 @@ func New(
 func (e *Engine) Ready() <-chan struct{} {
 	err := e.reloadUnexecutedBlocks()
 	if err != nil {
-		e.log.Error().Err(err).Msg("failed to load all unexecuted blocks")
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
 	}
 
 	return e.unit.Ready()
@@ -186,27 +186,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-// on nodes startup, we need to load all the unexecuted blocks to the execution queues.
-// blocks have to be loaded in the way that the parent has been loaded before loading its children
-func (e *Engine) reloadUnexecutedBlocks() error {
-	err := e.reloadFinalizedUnexecutedBlocks()
-	if err != nil {
-		return fmt.Errorf("could not reload finalized unexecuted blocks")
-	}
-
-	err = e.reloadPendingUnexecutedBlocks()
-	if err != nil {
-		return fmt.Errorf("could not reload pending unexecuted blocks")
-	}
-
-	return nil
-}
-
-func (e *Engine) reloadFinalizedUnexecutedBlocks() error {
+func (e *Engine) finalizedUnexecutedBlocks() ([]flow.Identifier, error) {
 	// get finalized height
 	final, err := e.state.Final().Head()
 	if err != nil {
-		return fmt.Errorf("could not get finalized block: %w", err)
+		return nil, fmt.Errorf("could not get finalized block: %w", err)
 	}
 
 	// find the first unexecuted and finalized block
@@ -217,91 +201,164 @@ func (e *Engine) reloadFinalizedUnexecutedBlocks() error {
 	// then the firstUnexecuted is a unfinalized block, which is ok,
 	// because the next loop will ensure it only iterate through finalized
 	// block.
-	firstUnexecuted := final.Height
-	for ; ; firstUnexecuted-- {
-		header, err := e.state.AtHeight(firstUnexecuted).Head()
+	lastExecuted := final.Height
+
+	for ; lastExecuted > 0; lastExecuted-- {
+		header, err := e.state.AtHeight(lastExecuted).Head()
 		if err != nil {
-			return fmt.Errorf("could not get header at height: %v, %w", firstUnexecuted, err)
+			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
 		}
 
 		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ID())
 		if err != nil {
-			return fmt.Errorf("could not check whether block is executed: %w", err)
+			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
 		}
 
 		if executed {
-			firstUnexecuted++
 			break
 		}
 	}
 
-	e.log.Info().Msgf("last finalized and executed height: %v", firstUnexecuted)
+	firstUnexecuted := lastExecuted + 1
+
+	e.log.Info().Msgf("last finalized and executed height: %v", lastExecuted)
+
+	unexecuted := make([]flow.Identifier, 0)
 
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
 	for height := firstUnexecuted; height <= final.Height; height++ {
 		header, err := e.state.AtHeight(height).Head()
 		if err != nil {
-			return fmt.Errorf("could not get header at height: %v, %w", height, err)
+			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
 
-		err = e.reloadBlock(header.ID())
-		if err != nil {
-			return fmt.Errorf("could not reload block %v, %w", height, err)
-		}
-
-		e.log.Info().Msgf("reloaded block at height: %v", height)
-
+		unexecuted = append(unexecuted, header.ID())
 	}
 
-	return nil
+	return unexecuted, nil
 }
 
-func (e *Engine) reloadPendingUnexecutedBlocks() error {
+func (e *Engine) pendingUnexecutedBlocks() ([]flow.Identifier, error) {
+	unexecuted := make([]flow.Identifier, 0)
+
 	pendings, err := e.state.Final().Pending()
 	if err != nil {
-		return fmt.Errorf("could not get pending blocks: %w", err)
+		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
 
 	for _, pending := range pendings {
-		reloaded, err := e.reloadBlockIfNotExecuted(pending)
+		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, pending)
 		if err != nil {
-			return fmt.Errorf("could not reload block for block %w", err)
+			return nil, fmt.Errorf("could not check block executed or not: %w", err)
 		}
 
-		e.log.Info().Bool("reloaded", reloaded).Msgf("reloaded block %v", pending)
+		if !executed {
+			unexecuted = append(unexecuted, pending)
+		}
 	}
 
-	return nil
+	return unexecuted, nil
 }
 
-// reload the block to execution queues if has not been executed.
-// return whether the block was reloaded.
-func (e *Engine) reloadBlockIfNotExecuted(blockID flow.Identifier) (bool, error) {
-	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
+	finalized, err = e.finalizedUnexecutedBlocks()
 	if err != nil {
-		return false, fmt.Errorf("could not check block executed or not: %w", err)
+		return nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
 	}
 
-	if executed {
-		return false, nil
-	}
-
-	err = e.reloadBlock(blockID)
+	pending, err = e.pendingUnexecutedBlocks()
 	if err != nil {
-		return false, fmt.Errorf("could not reload block: %w", err)
+		return nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
 	}
 
-	return true, nil
+	return finalized, pending, nil
 }
 
-func (e *Engine) reloadBlock(blockID flow.Identifier) error {
+// on nodes startup, we need to load all the unexecuted blocks to the execution queues.
+// blocks have to be loaded in the way that the parent has been loaded before loading its children
+func (e *Engine) reloadUnexecutedBlocks() error {
+	// it's possible the BlockProcessable is called during the reloading, as the follower engine
+	// will receive blocks before ingestion engine is ready.
+	// The problem with that is, since the reloading hasn't finished yet, enqueuing the new block from
+	// the BlockProcessable callback will fail, because its parent block might have not been reloaded
+	// to the queues yet.
+	// So one solution here is to lock the execution queues during reloading, so that if BlockProcessable
+	// is called before reloading is finished, it will be blocked, which will avoid that edge case.
+	return e.mempool.Run(func(
+		blockByCollection *stdmap.BlockByCollectionBackdata,
+		executionQueues *stdmap.QueuesBackdata) error {
+
+		// saving an executed block is currently not transactional, so it's possible
+		// the block is marked as executed but the receipt might not be saved during a crash.
+		// in order to mitigate this problem, we always re-execute the last executed and finalized
+		// block.
+		// there is an exception, if the last executed block is a root block, then don't execute it,
+		// because the root has already been executed during bootstrapping phase. And re-executing
+		// a root block will fail, because the root block doesn't have a parent block, and could not
+		// get the result of it.
+		// TODO: remove this, when saving a executed block is transactional
+		lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
+		if err != nil {
+			return fmt.Errorf("could not get last executed: %w", err)
+		}
+
+		last, err := e.state.AtBlockID(lastExecutedID).Head()
+		if err != nil {
+			return fmt.Errorf("could not get last executed final by ID: %w", err)
+		}
+
+		// don't reload root block
+		isRoot := last.ParentID == flow.ZeroID
+		if !isRoot {
+			err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
+			if err != nil {
+				return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
+			}
+		}
+
+		finalized, pending, err := e.unexecutedBlocks()
+		if err != nil {
+			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
+		}
+
+		unexecuted := append(finalized, pending...)
+
+		log := e.log.With().
+			Int("total", len(unexecuted)).
+			Int("finalized", len(finalized)).
+			Int("pending", len(pending)).
+			Uint64("last_executed", lastExecutedHeight).
+			Hex("last_executed_id", lastExecutedID[:]).
+			Logger()
+
+		log.Info().Msg("reloading unexecuted blocks")
+
+		for _, blockID := range unexecuted {
+			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
+			if err != nil {
+				return fmt.Errorf("could not reload block: %v, %w", blockID, err)
+			}
+
+			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
+		}
+
+		log.Info().Msg("all unexecuted have been successfully reloaded")
+
+		return nil
+	})
+}
+
+func (e *Engine) reloadBlock(
+	blockByCollection *stdmap.BlockByCollectionBackdata,
+	executionQueues *stdmap.QueuesBackdata,
+	blockID flow.Identifier) error {
 	block, err := e.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block by ID: %v %w", blockID, err)
 	}
 
-	err = e.enqueueBlockAndCheckExecutable(block, false)
+	err = e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
 
 	if err != nil {
 		return fmt.Errorf("could not enqueue block on reloading: %w", err)
@@ -338,22 +395,27 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
-	_, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err == nil {
-		// a statecommitment being stored indicates the block
-		// has been executed
-		log.Debug().Msg("block has been executed already")
-		return nil
+	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	if err != nil {
+		return fmt.Errorf("could not check whether block is executed: %w", err)
 	}
 
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not query state commitment for block: %w", err)
+	if executed {
+		log.Debug().Msg("block has been executed already")
+		return nil
 	}
 
 	// unexecuted block
 	e.metrics.StartBlockReceivedToExecuted(blockID)
 
-	err = e.enqueueBlockAndCheckExecutable(block, true)
+	// acquiring the lock so that there is only one process modifying the queue
+	err = e.mempool.Run(func(
+		blockByCollection *stdmap.BlockByCollectionBackdata,
+		executionQueues *stdmap.QueuesBackdata,
+	) error {
+		return e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, true)
+	})
+
 	if err != nil {
 		return fmt.Errorf("could not enqueue block: %w", err)
 	}
@@ -361,7 +423,11 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	return nil
 }
 
-func (e *Engine) enqueueBlockAndCheckExecutable(block *flow.Block, checkStateSync bool) error {
+func (e *Engine) enqueueBlockAndCheckExecutable(
+	blockByCollection *stdmap.BlockByCollectionBackdata,
+	executionQueues *stdmap.QueuesBackdata,
+	block *flow.Block,
+	checkStateSync bool) error {
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
@@ -369,70 +435,69 @@ func (e *Engine) enqueueBlockAndCheckExecutable(block *flow.Block, checkStateSyn
 
 	blockID := executableBlock.ID()
 
-	// acquiring the lock so that there is only one process modifying the queue
-	return e.mempool.Run(
-		func(
-			blockByCollection *stdmap.BlockByCollectionBackdata,
-			executionQueues *stdmap.QueuesBackdata,
-		) error {
-			// adding the block to the queue,
-			queue, added := enqueue(executableBlock, executionQueues)
+	// adding the block to the queue,
+	queue, added := enqueue(executableBlock, executionQueues)
 
-			// if it's not added, it means the block is not a new block, it already
-			// exists in the queue, then bail
-			if !added {
-				log.Debug().Msg("block already exists in the execution queue")
-				return nil
-			}
+	// if it's not added, it means the block is not a new block, it already
+	// exists in the queue, then bail
+	if !added {
+		log.Debug().Msg("block already exists in the execution queue")
+		return nil
+	}
 
-			if checkStateSync {
-				// whenever the queue grows, we need to check whether the state sync should be
-				// triggered.
-				firstUnexecutedHeight := queue.Head.Item.Height()
-				e.unit.Launch(func() {
-					e.checkStateSyncStart(firstUnexecutedHeight)
-				})
-			}
+	firstUnexecutedHeight := queue.Head.Item.Height()
+	if checkStateSync {
+		// whenever the queue grows, we need to check whether the state sync should be
+		// triggered.
+		e.unit.Launch(func() {
+			e.checkStateSyncStart(firstUnexecutedHeight)
+		})
+	}
 
-			// check if a block is executable.
-			// a block is executable if the following conditions are all true
-			// 1) the parent state commitment is ready
-			// 2) the collections for the block payload are ready
-			// 3) the child block is ready for querying the randomness
+	// check if a block is executable.
+	// a block is executable if the following conditions are all true
+	// 1) the parent state commitment is ready
+	// 2) the collections for the block payload are ready
+	// 3) the child block is ready for querying the randomness
 
-			// check if the block's parent has been executed. (we can't execute the block if the parent has
-			// not been executed yet)
-			// check if there is a statecommitment for the parent block
-			parentCommitment, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), block.Header.ParentID)
+	// check if the block's parent has been executed. (we can't execute the block if the parent has
+	// not been executed yet)
+	// check if there is a statecommitment for the parent block
+	parentCommitment, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), block.Header.ParentID)
 
-			// if we found the statecommitment for the parent block, then add it to the executable block.
-			if err == nil {
-				executableBlock.StartState = parentCommitment
-			} else if errors.Is(err, storage.ErrNotFound) {
-				// the parent block is an unexecuted block.
-				// if the queue only has one block, and its parent doesn't
-				// exist in the queue, then we need to load the block from the storage.
-				_, ok := queue.Nodes[blockID]
-				if !ok {
-					log.Error().Msgf("an unexecuted parent block is missing in the queue")
-				}
-			} else {
-				// if there is exception, then crash
-				log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
-			}
+	// if we found the statecommitment for the parent block, then add it to the executable block.
+	if err == nil {
+		executableBlock.StartState = parentCommitment
+	} else if errors.Is(err, storage.ErrNotFound) {
+		// the parent block is an unexecuted block.
+		// if the queue only has one block, and its parent doesn't
+		// exist in the queue, then we need to load the block from the storage.
+		_, ok := queue.Nodes[blockID]
+		if !ok {
+			log.Error().Msgf("an unexecuted parent block is missing in the queue")
+		}
+	} else {
+		// if there is exception, then crash
+		log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
+	}
 
-			// check if we have all the collections for the block, and request them if there is missing.
-			err = e.matchOrRequestCollections(executableBlock, blockByCollection)
-			if err != nil {
-				return fmt.Errorf("cannot send collection requests: %w", err)
-			}
+	// check if we have all the collections for the block, and request them if there is missing.
+	err = e.matchOrRequestCollections(executableBlock, blockByCollection)
+	if err != nil {
+		return fmt.Errorf("cannot send collection requests: %w", err)
+	}
 
-			// execute the block if the block is ready to be executed
-			e.executeBlockIfComplete(executableBlock)
+	// execute the block if the block is ready to be executed
+	completed := e.executeBlockIfComplete(executableBlock)
 
-			return nil
-		},
-	)
+	log.Info().
+		// if the execution is halt, but the queue keeps growing, we could check which block
+		// hasn't been executed.
+		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
+		Bool("completed", completed).
+		Msg("block is enqueued")
+
+	return nil
 }
 
 // executeBlock will execute the block.
@@ -511,7 +576,10 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executed.ID())
 			if !exists {
-				return fmt.Errorf("fatal error - executed block not present in execution queue")
+				// when the block no longer exists in the queue, it means there was a race condition that
+				// two onBlockExecuted was called for the same block, and one process has already removed the
+				// block from the queue, so we will print an error here
+				return fmt.Errorf("block has been executed already, no longer exists in the queue")
 			}
 
 			// dismount the executed block and all its children
@@ -1385,25 +1453,26 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 		}
 
 		blockID := header.ID()
-		_, err = e.execState.StateCommitmentByBlockID(ctx, blockID)
 
-		if err == nil {
-			// this block has been executed, we will send the delta
-			delta, err := e.execState.RetrieveStateDelta(ctx, blockID)
-			if err != nil {
-				return fmt.Errorf("could not retrieve state delta for block %v, %w", blockID, err)
-			}
-
-			onDelta(delta)
-
-		} else if errors.Is(err, storage.ErrNotFound) {
-			// this block has not been executed,
-			// it parent block hasn't been executed, the higher block won't be
-			// executed either, so we stop iterating through the heights
-			break
-		} else {
-			return fmt.Errorf("could not query statecommitment for height %v: %w", height, err)
+		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+		if err != nil {
+			return fmt.Errorf("could not check whether block is executed: %w", err)
 		}
+
+		if !executed {
+			// this block has not been executed,
+			// we could stop iterating through the heights, because
+			// if a parent block is not executed, its children won't be executed
+			break
+		}
+
+		// this block has been executed, we will send the delta
+		delta, err := e.execState.RetrieveStateDelta(ctx, blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve state delta for block %v, %w", blockID, err)
+		}
+
+		onDelta(delta)
 	}
 
 	return nil
@@ -1431,17 +1500,15 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 	// check if the block has been executed already
 	// delta ID is block ID
 	blockID := delta.ID()
-	_, err = e.execState.StateCommitmentByBlockID(e.unit.Ctx(), blockID)
-
-	if err == nil {
-		// the block has been executed, ignore
-		e.log.Info().Hex("block", logging.Entity(delta)).Msg("ignore executed state delta")
-		return nil
+	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	if err != nil {
+		return fmt.Errorf("could not check whether block is executed: %w", err)
 	}
 
-	// exception
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not get know block was executed or not: %w", err)
+	if executed {
+		// if the block has been executed, we don't need the delta, exit here
+		e.log.Info().Hex("block", logging.Entity(delta)).Msg("ignore executed state delta")
+		return nil
 	}
 
 	// block not executed yet, check if the block has been sealed
