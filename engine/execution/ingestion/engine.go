@@ -544,7 +544,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionGasUsedPerBlock(computationResult.GasUsed)
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
-	finalState, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
+	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
 	if err != nil {
 		e.log.Err(err).
 			Hex("block_id", logging.Entity(executableBlock)).
@@ -554,8 +554,13 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
+		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
 		Uint64("block_height", executableBlock.Block.Header.Height).
+		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
+		Hex("start_state", executableBlock.StartState).
 		Hex("final_state", finalState).
+		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Msg("block executed")
 
 	err = e.onBlockExecuted(executableBlock, finalState)
@@ -961,7 +966,7 @@ func (e *Engine) handleComputationResult(
 	ctx context.Context,
 	result *execution.ComputationResult,
 	startState flow.StateCommitment,
-) (flow.StateCommitment, error) {
+) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
@@ -980,12 +985,12 @@ func (e *Engine) handleComputationResult(
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 	if err != nil {
-		return nil, fmt.Errorf("could not send broadcast order: %w", err)
+		return nil, nil, fmt.Errorf("could not send broadcast order: %w", err)
 	}
 
 	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
@@ -993,7 +998,7 @@ func (e *Engine) handleComputationResult(
 		finalState = startState
 	}
 
-	return finalState, nil
+	return finalState, receipt, nil
 }
 
 // save the execution result of a block
