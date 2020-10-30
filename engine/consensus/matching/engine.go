@@ -217,17 +217,23 @@ func (e *Engine) fromAllowedExecutor(receipt *flow.ExecutionReceipt) (bool, erro
 	}
 
 	// drop of all Receipts NOT from EN 1, 2, 3, 4
+	fromAllowedExecutor := false
 	allowedExecutors := []flow.Identifier{execution1, execution2, execution3, execution4}
 	for _, e := range allowedExecutors {
-		if e != receipt.ExecutorID {
-			return false, nil
+		if e == receipt.ExecutorID {
+			fromAllowedExecutor = true
+			break
 		}
 	}
+	if !fromAllowedExecutor {
+		return false, nil
+	}
+	// Receipt is from EN1, EN2, EN3, or EN4
 
 	// only accept Receipt from EN4 if it is at height LARGER then 8209688
 	if execution4 == receipt.ExecutorID {
 		head, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
-		if err != nil {
+		if err != nil { // if the receipt is for an unknown block, skip it. It will be re-requested later.
 			return false, err
 		}
 		if head.Height <= 8209688 {
