@@ -1,4 +1,4 @@
-package find
+package truncate_database
 
 import (
 	"github.com/rs/zerolog/log"
