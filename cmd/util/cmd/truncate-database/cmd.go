@@ -9,8 +9,7 @@ import (
 )
 
 var (
-	flagBlockHeight uint64
-	flagDatadir     string
+	flagDatadir string
 )
 
 var Cmd = &cobra.Command{
