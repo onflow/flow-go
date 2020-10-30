@@ -198,7 +198,57 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // onReceipt processes a new execution receipt.
+func (e *Engine) fromAllowedExecutor(receipt *flow.ExecutionReceipt) (bool, error) {
+	execution1, err := flow.HexStringToIdentifier("e4d3a52b94ad89afdca0ef7cba363f199f8afef4c922665deb66bdf1eaa77ab9")
+	if err != nil {
+		return false, err
+	}
+	execution2, err := flow.HexStringToIdentifier("9741ec9c5e5b2102bbd69f39a4eb965ce8afa69de841a76c59751a83d4e39602")
+	if err != nil {
+		return false, err
+	}
+	execution3, err := flow.HexStringToIdentifier("f0618a590129fae5ac327fbaee2ae831698443b698d08b8242852e64d0ec9565")
+	if err != nil {
+		return false, err
+	}
+	execution4, err := flow.HexStringToIdentifier("f5a488a8bce65e4c9f8e07dd1d4ef9b2849ac67dc68a57dae9691a9ab69d1ef5")
+	if err != nil {
+		return false, err
+	}
+
+	// drop of all Receipts NOT from EN 1, 2, 3, 4
+	allowedExecutors := []flow.Identifier{execution1, execution2, execution3, execution4}
+	for _, e := range allowedExecutors {
+		if e != receipt.ExecutorID {
+			return false, nil
+		}
+	}
+
+	// only accept Receipt from EN4 if it is at height LARGER then 8209688
+	if execution4 == receipt.ExecutorID {
+		head, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Head()
+		if err != nil {
+			return false, err
+		}
+		if head.Height <= 8209688 {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+
+	// HOTFIX:
+	allowedExecutor, err := e.fromAllowedExecutor(receipt)
+	if err != nil {
+		return fmt.Errorf("failed to determine whether receipt is from allowed executor")
+	}
+	if !allowedExecutor {
+		return nil
+	}
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
