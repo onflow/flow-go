@@ -25,6 +25,7 @@ type ProtocolState struct {
 	children  map[flow.Identifier][]flow.Identifier
 	heights   map[uint64]*flow.Block
 	finalized uint64
+	root      *flow.Block
 	result    *flow.ExecutionResult
 	seal      *flow.Seal
 }
@@ -40,6 +41,28 @@ func NewProtocolState() *ProtocolState {
 type ProtocolStateMutator struct {
 	protocolmock.Mutator
 	ps *ProtocolState
+}
+
+type Params struct {
+	state *ProtocolState
+}
+
+func (p *Params) ChainID() (flow.ChainID, error) {
+	return p.state.root.Header.ChainID, nil
+}
+
+func (p *Params) Root() (*flow.Header, error) {
+	return p.state.root.Header, nil
+}
+
+func (p *Params) Seal() (*flow.Seal, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (ps *ProtocolState) Params() protocol.Params {
+	return &Params{
+		state: ps,
+	}
 }
 
 func (ps *ProtocolState) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
@@ -123,6 +146,7 @@ func (m *ProtocolStateMutator) Bootstrap(root *flow.Block, result *flow.Executio
 	}
 
 	m.ps.blocks[root.ID()] = root
+	m.ps.root = root
 	m.ps.result = result
 	m.ps.seal = seal
 	m.ps.heights[root.Header.Height] = root
