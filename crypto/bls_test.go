@@ -128,7 +128,7 @@ func TestAggregateSignatures(t *testing.T) {
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	var aggSig,expectedSig Signature
+	var aggSig, expectedSig Signature
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
@@ -161,7 +161,6 @@ func TestAggregateSignatures(t *testing.T) {
 			fmt.Sprintf("Verification of %s failed, signature should be %s private keys are %s, input is %x",
 				aggSig, expectedSig, sks, input))
 	})
-	
 
 	// check if one the signatures is not correct
 	t.Run("one invalid signatures", func(t *testing.T) {
@@ -181,7 +180,6 @@ func TestAggregateSignatures(t *testing.T) {
 				aggSig, expectedSig, sks, input))
 		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
 	})
-
 
 	// check if one the public keys is not correct
 	t.Run("one invalid public key", func(t *testing.T) {
@@ -390,10 +388,10 @@ func TestBatchVerify(t *testing.T) {
 	})
 
 	// pick a random number of invalid signatures
-	invalidSigsNum := mrand.Intn(sigsNum-1) + 1 
-	// generate a random permutation of indices to pick the 
+	invalidSigsNum := mrand.Intn(sigsNum-1) + 1
+	// generate a random permutation of indices to pick the
 	// invalid signatures.
-	indices := make([]int, 0, sigsNum)          
+	indices := make([]int, 0, sigsNum)
 	for i := 0; i < sigsNum; i++ {
 		indices = append(indices, i)
 	}
@@ -425,7 +423,7 @@ func TestBatchVerify(t *testing.T) {
 				sigs[indices[i]] = sigs[indices[i]][:3] // test the short signatures
 			}
 		}
-	
+
 		valid, err := BatchVerifySignaturesOneMessage(pks, sigs, input, kmac)
 		require.NoError(t, err)
 		assert.Equal(t, valid, expectedValid,
@@ -456,7 +454,7 @@ func TestBatchVerify(t *testing.T) {
 		}
 		valid, err := BatchVerifySignaturesOneMessage(pks, sigs, input, nil)
 		require.Error(t, err)
-		
+
 		assert.Equal(t, valid, expectedValid,
 			fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
 	})
@@ -509,7 +507,7 @@ func BenchmarkBatchVerify(b *testing.B) {
 	// - if all signatures are invalid (valid points in G1):
 	// (2*2*(n-1)) pairings compared to (2*n) pairings for the simple verification.
 	b.Run("unhappy path", func(b *testing.B) {
-			// only one invalid signature
+		// only one invalid signature
 		alterSignature(sigs[sigsNum/2])
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
