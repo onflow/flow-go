@@ -435,6 +435,11 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 
 	blockID := executableBlock.ID()
 
+	lg := e.log.With().
+		Hex("block_id", blockID[:]).
+		Uint64("block_height", executableBlock.Block.Header.Height).
+		Logger()
+
 	// adding the block to the queue,
 	queue, added := enqueue(executableBlock, executionQueues)
 
@@ -474,11 +479,11 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		// exist in the queue, then we need to load the block from the storage.
 		_, ok := queue.Nodes[blockID]
 		if !ok {
-			log.Error().Msgf("an unexecuted parent block is missing in the queue")
+			lg.Error().Msgf("an unexecuted parent block is missing in the queue")
 		}
 	} else {
 		// if there is exception, then crash
-		log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
+		lg.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
 	}
 
 	// check if we have all the collections for the block, and request them if there is missing.
@@ -490,7 +495,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	// execute the block if the block is ready to be executed
 	completed := e.executeBlockIfComplete(executableBlock)
 
-	log.Info().
+	lg.Info().
 		// if the execution is halt, but the queue keeps growing, we could check which block
 		// hasn't been executed.
 		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
@@ -709,9 +714,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 	collID := collection.ID()
 
-	log := e.log.With().Hex("collection_id", collID[:]).Logger()
+	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
-	log.Info().Hex("sender", originID[:]).Msg("handle collection")
+	lg.Info().Hex("sender", originID[:]).Msg("handle collection")
 
 	// TODO: bail if have seen this collection before.
 	err := e.collections.Store(collection)
@@ -728,8 +733,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// or it was ejected from the mempool when it was full.
 			// either way, we will return
 			if !exists {
-				e.log.Debug().Hex("collection_id", collID[:]).
-					Msg("could not find block for collection")
+				lg.Debug().Msg("could not find block for collection")
 				return nil
 			}
 
