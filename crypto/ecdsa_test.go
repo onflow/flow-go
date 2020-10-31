@@ -216,8 +216,10 @@ func TestSignatureFormatCheck(t *testing.T) {
 			len := sigLen[curve]
 			sig := Signature(make([]byte, len))
 			rand.Read(sig)
-			sig[len/2] = 0 // force s to be less than the curve order
-			sig[0] = 0     // force r to be less than the curve order
+			sig[len/2] = 0    // force s to be less than the curve order
+			sig[len-1] |= 1   // force s to be non zero
+			sig[0] = 0        // force r to be less than the curve order
+			sig[len/2-1] |= 1 // force r to be non zero
 			valid, err := SignatureFormatCheck(curve, sig)
 			assert.Nil(t, err)
 			assert.True(t, valid)
