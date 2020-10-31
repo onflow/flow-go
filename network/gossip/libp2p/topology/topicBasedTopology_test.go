@@ -82,10 +82,9 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 	}
 }
 
-// TestDeteministicity verifies that the same seed generates the same topology for a topic.
+// TestDeteministicity is a weak test that verifies the same seed generates the same topology for a topic.
 //
 // It also checks the topology against non-inclusion of the node itself in its own topology.
-//
 func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 	top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state)
 	require.NoError(suite.T(), err)
@@ -174,8 +173,11 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 	}
 }
 
-func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterTopics() {
+// TestConnectedness_NonClusterTopics checks whether graph components corresponding to a
+// non-cluster channel ID are individually connected.
+func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID() {
 	channelID := engine.TestNetwork
+	// adjacency map keeps graph component of a single channel ID
 	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	for _, id := range suite.ids {
@@ -193,13 +195,18 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterTopics() {
 	topology.CheckConnectednessByChannelID(suite.T(), channelIDAdjMap, suite.ids, channelID)
 }
 
-func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterTopics() {
+// TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
+// cluster channel ID are individually connected.
+func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
+	// picks one cluster channel ID as sample
 	channelID := clusterChannelIDs(suite.T())[0]
+
+	// adjacency map keeps graph component of a single channel ID
 	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	// iterates over collection nodes
 	for _, id := range suite.ids.Filter(filter.HasRole(flow.RoleCollection)) {
-		// creates a topic-based topology for node
+		// creates a channelID-based topology for node
 		top, err := topology.NewTopicBasedTopology(id.NodeID, suite.state)
 		require.NoError(suite.T(), err)
 
