@@ -21,7 +21,7 @@ tx := flow.NewTransactionBody().
     SetScript([]byte(`transaction { execute { log("Hello, World!") } }`))
 
 ctx := fvm.NewContext()
-ledger := new(state.MapLedger)
+ledger := state.NewMapLedger()
 
 txProc := fvm.Transaction(tx)
 
