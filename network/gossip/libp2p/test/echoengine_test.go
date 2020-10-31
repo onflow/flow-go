@@ -61,7 +61,7 @@ func (suite *EchoEngineTestSuite) TestUnknownChannelID() {
 	require.Error(suite.T(), err)
 }
 
-// TestUnknownChannelID evaluates that registering an engine with duplicate channel ID returns an error.
+// TestDuplicateChannelID evaluates that registering an engine with duplicate channel ID returns an error.
 func (suite *EchoEngineTestSuite) TestDuplicateChannelID() {
 	// creates an echo engine, which registers it on test network channel
 	e := NewEchoEngine(suite.T(), suite.nets[0], 1, engine.TestNetwork, false, suite.Unicast)
