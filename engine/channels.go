@@ -9,8 +9,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// init is a native golang function getting called the first time this package is imported
-// externally. It creates and initializes the channel ID map.
+// init is called first time this package is imported.
+// It creates and initializes the channel ID map.
 func init() {
 	initializeChannelIdMap()
 }
