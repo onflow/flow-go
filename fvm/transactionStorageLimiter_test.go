@@ -16,8 +16,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		ledger := newMockLedger(
 			[]string{owner},
 			[]OwnerKeyValue{
-				storageUsedOKV(owner, 99),
-				storageCapacityOKV(owner, 100),
+				storageUsed(owner, 99),
+				storageCapacity(owner, 100),
 				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
@@ -31,8 +31,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		ledger := newMockLedger(
 			[]string{owner},
 			[]OwnerKeyValue{
-				storageUsedOKV(owner, 100),
-				storageCapacityOKV(owner, 100),
+				storageUsed(owner, 100),
+				storageCapacity(owner, 100),
 				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
@@ -46,8 +46,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		ledger := newMockLedger(
 			[]string{owner},
 			[]OwnerKeyValue{
-				storageUsedOKV(owner, 101),
-				storageCapacityOKV(owner, 100),
+				storageUsed(owner, 101),
+				storageCapacity(owner, 100),
 				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
@@ -61,8 +61,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		ledger := newMockLedger(
 			[]string{owner, owner},
 			[]OwnerKeyValue{
-				storageUsedOKV(owner, 99),
-				storageCapacityOKV(owner, 100),
+				storageUsed(owner, 99),
+				storageCapacity(owner, 100),
 				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
@@ -79,11 +79,11 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		ledger := newMockLedger(
 			[]string{owner1, owner1, owner2, owner2},
 			[]OwnerKeyValue{
-				storageUsedOKV(owner1, 99),
-				storageCapacityOKV(owner1, 100),
+				storageUsed(owner1, 99),
+				storageCapacity(owner1, 100),
 				accountExists(owner2),
-				storageUsedOKV(owner2, 999),
-				storageCapacityOKV(owner2, 1000),
+				storageUsed(owner2, 999),
+				storageCapacity(owner2, 1000),
 				accountExists(owner2),
 			})
 		d := &fvm.TransactionStorageLimiter{}
@@ -100,8 +100,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		ledger := newMockLedger(
 			[]string{owner},
 			[]OwnerKeyValue{
-				storageUsedOKV(owner, 101),
-				storageCapacityOKV(owner, 100),
+				storageUsed(owner, 101),
+				storageCapacity(owner, 100),
 				accountExists(owner), // it has exists value, but it cannot be parsed as an address
 			})
 		d := &fvm.TransactionStorageLimiter{}
@@ -115,8 +115,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		ledger := newMockLedger(
 			[]string{owner},
 			[]OwnerKeyValue{
-				storageUsedOKV(owner, 101),
-				storageCapacityOKV(owner, 100),
+				storageUsed(owner, 101),
+				storageCapacity(owner, 100),
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
@@ -138,7 +138,7 @@ type OwnerKeyValue struct {
 	Value uint64
 }
 
-func storageUsedOKV(owner string, value uint64) OwnerKeyValue {
+func storageUsed(owner string, value uint64) OwnerKeyValue {
 	return OwnerKeyValue{
 		Owner: owner,
 		Key:   "storage_used",
@@ -146,7 +146,7 @@ func storageUsedOKV(owner string, value uint64) OwnerKeyValue {
 	}
 }
 
-func storageCapacityOKV(owner string, value uint64) OwnerKeyValue {
+func storageCapacity(owner string, value uint64) OwnerKeyValue {
 	return OwnerKeyValue{
 		Owner: owner,
 		Key:   "storage_capacity",

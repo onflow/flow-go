@@ -41,9 +41,7 @@ func (d *TransactionStorageLimiter) Process(
 		if !exists {
 			continue
 		}
-
-		// get capacity. Capacity will be 0 if not set yet. This can only be in the case of a bug.
-		// It should have been set during account creation
+		
 		capacity, err := accounts.GetStorageCapacity(address)
 		if err != nil {
 			return err
