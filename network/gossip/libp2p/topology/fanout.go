@@ -7,5 +7,5 @@ type FanoutFunc func(size uint) uint
 // LinearFanoutFunc guarantees full network connectivity in a deterministic way.
 // Given system of `size` nodes, it returns `size+1/2`.
 var LinearFanoutFunc FanoutFunc = func(size uint) uint {
-	return uint(size+1) / 2
+	return (size + 1) / 2
 }
