@@ -246,6 +246,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
 		}
 		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
+			block, err := b.headers.ByBlockID(irSeal.Seal.BlockID)
+			if err != nil {
+				return nil, fmt.Errorf("could not block for seal: %w", err)
+			}
 			sc1json, err := json.Marshal(irSeal)
 			if err != nil {
 				return nil, err
@@ -258,10 +262,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			// check whether seals are inconsistent:
 			if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
 				!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
-				fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+				fmt.Printf("ERROR: inconsistent seals for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
 				encounteredInconsistentSealsForSameBlock = true
 			} else {
-				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
 			}
 
 		} else {
