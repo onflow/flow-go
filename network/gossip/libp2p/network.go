@@ -53,7 +53,7 @@ func NewNetwork(
 	me module.Local,
 	mw middleware.Middleware,
 	csize int,
-	topMngr topology.Topology,
+	topMngr topology.Manager,
 	sm channel.SubscriptionManager,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
