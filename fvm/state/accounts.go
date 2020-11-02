@@ -137,7 +137,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 	return decodedPublicKey, nil
 }
 
-func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
+func (a *Accounts) getPublicKeyCount(address flow.Address) (uint64, error) {
 	countBytes, err := a.getValue(address, true, keyPublicKeyCount)
 	if err != nil {
 		return 0, newLedgerGetError(keyPublicKeyCount, address, err)
@@ -158,7 +158,7 @@ func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 	return countInt.Uint64(), nil
 }
 
-func (a *Accounts) SetPublicKeyCount(address flow.Address, count uint64) error {
+func (a *Accounts) setPublicKeyCount(address flow.Address, count uint64) error {
 	newCount := new(big.Int).SetUint64(count)
 
 	return a.setValue(address, true, keyPublicKeyCount, newCount.Bytes())
@@ -221,7 +221,6 @@ func (a *Accounts) SetPublicKey(
 }
 
 func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.AccountPublicKey) error {
-
 	for i, publicKey := range publicKeys {
 		_, err := a.SetPublicKey(address, uint64(i), publicKey)
 		if err != nil {
@@ -231,11 +230,11 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 
 	count := uint64(len(publicKeys)) // len returns int and this will not exceed uint64
 
-	return a.SetPublicKeyCount(address, count)
+	return a.setPublicKeyCount(address, count)
 }
 
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
-	count, err := a.GetPublicKeyCount(address)
+	count, err := a.getPublicKeyCount(address)
 	if err != nil {
 		return err
 	}
@@ -245,7 +244,7 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 		return err
 	}
 
-	return a.SetPublicKeyCount(address, count+1)
+	return a.setPublicKeyCount(address, count+1)
 }
 
 func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
@@ -283,32 +282,28 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 		return nil
 	}
 
-	err = a.setValue(address, true, keyCode, code)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return a.setValue(address, true, keyCode, code)
 }
 
-func (a *Accounts) GetStorageUsed(owner flow.Address) (uint64, error) {
-	oldSizeRegister, err := a.getValue(owner, false, storageUsedRegisterName)
+// GetStorageUsed returns the amount of storage used in bytes by this account
+func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
+	storageUsedRegister, err := a.getValue(address, false, storageUsedRegisterName)
 	if err != nil {
 		return 0, err
 	}
 
-	if len(oldSizeRegister) == 0 {
-		return 0, fmt.Errorf("account %s storage used is not initialized", owner.Hex())
+	if len(storageUsedRegister) == 0 {
+		return 0, fmt.Errorf("account %s storage used is not initialized", address.Hex())
 	}
 
-	storageUsed := binary.LittleEndian.Uint64(oldSizeRegister)
+	storageUsed := binary.LittleEndian.Uint64(storageUsedRegister)
 	return storageUsed, nil
 }
 
-func (a *Accounts) setStorageUsed(owner flow.Address, used uint64) error {
+func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
 	buffer := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buffer, used)
-	return a.setValue(owner, false, storageUsedRegisterName, buffer)
+	return a.setValue(address, false, storageUsedRegisterName, buffer)
 }
 
 func (a *Accounts) GetStorageCapacity(owner flow.Address) (uint64, error) {
@@ -338,6 +333,7 @@ func (a *Accounts) getValue(address flow.Address, isController bool, key string)
 	}
 }
 
+// SetValue sets a value in address' storage
 func (a *Accounts) SetValue(address flow.Address, key string, value flow.RegisterValue) error {
 	return a.setValue(address, false, key, value)
 }
@@ -345,8 +341,9 @@ func (a *Accounts) SetValue(address flow.Address, key string, value flow.Registe
 func (a *Accounts) setValue(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
 	err := a.updateRegisterSizeChange(address, isController, key, value)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", key, address, err)
 	}
+
 	if isController {
 		a.ledger.Set(string(address.Bytes()), string(address.Bytes()), key, value)
 	} else {
@@ -355,12 +352,13 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 	return nil
 }
 
-func (a *Accounts) updateRegisterSizeChange(owner flow.Address, isController bool, key string, value flow.RegisterValue) error {
+func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
 	if key == storageUsedRegisterName {
 		// size of this register is always 8
+		// don't double check this to save time and prevent recursion
 		return nil
 	}
-	oldValue, err := a.getValue(owner, isController, key)
+	oldValue, err := a.getValue(address, isController, key)
 	if err != nil {
 		return err
 	}
@@ -371,7 +369,7 @@ func (a *Accounts) updateRegisterSizeChange(owner flow.Address, isController boo
 		return nil
 	}
 
-	oldSize, err := a.GetStorageUsed(owner)
+	oldSize, err := a.GetStorageUsed(address)
 	if err != nil {
 		return err
 	}
@@ -382,7 +380,7 @@ func (a *Accounts) updateRegisterSizeChange(owner flow.Address, isController boo
 		absChange := uint64(-sizeChange)
 		if absChange > oldSize {
 			// should never happen
-			panic("account storage used would be negative")
+			return fmt.Errorf("storage used by key %s on account %s would be negative", key, address.Hex())
 		}
 		newSize = oldSize - absChange
 	} else {
@@ -392,14 +390,9 @@ func (a *Accounts) updateRegisterSizeChange(owner flow.Address, isController boo
 
 	buffer := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buffer, newSize)
-	// this will put us back in the Set method.
-	// The difference will be that sizeChange will always be 0 when setting storage_used
-	err = a.setStorageUsed(owner, newSize)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	// this puts us back in the setValue method.
+	// The difference is that storage_used update exits early from this function so there isn't any recursion.
+	return a.setStorageUsed(address, newSize)
 }
 
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {

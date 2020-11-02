@@ -45,12 +45,10 @@ func (d Delta) Get(owner, controller, key string) (flow.RegisterValue, bool) {
 // Set records an update in this delta.
 func (d Delta) Set(owner, controller, key string, value flow.RegisterValue) {
 	k := toString(owner, controller, key)
-	r := flow.RegisterEntry{
+	d.Data[k] = flow.RegisterEntry{
 		Key:   toRegisterID(owner, controller, key),
 		Value: value,
 	}
-
-	d.Data[k] = r
 }
 
 // RegisterUpdates returns all registers that were updated by this delta.
