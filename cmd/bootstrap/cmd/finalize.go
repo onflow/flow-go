@@ -48,7 +48,7 @@ var finalizeCmd = &cobra.Command{
 		partnerNodes := assemblePartnerNodes()
 		log.Info().Msg("")
 
-		log.Info().Msg("collecting internal network and staking keys")
+		log.Info().Msg("generating internal private networking and staking keys")
 		internalNodes := assembleInternalNodes()
 		log.Info().Msg("")
 
@@ -219,13 +219,13 @@ func assembleInternalNodes() []model.NodeInfo {
 		nodeID := validateNodeID(internal.NodeID)
 		stake := validateStake(stakes[internal.Address])
 
-		node := model.NewPublicNodeInfo(
+		node := model.NewPrivateNodeInfo(
 			nodeID,
 			internal.Role,
 			internal.Address,
 			stake,
-			internal.NetworkPrivKey.PublicKey(),
-			internal.StakingPrivKey.PublicKey(),
+			internal.NetworkPrivKey,
+			internal.StakingPrivKey,
 		)
 
 		nodes = append(nodes, node)
@@ -296,7 +296,7 @@ func readInternalNodes() []model.NodeInfoPriv {
 	// for each of the files
 	for _, f := range files {
 		// skip files that do not include node-infos
-		if !strings.Contains(f, model.PathNodeInfoPriv) {
+		if !strings.Contains(f, model.PathPrivNodeInfoPrefix) {
 			continue
 		}
 
