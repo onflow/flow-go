@@ -76,7 +76,7 @@ func (c *Checkpointer) NotCheckpointedSegments() (from, to int, err error) {
 		return -1, -1, fmt.Errorf("cannot get last checkpoint: %w", err)
 	}
 
-	first, last, err := c.wal.wal.Segments()
+	first, last, err := c.wal.Segments()
 	if err != nil {
 		return -1, -1, fmt.Errorf("cannot get range of segments: %w", err)
 	}
