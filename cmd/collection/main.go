@@ -46,6 +46,8 @@ func main() {
 	var (
 		txLimit                                uint
 		maxCollectionSize                      uint
+		maxCollectionByteSize                  uint64
+		maxCollectionTotalGas                  uint64
 		builderExpiryBuffer                    uint
 		builderPayerRateLimit                  float64
 		builderUnlimitedPayers                 []string
@@ -86,6 +88,8 @@ func main() {
 				"expiry buffer for inbound transactions")
 			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
 				"how many additional cluster members we propagate transactions to")
+			flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 1_000_000,
+				"the maximum address index allowed in transactions")
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 25,
 				"expiry buffer for transactions in proposed collections")
 			flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", 0, // no rate limiting
@@ -94,6 +98,10 @@ func main() {
 				"set of payer addresses which are omitted from rate limiting")
 			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 200,
 				"maximum number of transactions in proposed collections")
+			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", 1000000,
+				"maximum byte size of the proposed collection")
+			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", 1000000,
+				"maximum total amount of maxgas of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
 				"the initial timeout for the hotstuff pacemaker")
 			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
@@ -231,6 +239,7 @@ func main() {
 				node.Metrics.Engine,
 				colMetrics,
 				node.Me,
+				node.RootChainID.Chain(),
 				pools,
 				ingestConf,
 			)
@@ -287,6 +296,8 @@ func main() {
 				colMetrics,
 				push,
 				builder.WithMaxCollectionSize(maxCollectionSize),
+				builder.WithMaxCollectionByteSize(maxCollectionByteSize),
+				builder.WithMaxCollectionTotalGas(maxCollectionTotalGas),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 				builder.WithMaxPayerTransactionRate(builderPayerRateLimit),
 				builder.WithUnlimitedPayers(unlimitedPayers...),
