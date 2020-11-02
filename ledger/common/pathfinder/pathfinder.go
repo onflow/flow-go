@@ -80,7 +80,7 @@ func QueryToTrieRead(q *ledger.Query, version uint8) (*ledger.TrieRead, error) {
 func PayloadsToValues(payloads []*ledger.Payload) ([]ledger.Value, error) {
 	ret := make([]ledger.Value, 0)
 	for _, p := range payloads {
-		ret = append(ret, p.Value)
+		ret = append(ret, p.Value.DeepCopy())
 	}
 	return ret, nil
 }
