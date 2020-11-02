@@ -7,7 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	state "github.com/onflow/flow-go/engine/execution/state/mock"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -17,7 +18,7 @@ import (
 // simulates some of its behavior for testing purpose
 type ExecutionState struct {
 	sync.Mutex
-	state.ExecutionState
+	mock.ExecutionState
 	commits map[flow.Identifier]flow.StateCommitment
 }
 
@@ -37,6 +38,8 @@ func (es *ExecutionState) PersistStateCommitment(ctx context.Context, blockID fl
 }
 
 func (es *ExecutionState) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
+	es.Lock()
+	defer es.Unlock()
 	commit, ok := es.commits[blockID]
 	if !ok {
 		return nil, storage.ErrNotFound
@@ -46,8 +49,9 @@ func (es *ExecutionState) StateCommitmentByBlockID(ctx context.Context, blockID 
 }
 
 func (es *ExecutionState) ExecuteBlock(t *testing.T, block *flow.Block) {
-	_, ok := es.commits[block.Header.ParentID]
-	require.True(t, ok, "parent block not executed")
+	parentExecuted, err := state.IsBlockExecuted(context.Background(), es, block.Header.ParentID)
+	require.NoError(t, err)
+	require.True(t, parentExecuted, "parent block not executed")
 	require.NoError(t,
 		es.PersistStateCommitment(
 			context.Background(),
