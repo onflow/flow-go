@@ -66,6 +66,11 @@ func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool)
 	return r0, r1
 }
 
+// Clear provides a mock function with given fields:
+func (_m *Transactions) Clear() {
+	_m.Called()
+}
+
 // Has provides a mock function with given fields: txID
 func (_m *Transactions) Has(txID flow.Identifier) bool {
 	ret := _m.Called(txID)

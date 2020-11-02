@@ -12,7 +12,7 @@ Type=simple
 TimeoutStopSec=1m
 
 RestartSec=5s
-Restart=no
+Restart=always
 
 StandardOutput=journal
 

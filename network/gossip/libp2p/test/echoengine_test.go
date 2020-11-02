@@ -10,7 +10,6 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -42,17 +41,10 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *EchoEngineTestSuite) SetupTest() {
 	const count = 2
-	golog.SetAllLoggers(golog.LevelInfo)
-	s.ids = CreateIDs(count)
 
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := createMiddleware(logger, s.ids)
-	require.NoError(s.Suite.T(), err)
-	s.mws = mws
-
-	nets, err := createNetworks(logger, s.mws, s.ids, 100, false)
-	require.NoError(s.Suite.T(), err)
-	s.nets = nets
+	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	golog.SetAllLoggers(golog.LevelError)
+	s.ids, s.mws, s.nets = generateIDsMiddlewaresNetworks(s.T(), count, logger, 100, nil, false)
 }
 
 // TearDownTest closes the networks within a specified timeout

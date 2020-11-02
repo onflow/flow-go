@@ -16,10 +16,10 @@ import (
 
 func TestDKG(t *testing.T) {
 	t.Run("FeldmanVSS", testFeldmanVSSSimple)
-	t.Run("FeldmanVSS with Qualified set", testFeldmanVSSQual)
-	t.Run("FeldmanVSS Unhappy Path", testFeldmanVSSQualUnhappyPath)
-	t.Run("Joint Feldman", testJointFeldman)
-	t.Run("Joint Feldman Unhappy Path", testJointFeldmanUnhappyPath)
+	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
+	t.Run("FeldmanVSSUnhappyPath", testFeldmanVSSQualUnhappyPath)
+	t.Run("JointFeldmanHappyPath", testJointFeldman)
+	t.Run("JointFeldmanUnhappyPath", testJointFeldmanUnhappyPath)
 }
 
 // optimal threshold (t) to allow the largest number of malicious nodes (m)

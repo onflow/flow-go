@@ -3,6 +3,7 @@ package ledger
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/onflow/flow-go/module"
@@ -227,6 +228,16 @@ func (kp *KeyPart) DeepCopy() *KeyPart {
 	return &KeyPart{Type: kp.Type, Value: newV}
 }
 
+func (kp *KeyPart) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  uint16
+		Value string
+	}{
+		Type:  kp.Type,
+		Value: hex.EncodeToString(kp.Value),
+	})
+}
+
 // Value holds the value part of a ledger key value pair
 type Value []byte
 
@@ -252,4 +263,8 @@ func (v Value) Equals(other Value) bool {
 		return false
 	}
 	return bytes.Equal(v, other)
+}
+
+func (v Value) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(v))
 }

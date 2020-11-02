@@ -21,10 +21,11 @@ var _ runtime.Interface = &hostEnv{}
 var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
-	ctx           Context
-	ledger        state.Ledger
-	accounts      *state.Accounts
-	uuidGenerator *UUIDGenerator
+	ctx              Context
+	ledger           state.Ledger
+	accounts         *state.Accounts
+	addressGenerator flow.AddressGenerator
+	uuidGenerator    *UUIDGenerator
 
 	runtime.Metrics
 
@@ -35,18 +36,23 @@ type hostEnv struct {
 	rng            *rand.Rand
 }
 
-func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
-	accounts := state.NewAccounts(ledger, ctx.Chain)
+func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
+	accounts := state.NewAccounts(ledger)
+	generator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+	if err != nil {
+		return nil, err
+	}
 
 	uuids := state.NewUUIDs(ledger)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{
-		ctx:           ctx,
-		ledger:        ledger,
-		Metrics:       &noopMetricsCollector{},
-		accounts:      accounts,
-		uuidGenerator: uuidGenerator,
+		ctx:              ctx,
+		ledger:           ledger,
+		Metrics:          &noopMetricsCollector{},
+		accounts:         accounts,
+		addressGenerator: generator,
+		uuidGenerator:    uuidGenerator,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -57,7 +63,7 @@ func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
 		env.Metrics = &metricsCollector{ctx.Metrics}
 	}
 
-	return env
+	return env, nil
 }
 
 func (e *hostEnv) seedRNG(header *flow.Header) {
@@ -74,6 +80,7 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
 		e.ctx,
 		e.ledger,
 		e.accounts,
+		e.addressGenerator,
 		tx,
 	)
 }
@@ -87,23 +94,19 @@ func (e *hostEnv) getLogs() []string {
 }
 
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
-	v, _ := e.ledger.Get(
-
-		string(owner),
-		"", // TODO: Remove empty controller key
+	v, _ := e.accounts.GetValue(
+		flow.BytesToAddress(owner),
 		string(key),
 	)
 	return v, nil
 }
 
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
-	e.ledger.Set(
-		string(owner),
-		"", // TODO: Remove empty controller key
+	return e.accounts.SetValue(
+		flow.BytesToAddress(owner),
 		string(key),
 		value,
 	)
-	return nil
 }
 
 func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
@@ -341,10 +344,11 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 // Transaction Environment
 
 type transactionEnv struct {
-	vm       *VirtualMachine
-	ctx      Context
-	ledger   state.Ledger
-	accounts *state.Accounts
+	vm               *VirtualMachine
+	ctx              Context
+	ledger           state.Ledger
+	accounts         *state.Accounts
+	addressGenerator flow.AddressGenerator
 
 	tx          *flow.TransactionBody
 	authorizers []runtime.Address
@@ -355,14 +359,16 @@ func newTransactionEnv(
 	ctx Context,
 	ledger state.Ledger,
 	accounts *state.Accounts,
+	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
 ) *transactionEnv {
 	return &transactionEnv{
-		vm:       vm,
-		ctx:      ctx,
-		ledger:   ledger,
-		accounts: accounts,
-		tx:       tx,
+		vm:               vm,
+		ctx:              ctx,
+		ledger:           ledger,
+		accounts:         accounts,
+		addressGenerator: addressGenerator,
+		tx:               tx,
 	}
 }
 
@@ -399,9 +405,12 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		}
 	}
 
-	var flowAddress flow.Address
+	flowAddress, err := e.addressGenerator.NextAddress()
+	if err != nil {
+		return address, err
+	}
 
-	flowAddress, err = e.accounts.Create(nil)
+	err = e.accounts.Create(nil, flowAddress)
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return address, err
