@@ -64,7 +64,7 @@ func (tb TransactionBody) Fingerprint() []byte {
 	})
 }
 
-func (tb TransactionBody) ByteSize() int {
+func (tb TransactionBody) ByteSize() uint {
 	size := 0
 	size += len(tb.ReferenceBlockID)
 	size += len(tb.Script)
@@ -81,7 +81,7 @@ func (tb TransactionBody) ByteSize() int {
 	for _, s := range tb.EnvelopeSignatures {
 		size += s.ByteSize()
 	}
-	return size
+	return uint(size)
 }
 
 func (tb TransactionBody) ID() Identifier {
