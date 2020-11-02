@@ -248,7 +248,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
 			block, err := b.headers.ByBlockID(irSeal.Seal.BlockID)
 			if err != nil {
-				return nil, fmt.Errorf("could not block for seal: %w", err)
+				return nil, fmt.Errorf("could not retrieve block for seal: %w", err)
 			}
 			sc1json, err := json.Marshal(irSeal)
 			if err != nil {
