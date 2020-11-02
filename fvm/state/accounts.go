@@ -283,16 +283,16 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 }
 
 func (a *Accounts) GetStorageUsed(owner flow.Address) (uint64, error) {
-	oldSizeRegister, err := a.getValue(owner, false, storageUsedRegisterName)
+	storageUsedRegister, err := a.getValue(owner, false, storageUsedRegisterName)
 	if err != nil {
 		return 0, err
 	}
 
-	if len(oldSizeRegister) == 0 {
+	if len(storageUsedRegister) == 0 {
 		return 0, fmt.Errorf("account %s storage used is not initialized", owner.Hex())
 	}
 
-	storageUsed := binary.LittleEndian.Uint64(oldSizeRegister)
+	storageUsed := binary.LittleEndian.Uint64(storageUsedRegister)
 	return storageUsed, nil
 }
 
