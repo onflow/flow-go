@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log"
-	prometheusWAL "github.com/m4ksio/wal"
+	prometheusWAL "github.com/m4ksio/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/ledger"
@@ -22,7 +22,7 @@ type LedgerWAL struct {
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
 func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize)
+	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
 		return nil, err
 	}
@@ -80,12 +80,16 @@ func (w *LedgerWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	)
 }
 
+func (w *LedgerWAL) Segments() (first, last int, err error) {
+	return prometheusWAL.Segments(w.wal.Dir())
+}
+
 func (w *LedgerWAL) Replay(
 	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(ledger.RootHash) error,
 ) error {
-	from, to, err := w.wal.Segments()
+	from, to, err := w.Segments()
 	if err != nil {
 		return err
 	}
@@ -97,7 +101,7 @@ func (w *LedgerWAL) ReplayLogsOnly(
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
-	from, to, err := w.wal.Segments()
+	from, to, err := w.Segments()
 	if err != nil {
 		return err
 	}
