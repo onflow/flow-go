@@ -485,16 +485,9 @@ func moveFile(src, dst string) error {
 		return fmt.Errorf("file not found: %s", src)
 	}
 
-	// open the source file
-	source, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", src, err)
-	}
-	defer source.Close()
-
 	// create the destination dir if it does not exist
 	destinationDir := filepath.Dir(dst)
-	err = os.MkdirAll(destinationDir, 0755)
+	err := os.MkdirAll(destinationDir, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", destinationDir, err)
 	}
@@ -506,10 +499,27 @@ func moveFile(src, dst string) error {
 	}
 	defer destination.Close()
 
+	// open the source file
+	source, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", src, err)
+	}
+
 	// copy the source file to the destination file
 	_, err = io.Copy(destination, source)
 	if err != nil {
-		return fmt.Errorf("failed to copy file %s to %s: %w", src, dst, err)
+		errorStr := err.Error()
+		closeErr := source.Close()
+		if closeErr != nil {
+			errorStr = fmt.Sprintf("%s, %s", errorStr, closeErr)
+		}
+		return fmt.Errorf("failed to copy file %s to %s: %s", src, dst, errorStr)
+	}
+
+	// close the source file
+	err = source.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close source file %s: %w", src, err)
 	}
 
 	// flush the destination file
