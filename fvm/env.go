@@ -416,6 +416,13 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		return address, err
 	}
 
+	// TODO: This is temporary! Need to fix with next PR before this can be merged to master
+	// this will be in the transaction that created the account. It's here now so I can run the tests.
+	err = e.accounts.SetStorageCapacity(flowAddress, 100000)
+	if err != nil {
+		return address, err
+	}
+
 	if e.ctx.ServiceAccountEnabled {
 		err = e.vm.invokeMetaTransaction(
 			e.ctx,

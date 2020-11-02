@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	keyExists               = "exists"
-	keyCode                 = "code"
-	keyPublicKeyCount       = "public_key_count"
-	storageUsedRegisterName = "storage_used"
+	keyExists                   = "exists"
+	keyCode                     = "code"
+	keyPublicKeyCount           = "public_key_count"
+	storageUsedRegisterName     = "storage_used"
+	storageCapacityRegisterName = "storage_capacity"
 )
 
 var (
@@ -96,11 +97,10 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return err
 	}
 
-	// TODO: This is temporary! Need to fix with next PR before this can be merged to master
-	// this will be in the transaction that created the account. It's here now so I can run the tests.
-	buffer := make([]byte, 8)
-	binary.LittleEndian.PutUint64(buffer, 100000)
-	err = a.setValue(string(newAddress.Bytes()), false, StorageCapacityRegisterName, buffer)
+	// set storage capacity to 0.
+	// It must be set with the storage contract before the end of this transaction.
+	// TODO: for this PR set storage capacity to 100kB, remove this in the next PR to this feature branch
+	err = a.SetStorageCapacity(newAddress, 100000)
 	if err != nil {
 		return err
 	}
@@ -309,6 +309,21 @@ func (a *Accounts) setStorageUsed(owner flow.Address, used uint64) error {
 	buffer := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buffer, used)
 	return a.setValue(owner, false, storageUsedRegisterName, buffer)
+}
+
+func (a *Accounts) GetStorageCapacity(owner flow.Address) (uint64, error) {
+	storageCapacityRegister, err := a.getValue(owner, false, storageCapacityRegisterName)
+	if err != nil {
+		return 0, err
+	}
+	storageUsed := binary.LittleEndian.Uint64(storageCapacityRegister)
+	return storageUsed, nil
+}
+
+func (a *Accounts) SetStorageCapacity(owner flow.Address, capacity uint64) error {
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, capacity)
+	return a.setValue(owner, false, storageCapacityRegisterName, buffer)
 }
 
 func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {

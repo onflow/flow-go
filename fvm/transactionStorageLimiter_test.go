@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -142,7 +141,7 @@ type OwnerKeyValue struct {
 func storageUsedOKV(owner string, value uint64) OwnerKeyValue {
 	return OwnerKeyValue{
 		Owner: owner,
-		Key:   state.StorageUsedRegisterName,
+		Key:   "storage_used",
 		Value: value,
 	}
 }
@@ -150,7 +149,7 @@ func storageUsedOKV(owner string, value uint64) OwnerKeyValue {
 func storageCapacityOKV(owner string, value uint64) OwnerKeyValue {
 	return OwnerKeyValue{
 		Owner: owner,
-		Key:   state.StorageCapacityRegisterName,
+		Key:   "storage_capacity",
 		Value: value,
 	}
 }
