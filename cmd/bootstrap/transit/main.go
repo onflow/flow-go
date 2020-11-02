@@ -490,6 +490,7 @@ func moveFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", src, err)
 	}
+	defer source.Close()
 
 	// create the destination dir if it does not exist
 	destinationDir := filepath.Dir(dst)
@@ -509,12 +510,6 @@ func moveFile(src, dst string) error {
 	_, err = io.Copy(destination, source)
 	if err != nil {
 		return fmt.Errorf("failed to copy file %s to %s: %w", src, dst, err)
-	}
-
-	// close the source file
-	err = source.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close source file %s: %w", src, err)
 	}
 
 	// flush the destination file
