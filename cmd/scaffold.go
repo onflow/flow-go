@@ -181,22 +181,27 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		var nodeTopology topology.Topology
-
-		nodeTopology, err = topology.NewTopicBasedTopology(fnb.Me.NodeID(), fnb.State)
+		// creates topology and subscription managers
+		var topologyManager topology.Manager
+		subscriptionManager := libp2p.NewSubscriptionManager(fnb.Middleware)
+		topologyManager, err = topology.NewStatefulTopologyManager(fnb.Me.NodeID(),
+			fnb.State,
+			subscriptionManager,
+			topology.LinearFanoutFunc)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
 
+		// creates network instance
 		net, err := libp2p.NewNetwork(fnb.Logger,
 			codec,
 			participants,
 			fnb.Me,
 			fnb.Middleware,
 			10e6,
-			nodeTopology,
-			libp2p.NewSubscriptionManager(fnb.Middleware),
+			topologyManager,
+			subscriptionManager,
 			fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
