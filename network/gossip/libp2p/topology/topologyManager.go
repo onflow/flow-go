@@ -13,5 +13,5 @@ type Manager interface {
 	MakeTopology(ids flow.IdentityList) (flow.IdentityList, error)
 	// Fanout returns size of topology list of a node, i.e., number of nodes it gets connected to
 	// for epidemic dissemination.
-	Fanout() uint
+	Fanout(uint) uint
 }
