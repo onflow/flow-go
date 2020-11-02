@@ -10,7 +10,6 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -42,8 +41,9 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *EchoEngineTestSuite) SetupTest() {
 	const count = 2
+
+	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	s.ids, s.mws, s.nets = generateIDsMiddlewaresNetworks(s.T(), count, logger, 100, nil, false)
 }
 
