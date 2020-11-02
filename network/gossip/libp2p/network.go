@@ -164,24 +164,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentityList, error) {
-	n.RLock()
-	defer n.RUnlock()
 
-	fanout := uint(len(n.ids)+1) / 2
-
-	myTopics := n.sm.GetChannelIDs()
-	myFanout := flow.IdentityList{}
-
-	// samples a connected component fanout from each topic and takes the
-	// union of all fanouts.
-	for _, topic := range myTopics {
-		subset, err := n.top.Subset(n.ids, fanout, topic)
-		if err != nil {
-			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", topic, err)
-		}
-		myFanout = myFanout.Union(subset)
-	}
-	return myFanout, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
