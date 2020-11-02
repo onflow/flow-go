@@ -48,20 +48,27 @@ type TransactionValidationOptions struct {
 	AllowUnknownReferenceBlockID bool
 	MaxGasLimit                  uint64
 	CheckScriptsParse            bool
-	MaxTxSizeLimit               uint64
+	// MaxAddressIndex is a simple spam prevention measure. It rejects any
+	// transactions referencing an address with index newer than the specified
+	// maximum. A zero value indicates no address checking.
+	MaxAddressIndex uint64
+	MaxTxSizeLimit  uint64
 }
 
 type TransactionValidator struct {
-	blocks  Blocks
+	blocks  Blocks     // for looking up blocks to check transaction expiry
+	chain   flow.Chain // for checking validity of addresses
 	options TransactionValidationOptions
 }
 
 func NewTransactionValidator(
 	blocks Blocks,
+	chain flow.Chain,
 	options TransactionValidationOptions,
 ) *TransactionValidator {
 	return &TransactionValidator{
 		blocks:  blocks,
+		chain:   chain,
 		options: options,
 	}
 }
@@ -93,6 +100,11 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 	}
 
 	// TODO check account/payer signatures
+
+	err = v.checkAddresses(tx)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -186,6 +198,33 @@ func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error 
 		_, err := parser2.ParseProgram(string(tx.Script))
 		if err != nil {
 			return InvalidScriptError{ParserErr: err}
+		}
+	}
+
+	return nil
+}
+
+func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
+
+	for _, address := range append(tx.Authorizers, tx.Payer) {
+		// first we check objective validity, essentially whether or not this
+		// is a valid output of the address generator
+		if !v.chain.IsValid(address) {
+			return InvalidAddressError{Address: address}
+		}
+
+		// skip second check if not configured
+		if v.options.MaxAddressIndex == 0 {
+			continue
+		}
+
+		// next we check subjective validity based on the configured maximum index
+		index, err := v.chain.IndexFromAddress(address)
+		if err != nil {
+			return fmt.Errorf("could not get index for address (%s): %w", address, err)
+		}
+		if index > v.options.MaxAddressIndex {
+			return InvalidAddressError{Address: address}
 		}
 	}
 
