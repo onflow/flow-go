@@ -234,47 +234,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// roadmap (https://github.com/dapperlabs/flow-go/issues/4872)
 
 	// create a mapping of block to seal for all seals in our pool
-	// We consider two seals as inconsistent, if they have different start or end states
-	encounteredInconsistentSealsForSameBlock := false
-	byBlock := make(map[flow.Identifier]*flow.IncorporatedResultSeal)
-	for _, irSeal := range b.sealPool.All() {
-		if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
-			return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
-		}
-		if len(irSeal.Seal.FinalState) < 1 {
-			// respective Execution Result should have been rejected by matching engine
-			return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
-		}
-		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
-			block, err := b.headers.ByBlockID(irSeal.Seal.BlockID)
-			if err != nil {
-				return nil, fmt.Errorf("could not retrieve block for seal: %w", err)
-			}
-			sc1json, err := json.Marshal(irSeal)
-			if err != nil {
-				return nil, err
-			}
-			sc2json, err := json.Marshal(irSeal2)
-			if err != nil {
-				return nil, err
-			}
-
-			// check whether seals are inconsistent:
-			if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
-				!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
-				fmt.Printf("ERROR: inconsistent seals for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
-				encounteredInconsistentSealsForSameBlock = true
-			} else {
-				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
-			}
-
-		} else {
-			byBlock[irSeal.Seal.BlockID] = irSeal
-		}
-	}
-	if encounteredInconsistentSealsForSameBlock {
-		// in case we find inconsistent seals, do not seal anything
-		byBlock = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	byBlock, err := b.block2SealMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct map from blockID to seal: %w", err)
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -445,4 +407,69 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	return header, nil
+}
+
+// block2SealMap creates a map: blockID -> seal
+// from all seals in our mempool. Its also checks for inconsistent seals:
+// we consider two seals as inconsistent, if they have different start or end states
+func (b *Builder) block2SealMap() (map[flow.Identifier]*flow.IncorporatedResultSeal, error) {
+	// TODO: the following implementation is somewhat temporary and contains a lot of sanity checks
+	//       probably should be cleaned up once we have full sealing
+	encounteredInconsistentSealsForSameBlock := false
+	byBlock := make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	for _, irSeal := range b.sealPool.All() {
+		irSealInitialState, ok := irSeal.IncorporatedResult.Result.InitialStateCommit()
+		if !ok || len(irSealInitialState) < 1 { // missing or empty initial state commitment
+			// fatal error: respective Execution Result should have been rejected by matching engine
+			return nil, fmt.Errorf("seal for result without initial state: %v", irSeal.IncorporatedResult.Result.ID())
+		}
+		irSealFinalState, ok := irSeal.IncorporatedResult.Result.FinalStateCommitment()
+		if !ok || len(irSealFinalState) < 1 { // missing or empty final state commitment
+			// fatal error: respective Execution Result should have been rejected by matching engine
+			return nil, fmt.Errorf("seal for result without final state: %v", irSeal.IncorporatedResult.Result.ID())
+		}
+		if !bytes.Equal(irSeal.Seal.FinalState, irSealFinalState) {
+			// fatal error: matching engine has constructed seal with inconsistent values
+			return nil, fmt.Errorf("inconsistent final sate in result and seal for block %v", irSeal.Seal.BlockID)
+		}
+		// all Seals that are added to map have initial and final state commitment (otherwise, they are rejected by code above)
+
+		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
+			sc1json, err := json.Marshal(irSeal)
+			if err != nil {
+				return nil, err
+			}
+			sc2json, err := json.Marshal(irSeal2)
+			if err != nil {
+				return nil, err
+			}
+			block, err := b.headers.ByBlockID(irSeal.Seal.BlockID)
+			if err != nil {
+				// not finding the block for a seal is a fatal, internal error: respective Execution Result should have been rejected by matching engine
+				// we still print as much of the error message as we can about the inconsistent seals
+				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s\n", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+				return nil, fmt.Errorf("could not retrieve block for seal: %w", err)
+			}
+
+			// by induction, all elements in byBlock should have initial and final state commitment
+			irSeal2InitialState, _ := irSeal2.IncorporatedResult.Result.InitialStateCommit()
+			irSeal2FinalState, _ := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
+
+			// check whether seals are inconsistent:
+			if !bytes.Equal(irSealFinalState, irSeal2FinalState) || !bytes.Equal(irSealInitialState, irSeal2InitialState) {
+				fmt.Printf("ERROR: inconsistent seals for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
+				encounteredInconsistentSealsForSameBlock = true
+			} else {
+				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
+			}
+
+		} else {
+			byBlock[irSeal.Seal.BlockID] = irSeal
+		}
+	}
+	if encounteredInconsistentSealsForSameBlock {
+		// in case we find inconsistent seals, do not seal anything
+		byBlock = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	}
+	return byBlock, nil
 }
