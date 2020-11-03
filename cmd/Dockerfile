@@ -32,6 +32,8 @@ RUN mkdir /app
 WORKDIR /app
 
 ARG TARGET
+ARG COMMIT
+ARG VERSION
 
 COPY . .
 
