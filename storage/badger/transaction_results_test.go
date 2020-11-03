@@ -1,6 +1,8 @@
 package badger_test
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -8,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -59,5 +62,31 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			require.Nil(t, err)
 			assert.Equal(t, txResult, *actual)
 		}
+	})
+}
+
+func TestRemove(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		store := bstorage.NewTransactionResults(db)
+
+		blockID := unittest.IdentifierFixture()
+		txResults := make([]flow.TransactionResult, 0)
+		for i := 0; i < 10; i++ {
+			txID := unittest.IdentifierFixture()
+			expected := flow.TransactionResult{
+				TransactionID: txID,
+				ErrorMessage:  "a runtime error " + string(i),
+			}
+			txResults = append(txResults, expected)
+		}
+		err := store.BatchStore(blockID, txResults)
+		require.Nil(t, err)
+
+		require.NoError(t, store.RemoveByBlockID(blockID), "remove for the first time should work, but didn't")
+
+		result, err := store.ByBlockIDTransactionID(blockID, txResults[1].TransactionID)
+		require.True(t, errors.Is(err, storage.ErrNotFound), fmt.Sprintf("%v", result))
+
+		require.NoError(t, store.RemoveByBlockID(blockID), "remove again should work, but failed")
 	})
 }

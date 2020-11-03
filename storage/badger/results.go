@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -73,4 +74,18 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
 	return r.byBlockID(blockID)(tx)
+}
+
+func (r *ExecutionResults) RemoveByBlockID(blockID flow.Identifier) error {
+
+	result, err := r.ByBlockID(blockID)
+	if errors.Is(err, badger.ErrKeyNotFound) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return r.db.Update(operation.RemoveExecutionResult(blockID, result))
 }
