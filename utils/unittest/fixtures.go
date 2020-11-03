@@ -147,7 +147,7 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 }
 
 func StateInteractionsFixture() *delta.Snapshot {
-	return delta.NewView(nil).Interactions()
+	return &delta.NewView(nil).Interactions().Snapshot
 }
 
 func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier) flow.Block {
