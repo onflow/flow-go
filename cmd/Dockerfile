@@ -76,19 +76,21 @@ COPY --from=build-debug /app/app /bin/app
 
 ENTRYPOINT ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/bin/app"]
 
-FROM build-env as build-production-nocgo
+FROM build-env as build-transit-production-nocgo
 WORKDIR /app
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=ssh \
-    GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static \
+    -X 'github.com/onflow/flow-go/cmd/bootstrap/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/bootstrap/build.semver=${VERSION}'" \
+    -o ./app ./cmd/${TARGET}
 
 RUN chmod a+x /app/app
 
 ## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/base as production-nocgo
+FROM gcr.io/distroless/base as production-transit-nocgo
 
-COPY --from=build-production-nocgo /app/app /bin/app
+COPY --from=build-transit-production-nocgo /app/app /bin/app
 
 ENTRYPOINT ["/bin/app"]
