@@ -43,9 +43,9 @@ func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) 
 	}
 
 	// check the key size (required if the key is used as a security key)
-	if len(key) < bitsToBytes(securityBits) {
+	if len(key) < KmacMinKeyLen {
 		return nil,
-			fmt.Errorf("kmac key size must be at least %d", bitsToBytes(securityBits))
+			fmt.Errorf("kmac key size must be at least %d", KmacMinKeyLen)
 	}
 
 	k.commonHasher = &commonHasher{

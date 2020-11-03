@@ -65,6 +65,12 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 		_, err = sk.PublicKey().Verify(sig, seed, hash.NewSHA2_256())
 		assert.Error(t, err)
 	})
+
+	t.Run("NewBLSKMAC sanity check", func(t *testing.T) {
+		// test the parameter lengths of "NewBLSKMAC" are in the correct range
+		_, err := hash.NewKMAC_128([]byte(blsCipherSuite), []byte(blsKMACFunction), minHashSizeBLSBLS12381)
+		assert.NoError(t, err)
+	})
 }
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys

@@ -33,8 +33,6 @@ const (
 	// KMAC
 	// the parameter maximum bytes-length as defined in NIST SP 800-185
 	KmacMaxParamsLen = 2040 / 8
+	// the minimum key length
+	KmacMinKeyLen = securityBits / 8
 )
-
-func bitsToBytes(bits int) int {
-	return (bits + 7) >> 3
-}
