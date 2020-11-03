@@ -131,7 +131,10 @@ func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *goecdsa.PrivateKey {
 }
 
 // generatePrivateKey generates a private key for ECDSA
-// deterministically using the input seed
+// deterministically using the input seed.
+//
+// It is recommended to use a secure crypto RNG to generate the seed.
+// The seed must have enough entropy and should be sampled uniformly at random.
 func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
 	// use extra 128 bits to reduce the modular reduction bias

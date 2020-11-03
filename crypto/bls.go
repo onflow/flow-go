@@ -88,7 +88,7 @@ const blsKMACFunction = "H2C"
 // It expands the message into 1024 bits (required for the optimal SwU hash to curve)
 // tag is the domain separation tag, it is recommended to use a different tag for each signature domain
 func NewBLSKMAC(tag string) hash.Hasher {
-	// the error is ignored as the parameter lengths are in the correct range for kmac
+	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
 	kmac, _ := hash.NewKMAC_128([]byte(tag), []byte(blsKMACFunction), minHashSizeBLSBLS12381)
 	return kmac
 }
@@ -129,7 +129,10 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 }
 
 // generatePrivateKey generates a private key for BLS on BLS12381 curve.
-// The minimum size of the input seed is 48 bytes (for a sceurity of 128 bits)
+// The minimum size of the input seed is 48 bytes.
+//
+// It is recommended to use a secure crypto RNG to generate the seed.
+// The seed must have enough entropy and should be sampled uniformly at random.
 func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	if len(seed) < KeyGenSeedMinLenBLSBLS12381 || len(seed) > KeyGenSeedMaxLenBLSBLS12381 {
 		return nil, fmt.Errorf("seed length should be between %d and %d bytes",
