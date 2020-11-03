@@ -81,16 +81,19 @@ func (suite *TopologyTestSuite) testTopology(total int, minorityRole flow.Role) 
 		ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 
 	// creates topology instances for the nodes based on their roles
-	tops := GenerateTopologies(suite.T(), state, ids)
-
-	// creates topology instances for the nodes based on their roles
 	golog.SetAllLoggers(golog.LevelError)
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	mws := GenerateMiddlewares(suite.T(), logger, ids, keys)
 
-	// mocks subscription manager and creates network in dryrun
-	sms := MockSubscriptionManager(suite.T(), ids)
-	nets := GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, sms, DryRunNetwork)
+	// mocks subscription manager
+	subMngrs := MockSubscriptionManager(suite.T(), ids)
+
+	// creates topology instances for the nodes based on their roles
+	tops := GenerateTopologies(suite.T(), state, ids)
+	topMngrs := GenerateTopologyManager(suite.T(), subMngrs, tops, topology.LinearFanoutFunc)
+
+	// creates network in dryrun
+	nets := GenerateNetworks(suite.T(), logger, ids, mws, 100, topMngrs, subMngrs, DryRunNetwork)
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range nets {
