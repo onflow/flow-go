@@ -25,10 +25,14 @@ type View struct {
 	readFunc          GetRegisterFunc
 }
 
-// Snapshot is set of interactions with the register
 type Snapshot struct {
-	Delta       Delta
-	Reads       []flow.RegisterID
+	Delta Delta
+	Reads []flow.RegisterID
+}
+
+// Snapshot is state of interactions with the register
+type SpockSnapshot struct {
+	Snapshot
 	SpockSecret []byte
 }
 
@@ -43,7 +47,7 @@ func NewView(readFunc GetRegisterFunc) *View {
 }
 
 // Snapshot returns copy of current state of interactions with a View
-func (v *View) Interactions() *Snapshot {
+func (v *View) Interactions() *SpockSnapshot {
 
 	var delta = Delta{
 		Data: make(map[string]flow.RegisterEntry, len(v.delta.Data)),
@@ -63,9 +67,11 @@ func (v *View) Interactions() *Snapshot {
 	var spockSecret = make([]byte, len(spockSecHashSum))
 	copy(spockSecret, spockSecHashSum)
 
-	return &Snapshot{
-		Delta:       delta,
-		Reads:       reads,
+	return &SpockSnapshot{
+		Snapshot: Snapshot{
+			Delta: delta,
+			Reads: reads,
+		},
 		SpockSecret: spockSecret,
 	}
 }
