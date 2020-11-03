@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
-	"github.com/onflow/flow-go/state/protocol"
 )
 
 type StatefulTopologyManager struct {
@@ -15,22 +14,13 @@ type StatefulTopologyManager struct {
 }
 
 // NewStatefulTopologyManager generates and returns an instance of stateful topology manager.
-func NewStatefulTopologyManager(me flow.Identifier,
-	state protocol.ReadOnlyState,
-	subMngr channel.SubscriptionManager,
-	fanout FanoutFunc) (*StatefulTopologyManager, error) {
-
-	// creates topology instance for manager
-	top, err := NewTopicBasedTopology(me, state)
-	if err != nil {
-		return nil, fmt.Errorf("could not instantiate topology: %w", err)
-	}
-
+func NewStatefulTopologyManager(topology Topology, subMngr channel.SubscriptionManager,
+	fanout FanoutFunc) *StatefulTopologyManager {
 	return &StatefulTopologyManager{
 		fanout:   fanout,
-		topology: top,
+		topology: topology,
 		subMngr:  subMngr,
-	}, nil
+	}
 }
 
 // MakeTopology receives identity list of entire network and constructs identity list of topology
