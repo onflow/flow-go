@@ -32,7 +32,7 @@ type SparseTopologyTestSuite struct {
 	ids  flow.IdentityList    // used to keep track of the identifiers associated with networks
 }
 
-// TestSparseTopologyTestSuite runs all tests in this test suit
+// TestSparseTopologyTestSuite runs all tests in this test suite
 func TestSparseTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(SparseTopologyTestSuite))
 }
