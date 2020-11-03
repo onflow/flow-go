@@ -23,7 +23,8 @@ func (f SigningAlgorithm) String() string {
 }
 
 const (
-	// minimum targeted bits of security
+	// Minimum targeted bits of security.
+	// This is used as a reference but it doesn't mean all implemented primitives provide this minimum.
 	securityBits = 128
 
 	// BLS signature scheme lengths

@@ -21,6 +21,9 @@ func (f HashingAlgorithm) String() string {
 }
 
 const (
+	// minimum targeted bits of security
+	securityBits = 128
+
 	// Lengths of hash outputs in bytes
 	HashLenSha2_256 = 32
 	HashLenSha2_384 = 48
@@ -31,3 +34,7 @@ const (
 	// the parameter maximum bytes-length as defined in NIST SP 800-185
 	KmacMaxParamsLen = 2040 / 8
 )
+
+func bitsToBytes(bits int) int {
+	return (bits + 7) >> 3
+}

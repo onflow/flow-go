@@ -26,9 +26,8 @@ type kmac128 struct {
 const cSHAKE128BlockSize = 168
 
 // NewKMAC_128 returns a new KMAC instance
-// - key is the KMAC key (the key length is not compared to the security level, if the parameter
-//	is used as a security key and not a domain tag, the caller must make sure the key length is
-//  larger than the security level)
+// - key is the KMAC key (the key size is compared to the security level, although
+//	the parameter is used as a domain tag in Flow and not as a security key).
 // - customizer is the customization string. It can be left empty if no customizer
 //   is required.
 func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) {
@@ -42,14 +41,19 @@ func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) 
 		return nil,
 			fmt.Errorf("kmac output size must be a positive number less than %d", KmacMaxParamsLen)
 	}
+
+	// check the key size (required if the key is used as a security key)
+	if len(key) < bitsToBytes(securityBits) {
+		return nil,
+			fmt.Errorf("kmac key size must be at least %d", bitsToBytes(securityBits))
+	}
+
 	k.commonHasher = &commonHasher{
 		algo:       KMAC128,
 		outputSize: outputSize}
 	// initialize the cSHAKE128 instance
 	k.ShakeHash = sha3.NewCShake128([]byte("KMAC"), customizer)
-	// key length should be larger than the bit-security level
-	// This is not checked here as the key is public and only used
-	// as a domain tag
+
 	// store the encoding of the key
 	k.initBlock = bytepad(encodeString(key), cSHAKE128BlockSize)
 	_, _ = k.Write(k.initBlock)
