@@ -101,14 +101,17 @@ func GenerateNetworks(t *testing.T,
 	ids flow.IdentityList,
 	mws []*libp2p.Middleware,
 	csize int,
-	tops []topology.Topology,
+	topMngrs []topology.Manager,
 	sms []channel.SubscriptionManager,
 	runningMode string) []*libp2p.Network {
 	count := len(ids)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
 
-	if tops == nil {
+	// checks if necessary to generate topology managers
+	if topMngrs == nil {
+		// nil topology managers means generating default ones
+
 		// creates default topology
 		//
 		// mocks state for collector nodes topology
@@ -117,7 +120,8 @@ func GenerateNetworks(t *testing.T,
 		state, _ := topology.CreateMockStateForCollectionNodes(t,
 			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 		// creates topology instances for the nodes based on their roles
-		tops = GenerateTopologies(t, state, ids)
+		tops := GenerateTopologies(t, state, ids)
+		topMngrs = GenerateTopologyManager(t, sms, tops, topology.LinearFanoutFunc)
 	}
 
 	for i := 0; i < count; i++ {
@@ -129,7 +133,7 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, topMngrs[i], sms[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -158,11 +162,11 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	n int,
 	log zerolog.Logger,
 	csize int,
-	tops []topology.Topology,
+	topMngrs []topology.Manager,
 	runninMode string) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
 	ids, mws := GenerateIDsAndMiddlewares(t, n, runninMode, log)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, runninMode)
+	networks := GenerateNetworks(t, log, ids, mws, csize, topMngrs, sms, runninMode)
 	return ids, mws, networks
 }
 
@@ -237,4 +241,19 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.Subs
 	}
 
 	return sms
+}
+
+// GenerateTopologyManager creates a topology per identity and its corresponding subscription manager.
+func GenerateTopologyManager(t *testing.T, subMngrs []channel.SubscriptionManager, tops []topology.Topology, fanout topology.FanoutFunc) []topology.Manager {
+	topMngrs := make([]topology.Manager, 0)
+	for i := 0; i < len(tops); i++ {
+		var topMngr topology.Manager
+		var err error
+
+		topMngr = topology.NewStatefulTopologyManager(tops[i], subMngrs[i], fanout)
+
+		require.NoError(t, err)
+		topMngrs = append(topMngrs, topMngr)
+	}
+	return topMngrs
 }
