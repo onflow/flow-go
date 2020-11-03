@@ -86,6 +86,8 @@ type ExecutionState interface {
 	// PersistChunkDataPack stores a chunk data pack by chunk ID.
 	PersistChunkDataPack(context.Context, *flow.ChunkDataPack) error
 
+	PersistExecutionResult(ctx context.Context, result *flow.ExecutionResult) error
+
 	PersistExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
 
 	PersistStateInteractions(context.Context, flow.Identifier, []*delta.Snapshot) error
@@ -109,6 +111,20 @@ type state struct {
 	results        storage.ExecutionResults
 	receipts       storage.ExecutionReceipts
 	db             *badger.DB
+}
+
+func (s *state) PersistExecutionResult(ctx context.Context, executionResult *flow.ExecutionResult) error {
+
+	err := s.results.Store(executionResult)
+	if err != nil {
+		return fmt.Errorf("could not store result: %w", err)
+	}
+
+	err = s.results.Index(executionResult.BlockID, executionResult.ID())
+	if err != nil {
+		return fmt.Errorf("could not index execution result: %w", err)
+	}
+	return nil
 }
 
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
@@ -350,10 +366,6 @@ func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.Execu
 	err = s.receipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
 	if err != nil {
 		return fmt.Errorf("could not index execution receipt: %w", err)
-	}
-	err = s.results.Index(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution result: %w", err)
 	}
 	return nil
 }
