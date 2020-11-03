@@ -989,12 +989,12 @@ func (e *Engine) handleComputationResult(
 		startState,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not save execution results: %w", err)
+		return nil, nil, fmt.Errorf("could not save execution results: %w", err)
 	}
 
 	receipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
+		return nil, nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
 	err = func() error {
