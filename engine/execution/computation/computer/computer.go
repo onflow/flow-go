@@ -104,7 +104,7 @@ func (e *blockComputer) executeBlock(
 
 	var gasUsed uint64
 
-	interactions := make([]*delta.Snapshot, len(collections)+1)
+	interactions := make([]*delta.SpockSnapshot, len(collections)+1)
 
 	events := make([]flow.Event, 0)
 	blockTxResults := make([]flow.TransactionResult, 0)
