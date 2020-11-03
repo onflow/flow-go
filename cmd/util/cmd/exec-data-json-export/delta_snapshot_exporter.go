@@ -2,7 +2,6 @@ package jsonexporter
 
 import (
 	"bufio"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,7 +18,6 @@ import (
 type dSnapshot struct {
 	DeltaJSONStr string   `json:"delta_json_str"`
 	Reads        []string `json:"reads"`
-	SpockSecret  string   `json:"spock_secret_data"`
 }
 
 // ExportDeltaSnapshots exports all the delta snapshots
@@ -79,7 +77,6 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 		data := dSnapshot{
 			DeltaJSONStr: string(m),
 			Reads:        reads,
-			SpockSecret:  hex.EncodeToString(snap[0].SpockSecret),
 		}
 
 		jsonData, err := json.Marshal(data)

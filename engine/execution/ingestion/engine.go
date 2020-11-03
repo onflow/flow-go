@@ -975,15 +975,38 @@ func (e *Engine) handleComputationResult(
 	// There is one result per transaction
 	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
 
-	receipt, err := e.saveExecutionResults(
+	snapshots := make([]*delta.Snapshot, len(result.StateSnapshots))
+	for i, stateSnapshot := range result.StateSnapshots {
+		snapshots[i] = &stateSnapshot.Snapshot
+	}
+
+	executionResult, err := e.saveExecutionResults(
 		ctx,
 		result.ExecutableBlock,
-		result.StateSnapshots,
+		snapshots,
 		result.Events,
 		result.TransactionResult,
 		startState,
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not save execution results: %w", err)
+	}
 
+	receipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not generate execution receipt: %w", err)
+	}
+
+	err = func() error {
+		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionReceipt)
+		defer span.Finish()
+
+		err = e.execState.PersistExecutionReceipt(ctx, receipt)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not persist execution receipt: %w", err)
+		}
+		return nil
+	}()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1009,7 +1032,7 @@ func (e *Engine) saveExecutionResults(
 	events []flow.Event,
 	txResults []flow.TransactionResult,
 	startState flow.StateCommitment,
-) (*flow.ExecutionReceipt, error) {
+) (*flow.ExecutionResult, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
@@ -1081,9 +1104,9 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
 
-	receipt, err := e.generateExecutionReceipt(childCtx, executionResult, stateInteractions)
+	err = e.execState.PersistExecutionResult(childCtx, executionResult)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
+		return nil, fmt.Errorf("could not persist execution result: %w", err)
 	}
 
 	// not update the highest executed until the result and receipts are saved.
@@ -1123,27 +1146,13 @@ func (e *Engine) saveExecutionResults(
 		return nil, err
 	}
 
-	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveExecutionReceipt)
-		defer span.Finish()
-
-		err = e.execState.PersistExecutionReceipt(ctx, receipt)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not persist execution receipt: %w", err)
-		}
-		return nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
 	e.log.Debug().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Hex("start_state", originalState).
 		Hex("final_state", endState).
 		Msg("saved computation results")
 
-	return receipt, nil
+	return executionResult, nil
 }
 
 // logExecutableBlock logs all data about an executable block
@@ -1228,7 +1237,7 @@ func (e *Engine) generateExecutionResultForBlock(
 func (e *Engine) generateExecutionReceipt(
 	ctx context.Context,
 	result *flow.ExecutionResult,
-	stateInteractions []*delta.Snapshot,
+	stateInteractions []*delta.SpockSnapshot,
 ) (*flow.ExecutionReceipt, error) {
 
 	spocks := make([]crypto.Signature, len(stateInteractions))
@@ -1649,7 +1658,7 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 
 	// TODO - validate state delta, reject invalid messages
 
-	executionReceipt, err := e.saveExecutionResults(
+	executionResult, err := e.saveExecutionResults(
 		e.unit.Ctx(),
 		&delta.ExecutableBlock,
 		delta.StateInteractions,
@@ -1662,7 +1671,7 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 		log.Fatal().Err(err).Msg("fatal error while processing sync message")
 	}
 
-	finalState, ok := executionReceipt.ExecutionResult.FinalStateCommitment()
+	finalState, ok := executionResult.FinalStateCommitment()
 	if !ok {
 		// set to start state next line will fail anyways
 		finalState = delta.StartState

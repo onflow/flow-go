@@ -221,6 +221,16 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 
 	ctx.executionState.
 		On(
+			"PersistExecutionResult",
+			mock.Anything,
+			mock.MatchedBy(func(executionResult *flow.ExecutionResult) bool {
+				return executionResult.BlockID == executableBlock.Block.ID() && executionResult.PreviousResultID == previousExecutionResultID
+			}),
+		).
+		Return(nil)
+
+	ctx.executionState.
+		On(
 			"PersistExecutionReceipt",
 			mock.Anything,
 			mock.MatchedBy(func(receipt *flow.ExecutionReceipt) bool {
@@ -512,7 +522,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 func Test_SPOCKGeneration(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
-		snapshots := []*delta.Snapshot{
+		snapshots := []*delta.SpockSnapshot{
 			{
 				SpockSecret: []byte{1, 2, 3},
 			},
