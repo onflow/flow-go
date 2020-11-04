@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -37,7 +38,7 @@ func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, out
 		return fmt.Errorf("cannot get state commitment for block: %w", err)
 	}
 
-	w, err := wal.NewWAL(nil, nil, ledgerPath, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
+	w, err := wal.NewWAL(zerolog.Nop(), nil, ledgerPath, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}

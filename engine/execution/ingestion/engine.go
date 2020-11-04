@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
@@ -1166,6 +1167,8 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 		Int("number_of_collections", len(eb.Collections())).
 		RawJSON("block_header", logging.AsJSON(eb.Block.Header)).
 		Msg("extensive log: block header")
+
+	spew.Dump("lol")
 
 	// logs transactions
 	for i, col := range eb.Collections() {

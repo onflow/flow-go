@@ -3,6 +3,7 @@ package read
 import (
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -42,7 +43,7 @@ func addSubcommands() {
 func loadExecutionState() *mtrie.Forest {
 
 	w, err := wal.NewWAL(
-		nil,
+		zerolog.Nop(),
 		nil,
 		flagExecutionStateDir,
 		complete.DefaultCacheSize,

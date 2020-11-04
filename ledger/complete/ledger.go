@@ -46,7 +46,7 @@ func NewLedger(dbDir string,
 	log zerolog.Logger,
 	reg prometheus.Registerer) (*Ledger, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
+	w, err := wal.NewWAL(log, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}

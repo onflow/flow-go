@@ -32,7 +32,7 @@ func Test_noCheckpoints(t *testing.T) {
 		from, to, err := checkpointer.NotCheckpointedSegments()
 		require.NoError(t, err)
 		require.Equal(t, 0, from)
-		require.Equal(t, 2, to)
+		require.Equal(t, 3, to) //extra one because WAL now creates empty file on start
 	})
 }
 
@@ -45,7 +45,7 @@ func Test_someCheckpoints(t *testing.T) {
 		from, to, err := checkpointer.NotCheckpointedSegments()
 		require.NoError(t, err)
 		require.Equal(t, 3, from)
-		require.Equal(t, 5, to)
+		require.Equal(t, 6, to) //extra one because WAL now creates empty file on start
 	})
 }
 
@@ -71,7 +71,7 @@ func Test_checkpointWithoutPrecedingSegments(t *testing.T) {
 		from, to, err := checkpointer.NotCheckpointedSegments()
 		require.NoError(t, err)
 		require.Equal(t, 6, from)
-		require.Equal(t, 7, to)
+		require.Equal(t, 8, to) //extra one because WAL now creates empty file on start
 	})
 }
 
@@ -84,7 +84,7 @@ func Test_checkpointWithSameSegment(t *testing.T) {
 		from, to, err := checkpointer.NotCheckpointedSegments()
 		require.NoError(t, err)
 		require.Equal(t, 6, from)
-		require.Equal(t, 7, to)
+		require.Equal(t, 8, to) //extra one because WAL now creates empty file on start
 	})
 }
 
