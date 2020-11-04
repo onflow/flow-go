@@ -11,11 +11,12 @@ import (
 )
 
 const (
-	keyExists                   = "exists"
-	keyCode                     = "code"
-	keyPublicKeyCount           = "public_key_count"
-	storageUsedRegisterName     = "storage_used"
-	storageCapacityRegisterName = "storage_capacity"
+	keyExists          = "exists"
+	keyCode            = "code"
+	keyPublicKeyCount  = "public_key_count"
+	keyStorageUsed     = "storage_used"
+	keyStorageCapacity = "storage_capacity"
+	uint64StorageSize  = 8
 )
 
 var (
@@ -92,7 +93,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return fmt.Errorf("account with address %s already exists", newAddress.Hex())
 	}
 
-	err = a.setStorageUsed(newAddress, 8) //set storage used to the size of storage used
+	err = a.setStorageUsed(newAddress, uint64StorageSize) //set storage used to the size of storage used
 	if err != nil {
 		return err
 	}
@@ -287,13 +288,13 @@ func (a *Accounts) SetCode(address flow.Address, code []byte) error {
 
 // GetStorageUsed returns the amount of storage used in bytes by this account
 func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
-	storageUsedRegister, err := a.getValue(address, false, storageUsedRegisterName)
+	storageUsedRegister, err := a.getValue(address, false, keyStorageUsed)
 	if err != nil {
 		return 0, err
 	}
 
-	if len(storageUsedRegister) == 0 {
-		return 0, fmt.Errorf("account %s storage used is not initialized", address.Hex())
+	if len(storageUsedRegister) != uint64StorageSize {
+		return 0, fmt.Errorf("account %s storage used is not initialized or not initialized correctly", address.Hex())
 	}
 
 	storageUsed := binary.LittleEndian.Uint64(storageUsedRegister)
@@ -301,13 +302,13 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 }
 
 func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
-	buffer := make([]byte, 8)
+	buffer := make([]byte, uint64StorageSize)
 	binary.LittleEndian.PutUint64(buffer, used)
-	return a.setValue(address, false, storageUsedRegisterName, buffer)
+	return a.setValue(address, false, keyStorageUsed, buffer)
 }
 
 func (a *Accounts) GetStorageCapacity(owner flow.Address) (uint64, error) {
-	storageCapacityRegister, err := a.getValue(owner, false, storageCapacityRegisterName)
+	storageCapacityRegister, err := a.getValue(owner, false, keyStorageCapacity)
 	if err != nil {
 		return 0, err
 	}
@@ -316,9 +317,9 @@ func (a *Accounts) GetStorageCapacity(owner flow.Address) (uint64, error) {
 }
 
 func (a *Accounts) SetStorageCapacity(owner flow.Address, capacity uint64) error {
-	buffer := make([]byte, 8)
+	buffer := make([]byte, uint64StorageSize)
 	binary.LittleEndian.PutUint64(buffer, capacity)
-	return a.setValue(owner, false, storageCapacityRegisterName, buffer)
+	return a.setValue(owner, false, keyStorageCapacity, buffer)
 }
 
 func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
@@ -328,9 +329,8 @@ func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValu
 func (a *Accounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
 		return a.ledger.Get(string(address.Bytes()), string(address.Bytes()), key)
-	} else {
-		return a.ledger.Get(string(address.Bytes()), "", key)
 	}
+	return a.ledger.Get(string(address.Bytes()), "", key)
 }
 
 // SetValue sets a value in address' storage
@@ -353,8 +353,8 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 }
 
 func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
-	if key == storageUsedRegisterName {
-		// size of this register is always 8
+	if key == keyStorageUsed {
+		// size of this register is always uint64StorageSize
 		// don't double check this to save time and prevent recursion
 		return nil
 	}
@@ -388,7 +388,7 @@ func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController b
 		newSize = oldSize + absChange
 	}
 
-	buffer := make([]byte, 8)
+	buffer := make([]byte, uint64StorageSize)
 	binary.LittleEndian.PutUint64(buffer, newSize)
 	// this puts us back in the setValue method.
 	// The difference is that storage_used update exits early from this function so there isn't any recursion.
