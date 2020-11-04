@@ -162,6 +162,25 @@ func TestAccount_StorageUsed(t *testing.T) {
 		require.Equal(t, storageUsed, uint64(9+11)) // exists: 1 byte, storage_used 8 bytes, some_key 11
 	})
 
+	t.Run("Storage used, after register deleted, decreases", func(t *testing.T) {
+		ledger := state.NewMapLedger()
+
+		accounts := state.NewAccounts(ledger)
+		address := flow.HexToAddress("01")
+
+		err := accounts.Create(nil, address)
+		require.NoError(t, err)
+
+		err = accounts.SetValue(address, "some_key", createByteArray(12))
+		require.NoError(t, err)
+		err = accounts.SetValue(address, "some_key", nil)
+		require.NoError(t, err)
+
+		storageUsed, err := accounts.GetStorageUsed(address)
+		require.NoError(t, err)
+		require.Equal(t, storageUsed, uint64(9+0)) // exists: 1 byte, storage_used 8 bytes, some_key 0
+	})
+
 	t.Run("Storage used on a complex scenario has correct value", func(t *testing.T) {
 		ledger := state.NewMapLedger()
 
