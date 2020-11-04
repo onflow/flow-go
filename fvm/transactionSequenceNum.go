@@ -19,7 +19,7 @@ func (c *TransactionSequenceNumberChecker) Process(
 	proc *TransactionProcedure,
 	ledger state.Ledger,
 ) error {
-	accounts := state.NewAccounts(ledger, ctx.Chain)
+	accounts := state.NewAccounts(ledger)
 
 	return c.checkAndIncrementSequenceNumber(proc.Transaction, accounts)
 }
