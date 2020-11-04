@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
-	engine2 "github.com/onflow/flow-go/engine"
+	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
@@ -113,7 +113,7 @@ func (n *Network) Done() <-chan struct{} {
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
-	if _, ok := engine2.RolesByChannelID(channelID); !ok {
+	if _, ok := channels.RolesByChannelID(channelID); !ok {
 		return nil, fmt.Errorf("unknown channel id: %s, should be registered in topic map", channelID)
 	}
 
