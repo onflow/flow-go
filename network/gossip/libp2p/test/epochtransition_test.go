@@ -44,82 +44,80 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 	suite.Run(t, new(EpochTransitionTestSuite))
 }
 
-func (ts *EpochTransitionTestSuite) SetupTest() {
+func (suite *EpochTransitionTestSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
-	ts.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
 
 	// create ids
-	ids, mws := GenerateIDsAndMiddlewares(ts.T(), nodeCount, RunNetwork, ts.logger)
-	ts.ids = ids
-	ts.mws = mws
+	ids, mws := GenerateIDsAndMiddlewares(suite.T(), nodeCount, RunNetwork, suite.logger)
+	suite.ids = ids
+	suite.mws = mws
 
 	// setup current epoch
-	ts.currentEpoch = 0
-	ts.currentEpochPhase = flow.EpochPhaseStaking
-	ts.epochQuery = mocks.NewEpochQuery(ts.T(), ts.currentEpoch)
-	ts.addEpoch(ts.currentEpoch, ts.ids)
+	suite.currentEpoch = 0
+	suite.currentEpochPhase = flow.EpochPhaseStaking
+	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.currentEpoch)
+	suite.addEpoch(suite.currentEpoch, suite.ids)
 
 	// setup state related mocks
-	ts.state = new(protocol.ReadOnlyState)
-	ts.snapshot = new(protocol.Snapshot)
-	ts.snapshot.On("Identities", testifymock.Anything).Return(ids, nil)
-	ts.snapshot.On("Epochs").Return(ts.epochQuery)
-	ts.snapshot.On("Phase").Return(
-		func() flow.EpochPhase { return ts.currentEpochPhase },
+	suite.state = new(protocol.ReadOnlyState)
+	suite.snapshot = new(protocol.Snapshot)
+	suite.snapshot.On("Identities", testifymock.Anything).Return(ids, nil)
+	suite.snapshot.On("Epochs").Return(suite.epochQuery)
+	suite.snapshot.On("Phase").Return(
+		func() flow.EpochPhase { return suite.currentEpochPhase },
 		func() error { return nil },
 	)
-	ts.state.On("Final").Return(ts.snapshot, nil)
+	suite.state.On("Final").Return(suite.snapshot, nil)
 
 	// all nodes use the same state mock
 	states := make([]*protocol.ReadOnlyState, nodeCount)
 	for i := 0; i < nodeCount; i++ {
-		states[i] = ts.state
+		states[i] = suite.state
 	}
 
 	// create networks using the mocked state and default topology
-	sms := GenerateSubscriptionManagers(ts.T(), mws)
-	nets := GenerateNetworks(ts.T(), ts.logger, ids, mws, 100, nil, sms, RunNetwork)
-	ts.nets = nets
+	sms := GenerateSubscriptionManagers(suite.T(), mws)
+	nets := GenerateNetworks(suite.T(), suite.logger, ids, mws, 100, nil, sms, RunNetwork)
+	suite.nets = nets
 
 	// generate the refreshers
-	ts.idRefreshers = ts.generateNodeIDRefreshers(nets)
+	suite.idRefreshers = suite.generateNodeIDRefreshers(nets)
 
 	// generate the engines
-	ts.engines = GenerateEngines(ts.T(), nets)
+	suite.engines = GenerateEngines(suite.T(), nets)
 }
 
 // TearDownTest closes the networks within a specified timeout
-func (ts *EpochTransitionTestSuite) TearDownTest() {
-	for _, net := range ts.nets {
-		unittest.RequireCloseBefore(ts.T(), net.Done(), 3*time.Second, "could not stop the network")
-	}
+func (suite *EpochTransitionTestSuite) TearDownTest() {
+	stopNetworks(suite.T(), suite.nets, 3*time.Second)
 }
 
 // TestNewNodeAdded tests that an additional node in the next epoch gets connected to other nodes and can exchange messages
 // in the current epoch
-func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
+func (suite *EpochTransitionTestSuite) TestNewNodeAdded() {
 	// create the id, middleware and network for a new node
-	ids, mws, nets := GenerateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, RunNetwork)
+	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), 1, suite.logger, 100, nil, RunNetwork)
 	newMiddleware := mws[0]
 
-	newIDs := append(ts.ids, ids...)
+	newIDs := append(suite.ids, ids...)
 
 	// create a new refresher
-	newIDRefresher := ts.generateNodeIDRefreshers(nets)
-	newIDRefreshers := append(ts.idRefreshers, newIDRefresher...)
+	newIDRefresher := suite.generateNodeIDRefreshers(nets)
+	newIDRefreshers := append(suite.idRefreshers, newIDRefresher...)
 
 	// create the engine for the new node
-	newEngine := GenerateEngines(ts.T(), nets)
-	newEngines := append(ts.engines, newEngine...)
+	newEngine := GenerateEngines(suite.T(), nets)
+	newEngines := append(suite.engines, newEngine...)
 
 	// update epoch query mock to return new IDs for the next epoch
-	nextEpoch := ts.currentEpoch + 1
-	ts.addEpoch(nextEpoch, newIDs)
+	nextEpoch := suite.currentEpoch + 1
+	suite.addEpoch(nextEpoch, newIDs)
 
 	// adjust the epoch phase
-	ts.currentEpochPhase = flow.EpochPhaseSetup
+	suite.currentEpochPhase = flow.EpochPhaseSetup
 
 	// trigger an epoch phase change for all networks going from flow.EpochPhaseStaking to flow.EpochPhaseSetup
 	for _, n := range newIDRefreshers {
@@ -128,40 +126,40 @@ func (ts *EpochTransitionTestSuite) TestNewNodeAdded() {
 
 	// check if the new node has sufficient connections with the existing nodes
 	// if it does, then it has been inducted successfully in the network
-	checkConnectivity(ts.T(), newMiddleware, ids)
+	checkConnectivity(suite.T(), newMiddleware, ids)
 
 	// check that all the engines on this new epoch can talk to each other
-	sendMessagesAndVerify(ts.T(), newIDs, newEngines, ts.Publish)
+	sendMessagesAndVerify(suite.T(), newIDs, newEngines, suite.Publish)
 }
 
 // TestNodeRemoved tests that a node that is removed in the next epoch remains connected for the current epoch
-func (ts *EpochTransitionTestSuite) TestNodeRemoved() {
+func (suite *EpochTransitionTestSuite) TestNodeRemoved() {
 	// choose a random node to remove
-	removeIndex := rand.Intn(len(ts.ids))
-	removedID := ts.ids[removeIndex]
-	removedMW := ts.mws[removeIndex]
+	removeIndex := rand.Intn(len(suite.ids))
+	removedID := suite.ids[removeIndex]
+	removedMW := suite.mws[removeIndex]
 
 	// remove the identity at that index from the ids
-	newIDs := ts.ids.Filter(filter.Not(filter.HasNodeID(removedID.NodeID)))
+	newIDs := suite.ids.Filter(filter.Not(filter.HasNodeID(removedID.NodeID)))
 
 	// update epoch query mock to return new IDs for the next epoch
-	nextEpoch := ts.currentEpoch + 1
-	ts.addEpoch(nextEpoch, newIDs)
+	nextEpoch := suite.currentEpoch + 1
+	suite.addEpoch(nextEpoch, newIDs)
 
 	// adjust the epoch phase
-	ts.currentEpochPhase = flow.EpochPhaseSetup
+	suite.currentEpochPhase = flow.EpochPhaseSetup
 
 	// trigger an epoch phase change for all nodes
 	// from flow.EpochPhaseStaking to flow.EpochPhaseSetup
-	for _, n := range ts.idRefreshers {
+	for _, n := range suite.idRefreshers {
 		n.EpochSetupPhaseStarted(nextEpoch, nil)
 	}
 
 	// check if the evicted node still has sufficient connections with the existing nodes
-	checkConnectivity(ts.T(), removedMW, newIDs)
+	checkConnectivity(suite.T(), removedMW, newIDs)
 
 	// check that all the engines on this new epoch can still talk to each other
-	sendMessagesAndVerify(ts.T(), ts.ids, ts.engines, ts.Publish)
+	sendMessagesAndVerify(suite.T(), suite.ids, suite.engines, suite.Publish)
 }
 
 // checkConnectivity checks that the middleware of a node is directly connected to atleast half of the other nodes
@@ -215,17 +213,17 @@ func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngi
 }
 
 // addEpoch adds an epoch with the given counter.
-func (ts *EpochTransitionTestSuite) addEpoch(counter uint64, ids flow.IdentityList) {
+func (suite *EpochTransitionTestSuite) addEpoch(counter uint64, ids flow.IdentityList) {
 	epoch := new(protocol.Epoch)
 	epoch.On("InitialIdentities").Return(ids, nil)
 	epoch.On("Counter").Return(counter, nil)
-	ts.epochQuery.Add(epoch)
+	suite.epochQuery.Add(epoch)
 }
 
-func (ts *EpochTransitionTestSuite) generateNodeIDRefreshers(nets []*libp2p.Network) []*libp2p.NodeIDRefresher {
+func (suite *EpochTransitionTestSuite) generateNodeIDRefreshers(nets []*libp2p.Network) []*libp2p.NodeIDRefresher {
 	refreshers := make([]*libp2p.NodeIDRefresher, len(nets))
 	for i, net := range nets {
-		refreshers[i] = libp2p.NewNodeIDRefresher(ts.logger, ts.state, net.SetIDs)
+		refreshers[i] = libp2p.NewNodeIDRefresher(suite.logger, suite.state, net.SetIDs)
 	}
 	return refreshers
 }
