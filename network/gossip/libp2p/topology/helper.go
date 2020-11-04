@@ -95,8 +95,9 @@ func ClusterNum(t *testing.T, ids flow.IdentityList, size int) int {
 	return int(math.Max(float64(clusterNum), 1))
 }
 
-// DFS is a test helper function checking graph connectedness. It returns true if
-// graph represented by `adjMap` is connected.
+// DFS is a test helper function checking graph connectedness. It fails if
+// graph represented by `adjMap` is not connected, i.e., there is more than a single
+// connected component.
 func DFS(currentID flow.Identifier,
 	adjMap map[flow.Identifier]flow.IdentityList,
 	visited map[flow.Identifier]bool,
