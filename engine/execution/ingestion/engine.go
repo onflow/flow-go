@@ -1121,9 +1121,17 @@ func (e *Engine) saveExecutionResults(
 		defer span.Finish()
 
 		if len(events) > 0 {
-			err = e.events.Store(blockID, events)
-			if err != nil {
-				return fmt.Errorf("failed to store events: %w", err)
+			// store events 1K in each batch
+			chunkSize := 1000
+			for i := 0; i < len(events); i += chunkSize {
+				end := i + chunkSize
+				if end > len(events) {
+					end = len(events)
+				}
+				err = e.events.Store(blockID, events[i:end])
+				if err != nil {
+					return fmt.Errorf("failed to store events: %w", err)
+				}
 			}
 		}
 		return nil
