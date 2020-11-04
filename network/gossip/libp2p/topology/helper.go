@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
-	mock2 "github.com/onflow/flow-go/state/protocol/mock"
+	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
