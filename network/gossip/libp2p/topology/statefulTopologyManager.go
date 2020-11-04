@@ -29,7 +29,8 @@ func NewStatefulTopologyManager(topology Topology, subMngr channel.SubscriptionM
 // Independent invocations of MakeTopology on different nodes collaboratively
 // constructs a connected graph of nodes that enables them talking to each other.
 func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.IdentityList, error) {
-	myFanout := flow.IdentityList{}
+	var myFanout flow.IdentityList
+	var err error
 
 	// extracts channel ids this node subscribed to
 	myChannels := stm.subMngr.GetChannelIDs()
@@ -37,11 +38,10 @@ func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.Id
 	// samples a connected component fanout from each topic and takes the
 	// union of all fanouts.
 	for _, myChannel := range myChannels {
-		subset, err := stm.topology.Subset(ids, stm.fanout(uint(len(ids))), myChannel)
+		myFanout, err = stm.topology.Subset(ids, myFanout, myChannel, stm.fanout(uint(len(ids))))
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", myChannel, err)
 		}
-		myFanout = myFanout.Union(subset)
 	}
 	return myFanout, nil
 }
