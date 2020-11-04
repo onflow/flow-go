@@ -149,6 +149,7 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	runningMode string,
 	log zerolog.Logger) (flow.IdentityList,
 	[]*libp2p.Middleware) {
+	
 	ids, keys := GenerateIDs(t, n, runningMode)
 	mws := GenerateMiddlewares(t, log, ids, keys)
 	return ids, mws
