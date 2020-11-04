@@ -517,18 +517,26 @@ func moveFile(src, dst string) error {
 		return fmt.Errorf("failed to create directory %s: %w", destinationDir, err)
 	}
 
+	// first, try renaming the file
+	err = os.Rename(src, dst)
+	if err == nil {
+		// if renaming works, we are done
+		return nil
+	}
+
+	// renaming may fail if the destination dir is on a different disk, in that case we do a copy followed by remove
+	// open the source file
+	source, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", src, err)
+	}
+
 	// create the destination file
 	destination, err := os.Create(dst)
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %w", dst, err)
 	}
 	defer destination.Close()
-
-	// open the source file
-	source, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", src, err)
-	}
 
 	// copy the source file to the destination file
 	_, err = io.Copy(destination, source)
