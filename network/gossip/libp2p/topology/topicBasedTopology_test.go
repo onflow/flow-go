@@ -150,7 +150,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		previous = current
 		current = nil
 
-		// creates and samples a new topic aware topology for the first topic of collection nodes
+		// creates and samples a new topic aware topology for the first topic of consensus nodes
 		top, err := topology.NewTopicBasedTopology(identity.NodeID, suite.state)
 		require.NoError(suite.T(), err)
 		ids, err := top.Subset(suite.ids, suite.fanout, topics[0])
