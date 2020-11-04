@@ -114,7 +114,7 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 		s.setComplaintsTimeout()
 		return nil
 	}
-	return errors.New("next timeout should be to end DKG protocol")
+	return errors.New("the next timeout should be to end DKG protocol")
 }
 
 // End ends the protocol in the current node
@@ -223,7 +223,7 @@ func (s *feldmanVSSQualState) Disqualify(node int) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
-	if node >= s.Size() {
+	if node >= s.Size() || node < 0 {
 		return errors.New("wrong input")
 	}
 	if index(node) == s.leaderIndex {

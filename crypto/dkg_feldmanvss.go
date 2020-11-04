@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 )
 
 // Implements Feldman Verifiable Secret Sharing using
@@ -173,7 +174,7 @@ func (s *feldmanVSSstate) Disqualify(node int) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
-	if node >= s.Size() {
+	if node >= s.Size() || node < 0 {
 		return errors.New("wrong input")
 	}
 	if index(node) == s.leaderIndex {
@@ -186,7 +187,7 @@ func (s *feldmanVSSstate) Disqualify(node int) error {
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
-		return err
+		return fmt.Errorf("generating shares failed: %w", err)
 	}
 	// Generate a polyomial P in Zr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
