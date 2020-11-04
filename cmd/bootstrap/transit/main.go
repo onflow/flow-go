@@ -19,6 +19,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/build"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	utilsio "github.com/onflow/flow-go/utils/io"
