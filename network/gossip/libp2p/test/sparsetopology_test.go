@@ -137,7 +137,7 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	ids, keys := GenerateIDs(suite.T(), count, RunNetwork)
 	suite.ids = ids
 
-	tops := createDisjointedTopology(count, subsets)
+	tops := createDisjointedTopology(count, subnets)
 
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -163,7 +163,7 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	require.NoError(suite.Suite.T(), send(event, engs[0].con, suite.ids.NodeIDs()...))
 
 	// wait for message to be received by nodes only in subset 1 (excluding node 0)
-	suite.checkMessageReception(engs, 1, subsets)
+	suite.checkMessageReception(engs, 1, subnets)
 }
 
 // TearDownTest closes the networks within a specified timeout
