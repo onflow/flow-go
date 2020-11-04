@@ -3,6 +3,8 @@ package access
 import (
 	"errors"
 	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ErrUnknownReferenceBlock indicates that a transaction references an unknown block.
@@ -47,4 +49,24 @@ type InvalidGasLimitError struct {
 
 func (e InvalidGasLimitError) Error() string {
 	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Actual, e.Maximum)
+}
+
+// InvalidAddressError indicates that a transaction references an invalid flow Address
+// in either the Authorizers or Payer field.
+type InvalidAddressError struct {
+	Address flow.Address
+}
+
+func (e InvalidAddressError) Error() string {
+	return fmt.Sprintf("invalid address: %s", e.Address)
+}
+
+// InvalidTxByteSizeError indicates that a transaction byte size exceeds the maximum.
+type InvalidTxByteSizeError struct {
+	Maximum uint64
+	Actual  uint64
+}
+
+func (e InvalidTxByteSizeError) Error() string {
+	return fmt.Sprintf("transaction byte size (%d) exceeds the maximum byte size allowed for a transaction (%d)", e.Actual, e.Maximum)
 }

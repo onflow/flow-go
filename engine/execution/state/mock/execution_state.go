@@ -230,6 +230,20 @@ func (_m *ExecutionState) PersistExecutionReceipt(_a0 context.Context, _a1 *flow
 	return r0
 }
 
+// PersistExecutionResult provides a mock function with given fields: ctx, result
+func (_m *ExecutionState) PersistExecutionResult(ctx context.Context, result *flow.ExecutionResult) error {
+	ret := _m.Called(ctx, result)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecutionResult) error); ok {
+		r0 = rf(ctx, result)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // PersistStateCommitment provides a mock function with given fields: _a0, _a1, _a2
 func (_m *ExecutionState) PersistStateCommitment(_a0 context.Context, _a1 flow.Identifier, _a2 []byte) error {
 	ret := _m.Called(_a0, _a1, _a2)

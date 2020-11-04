@@ -19,6 +19,7 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/build"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	utilsio "github.com/onflow/flow-go/utils/io"
@@ -29,6 +30,8 @@ var (
 	FilenameTransitKeyPriv     = "transit-key.priv.%v"
 	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".%v.enc"
 	flowBucket                 string
+	commit                     = build.Commit()
+	semver                     = build.Semver()
 )
 
 const fileMode = os.FileMode(0644)
@@ -53,8 +56,9 @@ var (
 func main() {
 
 	var bootDir, keyDir, wrapID, role string
-	var pull, push, prepare bool
+	var version, pull, push, prepare bool
 
+	flag.BoolVar(&version, "v", false, "View version and commit information")
 	flag.StringVar(&bootDir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
 	flag.StringVar(&keyDir, "t", "", "Token provided by the Flow team to access the transit server")
 	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
@@ -64,6 +68,12 @@ func main() {
 	flag.StringVar(&wrapID, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
 	flag.StringVar(&flowBucket, "flow-bucket", "flow-genesis-bootstrap", "Storage for the transit server")
 	flag.Parse()
+
+	// always print version information
+	printVersion()
+	if version {
+		return
+	}
 
 	if role == "" {
 		flag.Usage()
@@ -130,6 +140,21 @@ func fetchNodeID(bootDir string) (string, error) {
 	}
 
 	return strings.TrimSpace(string(data)), nil
+}
+
+// Print the version and commit id
+func printVersion() {
+	// Print version/commit strings if they are known
+	if build.IsDefined(semver) {
+		fmt.Printf("Transit script Version: %s\n", semver)
+	}
+	if build.IsDefined(commit) {
+		fmt.Printf("Transit script Commit: %s\n", commit)
+	}
+	// If no version info is known print a message to indicate this.
+	if !build.IsDefined(semver) && !build.IsDefined(commit) {
+		fmt.Printf("Transit script version information unknown\n")
+	}
 }
 
 // Run the push process

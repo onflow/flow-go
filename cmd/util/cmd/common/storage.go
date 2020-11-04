@@ -8,10 +8,15 @@ import (
 )
 
 func InitStorage(datadir string) *badger.DB {
+	return InitStorageWithTruncate(datadir, false)
+}
+
+func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 	opts := badger.
 		DefaultOptions(datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(nil)
+		WithLogger(nil).
+		WithTruncate(truncate)
 
 	db, err := badger.Open(opts)
 	if err != nil {
