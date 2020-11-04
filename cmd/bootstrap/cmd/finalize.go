@@ -332,7 +332,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	return nodes
 }
 
-// Validation utilility methods ------------------------------------------------
+// Validation utility methods ------------------------------------------------
 
 func validateNodeID(nodeID flow.Identifier) flow.Identifier {
 	if nodeID == flow.ZeroID {
