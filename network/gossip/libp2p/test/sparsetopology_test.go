@@ -123,7 +123,7 @@ func (suite *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Multicast() {
 
 // disjointedNetworkScenario creates a network configuration of 9 nodes with 3 subsets.
 // The subsets are not connected with each other.
-// 0,1,2 <-> 3,4,5 <-> 6,7,8
+// 0,1,2 | 3,4,5 | 6,7,8
 // Message sent by a node from one subset should not be able to make to nodes in a different subset
 // This test is created primarily to prove that topology is indeed honored by the networking layer since technically,
 // each node does have the ip addresses of all other nodes and could just disregard topology all together and connect
