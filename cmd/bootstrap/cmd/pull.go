@@ -4,9 +4,7 @@ import (
 	"context"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/spf13/cobra"
-	"google.golang.org/api/iterator"
 )
 
 var (
@@ -32,33 +30,23 @@ func addPullCmdFlags() {
 }
 
 func pullPartners(cmd *cobra.Command, args []string) {
-	bucket := "flow-genesis-bootstrap"
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 
-	ctx := context.Background()
-	client, err := storage.NewClient(ctx)
+	bucket := NewGoogleBucket("flow-genesis-bootstrap")
+
+	client, err := bucket.NewClient(ctx)
 	if err != nil {
-		log.Error().Msgf("storage.NewClient: %v", err)
-		return
+		log.Error().Msgf("error trying get new google bucket client: %v", err)
 	}
 	defer client.Close()
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
-
-	it := client.Bucket(bucket).Objects(ctx, &storage.Query{
-		Prefix: "candidate-0-",
-	})
-	for {
-		attrs, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Error().Msgf("Bucket(%q).Objects: %v", bucket, err)
-			return
-		}
-		log.Info().Msg(attrs.Name)
+	files, err := bucket.GetFiles(ctx, "mainnet-1-", "")
+	if err != nil {
+		log.Error().Msgf("error trying list google bucket files: %v", err)
 	}
 
-	log.Info().Msg("Done")
+	for _, file := range files {
+		log.Info().Msg(file)
+	}
 }
