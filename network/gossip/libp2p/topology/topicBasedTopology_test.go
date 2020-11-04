@@ -243,5 +243,6 @@ func (suite *TopicAwareTopologyTestSuite) checkConnectednessByCluster(t *testing
 	cluster flow.IdentityList) {
 	topology.CheckGraphConnected(t,
 		adjMap,
-		suite.ids.Filter(filter.In(cluster))
+		suite.ids,
+		filter.In(cluster))
 }
