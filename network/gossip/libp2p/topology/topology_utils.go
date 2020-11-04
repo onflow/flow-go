@@ -18,9 +18,31 @@ func connectedGraph(ids flow.IdentityList, seed int64) flow.IdentityList {
 	return ids.DeterministicSample(size, seed)
 }
 
-func connectedGraphSample(ids flow.IdentityList, seed int64) (flow.IdentityList, flow.IdentityList) {
-	result := connectedGraph(ids, seed)
-	remainder := ids.Filter(filter.Not(filter.In(result)))
+// conditionalConnectedGraph returns a random subset of length (n+1)/2, which includes the shouldHave
+// set of identifiers.
+// If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
+func conditionalConnectedGraph(all, shouldHave flow.IdentityList, seed int64) flow.IdentityList {
+	// total sample size
+	totalSize := int(math.Ceil(float64(len(all)+1) / 2))
+
+	// subset size excluding should have ones
+	subsetSize := totalSize - len(shouldHave)
+
+	// others are all excluding should have ones
+	others := all.Filter(filter.Not(filter.In(shouldHave)))
+	return others.DeterministicSample(uint(subsetSize), seed)
+}
+
+func connectedGraphSample(all flow.IdentityList, shouldHave flow.IdentityList, seed int64) (flow.IdentityList,
+	flow.IdentityList) {
+	var result flow.IdentityList
+	if shouldHave == nil {
+		result = connectedGraph(all, seed)
+	} else {
+		result = conditionalConnectedGraph(all, shouldHave, seed)
+	}
+
+	remainder := all.Filter(filter.Not(filter.In(result)))
 	return result, remainder
 }
 
