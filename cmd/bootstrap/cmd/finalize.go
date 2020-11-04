@@ -211,7 +211,7 @@ func assembleInternalNodes() []model.NodeInfo {
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
 	stakes := internalStakesByAddress()
-	log.Info().Msgf("read %v stakes for partner nodes", len(stakes))
+	log.Info().Msgf("read %v stakes for internal nodes", len(stakes))
 
 	var nodes []model.NodeInfo
 	for _, internal := range privInternals {
