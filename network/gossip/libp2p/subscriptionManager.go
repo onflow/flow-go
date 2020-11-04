@@ -23,8 +23,8 @@ func NewSubscriptionManager(mw middleware.Middleware) *ChannelSubscriptionManage
 }
 
 func (sm *ChannelSubscriptionManager) Register(channelID string, engine network.Engine) error {
-	sm.Lock()
-	defer sm.Unlock()
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
 
 	// check if the engine engineID is already taken
 	_, ok := sm.engines[channelID]
@@ -45,8 +45,8 @@ func (sm *ChannelSubscriptionManager) Register(channelID string, engine network.
 }
 
 func (sm *ChannelSubscriptionManager) Unregister(channelID string) error {
-	sm.Lock()
-	defer sm.Unlock()
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
 
 	// check if there is a registered engine for the given channelID
 	_, ok := sm.engines[channelID]
@@ -66,8 +66,8 @@ func (sm *ChannelSubscriptionManager) Unregister(channelID string) error {
 }
 
 func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engine, error) {
-	sm.RLock()
-	defer sm.RUnlock()
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
 	eng, found := sm.engines[channelID]
 	if !found {
 		return nil, fmt.Errorf("subscriptionManager: engine for channelID %s not found", channelID)
