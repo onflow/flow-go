@@ -10,7 +10,7 @@ import (
 
 // ChannelSubscriptionManager manages the engine to channelID subscription
 type ChannelSubscriptionManager struct {
-	mu sync.RWMutex
+	mu      sync.RWMutex
 	engines map[string]network.Engine
 	mw      middleware.Middleware
 }
