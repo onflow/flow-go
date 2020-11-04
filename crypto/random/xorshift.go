@@ -8,7 +8,7 @@ import (
 // xorshifts is a set of xorshift128+ pseudo random number generators
 // each xorshift+ has a 128-bits state
 // using a set of xorshift128+ allows initializing the set with a larger
-// seed than 128 bits
+// seed than 128 bits.
 type xorshifts struct {
 	states     []xorshiftp
 	stateIndex int
@@ -22,14 +22,15 @@ type xorshiftp struct {
 }
 
 // at least a 16 bytes constant
-var zeroSeed = []byte("NothingUpMySleeve")
+var zeroSeed = []byte("NothingUpMySleeves")
 
-// NewRand returns a new PRG that is a set of xorshift128+ PRGs, seeded with the input seed
-// the input seed is the initial state of the PRG.
-// the length of the seed fixes the number of xorshift128+ to initialize:
-// each 16 bytes of the seed initilize an xorshift128+ instance
-// To make sure the seed entropy is optimal, the function checks that len(seed)
-// is a multiple 16 (PRG state size)
+// NewRand returns a new PRG that is a set of xorshift128+ PRGs, seeded with the input seed.
+//
+// The input seed is the initial state of the PRG, it is recommended to sample the
+// seed uniformly at random.
+// The length of the seed fixes the number of xorshift128+ to initialize:
+// each 16 bytes of the seed initilize an xorshift128+ instance. The seed length
+// has to be a multiple of 16 (the PRG state size).
 func NewRand(seed []byte) (*xorshifts, error) {
 	// safety check
 	if len(seed) == 0 || len(seed)%16 != 0 {
@@ -44,9 +45,10 @@ func NewRand(seed []byte) (*xorshifts, error) {
 			b: binary.BigEndian.Uint64(seed[i*16+8 : (i+1)*16]),
 		})
 	}
-	// check states are not zeros
-	// replace the zero seed by a nothing-up-my-sleeve constant seed
-	// the bias introduced is nigligible as the seed space is 2^128
+	// check states are not zeros.
+	// replace the zero seed by a nothing-up-my-sleeves constant seed.
+	// the bias introduced is nigligible if the seed is sampled uniformly
+	// at random.
 	for _, x := range states {
 		if x.a|x.b == 0 {
 			x.a = binary.BigEndian.Uint64(zeroSeed[:8])
@@ -67,6 +69,7 @@ func (x *xorshiftp) next() {
 	const shift0 = 23
 	const shift1 = 17
 	const shift2 = 26
+
 	var tmp uint64 = x.a
 	x.a = x.b
 	tmp ^= tmp << shift0

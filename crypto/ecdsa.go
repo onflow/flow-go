@@ -139,8 +139,9 @@ func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
 	// use extra 128 bits to reduce the modular reduction bias
 	minSeedLen := Nlen + (securityBits / 8)
-	if len(seed) < minSeedLen {
-		return nil, fmt.Errorf("seed should be at least %d bytes", minSeedLen)
+	if len(seed) < minSeedLen || len(seed) > KeyGenSeedMaxLenECDSA {
+		return nil, fmt.Errorf("seed byte length should be between %d and %d",
+			minSeedLen, KeyGenSeedMaxLenECDSA)
 	}
 	sk := goecdsaGenerateKey(a.curve, seed)
 	return &PrKeyECDSA{

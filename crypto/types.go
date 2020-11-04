@@ -50,6 +50,8 @@ const (
 
 	// ECDSA
 
+	KeyGenSeedMaxLenECDSA = 2048 // large enough constant accepted by the implementation
+
 	// NIST P256
 	SignatureLenECDSAP256 = 64
 	PrKeyLenECDSAP256     = 32

@@ -46,19 +46,6 @@ func TestPRGseeding(t *testing.T) {
 	assert.True(t, sk1.Equals(&sk2), "private keys should be equal")
 }
 
-// TestG1 helps debugging but is not a unit test
-func TestG1(t *testing.T) {
-	blsInstance.reInit()
-	seed := make([]byte, securityBits/8)
-	rand.Read(seed)
-	seedRelic(seed)
-	var expo scalar
-	randZr(&expo)
-	var res pointG1
-	genScalarMultG1(&res, &expo)
-
-}
-
 // G1 and G2 scalar multiplication
 func BenchmarkScalarMult(b *testing.B) {
 	blsInstance.reInit()
