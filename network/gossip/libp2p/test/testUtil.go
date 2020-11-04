@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
-	mock2 "github.com/onflow/flow-go/network/gossip/libp2p/mock"
+	libp2pmock "github.com/onflow/flow-go/network/gossip/libp2p/mock"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
