@@ -19,10 +19,10 @@ import (
 // clustering collection nodes into `clusterNum` clusters.
 func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList,
 	clusterNum uint) (protocol.State, flow.ClusterList) {
-	state := new(mock2.State)
-	snapshot := new(mock2.Snapshot)
-	epochQuery := new(mock2.EpochQuery)
-	epoch := new(mock2.Epoch)
+	state := new(protocolmock.State)
+	snapshot := new(protocolmock.Snapshot)
+	epochQuery := new(protocolmock.EpochQuery)
+	epoch := new(protocolmock.Epoch)
 	assignments := unittest.ClusterAssignment(clusterNum, collectorIds)
 	clusters, err := flow.NewClusterList(assignments, collectorIds)
 	require.NoError(t, err)
