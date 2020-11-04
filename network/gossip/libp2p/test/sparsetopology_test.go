@@ -132,7 +132,7 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	// total number of nodes in the network
 	const count = 9
 	// total number of subnets (should be less than count)
-	const subsets = 3
+	const subnets = 3
 
 	ids, keys := GenerateIDs(suite.T(), count, RunNetwork)
 	suite.ids = ids
