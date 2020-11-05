@@ -21,3 +21,7 @@ func IndexStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) 
 func LookupStateCommitment(blockID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCommit, blockID), commit)
 }
+
+func RemoveStateCommitment(blockID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeCommit, blockID))
+}
