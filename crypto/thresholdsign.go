@@ -320,8 +320,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 //
 // size is the size of the threshold signature group.
 // The function does not check the validity of the shares, and does not check
-// the validity of the resulting signature. It also does not check the signatures signers
-// are distinct. It is the caller's responsiblity to make sure all these conditions are met.
+// the validity of the resulting signature.
 // ReconstructThresholdSignature returns:
 // - error if the inputs are not in the correct range or if the threshold is not reached
 // - Signature: the threshold signature if there is no returned error, nil otherwise
@@ -386,8 +385,8 @@ func EnoughShares(threshold int, sharesNumber int) bool {
 	return sharesNumber > threshold
 }
 
-// ThresholdSignKeyGen is a centralized key generation for a BLS-based
-// threeshold signature scheme.
+// ThresholdSignKeyGen is a key generation for a BLS-based
+// threeshold signature scheme with a trusted dealer.
 func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {

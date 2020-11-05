@@ -22,7 +22,7 @@ type xorshiftp struct {
 }
 
 // at least a 16 bytes constant
-var zeroSeed = []byte("NothingUpMySleeves")
+var zeroSeed = []byte("NothingUpMySleeve")
 
 // NewRand returns a new PRG that is a set of xorshift128+ PRGs, seeded with the input seed.
 //

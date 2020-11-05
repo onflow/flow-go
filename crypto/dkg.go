@@ -129,13 +129,16 @@ type DKGProcessor interface {
 	// a private channel. The channel must preserve the
 	// confidentiality of the message and should authenticate
 	// the sender.
+	// It is recommended that the private channel is unique per
+	// protocol instance. This can be achieved by prepending all
+	// messages by a unique instance ID.
 	PrivateSend(dest int, data []byte)
 	// Broadcast broadcasts a message to all participants.
 	// This function assumes all nodes have received the same message,
 	// failing to do so, the protocol can be broken.
 	// The broadcasted message is public and not confidential.
 	// The broadcasting channel should authenticate the sender.
-	// It is recommended that the private channel is unique per
+	// It is recommended that the broadcasting channel is unique per
 	// protocol instance. This can be achieved by prepending all
 	// messages by a unique instance ID.
 	Broadcast(data []byte)
@@ -143,9 +146,6 @@ type DKGProcessor interface {
 	// disqualified from the protocol. Such behavior deserves
 	// disqualifying as it is flagged to all honest nodes in
 	// the protocol.
-	// It is recommended that the broadcast channel is unique per
-	// protocol instance. This can be achieved by prepending all
-	// messages by a unique instance ID.
 	Blacklist(node int)
 	// FlagMisbehavior warns that a node is misbehaving.
 	// Such behavior is not necessarily flagged to all nodes and therefore
