@@ -1,6 +1,7 @@
 package flattener
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -124,6 +125,12 @@ func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
 		mtrie, err := trie.NewMTrie(nodes[storableTrie.RootIndex])
 		if err != nil {
 			return nil, fmt.Errorf("restoring trie failed: %w", err)
+		}
+		if !mtrie.IsAValidTrie() {
+			return nil, fmt.Errorf("restoring trie failed: the constructed trie is not a valid trie")
+		}
+		if !bytes.Equal(storableTrie.RootHash, mtrie.RootHash()) {
+			return nil, fmt.Errorf("restoring trie failed: roothash doesn't match")
 		}
 		tries = append(tries, mtrie)
 	}

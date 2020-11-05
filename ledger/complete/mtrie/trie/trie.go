@@ -428,3 +428,9 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 func EmptyTrieRootHash(pathByteSize int) []byte {
 	return node.NewEmptyTreeRoot(8 * pathByteSize).Hash()
 }
+
+// IsAValidTrie verifies the content of the trie for potential issues
+func (mt *MTrie) IsAValidTrie() bool {
+	// TODO add checks on the health of node max height ...
+	return mt.root.VerifyCachedHash()
+}

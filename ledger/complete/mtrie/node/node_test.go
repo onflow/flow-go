@@ -17,6 +17,7 @@ func Test_ProperLeaf(t *testing.T) {
 	n := node.NewLeaf(path, payload, 0)
 	expectedRootHashHex := "aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(n.Hash()))
+	require.True(t, n.VerifyCachedHash())
 }
 
 // Test_ProperLeaf verifies that the hash value of a compactified leaf (at height > 0) is computed correctly.
@@ -110,4 +111,17 @@ func Test_RegCount(t *testing.T) {
 	n4 := node.NewInterimNode(1, n1, n2)
 	n5 := node.NewInterimNode(1, n4, n3)
 	require.Equal(t, n5.RegCount(), uint64(3))
+}
+
+func Test_VerifyCachedHash(t *testing.T) {
+	path := utils.TwoBytesPath(1)
+	payload := utils.LightPayload(2, 3)
+	n1 := node.NewLeaf(path, payload, 0)
+	n2 := node.NewLeaf(path, payload, 0)
+	n3 := node.NewLeaf(path, payload, 0)
+
+	n4 := node.NewInterimNode(1, n1, n2)
+	n5 := node.NewInterimNode(1, n4, n3)
+
+	require.True(t, n5.VerifyCachedHash())
 }

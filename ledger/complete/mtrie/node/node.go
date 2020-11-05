@@ -1,6 +1,7 @@
 package node
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -162,6 +163,23 @@ func (n *Node) computeHash() []byte {
 		h2 = n.rChild.Hash()
 	}
 	return common.HashInterNode(h1, h2)
+}
+
+func (n *Node) VerifyCachedHash() bool {
+	if n.lChild != nil {
+		if !n.lChild.VerifyCachedHash() {
+			return false
+		}
+	}
+	if n.rChild != nil {
+		if !n.rChild.VerifyCachedHash() {
+			return false
+		}
+	}
+	if n.hashValue != nil {
+		return bytes.Equal(n.hashValue, n.computeHash())
+	}
+	return true
 }
 
 // Hash returns the Node's hash value.
