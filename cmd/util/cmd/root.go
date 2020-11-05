@@ -12,6 +12,7 @@ import (
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
+	"github.com/onflow/flow-go/cmd/util/cmd/remove-execution-results"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 )
 
@@ -50,6 +51,7 @@ func addCommands() {
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
 	rootCmd.AddCommand(truncate_database.Cmd)
+	rootCmd.AddCommand(remove.Cmd)
 }
 
 func initConfig() {

@@ -109,6 +109,20 @@ func (_m *ExecutionReceipts) IndexByExecutor(receipt *flow.ExecutionReceipt) err
 	return r0
 }
 
+// RemoveByBlockID provides a mock function with given fields: blockID
+func (_m *ExecutionReceipts) RemoveByBlockID(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Store provides a mock function with given fields: result
 func (_m *ExecutionReceipts) Store(result *flow.ExecutionReceipt) error {
 	ret := _m.Called(result)
