@@ -388,8 +388,6 @@ func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController b
 		newSize = oldSize + absChange
 	}
 
-	buffer := make([]byte, uint64StorageSize)
-	binary.LittleEndian.PutUint64(buffer, newSize)
 	// this puts us back in the setValue method.
 	// The difference is that storage_used update exits early from this function so there isn't any recursion.
 	return a.setStorageUsed(address, newSize)
