@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/storage"
 	"golang.org/x/crypto/nacl/box"
@@ -20,6 +19,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/build"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	utilsio "github.com/onflow/flow-go/utils/io"
@@ -111,8 +111,9 @@ func main() {
 		log.Fatalf("Could not determine node ID: %s\n", err)
 	}
 
-	// timeout remote operations
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	// use a context without timeout since certain files are large (e.g. root.checkpoint) and depending on the
+	// network connection may need a lot of time to download
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if push {
@@ -192,6 +193,23 @@ func runPull(ctx context.Context, bootDir, token, nodeId string, role flow.Role)
 	err = bucketDownload(ctx, bootDir, folderToDownload, bootstrap.DirnamePublicBootstrap, token, extraFiles...)
 	if err != nil {
 		log.Fatalf("Failed to pull: %s", err)
+	}
+
+	if role == flow.RoleExecution {
+		// for an execution node, move the root.checkpoint file from <bootstrap folder>/public-root-information dir to
+		// <bootstrap folder>/execution-state dir
+
+		// root.checkpoint is downloaded to <bootstrap folder>/public-root-information after a pull
+		rootCheckpointSrc := filepath.Join(bootDir, bootstrap.DirnamePublicBootstrap, wal.RootCheckpointFilename)
+
+		rootCheckpointDst := filepath.Join(bootDir, bootstrap.PathRootCheckpoint)
+
+		log.Printf("Moving %s to %s \n", rootCheckpointSrc, rootCheckpointDst)
+
+		err := moveFile(rootCheckpointSrc, rootCheckpointDst)
+		if err != nil {
+			log.Fatalf("Failed to move root.checkpoint from %s to %s: %s", rootCheckpointSrc, rootCheckpointDst, err)
+		}
 	}
 
 	if role == flow.RoleConsensus {
@@ -482,4 +500,84 @@ func fileExists(filename string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+// moveFile moves a file from source to destination where src and dst are full paths including the filename
+func moveFile(src, dst string) error {
+
+	// check if source file exist
+	if !fileExists(src) {
+		return fmt.Errorf("file not found: %s", src)
+	}
+
+	// create the destination dir if it does not exist
+	destinationDir := filepath.Dir(dst)
+	err := os.MkdirAll(destinationDir, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", destinationDir, err)
+	}
+
+	// first, try renaming the file
+	err = os.Rename(src, dst)
+	if err == nil {
+		// if renaming works, we are done
+		return nil
+	}
+
+	// renaming may fail if the destination dir is on a different disk, in that case we do a copy followed by remove
+	// open the source file
+	source, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", src, err)
+	}
+
+	// create the destination file
+	destination, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", dst, err)
+	}
+	defer destination.Close()
+
+	// copy the source file to the destination file
+	_, err = io.Copy(destination, source)
+	if err != nil {
+		errorStr := err.Error()
+		closeErr := source.Close()
+		if closeErr != nil {
+			errorStr = fmt.Sprintf("%s, %s", errorStr, closeErr)
+		}
+		return fmt.Errorf("failed to copy file %s to %s: %s", src, dst, errorStr)
+	}
+
+	// close the source file
+	err = source.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close source file %s: %w", src, err)
+	}
+
+	// flush the destination file
+	err = destination.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to copy file %s to %s: %w", src, dst, err)
+	}
+
+	// read the source file permissions
+	si, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("failed to get file information %s: %w", src, err)
+	}
+
+	// set the same permissions on the destination file
+	err = os.Chmod(dst, si.Mode())
+	if err != nil {
+		return fmt.Errorf("failed to set permisson on file %s: %w", dst, err)
+	}
+
+	// delete the source file
+	err = os.Remove(src)
+	if err != nil {
+		return fmt.Errorf("failed removing original file: %s", err)
+	}
+
+	return nil
 }
