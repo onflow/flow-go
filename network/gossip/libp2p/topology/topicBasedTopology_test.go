@@ -71,7 +71,7 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 			roles, ok := engine.RolesByChannelID(topic)
 			require.True(suite.T(), ok)
 
-			ids, err := top.Subset(suite.ids, nil, topic, suite.fanout)
+			ids, err := top.Subset(suite.ids, nil, topic)
 			require.NoError(suite.T(), err)
 
 			// counts total number of nodes that has the roles and are not `suite.me`  (node of interest).
@@ -101,7 +101,7 @@ func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 			current = nil
 
 			// generate a new topology with a the same ids, size and seed
-			ids, err := top.Subset(suite.ids, nil, topic, suite.fanout)
+			ids, err := top.Subset(suite.ids, nil, topic)
 			require.NoError(suite.T(), err)
 
 			// topology should not contain the node itself
@@ -153,7 +153,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		// creates and samples a new topic aware topology for the first topic of consensus nodes
 		top, err := topology.NewTopicBasedTopology(identity.NodeID, suite.state)
 		require.NoError(suite.T(), err)
-		ids, err := top.Subset(suite.ids, nil, topics[0], suite.fanout)
+		ids, err := top.Subset(suite.ids, nil, topics[0])
 		require.NoError(suite.T(), err)
 
 		// topology should not contain the node itself
@@ -186,7 +186,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.Subset(suite.ids, nil, channelID, suite.fanout)
+		subset, err := top.Subset(suite.ids, nil, channelID)
 		require.NoError(suite.T(), err)
 
 		channelIDAdjMap[id.NodeID] = subset
@@ -211,7 +211,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.Subset(suite.ids, nil, channelID, suite.fanout)
+		subset, err := top.Subset(suite.ids, nil, channelID)
 		require.NoError(suite.T(), err)
 
 		channelIDAdjMap[id.NodeID] = subset

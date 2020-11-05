@@ -77,7 +77,7 @@ func (suite *StatefulTopologyTestSuite) TestRoleSize() {
 			// number of nodes in fanout with specified role
 			roleFanout := topMngr.Fanout(uint(len(myFanout.Filter(filter.HasRole(role)))))
 
-			require.LessOrEqual(suite.T(), roleFanout, roleTotal)
+			require.Less(suite.T(), roleFanout, roleTotal)
 		}
 	}
 }

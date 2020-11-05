@@ -182,7 +182,7 @@ type IndexBoundTopology struct {
 }
 
 // Returns a subset of ids bounded by [minIndex, maxIndex) for the SparseTopology
-func (ibt IndexBoundTopology) Subset(ids flow.IdentityList, shouldHave flow.IdentityList, topic string, fanout uint) (flow.IdentityList, error) {
+func (ibt IndexBoundTopology) Subset(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
 	sub := ids[ibt.minIndex:ibt.maxIndex]
 	return sub, nil
 }
