@@ -11,6 +11,9 @@ type ExecutionReceipts interface {
 	// Store stores an execution receipt.
 	Store(result *flow.ExecutionReceipt) error
 
+	// RemoveByBlockID receipt by block ID
+	RemoveByBlockID(blockID flow.Identifier) error
+
 	// ByID retrieves an execution receipt by its ID.
 	ByID(resultID flow.Identifier) (*flow.ExecutionReceipt, error)
 
