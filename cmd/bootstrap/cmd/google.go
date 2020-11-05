@@ -2,6 +2,10 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"cloud.google.com/go/storage"
@@ -9,17 +13,20 @@ import (
 	"google.golang.org/api/option"
 )
 
+// GoogleBucket ...
 type GoogleBucket struct {
-	name string
+	Name string
 }
 
+// NewGoogleBucket ...
 func NewGoogleBucket(bucketName string) *GoogleBucket {
 	return &GoogleBucket{
-		name: bucketName,
+		Name: bucketName,
 	}
 }
 
-func (g *Google) NewClient(ctx context.Context) (*storage.Client, error) {
+// NewClient ...
+func (g *GoogleBucket) NewClient(ctx context.Context) (*storage.Client, error) {
 	client, err := storage.NewClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -27,8 +34,9 @@ func (g *Google) NewClient(ctx context.Context) (*storage.Client, error) {
 	return client, nil
 }
 
+// GetFiles ...
 func (g *GoogleBucket) GetFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]string, error) {
-	it := client.Bucket(g.name).Objects(ctx, &storage.Query{
+	it := client.Bucket(g.Name).Objects(ctx, &storage.Query{
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	})
@@ -49,4 +57,33 @@ func (g *GoogleBucket) GetFiles(ctx context.Context, client *storage.Client, pre
 	}
 
 	return files, nil
+}
+
+// DownloadFile ...
+func (g *GoogleBucket) DownloadFile(ctx context.Context, client *storage.Client, destination, source string) error {
+
+	// create dir of destination
+	dir := filepath.Dir(destination)
+	err := os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("error creating destination directory: %w", err)
+	}
+
+	download, err := client.Bucket(g.Name).Object(source).NewReader(ctx)
+	if err != nil {
+		return fmt.Errorf("error creating GCS object reader: %w", err)
+	}
+	defer download.Close()
+
+	file, err := os.Create(destination)
+	if err != nil {
+		return fmt.Errorf("error creating download file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, download)
+	if err != nil {
+		return fmt.Errorf("error downloading file: %w", err)
+	}
+	return nil
 }
