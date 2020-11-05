@@ -18,6 +18,9 @@ type ExecutionReceipts interface {
 	// BatchStore stores an execution receipt inside given batch
 	BatchStore(receipt *flow.ExecutionReceipt, batch BatchStorage) error
 
+	// RemoveByBlockID receipt by block ID
+	RemoveByBlockID(blockID flow.Identifier) error
+
 	// ByID retrieves an execution receipt by its ID.
 	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
 

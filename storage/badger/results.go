@@ -145,3 +145,21 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	defer tx.Discard()
 	return r.byBlockID(blockID)(tx)
 }
+
+func (r *ExecutionResults) RemoveByBlockID(blockID flow.Identifier) error {
+
+	result, err := r.ByBlockID(blockID)
+	if errors.Is(err, badger.ErrKeyNotFound) {
+		return nil
+	}
+
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return r.db.Update(operation.RemoveExecutionResult(blockID, result))
+}

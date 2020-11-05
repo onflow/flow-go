@@ -216,6 +216,20 @@ func (_m *ExecutionState) PersistExecutionState(ctx context.Context, header *flo
 	return r0
 }
 
+// RemoveByBlockID provides a mock function with given fields: _a0
+func (_m *ExecutionState) RemoveByBlockID(_a0 flow.Identifier) error {
+	ret := _m.Called(_a0)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // RetrieveStateDelta provides a mock function with given fields: _a0, _a1
 func (_m *ExecutionState) RetrieveStateDelta(_a0 context.Context, _a1 flow.Identifier) (*messages.ExecutionStateDelta, error) {
 	ret := _m.Called(_a0, _a1)
@@ -237,6 +251,20 @@ func (_m *ExecutionState) RetrieveStateDelta(_a0 context.Context, _a1 flow.Ident
 	}
 
 	return r0, r1
+}
+
+// SetHighestExecuted provides a mock function with given fields: _a0
+func (_m *ExecutionState) SetHighestExecuted(_a0 *flow.Header) error {
+	ret := _m.Called(_a0)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Header) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // StateCommitmentByBlockID provides a mock function with given fields: _a0, _a1

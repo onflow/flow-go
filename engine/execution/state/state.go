@@ -67,6 +67,10 @@ type ExecutionState interface {
 	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 		chunkDataPacks []*flow.ChunkDataPack,
 		executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
+
+	RemoveByBlockID(flow.Identifier) error
+
+	SetHighestExecuted(*flow.Header) error
 }
 
 const (
@@ -527,6 +531,36 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 		err = operation.UpdateExecutedBlock(header.ID())(txn)
 		if err != nil {
 			return fmt.Errorf("cannot update highest executed block: %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (s *state) RemoveByBlockID(blockID flow.Identifier) error {
+	err := s.receipts.RemoveByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not remove receipt: %w", err)
+	}
+
+	err = s.commits.RemoveByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not remove commits: %w", err)
+	}
+
+	err = s.results.RemoveByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not remove result: %w", err)
+	}
+
+	return nil
+}
+
+func (s *state) SetHighestExecuted(header *flow.Header) error {
+	return operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {
+		err := operation.UpdateExecutedBlock(header.ID())(txn)
+		if err != nil {
+			return fmt.Errorf("cannot set highest executed block: %w", err)
 		}
 
 		return nil

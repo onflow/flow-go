@@ -15,4 +15,6 @@ type Commits interface {
 
 	// ByBlockID will retrieve a commit by its ID from persistent storage.
 	ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error)
+
+	RemoveByBlockID(blockID flow.Identifier) error
 }

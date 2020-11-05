@@ -116,6 +116,20 @@ func (_m *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identif
 	return r0
 }
 
+// RemoveByBlockID provides a mock function with given fields: blockID
+func (_m *ExecutionResults) RemoveByBlockID(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Store provides a mock function with given fields: result
 func (_m *ExecutionResults) Store(result *flow.ExecutionResult) error {
 	ret := _m.Called(result)

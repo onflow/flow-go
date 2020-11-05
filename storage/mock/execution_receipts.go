@@ -74,6 +74,20 @@ func (_m *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRec
 	return r0, r1
 }
 
+// RemoveByBlockID provides a mock function with given fields: blockID
+func (_m *ExecutionReceipts) RemoveByBlockID(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Store provides a mock function with given fields: receipt
 func (_m *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
 	ret := _m.Called(receipt)

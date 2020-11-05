@@ -152,3 +152,20 @@ func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionRe
 	defer tx.Discard()
 	return r.byBlockID(blockID)(tx)
 }
+
+func (r *ExecutionReceipts) RemoveByBlockID(blockID flow.Identifier) error {
+	receipt, err := r.ByBlockID(blockID)
+	if errors.Is(err, badger.ErrKeyNotFound) {
+		return nil
+	}
+
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil
+	}
+
+	if err != nil {
+		return fmt.Errorf("could not find receipt: %w", err)
+	}
+
+	return r.db.Update(operation.RemoveExecutionReceipt(blockID, receipt))
+}

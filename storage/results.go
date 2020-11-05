@@ -28,4 +28,6 @@ type ExecutionResults interface {
 
 	// ByBlockID retrieves an execution result by block ID.
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)
+
+	RemoveByBlockID(blockID flow.Identifier) error
 }

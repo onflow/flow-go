@@ -71,3 +71,15 @@ func receiptIterationFunc(receiptIDs *[]flow.Identifier) func() (checkFunc, crea
 		return check, create, handle
 	}
 }
+
+func RemoveExecutionReceipt(blockID flow.Identifier, receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		receiptID := receipt.ID()
+		err := remove(makePrefix(codeExecutionReceiptMeta, receiptID))(txn)
+		if err != nil {
+			return err
+		}
+
+		return remove(makePrefix(codeBlockExecutionReceipt, blockID))(txn)
+	}
+}
