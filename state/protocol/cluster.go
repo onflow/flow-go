@@ -14,14 +14,14 @@ type Cluster interface {
 	// Index returns the index for this cluster.
 	Index() uint
 
-	// ChainID returns chain ID for the cluster's chain.
-	ChainID() flow.ChainID
+	// ID returns ID for the cluster.
+	ID() flow.Identifier
 
 	// EpochCounter returns the epoch counter for this cluster.
 	EpochCounter() uint64
 
 	// Members returns the initial set of collector nodes in this cluster.
-	Members() flow.IdentityList
+	Members() flow.IdentifierList
 
 	// RootBlock returns the root block for this cluster.
 	RootBlock() *cluster.Block

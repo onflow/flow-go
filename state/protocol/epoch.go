@@ -50,12 +50,40 @@ type Epoch interface {
 	InitialIdentities() (flow.IdentityList, error)
 
 	// Clustering returns the cluster assignment for this epoch.
-	Clustering() (flow.ClusterList, error)
-
-	// Cluster returns the detailed cluster information for the cluster with the
-	// given index, in this epoch.
-	Cluster(index uint) (Cluster, error)
+	// CAUTION: only clusters that operate from this particular Epoch are considered.
+	Clusters() (ClusterList, error)
 
 	// DKG returns the result of the distributed key generation procedure.
 	DKG() (DKG, error)
+}
+
+// ClusterList is a list of clusters.
+type ClusterList []Cluster
+
+// ByIndex retrieves the list of identities that are part of the
+// given cluster.
+func (cl ClusterList) ByIndex(index uint) (Cluster, bool) {
+	panic("Implement me")
+}
+
+// ByTxID selects the cluster that should receive the transaction with the given
+// transaction ID.
+//
+// For evenly distributed transaction IDs, this will evenly distribute
+// transactions between clusters.
+func (cl ClusterList) ByTxID(txID flow.Identifier) (Cluster, bool) {
+	panic("Implement me")
+}
+
+// ByNodeID selects the cluster that the node with the given ID is part of.
+//
+// Nodes will be divided into equally sized clusters as far as possible.
+// The last return value will indicate if the look up was successful
+func (cl ClusterList) ByNodeID(nodeID flow.Identifier) (Cluster, bool) {
+	panic("Implement me")
+}
+
+// ByClusterID retruns the cluster with the given ID.
+func (cl ClusterList) ByClusterID(clusterID flow.Identifier) (Cluster, bool) {
+	panic("Implement me")
 }

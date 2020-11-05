@@ -47,6 +47,11 @@ type Snapshot interface {
 	// Phase returns the epoch phase for the current epoch, as of the Head block.
 	Phase() (flow.EpochPhase, error)
 
+	// Clustering returns the cluster assignment for this epoch.
+	// CAUTION: all clusters are included here, whose collections are allowed to be included
+	// in this block.
+	Clusters() (ClusterList, error)
+
 	// Epochs returns a query object enabling querying detailed information about
 	// various epochs.
 	//

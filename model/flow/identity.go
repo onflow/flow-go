@@ -24,6 +24,7 @@ type Identity struct {
 	Address       string
 	Role          Role
 	Stake         uint64
+	Ejected       bool
 	StakingPubKey crypto.PublicKey
 	NetworkPubKey crypto.PublicKey
 }
