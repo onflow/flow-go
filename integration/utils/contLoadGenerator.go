@@ -16,6 +16,16 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
+type LoadType string
+
+const (
+	TokenTransferLoadType LoadType = "token-transfer"
+	TokenAddKeysLoadType  LoadType = "add-keys"
+	CompHeavyLoadType     LoadType = "computation-heavy"
+	EventHeavyLoadType    LoadType = "event-heavy"
+	LedgerHeavyLoadType   LoadType = "ledger-heavy"
+)
+
 const accountCreationBatchSize = 100
 const tokensPerTransfer = 0.01 // flow testnets only have 10e6 total supply, so we choose a small amount here
 
@@ -33,15 +43,16 @@ type ContLoadGenerator struct {
 	serviceAccount       *flowAccount
 	flowTokenAddress     *flowsdk.Address
 	fungibleTokenAddress *flowsdk.Address
+	favContractAddress   *flowsdk.Address
 	accounts             []*flowAccount
 	availableAccounts    chan *flowAccount // queue with accounts that are available for workers
-	scriptCreator        *ScriptCreator
 	txTracker            *TxTracker
 	txStatsTracker       *TxStatsTracker
 	workerStatsTracker   *WorkerStatsTracker
 	workers              []*Worker
 	blockRef             BlockRef
 	stopped              bool
+	loadType             LoadType
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
@@ -56,6 +67,7 @@ func NewContLoadGenerator(
 	fungibleTokenAddress *flowsdk.Address,
 	flowTokenAddress *flowsdk.Address,
 	tps int,
+	loadType LoadType,
 ) (*ContLoadGenerator, error) {
 
 	numberOfAccounts := tps * 10 // 1 second per block, factor 10 for delays to prevent sequence number collisions
@@ -68,11 +80,6 @@ func NewContLoadGenerator(
 	// TODO get these params hooked to the top level
 	txStatsTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
 	txTracker, err := NewTxTracker(log, 5000, 100, loadedAccessAddr, time.Second, txStatsTracker)
-	if err != nil {
-		return nil, err
-	}
-
-	scriptCreator, err := NewScriptCreator()
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +101,8 @@ func NewContLoadGenerator(
 		txTracker:            txTracker,
 		txStatsTracker:       txStatsTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
-		scriptCreator:        scriptCreator,
 		blockRef:             NewBlockRef(supervisorClient),
+		loadType:             loadType,
 	}
 
 	return lGen, nil
@@ -116,6 +123,48 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
+	lg.SetupFavContract()
+	return nil
+}
+
+func (lg *ContLoadGenerator) SetupFavContract() error {
+	// take one of the accounts
+	if len(lg.accounts) == 0 {
+		return fmt.Errorf("can't setup fav contract, zero accounts available")
+	}
+
+	acc := lg.accounts[0]
+
+	blockRef, err := lg.blockRef.Get()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error getting reference block")
+		return err
+	}
+
+	lg.log.Trace().Msgf("creating fav contract deployment script")
+	deployScript := DeployingMyFavContractScript()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error creating fav contract deployment script")
+		return err
+	}
+
+	lg.log.Trace().Msgf("creating fav contract deployment transaction")
+	deploymentTx := flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef).
+		SetScript(deployScript).
+		SetProposalKey(*acc.address, 0, acc.seqNumber).
+		SetPayer(*acc.address).
+		AddAuthorizer(*acc.address)
+
+	lg.log.Trace().Msgf("signing transaction")
+	acc.signTx(deploymentTx, 0)
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error signing transaction")
+		return err
+	}
+
+	lg.sendTx(deploymentTx)
+	lg.favContractAddress = acc.address
 
 	return nil
 }
@@ -123,7 +172,18 @@ func (lg *ContLoadGenerator) Init() error {
 func (lg *ContLoadGenerator) Start() {
 	// spawn workers
 	for i := 0; i < lg.tps; i++ {
-		worker := NewWorker(i, 1*time.Second, lg.sendTx)
+		var worker Worker
+
+		switch lg.loadType {
+		case TokenTransferLoadType:
+			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
+		case TokenAddKeysLoadType:
+			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
+		// other types
+		default:
+			worker = NewWorker(i, 1*time.Second, lg.sendFavContractTx)
+		}
+
 		worker.Start()
 		lg.workerStatsTracker.AddWorker()
 
@@ -140,35 +200,6 @@ func (lg *ContLoadGenerator) Stop() {
 	}
 	lg.txTracker.Stop()
 	lg.workerStatsTracker.StopPrinting()
-}
-
-const createAccountsTransactionTemplate = `
-import FungibleToken from 0x%s
-import FlowToken from 0x%s
-
-transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
-  prepare(signer: AuthAccount) {
-	let vault = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-      ?? panic("Could not borrow reference to the owner's Vault")
-
-    var i = 0
-    while i < count {
-      let account = AuthAccount(payer: signer)
-      account.addPublicKey(publicKey)
-
-	  let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
-		?? panic("Could not borrow receiver reference to the recipient's Vault")
-
-      receiver.deposit(from: <-vault.withdraw(amount: initialTokenAmount))
-
-      i = i + 1
-    }
-  }
-}
-`
-
-func createAccountsTransaction(fungibleToken, flowToken flowsdk.Address) []byte {
-	return []byte(fmt.Sprintf(createAccountsTransactionTemplate, fungibleToken, flowToken))
 }
 
 func (lg *ContLoadGenerator) createAccounts(num int) error {
@@ -189,7 +220,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
-		SetScript(createAccountsTransaction(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
+		SetScript(CreateAccountsScript(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
 		SetReferenceBlockID(blockRef).
 		SetProposalKey(
 			*lg.serviceAccount.address,
@@ -226,7 +257,6 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	}
 
 	lg.serviceAccount.signerLock.Lock()
-
 	err = createAccountTx.SignEnvelope(
 		*lg.serviceAccount.address,
 		lg.serviceAccount.accountKey.Index,
@@ -235,9 +265,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	if err != nil {
 		return err
 	}
-
 	lg.serviceAccount.accountKey.SequenceNumber++
-
 	lg.serviceAccount.signerLock.Unlock()
 
 	err = lg.flowClient.SendTransaction(context.Background(), *createAccountTx)
@@ -314,7 +342,9 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) sendTx(workerID int) {
+func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
+	// TODO move this as a configurable parameter
+	numberOfKeysToAdd := 40
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error getting reference block")
@@ -326,21 +356,76 @@ func (lg *ContLoadGenerator) sendTx(workerID int) {
 	acc := <-lg.availableAccounts
 	defer func() { lg.availableAccounts <- acc }()
 
+	lg.log.Trace().Msgf("creating add proposer key script")
+	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
+	for i := 0; i < numberOfKeysToAdd; i++ {
+		cadenceKeys[i] = bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
+	}
+	cadenceKeysArray := cadence.NewArray(cadenceKeys)
+
+	addKeysScript, err := AddKeyToAccountScript()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error getting add key to account script")
+		return
+	}
+
+	addKeysTx := flowsdk.NewTransaction().
+		SetScript(addKeysScript).
+		AddAuthorizer(*acc.address).
+		SetReferenceBlockID(blockRef).
+		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
+		SetPayer(*lg.serviceAccount.address)
+
+	err = addKeysTx.AddArgument(cadenceKeysArray)
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error constructing add keys to account transaction")
+		return
+	}
+
+	lg.log.Trace().Msgf("creating transaction")
+
+	addKeysTx.SetReferenceBlockID(blockRef).
+		SetProposalKey(*acc.address, 0, acc.seqNumber).
+		SetPayer(*acc.address).
+		AddAuthorizer(*acc.address)
+
+	lg.log.Trace().Msgf("signing transaction")
+	acc.signTx(addKeysTx, 0)
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error signing transaction")
+		return
+	}
+
+	lg.sendTx(addKeysTx)
+}
+
+func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
+
+	blockRef, err := lg.blockRef.Get()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error getting reference block")
+		return
+	}
+
+	lg.log.Trace().Msgf("getting next available account")
+	acc := <-lg.availableAccounts
+	defer func() { lg.availableAccounts <- acc }()
+
 	lg.log.Trace().Msgf("getting next account")
 	nextAcc := lg.accounts[(acc.i+1)%len(lg.accounts)]
 
 	lg.log.Trace().Msgf("creating transfer script")
-	transferScript, err := lg.scriptCreator.TokenTransferScript(
+	transferScript, err := TokenTransferScript(
 		lg.fungibleTokenAddress,
 		acc.address,
 		nextAcc.address,
 		tokensPerTransfer)
 	if err != nil {
-		lg.log.Error().Err(err).Msgf("error creating token trasferscript")
+		lg.log.Error().Err(err).Msgf("error creating token transfer script")
 		return
 	}
 
-	lg.log.Trace().Msgf("creating transaction")
+	lg.log.Trace().Msgf("creating token transfer transaction")
 	transferTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef).
 		SetScript(transferScript).
@@ -349,18 +434,62 @@ func (lg *ContLoadGenerator) sendTx(workerID int) {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	acc.signerLock.Lock()
-	err = transferTx.SignEnvelope(*acc.address, 0, acc.signer)
+	acc.signTx(transferTx, 0)
 	if err != nil {
-		acc.signerLock.Unlock()
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return
 	}
-	acc.seqNumber++
-	acc.signerLock.Unlock()
+
+	lg.sendTx(transferTx)
+}
+
+// TODO update this to include loadtype
+func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
+
+	blockRef, err := lg.blockRef.Get()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error getting reference block")
+		return
+	}
+
+	lg.log.Trace().Msgf("getting next available account")
+
+	acc := <-lg.availableAccounts
+	defer func() { lg.availableAccounts <- acc }()
+	var txScript []byte
+
+	switch lg.loadType {
+	case CompHeavyLoadType:
+		txScript = ComputationHeavyScript(*lg.favContractAddress)
+	case EventHeavyLoadType:
+		txScript = EventHeavyScript(*lg.favContractAddress)
+	case LedgerHeavyLoadType:
+		txScript = LedgerHeavyScript(*lg.favContractAddress)
+	}
+
+	lg.log.Trace().Msgf("creating transaction")
+	tx := flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef).
+		SetScript(txScript).
+		SetProposalKey(*acc.address, 0, acc.seqNumber).
+		SetPayer(*acc.address).
+		AddAuthorizer(*acc.address)
+
+	lg.log.Trace().Msgf("signing transaction")
+	acc.signTx(tx, 0)
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error signing transaction")
+		return
+	}
+
+	lg.sendTx(tx)
+}
+
+func (lg *ContLoadGenerator) sendTx(tx *flowsdk.Transaction) {
+	// TODO move this as a configurable parameter
 
 	lg.log.Trace().Msgf("sending transaction")
-	err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
+	err := lg.flowClient.SendTransaction(context.Background(), *tx)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error sending transaction")
 		return
@@ -373,34 +502,34 @@ func (lg *ContLoadGenerator) sendTx(workerID int) {
 	if lg.trackTxs {
 		stopped := false
 		wg := sync.WaitGroup{}
-		lg.txTracker.AddTx(transferTx.ID(),
+		lg.txTracker.AddTx(tx.ID(),
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-				lg.log.Trace().Str("tx_id", transferTx.ID().String()).Msgf("finalized tx")
+				lg.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
 				if !stopped {
 					stopped = true
 					wg.Done()
 				}
 			}, // on finalized
 			func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-				lg.log.Trace().Str("tx_id", transferTx.ID().String()).Msgf("sealed tx")
+				lg.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
 			}, // on sealed
 			func(_ flowsdk.Identifier) {
-				lg.log.Warn().Str("tx_id", transferTx.ID().String()).Msgf("tx expired")
+				lg.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
 				if !stopped {
 					stopped = true
 					wg.Done()
 				}
 			}, // on expired
 			func(_ flowsdk.Identifier) {
-				lg.log.Warn().Str("tx_id", transferTx.ID().String()).Msgf("tx timed out")
+				lg.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
 				if !stopped {
 					stopped = true
 					wg.Done()
 				}
 			}, // on timout
 			func(_ flowsdk.Identifier, err error) {
-				lg.log.Error().Err(err).Str("tx_id", transferTx.ID().String()).Msgf("tx error")
+				lg.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
 				if !stopped {
 					stopped = true
 					wg.Done()

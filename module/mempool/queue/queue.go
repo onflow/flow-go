@@ -104,6 +104,7 @@ func dequeue(queue *Queue) *Queue {
 			cache[key] = val
 		}
 	}
+
 	return &Queue{
 		Head:    onlyChild,
 		Nodes:   cache,

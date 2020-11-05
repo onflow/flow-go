@@ -8,12 +8,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func StateInteractionsFixture() *delta.Snapshot {
+func StateInteractionsFixture() *delta.SpockSnapshot {
 	return delta.NewView(nil).Interactions()
 }
 
 func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *execution.ComputationResult {
-	stateViews := make([]*delta.Snapshot, len(collectionsSignerIDs))
+	stateViews := make([]*delta.SpockSnapshot, len(collectionsSignerIDs))
 	for i := 0; i < len(collectionsSignerIDs); i++ {
 		stateViews[i] = StateInteractionsFixture()
 	}
@@ -25,7 +25,7 @@ func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *executi
 
 func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *execution.ComputationResult {
 	n := len(completeBlock.CompleteCollections)
-	stateViews := make([]*delta.Snapshot, n)
+	stateViews := make([]*delta.SpockSnapshot, n)
 	for i := 0; i < n; i++ {
 		stateViews[i] = StateInteractionsFixture()
 	}

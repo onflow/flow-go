@@ -64,6 +64,26 @@ func (tb TransactionBody) Fingerprint() []byte {
 	})
 }
 
+func (tb TransactionBody) ByteSize() uint {
+	size := 0
+	size += len(tb.ReferenceBlockID)
+	size += len(tb.Script)
+	for _, arg := range tb.Arguments {
+		size += len(arg)
+	}
+	size += 8 // gas size
+	size += tb.ProposalKey.ByteSize()
+	size += AddressLength                       // payer address
+	size += len(tb.Authorizers) * AddressLength // Authorizers
+	for _, s := range tb.PayloadSignatures {
+		size += s.ByteSize()
+	}
+	for _, s := range tb.EnvelopeSignatures {
+		size += s.ByteSize()
+	}
+	return uint(size)
+}
+
 func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
@@ -386,12 +406,26 @@ type ProposalKey struct {
 	SequenceNumber uint64
 }
 
+// ByteSize returns the byte size of the proposal key
+func (p ProposalKey) ByteSize() int {
+	keyIDLen := 8
+	sequenceNumberLen := 8
+	return len(p.Address) + keyIDLen + sequenceNumberLen
+}
+
 // A TransactionSignature is a signature associated with a specific account key.
 type TransactionSignature struct {
 	Address     Address
 	SignerIndex int
 	KeyIndex    uint64
 	Signature   []byte
+}
+
+// ByteSize returns the byte size of the transaction signature
+func (s TransactionSignature) ByteSize() int {
+	signerIndexLen := 8
+	keyIDLen := 8
+	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature)
 }
 
 func (s TransactionSignature) Fingerprint() []byte {

@@ -256,27 +256,42 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*model.Vote, block 
 	return nil
 }
 
-// storeIncorporatedVote stores incorporated votes and accumulate stakes
-// it drops invalid votes and duplicate votes
+// storeIncorporatedVote stores incorporated votes and accumulates weight
+// It drops invalid votes.
+//
+// Handling of DOUBLE VOTES (equivocation):
+// Including double votes in building the QC for their respective block does _not_
+// reduce the security. The main deterrent is the slashing for equivocation, which only
+// requires detection of double voting. Therefore, we take the simpler approach and do
+// not discard votes from equivocating nodes. When encountering vote equivocation:
+//   * notify consumer
+//   * do not error, as a replica must handle this case is part of the "normal operation"
+//   * Provided the vote is valid by itself, treat it as valid. The validity of a vote
+//     needs to be objective and not depend on whether the replica has knowledge of a
+//     conflicting vote.
+//
+// Note that treating a valid vote as invalid would create the following additional edge case:
+//   * consider a primary that is proposing two conflicting blocks (block equivocation)
+//   * Assume the case where we would treat the proposer's vote for its second block
+//     (embedded in the block) as invalid
+//   * then, we would arrive at the conclusion that the second block itself is invalid
+// This would violate objective validity of blocks.
 func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, block *model.Block) (bool, error) {
 	// validate the vote
 	voter, err := va.voteValidator.ValidateVote(vote, block)
-
 	if model.IsInvalidVoteError(err) {
 		// does not report invalid vote as an error, notify consumers instead
 		va.notifier.OnInvalidVoteDetected(vote)
 		return false, nil
 	}
-
 	if err != nil {
 		return false, fmt.Errorf("could not validate incorporated vote: %w", err)
 	}
 
-	// does not report double vote as an error, notify consumers instead
+	// check for double vote:
 	firstVote, detected := va.detectDoubleVote(vote)
 	if detected {
 		va.notifier.OnDoubleVotingDetected(firstVote, vote)
-		return false, nil
 	}
 
 	// update existing voting status or create a new one
