@@ -468,7 +468,8 @@ func (b *Builder) block2SealMap() (map[flow.Identifier]*flow.IncorporatedResultS
 		}
 	}
 	if encounteredInconsistentSealsForSameBlock {
-		// in case we find inconsistent seals, do not seal anything
+		// in case we find inconsistent seals, do not seal anything,
+		// so that inconsistent seals won't impact finalization
 		byBlock = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 	}
 	return byBlock, nil
