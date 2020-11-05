@@ -59,7 +59,7 @@ func pull(cmd *cobra.Command, args []string) {
 
 	for _, file := range files {
 		fullOutpath := filepath.Join(flagOutdir, file)
-		log.Printf("Downloading %s", file)
+		log.Info().Msgf("Downloading %s", file)
 
 		err = bucket.DownloadFile(ctx, client, fullOutpath, file)
 		if err != nil {
