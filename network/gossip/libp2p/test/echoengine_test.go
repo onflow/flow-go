@@ -58,6 +58,17 @@ func (suite *EchoEngineTestSuite) TestUnknownChannelID() {
 	require.Error(suite.T(), err)
 }
 
+// TestClusterChannelID evaluates that registering a cluster channel ID is done without any error.
+func (suite *EchoEngineTestSuite) TestClusterChannelID() {
+	e := NewEchoEngine(suite.T(), suite.nets[0], 1, engine.TestNetwork, false, suite.Unicast)
+	// creates a cluster channel ID
+	clusterChannelID := engine.ChannelSyncCluster(flow.Testnet)
+	// registers engine with cluster channel ID
+	_, err := suite.nets[0].Register(clusterChannelID, e)
+	// registering cluster channel ID should not cause an error
+	require.NoError(suite.T(), err)
+}
+
 // TestDuplicateChannelID evaluates that registering an engine with duplicate channel ID returns an error.
 func (suite *EchoEngineTestSuite) TestDuplicateChannelID() {
 	// creates an echo engine, which registers it on test network channel
