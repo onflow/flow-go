@@ -24,6 +24,20 @@ func RolesByChannelID(channelID string) (flow.RoleList, bool) {
 	return roles, ok
 }
 
+// ValidChannelID returns true if channel ID is a valid channel, i.e.,
+// it is either a cluster channel id or is registered in the channel id map.
+func ValidChannelID(channelID string) bool {
+	if _, ok := RolesByChannelID(channelID); ok {
+		return true
+	}
+
+	if IsClusterChannelID(channelID) {
+		return true
+	}
+
+	return false
+}
+
 // ChannelIDsByRole returns a list of all channel IDs the role subscribes to.
 func ChannelIDsByRole(role flow.Role) []string {
 	channels := make([]string, 0)
