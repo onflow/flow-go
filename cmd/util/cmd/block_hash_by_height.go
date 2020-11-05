@@ -74,7 +74,7 @@ var blockHashByHeightCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(blockHashByHeightCmd)
+	// rootCmd.AddCommand(blockHashByHeightCmd)
 
 	blockHashByHeightCmd.Flags().Uint64Var(&flagHeight, "height", 0,
 		"height for which the block hash should be retrieved")
