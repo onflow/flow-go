@@ -17,11 +17,12 @@ import (
 // The BLS settings are the same as in the signature
 // scheme defined in the package.
 
-// the threshold value (t) if fixed for now to t = floor((n-1)/2)
-// where (t+1) signatures are required to reconstruct the
-// threshold signature.
-// FeldmanVSS, FeldmanVSSQual and JointFeldman are
-// key generators for this threshold signature scheme
+// A threshold signature scheme allows any subset of (t+1)
+// valid signature shares to reconstruct the threshold signature.
+// up to (t) shares do not leak any information about the threshold
+// signature.
+// In Flow, the input threshold value (t) is set to
+// t = floor((n-1)/2) to optimize for unforgeability and robustness.
 
 // The package offers two api:
 // - stateful api where a structure holds all information

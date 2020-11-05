@@ -130,7 +130,7 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	return (verif == valid), nil
 }
 
-// generatePrivateKey generates a private key for BLS on BLS12381 curve.
+// generatePrivateKey generates a private key for BLS on BLS12-381 curve.
 // The minimum size of the input seed is 48 bytes.
 //
 // It is recommended to use a secure crypto RNG to generate the seed.
@@ -306,7 +306,7 @@ var signatureLengthBLSBLS12381 = int(C.get_signature_len())
 var pubKeyLengthBLSBLS12381 = int(C.get_pk_len())
 var prKeyLengthBLSBLS12381 = int(C.get_sk_len())
 
-// init sets the context of BLS12381 curve
+// init sets the context of BLS12-381 curve
 func (a *blsBLS12381Algo) init() error {
 	// initializes relic context and sets the B12_381 parameters
 	if err := a.context.initContext(); err != nil {
