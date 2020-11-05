@@ -48,6 +48,8 @@ const AccountKeyWeightThreshold = 1000
 
 const defaultGasLimit = 100000
 
+const totalEventByteSizeLimit = 10000 // 10KB
+
 func defaultContext() Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
@@ -66,6 +68,7 @@ func defaultContext() Context {
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
 			NewTransactionInvocator(),
+			NewTransactionEventLimiter(10000),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
