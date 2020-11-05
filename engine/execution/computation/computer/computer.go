@@ -219,8 +219,7 @@ func (e *blockComputer) executeCollection(
 
 	for _, txBody := range collection.Transactions {
 
-		txEvents, txServiceEvents, txResult, txGasUsed, err :=
-		 	e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
+		txEvents, txServiceEvents, txResult, txGasUsed, err := e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
 
 		txIndex++
 		events = append(events, txEvents...)

@@ -77,5 +77,44 @@ func TestResultStoreTwoDifferentResultsShouldFail(t *testing.T) {
 		err = store.Index(blockID, result2.ID())
 		require.Error(t, err)
 		require.True(t, errors.Is(err, storage.ErrDataMismatch))
+		err = store.RemoveByBlockID(blockID)
+
+		require.NoError(t, err)
+
+		_, err = store.ByBlockID(blockID)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, storage.ErrNotFound))
+	})
+}
+
+func TestResultsRemoveNonExist(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewExecutionResults(metrics, db)
+
+		blockID := unittest.IdentifierFixture()
+		err := store.RemoveByBlockID(blockID)
+		require.NoError(t, err)
+	})
+}
+
+func TestResultsStoreRemove(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewExecutionResults(metrics, db)
+
+		result := unittest.ExecutionResultFixture()
+		blockID := unittest.IdentifierFixture()
+		err := store.Store(result)
+		require.NoError(t, err)
+
+		err = store.Index(blockID, result.ID())
+		require.NoError(t, err)
+
+		err = store.Store(result)
+		require.NoError(t, err)
+
+		err = store.Index(blockID, result.ID())
+		require.NoError(t, err)
 	})
 }

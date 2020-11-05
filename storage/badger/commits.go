@@ -67,3 +67,7 @@ func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, erro
 	defer tx.Discard()
 	return c.retrieveTx(blockID)(tx)
 }
+
+func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
+	return c.db.Update(operation.SkipNonExist(operation.RemoveStateCommitment(blockID)))
+}
