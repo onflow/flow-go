@@ -242,15 +242,17 @@ func assembleInternalNodes() []model.NodeInfo {
 
 	var nodes []model.NodeInfo
 	for _, internal := range privInternals {
+		// check if address is valid format
+		validateAddressFormat(internal.Address)
+
 		// validate every single internal node
 		nodeID := validateNodeID(internal.NodeID)
 		stake := validateStake(stakes[internal.Address])
-		address := validateAddress(internal.Address)
 
 		node := model.NewPrivateNodeInfo(
 			nodeID,
 			internal.Role,
-			address,
+			internal.Address,
 			stake,
 			internal.NetworkPrivKey,
 			internal.StakingPrivKey,
@@ -353,13 +355,6 @@ func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey 
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}
 	return key
-}
-
-func validateAddress(address string) string {
-	if address == "" {
-		log.Fatal().Msg("Address must not be empty")
-	}
-	return address
 }
 
 func validateStake(stake uint64) uint64 {
