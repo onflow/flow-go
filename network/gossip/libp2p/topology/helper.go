@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
-	mock2 "github.com/onflow/flow-go/state/protocol/mock"
+	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -19,10 +19,10 @@ import (
 // clustering collection nodes into `clusterNum` clusters.
 func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList,
 	clusterNum uint) (protocol.State, flow.ClusterList) {
-	state := new(mock2.State)
-	snapshot := new(mock2.Snapshot)
-	epochQuery := new(mock2.EpochQuery)
-	epoch := new(mock2.Epoch)
+	state := new(protocolmock.State)
+	snapshot := new(protocolmock.Snapshot)
+	epochQuery := new(protocolmock.EpochQuery)
+	epoch := new(protocolmock.Epoch)
 	assignments := unittest.ClusterAssignment(clusterNum, collectorIds)
 	clusters, err := flow.NewClusterList(assignments, collectorIds)
 	require.NoError(t, err)
@@ -95,8 +95,9 @@ func ClusterNum(t *testing.T, ids flow.IdentityList, size int) int {
 	return int(math.Max(float64(clusterNum), 1))
 }
 
-// DFS is a test helper function checking graph connectedness. It returns true if
-// graph represented by `adjMap` is connected.
+// DFS is a test helper function checking graph connectedness. It fails if
+// graph represented by `adjMap` is not connected, i.e., there is more than a single
+// connected component.
 func DFS(currentID flow.Identifier,
 	adjMap map[flow.Identifier]flow.IdentityList,
 	visited map[flow.Identifier]bool,

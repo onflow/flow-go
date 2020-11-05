@@ -150,7 +150,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		previous = current
 		current = nil
 
-		// creates and samples a new topic aware topology for the first topic of collection nodes
+		// creates and samples a new topic aware topology for the first topic of consensus nodes
 		top, err := topology.NewTopicBasedTopology(identity.NodeID, suite.state)
 		require.NoError(suite.T(), err)
 		ids, err := top.Subset(suite.ids, nil, topics[0], suite.fanout)
@@ -243,6 +243,6 @@ func (suite *TopicAwareTopologyTestSuite) checkConnectednessByCluster(t *testing
 	cluster flow.IdentityList) {
 	topology.CheckGraphConnected(t,
 		adjMap,
-		suite.ids.Filter(filter.HasRole(flow.RoleCollection)),
+		suite.ids,
 		filter.In(cluster))
 }

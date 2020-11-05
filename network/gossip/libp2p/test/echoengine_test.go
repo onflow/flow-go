@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -48,9 +47,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *EchoEngineTestSuite) TearDownTest() {
-	for _, net := range suite.nets {
-		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
-	}
+	stopNetworks(suite.T(), suite.nets, 3*time.Second)
 }
 
 // TestUnknownChannelID evaluates that registering an engine with an unknown channel ID returns an error.
@@ -386,10 +383,10 @@ func (suite *EchoEngineTestSuite) duplicateMessageSequential(send ConduitSendWra
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
-	// sender'suite engine
+	// sender's engine
 	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, engine.TestNetwork, false, send)
 
-	// receiver'suite engine
+	// receiver's engine
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, engine.TestNetwork, false, send)
 
 	// allow nodes to heartbeat and discover each other if using PubSub
@@ -419,10 +416,10 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapp
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
-	// sender'suite engine
+	// sender's engine
 	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, engine.TestNetwork, false, send)
 
-	// receiver'suite engine
+	// receiver's engine
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, engine.TestNetwork, false, send)
 
 	// allow nodes to heartbeat and discover each other
@@ -467,7 +464,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 	// sender'suite engine
 	sender1 := NewEchoEngine(suite.Suite.T(), suite.nets[sndNode], 10, channel1, false, send)
 
-	// receiver'suite engine
+	// receiver's engine
 	receiver1 := NewEchoEngine(suite.Suite.T(), suite.nets[rcvNode], 10, channel1, false, send)
 
 	// second type
@@ -475,7 +472,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 	// sender'suite engine
 	sender2 := NewEchoEngine(suite.Suite.T(), suite.nets[sndNode], 10, channel2, false, send)
 
-	// receiver'suite engine
+	// receiver's engine
 	receiver2 := NewEchoEngine(suite.Suite.T(), suite.nets[rcvNode], 10, channel2, false, send)
 
 	// allow nodes to heartbeat and discover each other
@@ -519,10 +516,10 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 	rcvID := 1
 
 	// registers engines in the network
-	// sender'suite engine
+	// sender's engine
 	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, engine.TestNetwork, echo, send)
 
-	// receiver'suite engine
+	// receiver's engine
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, engine.TestNetwork, echo, send)
 
 	// allow nodes to heartbeat and discover each other
@@ -573,7 +570,7 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 			require.True(suite.Suite.T(), ok)
 			// evaluates content of received message
 			echoEvent := &message.TestMessage{
-				Text: fmt.Sprintf("%suite: %suite", receiver.echomsg, event.Text),
+				Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 			}
 			assert.Equal(suite.Suite.T(), echoEvent, rcvEvent)
 
@@ -592,10 +589,10 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
-	// sender'suite engine
+	// sender's engine
 	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, engine.TestNetwork, echo, send)
 
-	// receiver'suite engine
+	// receiver's engine
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, engine.TestNetwork, echo, send)
 
 	// allow nodes to heartbeat and discover each other
@@ -647,7 +644,7 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 				require.True(suite.Suite.T(), ok)
 				// evaluates content of received message
 				echoEvent := &message.TestMessage{
-					Text: fmt.Sprintf("%suite: %suite", receiver.echomsg, event.Text),
+					Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 				}
 				assert.Equal(suite.Suite.T(), echoEvent, rcvEvent)
 
@@ -669,10 +666,10 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 	rcvID := 1
 
 	// registers engines in the network
-	// sender'suite engine
+	// sender's engine
 	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, engine.TestNetwork, echo, send)
 
-	// receiver'suite engine
+	// receiver's engine
 	receiver := NewEchoEngine(suite.Suite.T(), suite.nets[rcvID], 10, engine.TestNetwork, echo, send)
 
 	// allow nodes to heartbeat and discover each other

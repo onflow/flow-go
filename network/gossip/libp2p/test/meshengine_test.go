@@ -50,9 +50,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *MeshEngineTestSuite) TearDownTest() {
-	for _, net := range suite.nets {
-		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
-	}
+	stopNetworks(suite.T(), suite.nets, 3*time.Second)
 }
 
 // TestAllToAll_Submit evaluates the network of mesh engines against allToAllScenario scenario.

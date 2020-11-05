@@ -9,19 +9,21 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	mock3 "github.com/stretchr/testify/mock"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
-	mock2 "github.com/onflow/flow-go/network/gossip/libp2p/mock"
+	libp2pmock "github.com/onflow/flow-go/network/gossip/libp2p/mock"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -153,6 +155,7 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	runningMode string,
 	log zerolog.Logger) (flow.IdentityList,
 	[]*libp2p.Middleware) {
+
 	ids, keys := GenerateIDs(t, n, runningMode)
 	mws := GenerateMiddlewares(t, log, ids, keys)
 	return ids, mws
@@ -231,11 +234,11 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.Subs
 
 	sms := make([]channel.SubscriptionManager, len(ids))
 	for i, id := range ids {
-		sm := &mock2.SubscriptionManager{}
+		sm := &libp2pmock.SubscriptionManager{}
 		err := fmt.Errorf("this method should not be called on mock subscription manager")
-		sm.On("Register", mock3.Anything, mock3.Anything).Return(err)
-		sm.On("Unregister", mock3.Anything).Return(err)
-		sm.On("GetEngine", mock3.Anything).Return(err)
+		sm.On("Register", testifymock.Anything, testifymock.Anything).Return(err)
+		sm.On("Unregister", testifymock.Anything).Return(err)
+		sm.On("GetEngine", testifymock.Anything).Return(err)
 		sm.On("GetChannelIDs").Return(engine.ChannelIDsByRole(id.Role))
 		sms[i] = sm
 	}
@@ -256,4 +259,17 @@ func GenerateTopologyManager(t *testing.T, subMngrs []channel.SubscriptionManage
 		topMngrs = append(topMngrs, topMngr)
 	}
 	return topMngrs
+}
+
+// stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
+// duration.
+func stopNetworks(t *testing.T, nets []*libp2p.Network, duration time.Duration) {
+	// casts nets instances into ReadyDoneAware components
+	comps := make([]module.ReadyDoneAware, 0, len(nets))
+	for _, net := range nets {
+		comps = append(comps, net)
+	}
+
+	unittest.RequireCloseBefore(t, lifecycle.AllDone(comps...), duration,
+		"could not stop the networks")
 }

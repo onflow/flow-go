@@ -35,7 +35,7 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		_, err = d1.Get(string([]byte{3}), "", "")
 		require.NoError(t, err)
 
-		interactions := []*delta.Snapshot{d1.Interactions(), d2.Interactions()}
+		interactions := []*delta.Snapshot{&d1.Interactions().Snapshot, &d2.Interactions().Snapshot}
 
 		blockID := unittest.IdentifierFixture()
 

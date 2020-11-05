@@ -123,7 +123,7 @@ func (suite *SparseTopologyTestSuite) TestDisjoinedNetworkScenario_Multicast() {
 
 // disjointedNetworkScenario creates a network configuration of 9 nodes with 3 subsets.
 // The subsets are not connected with each other.
-// 0,1,2 <-> 3,4,5 <-> 6,7,8
+// 0,1,2 | 3,4,5 | 6,7,8
 // Message sent by a node from one subset should not be able to make to nodes in a different subset
 // This test is created primarily to prove that topology is indeed honored by the networking layer since technically,
 // each node does have the ip addresses of all other nodes and could just disregard topology all together and connect
@@ -132,12 +132,12 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	// total number of nodes in the network
 	const count = 9
 	// total number of subnets (should be less than count)
-	const subsets = 3
+	const subnets = 3
 
 	ids, keys := GenerateIDs(suite.T(), count, RunNetwork)
 	suite.ids = ids
 
-	tops := createDisjointedTopology(count, subsets)
+	tops := createDisjointedTopology(count, subnets)
 
 	// creates middleware and network instances
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -164,14 +164,12 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	require.NoError(suite.Suite.T(), send(event, engs[0].con, suite.ids.NodeIDs()...))
 
 	// wait for message to be received by nodes only in subset 1 (excluding node 0)
-	suite.checkMessageReception(engs, 1, subsets)
+	suite.checkMessageReception(engs, 1, subnets)
 }
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *SparseTopologyTestSuite) TearDownTest() {
-	for _, net := range suite.nets {
-		unittest.RequireCloseBefore(suite.T(), net.Done(), 3*time.Second, "could not stop the network")
-	}
+	stopNetworks(suite.T(), suite.nets, 3*time.Second)
 	suite.ids = nil
 	suite.mws = nil
 	suite.nets = nil
