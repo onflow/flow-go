@@ -55,6 +55,9 @@ func (suite *StatefulTopologyTestSuite) SetupTest() {
 
 // TestRoleSize evaluates that sub-fanout of each role in topology is
 // bound by the fanout function of topology on the role's entire size.
+// For example if fanout function is `n+1/2` and we have x consensus nodes,
+// then this tests evaluates that no node should have more than or equal to `x+1/2`
+// consensus faout.
 func (suite *StatefulTopologyTestSuite) TestRoleSize() {
 	// creates topology and topology manager
 	for i, id := range suite.ids {
