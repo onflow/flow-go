@@ -223,6 +223,11 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	// this should trigger the first update and which will block on the ConnectPeers to return
 	unittest.RequireClosesBefore(suite.T(), pm.Ready(), 2*time.Second)
 
+	// assert that the first update started
+	assert.Eventually(suite.T(), func() bool {
+		return connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 1)
+	}, 3*time.Second, 100*time.Millisecond)
+
 	// makes 10 concurrent request for peer update
 	unittest.RequireConcurrentCallsReturnBefore(suite.T(), pm.RequestPeerUpdate, 10, time.Second,
 		"concurrent peer update requests could not return on time")
@@ -230,7 +235,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	// allow the first (periodic/on-demand) and the second (on-demand) update to finish
 	connectPeerGate <- time.Now()
 
-	// requires two calls to ConnectPeers were made
+	// assert that two calls to ConnectPeers were made
 	assert.Eventually(suite.T(), func() bool {
 		return connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 2)
 	}, 3*time.Second, 100*time.Millisecond)
