@@ -2,11 +2,11 @@ package state
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
 
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -288,14 +288,16 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 		return 0, fmt.Errorf("account %s storage used is not initialized or not initialized correctly", address.Hex())
 	}
 
-	storageUsed := binary.LittleEndian.Uint64(storageUsedRegister)
+	storageUsed, _, err := utils.ReadUint64(storageUsedRegister)
+	if err != nil {
+		return 0, err
+	}
 	return storageUsed, nil
 }
 
 func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
-	buffer := make([]byte, uint64StorageSize)
-	binary.LittleEndian.PutUint64(buffer, used)
-	return a.setValue(address, false, keyStorageUsed, buffer)
+	usedBinary := utils.Uint64ToBinary(used)
+	return a.setValue(address, false, keyStorageUsed, usedBinary)
 }
 
 // GetValue returns a value stored in address' storage
