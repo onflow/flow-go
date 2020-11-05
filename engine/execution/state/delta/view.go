@@ -102,8 +102,12 @@ func (v *View) NewChild() *View {
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
 func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
+
 	value, exists := v.delta.Get(owner, controller, key)
 	if exists {
+		registerID := toRegisterID(owner, controller, key)
+		fmt.Printf("~~View: Get Register ID %v (from cache), %x \n", registerID.String(), value)
+
 		// every time we read a value (order preserving) we update spock
 		var err error = nil
 		if value != nil {
@@ -125,6 +129,8 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	// increase reads
 	v.readsCount++
 
+	fmt.Printf("~~View: Get Register ID %v (from ledger), %x \n", registerID.String(), value)
+
 	// every time we read a value (order preserving) we update spock
 	err = v.updateSpock(value)
 	return value, err
@@ -141,6 +147,8 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
 
 	// capture register touch
 	registerID := toRegisterID(owner, controller, key)
+
+	fmt.Printf("~~View: Set Register ID %v, %x \n", registerID.String(), value)
 
 	v.regTouchSet[registerID.String()] = registerID
 	// add key value to delta
@@ -160,6 +168,7 @@ func (v *View) Touch(owner, controller, key string) {
 
 	k := toRegisterID(owner, controller, key)
 
+	fmt.Printf("~~View: Touch Register ID %v \n", k.String())
 	// capture register touch
 	v.regTouchSet[k.String()] = k
 	// increase reads
