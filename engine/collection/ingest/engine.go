@@ -43,6 +43,7 @@ func New(
 	engMetrics module.EngineMetrics,
 	colMetrics module.CollectionMetrics,
 	me module.Local,
+	chain flow.Chain,
 	pools *epochs.TransactionPools,
 	config Config,
 ) (*Engine, error) {
@@ -51,12 +52,15 @@ func New(
 
 	transactionValidator := access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),
+		chain,
 		access.TransactionValidationOptions{
 			Expiry:                       flow.DefaultTransactionExpiry,
 			ExpiryBuffer:                 config.ExpiryBuffer,
 			AllowUnknownReferenceBlockID: config.AllowUnknownReference,
 			MaxGasLimit:                  flow.DefaultMaxGasLimit,
+			MaxAddressIndex:              config.MaxAddressIndex,
 			CheckScriptsParse:            config.CheckScriptsParse,
+			MaxTxSizeLimit:               flow.DefaultMaxTxSizeLimit,
 		},
 	)
 
@@ -142,9 +146,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from outside the system or routed from another collection node.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
+	txID := tx.ID()
+
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("tx_id", logging.Entity(tx)).
+		Hex("tx_id", txID[:]).
 		Hex("ref_block_id", tx.ReferenceBlockID[:]).
 		Logger()
 
@@ -179,7 +185,6 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	pool := e.pools.ForEpoch(counter)
 
 	// short-circuit if we have already stored the transaction
-	txID := tx.ID()
 	if pool.Has(txID) {
 		e.log.Debug().Msg("received dupe transaction")
 		return nil
@@ -202,13 +207,16 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("node is not assigned to any cluster in this epoch: %d", counter)
 	}
 
+	localClusterFingerPrint := localCluster.Fingerprint()
+	txClusterFingerPrint := txCluster.Fingerprint()
+
 	log = log.With().
-		Hex("local_cluster", logging.ID(localCluster.Fingerprint())).
-		Hex("tx_cluster", logging.ID(txCluster.Fingerprint())).
+		Hex("local_cluster", logging.ID(localClusterFingerPrint)).
+		Hex("tx_cluster", logging.ID(txClusterFingerPrint)).
 		Logger()
 
 	// if our cluster is responsible for the transaction, add it to the mempool
-	if localCluster.Fingerprint() == txCluster.Fingerprint() {
+	if localClusterFingerPrint == txClusterFingerPrint {
 		_ = pool.Add(tx)
 		e.colMetrics.TransactionIngested(txID)
 		log.Debug().Msg("added transaction to pool")

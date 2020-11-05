@@ -57,7 +57,7 @@ func (suite *AccessSuite) SetupTest() {
 		conID := unittest.IdentifierFixture()
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(conID),
-			testnet.AsGhost(),
+			testnet.AsGhost())
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 	}
 

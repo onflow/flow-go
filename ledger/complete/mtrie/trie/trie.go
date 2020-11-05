@@ -433,3 +433,9 @@ func EmptyTrieRootHash(pathByteSize int) []byte {
 func (mt *MTrie) AllPayloads() []ledger.Payload {
 	return mt.root.AllPayloads()
 }
+
+// IsAValidTrie verifies the content of the trie for potential issues
+func (mt *MTrie) IsAValidTrie() bool {
+	// TODO add checks on the health of node max height ...
+	return mt.root.VerifyCachedHash()
+}
