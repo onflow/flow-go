@@ -25,6 +25,8 @@ const (
 
 	errCodeInvalidHashAlgorithm = 10
 
+	errCodeMaxEventSizeLimitExceededError = 20
+
 	errCodeExecution = 100
 )
 
@@ -196,6 +198,25 @@ func (e *InvalidProposalKeyMissingSignatureError) Error() string {
 
 func (e *InvalidProposalKeyMissingSignatureError) Code() uint32 {
 	return errCodeInvalidProposalKeyMissingSignature
+}
+
+// MaxEventSizeLimitExceededError indicates that the transaction has produced events with size more than limit.
+type MaxEventSizeLimitExceededError struct {
+	TotalByteSize uint64
+	Limit         uint64
+}
+
+func (e *MaxEventSizeLimitExceededError) Error() string {
+	return fmt.Sprintf(
+		"The total byte size of events is %s which is more than the limit %d .",
+		e.TotalByteSize,
+		e.Limit,
+	)
+}
+
+// Code returns the error code for this error
+func (e *MaxEventSizeLimitExceededError) Code() uint32 {
+	return errCodeMaxEventSizeLimitExceededError
 }
 
 // An InvalidHashAlgorithmError indicates that a given key has an invalid hash algorithm.
