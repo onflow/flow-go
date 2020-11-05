@@ -36,6 +36,7 @@ func addPullCmdFlags() {
 	_ = pullCmd.MarkFlagRequired("bucket")
 }
 
+// pull partner node info from google bucket
 func pull(cmd *cobra.Command, args []string) {
 	log.Info().Msgf("Attempting to download partner info for network `%s` from bucket `%s`", flagNetwork, flagBucketName)
 
