@@ -82,12 +82,15 @@ func (i *TransactionInvocator) Process(
 	proc *TransactionProcedure,
 	ledger state.Ledger,
 ) error {
-	env := newEnvironment(ctx, ledger)
+	env, err := newEnvironment(ctx, ledger)
+	if err != nil {
+		return err
+	}
 	env.setTransaction(vm, proc.Transaction)
 
 	location := runtime.TransactionLocation(proc.ID[:])
 
-	err := vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
 	if err != nil {
 		return err
 	}

@@ -191,10 +191,13 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
+
 	m.peerManager = NewPeerManager(m.ctx, m.log, m.ov.Topology, libp2pConnector)
-	err = m.peerManager.Start()
-	if err != nil {
-		return fmt.Errorf("failed to start peer manager: %w", err)
+	select {
+	case <-m.peerManager.Ready():
+		m.log.Debug().Msg("peer manager successfully started")
+	case <-time.After(30 * time.Second):
+		return fmt.Errorf("could not start peer manager")
 	}
 
 	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
@@ -208,13 +211,17 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
-	// stop libp2p
+	// stops peer manager
+	<-m.peerManager.Done()
+	m.log.Debug().Msg("peer manager successfully stopped")
+
+	// stops libp2p
 	done, err := m.libP2PNode.Stop()
 	if err != nil {
-		m.log.Error().Err(err).Msg("stopping failed")
+		m.log.Error().Err(err).Msg("could not stop libp2p node")
 	} else {
 		<-done
-		m.log.Debug().Msg("node stopped successfully")
+		m.log.Debug().Msg("libp2p node successfully stopped")
 	}
 
 	// cancel the context (this also signals any lingering libp2p go routines to exit)
