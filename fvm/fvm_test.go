@@ -430,41 +430,22 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 }
 
 func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
-	rt := runtime.NewInterpreterRuntime()
+	t.Run("Storing too much data fails", vmTest(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
 
-	chain := flow.Mainnet.Chain()
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+			require.NoError(t, err)
 
-	vm := fvm.New(rt)
-
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
-
-	t.Run("Storing too much data fails", func(t *testing.T) {
-		mapLedger := state.NewMapLedger()
-		ledger := delta.NewView(mapLedger.Get)
-
-		_ = vm.Run(
-			ctx,
-			fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
-			ledger,
-		)
-
-		// Create an account private key.
-		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-		require.NoError(t, err)
-
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
-		require.NoError(t, err)
-
-		b := make([]byte, 100000) // 100k bytes
-		_, err = rand.Read(b)
-		require.NoError(t, err)
-		longString := base64.StdEncoding.EncodeToString(b)
-		txBody := testutil.CreateContractDeploymentTransaction(
-			fmt.Sprintf(`
+			b := make([]byte, 100000) // 100k bytes
+			_, err = rand.Read(b)
+			require.NoError(t, err)
+			longString := base64.StdEncoding.EncodeToString(b)
+			txBody := testutil.CreateContractDeploymentTransaction(
+				fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
 					pub var longString: String
@@ -474,25 +455,25 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				}
 			}
 			`, longString),
-			accounts[0],
-			chain)
+				accounts[0],
+				chain)
 
-		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(chain.ServiceAddress())
+			txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+			txBody.SetPayer(chain.ServiceAddress())
 
-		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
-		require.NoError(t, err)
+			err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+			require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+			err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+			require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody)
 
-		err = vm.Run(ctx, tx, ledger)
-		require.NoError(t, err)
+			err = vm.Run(ctx, tx, ledger)
+			require.NoError(t, err)
 
-		assert.Equal(t, (&fvm.OverStorageCapacityError{}).Code(), tx.Err.Code())
-	})
+			assert.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+		}))
 }
 
 var createAccountScript = []byte(`

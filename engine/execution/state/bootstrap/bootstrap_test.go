@@ -44,7 +44,7 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("4989ce4db0a3a46f9db3423735f28124d09c5396acd86b80b4ca9bd0fb075ee0")
+	var expectedStateCommitment, _ = hex.DecodeString("bc1dd2010b35639852bd92bf90af322e8262111c3f6970fef30aab31b90024be")
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
 

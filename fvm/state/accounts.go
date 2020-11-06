@@ -309,19 +309,21 @@ func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
 	return a.setValue(address, false, keyStorageUsed, usedBinary)
 }
 
-func (a *Accounts) GetStorageCapacity(owner flow.Address) (uint64, error) {
-	storageCapacityRegister, err := a.getValue(owner, false, keyStorageCapacity)
+func (a *Accounts) GetStorageCapacity(account flow.Address) (uint64, error) {
+	storageCapacityRegister, err := a.getValue(account, false, keyStorageCapacity)
 	if err != nil {
 		return 0, err
 	}
-	storageUsed := binary.LittleEndian.Uint64(storageCapacityRegister)
-	return storageUsed, nil
+	storageCapacity, _, err := utils.ReadUint64(storageCapacityRegister)
+	if err != nil {
+		return 0, err
+	}
+	return storageCapacity, nil
 }
 
-func (a *Accounts) SetStorageCapacity(owner flow.Address, capacity uint64) error {
-	buffer := make([]byte, uint64StorageSize)
-	binary.LittleEndian.PutUint64(buffer, capacity)
-	return a.setValue(owner, false, keyStorageCapacity, buffer)
+func (a *Accounts) SetStorageCapacity(account flow.Address, capacity uint64) error {
+	capacityBinary := utils.Uint64ToBinary(capacity)
+	return a.setValue(account, false, keyStorageCapacity, capacityBinary)
 }
 
 func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {

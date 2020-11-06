@@ -33,15 +33,19 @@ func (d *TransactionStorageLimiter) Process(
 		checked[owner] = struct{}{}
 
 		// is this an address?
+		address, isAddress := addressFromString(owner)
+		if !isAddress {
+			continue
+		}
 		// does it exist?
-		address, exists, err := isExistingAccount(accounts, owner)
+		exists, err := accounts.Exists(address)
 		if err != nil {
 			return err
 		}
 		if !exists {
 			continue
 		}
-		
+
 		capacity, err := accounts.GetStorageCapacity(address)
 		if err != nil {
 			return err
@@ -52,7 +56,7 @@ func (d *TransactionStorageLimiter) Process(
 		}
 
 		if usage > capacity {
-			return &OverStorageCapacityError{
+			return &StorageCapacityExceededError{
 				Address:         flow.HexToAddress(owner),
 				StorageUsed:     usage,
 				StorageCapacity: capacity,
@@ -62,13 +66,12 @@ func (d *TransactionStorageLimiter) Process(
 	return nil
 }
 
-func isExistingAccount(accounts *state.Accounts, owner string) (flow.Address, bool, error) {
+func addressFromString(owner string) (flow.Address, bool) {
 	ownerBytes := []byte(owner)
 	if len(ownerBytes) != flow.AddressLength {
 		// not an address
-		return flow.EmptyAddress, false, nil
+		return flow.EmptyAddress, false
 	}
-	flowAddress := flow.BytesToAddress(ownerBytes)
-	accountExists, err := accounts.Exists(flowAddress)
-	return flowAddress, accountExists, err
+	address := flow.BytesToAddress(ownerBytes)
+	return address, true
 }

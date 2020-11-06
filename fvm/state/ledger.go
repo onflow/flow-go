@@ -1,7 +1,6 @@
 package state
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -64,8 +63,6 @@ func (m MapLedger) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 	for _, v := range m.Registers {
 		data = append(data, v)
 	}
-
-	sort.Sort(&data)
 
 	ids := make([]flow.RegisterID, 0, len(m.Registers))
 	values := make([]flow.RegisterValue, 0, len(m.Registers))
