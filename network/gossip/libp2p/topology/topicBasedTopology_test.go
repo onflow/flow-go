@@ -227,7 +227,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 func clusterChannelIDs(t *testing.T) []string {
 	ccids := make([]string, 0)
 	for _, channelID := range engine.ChannelIDs() {
-		if !engine.IsClusterChannelID(channelID) {
+		if _, ok := engine.IsClusterChannelID(channelID); !ok {
 			continue
 		}
 		ccids = append(ccids, channelID)
