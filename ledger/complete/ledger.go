@@ -264,7 +264,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 	for i, migrate := range migrations {
 		payloads, err = migrate(payloads)
 		if err != nil {
-			return nil, fmt.Errorf("error applying migration: %w", err)
+			return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
 		}
 		if payloadSize != len(payloads) {
 			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
