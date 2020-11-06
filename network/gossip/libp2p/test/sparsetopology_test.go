@@ -144,7 +144,7 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	mws := GenerateMiddlewares(suite.T(), logger, suite.ids, keys)
 	sms := GenerateSubscriptionManagers(suite.T(), mws)
 	topMngrs := GenerateTopologyManager(suite.T(), sms, tops, topology.LinearFanoutFunc)
-	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, topMngrs, sms, RunNetwork)
+	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, topMngrs, sms, !DryRun)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)
