@@ -181,6 +181,10 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 		}
 		myFanout = myFanout.Union(subset)
 	}
+        // check if atleast one peer was selected
+        if fanout > 0 && len(myFanout) == 0 {
+              return nil, fmt.Error("peer selection resulted in 0 eligible peers")
+        }
 	return myFanout, nil
 }
 
