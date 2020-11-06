@@ -37,7 +37,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState)
 // construct a connected graph component among all the subscribers to the topic.
 func (t *TopicBasedTopology) Subset(ids flow.IdentityList, fanout uint, topic string) (flow.IdentityList, error) {
 	var subscribers flow.IdentityList
-	if engine.IsClusterChannelID(topic) {
+	if _, ok := engine.IsClusterChannelID(topic); ok {
 		// extracts cluster peer ids to which the node belongs to.
 		clusterPeers, err := t.clusterPeers()
 		if err != nil {
