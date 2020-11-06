@@ -358,7 +358,7 @@ func TestLedgerFunctionality(t *testing.T) {
 func Test_ExportCheckpointAt(t *testing.T) {
 	t.Run("noop migration", func(t *testing.T) {
 		// the exported state has two key/value pairs
-		// (0, "A") and (1, "B")
+		// (/1/1/22/2, "A") and (/1/3/22/4, "B")
 		// this tests the migration at the specific state
 		// without any special migration so we expect both
 		// register to show up in the new trie and with the same values
@@ -394,11 +394,11 @@ func Test_ExportCheckpointAt(t *testing.T) {
 			})
 		})
 	})
-	t.Run("change migration", func(t *testing.T) {
+	t.Run("migration by value", func(t *testing.T) {
 		// the exported state has two key/value pairs
-		// (0, "A") and (1, "B")
+		// ("/1/1/22/2", "A") and ("/1/3/22/4", "B")
 		// during the migration we change all keys with value "A" to "C"
-		// so in this case the resulting exported trie is (0, "C"), (1, "B")
+		// so in this case the resulting exported trie is ("/1/1/22/2", "C"), ("/1/3/22/4", "B")
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
@@ -412,7 +412,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				state, err = led.Set(u)
 				require.NoError(t, err)
 
-				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{changeOnesMigration}, complete.DefaultPathFinderVersion, dir2+"/root.checkpoint")
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, complete.DefaultPathFinderVersion, dir2+"/root.checkpoint")
 				require.NoError(t, err)
 
 				led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
@@ -425,6 +425,42 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'C'}))
+				assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
+
+			})
+		})
+	})
+	t.Run("migration by key", func(t *testing.T) {
+		// the exported state has two key/value pairs
+		// ("/1/1/22/2", "A") and ("/1/3/22/4", "B")
+		// during the migration we change the value to "D" for key "zero"
+		// so in this case the resulting exported trie is ("/1/1/22/2", "D"), ("/1/3/22/4", "B")
+		unittest.RunWithTempDir(t, func(dbDir string) {
+			unittest.RunWithTempDir(t, func(dir2 string) {
+
+				led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+				require.NoError(t, err)
+
+				state := led.InitialState()
+				u := utils.UpdateFixture()
+				u.SetState(state)
+
+				state, err = led.Set(u)
+				require.NoError(t, err)
+
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, complete.DefaultPathFinderVersion, dir2+"/root.checkpoint")
+				require.NoError(t, err)
+
+				led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+				require.NoError(t, err)
+
+				q, err := ledger.NewQuery(newState, u.Keys())
+				require.NoError(t, err)
+
+				retValues, err := led2.Get(q)
+				require.NoError(t, err)
+
+				assert.Equal(t, retValues[0], ledger.Value([]byte{'D'}))
 				assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
 
 			})
@@ -452,11 +488,24 @@ func noOpMigration(p []ledger.Payload) ([]ledger.Payload, error) {
 	return p, nil
 }
 
-func changeOnesMigration(p []ledger.Payload) ([]ledger.Payload, error) {
+func migrationByValue(p []ledger.Payload) ([]ledger.Payload, error) {
 	ret := make([]ledger.Payload, 0, len(p))
 	for _, p := range p {
 		if p.Value.Equals([]byte{'A'}) {
 			pp := ledger.Payload{Key: p.Key, Value: ledger.Value([]byte{'C'})}
+			ret = append(ret, pp)
+		} else {
+			ret = append(ret, p)
+		}
+	}
+	return ret, nil
+}
+
+func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {
+	ret := make([]ledger.Payload, 0, len(p))
+	for _, p := range p {
+		if p.Key.String() == "/1/1/22/2" {
+			pp := ledger.Payload{Key: p.Key, Value: ledger.Value([]byte{'D'})}
 			ret = append(ret, pp)
 		} else {
 			ret = append(ret, p)
