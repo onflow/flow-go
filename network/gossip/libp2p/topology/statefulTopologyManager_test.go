@@ -1,8 +1,10 @@
 package topology_test
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/bsipos/thist"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -17,12 +19,6 @@ import (
 
 type StatefulTopologyTestSuite struct {
 	suite.Suite
-	state    protocol.State                // represents a mocked protocol state
-	ids      flow.IdentityList             // represents the identity list of all nodes in the system
-	clusters flow.ClusterList              // represents list of cluster ids of collection nodes
-	me       flow.Identity                 // represents identity of single instance of node that creates topology
-	subMngrs []channel.SubscriptionManager // used to mock subscription manager for topology manager
-
 }
 
 // TestStatefulTopologyTestSuite runs all tests in this test suite
@@ -30,54 +26,82 @@ func TestStatefulTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(StatefulTopologyTestSuite))
 }
 
-// SetupTest initiates the test setups prior to each test
-func (suite *StatefulTopologyTestSuite) SetupTest() {
-	// creates 1000 flow nodes
-	// including 300 collectors in 10 clusters
-	nClusters := 10
-	nCollectors := 300
-	nTotal := 1000
-
-	collectors, _ := test.GenerateIDs(suite.T(), nCollectors, test.RunNetwork, unittest.WithRole(flow.RoleCollection))
-	others, _ := test.GenerateIDs(suite.T(), nTotal-nCollectors, test.RunNetwork,
-		unittest.WithAllRolesExcept(flow.RoleCollection))
-	suite.ids = append(others, collectors...)
-
-	// mocks state for collector nodes topology
-	suite.state, suite.clusters = topology.CreateMockStateForCollectionNodes(suite.T(),
-		suite.ids.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
-
-	suite.subMngrs = test.MockSubscriptionManager(suite.T(), suite.ids)
-
-	// takes first id as the current nodes id
-	suite.me = *suite.ids[0]
+func (suite *StatefulTopologyTestSuite) TestSingleSystemLowScale() {
+	suite.subFanoutScenario(40, 100, 100, 100, 100, 100, 10)
 }
 
-// TestRoleSize evaluates that sub-fanout of each role in topology is
+// generateSystem is a test helper that given number of nodes per role as well as desire number of clusters
+// generates the protocol state, identity list and subscription managers for the nodes.
+// - acc: number of access nodes
+// - col: number of collection nodes
+// - exe: number of execution nodes
+// - ver: number of verification nodes
+// - cluster: number of clusters of collection nodes
+func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster int) (protocol.State,
+	flow.IdentityList,
+	[]channel.SubscriptionManager) {
+
+	collector, _ := test.GenerateIDs(suite.T(), col, test.RunNetwork, unittest.WithRole(flow.RoleCollection))
+	access, _ := test.GenerateIDs(suite.T(), acc, test.RunNetwork, unittest.WithRole(flow.RoleAccess))
+	consensus, _ := test.GenerateIDs(suite.T(), con, test.RunNetwork, unittest.WithRole(flow.RoleConsensus))
+	verification, _ := test.GenerateIDs(suite.T(), ver, test.RunNetwork, unittest.WithRole(flow.RoleVerification))
+	execution, _ := test.GenerateIDs(suite.T(), exe, test.RunNetwork, unittest.WithRole(flow.RoleExecution))
+
+	ids := flow.IdentityList{}
+	ids = ids.Union(collector)
+	ids = ids.Union(access)
+	ids = ids.Union(consensus)
+	ids = ids.Union(verification)
+	ids = ids.Union(execution)
+
+	// mocks state for collector nodes topology
+	state, _ := topology.CreateMockStateForCollectionNodes(suite.T(),
+		ids.Filter(filter.HasRole(flow.RoleCollection)), uint(cluster))
+
+	subMngrs := test.MockSubscriptionManager(suite.T(), ids)
+
+	return state, ids, subMngrs
+}
+
+// subFanoutScenario is a test helper evaluates that sub-fanout of each role in topology is
 // bound by the fanout function of topology on the role's entire size.
 // For example if fanout function is `n+1/2` and we have x consensus nodes,
 // then this tests evaluates that no node should have more than or equal to `x+1/2`
-// consensus faout.
-func (suite *StatefulTopologyTestSuite) TestRoleSize() {
-	// creates topology and topology manager
-	for i, id := range suite.ids {
-		top, err := topology.NewTopicBasedTopology(id.NodeID, suite.state)
-		require.NoError(suite.T(), err)
+// consensus fanout.
+func (suite *StatefulTopologyTestSuite) subFanoutScenario(system, acc, col, con, exe, ver, cluster int) {
+	// fanouts := make([]float64, 0, system)
+	h := thist.NewHist(nil, "Fanout histogram", "auto", -1, false)
 
-		// creates topology manager
-		topMngr := topology.NewStatefulTopologyManager(top, suite.subMngrs[i], topology.LinearFanoutFunc)
+	for j := 0; j < system; j++ {
+		state, ids, subMngrs := suite.generateSystem(acc, col, con, exe, ver, cluster)
+		fanout := 0 // keeps summation of nodes' fanout for statistical reason
 
-		// generates topology of node
-		myFanout, err := topMngr.MakeTopology(suite.ids)
-		require.NoError(suite.T(), err)
+		// creates topology and topology manager
+		for i, id := range ids {
+			top, err := topology.NewTopicBasedTopology(id.NodeID, state)
+			require.NoError(suite.T(), err)
 
-		for _, role := range flow.Roles() {
-			// total number of nodes in flow with specified role
-			roleTotal := uint(len(suite.ids.Filter(filter.HasRole(role))))
-			// number of nodes in fanout with specified role
-			roleFanout := topMngr.Fanout(uint(len(myFanout.Filter(filter.HasRole(role)))))
+			// creates topology manager
+			topMngr := topology.NewStatefulTopologyManager(top, subMngrs[i], topology.LinearFanoutFunc)
 
-			require.Less(suite.T(), roleFanout, roleTotal)
+			// generates topology of node
+			myFanout, err := topMngr.MakeTopology(ids)
+			require.NoError(suite.T(), err)
+
+			for _, role := range flow.Roles() {
+				// total number of nodes in flow with specified role
+				roleTotal := uint(len(ids.Filter(filter.HasRole(role))))
+				// number of nodes in fanout with specified role
+				roleFanout := topMngr.Fanout(uint(len(myFanout.Filter(filter.HasRole(role)))))
+				require.Less(suite.T(), roleFanout, roleTotal)
+			}
+
+			fanout += len(myFanout)
 		}
+
+		// keeps track of average fanout
+		h.Update(float64(fanout) / float64(len(ids)))
 	}
+
+	fmt.Println(h.Draw())
 }
