@@ -9,14 +9,41 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestAccounts_GetWithNoKeys(t *testing.T) {
-	chain := flow.Mainnet.Chain()
+func TestAccounts_Create(t *testing.T) {
+	t.Run("Sets registers", func(t *testing.T) {
+		ledger := state.NewMapLedger()
 
+		accounts := state.NewAccounts(ledger)
+		address := flow.HexToAddress("01")
+
+		err := accounts.Create(nil, address)
+		require.NoError(t, err)
+
+		require.Equal(t, len(ledger.RegisterTouches), 3) // exists + code + key count
+	})
+
+	t.Run("Fails if account exists", func(t *testing.T) {
+		ledger := state.NewMapLedger()
+
+		accounts := state.NewAccounts(ledger)
+		address := flow.HexToAddress("01")
+
+		err := accounts.Create(nil, address)
+		require.NoError(t, err)
+
+		err = accounts.Create(nil, address)
+
+		require.Error(t, err)
+	})
+}
+
+func TestAccounts_GetWithNoKeys(t *testing.T) {
 	ledger := state.NewMapLedger()
 
-	accounts := state.NewAccounts(ledger, chain)
+	accounts := state.NewAccounts(ledger)
+	address := flow.HexToAddress("01")
 
-	address, err := accounts.Create(nil)
+	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
 	require.NotPanics(t, func() {
@@ -27,13 +54,12 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 // Some old account could be created without key count register
 // we recreate it in a test
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
-	chain := flow.Mainnet.Chain()
-
 	ledger := state.NewMapLedger()
 
-	accounts := state.NewAccounts(ledger, chain)
+	accounts := state.NewAccounts(ledger)
+	address := flow.HexToAddress("01")
 
-	address, err := accounts.Create(nil)
+	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
 	ledger.Delete(
