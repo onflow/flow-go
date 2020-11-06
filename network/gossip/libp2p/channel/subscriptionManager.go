@@ -14,6 +14,6 @@ type SubscriptionManager interface {
 	// GetEngine returns engine associated with a channel ID.
 	GetEngine(channelID string) (network.Engine, error)
 
-	// GetChannelID returns all the channel IDs registered in this subscription manager.
+	// GetChannelIDs returns all the channel IDs registered in this subscription manager.
 	GetChannelIDs() []string
 }
