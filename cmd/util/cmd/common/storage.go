@@ -40,21 +40,22 @@ func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 }
 
 type Storages struct {
-	Headers        storage.Headers
-	Guarantees     storage.Guarantees
-	Seals          storage.Seals
-	Index          storage.Index
-	Payloads       storage.Payloads
-	Blocks         storage.Blocks
-	Setups         storage.EpochSetups
-	EpochCommits   storage.EpochCommits
-	Statuses       storage.EpochStatuses
-	Results        storage.ExecutionResults
-	Receipts       storage.ExecutionReceipts
-	ChunkDataPacks storage.ChunkDataPacks
-	Commits        storage.Commits
-	Transactions   storage.Transactions
-	Collections    storage.Collections
+	Headers            storage.Headers
+	Guarantees         storage.Guarantees
+	Seals              storage.Seals
+	Index              storage.Index
+	Payloads           storage.Payloads
+	Blocks             storage.Blocks
+	Setups             storage.EpochSetups
+	EpochCommits       storage.EpochCommits
+	Statuses           storage.EpochStatuses
+	Results            storage.ExecutionResults
+	Receipts           storage.ExecutionReceipts
+	ChunkDataPacks     storage.ChunkDataPacks
+	Commits            storage.Commits
+	Transactions       storage.Transactions
+	TransactionResults storage.TransactionResults
+	Collections        storage.Collections
 }
 
 func InitStorages(db *badger.DB) *Storages {
@@ -74,23 +75,25 @@ func InitStorages(db *badger.DB) *Storages {
 	chunkDataPacks := storagebadger.NewChunkDataPacks(db)
 	commits := storagebadger.NewCommits(metrics, db)
 	transactions := storagebadger.NewTransactions(metrics, db)
+	transactionResults := storagebadger.NewTransactionResults(db)
 	collections := storagebadger.NewCollections(db, transactions)
 
 	return &Storages{
-		Headers:        headers,
-		Guarantees:     guarantees,
-		Seals:          seals,
-		Index:          index,
-		Payloads:       payloads,
-		Blocks:         blocks,
-		Setups:         setups,
-		EpochCommits:   epochCommits,
-		Statuses:       statuses,
-		Results:        results,
-		Receipts:       receipts,
-		ChunkDataPacks: chunkDataPacks,
-		Commits:        commits,
-		Transactions:   transactions,
-		Collections:    collections,
+		Headers:            headers,
+		Guarantees:         guarantees,
+		Seals:              seals,
+		Index:              index,
+		Payloads:           payloads,
+		Blocks:             blocks,
+		Setups:             setups,
+		EpochCommits:       epochCommits,
+		Statuses:           statuses,
+		Results:            results,
+		Receipts:           receipts,
+		ChunkDataPacks:     chunkDataPacks,
+		Commits:            commits,
+		Transactions:       transactions,
+		TransactionResults: transactionResults,
+		Collections:        collections,
 	}
 }
