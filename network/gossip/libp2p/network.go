@@ -171,11 +171,12 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
-	// check if atleast one peer was selected
-	if fanout > 0 && len(myFanout) == 0 {
-		return nil, fmt.Errorf("peer selection resulted in zero eligible peers")
+
+	// checks size of topology
+	if len(top) == 0 {
+		return nil, fmt.Errorf("topology size reached zero")
 	}
-	return myFanout, nil
+	return top, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
