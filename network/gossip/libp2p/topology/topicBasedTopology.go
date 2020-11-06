@@ -41,7 +41,7 @@ func (t *TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.Ident
 	var subscribers flow.IdentityList
 	var involvedRoles flow.RoleList
 
-	if engine.IsClusterChannelID(topic) {
+	if _, ok := engine.IsClusterChannelID(topic); ok {
 		// extracts cluster peer ids to which the node belongs to.
 		clusterPeers, err := t.clusterPeers()
 		if err != nil {
