@@ -91,6 +91,7 @@ const (
 )
 
 // initializeChannelIdMap initializes an instance of channelIdMap and populates it with the channel IDs and their
+// Note: Please update this map, if a new channel is defined or a the roles subscribing to a channel have changed
 // corresponding list of roles.
 func initializeChannelIdMap() {
 	channelIdMap = make(map[string]flow.RoleList)
