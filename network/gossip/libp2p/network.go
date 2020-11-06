@@ -169,7 +169,7 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 
 	fanout := uint(len(n.ids)+1) / 2
 
-       // get all the channels that this node has subscribed to
+	// gets all the channels that this node has subscribed to
 	myTopics := n.sm.GetChannelIDs()
 	myFanout := flow.IdentityList{}
 
@@ -182,10 +182,10 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 		}
 		myFanout = myFanout.Union(subset)
 	}
-        // check if atleast one peer was selected
-        if fanout > 0 && len(myFanout) == 0 {
-              return nil, fmt.Error("peer selection resulted in 0 eligible peers")
-        }
+	// check if atleast one peer was selected
+	if fanout > 0 && len(myFanout) == 0 {
+		return nil, fmt.Errorf("peer selection resulted in zero eligible peers")
+	}
 	return myFanout, nil
 }
 
