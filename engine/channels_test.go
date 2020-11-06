@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TestGetRolesByTopic evaluates correctness of GetRoleByTopic function against
+// TestGetRolesByChannelID_NonClusterChannelID evaluates correctness of GetRoleByChannelID function against
 // inclusion and exclusion of roles. Essentially, the test evaluates that RolesByChannelID
 // operates on top of channelIdMap.
-func TestGetRolesByChannelID(t *testing.T) {
+func TestGetRolesByChannelID_NonClusterChannelID(t *testing.T) {
 	// asserts existing topic with its role
 	// the roles list should contain collection and consensus roles
 	roles, ok := RolesByChannelID(PushGuarantees)
@@ -28,6 +28,20 @@ func TestGetRolesByChannelID(t *testing.T) {
 	roles, ok = RolesByChannelID("non-existing-topic")
 	assert.False(t, ok)
 	assert.Nil(t, roles)
+}
+
+// TestGetRolesByChannelID_ClusterChannelID evaluates correctness of GetRoleByChannelID function against
+// cluster channel ids. Essentially, the test evaluates that RolesByChannelID
+// operates on top of channelIdMap, and correctly identifies and strips of the cluster channel ids.
+func TestGetRolesByChannelID_ClusterChannelID(t *testing.T) {
+	// creates a cluster channel id
+	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
+
+	// the roles list should contain collection
+	roles, ok := RolesByChannelID(conClusterChannel)
+	assert.True(t, ok)
+	assert.Len(t, roles, 1)
+	assert.Contains(t, roles, flow.RoleCollection)
 }
 
 // TestGetChannelIDByRole evaluates retrieving channel IDs associated with a role from the
