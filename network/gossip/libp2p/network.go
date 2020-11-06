@@ -169,6 +169,7 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 
 	fanout := uint(len(n.ids)+1) / 2
 
+       // get all the channels that this node has subscribed to
 	myTopics := n.sm.GetChannelIDs()
 	myFanout := flow.IdentityList{}
 
