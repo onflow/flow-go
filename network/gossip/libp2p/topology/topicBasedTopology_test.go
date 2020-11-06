@@ -43,8 +43,8 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	nCollectors := 100
 	nTotal := 1000
 
-	collectors, _ := test.GenerateIDs(suite.T(), nCollectors, test.RunNetwork, unittest.WithRole(flow.RoleCollection))
-	others, _ := test.GenerateIDs(suite.T(), nTotal, test.RunNetwork,
+	collectors, _ := test.GenerateIDs(suite.T(), nCollectors, test.DryRun, unittest.WithRole(flow.RoleCollection))
+	others, _ := test.GenerateIDs(suite.T(), nTotal, test.DryRun,
 		unittest.WithAllRolesExcept(flow.RoleCollection))
 	suite.ids = append(others, collectors...)
 
@@ -227,7 +227,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 func clusterChannelIDs(t *testing.T) []string {
 	ccids := make([]string, 0)
 	for _, channelID := range engine.ChannelIDs() {
-		if !engine.IsClusterChannelID(channelID) {
+		if _, ok := engine.IsClusterChannelID(channelID); !ok {
 			continue
 		}
 		ccids = append(ccids, channelID)

@@ -42,7 +42,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
-	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, RunNetwork)
+	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun)
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -56,6 +56,17 @@ func (suite *EchoEngineTestSuite) TestUnknownChannelID() {
 	e := NewEchoEngine(suite.T(), suite.nets[0], 1, engine.TestNetwork, false, suite.Unicast)
 	_, err := suite.nets[0].Register("unknown-channel-id", e)
 	require.Error(suite.T(), err)
+}
+
+// TestClusterChannelID evaluates that registering a cluster channel ID is done without any error.
+func (suite *EchoEngineTestSuite) TestClusterChannelID() {
+	e := NewEchoEngine(suite.T(), suite.nets[0], 1, engine.TestNetwork, false, suite.Unicast)
+	// creates a cluster channel ID
+	clusterChannelID := engine.ChannelSyncCluster(flow.Testnet)
+	// registers engine with cluster channel ID
+	_, err := suite.nets[0].Register(clusterChannelID, e)
+	// registering cluster channel ID should not cause an error
+	require.NoError(suite.T(), err)
 }
 
 // TestDuplicateChannelID evaluates that registering an engine with duplicate channel ID returns an error.

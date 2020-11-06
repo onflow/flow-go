@@ -71,7 +71,7 @@ func (suite *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Cond
 	// total number of subnets (should be less than count)
 	const subsets = 3
 
-	ids, keys := GenerateIDs(suite.T(), count, RunNetwork)
+	ids, keys := GenerateIDs(suite.T(), count, !DryRun)
 	suite.ids = ids
 
 	// creates middleware and network instances
@@ -134,7 +134,7 @@ func (suite *SparseTopologyTestSuite) disjointedNetworkScenario(send ConduitSend
 	// total number of subnets (should be less than count)
 	const subnets = 3
 
-	ids, keys := GenerateIDs(suite.T(), count, RunNetwork)
+	ids, keys := GenerateIDs(suite.T(), count, !DryRun)
 	suite.ids = ids
 
 	tops := createDisjointedTopology(count, subnets)

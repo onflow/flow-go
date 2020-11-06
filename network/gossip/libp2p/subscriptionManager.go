@@ -15,7 +15,7 @@ type ChannelSubscriptionManager struct {
 	mw      middleware.Middleware
 }
 
-func NewSubscriptionManager(mw middleware.Middleware) *ChannelSubscriptionManager {
+func NewChannelSubscriptionManager(mw middleware.Middleware) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
 		engines: make(map[string]network.Engine),
 		mw:      mw,
@@ -77,6 +77,8 @@ func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engin
 
 // GetChannelIDs returns list of topics this subscription manager has an engine registered for.
 func (sm *ChannelSubscriptionManager) GetChannelIDs() []string {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
 	topics := make([]string, 0)
 	for topic := range sm.engines {
 		topics = append(topics, topic)

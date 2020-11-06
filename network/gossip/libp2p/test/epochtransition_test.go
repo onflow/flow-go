@@ -51,7 +51,7 @@ func (suite *EpochTransitionTestSuite) SetupTest() {
 	golog.SetAllLoggers(golog.LevelError)
 
 	// create ids
-	ids, mws := GenerateIDsAndMiddlewares(suite.T(), nodeCount, RunNetwork, suite.logger)
+	ids, mws := GenerateIDsAndMiddlewares(suite.T(), nodeCount, !DryRun, suite.logger)
 	suite.ids = ids
 	suite.mws = mws
 
@@ -80,7 +80,7 @@ func (suite *EpochTransitionTestSuite) SetupTest() {
 
 	// create networks using the mocked state and default topology
 	sms := GenerateSubscriptionManagers(suite.T(), mws)
-	nets := GenerateNetworks(suite.T(), suite.logger, ids, mws, 100, nil, sms, RunNetwork)
+	nets := GenerateNetworks(suite.T(), suite.logger, ids, mws, 100, nil, sms, !DryRun)
 	suite.nets = nets
 
 	// generate the refreshers
@@ -99,7 +99,7 @@ func (suite *EpochTransitionTestSuite) TearDownTest() {
 // in the current epoch
 func (suite *EpochTransitionTestSuite) TestNewNodeAdded() {
 	// create the id, middleware and network for a new node
-	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), 1, suite.logger, 100, nil, RunNetwork)
+	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), 1, suite.logger, 100, nil, !DryRun)
 	newMiddleware := mws[0]
 
 	newIDs := append(suite.ids, ids...)

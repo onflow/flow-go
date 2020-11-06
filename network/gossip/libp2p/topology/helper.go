@@ -61,7 +61,7 @@ func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityL
 	startID := expectedIDs.Sample(1)[0].NodeID
 
 	visited := make(map[flow.Identifier]bool)
-	DFS(startID, adjMap, visited, f)
+	dfs(startID, adjMap, visited, f)
 
 	// assert that expected number of nodes were visited by DFS
 	assert.Equal(t, expectedCount, len(visited))
@@ -98,7 +98,7 @@ func ClusterNum(t *testing.T, ids flow.IdentityList, size int) int {
 // DFS is a test helper function checking graph connectedness. It fails if
 // graph represented by `adjMap` is not connected, i.e., there is more than a single
 // connected component.
-func DFS(currentID flow.Identifier,
+func dfs(currentID flow.Identifier,
 	adjMap map[flow.Identifier]flow.IdentityList,
 	visited map[flow.Identifier]bool,
 	filter flow.IdentityFilter) {
@@ -110,6 +110,6 @@ func DFS(currentID flow.Identifier,
 	visited[currentID] = true
 
 	for _, id := range adjMap[currentID].Filter(filter) {
-		DFS(id.NodeID, adjMap, visited, filter)
+		dfs(id.NodeID, adjMap, visited, filter)
 	}
 }
