@@ -190,7 +190,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		// subscription manager
-		subscriptionManager := libp2p.NewSubscriptionManager(fnb.Middleware)
+		subscriptionManager := libp2p.NewChannelSubscriptionManager(fnb.Middleware)
 
 		// topology manager
 		var topManager topology.Manager
