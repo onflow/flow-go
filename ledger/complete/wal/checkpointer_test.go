@@ -57,7 +57,7 @@ var (
 	logger             = zerolog.Logger{}
 	segmentSize        = 32 * 1024
 	pathByteSize       = 32
-	pathFinderVersion  = uint8(1)
+	pathFinderVersion  = uint8(0)
 )
 
 func Test_WAL(t *testing.T) {

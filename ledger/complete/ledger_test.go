@@ -356,8 +356,12 @@ func TestLedgerFunctionality(t *testing.T) {
 }
 
 func Test_ExportCheckpointAt(t *testing.T) {
-
 	t.Run("noop migration", func(t *testing.T) {
+		// the exported state has two key/value pairs
+		// (0, "A") and (1, "B")
+		// this tests the migration at the specific state
+		// without any special migration so we expect both
+		// register to show up in the new trie and with the same values
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
@@ -391,6 +395,10 @@ func Test_ExportCheckpointAt(t *testing.T) {
 		})
 	})
 	t.Run("change migration", func(t *testing.T) {
+		// the exported state has two key/value pairs
+		// (0, "A") and (1, "B")
+		// during the migration we change all keys with value "A" to "C"
+		// so in this case the resulting exported trie is (0, "C"), (1, "B")
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
