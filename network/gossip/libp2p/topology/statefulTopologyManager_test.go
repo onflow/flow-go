@@ -41,11 +41,11 @@ func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, 
 	flow.IdentityList,
 	[]channel.SubscriptionManager) {
 
-	collector, _ := test.GenerateIDs(suite.T(), col, test.RunNetwork, unittest.WithRole(flow.RoleCollection))
-	access, _ := test.GenerateIDs(suite.T(), acc, test.RunNetwork, unittest.WithRole(flow.RoleAccess))
-	consensus, _ := test.GenerateIDs(suite.T(), con, test.RunNetwork, unittest.WithRole(flow.RoleConsensus))
-	verification, _ := test.GenerateIDs(suite.T(), ver, test.RunNetwork, unittest.WithRole(flow.RoleVerification))
-	execution, _ := test.GenerateIDs(suite.T(), exe, test.RunNetwork, unittest.WithRole(flow.RoleExecution))
+	collector, _ := test.GenerateIDs(suite.T(), col, !test.DryRun, unittest.WithRole(flow.RoleCollection))
+	access, _ := test.GenerateIDs(suite.T(), acc, !test.DryRun, unittest.WithRole(flow.RoleAccess))
+	consensus, _ := test.GenerateIDs(suite.T(), con, !test.DryRun, unittest.WithRole(flow.RoleConsensus))
+	verification, _ := test.GenerateIDs(suite.T(), ver, !test.DryRun, unittest.WithRole(flow.RoleVerification))
+	execution, _ := test.GenerateIDs(suite.T(), exe, !test.DryRun, unittest.WithRole(flow.RoleExecution))
 
 	ids := flow.IdentityList{}
 	ids = ids.Union(collector)

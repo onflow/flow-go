@@ -80,7 +80,7 @@ func (suite *SparseTopologyTestSuite) sparselyConnectedNetworkScenario(send Cond
 	sms := GenerateSubscriptionManagers(suite.T(), mws)
 	tops := createSparseTopology(count, subsets)
 	topMngrs := GenerateTopologyManager(suite.T(), sms, tops, topology.LinearFanoutFunc)
-	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, topMngrs, sms, RunNetwork)
+	suite.nets = GenerateNetworks(suite.T(), logger, suite.ids, mws, 100, topMngrs, sms, !DryRun)
 
 	// create engines
 	engs := make([]*MeshEngine, 0)

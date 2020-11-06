@@ -93,7 +93,7 @@ func (suite *TopologyTestSuite) testTopology(total int, minorityRole flow.Role) 
 	topMngrs := GenerateTopologyManager(suite.T(), subMngrs, tops, topology.LinearFanoutFunc)
 
 	// creates network in dryrun
-	nets := GenerateNetworks(suite.T(), logger, ids, mws, 100, topMngrs, subMngrs, DryRunNetwork)
+	nets := GenerateNetworks(suite.T(), logger, ids, mws, 100, topMngrs, subMngrs, DryRun)
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range nets {
