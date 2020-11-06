@@ -15,7 +15,7 @@ type ChannelSubscriptionManager struct {
 	mw      middleware.Middleware
 }
 
-func NewSubscriptionManager(mw middleware.Middleware) *ChannelSubscriptionManager {
+func NewChannelSubscriptionManager(mw middleware.Middleware) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
 		engines: make(map[string]network.Engine),
 		mw:      mw,
