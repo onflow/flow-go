@@ -46,7 +46,7 @@ func (suite *TopologyTestSuite) TestTopologySize() {
 	golog.SetAllLoggers(golog.LevelError)
 
 	// create totalNodes number of networks
-	_, _, nets := GenerateIDsMiddlewaresNetworks(suite.T(), totalNodes, logger, 100, nil, DryRunNetwork)
+	_, _, nets := GenerateIDsMiddlewaresNetworks(suite.T(), totalNodes, logger, 100, nil, !DryRun)
 
 	// determine the expected size of the id list that should be returned by RandPermTopology
 	rndSubsetSize := int(math.Ceil(float64(totalNodes+1) / 2))
@@ -69,7 +69,7 @@ func (suite *TopologyTestSuite) testTopology(total int, minorityRole flow.Role) 
 	keys := make([]crypto.PrivateKey, 0)
 	ids := make(flow.IdentityList, 0)
 	for role, count := range distribution {
-		roleIDs, roleKeys := GenerateIDs(suite.T(), count, RunNetwork, unittest.WithRole(role))
+		roleIDs, roleKeys := GenerateIDs(suite.T(), count, DryRun, unittest.WithRole(role))
 		ids = append(ids, roleIDs...)
 		keys = append(keys, roleKeys...)
 	}
@@ -90,7 +90,7 @@ func (suite *TopologyTestSuite) testTopology(total int, minorityRole flow.Role) 
 
 	// mocks subscription manager and creates network in dryrun
 	sms := MockSubscriptionManager(suite.T(), ids)
-	nets := GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, sms, DryRunNetwork)
+	nets := GenerateNetworks(suite.T(), logger, ids, mws, 100, tops, sms, DryRun)
 
 	// extracts adjacency matrix of the entire system
 	for i, net := range nets {
