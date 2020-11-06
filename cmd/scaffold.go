@@ -196,7 +196,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			fnb.Middleware,
 			10e6,
 			nodeTopology,
-			libp2p.NewSubscriptionManager(fnb.Middleware),
+			libp2p.NewChannelSubscriptionManager(fnb.Middleware),
 			fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)

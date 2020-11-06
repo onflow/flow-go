@@ -31,12 +31,7 @@ import (
 
 var rootBlockID string
 
-const(
-  DryRun = true
-  )
-	DryRunNetwork = "dry-run-network" // does not run network
-	RunNetwork    = "run-network"     // runs network
-)
+const DryRun = true
 
 var allocator *portAllocator
 
@@ -48,12 +43,12 @@ func init() {
 }
 
 // GenerateIDs generate flow Identities with a valid port and networking key
-func GenerateIDs(t *testing.T, n int, runningMode string, opts ...func(*flow.Identity)) (flow.IdentityList,
+func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identity)) (flow.IdentityList,
 	[]crypto.PrivateKey) {
 	privateKeys := make([]crypto.PrivateKey, n)
 	var freePorts []int
 
-	if !strings.EqualFold(runningMode, DryRunNetwork) {
+	if !dryRunMode {
 		// get free ports
 		freePorts = allocator.getFreePorts(t, n)
 	}
@@ -68,7 +63,7 @@ func GenerateIDs(t *testing.T, n int, runningMode string, opts ...func(*flow.Ide
 		privateKeys[i] = key
 		port := 0
 
-		if !strings.EqualFold(runningMode, DryRunNetwork) {
+		if !dryRunMode {
 			port = freePorts[i]
 		}
 
@@ -107,7 +102,7 @@ func GenerateNetworks(t *testing.T,
 	csize int,
 	tops []topology.Topology,
 	sms []channel.SubscriptionManager,
-	runningMode string) []*libp2p.Network {
+	dryRunMode bool) []*libp2p.Network {
 	count := len(ids)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -140,7 +135,7 @@ func GenerateNetworks(t *testing.T,
 	}
 
 	// if dryrun then don't actually start the network
-	if !strings.EqualFold(runningMode, DryRunNetwork) {
+	if !dryRunMode {
 		for _, net := range nets {
 			<-net.Ready()
 		}
@@ -150,11 +145,11 @@ func GenerateNetworks(t *testing.T,
 
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
-	runningMode string,
+	dryRunMode bool,
 	log zerolog.Logger) (flow.IdentityList,
 	[]*libp2p.Middleware) {
 
-	ids, keys := GenerateIDs(t, n, runningMode)
+	ids, keys := GenerateIDs(t, n, dryRunMode)
 	mws := GenerateMiddlewares(t, log, ids, keys)
 	return ids, mws
 }
@@ -164,10 +159,10 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []topology.Topology,
-	runninMode string) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
-	ids, mws := GenerateIDsAndMiddlewares(t, n, runninMode, log)
+	dryRunMode bool) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
+	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRunMode, log)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, runninMode)
+	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRunMode)
 	return ids, mws, networks
 }
 
@@ -219,7 +214,7 @@ func GenerateSubscriptionManagers(t *testing.T, mws []*libp2p.Middleware) []chan
 
 	sms := make([]channel.SubscriptionManager, len(mws))
 	for i, mw := range mws {
-		sms[i] = libp2p.NewSubscriptionManager(mw)
+		sms[i] = libp2p.NewChannelSubscriptionManager(mw)
 	}
 	return sms
 }

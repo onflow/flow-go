@@ -77,7 +77,7 @@ func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engin
 
 // GetChannelIDs returns list of topics this subscription manager has an engine registered for.
 func (sm *ChannelSubscriptionManager) GetChannelIDs() []string {
-        sm.RLock()
+	sm.RLock()
 	defer sm.RUnlock()
 	topics := make([]string, 0)
 	for topic := range sm.engines {

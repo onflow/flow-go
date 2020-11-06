@@ -43,8 +43,8 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	nCollectors := 100
 	nTotal := 1000
 
-	collectors, _ := test.GenerateIDs(suite.T(), nCollectors, test.RunNetwork, unittest.WithRole(flow.RoleCollection))
-	others, _ := test.GenerateIDs(suite.T(), nTotal, test.RunNetwork,
+	collectors, _ := test.GenerateIDs(suite.T(), nCollectors, test.DryRun, unittest.WithRole(flow.RoleCollection))
+	others, _ := test.GenerateIDs(suite.T(), nTotal, test.DryRun,
 		unittest.WithAllRolesExcept(flow.RoleCollection))
 	suite.ids = append(others, collectors...)
 
