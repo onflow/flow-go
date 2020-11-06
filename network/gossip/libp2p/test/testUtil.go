@@ -31,7 +31,9 @@ import (
 
 var rootBlockID string
 
-const (
+const(
+  DryRun = true
+  )
 	DryRunNetwork = "dry-run-network" // does not run network
 	RunNetwork    = "run-network"     // runs network
 )
