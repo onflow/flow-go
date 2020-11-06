@@ -20,22 +20,12 @@ var channelIdMap map[string]flow.RoleList
 
 // RolesByChannelID returns list of flow roles involved in the channelID.
 func RolesByChannelID(channelID string) (flow.RoleList, bool) {
+	if clusterChannelID, isCluster := IsClusterChannelID(channelID); isCluster {
+		// replaces channelID with the stripped-off channel prefix
+		channelID = clusterChannelID
+	}
 	roles, ok := channelIdMap[channelID]
 	return roles, ok
-}
-
-// ValidChannelID returns true if channel ID is a valid channel, i.e.,
-// it is either a cluster channel id or is registered in the channel id map.
-func ValidChannelID(channelID string) bool {
-	if _, ok := RolesByChannelID(channelID); ok {
-		return true
-	}
-
-	if IsClusterChannelID(channelID) {
-		return true
-	}
-
-	return false
 }
 
 // ChannelIDsByRole returns a list of all channel IDs the role subscribes to.
@@ -150,8 +140,17 @@ func initializeChannelIdMap() {
 
 // IsClusterChannelID returns true if channel ID is a cluster-related channel ID.
 // At the current implementation, only collection nodes are involved in a cluster-related channel ID.
-func IsClusterChannelID(channelID string) bool {
-	return strings.HasPrefix(channelID, syncClusterPrefix) || strings.HasPrefix(channelID, consensusClusterPrefix)
+// If the channel ID is a cluster-related one, this method also strips off the channel prefix and returns it.
+func IsClusterChannelID(channelID string) (string, bool) {
+	if strings.HasPrefix(channelID, syncClusterPrefix) {
+		return syncClusterPrefix, true
+	}
+
+	if strings.HasPrefix(channelID, consensusClusterPrefix) {
+		return consensusClusterPrefix, true
+	}
+
+	return "", false
 }
 
 // FullyQualifiedChannelName returns the unique channel name made up of channel name string suffixed with root block id
