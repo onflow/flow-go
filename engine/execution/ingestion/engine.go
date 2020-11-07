@@ -952,7 +952,7 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 		}
 		e.log.Debug().
 			Hex("block_id", logging.ID(blockID)).
-			Int("block_height", int(block.Height)).
+			Uint64("block_height", block.Height).
 			Hex("state_commitment", stateCommit).
 			Hex("script_hex", script).
 			Str("args", strings.Join(args[:], ",")).
