@@ -25,3 +25,15 @@ func IndexExecutionReceipt(blockID flow.Identifier, receiptID flow.Identifier) f
 func LookupExecutionReceipt(blockID flow.Identifier, receiptID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBlockExecutionReceipt, blockID), receiptID)
 }
+
+func RemoveExecutionReceipt(blockID flow.Identifier, receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		receiptID := receipt.ID()
+		err := remove(makePrefix(codeExecutionReceiptMeta, receiptID))(txn)
+		if err != nil {
+			return err
+		}
+
+		return remove(makePrefix(codeBlockExecutionReceipt, blockID))(txn)
+	}
+}
