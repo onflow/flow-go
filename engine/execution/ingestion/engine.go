@@ -547,6 +547,10 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
+	if errors.Is(err, storage.ErrDataMismatch) {
+		e.log.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
+	}
+
 	if err != nil {
 		e.log.Err(err).
 			Hex("block_id", logging.Entity(executableBlock)).
