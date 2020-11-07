@@ -65,6 +65,10 @@ func (t *TopicBasedTopology) Subset(ids flow.IdentityList, fanout uint, topic st
 	// excluding the node itself from its topology
 	subscribers = subscribers.Filter(filter.Not(filter.HasNodeID(t.me)))
 
+	if len(subscribers) == 0 {
+		return nil, fmt.Errorf("zero subscribers to channel id: %s", topic)
+	}
+
 	// samples subscribers of a connected graph
 	subscriberSample, _ := connectedGraphSample(subscribers, t.seed)
 
