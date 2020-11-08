@@ -1113,6 +1113,26 @@ func (e *Engine) saveExecutionResults(
 		startState = endState
 	}
 
+	// before persisting state commitment, check whether this block has been sealed already.
+	// if the block has been sealed, it means some other execution node has executed this block
+	// already, and its result has already been accepted by the consensus nodes. In that
+	// case, we need to double check whether our execution result is consistent with the sealed
+	// result. If inconsistent, it means there is a fork in the execution results, which
+	// would be abnormal. we'd better stop the node in this case.
+	commit, err := e.state.AtBlockID(blockID).Commit()
+	if err == nil {
+		// the block has been sealed
+		isExecutionEndStateInconsistentWithSealedState := !bytes.Equal(commit, endState)
+		if isExecutionEndStateInconsistentWithSealedState {
+			e.log.Fatal().
+				Hex("sealed_commit", commit).
+				Hex("executed_commit", endState).
+				Hex("block_id", blockID[:]).
+				Uint64("height", executableBlock.Block.Header.Height).
+				Msg("fatal: execution result is inconsistent with sealed result")
+		}
+	}
+
 	err = e.execState.PersistStateCommitment(childCtx, blockID, endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
