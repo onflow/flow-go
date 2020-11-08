@@ -26,4 +26,7 @@ type IncorporatedResultSeals interface {
 
 	// Size returns the number of items in the mempool
 	Size() uint
+
+	// Clear removes all entities from the pool.
+	Clear()
 }

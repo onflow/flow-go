@@ -45,3 +45,8 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 	return ir.Backend.Rem(id)
 }
+
+// Clear removes all entities from the pool.
+func (ir *IncorporatedResultSeals) Clear() {
+	ir.Backend.Clear()
+}

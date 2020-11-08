@@ -31,13 +31,13 @@ func LookupBlockSeal(blockID flow.Identifier, sealID *flow.Identifier) func(*bad
 }
 
 func InsertExecutionForkDetected(flag bool) func(*badger.Txn) error {
-	return insert(makePrefix(codeBlockToSeal), flag)
+	return insert(makePrefix(codeExecutionForkDetected), flag)
 }
 
 func UpdateExecutionForkDetected(flag bool) func(*badger.Txn) error {
-	return update(makePrefix(codeBlockToSeal), flag)
+	return update(makePrefix(codeExecutionForkDetected), flag)
 }
 
 func RetrieveExecutionForkDetected(flag *bool) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeBlockToSeal), flag)
+	return retrieve(makePrefix(codeExecutionForkDetected), flag)
 }

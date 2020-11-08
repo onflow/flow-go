@@ -16,7 +16,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var ForkedExecutionStateErr = fmt.Errorf("forked execution state detected") // sentinel error
+var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel error
 
 // ExecStateForkSuppressor is a wrapper around a conventional mempool.IncorporatedResultSeals
 // mempool. It implements the following mitigation strategy for execution forks:
@@ -69,11 +69,15 @@ func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, db *badge
 // Error returns:
 //   * engine.InvalidInputError (sentinel error)
 //     In case a seal fails one of the required consistency checks;
-//   * ForkedExecutionStateErr (sentinel error)
+//   * ExecutionForkErr (sentinel error)
 //     In case a fork in the execution state has been detected.
 func (s *ExecStateForkSuppressor) Add(irSeal *flow.IncorporatedResultSeal) (bool, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	if s.execForkDetected {
+		return false, ExecutionForkErr
+	}
 
 	err := s.enforceValidStates(irSeal)
 	if err != nil {
@@ -86,12 +90,6 @@ func (s *ExecStateForkSuppressor) Add(irSeal *flow.IncorporatedResultSeal) (bool
 	if found {
 		// already other seal for this block in mempool => compare consistency of results' state transitions
 		err := s.enforceConsistenStateTransitions(irSeal, otherSeal)
-		if errors.Is(err, ForkedExecutionStateErr) {
-			err := operation.RetryOnConflict(s.db.Update, operation.UpdateExecutionForkDetected(true))
-			if err != nil {
-				return false, fmt.Errorf("failed to update execution-fork-detected flag: %w", err)
-			}
-		}
 		if err != nil {
 			return false, fmt.Errorf("failed to add candidate seal to mempool: %w", err)
 		}
@@ -149,6 +147,15 @@ func (s *ExecStateForkSuppressor) Limit() uint {
 	return s.seals.Limit()
 }
 
+// Clear removes all entities from the pool.
+func (s *ExecStateForkSuppressor) Clear() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.seals.Clear()
+}
+
+// readExecutionForkDetectedFlag attempts to read the flag ExecutionForkDetected from the database.
+// In case no value is persisted, the default value is written to the database.
 func readExecutionForkDetectedFlag(db *badger.DB, defaultValue bool) (bool, error) {
 	var flag bool
 	err := operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
@@ -202,7 +209,12 @@ func (s *ExecStateForkSuppressor) enforceValidStates(irSeal *flow.IncorporatedRe
 	return nil
 }
 
-// consistenStateTransitions checks whether the execution results in the seals have matching state transitions
+// consistenStateTransitions checks whether the execution results in the seals have matching state transitions.
+// If a fork in the execution state is detected:
+//   * wrapped mempool is cleared
+//   * internal execForkDetected flag is ste to true
+//   * the new value of execForkDetected is persisted to data base
+// and ExecutionForkErr (sentinel error) is returned
 func (s *ExecStateForkSuppressor) enforceConsistenStateTransitions(irSeal1, irSeal2 *flow.IncorporatedResultSeal) error {
 	if irSeal1.IncorporatedResult.Result.ID() == irSeal2.IncorporatedResult.Result.ID() {
 		// happy case: candidate seals are for the same result
@@ -232,7 +244,13 @@ func (s *ExecStateForkSuppressor) enforceConsistenStateTransitions(irSeal1, irSe
 
 	if !bytes.Equal(irSeal1InitialState, irSeal2InitialState) || !bytes.Equal(irSeal1FinalState, irSeal2FinalState) {
 		log.Error().Msg("inconsistent seals for the same block")
-		return ForkedExecutionStateErr
+		s.seals.Clear()
+		s.execForkDetected = true
+		err := operation.RetryOnConflict(s.db.Update, operation.UpdateExecutionForkDetected(true))
+		if err != nil {
+			return fmt.Errorf("failed to update execution-fork-detected flag: %w", err)
+		}
+		return ExecutionForkErr
 	} else {
 		log.Warn().Msg("seals with different ID but consistent state transition")
 		return nil
