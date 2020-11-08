@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 var ForkedExecutionStateErr = fmt.Errorf("forked execution state detected") // sentinel error
@@ -150,39 +149,6 @@ func (s *ExecStateForkSuppressor) Limit() uint {
 	return s.seals.Limit()
 }
 
-func (s *ExecStateForkSuppressor) logInconsistentSeals(s1, s2 *flow.IncorporatedResultSeal) uint {
-	sc1json, err := json.Marshal(irSeal)
-	if err != nil {
-		return nil, err
-	}
-	sc2json, err := json.Marshal(irSeal2)
-	if err != nil {
-		return nil, err
-	}
-	block, err := b.headers.ByBlockID(irSeal.Seal.BlockID)
-	if err != nil {
-		// not finding the block for a seal is a fatal, internal error: respective Execution Result should have been rejected by matching engine
-		// we still print as much of the error message as we can about the inconsistent seals
-		fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s\n", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-		return nil, fmt.Errorf("could not retrieve block for seal: %w", err)
-	}
-
-	// matching engine only adds seals to the mempool that have final and initial state
-	irSealInitialState, _ := irSeal.IncorporatedResult.Result.InitialStateCommit()
-	irSealFinalState, _ := irSeal.IncorporatedResult.Result.FinalStateCommitment()
-	irSeal2InitialState, _ := irSeal2.IncorporatedResult.Result.InitialStateCommit()
-	irSeal2FinalState, _ := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
-
-	// check whether seals are inconsistent:
-	if !bytes.Equal(irSealFinalState, irSeal2FinalState) || !bytes.Equal(irSealInitialState, irSeal2InitialState) {
-		fmt.Printf("ERROR: inconsistent seals for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
-		encounteredInconsistentSealsForSameBlock = true
-	} else {
-		fmt.Printf("WARNING: multiple seals with different IDs for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
-	}
-
-}
-
 func readExecutionForkDetectedFlag(db *badger.DB, defaultValue bool) (bool, error) {
 	var flag bool
 	err := operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
@@ -200,11 +166,6 @@ func readExecutionForkDetectedFlag(db *badger.DB, defaultValue bool) (bool, erro
 		}
 		return nil // happy case: flag was previously stored and we have successfully retrieved it
 	})
-	return flag, err
-}
-
-func setExecutionForkDetectedFlag(db *badger.DB) (bool, error) {
-
 	return flag, err
 }
 
@@ -276,42 +237,4 @@ func (s *ExecStateForkSuppressor) enforceConsistenStateTransitions(irSeal1, irSe
 		log.Warn().Msg("seals with different ID but consistent state transition")
 		return nil
 	}
-}
-
-// ExecStateTransition represents an execution state transition from state `start` to state `end`
-type ExecStateTransition struct {
-	start flow.StateCommitment
-	end   flow.StateCommitment
-}
-
-// NewExecStateTransition constructs a new state ExecStateTransition from the provided ExecutionResult.
-// Enforces that result's initial and final state are non-empty
-func NewExecStateTransition(result *flow.ExecutionResult) (*ExecStateTransition, error) {
-	initialState, ok := result.InitialStateCommit()
-	if !ok || len(initialState) < 1 {
-		log.Error().Msg("execution receipt without InitialStateCommit received")
-		return nil, engine.NewInvalidInputErrorf("execution result without InitialStateCommit: %x", result.ID())
-	}
-	finalState, ok := result.FinalStateCommitment()
-	if !ok || len(finalState) < 1 {
-		return nil, engine.NewInvalidInputErrorf("execution result without FinalStateCommit: %x", result.ID())
-	}
-	return &ExecStateTransition{
-		start: initialState,
-		end:   finalState,
-	}, nil
-}
-
-// IsConsistent returns true if and only if irSeal has the same start and end state as this ExecStateTransition
-func (t *ExecStateTransition) IsConsistent(result *flow.ExecutionResult) (bool, error) {
-	initialState, ok := result.InitialStateCommit()
-	if !ok || len(initialState) < 1 {
-		log.Error().Msg("execution receipt without InitialStateCommit received")
-		return false, engine.NewInvalidInputErrorf("execution result without InitialStateCommit: %x", result.ID())
-	}
-	finalState, ok := result.FinalStateCommitment()
-	if !ok || len(finalState) < 1 {
-		return false, engine.NewInvalidInputErrorf("execution result without FinalStateCommit: %x", result.ID())
-	}
-	return bytes.Equal(t.start, initialState) && bytes.Equal(t.end, initialState), nil
 }
