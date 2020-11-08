@@ -418,22 +418,6 @@ func (b *Builder) block2SealMap() (map[flow.Identifier]*flow.IncorporatedResultS
 	encounteredInconsistentSealsForSameBlock := false
 	byBlock := make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 	for _, irSeal := range b.sealPool.All() {
-		irSealInitialState, ok := irSeal.IncorporatedResult.Result.InitialStateCommit()
-		if !ok || len(irSealInitialState) < 1 { // missing or empty initial state commitment
-			// fatal error: respective Execution Result should have been rejected by matching engine
-			return nil, fmt.Errorf("seal for result without initial state: %v", irSeal.IncorporatedResult.Result.ID())
-		}
-		irSealFinalState, ok := irSeal.IncorporatedResult.Result.FinalStateCommitment()
-		if !ok || len(irSealFinalState) < 1 { // missing or empty final state commitment
-			// fatal error: respective Execution Result should have been rejected by matching engine
-			return nil, fmt.Errorf("seal for result without final state: %v", irSeal.IncorporatedResult.Result.ID())
-		}
-		if !bytes.Equal(irSeal.Seal.FinalState, irSealFinalState) {
-			// fatal error: matching engine has constructed seal with inconsistent values
-			return nil, fmt.Errorf("inconsistent final sate in result and seal for block %v", irSeal.Seal.BlockID)
-		}
-		// all Seals that are added to map have initial and final state commitment (otherwise, they are rejected by code above)
-
 		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
 			sc1json, err := json.Marshal(irSeal)
 			if err != nil {
@@ -451,7 +435,9 @@ func (b *Builder) block2SealMap() (map[flow.Identifier]*flow.IncorporatedResultS
 				return nil, fmt.Errorf("could not retrieve block for seal: %w", err)
 			}
 
-			// by induction, all elements in byBlock should have initial and final state commitment
+			// matching engine only adds seals to the mempool that have final and initial state
+			irSealInitialState, _ := irSeal.IncorporatedResult.Result.InitialStateCommit()
+			irSealFinalState, _ := irSeal.IncorporatedResult.Result.FinalStateCommitment()
 			irSeal2InitialState, _ := irSeal2.IncorporatedResult.Result.InitialStateCommit()
 			irSeal2FinalState, _ := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
 
@@ -462,7 +448,6 @@ func (b *Builder) block2SealMap() (map[flow.Identifier]*flow.IncorporatedResultS
 			} else {
 				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
 			}
-
 		} else {
 			byBlock[irSeal.Seal.BlockID] = irSeal
 		}

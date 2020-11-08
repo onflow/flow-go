@@ -16,8 +16,8 @@ func NewIncorporatedResultSeals(limit uint, opts ...OptionFunc) *IncorporatedRes
 }
 
 // Add adds an IncorporatedResultSeal to the mempool
-func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) bool {
-	return ir.Backend.Add(seal)
+func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
+	return ir.Backend.Add(seal), nil
 }
 
 // All returns all the items in the mempool
@@ -42,6 +42,6 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 }
 
 // Rem removes an IncorporatedResultSeal from the mempool
-func (ir *IncorporatedResultSeals) Rem(incorporatedResultID flow.Identifier) bool {
-	return ir.Backend.Rem(incorporatedResultID)
+func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
+	return ir.Backend.Rem(id)
 }

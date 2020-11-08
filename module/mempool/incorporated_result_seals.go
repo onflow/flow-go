@@ -10,7 +10,7 @@ import (
 // incorporated result seals
 type IncorporatedResultSeals interface {
 	// Add adds an IncorporatedResultSeal to the mempool
-	Add(irSeal *flow.IncorporatedResultSeal) bool
+	Add(irSeal *flow.IncorporatedResultSeal) (bool, error)
 
 	// All returns all the IncorporatedResultSeals in the mempool
 	All() []*flow.IncorporatedResultSeal

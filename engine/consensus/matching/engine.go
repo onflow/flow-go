@@ -210,11 +210,18 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Logger()
 
 	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok { // return
+	if !ok || len(resultFinalState) < 1 { // discard receipt
 		log.Error().Msg("execution receipt without FinalStateCommit received")
 		return engine.NewInvalidInputErrorf("execution receipt without FinalStateCommit: %x", receipt.ID())
 	}
 	log = log.With().Hex("final_state", resultFinalState).Logger()
+
+	resultInitialState, ok := receipt.ExecutionResult.InitialStateCommit()
+	if !ok || len(resultInitialState) < 1 { // discard receipt
+		log.Error().Msg("execution receipt without InitialStateCommit received")
+		return engine.NewInvalidInputErrorf("execution receipt without InitialStateCommit: %x", receipt.ID())
+	}
+	log = log.With().Hex("initial_state", resultInitialState).Logger()
 
 	// CAUTION INCOMPLETE
 	// For many other messages, we check that the message's origin (as established by the
@@ -281,6 +288,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	added, err := e.incorporatedResults.Add(flow.NewIncorporatedResult(result.BlockID, result))
 	if err != nil {
 		log.Err(err).Msg("error inserting incorporated result in mempool")
+		return fmt.Errorf("error inserting incorporated result in mempool: %w", err)
 	}
 	if !added {
 		log.Debug().Msg("skipping result already in mempool")
