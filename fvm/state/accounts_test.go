@@ -72,27 +72,6 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	})
 }
 
-type TestLedger struct {
-	contracts []byte
-}
-
-func (l *TestLedger) Set(_, _, key string, value flow.RegisterValue) {
-	if key == "contract_names" {
-		l.contracts = value
-	}
-}
-func (l *TestLedger) Get(_, _, key string) (flow.RegisterValue, error) {
-	if key == "exists" {
-		return []byte("1"), nil
-	}
-	if key == "contract_names" {
-		return l.contracts, nil
-	}
-	return nil, nil
-}
-func (l *TestLedger) Touch(_, _, _ string)  {}
-func (l *TestLedger) Delete(_, _, _ string) {}
-
 func TestAccounts_SetContracts(t *testing.T) {
 
 	address := flow.HexToAddress("0x01")
