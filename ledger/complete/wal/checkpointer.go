@@ -187,6 +187,15 @@ type SyncOnCloseFile struct {
 	*bufio.Writer
 }
 
+func (s *SyncOnCloseFile) Sync() error {
+	err := s.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush buffer: %w", err)
+	}
+	return s.file.Sync()
+
+}
+
 func (s *SyncOnCloseFile) Close() error {
 	defer func() {
 		err := s.file.Close()

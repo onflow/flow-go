@@ -94,7 +94,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	}
 
 	// constructing a partial trie given chunk data package
-	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunkDataPack.StartState)
+	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunkDataPack.StartState, partial.DefaultPathFinderVersion)
 
 	if err != nil {
 		// TODO provide more details based on the error type
