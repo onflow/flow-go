@@ -116,7 +116,7 @@ func main() {
 			return nil
 		}).
 		Module("historical access node clients", func(node *cmd.FlowNodeBuilder) error {
-			addrs := strings.Split(rpcConf.HistoricalAccessAddrs)
+			addrs := strings.Split(rpcConf.HistoricalAccessAddrs, ",")
 			for _, addr := range addrs {
 				if strings.TrimSpace(addr) == "" {
 					continue
@@ -132,6 +132,7 @@ func main() {
 				}
 				historicalAccessRPCs = append(historicalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
 			}
+			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			conCache = buffer.NewPendingBlocks()
