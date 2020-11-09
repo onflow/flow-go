@@ -13,27 +13,18 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-// TestHistoricalTransaction tests that the status of transaction changes from Finalized to Sealed
-// when the protocol state is updated
+// TestHistoricalTransaction tests to see if the historical transaction status can be retrieved
 func (suite *Suite) TestHistoricalTransaction() {
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
-	block := unittest.BlockFixture()
-	block.Header.Height = 2
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
-
-	suite.snapshot.
-		On("Head").
-		Return(headBlock.Header, nil)
 
 	txID := transactionBody.ID()
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
 		On("ByID", txID).
-		Return(nil, status.Errorf(codes.NotFound, "not found"))
+		Return(nil, status.Errorf(codes.NotFound, "not found on main node"))
 
 	accessEventReq := accessproto.GetTransactionRequest{
 		Id: txID[:],

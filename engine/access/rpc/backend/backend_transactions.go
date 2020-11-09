@@ -196,18 +196,17 @@ func (b *backendTransactions) GetTransactionResult(
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	tx, err := b.transactions.ByID(txID)
-	if err != nil {
-		return nil, convertStorageError(err)
+	txErr := convertStorageError(err)
+	if txErr != nil {
+		if status.Code(txErr) == codes.NotFound {
+			// Tx not found. If we have historical Sporks setup, lets look through those as well
+			return b.getHistoricalTransactionResult(ctx, txID)
+		}
+		return nil, txErr
 	}
 
 	// get events for the transaction
 	executed, events, statusCode, txError, err := b.lookupTransactionResult(ctx, txID)
-
-	errStatus, _ := status.FromError(err)
-	if errStatus.Code() == codes.NotFound {
-		// Tx not found. If we have historical Sporks setup, lets look through those as well
-		return b.getHistoricalTransactionResult(ctx, txID)
-	}
 	if err != nil {
 		return nil, convertStorageError(err)
 	}

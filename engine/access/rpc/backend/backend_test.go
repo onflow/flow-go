@@ -61,7 +61,6 @@ func (suite *Suite) SetupTest() {
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
-
 }
 
 func (suite *Suite) TestPing() {
