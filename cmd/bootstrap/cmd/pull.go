@@ -38,7 +38,7 @@ func addPullCmdFlags() {
 
 // pull partner node info from google bucket
 func pull(cmd *cobra.Command, args []string) {
-	log.Info().Msgf("Attempting to download partner info for network `%s` from bucket `%s`", flagNetwork, flagBucketName)
+	log.Info().Msgf("attempting to download partner info for network `%s` from bucket `%s`", flagNetwork, flagBucketName)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -56,10 +56,11 @@ func pull(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Error().Msgf("error trying list google bucket files: %v", err)
 	}
+	log.Info().Msgf("found %d files in google bucket", len(files))
 
 	for _, file := range files {
 		fullOutpath := filepath.Join(flagOutdir, file)
-		log.Printf("Downloading %s", file)
+		log.Printf("downloading %s", file)
 
 		err = bucket.DownloadFile(ctx, client, fullOutpath, file)
 		if err != nil {
