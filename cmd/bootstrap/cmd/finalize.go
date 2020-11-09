@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 
 var (
 	flagConfig                      string
+	flagInternalNodePrivInfoDir     string
 	flagCollectionClusters          uint
 	flagPartnerNodeInfoDir          string
 	flagPartnerStakes               string
@@ -31,99 +33,29 @@ var (
 	flagGenesisTokenSupply          string
 )
 
+// PartnerStakes ...
 type PartnerStakes map[flow.Identifier]uint64
 
 // finalizeCmd represents the finalize command
 var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
-	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
-running the DKG for the generation of the random beacon keys and generating the root block, QC, execution result
-and block seal.`,
-	Run: func(cmd *cobra.Command, args []string) {
-
-		log.Info().Msg("collecting partner network and staking keys")
-		partnerNodes := assemblePartnerNodes()
-		log.Info().Msg("")
-
-		log.Info().Msg("generating internal private networking and staking keys")
-		internalNodes := genNetworkAndStakingKeys(partnerNodes)
-		log.Info().Msg("")
-
-		log.Info().Msg("checking constraints on consensus/cluster nodes")
-		checkConstraints(partnerNodes, internalNodes)
-		log.Info().Msg("")
-
-		log.Info().Msg("assembling network and staking keys")
-		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-		writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
-		log.Info().Msg("")
-
-		log.Info().Msg("running DKG for consensus nodes")
-		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
-		log.Info().Msg("")
-
-		var commit []byte
-		if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
-			log.Info().Msg("generating empty execution state")
-
-			var err error
-			serviceAccountPublicKey := flow.AccountPublicKey{}
-			err = serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
-			if err != nil {
-				log.Fatal().Err(err).Msg("unable to parse the service account public key json")
-			}
-			value, err := cadence.NewUFix64(flagGenesisTokenSupply)
-			if err != nil {
-				log.Fatal().Err(err).Msg("invalid genesis token supply")
-			}
-			commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
-			if err != nil {
-				log.Fatal().Err(err).Msg("unable to generate execution state")
-			}
-			flagRootCommit = hex.EncodeToString(commit)
-			log.Info().Msg("")
-		}
-
-		log.Info().Msg("constructing root block")
-		block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
-		log.Info().Msg("")
-
-		log.Info().Msg("constructing root QC")
-		constructRootQC(
-			block,
-			model.FilterByRole(stakingNodes, flow.RoleConsensus),
-			model.FilterByRole(internalNodes, flow.RoleConsensus),
-			dkgData,
-		)
-		log.Info().Msg("")
-
-		log.Info().Msg("computing collection node clusters")
-		assignments, clusters := constructClusterAssignment(partnerNodes, internalNodes)
-		log.Info().Msg("")
-
-		log.Info().Msg("constructing root blocks for collection node clusters")
-		clusterBlocks := run.GenerateRootClusterBlocks(flagEpochCounter, clusters)
-		log.Info().Msg("")
-
-		log.Info().Msg("constructing root QCs for collection node clusters")
-		clusterQCs := constructRootQCsForClusters(clusters, internalNodes, clusterBlocks)
-		log.Info().Msg("")
-
-		log.Info().Msg("constructing root execution result and block seal")
-		constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
-		log.Info().Msg("")
-
-		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
-	},
+	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon 
+	keys and generating the root block, QC, execution result and block seal.`,
+	Run: finalize,
 }
 
 func init() {
 	rootCmd.AddCommand(finalizeCmd)
+	addFinalizeCmdFlags()
+}
 
+func addFinalizeCmdFlags() {
 	// required parameters for network configuration and generation of root node identities
 	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
+	finalizeCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
+		"containing the output from the `keygen` command for internal nodes")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
 		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
 		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
@@ -131,6 +63,7 @@ func init() {
 		"a map from partner node's NodeID to their stake")
 
 	_ = finalizeCmd.MarkFlagRequired("config")
+	_ = finalizeCmd.MarkFlagRequired("internal-priv-dir")
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 
@@ -162,8 +95,92 @@ func init() {
 		"genesis flow token supply")
 }
 
-func assemblePartnerNodes() []model.NodeInfo {
+func finalize(cmd *cobra.Command, args []string) {
 
+	log.Info().Msg("collecting partner network and staking keys")
+	partnerNodes := assemblePartnerNodes()
+	log.Info().Msg("")
+
+	log.Info().Msg("generating internal private networking and staking keys")
+	internalNodes := assembleInternalNodes()
+	log.Info().Msg("")
+
+	log.Info().Msg("checking constraints on consensus/cluster nodes")
+	checkConstraints(partnerNodes, internalNodes)
+	log.Info().Msg("")
+
+	log.Info().Msg("assembling network and staking keys")
+	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
+	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
+	log.Info().Msg("")
+
+	log.Info().Msg("running DKG for consensus nodes")
+	dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
+	log.Info().Msg("")
+
+	var commit []byte
+	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
+		log.Info().Msg("generating empty execution state")
+
+		var err error
+		serviceAccountPublicKey := flow.AccountPublicKey{}
+		err = serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
+		if err != nil {
+			log.Fatal().Err(err).Msg("unable to parse the service account public key json")
+		}
+		value, err := cadence.NewUFix64(flagGenesisTokenSupply)
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid genesis token supply")
+		}
+		commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
+		if err != nil {
+			log.Fatal().Err(err).Msg("unable to generate execution state")
+		}
+		flagRootCommit = hex.EncodeToString(commit)
+		log.Info().Msg("")
+	}
+
+	log.Info().Msg("constructing root block")
+	block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	log.Info().Msg("")
+
+	log.Info().Msg("constructing root QC")
+	constructRootQC(
+		block,
+		model.FilterByRole(stakingNodes, flow.RoleConsensus),
+		model.FilterByRole(internalNodes, flow.RoleConsensus),
+		dkgData,
+	)
+	log.Info().Msg("")
+
+	log.Info().Msg("computing collection node clusters")
+	assignments, clusters := constructClusterAssignment(partnerNodes, internalNodes)
+	log.Info().Msg("")
+
+	log.Info().Msg("constructing root blocks for collection node clusters")
+	clusterBlocks := run.GenerateRootClusterBlocks(flagEpochCounter, clusters)
+	log.Info().Msg("")
+
+	log.Info().Msg("constructing root QCs for collection node clusters")
+	clusterQCs := constructRootQCsForClusters(clusters, internalNodes, clusterBlocks)
+	log.Info().Msg("")
+
+	log.Info().Msg("constructing root execution result and block seal")
+	constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
+	log.Info().Msg("")
+
+	// print count of all nodes
+	roleCounts := nodeCountByRole(stakingNodes)
+	for role, count := range roleCounts {
+		log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
+	}
+
+	log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
+}
+
+// assemblePartnerNodes returns a list of partner nodes after gathering stake
+// and public key information from configuration files
+func assemblePartnerNodes() []model.NodeInfo {
 	partners := readPartnerNodes()
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 
@@ -187,12 +204,137 @@ func assemblePartnerNodes() []model.NodeInfo {
 			networkPubKey,
 			stakingPubKey,
 		)
+		nodes = append(nodes, node)
+	}
+
+	return nodes
+}
+
+// readParnterNodes reads the partner node information from the flag --partner-dir
+func readPartnerNodes() []model.PartnerNodeInfoPub {
+	var partners []model.PartnerNodeInfoPub
+	files, err := filesInDir(flagPartnerNodeInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read partner node infos")
+	}
+	for _, f := range files {
+		// skip files that do not include node-infos
+		if !strings.Contains(f, model.PathPartnerNodeInfoPrefix) {
+			continue
+		}
+
+		// read file and append to partners
+		var p model.PartnerNodeInfoPub
+		readJSON(f, &p)
+		partners = append(partners, p)
+	}
+	return partners
+}
+
+// assembleInternalNodes returns a list of internal nodes after collecting stakes
+// from configuration files
+func assembleInternalNodes() []model.NodeInfo {
+	privInternals := readInternalNodes()
+	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
+
+	stakes := internalStakesByAddress()
+	log.Info().Msgf("read %v stakes for internal nodes", len(stakes))
+
+	var nodes []model.NodeInfo
+	for _, internal := range privInternals {
+		// check if address is valid format
+		validateAddressFormat(internal.Address)
+
+		// validate every single internal node
+		nodeID := validateNodeID(internal.NodeID)
+		stake := validateStake(stakes[internal.Address])
+
+		node := model.NewPrivateNodeInfo(
+			nodeID,
+			internal.Role,
+			internal.Address,
+			stake,
+			internal.NetworkPrivKey,
+			internal.StakingPrivKey,
+		)
 
 		nodes = append(nodes, node)
 	}
 
 	return nodes
 }
+
+// readInternalNodes reads our internal node private infos generated by
+// `keygen` command and returns it
+func readInternalNodes() []model.NodeInfoPriv {
+	var internalPrivInfos []model.NodeInfoPriv
+
+	// get files in internal priv node infos directory
+	files, err := filesInDir(flagInternalNodePrivInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read partner node infos")
+	}
+
+	// for each of the files
+	for _, f := range files {
+		// skip files that do not include node-infos
+		if !strings.Contains(f, model.PathPrivNodeInfoPrefix) {
+			continue
+		}
+
+		// read file and append to partners
+		var p model.NodeInfoPriv
+		readJSON(f, &p)
+		internalPrivInfos = append(internalPrivInfos, p)
+	}
+
+	return internalPrivInfos
+}
+
+// internalStakesByAddress returns a mapping of node address by stake for internal nodes
+func internalStakesByAddress() map[string]uint64 {
+	// read json
+	var configs []model.NodeConfig
+	readJSON(flagConfig, &configs)
+	log.Info().Msgf("read internal %v node configurations", configs)
+
+	stakes := make(map[string]uint64)
+	for _, config := range configs {
+		if _, ok := stakes[config.Address]; !ok {
+			stakes[config.Address] = config.Stake
+		} else {
+			log.Error().Msgf("duplicate internal node address %s", config.Address)
+		}
+	}
+
+	return stakes
+}
+
+// mergeNodeInfos merges the inernal and partner nodes and checks if there is no
+// duplicate addresses or node Ids
+func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
+	nodes := append(internalNodes, partnerNodes...)
+
+	// test for duplicate Addresses
+	addressLookup := make(map[string]struct{})
+	for _, node := range nodes {
+		if _, ok := addressLookup[node.Address]; ok {
+			log.Fatal().Str("address", node.Address).Msg("duplicate node address")
+		}
+	}
+
+	// test for duplicate node IDs
+	idLookup := make(map[flow.Identifier]struct{})
+	for _, node := range nodes {
+		if _, ok := idLookup[node.NodeID]; ok {
+			log.Fatal().Str("NodeID", node.NodeID.String()).Msg("duplicate node ID")
+		}
+	}
+
+	return nodes
+}
+
+// Validation utility methods ------------------------------------------------
 
 func validateNodeID(nodeID flow.Identifier) flow.Identifier {
 	if nodeID == flow.ZeroID {
@@ -220,46 +362,4 @@ func validateStake(stake uint64) uint64 {
 		log.Fatal().Msg("Stake must be bigger than 0")
 	}
 	return stake
-}
-
-func readPartnerNodes() []model.PartnerNodeInfoPub {
-	var partners []model.PartnerNodeInfoPub
-	files, err := filesInDir(flagPartnerNodeInfoDir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read partner node infos")
-	}
-	for _, f := range files {
-		// skip files that do not include node-infos
-		if !strings.Contains(f, model.PathPartnerNodeInfoPrefix) {
-			continue
-		}
-
-		// read file and append to partners
-		var p model.PartnerNodeInfoPub
-		readJSON(f, &p)
-		partners = append(partners, p)
-	}
-	return partners
-}
-
-func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
-	nodes := append(internalNodes, partnerNodes...)
-
-	// test for duplicate Addresses
-	addressLookup := make(map[string]struct{})
-	for _, node := range nodes {
-		if _, ok := addressLookup[node.Address]; ok {
-			log.Fatal().Str("address", node.Address).Msg("duplicate node address")
-		}
-	}
-
-	// test for duplicate node IDs
-	idLookup := make(map[flow.Identifier]struct{})
-	for _, node := range nodes {
-		if _, ok := idLookup[node.NodeID]; ok {
-			log.Fatal().Str("NodeID", node.NodeID.String()).Msg("duplicate node ID")
-		}
-	}
-
-	return nodes
 }

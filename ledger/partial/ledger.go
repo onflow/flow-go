@@ -9,20 +9,20 @@ import (
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 )
 
-// PathFinderVersion captures the version of path finder that the partial ledger uses
-const PathFinderVersion = 0
+const DefaultPathFinderVersion = 0
 
 // Ledger implements the ledger functionality for a limited subset of keys (partial ledger).
 // Partial ledgers are designed to be constructed and verified by a collection of proofs from a complete ledger.
 // The partial ledger uses a partial binary Merkle trie which holds intermediate hash value for the pruned branched and prevents updates to keys that were not part of proofs.
 type Ledger struct {
-	ptrie *ptrie.PSMT
-	state ledger.State
-	proof ledger.Proof
+	ptrie             *ptrie.PSMT
+	state             ledger.State
+	proof             ledger.Proof
+	pathFinderVersion uint8
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
-func NewLedger(proof ledger.Proof, s ledger.State) (*Ledger, error) {
+func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger, error) {
 
 	// Decode proof encodings
 	if len(proof) < 1 {
@@ -41,7 +41,7 @@ func NewLedger(proof ledger.Proof, s ledger.State) (*Ledger, error) {
 		return nil, ledger.NewErrLedgerConstruction(err)
 	}
 
-	return &Ledger{ptrie: psmt, proof: proof, state: s}, nil
+	return &Ledger{ptrie: psmt, proof: proof, state: s, pathFinderVersion: pathFinderVer}, nil
 }
 
 // Ready implements interface module.ReadyDoneAware
@@ -67,7 +67,7 @@ func (l *Ledger) InitialState() ledger.State {
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	// TODO compare query.State() to the ledger sc
-	paths, err := pathfinder.KeysToPaths(query.Keys(), PathFinderVersion)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, PathFinderVersion)
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	if err != nil {
 		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
 
-			paths, err := pathfinder.KeysToPaths(update.Keys(), PathFinderVersion)
+			paths, err := pathfinder.KeysToPaths(update.Keys(), l.pathFinderVersion)
 			if err != nil {
 				return nil, err
 			}
