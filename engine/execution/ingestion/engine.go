@@ -1141,7 +1141,7 @@ func (e *Engine) saveExecutionResults(
 
 		// store events 1K in each batch
 		chunkSize := uint(1000)
-		eventChunks := ChunkfiyEvents(events, chunkSize)
+		eventChunks := ChunkifyEvents(events, chunkSize)
 		for _, ch := range eventChunks {
 			err = e.events.Store(blockID, ch)
 			if err != nil {
@@ -1717,8 +1717,8 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 	log.Info().Msg("block has been executed successfully from applying state deltas")
 }
 
-// ChunkfiyEvents breaks an slice of events into smaller chunks
-func ChunkfiyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
+// ChunkifyEvents breaks an slice of events into smaller chunks
+func ChunkifyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
 	res := make([][]flow.Event, 0)
 	if len(events) == 0 {
 		return res
