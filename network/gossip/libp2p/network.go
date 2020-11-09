@@ -122,6 +122,10 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channelID, err)
 	}
 
+	n.logger.Info().
+		Str("channel_id", channelID).
+		Msg("channel successfully registered")
+
 	// create a cancellable child context
 	ctx, cancel := context.WithCancel(n.ctx)
 
@@ -172,6 +176,10 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	// gets all the channels that this node has subscribed to
 	myTopics := n.sm.GetChannelIDs()
 	myFanout := flow.IdentityList{}
+
+	if len(myTopics) == 0 {
+		return nil, fmt.Errorf("no subscribed topic found for the node")
+	}
 
 	// samples a connected component fanout from each topic and takes the
 	// union of all fanouts.
