@@ -494,6 +494,14 @@ func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
 		verif, err := pkGroup.Verify(thresholdSignature, messageToSign, kmac)
 		require.NoError(t, err)
 		assert.True(t, verif, "signature share is not valid")
+
+		// check failure with a random redundant signer
+		if threshold > 1 {
+			randomDuplicate := mrand.Intn(int(threshold)) + 1 // 1 <= duplicate <= threshold
+			signers[randomDuplicate] = signers[0]
+			thresholdSignature, err = ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
+			assert.Error(t, err)
+		}
 	}
 }
 

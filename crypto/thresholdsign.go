@@ -106,15 +106,19 @@ func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash
 // - sharePublicKeys are the public key shares corresponding to the nodes private
 // key shares.
 // - currentPrivateKey is the current node's own private key share
-// Output keys of FeldmanVSS, FeldmanVSSQual and JointFeldman protocols could
-// be used as the input keys to this function.
+// Output keys of ThresholdSignKeyGen or DKG protocols could be used as the input
+// keys to this function.
 func (s *thresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 	groupPublicKey PublicKey,
 	sharePublicKeys []PublicKey) error {
 
 	if len(sharePublicKeys) != s.size {
-		return fmt.Errorf("size of public key shares should be %d", s.size)
+		return fmt.Errorf("size of public key shares should be %d, but got %d",
+			s.size, len(sharePublicKeys))
 	}
+
+	// clear existing shares signed with previous keys.
+	s.ClearShares()
 
 	s.currentPrivateKey = currentPrivateKey
 	s.groupPublicKey = groupPublicKey
@@ -122,7 +126,7 @@ func (s *thresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 	return nil
 }
 
-// SetMessageToSign sets the next message to be signed
+// SetMessageToSign sets the next message to be signed.
 // All signatures shares of a different message are ignored
 func (s *thresholdSigner) SetMessageToSign(message []byte) {
 	s.ClearShares()
@@ -322,7 +326,8 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // The function does not check the validity of the shares, and does not check
 // the validity of the resulting signature.
 // ReconstructThresholdSignature returns:
-// - error if the inputs are not in the correct range or if the threshold is not reached
+// - error if the inputs are not in the correct range, if the threshold is not reached,
+//    or if input signers are not distinct.
 // - Signature: the threshold signature if there is no returned error, nil otherwise
 // If the number of shares reaches the required threshold, only the first threshold+1 shares
 // are considered to reconstruct the signature.
@@ -363,6 +368,7 @@ func ReconstructThresholdSignature(size int, threshold int,
 		if _, isSeen := m[index(signers[i])]; isSeen {
 			return nil, fmt.Errorf("%d is a duplicate signer", index(signers[i]))
 		}
+		m[index(signers[i])] = true
 		indexSigners = append(indexSigners, index(signers[i]))
 	}
 
