@@ -155,7 +155,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	}
 
 	duration = time.Since(startTime)
-	log.Info().Float64("total_time_s", duration.Seconds()).Msg("finished writing checkpoiunt")
+	log.Info().Float64("total_time_s", duration.Seconds()).Msg("finished writing checkpoint")
 
 	return nil
 }
