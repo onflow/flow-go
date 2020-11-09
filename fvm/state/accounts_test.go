@@ -19,7 +19,7 @@ func TestAccounts_Create(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
-		require.Equal(t, len(ledger.RegisterTouches), 3) // exists + code + key count
+		require.Equal(t, len(ledger.RegisterTouches), 2) // exists  + key count
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
@@ -94,13 +94,11 @@ func (l *TestLedger) Touch(_, _, _ string)  {}
 func (l *TestLedger) Delete(_, _, _ string) {}
 
 func TestAccounts_SetContracts(t *testing.T) {
-
-	chain := struct{ flow.Chain }{}
 	address := flow.HexToAddress("0x01")
 
 	t.Run("Setting a contract puts it in Contracts", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger, chain)
+		a := state.NewAccounts(&ledger)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
 		require.NoError(t, err)
@@ -113,7 +111,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting a contract again, does not add it to contracts", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger, chain)
+		a := state.NewAccounts(&ledger)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
 		require.NoError(t, err)
@@ -129,7 +127,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting more contracts always keeps them sorted", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger, chain)
+		a := state.NewAccounts(&ledger)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
 		require.NoError(t, err)
@@ -150,14 +148,14 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Removing a contract does not fail if there is none", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger, chain)
+		a := state.NewAccounts(&ledger)
 
 		err := a.DeleteContract("Dummy", address)
 		require.NoError(t, err)
 	})
 	t.Run("Removing a contract removes it", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger, chain)
+		a := state.NewAccounts(&ledger)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
 		require.NoError(t, err)
