@@ -35,7 +35,7 @@ func GenerateExecutionState(
 ) (flow.StateCommitment, error) {
 	metricsCollector := &metrics.NoopCollector{}
 
-	ledgerStorage, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
+	ledgerStorage, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, ledger.DefaultPathFinderVersion)
 	if err != nil {
 		return nil, err
 	}

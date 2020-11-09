@@ -64,13 +64,13 @@ func TestPopulatedTrie(t *testing.T) {
 	require.True(t, itr.Next())
 	p_parent := itr.Value()
 	require.Equal(t, p1_leaf, p_parent.LeftChild())
-	require.Equal(t, p2_leaf, p_parent.RigthChild())
+	require.Equal(t, p2_leaf, p_parent.RightChild())
 
 	require.True(t, itr.Next())
 	root := itr.Value()
 	require.Equal(t, testTrie.RootNode(), root)
 	require.Equal(t, p_parent, root.LeftChild())
-	require.True(t, nil == root.RigthChild())
+	require.True(t, nil == root.RightChild())
 
 	require.False(t, itr.Next())
 	require.True(t, nil == itr.Value())

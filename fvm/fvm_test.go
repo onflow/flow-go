@@ -254,6 +254,35 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Equal(t, expectedErr, tx.Err.Error())
 		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
 	})
+
+	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+
+		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody)
+
+		err = vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		assert.Error(t, tx.Err)
+
+		expectedErr := "Execution failed:\ncode deployment requires authorization from the service account\n"
+
+		assert.Equal(t, expectedErr, tx.Err.Error())
+		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+	})
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {

@@ -20,7 +20,7 @@ func TestAccounts_Create(t *testing.T) {
 		require.NoError(t, err)
 
 		// storage_used + storage_capacity + exists + code + key count
-		require.Equal(t, len(ledger.RegisterTouches), 5)
+		require.Equal(t, len(ledger.RegisterTouches), 4)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
@@ -70,6 +70,94 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 
 	require.NotPanics(t, func() {
 		_, _ = accounts.Get(address)
+	})
+}
+
+func TestAccounts_SetContracts(t *testing.T) {
+
+	address := flow.HexToAddress("0x01")
+
+	t.Run("Setting a contract puts it in Contracts", func(t *testing.T) {
+		ledger := state.NewMapLedger()
+		a := state.NewAccounts(ledger)
+		err := a.Create(nil, address)
+		require.NoError(t, err)
+
+		err = a.SetContract("Dummy", address, []byte("non empty string"))
+		require.NoError(t, err)
+
+		contractNames, err := a.GetContractNames(address)
+		require.NoError(t, err)
+
+		require.Len(t, contractNames, 1, "There should only be one contract")
+		require.Equal(t, contractNames[0], "Dummy")
+	})
+	t.Run("Setting a contract again, does not add it to contracts", func(t *testing.T) {
+		ledger := state.NewMapLedger()
+		a := state.NewAccounts(ledger)
+		err := a.Create(nil, address)
+		require.NoError(t, err)
+
+		err = a.SetContract("Dummy", address, []byte("non empty string"))
+		require.NoError(t, err)
+
+		err = a.SetContract("Dummy", address, []byte("non empty string"))
+		require.NoError(t, err)
+
+		contractNames, err := a.GetContractNames(address)
+		require.NoError(t, err)
+
+		require.Len(t, contractNames, 1, "There should only be one contract")
+		require.Equal(t, contractNames[0], "Dummy")
+	})
+	t.Run("Setting more contracts always keeps them sorted", func(t *testing.T) {
+		ledger := state.NewMapLedger()
+		a := state.NewAccounts(ledger)
+		err := a.Create(nil, address)
+		require.NoError(t, err)
+
+		err = a.SetContract("Dummy", address, []byte("non empty string"))
+		require.NoError(t, err)
+
+		err = a.SetContract("ZedDummy", address, []byte("non empty string"))
+		require.NoError(t, err)
+
+		err = a.SetContract("ADummy", address, []byte("non empty string"))
+		require.NoError(t, err)
+
+		contractNames, err := a.GetContractNames(address)
+		require.NoError(t, err)
+
+		require.Len(t, contractNames, 3)
+		require.Equal(t, contractNames[0], "ADummy")
+		require.Equal(t, contractNames[1], "Dummy")
+		require.Equal(t, contractNames[2], "ZedDummy")
+	})
+	t.Run("Removing a contract does not fail if there is none", func(t *testing.T) {
+		ledger := state.NewMapLedger()
+		a := state.NewAccounts(ledger)
+		err := a.Create(nil, address)
+		require.NoError(t, err)
+
+		err = a.DeleteContract("Dummy", address)
+		require.NoError(t, err)
+	})
+	t.Run("Removing a contract removes it", func(t *testing.T) {
+		ledger := state.NewMapLedger()
+		a := state.NewAccounts(ledger)
+		err := a.Create(nil, address)
+		require.NoError(t, err)
+
+		err = a.SetContract("Dummy", address, []byte("non empty string"))
+		require.NoError(t, err)
+
+		err = a.DeleteContract("Dummy", address)
+		require.NoError(t, err)
+
+		contractNames, err := a.GetContractNames(address)
+		require.NoError(t, err)
+
+		require.Len(t, contractNames, 0, "There should be no contract")
 	})
 }
 
