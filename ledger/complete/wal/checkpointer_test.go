@@ -5,6 +5,7 @@ import (
 	"io"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -179,6 +180,8 @@ func Test_Checkpointing(t *testing.T) {
 
 				savedData[string(rootHash)] = data
 			}
+			// some buffer time of the checkpointer to run
+			time.Sleep(1 * time.Second)
 			err = wal.Close()
 			require.NoError(t, err)
 
