@@ -33,5 +33,5 @@ func LookupTransactionResultsByBlockID(blockID flow.Identifier, txResults *[]flo
 		return check, create, handle
 	}
 
-	return traverse(makePrefix(codeEvent, blockID), txErrIterFunc)
+	return traverse(makePrefix(codeTransactionResult, blockID), txErrIterFunc)
 }
