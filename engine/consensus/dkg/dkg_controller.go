@@ -1,7 +1,7 @@
 /*
 
 Package dkg implements a controller that manages the lifecycle of a Joint
-Feldman DKG protocol instance.
+Feldman DKG node.
 
 The state-machine can be represented as follows:
 
@@ -70,7 +70,7 @@ type Controller struct {
 	log zerolog.Logger
 }
 
-// NewController instantiates a new instance of a Joint Feldman DKG protocol.
+// NewController instantiates a new Joint Feldman DKG controller.
 func NewController(
 	dkg crypto.DKGState,
 	seed []byte,
@@ -173,6 +173,8 @@ func (c *Controller) End() (crypto.PrivateKey, crypto.PublicKey, []crypto.Public
 	close(c.endCh)
 
 	c.SetState(Shutdown)
+
+	c.log.Debug().Msg("DKG engine end")
 
 	// return the products of the DKG protocol
 	return c.dkg.End()
