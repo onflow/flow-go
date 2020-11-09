@@ -20,7 +20,7 @@ func TestBootstrapLedger(t *testing.T) {
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
+		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
@@ -44,14 +44,14 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("489e6a75628cee6ae24662e86d642178c6ab3210d7a213d81de45664bac8cf4f")
+	var expectedStateCommitment, _ = hex.DecodeString("d1ac84222a9e6312d288f918b16f1c887128ee1a1fb7506ad4c3e55a0b491f7b")
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil)
+		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
