@@ -53,6 +53,7 @@ func main() {
 		rpcEng                       *rpc.Engine
 		collectionRPC                access.AccessAPIClient
 		executionRPC                 execution.ExecutionAPIClient
+		historicalAccessRPCs         []access.AccessAPIClient
 		err                          error
 		conCache                     *buffer.PendingBlocks // pending block cache for follower
 		transactionTimings           *stdmap.TransactionTimings
@@ -77,6 +78,7 @@ func main() {
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
+			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
@@ -112,6 +114,25 @@ func main() {
 				return err
 			}
 			executionRPC = execution.NewExecutionAPIClient(executionRPCConn)
+			return nil
+		}).
+		Module("historical access node clients", func(node *cmd.FlowNodeBuilder) error {
+			addrs := strings.Split(rpcConf.HistoricalAccessAddrs, ",")
+			for _, addr := range addrs {
+				if strings.TrimSpace(addr) == "" {
+					continue
+				}
+				node.Logger.Info().Err(err).Msgf("Historical access node Addr: %s", addr)
+
+				historicalAccessRPCConn, err := grpc.Dial(
+					addr,
+					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+					grpc.WithInsecure())
+				if err != nil {
+					return err
+				}
+				historicalAccessRPCs = append(historicalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
+			}
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -157,6 +178,7 @@ func main() {
 				rpcConf,
 				executionRPC,
 				collectionRPC,
+				historicalAccessRPCs,
 				node.Storage.Blocks,
 				node.Storage.Headers,
 				node.Storage.Collections,

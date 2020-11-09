@@ -47,6 +47,7 @@ func New(
 	state protocol.State,
 	executionRPC execproto.ExecutionAPIClient,
 	collectionRPC accessproto.AccessAPIClient,
+	historicalAccessNodes []accessproto.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -84,6 +85,7 @@ func New(
 			retry:                retry,
 			collectionGRPCPort:   collectionGRPCPort,
 			connFactory:          connFactory,
+			previousAccessNodes:  historicalAccessNodes,
 		},
 		backendEvents: backendEvents{
 			executionRPC: executionRPC,
@@ -164,6 +166,13 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 }
 
 func convertStorageError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if status.Code(err) == codes.NotFound {
+		// Already converted
+		return err
+	}
 	if errors.Is(err, storage.ErrNotFound) {
 		return status.Errorf(codes.NotFound, "not found: %v", err)
 	}
