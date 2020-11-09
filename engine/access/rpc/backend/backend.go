@@ -47,6 +47,7 @@ func New(
 	state protocol.State,
 	executionRPC execproto.ExecutionAPIClient,
 	collectionRPC accessproto.AccessAPIClient,
+	historicalAccessNodes []accessproto.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -84,6 +85,7 @@ func New(
 			retry:                retry,
 			collectionGRPCPort:   collectionGRPCPort,
 			connFactory:          connFactory,
+			previousAccessNodes:  historicalAccessNodes,
 		},
 		backendEvents: backendEvents{
 			executionRPC: executionRPC,
