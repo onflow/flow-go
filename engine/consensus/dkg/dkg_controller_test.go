@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"crypto/rand"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -96,32 +97,60 @@ func (proc *processor) Blacklist(node int) {}
 
 func (proc *processor) FlagMisbehavior(node int, logData string) {}
 
-// TestDKG tests the controller in optimal conditions, when all nodes are
+type testCase struct {
+	totalNodes    int
+	phaseDuration time.Duration
+}
+
+// TestDKGNormal tests the controller in optimal conditions, when all nodes are
 // working correctly.
-func TestDKG(t *testing.T) {
-	t.Run("5nodes", func(t *testing.T) { testDKG(t, 5, 5, time.Second) })
-	t.Run("10nodes", func(t *testing.T) { testDKG(t, 10, 10, time.Second) })
-	// t.Run("20nodes", func(t *testing.T) { testDKG(t, 20, 5*time.Second) })
+func TestDKGNormal(t *testing.T) {
+	// define different test cases with varying number of nodes, and phase
+	// durations
+	testCases := []testCase{
+		testCase{totalNodes: 5, phaseDuration: time.Second},
+		testCase{totalNodes: 10, phaseDuration: time.Second},
+		testCase{totalNodes: 15, phaseDuration: 3 * time.Second},
+		testCase{totalNodes: 20, phaseDuration: 3 * time.Second},
+	}
+
+	// run each test case
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%d nodes", tc.totalNodes), func(t *testing.T) {
+			testDKG(t, tc.totalNodes, tc.totalNodes, tc.phaseDuration)
+		})
+	}
 }
 
 // TestDKGThreshold tests that the controller results in a successful DKG as
 // long as the minimum threshold for non-byzantine nodes is satisfied.
 func TestDKGThreshold(t *testing.T) {
-	n := 10
-	phaseDuration := 1 * time.Second
+	// define different test cases with varying number of nodes, and phase
+	// durations
+	testCases := []testCase{
+		testCase{totalNodes: 5, phaseDuration: time.Second},
+		testCase{totalNodes: 10, phaseDuration: time.Second},
+		testCase{totalNodes: 15, phaseDuration: 3 * time.Second},
+		testCase{totalNodes: 20, phaseDuration: 3 * time.Second},
+	}
 
-	// gn is the minimum number of good nodes required for the DKG protocol to
-	// go well
-	gn := n - optimalThreshold(n)
+	// run each test case
+	for _, tc := range testCases {
+		// gn is the minimum number of good nodes required for the DKG protocol
+		// to go well
+		gn := tc.totalNodes - optimalThreshold(tc.totalNodes)
 
-	testDKG(t, n, gn, phaseDuration)
+		t.Run(fmt.Sprintf("%d/%d nodes", gn, tc.totalNodes), func(t *testing.T) {
+			testDKG(t, tc.totalNodes, gn, tc.phaseDuration)
+		})
+	}
 }
 
 func testDKG(t *testing.T, totalNodes int, goodNodes int, phaseDuration time.Duration) {
 	nodes := initNodes(t, totalNodes, phaseDuration)
 	gnodes := nodes[:goodNodes]
 
-	// Start all nodes in parallel
+	// Start all the good nodes in parallel
 	for _, n := range gnodes {
 		go func(node *node) {
 			err := node.run()
@@ -136,6 +165,7 @@ func testDKG(t *testing.T, totalNodes int, goodNodes int, phaseDuration time.Dur
 	checkArtifacts(t, gnodes)
 }
 
+// Initialise nodes and communication channels.
 func initNodes(t *testing.T, n int, phaseDuration time.Duration) []*node {
 	// Create the channels through which the nodes will communicate
 	channels := make([]chan DKGMessage, 0, n)
@@ -172,6 +202,7 @@ func initNodes(t *testing.T, n int, phaseDuration time.Duration) []*node {
 	return nodes
 }
 
+// Wait for all the nodes to reach the SHUTDOWN state, or timeout.
 func wait(t *testing.T, nodes []*node, timeout time.Duration) {
 
 	timer := time.After(timeout)
@@ -196,15 +227,19 @@ func wait(t *testing.T, nodes []*node, timeout time.Duration) {
 	}
 }
 
+// Check that all nodes have produced the same set of public keys
 func checkArtifacts(t *testing.T, nodes []*node) {
 	for i := 1; i < len(nodes); i++ {
 		require.NotEmpty(t, nodes[i].priv)
 		require.NotEmpty(t, nodes[i].pub)
-		require.NotEmpty(t, nodes[i].pubs)
-		// require.Equal(t, nodes[0].pubs, nodes[i].pubs)
-		if !reflect.DeepEqual(nodes[0].pubs, nodes[i].pubs) {
-			t.Fatalf("pubs differ: %#v, %#v", nodes[0].pubs, nodes[i].pubs)
+		require.Len(t, nodes[i].pubs, len(nodes))
+
+		for j := 0; j < len(nodes); j++ {
+			if !reflect.DeepEqual(nodes[0].pubs[j], nodes[i].pubs[j]) {
+				t.Fatalf("pubs[%d] differ: %s, %s", j, nodes[0].pubs[j].String(), nodes[i].pubs[j].String())
+			}
 		}
+
 	}
 }
 
