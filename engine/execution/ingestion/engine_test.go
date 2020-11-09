@@ -876,7 +876,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 	})
 }
 
-func TestchunkfiyEvents(t *testing.T) {
+func TestChunkfiyEvents(t *testing.T) {
 	// generate events
 	events := make([]flow.Event, 0)
 	for j := 0; j < 10; j++ {
