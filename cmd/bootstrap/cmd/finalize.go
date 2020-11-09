@@ -210,7 +210,7 @@ func assemblePartnerNodes() []model.NodeInfo {
 	return nodes
 }
 
-// readParnterNodes reads the partner node information from the flag --partner-dir
+// readParnterNodes reads the partner node information
 func readPartnerNodes() []model.PartnerNodeInfoPub {
 	var partners []model.PartnerNodeInfoPub
 	files, err := filesInDir(flagPartnerNodeInfoDir)
