@@ -32,13 +32,14 @@ type Suite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks       *storagemock.Blocks
-	headers      *storagemock.Headers
-	collections  *storagemock.Collections
-	transactions *storagemock.Transactions
-	colClient    *access.AccessAPIClient
-	execClient   *access.ExecutionAPIClient
-	chainID      flow.ChainID
+	blocks                 *storagemock.Blocks
+	headers                *storagemock.Headers
+	collections            *storagemock.Collections
+	transactions           *storagemock.Transactions
+	colClient              *access.AccessAPIClient
+	execClient             *access.ExecutionAPIClient
+	historicalAccessClient *access.AccessAPIClient
+	chainID                flow.ChainID
 }
 
 func TestHandler(t *testing.T) {
@@ -59,6 +60,7 @@ func (suite *Suite) SetupTest() {
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.chainID = flow.Testnet
+	suite.historicalAccessClient = new(access.AccessAPIClient)
 }
 
 func (suite *Suite) TestPing() {
@@ -74,7 +76,7 @@ func (suite *Suite) TestPing() {
 		suite.state,
 		suite.execClient,
 		suite.colClient,
-		nil, nil, nil, nil,
+		nil, nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		0,
@@ -96,7 +98,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	backend := New(
 		suite.state,
 		suite.execClient,
-		nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		0,
@@ -123,7 +125,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil,
+		nil, nil, nil, nil,
 		suite.headers, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
@@ -155,7 +157,7 @@ func (suite *Suite) TestGetTransaction() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil,
 		suite.transactions,
 		suite.chainID,
 		metrics.NewNoopCollector(),
@@ -182,7 +184,7 @@ func (suite *Suite) TestGetCollection() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil,
+		nil, nil, nil, nil, nil,
 		suite.collections,
 		suite.transactions,
 		suite.chainID,
@@ -248,6 +250,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	backend := New(
 		suite.state,
 		suite.execClient,
+		nil,
 		nil,
 		suite.blocks,
 		suite.headers,
@@ -350,6 +353,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		suite.state,
 		suite.execClient,
 		nil,
+		nil,
 		suite.blocks,
 		suite.headers,
 		suite.collections,
@@ -396,7 +400,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	backend := New(
 		suite.state,
-		nil, nil,
+		nil, nil, nil,
 		suite.blocks,
 		nil, nil, nil,
 		suite.chainID,
@@ -480,7 +484,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	backend := New(
 		suite.state,
 		suite.execClient,
-		nil,
+		nil, nil,
 		suite.blocks,
 		nil, nil, nil,
 		suite.chainID,
@@ -573,7 +577,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("invalid request max height < min height", func() {
 		backend := New(
 			suite.state,
-			nil, nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil, nil, nil,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			0,
@@ -600,7 +604,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend := New(
 			suite.state,
 			suite.execClient,
-			nil,
+			nil, nil,
 			suite.blocks,
 			suite.headers,
 			nil, nil,
@@ -629,7 +633,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend := New(
 			suite.state,
 			suite.execClient,
-			nil,
+			nil, nil,
 			suite.blocks,
 			suite.headers,
 			nil, nil,
@@ -691,7 +695,7 @@ func (suite *Suite) TestGetAccount() {
 	backend := New(
 		suite.state,
 		suite.execClient,
-		nil, nil,
+		nil, nil, nil,
 		suite.headers,
 		nil, nil,
 		suite.chainID,
@@ -750,7 +754,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	backend := New(
 		suite.state,
 		suite.execClient,
-		nil, nil,
+		nil, nil, nil,
 		suite.headers,
 		nil, nil,
 		flow.Testnet,
@@ -774,7 +778,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 	expectedChainID := flow.Mainnet
 
 	backend := New(
-		nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil,
 		flow.Mainnet,
 		metrics.NewNoopCollector(),
 		0,
