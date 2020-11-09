@@ -1120,18 +1120,13 @@ func (e *Engine) saveExecutionResults(
 		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionEvents)
 		defer span.Finish()
 
-		if len(events) > 0 {
-			// store events 1K in each batch
-			chunkSize := 1000
-			for i := 0; i < len(events); i += chunkSize {
-				end := i + chunkSize
-				if end > len(events) {
-					end = len(events)
-				}
-				err = e.events.Store(blockID, events[i:end])
-				if err != nil {
-					return fmt.Errorf("failed to store events: %w", err)
-				}
+		// store events 1K in each batch
+		chunkSize := uint(1000)
+		eventChunks := ChunkfiyEvents(events, chunkSize)
+		for _, ch := range eventChunks {
+			err = e.events.Store(blockID, ch)
+			if err != nil {
+				return fmt.Errorf("failed to store events: %w", err)
 			}
 		}
 		return nil
@@ -1701,6 +1696,28 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 	}
 
 	log.Info().Msg("block has been executed successfully from applying state deltas")
+}
+
+// ChunkfiyEvents breaks an slice of events into smaller chunks
+func ChunkfiyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
+	res := make([][]flow.Event, 0)
+	if len(events) == 0 {
+		return res
+	}
+	// if chunkSize zero, return all as one chunk
+	if chunkSize < 1 {
+		res = append(res, events[:])
+		return res
+	}
+
+	for i := 0; i < len(events); i += int(chunkSize) {
+		end := i + int(chunkSize)
+		if end > len(events) {
+			end = len(events)
+		}
+		res = append(res, events[i:end])
+	}
+	return res
 }
 
 // generateChunkDataPack creates a chunk data pack
