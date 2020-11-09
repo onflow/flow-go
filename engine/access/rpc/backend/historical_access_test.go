@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -13,8 +14,8 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-// TestHistoricalTransaction tests to see if the historical transaction status can be retrieved
-func (suite *Suite) TestHistoricalTransaction() {
+// TestHistoricalTransactionResult tests to see if the historical transaction status can be retrieved
+func (suite *Suite) TestHistoricalTransactionResult() {
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -51,18 +52,68 @@ func (suite *Suite) TestHistoricalTransaction() {
 		false,
 	)
 
-	// Successfully return empty event list
+	// Successfully return the transaction from the historical node
 	suite.historicalAccessClient.
 		On("GetTransactionResult", ctx, &accessEventReq).
 		Return(&accessEventResp, nil).
 		Once()
 
-	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
+	// Make the call for the transaction result
 	result, err := backend.GetTransactionResult(ctx, txID)
 	suite.checkResponse(result, err)
 
-	// status should be finalized since the sealed blocks is smaller in height
+	// status should be sealed
 	suite.Assert().Equal(flow.TransactionStatusSealed, result.Status)
+
+	suite.assertAllExpectations()
+}
+
+// TestHistoricalTransaction tests to see if the historical transaction can be retrieved
+func (suite *Suite) TestHistoricalTransaction() {
+
+	ctx := context.Background()
+	collection := unittest.CollectionFixture(1)
+	transactionBody := collection.Transactions[0]
+
+	txID := transactionBody.ID()
+	// transaction storage returns the corresponding transaction
+	suite.transactions.
+		On("ByID", txID).
+		Return(nil, status.Errorf(codes.NotFound, "not found on main node"))
+
+	accessEventReq := accessproto.GetTransactionRequest{
+		Id: txID[:],
+	}
+
+	accessEventResp := accessproto.TransactionResponse{
+		Transaction: convert.TransactionToMessage(*transactionBody),
+	}
+
+	backend := New(
+		suite.state,
+		suite.execClient,
+		nil,
+		[]accessproto.AccessAPIClient{suite.historicalAccessClient},
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		0,
+		nil,
+		false,
+	)
+
+	// Successfully return the transaction from the historical node
+	suite.historicalAccessClient.
+		On("GetTransaction", ctx, &accessEventReq).
+		Return(&accessEventResp, nil).
+		Once()
+
+	// Make the call for the transaction result
+	tx, err := backend.GetTransaction(ctx, txID)
+	suite.checkResponse(tx, err)
 
 	suite.assertAllExpectations()
 }
