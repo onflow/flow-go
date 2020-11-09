@@ -474,6 +474,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 			require.NoError(t, err)
 			longString := base64.StdEncoding.EncodeToString(b)
 			txBody := testutil.CreateContractDeploymentTransaction(
+				"Container",
 				fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
