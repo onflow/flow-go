@@ -1,11 +1,13 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -21,7 +23,7 @@ func NewExecutionResults(db *badger.DB) *ExecutionResults {
 }
 
 func (r *ExecutionResults) store(result *flow.ExecutionResult) func(*badger.Txn) error {
-	return operation.InsertExecutionResult(result)
+	return operation.SkipDuplicates(operation.InsertExecutionResult(result))
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) func(*badger.Txn) (*flow.ExecutionResult, error) {
@@ -48,7 +50,31 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) func(*badger.Txn) 
 }
 
 func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*badger.Txn) error {
-	return operation.IndexExecutionResult(blockID, resultID)
+	return func(tx *badger.Txn) error {
+		err := operation.IndexExecutionResult(blockID, resultID)(tx)
+		if err == nil {
+			return nil
+		}
+
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return err
+		}
+
+		// when trying to index a result for a block, and there is already a result indexed for this block,
+		// double check if the indexed result is the same
+		var storedResultID flow.Identifier
+		err = operation.LookupExecutionResult(blockID, &storedResultID)(tx)
+		if err != nil {
+			return fmt.Errorf("there is a result stored already, but cannot retrieve it: %w", err)
+		}
+
+		if storedResultID != resultID {
+			return fmt.Errorf("storing result that is different from the already stored one for block: %v, storing result: %v, stored result: %v. %w",
+				blockID, resultID, storedResultID, storage.ErrDataMismatch)
+		}
+
+		return nil
+	}
 }
 
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {

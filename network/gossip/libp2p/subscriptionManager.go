@@ -68,6 +68,7 @@ func (sm *ChannelSubscriptionManager) Unregister(channelID string) error {
 func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engine, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
+
 	eng, found := sm.engines[channelID]
 	if !found {
 		return nil, fmt.Errorf("subscriptionManager: engine for channelID %s not found", channelID)
@@ -79,6 +80,7 @@ func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engin
 func (sm *ChannelSubscriptionManager) GetChannelIDs() []string {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
+
 	topics := make([]string, 0)
 	for topic := range sm.engines {
 		topics = append(topics, topic)

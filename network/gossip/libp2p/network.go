@@ -123,6 +123,10 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channelID, err)
 	}
 
+	n.logger.Info().
+		Str("channel_id", channelID).
+		Msg("channel successfully registered")
+
 	// create a cancellable child context
 	ctx, cancel := context.WithCancel(n.ctx)
 
