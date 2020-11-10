@@ -120,7 +120,7 @@ func GenerateNetworks(t *testing.T,
 			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 		// creates topology instances for the nodes based on their roles
 		tops := GenerateTopologies(t, state, ids)
-		topMngrs = GenerateTopologyManager(t, sms, tops, topology.LinearFanoutFunc)
+		topMngrs = GenerateTopologyManager(t, sms, tops)
 	}
 
 	for i := 0; i < count; i++ {
@@ -204,9 +204,12 @@ func GenerateTopologies(t *testing.T, state protocol.State, identities flow.Iden
 		var top topology.Topology
 		var err error
 
-		top, err = topology.NewTopicBasedTopology(id.NodeID, state)
-
+		graphSampler, err := topology.NewLinearFanoutGraphSampler(id.NodeID)
 		require.NoError(t, err)
+
+		top, err = topology.NewTopicBasedTopology(id.NodeID, state, graphSampler)
+		require.NoError(t, err)
+
 		tops = append(tops, top)
 	}
 	return tops
@@ -244,13 +247,13 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.Subs
 }
 
 // GenerateTopologyManager creates a topology per identity and its corresponding subscription manager.
-func GenerateTopologyManager(t *testing.T, subMngrs []channel.SubscriptionManager, tops []topology.Topology, fanout topology.FanoutFunc) []topology.Manager {
+func GenerateTopologyManager(t *testing.T, subMngrs []channel.SubscriptionManager, tops []topology.Topology) []topology.Manager {
 	topMngrs := make([]topology.Manager, 0)
 	for i := 0; i < len(tops); i++ {
 		var topMngr topology.Manager
 		var err error
 
-		topMngr = topology.NewStatefulTopologyManager(tops[i], subMngrs[i], fanout)
+		topMngr = topology.NewStatefulTopologyManager(tops[i], subMngrs[i])
 
 		require.NoError(t, err)
 		topMngrs = append(topMngrs, topMngr)
