@@ -165,6 +165,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	epoch2Identities := append(
 		epoch1Identities.Filter(filter.Not(filter.HasNodeID(removedAtEpoch2.NodeID))),
 		addedAtEpoch2)
+
+	// TODO
 	addedAtEpoch3 := unittest.IdentityFixture()
 	removedAtEpoch3 := epoch2Identities.Sample(1)[0]
 	epoch3Identities := append(
@@ -177,14 +179,49 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		err := state.Mutate().Bootstrap(root, result, seal)
 		require.Nil(t, err)
 
+		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
+		// See EpochBuilder documentation for details of these blocks.
+		//
+		// In these tests we refer to blocks as XN, where X is one of A,B,C,D
+		// denoting which block of the epoch we're referring to and N is the
+		// epoch number.
 		epochBuilder := unittest.NewEpochBuilder(t, state)
+		// build epoch 1
+		// A - height 0 (root block)
+		// B - height 1 - staking phase
+		// C - height 2 - setup phase
+		// D - height 3 - committed phase
 		epochBuilder.
 			WithSetupOpts(unittest.WithParticipants(epoch1Identities)).
 			BuildEpoch().
 			Complete()
+		// build epoch 2
+		// A - height 4
+		// B - height 5 - staking phase
+		// C - height 6 - setup phase
+		// D - height 7 - committed phase
 		epochBuilder.
 			WithSetupOpts(unittest.WithParticipants(epoch2Identities)).
 			BuildEpoch().
 			Complete()
+
+		t.Run("should include next epoch", func(t *testing.T) {
+			C1 := state.AtHeight(2)
+			identities, err := C1.Identities(filter.Any)
+			require.Nil(t, err)
+			// should contain all current epoch identities
+			currentEpochIdentities := identities.Filter(filter.HasNodeID(epoch1Identities.NodeIDs()...))
+			require.Equal(t, len(epoch1Identities), len(currentEpochIdentities))
+			// all current epoch identities should match configuration from EpochSetup event
+			for i := 0; i < len(epoch1Identities); i++ {
+				assert.Equal(t, epoch1Identities[i], currentEpochIdentities[i])
+			}
+
+			// should contain next epoch identity with 0 weight
+			nextEpochIdentity := identities.Filter(filter.HasNodeID(addedAtEpoch2.NodeID))[0]
+			assert.Equal(t, uint64(0), nextEpochIdentity.Stake) // should have 0 weight
+			nextEpochIdentity.Stake = addedAtEpoch2.Stake
+			assert.Equal(t, addedAtEpoch2, nextEpochIdentity) // should be equal besides weight
+		})
 	})
 }
