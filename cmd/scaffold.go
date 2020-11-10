@@ -189,7 +189,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
 
-		top, err = topology.NewTopicBasedTopology(fnb.NodeID, fnb.State)
+		top, err = topology.NewTopicBasedTopology(fnb.NodeID, fnb.State, graphSampler)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
