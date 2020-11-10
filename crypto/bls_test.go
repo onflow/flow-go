@@ -18,6 +18,8 @@ import (
 // BLS tests
 func TestBLSBLS12381(t *testing.T) {
 	halg := NewBLSKMAC("test tag")
+	// test the key generation seed lengths
+	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
 	// test the consistency with different inputs
 	testGenSignVerify(t, BLSBLS12381, halg)
 }

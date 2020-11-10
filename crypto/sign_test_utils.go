@@ -71,6 +71,23 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	}
 }
 
+func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int) {
+	// valid seed lengths
+	seed := make([]byte, minLen)
+	_, err := GeneratePrivateKey(salg, seed)
+	assert.NoError(t, err)
+	seed = make([]byte, maxLen)
+	_, err = GeneratePrivateKey(salg, seed)
+	assert.NoError(t, err)
+	// invalid seed lengths
+	seed = make([]byte, minLen-1)
+	_, err = GeneratePrivateKey(salg, seed)
+	assert.Error(t, err)
+	seed = make([]byte, maxLen+1)
+	_, err = GeneratePrivateKey(salg, seed)
+	assert.Error(t, err)
+}
+
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	t.Logf("Testing encode/decode for %s", salg)
 	// make sure the length is larger than minimum lengths of all the signaure algos
