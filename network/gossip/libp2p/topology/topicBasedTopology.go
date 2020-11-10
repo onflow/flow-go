@@ -34,11 +34,6 @@ func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState,
 // Subset samples and returns a connected graph of the subscribers to the topic from the ids.
 // A connected graph fanout means that the subset of ids returned by this method on different nodes collectively
 // construct a connected graph component among all the subscribers to the topic.
-// 100 CN
-// shouldHave = {10 CN, 5 EN, 50 VN}
-// topic = consensus node
-// ids - shouldHave = {assume 90} = ~45 fanout
-// ~51 fanout
 func (t *TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
 	var subscribers flow.IdentityList
 	var involvedRoles flow.RoleList

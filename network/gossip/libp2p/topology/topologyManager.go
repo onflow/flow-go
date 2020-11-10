@@ -11,7 +11,4 @@ type Manager interface {
 	// Independent invocations of MakeTopology on different nodes collaboratively
 	// constructs a connected graph of nodes that enables them talking to each other.
 	MakeTopology(ids flow.IdentityList) (flow.IdentityList, error)
-	// Fanout returns size of topology list of a node, i.e., number of nodes it gets connected to
-	// for epidemic dissemination.
-	Fanout(uint) uint
 }
