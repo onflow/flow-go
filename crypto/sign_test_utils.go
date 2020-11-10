@@ -93,21 +93,28 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 
-	// Key generation seed
+	// Key generation
 	seed := make([]byte, seedMinLength)
 	read, err := rand.Read(seed)
 	require.Equal(t, read, seedMinLength)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(salg, seed)
-	assert.Nil(t, err, "the key generation has failed")
+	require.NoError(t, err)
+	seed[0] ^= 1 // alter the seed to get a new private key
+	distinctSk, err := GeneratePrivateKey(salg, seed)
+	require.NoError(t, err)
 
+	// check encode/decode private keys
 	skBytes := sk.Encode()
 	skCheck, err := DecodePrivateKey(salg, skBytes)
 	require.Nil(t, err, "the key decoding has failed")
 	assert.True(t, sk.Equals(skCheck), "key equality check failed")
 	skCheckBytes := skCheck.Encode()
 	assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
+	distinctSkBytes := distinctSk.Encode()
+	assert.NotEqual(t, skBytes, distinctSkBytes, "keys should be different")
 
+	// check encode/decode public keys
 	pk := sk.PublicKey()
 	pkBytes := pk.Encode()
 	pkCheck, err := DecodePublicKey(salg, pkBytes)
@@ -115,6 +122,8 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	assert.True(t, pk.Equals(pkCheck), "key equality check failed")
 	pkCheckBytes := pkCheck.Encode()
 	assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+	distinctPkBytes := distinctSk.PublicKey().Encode()
+	assert.NotEqual(t, pkBytes, distinctPkBytes, "keys should be different")
 
 	// test invalid private keys (equal to the curve group order)
 	groupOrder := make(map[SigningAlgorithm][]byte)
