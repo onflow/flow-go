@@ -46,7 +46,8 @@ func TestLatestSealEjector(t *testing.T) {
 				},
 				Seal: seal,
 			}
-			ok := pool.Add(ir)
+			ok, err := pool.Add(ir)
+			require.NoError(t, err)
 			assert.True(t, ok)
 
 			if header.Height >= maxHeader.Height {

@@ -14,7 +14,7 @@ type IncorporatedResultSeals struct {
 }
 
 // Add provides a mock function with given fields: irSeal
-func (_m *IncorporatedResultSeals) Add(irSeal *flow.IncorporatedResultSeal) bool {
+func (_m *IncorporatedResultSeals) Add(irSeal *flow.IncorporatedResultSeal) (bool, error) {
 	ret := _m.Called(irSeal)
 
 	var r0 bool
@@ -24,7 +24,14 @@ func (_m *IncorporatedResultSeals) Add(irSeal *flow.IncorporatedResultSeal) bool
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*flow.IncorporatedResultSeal) error); ok {
+		r1 = rf(irSeal)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // All provides a mock function with given fields:
@@ -64,6 +71,11 @@ func (_m *IncorporatedResultSeals) ByID(_a0 flow.Identifier) (*flow.Incorporated
 	}
 
 	return r0, r1
+}
+
+// Clear provides a mock function with given fields:
+func (_m *IncorporatedResultSeals) Clear() {
+	_m.Called()
 }
 
 // Limit provides a mock function with given fields:

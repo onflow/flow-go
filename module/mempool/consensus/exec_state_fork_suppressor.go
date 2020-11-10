@@ -28,9 +28,9 @@ var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel
 // The ExecStateForkSuppressor implements this mitigation strategy as follows:
 //   * For each candidate seal inserted into the mempool, inspect the state
 //     transition for the respective block.
-//   * If this is the first seal for a block, store the state transition
-//     proposed by the seal into an internal map `byBlockID`.
-//   * If the mempool already knowns about a state transition for a block,
+//   * If this is the first seal for a block, store the seal as an archetype
+//     for the state transition into the internal map `byBlockID`.
+//   * If the mempool already knows about a state transition for a block,
 //     and a second seal for the same block is inserted, check whether
 //     the seal has the same state transition.
 //   * If conflicting state transitions for the same block are detected,
@@ -89,19 +89,20 @@ func (s *ExecStateForkSuppressor) Add(irSeal *flow.IncorporatedResultSeal) (bool
 	otherSeal, found := s.byBlockID[blockID]
 	if found {
 		// already other seal for this block in mempool => compare consistency of results' state transitions
-		err := s.enforceConsistenStateTransitions(irSeal, otherSeal)
+		err := s.enforceConsistentStateTransitions(irSeal, otherSeal)
 		if err != nil {
-			return false, fmt.Errorf("failed to add candidate seal to mempool: %w", err)
+			return false, fmt.Errorf("state consistency check failed: %w", err)
 		}
-		// state transitions are consistent => add seal to wrapped mempool
-	} else {
-		// no other seal for this block in mempool => store seal as archetype result for block
-		s.byBlockID[blockID] = irSeal
-	}
+	} // no conflicting state transition for this block known
 
 	added, err := s.seals.Add(irSeal) // internally de-duplicates
 	if err != nil {
 		return added, fmt.Errorf("failed to add seal to wrapped mempool: %w", err)
+	}
+	if added && !found {
+		// We only store the
+		// no other seal for this block in mempool => store seal as archetype result for block
+		s.byBlockID[blockID] = irSeal
 	}
 	return added, nil
 }
@@ -148,9 +149,11 @@ func (s *ExecStateForkSuppressor) Limit() uint {
 }
 
 // Clear removes all entities from the pool.
+// The wrapper clears the internal state as well as its local (additional) state.
 func (s *ExecStateForkSuppressor) Clear() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	s.byBlockID = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 	s.seals.Clear()
 }
 
@@ -209,13 +212,13 @@ func (s *ExecStateForkSuppressor) enforceValidStates(irSeal *flow.IncorporatedRe
 	return nil
 }
 
-// consistenStateTransitions checks whether the execution results in the seals have matching state transitions.
-// If a fork in the execution state is detected:
+// enforceConsistentStateTransitions checks whether the execution results in the seals
+// have matching state transitions. If a fork in the execution state is detected:
 //   * wrapped mempool is cleared
 //   * internal execForkDetected flag is ste to true
 //   * the new value of execForkDetected is persisted to data base
 // and ExecutionForkErr (sentinel error) is returned
-func (s *ExecStateForkSuppressor) enforceConsistenStateTransitions(irSeal1, irSeal2 *flow.IncorporatedResultSeal) error {
+func (s *ExecStateForkSuppressor) enforceConsistentStateTransitions(irSeal1, irSeal2 *flow.IncorporatedResultSeal) error {
 	if irSeal1.IncorporatedResult.Result.ID() == irSeal2.IncorporatedResult.Result.ID() {
 		// happy case: candidate seals are for the same result
 		return nil

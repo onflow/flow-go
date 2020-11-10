@@ -66,8 +66,8 @@ const (
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
 
-	// temporary codes
-	codeExecutionForkDetected = 300
+	// Flags indicating internal failures that should be preserved accross restarts
+	codeExecutionForkDetected = 254
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
