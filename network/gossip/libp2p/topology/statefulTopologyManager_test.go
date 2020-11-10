@@ -119,7 +119,11 @@ func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
 	subMngr channel.SubscriptionManager,
 	ids flow.IdentityList,
 	state protocol.ReadOnlyState) int {
-	top, err := topology.NewTopicBasedTopology(me, state)
+	// creates a graph sampler for the node
+	graphSampler, err := topology.NewLinearFanoutGraphSampler(me)
+
+	// creates topology of the node
+	top, err := topology.NewTopicBasedTopology(me, state, graphSampler)
 	require.NoError(suite.T(), err)
 
 	// creates topology manager
