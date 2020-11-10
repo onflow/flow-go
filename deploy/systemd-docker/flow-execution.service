@@ -12,7 +12,7 @@ Type=simple
 TimeoutStopSec=1m
 
 RestartSec=5s
-Restart=no
+Restart=always
 
 StandardOutput=journal
 
@@ -27,10 +27,10 @@ ExecStart=docker run --rm \
 	--name flow-go \
 	--network host \
 	gcr.io/flow-container-registry/execution:${FLOW_GO_NODE_VERSION} \
-	--nodeid=${FLOW_GO_NODE_ID} \
-	--bootstrapdir=/bootstrap \
-	--datadir=/data/protocol \
-	--triedir=/data/execution \
-	--rpc-addr=0.0.0.0:9000 \
+	--nodeid ${FLOW_GO_NODE_ID} \
+	--bootstrapdir /bootstrap \
+	--datadir /data/protocol \
+	--triedir /data/execution \
+	--rpc-addr 0.0.0.0:9000 \
 	--bind 0.0.0.0:3569 \
-	--loglevel=ERROR
+	--loglevel ERROR

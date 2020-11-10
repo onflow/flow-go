@@ -241,8 +241,9 @@ func (c *Core) prune(final *flow.Header) {
 		}
 	}
 
-	prunedHeights := len(c.heights) - initialHeights
-	prunedBlockIDs := len(c.blockIDs) - initialBlockIDs
+	prunedHeights := initialHeights - len(c.heights)
+	prunedBlockIDs := initialBlockIDs - len(c.blockIDs)
+
 	c.log.Debug().
 		Uint64("final_height", final.Height).
 		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)

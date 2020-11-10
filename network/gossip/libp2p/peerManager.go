@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
@@ -31,6 +32,7 @@ var PeerUpdateInterval = 1 * time.Minute
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
+	unit        *engine.Unit
 	ctx         context.Context
 	logger      zerolog.Logger
 	idsProvider func() (flow.IdentityList, error) // callback to retrieve list of peers to connect to
@@ -42,9 +44,11 @@ type PeerManager struct {
 
 // NewPeerManager creates a new peer manager which calls the idsProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func() (flow.IdentityList, error), connector Connector) *PeerManager {
+func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func() (flow.IdentityList, error),
+	connector Connector) *PeerManager {
 	return &PeerManager{
 		ctx:          ctx,
+		unit:         engine.NewUnit(),
 		logger:       logger,
 		idsProvider:  idsProvider,
 		connector:    connector,
@@ -52,39 +56,31 @@ func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func
 	}
 }
 
-// Start kicks off the ambient periodic connection updates
-func (pm *PeerManager) Start() error {
-	go pm.updateLoop()
-	go pm.periodicUpdate()
-	return nil
+// Ready kicks off the ambient periodic connection updates.
+func (pm *PeerManager) Ready() <-chan struct{} {
+	// makes sure that peer update request is invoked
+	// once before returning
+	pm.RequestPeerUpdate()
+
+	// also starts running it periodically
+	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, PeerUpdateInterval, time.Duration(0))
+
+	pm.unit.Launch(pm.updateLoop)
+
+	return pm.unit.Ready()
+}
+
+func (pm *PeerManager) Done() <-chan struct{} {
+	return pm.unit.Done()
 }
 
 // updateLoop triggers an update peer request when it has been requested
 func (pm *PeerManager) updateLoop() {
 	for {
 		select {
-		case <-pm.ctx.Done():
-			return
 		case <-pm.peerRequestQ:
 			pm.updatePeers()
-		}
-	}
-}
-
-// updateLoop request periodic connection update
-func (pm *PeerManager) periodicUpdate() {
-
-	// request initial discovery
-	pm.RequestPeerUpdate()
-
-	ticker := time.NewTicker(PeerUpdateInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			pm.RequestPeerUpdate()
-		case <-pm.ctx.Done():
+		case <-pm.unit.Quit():
 			return
 		}
 	}
@@ -127,7 +123,7 @@ func (pm *PeerManager) updatePeers() {
 }
 
 func (pm *PeerManager) connect(ids flow.IdentityList) {
-	pm.logger.Debug().
+	pm.logger.Trace().
 		Str("peers", fmt.Sprintf("%v", ids.NodeIDs())).
 		Msg("connecting to peers")
 

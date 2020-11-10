@@ -37,6 +37,15 @@ func RandomAddressFixture() flow.Address {
 	return addr
 }
 
+func InvalidAddressFixture() flow.Address {
+	addr := AddressFixture()
+	addr[0] ^= 1 // alter one bit to obtain an invalid address
+	if flow.Testnet.Chain().IsValid(addr) {
+		panic("invalid address fixture generated valid address")
+	}
+	return addr
+}
+
 func TransactionSignatureFixture() flow.TransactionSignature {
 	return flow.TransactionSignature{
 		Address:     AddressFixture(),
@@ -138,7 +147,7 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 }
 
 func StateInteractionsFixture() *delta.Snapshot {
-	return delta.NewView(nil).Interactions()
+	return &delta.NewView(nil).Interactions().Snapshot
 }
 
 func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier) flow.Block {
@@ -1058,4 +1067,31 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
 	seal := SealFixture(SealFromResult(result), WithServiceEvents(setup.ServiceEvent(), commit.ServiceEvent()))
 	return root, result, seal
+}
+
+// ChainFixture creates a list of blocks that forms a chain
+func ChainFixture(nonGenesisCount int) ([]*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	chain := make([]*flow.Block, 0, nonGenesisCount+1)
+
+	participants := IdentityListFixture(5, WithAllRoles())
+	genesis, result, seal := BootstrapFixture(participants)
+	chain = append(chain, genesis)
+
+	children := ChainFixtureFrom(nonGenesisCount, genesis.Header)
+	chain = append(chain, children...)
+	return chain, result, seal
+}
+
+// ChainFixtureFrom creates a chain of blocks starting from a given parent block,
+// the total number of blocks in the chain is specified by the given count
+func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
+	blocks := make([]*flow.Block, 0, count)
+
+	for i := 0; i < count; i++ {
+		block := BlockWithParentFixture(parent)
+		blocks = append(blocks, &block)
+		parent = block.Header
+	}
+
+	return blocks
 }
