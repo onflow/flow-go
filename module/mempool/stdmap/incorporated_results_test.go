@@ -13,7 +13,7 @@ import (
 func TestIncorporatedResults(t *testing.T) {
 	pool := NewIncorporatedResults(1000)
 
-	ir1 := unittest.IncorporatedResultFixture()
+	ir1 := unittest.IncorporatedResult.Fixture()
 	t.Run("Adding first incorporated result", func(t *testing.T) {
 		ok, err := pool.Add(ir1)
 		require.True(t, ok)
@@ -43,7 +43,7 @@ func TestIncorporatedResults(t *testing.T) {
 		require.Contains(t, incorporatedResults, ir2.IncorporatedBlockID)
 	})
 
-	ir3 := unittest.IncorporatedResultFixture()
+	ir3 := unittest.IncorporatedResult.Fixture()
 	t.Run("Adding third incorporated result", func(t *testing.T) {
 		ok, err := pool.Add(ir3)
 		require.True(t, ok)

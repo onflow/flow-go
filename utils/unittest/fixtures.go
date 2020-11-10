@@ -124,7 +124,7 @@ func StateDeltaFixture() *messages.ExecutionStateDelta {
 func PayloadFixture(options ...func(*flow.Payload)) *flow.Payload {
 	payload := flow.Payload{
 		Guarantees: CollectionGuaranteesFixture(16),
-		Seals:      BlockSealsFixture(16),
+		Seals:      Seal.Fixtures(16),
 	}
 	for _, option := range options {
 		option(&payload)
@@ -168,8 +168,8 @@ func BlockWithParentAndSeal(
 
 	if sealed != nil {
 		payload.Seals = []*flow.Seal{
-			SealFixture(
-				SealWithBlockID(sealed.ID()),
+			Seal.Fixture(
+				Seal.WithBlockID(sealed.ID()),
 			),
 		}
 	}
@@ -313,43 +313,10 @@ func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarante
 	return guarantees
 }
 
-func SealFromResult(result *flow.ExecutionResult) func(*flow.Seal) {
-	return func(seal *flow.Seal) {
-		finalState, _ := result.FinalStateCommitment()
-		seal.ResultID = result.ID()
-		seal.BlockID = result.BlockID
-		seal.FinalState = finalState
-	}
-}
-
-func SealWithBlockID(blockID flow.Identifier) func(*flow.Seal) {
-	return func(seal *flow.Seal) {
-		seal.BlockID = blockID
-	}
-}
-
-func WithServiceEvents(events ...flow.ServiceEvent) func(*flow.Seal) {
-	return func(seal *flow.Seal) {
-		seal.ServiceEvents = events
-	}
-}
-
-func SealFixture(opts ...func(*flow.Seal)) *flow.Seal {
-	seal := &flow.Seal{
-		BlockID:    IdentifierFixture(),
-		ResultID:   IdentifierFixture(),
-		FinalState: StateCommitmentFixture(),
-	}
-	for _, apply := range opts {
-		apply(seal)
-	}
-	return seal
-}
-
 func BlockSealsFixture(n int) []*flow.Seal {
 	seals := make([]*flow.Seal, 0, n)
 	for i := 0; i < n; i++ {
-		seal := SealFixture()
+		seal := Seal.Fixture()
 		seals = append(seals, seal)
 	}
 	return seals
@@ -474,25 +441,6 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		apply(result)
 	}
 	return result
-}
-
-// TODO replace by usage unittest.IncorporatedResult
-func IncorporatedResultFixture(opts ...func(*flow.IncorporatedResult)) *flow.IncorporatedResult {
-	result := ExecutionResultFixture()
-	incorporatedBlockID := IdentifierFixture()
-	ir := flow.NewIncorporatedResult(incorporatedBlockID, result)
-
-	for _, apply := range opts {
-		apply(ir)
-	}
-	return ir
-}
-
-// TODO replace by usage unittest.IncorporatedResult
-func IncorporatedResultForBlockFixture(block *flow.Block) *flow.IncorporatedResult {
-	result := ExecutionResultFixture(WithBlock(block))
-	incorporatedBlockID := IdentifierFixture()
-	return flow.NewIncorporatedResult(incorporatedBlockID, result)
 }
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
@@ -1065,7 +1013,10 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		WithFinalView(root.Header.View+1000),
 	)
 	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
-	seal := SealFixture(SealFromResult(result), WithServiceEvents(setup.ServiceEvent(), commit.ServiceEvent()))
+	seal := Seal.Fixture(
+		Seal.WithResult(result),
+		Seal.WithServiceEvents(setup.ServiceEvent(), commit.ServiceEvent()),
+	)
 	return root, result, seal
 }
 
