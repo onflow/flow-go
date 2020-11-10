@@ -68,7 +68,7 @@ func defaultContext() Context {
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
 			NewTransactionInvocator(),
-			NewTransactionEventLimiter(10000),
+			NewTransactionEventLimiter(totalEventByteSizeLimit),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),

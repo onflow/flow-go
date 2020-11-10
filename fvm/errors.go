@@ -208,7 +208,7 @@ type MaxEventSizeLimitExceededError struct {
 
 func (e *MaxEventSizeLimitExceededError) Error() string {
 	return fmt.Sprintf(
-		"The total byte size of events is %s which is more than the limit %d .",
+		"The total byte size of events is %d which is more than the limit %d .",
 		e.TotalByteSize,
 		e.Limit,
 	)
