@@ -184,6 +184,11 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		// creates topology, topology manager, and subscription managers
 		// topology
 		var top topology.Topology
+		graphSampler, err := topology.NewLinearFanoutGraphSampler(fnb.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not create topology: %w", err)
+		}
+
 		top, err = topology.NewTopicBasedTopology(fnb.NodeID, fnb.State)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
