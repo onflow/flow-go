@@ -175,11 +175,6 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
-
-	// checks size of topology
-	if len(top) == 0 {
-		return nil, fmt.Errorf("topology size reached zero")
-	}
 	return top, nil
 }
 
