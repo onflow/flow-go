@@ -151,3 +151,40 @@ func TestSeed(t *testing.T) {
 		// TODO
 	})
 }
+
+// Test querying identities in different epoch phases. During staking phase we
+// should see identities from last epoch and current epoch. After staking phase
+// we should see identities from current epoch and next epoch. Identities from
+// a non-current epoch should have weight 0. Identities that exist in consecutive
+// epochs should be de-duplicated.
+func TestSnapshot_CrossEpochIdentities(t *testing.T) {
+
+	epoch1Identities := unittest.IdentityListFixture(20, unittest.WithAllRoles())
+	addedAtEpoch2 := unittest.IdentityFixture()
+	removedAtEpoch2 := epoch1Identities.Sample(1)[0]
+	epoch2Identities := append(
+		epoch1Identities.Filter(filter.Not(filter.HasNodeID(removedAtEpoch2.NodeID))),
+		addedAtEpoch2)
+	addedAtEpoch3 := unittest.IdentityFixture()
+	removedAtEpoch3 := epoch2Identities.Sample(1)[0]
+	epoch3Identities := append(
+		epoch2Identities.Filter(filter.Not(filter.HasNodeID(removedAtEpoch3.NodeID))),
+		addedAtEpoch3)
+	_ = epoch3Identities
+
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		root, result, seal := unittest.BootstrapFixture(epoch1Identities)
+		err := state.Mutate().Bootstrap(root, result, seal)
+		require.Nil(t, err)
+
+		epochBuilder := unittest.NewEpochBuilder(t, state)
+		epochBuilder.
+			WithSetupOpts(unittest.WithParticipants(epoch1Identities)).
+			BuildEpoch().
+			Complete()
+		epochBuilder.
+			WithSetupOpts(unittest.WithParticipants(epoch2Identities)).
+			BuildEpoch().
+			Complete()
+	})
+}
