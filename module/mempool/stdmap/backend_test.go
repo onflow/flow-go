@@ -143,11 +143,7 @@ func TestBackend_EjectionCallback(t *testing.T) {
 	)
 	pool := NewBackend(WithLimit(limit))
 
-	var ejected sync.Map
-	storeEntity := func(entity flow.Entity) {
-		go ejected.Store(entity.ID(), entity)
-	}
-	pool.RegisterEjectionCallback(storeEntity)
+	// on ejection callback: test whether ejected identity is no longer part of the mempool
 	ensureEntityNotInMempool := func(entity flow.Entity) {
 		id := entity.ID()
 		go func() {
@@ -171,22 +167,7 @@ func TestBackend_EjectionCallback(t *testing.T) {
 			wg.Done()
 		}(i)
 	}
+
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
-
-	// verify that the mempool is at full capacity
 	require.Equal(t, pool.Size(), uint(limit), "expected mempool to be at max capacity limit")
-
-	// verify that all ejected elements are not part of the
-	ejected.Range(func(key, value interface{}) bool {
-		id := value.(fake).ID()
-
-		e, found := pool.ByID(id)
-		require.False(t, found)
-		require.Nil(t, e)
-
-		require.False(t, pool.Has(id))
-
-		return true
-	})
-
 }

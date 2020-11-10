@@ -2,7 +2,6 @@ package stdmap
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/model"
@@ -12,21 +11,27 @@ import (
 // IncorporatedResults implements the incorporated results memory pool of the
 // consensus nodes, used to store results that need to be sealed.
 type IncorporatedResults struct {
+	// Concurrency: the mempool internally re-uses the backend's lock
+
 	backend *Backend
-	size    *uint
+	size    uint
 }
 
 // NewIncorporatedResults creates a mempool for the incorporated results.
-func NewIncorporatedResults(limit uint) *IncorporatedResults {
-	var size uint
-	ejector := NewSizeEjector(&size)
-	return &IncorporatedResults{
-		size: &size,
-		backend: NewBackend(
-			WithLimit(limit),
-			WithEject(ejector.Eject),
-		),
+func NewIncorporatedResults(limit uint, opts ...OptionFunc) *IncorporatedResults {
+	mempool := &IncorporatedResults{
+		size:    0,
+		backend: NewBackend(append(opts, WithLimit(limit))...),
 	}
+
+	adjustSizeOnEjection := func(entity flow.Entity) {
+		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
+		incorporatedResultMap := entity.(*model.IncorporatedResultMap)
+		mempool.size -= uint(len(incorporatedResultMap.IncorporatedResults))
+	}
+	mempool.backend.RegisterEjectionCallback(adjustSizeOnEjection)
+
+	return mempool
 }
 
 // Add adds an IncorporatedResult to the mempool.
@@ -45,17 +50,13 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 			// incResults.
 			incResults = make(map[flow.Identifier]*flow.IncorporatedResult)
 			// add the new map to mempool for holding all incorporated results for the same result.ID
-			backdata[key] = model.IncorporatedResultMap{
+			backdata[key] = &model.IncorporatedResultMap{
 				ExecutionResult:     incorporatedResult.Result,
 				IncorporatedResults: incResults,
 			}
 		} else {
-			incorporatedResultMap, ok := entity.(model.IncorporatedResultMap)
-			if !ok {
-				return fmt.Errorf("unexpected entity type %T", entity)
-			}
-
-			incResults = incorporatedResultMap.IncorporatedResults
+			// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
+			incResults = entity.(*model.IncorporatedResultMap).IncorporatedResults
 			if _, ok := incResults[incorporatedResult.IncorporatedBlockID]; ok {
 				// incorporated result is already associated with result and
 				// incorporated block.
@@ -66,7 +67,7 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 		// appends incorporated result to the map
 		incResults[incorporatedResult.IncorporatedBlockID] = incorporatedResult
 		appended = true
-		*ir.size++
+		ir.size++
 		return nil
 	})
 
@@ -81,7 +82,7 @@ func (ir *IncorporatedResults) All() []*flow.IncorporatedResult {
 	_ = ir.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		for _, entity := range backdata {
 			// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
-			for _, ir := range entity.(model.IncorporatedResultMap).IncorporatedResults {
+			for _, ir := range entity.(*model.IncorporatedResultMap).IncorporatedResults {
 				res = append(res, ir)
 			}
 		}
@@ -104,7 +105,7 @@ func (ir *IncorporatedResults) ByResultID(resultID flow.Identifier) (*flow.Execu
 			return storage.ErrNotFound
 		}
 		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
-		irMap := entity.(model.IncorporatedResultMap)
+		irMap := entity.(*model.IncorporatedResultMap)
 		result = irMap.ExecutionResult
 		for i, res := range irMap.IncorporatedResults {
 			incResults[i] = res
@@ -135,7 +136,7 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 			return nil
 		}
 		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
-		incResults = entity.(model.IncorporatedResultMap).IncorporatedResults
+		incResults = entity.(*model.IncorporatedResultMap).IncorporatedResults
 		if _, ok := incResults[incorporatedResult.IncorporatedBlockID]; !ok {
 			// there are no items for this IncorporatedBlockID
 			return nil
@@ -150,7 +151,7 @@ func (ir *IncorporatedResults) Rem(incorporatedResult *flow.IncorporatedResult) 
 		}
 
 		removed = true
-		*ir.size--
+		ir.size--
 		return nil
 	}) // error return impossible
 
@@ -165,5 +166,5 @@ func (ir *IncorporatedResults) Size() uint {
 	// we need run utilize the backend's lock.
 	ir.backend.RLock()
 	defer ir.backend.RUnlock()
-	return *ir.size
+	return ir.size
 }
