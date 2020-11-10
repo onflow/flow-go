@@ -90,7 +90,7 @@ func (suite *TopologyTestSuite) testTopology(total int, minorityRole flow.Role) 
 
 	// creates topology instances for the nodes based on their roles
 	tops := GenerateTopologies(suite.T(), state, ids)
-	topMngrs := GenerateTopologyManager(suite.T(), subMngrs, tops, topology.LinearFanoutFunc)
+	topMngrs := GenerateTopologyManager(suite.T(), subMngrs, tops)
 
 	// creates network in dryrun
 	nets := GenerateNetworks(suite.T(), logger, ids, mws, 100, topMngrs, subMngrs, DryRun)
