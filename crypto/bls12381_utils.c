@@ -220,7 +220,7 @@ void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
 }
 
 // returns the sign of y.
-// 1 if y > (p - 1) and 0 otherwise.
+// 1 if y > (p - 1)/2 and 0 otherwise.
 static int fp_get_sign(fp_t y) {
     bn_t bn_y;
     bn_new(bn_y);
@@ -397,8 +397,8 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 		return RLC_OK;
 	} 
     byte compressed = bin[0] >> 7;
-    byte y_is_odd = (bin[0] >> 5) & 1;
-    if (y_is_odd && (!compressed)) {
+    byte y_sign = (bin[0] >> 5) & 1;
+    if (y_sign && (!compressed)) {
         return RLC_ERR;
     } 
 	a->coord = BASIC;
@@ -421,7 +421,7 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     }
     
     fp2_zero(a->y);
-    fp_set_bit(a->y[0], 0, y_is_odd);
+    fp_set_bit(a->y[0], 0, y_sign);
     fp_zero(a->y[1]);
     if (ep2_upk(a, a) == 1) {
         return RLC_OK;

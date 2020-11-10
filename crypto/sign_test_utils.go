@@ -19,9 +19,11 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	seedMinLength := 48
 	seed := make([]byte, seedMinLength)
 	input := make([]byte, 100)
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 
-	loops := 3
+	loops := 50
 	for j := 0; j < loops; j++ {
 		n, err := mrand.Read(seed)
 		require.Equal(t, n, seedMinLength)
@@ -68,7 +70,9 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	t.Logf("Testing encode/decode for %s", salg)
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 
@@ -119,7 +123,9 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 
 func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorithm) {
 	t.Logf("Testing Equals for %s", salg)
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 	// generate a key pair
@@ -207,7 +213,9 @@ func benchSign(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 // testPOP tests proofs of possession
 func testPOP(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	t.Logf("Testing proof of possession for %s", salg)
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 	seed := make([]byte, seedMinLength)

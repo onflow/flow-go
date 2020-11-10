@@ -116,7 +116,9 @@ func TestAggregateSignatures(t *testing.T) {
 	// hasher
 	kmac := NewBLSKMAC("test tag")
 	// number of signatures to aggregate
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	sigsNum := mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
@@ -206,8 +208,10 @@ func TestAggregateSignatures(t *testing.T) {
 // the public key of the aggregated private key is equal to the aggregated
 // public key
 func TestAggregatePubKeys(t *testing.T) {
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// number of keys to aggregate
-	mrand.Seed(time.Now().UnixNano())
 	pkNum := mrand.Intn(100) + 1
 	pks := make([]PublicKey, 0, pkNum)
 	sks := make([]PrivateKey, 0, pkNum)
@@ -248,7 +252,9 @@ func TestAggregatePubKeys(t *testing.T) {
 // the public key of the aggregated private key is equal to the aggregated
 // public key
 func TestRemovePubKeys(t *testing.T) {
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// number of keys to aggregate
 	pkNum := mrand.Intn(100) + 1
 	pks := make([]PublicKey, 0, pkNum)
@@ -320,7 +326,9 @@ func TestRemovePubKeys(t *testing.T) {
 // batch verification technique and compares the result to verifying each signature
 // separately.
 func TestBatchVerify(t *testing.T) {
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// random message
 	input := make([]byte, 100)
 	_, err := mrand.Read(input)
@@ -488,8 +496,9 @@ func BenchmarkBatchVerifyUnHappyPath(b *testing.B) {
 // and verify the aggregated signature using the multi-signature verification with
 // many message.
 func TestAggregateSignaturesManyMessages(t *testing.T) {
-	//int64(1601003187394381000) //
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 
 	// number of signatures to aggregate
 	sigsNum := mrand.Intn(20) + 1

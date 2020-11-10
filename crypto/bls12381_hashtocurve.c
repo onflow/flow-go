@@ -73,7 +73,7 @@ const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xD91DD2E13CE144AF, 0x92C6E9ED90D2EB35, 0x0680447A8E5FF9A6,
 };
 
-// convertede to Montgomery form
+// (p-1)/2 converted to Montgomery form
 const uint64_t fp_p_1div2_data[Fp_DIGITS] = {
     0xa1fafffffffe5557, 0x995bfff976a3fffe, 0x03f41d24d174ceb4,
     0xf6547998c1995dbd, 0x778a468f507a6034, 0x020559931f7f8103,
