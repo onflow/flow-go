@@ -60,7 +60,10 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 // `(k+1)/2` where `k` is number of nodes subscribed to a topic. It does that over 100 random iterations.
 func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 	for i := 0; i < 100; i++ {
-		top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state)
+		graphSampler, err := topology.NewLinearFanoutGraphSampler(suite.me.NodeID)
+		require.NoError(suite.T(), err)
+
+		top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state, graphSampler)
 		require.NoError(suite.T(), err)
 
 		topics := engine.ChannelIDsByRole(suite.me.Role)
@@ -86,7 +89,12 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 //
 // It also checks the topology against non-inclusion of the node itself in its own topology.
 func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
-	top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state)
+	// creates a graph sampler for the node
+	graphSampler, err := topology.NewLinearFanoutGraphSampler(suite.me.NodeID)
+	require.NoError(suite.T(), err)
+
+	// creates a topology using the graph sampler
+	top, err := topology.NewTopicBasedTopology(suite.me.NodeID, suite.state, graphSampler)
 	require.NoError(suite.T(), err)
 
 	topics := engine.ChannelIDsByRole(suite.me.Role)
@@ -150,8 +158,12 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		previous = current
 		current = nil
 
+		// creates a graph sampler for the node
+		graphSampler, err := topology.NewLinearFanoutGraphSampler(suite.me.NodeID)
+		require.NoError(suite.T(), err)
+
 		// creates and samples a new topic aware topology for the first topic of consensus nodes
-		top, err := topology.NewTopicBasedTopology(identity.NodeID, suite.state)
+		top, err := topology.NewTopicBasedTopology(identity.NodeID, suite.state, graphSampler)
 		require.NoError(suite.T(), err)
 		ids, err := top.Subset(suite.ids, nil, topics[0])
 		require.NoError(suite.T(), err)
@@ -181,8 +193,12 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	for _, id := range suite.ids {
+		// creates a graph sampler for the node
+		graphSampler, err := topology.NewLinearFanoutGraphSampler(suite.me.NodeID)
+		require.NoError(suite.T(), err)
+
 		// creates a topic-based topology for node
-		top, err := topology.NewTopicBasedTopology(id.NodeID, suite.state)
+		top, err := topology.NewTopicBasedTopology(id.NodeID, suite.state, graphSampler)
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
@@ -206,8 +222,12 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 
 	// iterates over collection nodes
 	for _, id := range suite.ids.Filter(filter.HasRole(flow.RoleCollection)) {
+		// creates a graph sampler for the node
+		graphSampler, err := topology.NewLinearFanoutGraphSampler(suite.me.NodeID)
+		require.NoError(suite.T(), err)
+
 		// creates a channelID-based topology for node
-		top, err := topology.NewTopicBasedTopology(id.NodeID, suite.state)
+		top, err := topology.NewTopicBasedTopology(id.NodeID, suite.state, graphSampler)
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
