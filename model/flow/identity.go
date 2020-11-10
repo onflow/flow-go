@@ -20,6 +20,8 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|acc
 
 // Identity represents a node identity.
 type Identity struct {
+	// NodeID uniquely identifies a particular node. A node's ID is fixed for
+	// the duration of that node's participation in the network.
 	NodeID  Identifier
 	Address string
 	Role    Role
