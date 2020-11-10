@@ -11,6 +11,7 @@ package crypto
 import "C"
 import (
 	"errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -18,7 +19,7 @@ import (
 // SPOCKProve generates a spock poof for data under the private key sk.
 func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
 	if sk.Algorithm() != BLSBLS12381 {
-		return nil, errors.New("private key must be a BLS key.")
+		return nil, fmt.Errorf("private key must be a BLS key, got %s", sk.Algorithm())
 	}
 
 	// BLS signature of data
@@ -29,7 +30,7 @@ func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error)
 // and the prover's public key.
 func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if pk.Algorithm() != BLSBLS12381 {
-		return false, errors.New("public key must be a BLS key.")
+		return false, fmt.Errorf("public key must be a BLS key, got %s", pk.Algorithm())
 	}
 	// BLS verification of data
 	return pk.Verify(proof, data, kmac)
@@ -43,7 +44,7 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 	blsPk1, ok1 := pk1.(*PubKeyBLSBLS12381)
 	blsPk2, ok2 := pk2.(*PubKeyBLSBLS12381)
 	if !(ok1 && ok2) {
-		return false, errors.New("public keys must be BLS keys.")
+		return false, errors.New("public keys must be BLS keys")
 	}
 
 	if len(proof1) != signatureLengthBLSBLS12381 || len(proof2) != signatureLengthBLSBLS12381 {

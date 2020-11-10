@@ -586,7 +586,7 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
 
-    // elemsG1[0] = s2
+    // elemsG1[1] = s2
     ep_new(elemsG1[1]);
     if (ep_read_bin_compact(elemsG1[1], sig2, SIGNATURE_LEN) != RLC_OK) 
         return INVALID;
