@@ -11,9 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// tests of happy and unhappy paths of SPOCKVerifyAgainstData
 func TestSPOCKProveVerifyAgainstData(t *testing.T) {
-	// test the consistency with different inputs
+	// test the consistency with different data
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	data := make([]byte, 100)
 
@@ -63,7 +62,7 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 
 // tests of happy and unhappy paths of SPOCKVerify
 func TestSPOCKProveVerify(t *testing.T) {
-	// test the consistency with different inputs
+	// test the consistency with different data
 	seed1 := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	seed2 := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	data := make([]byte, 100)
@@ -96,7 +95,7 @@ func TestSPOCKProveVerify(t *testing.T) {
 		result, err := SPOCKVerify(sk1.PublicKey(), pr1, sk2.PublicKey(), pr2)
 		require.NoError(t, err)
 		assert.True(t, result, fmt.Sprintf(
-			"Verification should succeed:\n proofs:%s\n %s\n private keys:%s\n %s\n data:%s",
+			"Verification should succeed:\n proofs:%s\n %s\n private keys:%s\n %s\n data:%x",
 			pr1, pr2, sk1, sk2, data))
 	})
 
@@ -109,7 +108,7 @@ func TestSPOCKProveVerify(t *testing.T) {
 		result, err := SPOCKVerify(sk1.PublicKey(), pr1, sk2.PublicKey(), pr2bis)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n proofs:%s\n %s\n private keys:%s\n %s \n data:%s",
+			"Verification should fail:\n proofs:%s\n %s\n private keys:%s\n %s \n data:%x",
 			pr1, pr2bis, sk1, sk2, data))
 		data[0] ^= 1 // restore the data
 	})

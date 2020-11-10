@@ -32,7 +32,7 @@ int check_membership_Zr(const bn_t a){
 
 // checks if input point s is on the curve E1
 // and is in the subgroup G1
-static int check_membership_G1(const ep_t p){
+int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
     if (!ep_on_curve(p))
