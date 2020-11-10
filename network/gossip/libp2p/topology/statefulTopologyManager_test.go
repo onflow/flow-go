@@ -121,24 +121,25 @@ func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
 	state protocol.ReadOnlyState) int {
 	// creates a graph sampler for the node
 	graphSampler, err := topology.NewLinearFanoutGraphSampler(me)
+	require.NoError(suite.T(), err)
 
 	// creates topology of the node
 	top, err := topology.NewTopicBasedTopology(me, state, graphSampler)
 	require.NoError(suite.T(), err)
 
 	// creates topology manager
-	topMngr := topology.NewStatefulTopologyManager(top, subMngr, topology.LinearFanoutFunc)
+	topMngr := topology.NewStatefulTopologyManager(top, subMngr)
 
 	// generates topology of node
 	myFanout, err := topMngr.MakeTopology(ids)
-	require.GreaterOrEqual(suite.T(), uint(len(myFanout)), topMngr.Fanout(uint(len(ids))))
+	require.GreaterOrEqual(suite.T(), uint(len(myFanout)), topology.LinearFanoutFunc(uint(len(ids))))
 	require.NoError(suite.T(), err)
 
 	for _, role := range flow.Roles() {
 		// total number of nodes in flow with specified role
 		roleTotal := uint(len(ids.Filter(filter.HasRole(role))))
 		// number of nodes in fanout with specified role
-		roleFanout := topMngr.Fanout(uint(len(myFanout.Filter(filter.HasRole(role)))))
+		roleFanout := topology.LinearFanoutFunc(uint(len(myFanout.Filter(filter.HasRole(role)))))
 		require.Less(suite.T(), roleFanout, roleTotal)
 	}
 

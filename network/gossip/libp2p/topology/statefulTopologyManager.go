@@ -14,10 +14,8 @@ type StatefulTopologyManager struct {
 }
 
 // NewStatefulTopologyManager generates and returns an instance of stateful topology manager.
-func NewStatefulTopologyManager(topology Topology, subMngr channel.SubscriptionManager,
-	fanout FanoutFunc) *StatefulTopologyManager {
+func NewStatefulTopologyManager(topology Topology, subMngr channel.SubscriptionManager) *StatefulTopologyManager {
 	return &StatefulTopologyManager{
-		fanout:   fanout,
 		topology: topology,
 		subMngr:  subMngr,
 	}
