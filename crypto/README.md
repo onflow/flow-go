@@ -31,11 +31,8 @@ go generate
 
 `crypto/hash` provides the hashing and MAC algorithms required for Flow. All algorithm implement the generic interface `Hasher`. All digests are of the generic type `Hash`.
 
-*Hashing* :
  * Sha3: 256 and 384 output sizes
  * Sha2: 256 and 384 output sizes
-
-*MAC* :
  * KMAC: 128 variant
 
 ### Signature schemes 
@@ -48,10 +45,10 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * supports NIST P-256 (secp256r1) and secp256k1 curves.
 
  * BLS
-    * supports [BLS 12-381](https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md) curve.
+    * supports [BLS 12-381](https://electriccoin.co/blog/new-snark-curve/) curve.
     * is optimized for shorter signatures (on G1) 
     * public keys are longer (on G2)
-    * supports [compressed](https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization) and uncompressed serialization of G1/G2 points.
+    * supports [compressed](https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) and uncompressed serialization of G1/G2 points.
     * hash to curve is using the [optimized SWU map](https://eprint.iacr.org/2019/403.pdf).
     * expanding the message is using KMAC 128 with a domain separation tag.
     * signature verification includes the signature membership check in G1. 
@@ -62,10 +59,9 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * multi-signature verification of an aggregated signature of multiple messages under multiple public keys.
     * batch verification of multiple signatures of a single message under multiple
     public keys: use a binary tree of aggregations to find the invalid signatures.
+    * SPoCK scheme based on BLS: verifies two signatures have been generated from the same message that is unknown to the verifier. 
 
  * Future features:
-    * more tools for BLS multi signature and batch verification.
-    * BLS-based SPoCK.
     * membership checks in G2 using [Bowe's method](https://eprint.iacr.org/2019/814.pdf).
     * support a G1/G2 swap (signatures on G2 and public keys on G1).
  
