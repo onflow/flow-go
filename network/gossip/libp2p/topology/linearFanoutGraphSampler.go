@@ -2,7 +2,6 @@ package topology
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -46,7 +45,7 @@ func (l *LinearFanoutGraphSampler) SampleConnectedGraph(all flow.IdentityList,
 // If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
 func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flow.IdentityList, seed int64) flow.IdentityList {
 	// total sample size
-	totalSize := int(math.Ceil(float64(len(all)+1) / 2))
+	totalSize := LinearFanoutFunc(len(all))
 
 	// subset size excluding should have ones
 	subsetSize := totalSize - len(shouldHave)
@@ -62,6 +61,6 @@ func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flo
 func (l *LinearFanoutGraphSampler) connectedGraph(ids flow.IdentityList, seed int64) flow.IdentityList {
 	// choose (n+1)/2 random nodes so that each node in the graph will have a degree >= (n+1) / 2,
 	// guaranteeing a connected graph.
-	size := uint(math.Ceil(float64(len(ids)+1) / 2))
+	size := uint(LinearFanoutFunc(len(ids)))
 	return ids.DeterministicSample(size, seed)
 }
