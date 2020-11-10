@@ -572,6 +572,73 @@ void ep2_sum_vector(ep2_t jointy, ep2_st* y, const int len){
                             // public key
 }
 
+// Verifies the validity of 2 SPoCK proofs and 2 public keys.
+// Membership check in G1 of both proofs is verified in this function.
+// Membership check in G2 of both keys is not verified in this function.
+// the membership check in G2 is separated to allow optimizing multiple verifications 
+// using the same public keys.
+int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const byte* sig2) {  
+    ep_t elemsG1[2];
+    ep2_t elemsG2[2];
+
+    // elemsG1[0] = s1
+    ep_new(elemsG1[0]);
+    if (ep_read_bin_compact(elemsG1[0], sig1, SIGNATURE_LEN) != RLC_OK) 
+        return INVALID;
+
+    // check s1 is on curve and in G1
+    if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+        return INVALID;
+
+    // elemsG1[1] = s2
+    ep_new(elemsG1[1]);
+    if (ep_read_bin_compact(elemsG1[1], sig2, SIGNATURE_LEN) != RLC_OK) 
+        return INVALID;
+
+    // check s2 is on curve and in G1
+    if (check_membership_G1(elemsG1[1]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+        return INVALID; 
+
+    // elemsG2[1] = pk1
+    ep2_new(elemsG2[1]);
+    ep2_copy(elemsG2[1], (ep2_st*)pk1);
+
+    // elemsG2[0] = pk2
+    ep2_new(elemsG2[0]);
+    ep2_copy(elemsG2[0], (ep2_st*)pk2);
+
+#if DOUBLE_PAIRING  
+    // elemsG2[0] = -pk2
+    ep2_neg(elemsG2[0], elemsG2[0]);
+
+    fp12_t pair;
+    fp12_new(&pair);
+    // double pairing with Optimal Ate 
+    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), 2);
+
+    // compare the result to 1
+    int res = fp12_cmp_dig(pair, 1);
+
+#elif SINGLE_PAIRING   
+    fp12_t pair1, pair2;
+    fp12_new(&pair1); fp12_new(&pair2);
+    pp_map_oatep_k12(pair1, elemsG1[0], elemsG2[0]);
+    pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
+
+    int res = fp12_cmp(pair1, pair2);
+#endif
+    fp12_free(&one);
+    ep_free(elemsG1[0]);
+    ep_free(elemsG1[1]);
+    ep2_free(elemsG2[0]);
+    ep2_free(elemsG2[1]);
+    
+    if (res == RLC_EQ && core_get()->code == RLC_OK) 
+        return VALID;
+    else 
+        return INVALID;
+}
+
 // Subtracts the sum of a G2 array elements y from an element x and writes the 
 // result in res
 void ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len){

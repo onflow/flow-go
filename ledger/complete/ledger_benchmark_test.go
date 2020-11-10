@@ -40,7 +40,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		b.Fatal(err)
 	}
 
-	led, err := complete.NewLedger(dir, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+	led, err := complete.NewLedger(dir, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
 	defer led.Done()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")
