@@ -19,6 +19,7 @@ import (
 
 type StatefulTopologyTestSuite struct {
 	suite.Suite
+	histFlag bool // used to control printing histogram
 }
 
 // TestStatefulTopologyTestSuite runs all tests in this test suite
@@ -26,8 +27,12 @@ func TestStatefulTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(StatefulTopologyTestSuite))
 }
 
+func (suite *StatefulTopologyTestSuite) SetupTest() {
+	suite.histFlag = true
+}
+
 func (suite *StatefulTopologyTestSuite) TestSingleSystemLowScale() {
-	suite.subFanoutScenario(40, 100, 100, 100, 100, 100, 10)
+	suite.systemScenario(10, 10, 100, 120, 5, 100, 4)
 }
 
 // generateSystem is a test helper that given number of nodes per role as well as desire number of clusters
@@ -63,45 +68,75 @@ func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, 
 	return state, ids, subMngrs
 }
 
-// subFanoutScenario is a test helper evaluates that sub-fanout of each role in topology is
+// systemScenario is a test helper evaluates that generates several systems with specfies number of nodes
+// on each role. It then evaluates that sub-fanout of each role in topology is
+// bound by the fanout function of topology on the role's entire size.
+func (suite *StatefulTopologyTestSuite) systemScenario(system, acc, col, con, exe, ver, cluster int) {
+	// creates a histogram to keep average fanout of nodes in systems
+	aveHist := thist.NewHist(nil, fmt.Sprintf("Average fanout for %d systems", system),
+		"fit", 10, false)
+
+	for j := 0; j < system; j++ {
+		// creates a flow system
+		state, ids, subMngrs := suite.generateSystem(acc, col, con, exe, ver, cluster)
+
+		// creates a fanout histogram for this system
+		systemHist := thist.NewHist(nil, fmt.Sprintf("System #%d fanout", j),
+			"auto", -1, false)
+
+		totalFanout := 0 // keeps summation of nodes' fanout for statistical reason
+
+		// creates topology and topology manager
+		for i, id := range ids {
+			fanout := suite.subFanoutScenario(id.NodeID, subMngrs[i], ids, state)
+			systemHist.Update(float64(fanout))
+			totalFanout += fanout
+		}
+
+		if suite.histFlag {
+			// prints fanout histogram of this system
+			fmt.Println(systemHist.Draw())
+		}
+
+		// keeps track of average fanout per node
+		aveHist.Update(float64(totalFanout) / float64(len(ids)))
+	}
+
+	if suite.histFlag {
+		fmt.Println(aveHist.Draw())
+	}
+}
+
+// subFanoutScenario is a test helper that creates a stateful topology manager with a linear fanout function for the
+// node. It then evaluates that sub-fanout of each role in topology is
 // bound by the fanout function of topology on the role's entire size.
 // For example if fanout function is `n+1/2` and we have x consensus nodes,
 // then this tests evaluates that no node should have more than or equal to `x+1/2`
 // consensus fanout.
-func (suite *StatefulTopologyTestSuite) subFanoutScenario(system, acc, col, con, exe, ver, cluster int) {
-	// fanouts := make([]float64, 0, system)
-	h := thist.NewHist(nil, "Fanout histogram", "auto", -1, false)
+//
+// It returns the fanout of node.
+func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
+	subMngr channel.SubscriptionManager,
+	ids flow.IdentityList,
+	state protocol.ReadOnlyState) int {
+	top, err := topology.NewTopicBasedTopology(me, state)
+	require.NoError(suite.T(), err)
 
-	for j := 0; j < system; j++ {
-		state, ids, subMngrs := suite.generateSystem(acc, col, con, exe, ver, cluster)
-		fanout := 0 // keeps summation of nodes' fanout for statistical reason
+	// creates topology manager
+	topMngr := topology.NewStatefulTopologyManager(top, subMngr, topology.LinearFanoutFunc)
 
-		// creates topology and topology manager
-		for i, id := range ids {
-			top, err := topology.NewTopicBasedTopology(id.NodeID, state)
-			require.NoError(suite.T(), err)
+	// generates topology of node
+	myFanout, err := topMngr.MakeTopology(ids)
+	require.GreaterOrEqual(suite.T(), uint(len(myFanout)), topMngr.Fanout(uint(len(ids))))
+	require.NoError(suite.T(), err)
 
-			// creates topology manager
-			topMngr := topology.NewStatefulTopologyManager(top, subMngrs[i], topology.LinearFanoutFunc)
-
-			// generates topology of node
-			myFanout, err := topMngr.MakeTopology(ids)
-			require.NoError(suite.T(), err)
-
-			for _, role := range flow.Roles() {
-				// total number of nodes in flow with specified role
-				roleTotal := uint(len(ids.Filter(filter.HasRole(role))))
-				// number of nodes in fanout with specified role
-				roleFanout := topMngr.Fanout(uint(len(myFanout.Filter(filter.HasRole(role)))))
-				require.Less(suite.T(), roleFanout, roleTotal)
-			}
-
-			fanout += len(myFanout)
-		}
-
-		// keeps track of average fanout
-		h.Update(float64(fanout) / float64(len(ids)))
+	for _, role := range flow.Roles() {
+		// total number of nodes in flow with specified role
+		roleTotal := uint(len(ids.Filter(filter.HasRole(role))))
+		// number of nodes in fanout with specified role
+		roleFanout := topMngr.Fanout(uint(len(myFanout.Filter(filter.HasRole(role)))))
+		require.Less(suite.T(), roleFanout, roleTotal)
 	}
 
-	fmt.Println(h.Draw())
+	return len(myFanout)
 }
