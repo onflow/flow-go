@@ -34,12 +34,15 @@ func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.Id
 
 	// samples a connected component fanout from each topic and takes the
 	// union of all fanouts.
-	for _, myChannel := range stm.subMngr.GetChannelIDs() {
+	myChannelIDs := stm.subMngr.GetChannelIDs()
+	for _, myChannel := range myChannelIDs {
 		myFanout, err = stm.topology.Subset(ids, myFanout, myChannel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", myChannel, err)
 		}
+		fmt.Println(len(myFanout))
 	}
+	fmt.Println("----")
 	return myFanout, nil
 }
 
