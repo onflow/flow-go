@@ -52,6 +52,8 @@ typedef uint8_t byte;
 
 typedef struct prec_ {
     #if (hashToPoint == OPSWU)
+    bn_st p_3div4;
+    fp_st fp_p_1div2; 
     // coefficients of E1(Fp)
     fp_st a1;
     fp_st b1; 
@@ -65,8 +67,7 @@ typedef struct prec_ {
     bn_st beta;
     bn_st z2_1_by3;
     #endif
-    bn_st p_3div4;
-    fp_st p_1div2;
+    bn_st p_1div2;
 } prec_st;
 
 // Utility functions

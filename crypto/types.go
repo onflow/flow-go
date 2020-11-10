@@ -32,7 +32,7 @@ const (
 	// BLS12-381
 	// p size in bytes, where G1 is defined over the field Zp
 	fieldSize = 48
-	// Points compression: 1 for compressed, 0 for uncompressed
+	// Points compression when serialized: 1 for compressed, 0 for uncompressed
 	compression = 1
 	// SignatureLenBLSBLS12381 is the size of G1 elements
 	SignatureLenBLSBLS12381 = fieldSize * (2 - compression) // the length is divided by 2 if compression is on
