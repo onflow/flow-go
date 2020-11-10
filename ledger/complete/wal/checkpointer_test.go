@@ -64,7 +64,7 @@ func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		led, err := complete.NewLedger(dir, size*10, metricsCollector, logger, nil)
+		led, err := complete.NewLedger(dir, size*10, metricsCollector, logger, nil, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		var state = led.InitialState()
@@ -95,7 +95,7 @@ func Test_WAL(t *testing.T) {
 
 		<-led.Done()
 
-		led2, err := complete.NewLedger(dir, (size*10)+10, metricsCollector, logger, nil)
+		led2, err := complete.NewLedger(dir, (size*10)+10, metricsCollector, logger, nil, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		// random map iteration order is a benefit here

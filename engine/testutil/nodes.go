@@ -146,7 +146,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	transactions := storage.NewTransactions(node.Metrics, node.DB)
 	collections := storage.NewCollections(node.DB, transactions)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pools, collectioningest.DefaultConfig())
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, chainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
 
 	selector := filter.HasRole(flow.RoleAccess, flow.RoleVerification)
@@ -270,7 +270,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	dbDir := unittest.TempDir(t)
 
 	metricsCollector := &metrics.NoopCollector{}
-	ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), nil)
+	ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), nil, completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()
