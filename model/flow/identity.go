@@ -20,10 +20,24 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|acc
 
 // Identity represents a node identity.
 type Identity struct {
-	NodeID        Identifier
-	Address       string
-	Role          Role
-	Stake         uint64
+	NodeID  Identifier
+	Address string
+	Role    Role
+	// Stake represents the node's *weight*. The stake (quantity of $FLOW held
+	// in escrow during the node's participation) is strictly managed by the
+	// service account. The protocol software strictly considers weight, which
+	// represents how much voting power a given node has.
+	//
+	// NOTE: Nodes that are registered for an upcoming epoch, or that are in
+	// the process of un-staking, have 0 weight.
+	//
+	// TODO: to be renamed to Weight
+	Stake uint64
+	// Ejected represents whether a node has been permanently removed from the
+	// network. A node may be ejected for either:
+	// * committing one protocol felony
+	// * committing a series of protocol misdemeanours
+	Ejected       bool
 	StakingPubKey crypto.PublicKey
 	NetworkPubKey crypto.PublicKey
 }
