@@ -20,11 +20,6 @@ type node struct {
 	id            int
 	controller    *Controller
 	phaseDuration time.Duration
-
-	// artifacts of DKG
-	priv crypto.PrivateKey
-	pub  crypto.PublicKey
-	pubs []crypto.PublicKey
 }
 
 func newNode(id int, controller *Controller, phaseDuration time.Duration) *node {
@@ -57,7 +52,7 @@ func (n *node) run() error {
 	err = n.delayedTask(
 		n.phaseDuration,
 		func() error {
-			n.priv, n.pub, n.pubs, err = n.controller.End()
+			err := n.controller.End()
 			return err
 		})
 	if err != nil {
@@ -162,7 +157,7 @@ func testDKG(t *testing.T, totalNodes int, goodNodes int, phaseDuration time.Dur
 	wait(t, gnodes, 5*phaseDuration)
 
 	// Check that all nodes have agreed on the same set of public keys
-	checkArtifacts(t, gnodes)
+	checkArtifacts(t, gnodes, totalNodes)
 }
 
 // Initialise nodes and communication channels.
@@ -228,15 +223,17 @@ func wait(t *testing.T, nodes []*node, timeout time.Duration) {
 }
 
 // Check that all nodes have produced the same set of public keys
-func checkArtifacts(t *testing.T, nodes []*node) {
+func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 	for i := 1; i < len(nodes); i++ {
-		require.NotEmpty(t, nodes[i].priv)
-		require.NotEmpty(t, nodes[i].pub)
-		require.Len(t, nodes[i].pubs, len(nodes))
+		require.NotEmpty(t, nodes[i].controller.privateShare)
+		require.NotEmpty(t, nodes[i].controller.publicShare)
+		require.Len(t, nodes[i].controller.publicKeys, totalNodes)
 
-		for j := 0; j < len(nodes); j++ {
-			if !reflect.DeepEqual(nodes[0].pubs[j], nodes[i].pubs[j]) {
-				t.Fatalf("pubs[%d] differ: %s, %s", j, nodes[0].pubs[j].String(), nodes[i].pubs[j].String())
+		for j := 0; j < totalNodes; j++ {
+			if !reflect.DeepEqual(nodes[0].controller.publicKeys[j], nodes[i].controller.publicKeys[j]) {
+				t.Fatalf("pubs[%d] differ: %s, %s", j,
+					nodes[0].controller.publicKeys[j].String(),
+					nodes[i].controller.publicKeys[j].String())
 			}
 		}
 

@@ -1,7 +1,7 @@
 package dkg
 
 import (
-	"sync/atomic"
+	"sync"
 )
 
 // State captures the state of a DKG engine
@@ -33,17 +33,20 @@ func (s State) String() string {
 
 // Manager wraps a State with get and set methods
 type Manager struct {
+	sync.Mutex
 	state State
 }
 
 // GetState returns the current state.
 func (m *Manager) GetState() State {
-	stateAddr := (*uint32)(&m.state)
-	return State(atomic.LoadUint32(stateAddr))
+	m.Lock()
+	defer m.Unlock()
+	return m.state
 }
 
 // SetState sets the state.
 func (m *Manager) SetState(s State) {
-	stateAddr := (*uint32)(&m.state)
-	atomic.StoreUint32(stateAddr, uint32(s))
+	m.Lock()
+	defer m.Unlock()
+	m.state = s
 }
