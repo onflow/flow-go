@@ -12,23 +12,20 @@ import (
 // TopicBasedTopology is a deterministic topology mapping that creates a connected graph component among the nodes
 // involved in each topic.
 type TopicBasedTopology struct {
-	seed        int64                  // used for sampling connected graph
-	me          flow.Identifier        // used to keep identifier of the node
-	state       protocol.ReadOnlyState // used to keep a read only protocol state
-	notMeFilter flow.IdentityFilter    // used to filter out the node itself
+	me           flow.Identifier        // used to keep identifier of the node
+	state        protocol.ReadOnlyState // used to keep a read only protocol state
+	notMeFilter  flow.IdentityFilter    // used to filter out the node itself
+	graphSampler ConnectedGraphSampler  // used to create connected graph sampler
 }
 
 // NewTopicBasedTopology returns an instance of the TopicBasedTopology.
-func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState) (*TopicBasedTopology, error) {
-	seed, err := seedFromID(nodeID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to seed topology: %w", err)
-	}
+func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState,
+	graphSampler ConnectedGraphSampler) (*TopicBasedTopology, error) {
 	t := &TopicBasedTopology{
-		seed:        seed,
-		me:          nodeID,
-		state:       state,
-		notMeFilter: filter.Not(filter.HasNodeID(nodeID)),
+		me:           nodeID,
+		state:        state,
+		graphSampler: graphSampler,
+		notMeFilter:  filter.Not(filter.HasNodeID(nodeID)),
 	}
 
 	return t, nil
@@ -37,6 +34,11 @@ func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState)
 // Subset samples and returns a connected graph of the subscribers to the topic from the ids.
 // A connected graph fanout means that the subset of ids returned by this method on different nodes collectively
 // construct a connected graph component among all the subscribers to the topic.
+// 100 CN
+// shouldHave = {10 CN, 5 EN, 50 VN}
+// topic = consensus node
+// ids - shouldHave = {assume 90} = ~45 fanout
+// ~51 fanout
 func (t *TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
 	var subscribers flow.IdentityList
 	var involvedRoles flow.RoleList
@@ -78,7 +80,7 @@ func (t *TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.Ident
 	}
 
 	// samples subscribers of a connected graph
-	subscriberSample, _ := connectedGraphSample(subscribers, shouldHave, t.seed)
+	subscriberSample := t.graphSampler.SampleConnectedGraph(subscribers, shouldHave)
 
 	return subscriberSample, nil
 }
