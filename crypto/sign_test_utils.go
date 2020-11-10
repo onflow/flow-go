@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"crypto/rand"
 	"fmt"
 	mrand "math/rand"
 	"testing"
@@ -20,16 +19,18 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	seedMinLength := 48
 	seed := make([]byte, seedMinLength)
 	input := make([]byte, 100)
-	mrand.Seed(time.Now().UnixNano())
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 
 	loops := 50
 	for j := 0; j < loops; j++ {
-		n, err := rand.Read(seed)
+		n, err := mrand.Read(seed)
 		require.Equal(t, n, seedMinLength)
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(salg, seed)
 		require.NoError(t, err)
-		_, err = rand.Read(input)
+		_, err = mrand.Read(input)
 		require.NoError(t, err)
 		s, err := sk.Sign(input, halg)
 		require.NoError(t, err)
@@ -73,31 +74,39 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	t.Logf("Testing encode/decode for %s", salg)
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 
-	// Key generation seed
-	seed := make([]byte, seedMinLength)
-	read, err := rand.Read(seed)
-	require.Equal(t, read, seedMinLength)
-	require.NoError(t, err)
-	sk, err := GeneratePrivateKey(salg, seed)
-	assert.Nil(t, err, "the key generation has failed")
+	loops := 50
+	for j := 0; j < loops; j++ {
+		// generate a private key
+		seed := make([]byte, seedMinLength)
+		read, err := mrand.Read(seed)
+		require.Equal(t, read, seedMinLength)
+		require.NoError(t, err)
+		sk, err := GeneratePrivateKey(salg, seed)
+		assert.Nil(t, err, "the key generation has failed")
 
-	skBytes := sk.Encode()
-	skCheck, err := DecodePrivateKey(salg, skBytes)
-	require.Nil(t, err, "the key decoding has failed")
-	assert.True(t, sk.Equals(skCheck), "key equality check failed")
-	skCheckBytes := skCheck.Encode()
-	assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
+		// check private key encoding
+		skBytes := sk.Encode()
+		skCheck, err := DecodePrivateKey(salg, skBytes)
+		require.Nil(t, err, "the key decoding has failed")
+		assert.True(t, sk.Equals(skCheck), "key equality check failed")
+		skCheckBytes := skCheck.Encode()
+		assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
 
-	pk := sk.PublicKey()
-	pkBytes := pk.Encode()
-	pkCheck, err := DecodePublicKey(salg, pkBytes)
-	require.Nil(t, err, "the key decoding has failed")
-	assert.True(t, pk.Equals(pkCheck), "key equality check failed")
-	pkCheckBytes := pkCheck.Encode()
-	assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+		// check public key encoding
+		pk := sk.PublicKey()
+		pkBytes := pk.Encode()
+		pkCheck, err := DecodePublicKey(salg, pkBytes)
+		require.Nil(t, err, "the key decoding has failed")
+		assert.True(t, pk.Equals(pkCheck), "key equality check failed")
+		pkCheckBytes := pkCheck.Encode()
+		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+	}
 
 	// test invalid private keys (equal to the curve group order)
 	groupOrder := make(map[SigningAlgorithm][]byte)
@@ -112,18 +121,21 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	groupOrder[BLSBLS12381] = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
 		0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
 		0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
-	_, err = DecodePrivateKey(salg, groupOrder[salg])
+	_, err := DecodePrivateKey(salg, groupOrder[salg])
 	require.Error(t, err, "the key decoding should fail - private key value is too large")
 }
 
 func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorithm) {
 	t.Logf("Testing Equals for %s", salg)
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 
 	// generate a key pair
 	seed := make([]byte, seedMinLength)
-	n, err := rand.Read(seed)
+	n, err := mrand.Read(seed)
 	require.Equal(t, n, seedMinLength)
 	require.NoError(t, err)
 
@@ -211,6 +223,9 @@ func benchSign(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 // testPOP tests proofs of possession
 func testPOP(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	t.Logf("Testing proof of possession for %s", salg)
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 	seed := make([]byte, seedMinLength)
@@ -218,12 +233,12 @@ func testPOP(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 
 	loops := 10
 	for j := 0; j < loops; j++ {
-		n, err := rand.Read(seed)
+		n, err := mrand.Read(seed)
 		require.Equal(t, n, seedMinLength)
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(salg, seed)
 		require.NoError(t, err)
-		_, err = rand.Read(input)
+		_, err = mrand.Read(input)
 		require.NoError(t, err)
 		s, err := sk.GeneratePOP(halg)
 		require.NoError(t, err)
