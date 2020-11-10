@@ -100,16 +100,18 @@ func (b *Backdata) Hash() flow.Identifier {
 type Backend struct {
 	sync.RWMutex
 	Backdata
-	limit uint
-	eject EjectFunc
+	limit             uint
+	eject             EjectFunc
+	ejectionCallbacks []OnEjection
 }
 
 // NewBackend creates a new memory pool backend.
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		Backdata: NewBackdata(),
-		limit:    uint(math.MaxUint32),
-		eject:    EjectTrueRandom,
+		Backdata:          NewBackdata(),
+		limit:             uint(math.MaxUint32),
+		eject:             EjectTrueRandom,
+		ejectionCallbacks: nil,
 	}
 	for _, option := range options {
 		option(&b)
@@ -200,6 +202,13 @@ func (b *Backend) Hash() flow.Identifier {
 	return b.Backdata.Hash()
 }
 
+// RegisterEjectionCallback adds an OnEjection callback
+func (b *Backend) RegisterEjectionCallback(callback OnEjection) {
+	b.Lock()
+	defer b.Unlock()
+	b.ejectionCallbacks = append(b.ejectionCallbacks, callback)
+}
+
 // reduce will reduce the size of the kept entities until we are within the
 // configured memory pool size limit.
 func (b *Backend) reduce() {
@@ -211,12 +220,17 @@ func (b *Backend) reduce() {
 		key, _ := b.eject(b.entities)
 
 		// if the key is not actually part of the map, use stupid fallback eject
-		_, ok := b.entities[key]
+		entity, ok := b.entities[key]
 		if !ok {
 			key, _ = EjectFakeRandom(b.entities)
 		}
 
 		// remove the key
 		delete(b.entities, key)
+
+		// notify callbacks
+		for _, callback := range b.ejectionCallbacks {
+			callback(entity)
+		}
 	}
 }

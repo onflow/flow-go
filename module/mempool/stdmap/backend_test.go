@@ -132,5 +132,61 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 	}
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
+}
+
+// TestBackend_EjectionCallback verifies that the Backend calls the ejection callbacks whenever
+// it ejects a stored entity due to size limitations.
+func TestBackend_EjectionCallback(t *testing.T) {
+	const (
+		limit = 10
+		swarm = 20
+	)
+	pool := NewBackend(WithLimit(limit))
+
+	var ejected sync.Map
+	storeEntity := func(entity flow.Entity) {
+		go ejected.Store(entity.ID(), entity)
+	}
+	pool.RegisterEjectionCallback(storeEntity)
+	ensureEntityNotInMempool := func(entity flow.Entity) {
+		id := entity.ID()
+		go func() {
+			e, found := pool.ByID(id)
+			require.False(t, found)
+			require.Nil(t, e)
+		}()
+		go func() {
+			require.False(t, pool.Has(id))
+		}()
+	}
+	pool.RegisterEjectionCallback(ensureEntityNotInMempool)
+
+	wg := sync.WaitGroup{}
+	wg.Add(swarm)
+	for i := 0; i < swarm; i++ {
+		go func(x int) {
+			// creates and adds a fake item to the mempool
+			item := fake(fmt.Sprintf("item%d", x))
+			pool.Add(item)
+			wg.Done()
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
+
+	// verify that the mempool is at full capacity
+	require.Equal(t, pool.Size(), uint(limit), "expected mempool to be at max capacity limit")
+
+	// verify that all ejected elements are not part of the
+	ejected.Range(func(key, value interface{}) bool {
+		id := value.(fake).ID()
+
+		e, found := pool.ByID(id)
+		require.False(t, found)
+		require.Nil(t, e)
+
+		require.False(t, pool.Has(id))
+
+		return true
+	})
 
 }
