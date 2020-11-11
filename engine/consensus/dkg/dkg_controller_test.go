@@ -141,6 +141,12 @@ func TestDKGThreshold(t *testing.T) {
 	}
 }
 
+// ATTENTION: This test seems to indicate that nodes end up with a different set
+// of public keys when the phase duration is short.
+func TestDKGShortDuration(t *testing.T) {
+	testDKG(t, 20, 20, 2*time.Second)
+}
+
 func testDKG(t *testing.T, totalNodes int, goodNodes int, phaseDuration time.Duration) {
 	nodes := initNodes(t, totalNodes, phaseDuration)
 	gnodes := nodes[:goodNodes]
