@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -59,12 +60,14 @@ func pull(cmd *cobra.Command, args []string) {
 	log.Info().Msgf("found %d files in google bucket", len(files))
 
 	for _, file := range files {
-		fullOutpath := filepath.Join(flagOutdir, file)
-		log.Printf("downloading %s", file)
+		if strings.Contains(file, "node-info.pub") {
+			fullOutpath := filepath.Join(flagOutdir, file)
+			log.Printf("downloading %s", file)
 
-		err = bucket.DownloadFile(ctx, client, fullOutpath, file)
-		if err != nil {
-			log.Error().Msgf("error trying download google bucket file: %v", err)
+			err = bucket.DownloadFile(ctx, client, fullOutpath, file)
+			if err != nil {
+				log.Error().Msgf("error trying download google bucket file: %v", err)
+			}
 		}
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -49,10 +48,6 @@ func (g *GoogleBucket) GetFiles(ctx context.Context, client *storage.Client, pre
 		}
 		if err != nil {
 			return nil, err
-		}
-
-		if strings.Contains(attrs.Name, "node-info.pub") {
-			files = append(files, attrs.Name)
 		}
 	}
 
