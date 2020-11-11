@@ -32,7 +32,15 @@ func (suite *StatefulTopologyTestSuite) SetupTest() {
 }
 
 func (suite *StatefulTopologyTestSuite) TestSingleSystemLowScale() {
-	suite.systemScenario(10, 10, 100, 120, 5, 100, 4)
+	suite.systemScenario(1, 10, 100, 120, 5, 100, 4)
+}
+
+func (suite *StatefulTopologyTestSuite) TestModerateScale() {
+	suite.systemScenario(200, 20, 200, 240, 10, 200, 8)
+}
+
+func (suite *StatefulTopologyTestSuite) TestHighScale() {
+	suite.systemScenario(200, 40, 400, 480, 20, 400, 16)
 }
 
 // generateSystem is a test helper that given number of nodes per role as well as desire number of clusters
@@ -46,11 +54,11 @@ func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, 
 	flow.IdentityList,
 	[]channel.SubscriptionManager) {
 
-	collector, _ := test.GenerateIDs(suite.T(), col, !test.DryRun, unittest.WithRole(flow.RoleCollection))
-	access, _ := test.GenerateIDs(suite.T(), acc, !test.DryRun, unittest.WithRole(flow.RoleAccess))
-	consensus, _ := test.GenerateIDs(suite.T(), con, !test.DryRun, unittest.WithRole(flow.RoleConsensus))
-	verification, _ := test.GenerateIDs(suite.T(), ver, !test.DryRun, unittest.WithRole(flow.RoleVerification))
-	execution, _ := test.GenerateIDs(suite.T(), exe, !test.DryRun, unittest.WithRole(flow.RoleExecution))
+	collector, _ := test.GenerateIDs(suite.T(), col, test.DryRun, unittest.WithRole(flow.RoleCollection))
+	access, _ := test.GenerateIDs(suite.T(), acc, test.DryRun, unittest.WithRole(flow.RoleAccess))
+	consensus, _ := test.GenerateIDs(suite.T(), con, test.DryRun, unittest.WithRole(flow.RoleConsensus))
+	verification, _ := test.GenerateIDs(suite.T(), ver, test.DryRun, unittest.WithRole(flow.RoleVerification))
+	execution, _ := test.GenerateIDs(suite.T(), exe, test.DryRun, unittest.WithRole(flow.RoleExecution))
 
 	ids := flow.IdentityList{}
 	ids = ids.Union(collector)
@@ -88,6 +96,7 @@ func (suite *StatefulTopologyTestSuite) systemScenario(system, acc, col, con, ex
 
 		// creates topology and topology manager
 		for i, id := range ids {
+			fmt.Println("------", id.Role)
 			fanout := suite.subFanoutScenario(id.NodeID, subMngrs[i], ids, state)
 			systemHist.Update(float64(fanout))
 			totalFanout += fanout
@@ -100,6 +109,7 @@ func (suite *StatefulTopologyTestSuite) systemScenario(system, acc, col, con, ex
 
 		// keeps track of average fanout per node
 		aveHist.Update(float64(totalFanout) / float64(len(ids)))
+
 	}
 
 	if suite.histFlag {
@@ -132,14 +142,14 @@ func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
 
 	// generates topology of node
 	myFanout, err := topMngr.MakeTopology(ids)
-	require.GreaterOrEqual(suite.T(), uint(len(myFanout)), topology.LinearFanoutFunc(uint(len(ids))))
+	require.GreaterOrEqual(suite.T(), len(myFanout), topology.LinearFanoutFunc(len(ids)))
 	require.NoError(suite.T(), err)
 
 	for _, role := range flow.Roles() {
 		// total number of nodes in flow with specified role
-		roleTotal := uint(len(ids.Filter(filter.HasRole(role))))
+		roleTotal := len(ids.Filter(filter.HasRole(role)))
 		// number of nodes in fanout with specified role
-		roleFanout := topology.LinearFanoutFunc(uint(len(myFanout.Filter(filter.HasRole(role)))))
+		roleFanout := topology.LinearFanoutFunc(len(myFanout.Filter(filter.HasRole(role))))
 		require.Less(suite.T(), roleFanout, roleTotal)
 	}
 
