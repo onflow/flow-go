@@ -869,7 +869,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 
 				// We should only have a single epoch commit event per epoch.
 				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
-					// true iff EpochEpochCommitSetup event for NEXT epoch was already included before
+					// true iff EpochCommit event for NEXT epoch was already included before
 					return nil, state.NewInvalidExtensionError("duplicate epoch commit service event")
 				}
 
