@@ -1,6 +1,12 @@
 package errors
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/onflow/cadence/runtime"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 const (
 	// tx validation errors
@@ -25,10 +31,10 @@ const (
 	errCodeExecution = 100
 )
 
-// TxValidationError captures a transaction validation error
+// TransactionValidationError captures a transaction validation error
 // A transaction having this error (in most cases) is rejected by access/collection nodes
 // and later in the pipeline be verified by execution and verification nodes.
-type TxValidationError interface {
+type TransactionValidationError interface {
 	// Code returns the code for this error
 	Code() uint32
 	// Error returns an string describing the details of the error
@@ -67,18 +73,18 @@ func (e InvalidReferenceBlockError) Code() uint32 {
 	return errCodeInvalidReferenceBlockError
 }
 
-// ExpiredTxError indicates that a transaction has expired.
+// ExpiredTransactionError indicates that a transaction has expired.
 // this error is the result of failure in any of the following conditions:
 // - ReferenceBlock.Height - CurrentBlock.Height < Expiry Limit (Transaction is Expired)
-type ExpiredTxError struct {
+type ExpiredTransactionError struct {
 	RefHeight, FinalHeight uint64
 }
 
-func (e ExpiredTxError) Error() string {
+func (e ExpiredTransactionError) Error() string {
 	return fmt.Sprintf("transaction is expired: ref_height=%d final_height=%d", e.RefHeight, e.FinalHeight)
 }
 
-func (e ExpiredTxError) Code() uint32 {
+func (e ExpiredTransactionError) Code() uint32 {
 	return errCodeInvalidReferenceBlockError
 }
 
@@ -116,85 +122,312 @@ func (e InvalidGasLimitError) Error() string {
 	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Actual, e.Maximum)
 }
 
-// 		- InvalidArgumentError
-// 			- check
-// 				- # of args not matching the script template
+// InvalidAddressError indicates that a transaction references an invalid flow Address
+// in either the Authorizers or Payer field.
+type InvalidAddressError struct {
+	Address flow.Address
+}
 
-// 		- InvalidPayloadSignatureError
-// 			(role : payer)
-// 			- PublicKeyDoesNotExist
-// 			- PublicKeyRevoked
-// 			- Verification failed?
-// 			- not enough weight ?
+func (e InvalidAddressError) Code() uint32 {
+	return errCodeInvalidAddressError
+}
 
-// 		- InvalidEnvelopeSignatureError
-// 				(role : payer, proposer, authroizer)
-// 			- PublicKeyDoesNotExist
-// 			- PublicKeyRevoked
-// 			- VerificationFailed?
-// 			- not enough weight ?
-// 			- InvalidHashAlgorithm
+func (e InvalidAddressError) Error() string {
+	return fmt.Sprintf("invalid address: %s", e.Address)
+}
 
-// 		- InvalidSequenceNumber
-// 			- check
-// 				- proposal sequence number not match
+// InvalidArgumentError indicates that a transaction includes invalid arguments.
+// this error is the result of failure in any of the following conditions:
+// - number of arguments doesn't match the template
+// TODO add more cases like argument size
+type InvalidArgumentError struct {
+	Issue string
+}
 
-// // TxExecutionError captures a transaction execution error
-// type TxExecutionError interface {
-// 	// TxHash returns the hash of the transaction content
-// 	TxHash() string
-// 	// Code returns the code for this error
-// 	Code() uint32
-// 	// Error returns an string describing the details of the error
-// 	Error() string
-// }
+func (e InvalidArgumentError) Code() uint32 {
+	return errCodeInvalidArgumentError
+}
 
-// type TxExecutionError
+func (e InvalidArgumentError) Error() string {
+	return fmt.Sprintf("transaction arguments are invalid: (%s)", e.Actual, e.Issue)
+}
 
-// 	// run time error
-// 	cadence.Errors []
+// TxExecutionError captures errors when executing a transaction.
+// A transaction having this error has already passed validation and is included in a collection.
+// the transaction will be executed by execution nodes but the result is reverted
+// and in some cases there will be a penalty (or fees) for the payer, access nodes or collection nodes.
+type TransactionExecutionError interface {
+	// TxHash returns the hash of the transaction content
+	TxHash() flow.Identifier
+	// Code returns the code for this error
+	Code() uint32
+	// Error returns an string describing the details of the error
+	Error() string
+}
 
-// // ErrUnknownReferenceBlock indicates that a transaction references an unknown block.
-// var ErrUnknownReferenceBlock = errors.New("unknown reference block")
+// ProposalMissingSignatureError indicates that no valid signature is provided for the proposal key.
+type ProposalMissingSignatureError struct {
+	TxHash   flow.Identifier
+	Address  flow.Address
+	KeyIndex uint64
+}
 
-// // IncompleteTransactionError indicates that a transaction is missing one or more required fields.
-// type IncompleteTransactionError struct {
-// 	MissingFields []string
-// }
+func (e *ProposalMissingSignatureError) TxHash() flow.Identifier {
+	return e.TxHash
+}
 
-// func (e IncompleteTransactionError) Error() string {
-// 	return fmt.Sprintf("transaction is missing required fields: %s", e.MissingFields)
-// }
+func (e *ProposalMissingSignatureError) Code() uint32 {
+	return errCodeProposalMissingSignatureError
+}
 
-// // InvalidScriptError indicates that a transaction contains an invalid Cadence script.
-// type InvalidScriptError struct {
-// 	ParserErr error
-// }
+func (e *ProposalMissingSignatureError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal key: public key %d on account %s does not have a valid signature",
+		e.KeyIndex,
+		e.Address,
+	)
+}
 
-// func (e InvalidScriptError) Error() string {
-// 	return fmt.Sprintf("failed to parse transaction Cadence script: %s", e.ParserErr)
-// }
+// ProposalSeqNumberMismatchError indicates that proposal key sequence number does not match the on-chain value.
+type ProposalSeqNumberMismatchError struct {
+	TxHash            flow.Identifier
+	Address           flow.Address
+	KeyIndex          uint64
+	CurrentSeqNumber  uint64
+	ProvidedSeqNumber uint64
+}
 
-// func (e InvalidScriptError) Unwrap() error {
-// 	return e.ParserErr
-// }
+func (e *ProposalSeqNumberMismatchError) TxHash() flow.Identifier {
+	return e.TxHash
+}
 
-// // InvalidGasLimitError indicates that a transaction specifies a gas limit that exceeds the maximum.
-// type InvalidGasLimitError struct {
-// 	Maximum uint64
-// 	Actual  uint64
-// }
+func (e *ProposalSeqNumberMismatchError) Code() uint32 {
+	return errCodeProposalSeqNumberMismatchError
+}
 
-// func (e InvalidGasLimitError) Error() string {
-// 	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Actual, e.Maximum)
-// }
+func (e *ProposalSeqNumberMismatchError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal key: public key %d on account %s has sequence number %d, but given %d",
+		e.KeyIndex,
+		e.Address,
+		e.CurrentSeqNumber,
+		e.ProvidedSeqNumber,
+	)
+}
 
-// // InvalidAddressError indicates that a transaction references an invalid flow Address
-// // in either the Authorizers or Payer field.
-// type InvalidAddressError struct {
-// 	Address flow.Address
-// }
+// PayloadSignatureError indicates that signature verification for a key in this transaction has failed.
+// this error is the result of failure in any of the following conditions:
+// - provided hashing method is not supported
+// - signature size is wrong
+// - signature verification failed
+// - public key doesn't match the one in the signature
+type PayloadSignatureError struct {
+	TxHash   flow.Identifier
+	Address  flow.Address
+	KeyIndex uint64
+}
 
-// func (e InvalidAddressError) Error() string {
-// 	return fmt.Sprintf("invalid address: %s", e.Address)
-// }
+func (e *PayloadSignatureError) TxHash() flow.Identifier {
+	return e.TxHash
+}
+
+func (e *PayloadSignatureError) Code() uint32 {
+	return errCodePayloadSignatureError
+}
+
+func (e *PayloadSignatureError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal key: public key %d on account %s does not have a valid signature",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+// PayloadSignatureKeyError indicates an issue with a payload key in the transaction.
+// this error is the result of failure in any of the following conditions:
+// - keyIndex doesn't exist at this address
+type PayloadSignatureKeyError struct {
+	TxHash   flow.Identifier
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *PayloadSignatureKeyError) TxHash() flow.Identifier {
+	return e.TxHash
+}
+
+func (e *PayloadSignatureKeyError) Code() uint32 {
+	return errCodePayloadSignatureKeyError
+}
+
+func (e *PayloadSignatureKeyError) Error() string {
+	return fmt.Sprintf(
+		"invalid payload key: key index %d doesn't exist on account %s",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+// RevokedPayloadSignatureKeyError indicates a transaction payload key is revoked.
+// this error is the result of failure in any of the following conditions:
+// - key Index is revoked from this account
+// TODO maybe merge with the one above
+type RevokedPayloadSignatureKeyError struct {
+	TxHash   flow.Identifierss
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *RevokedPayloadSignatureKeyError) TxHash() flow.Identifier {
+	return e.TxHash
+}
+
+func (e *RevokedPayloadSignatureKeyError) Code() uint32 {
+	return errCodeRevokedPayloadSignatureKeyError
+}
+
+func (e *RevokedPayloadSignatureKeyError) Error() string {
+	return fmt.Sprintf(
+		"invalid payload key: key index %d doesn't exist on account %s",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+// EnvelopeSignatureError indicates that signature verification for a envelope key in this transaction has failed.
+// this error is the result of failure in any of the following conditions:
+// - provided hashing method is not supported
+// - signature size is wrong
+// - signature verification failed
+// - public key doesn't match the one in the signature
+type EnvelopeSignatureError struct {
+	TxHash   flow.Identifier
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *EnvelopeSignatureError) TxHash() flow.Identifier {
+	return e.TxHash
+}
+
+func (e *EnvelopeSignatureError) Code() uint32 {
+	return errCodeEnvelopeSignatureError
+}
+
+func (e *EnvelopeSignatureError) Error() string {
+	return fmt.Sprintf(
+		"invalid envelope key: public key %d on account %s does not have a valid signature",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+// EnvelopeSignatureKeyError indicates an issue with a envelope key in the transaction.
+// this error is the result of failure in any of the following conditions:
+// - keyIndex doesn't exist at this address
+type EnvelopeSignatureKeyError struct {
+	TxHash   flow.Identifier
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *EnvelopeSignatureKeyError) TxHash() flow.Identifier {
+	return e.TxHash
+}
+
+func (e *EnvelopeSignatureKeyError) Code() uint32 {
+	return errCodeEnvelopeSignatureKeyError
+}
+
+func (e *EnvelopeSignatureKeyError) Error() string {
+	return fmt.Sprintf(
+		"invalid envelope key: key index %d doesn't exist on account %s",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+// RevokedEnvelopeSignatureKeyError indicates a transaction payload key is revoked.
+// this error is the result of failure in any of the following conditions:
+// - key Index is revoked from this account
+// TODO maybe merge with the one above
+type RevokedEnvelopeSignatureKeyError struct {
+	TxHash   flow.Identifier
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *RevokedEnvelopeSignatureKeyError) TxHash() flow.Identifier {
+	return e.TxHash
+}
+
+func (e *RevokedEnvelopeSignatureKeyError) Code() uint32 {
+	return errCodeRevokedEnvelopeSignatureKeyError
+}
+
+func (e *RevokedEnvelopeSignatureKeyError) Error() string {
+	return fmt.Sprintf(
+		"invalid envelope key: key index %d doesn't exist on account %s",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+// AuthorizationError indicates that a transaction is missing a required signature to
+// authorize access to an account.
+// this error is the result of failure in any of the following conditions:
+// - no signature provided for an account
+// - not enough key weight in total for this account
+type AuthorizationError struct {
+	TxHash       flow.Identifier
+	Address      flow.Address
+	SignedWeight uint32
+}
+
+func (e *AuthorizationError) TxHash() flow.Identifier {
+	return e.TxHash
+}
+
+func (e *AuthorizationError) Code() uint32 {
+	return errCodeAuthorizationError
+}
+
+func (e *AuthorizationError) Error() string {
+	return fmt.Sprintf(
+		"account %s does not have sufficient signatures (unauthorized access)",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+// CadenceError captures a collection of errors provided by cadence runtime
+// it cover cadence errors such as
+// NotDeclaredError, NotInvokableError, ArgumentCountError, TransactionNotDeclaredError,
+// ConditionError, RedeclarationError, DereferenceError,
+// OverflowError, UnderflowError, DivisionByZeroError,
+// DestroyedCompositeError,  ForceAssignmentToNonNilResourceError, ForceNilError,
+// TypeMismatchError, InvalidPathDomainError, OverwriteError, CyclicLinkError,
+// ArrayIndexOutOfBoundsError, ...
+type CadenceRunTimeError struct {
+	TxHash flow.Identifier
+	error  runtime.Error
+}
+
+// TODO add unwrap
+
+// account doesn't have enough storage
+type InsufficientStorageError struct {
+}
+
+// - if user can pay for the tx fees
+type InsufficientTokenBalanceError struct {
+}
+
+type MaxGasExceededError struct {
+}
+
+type MaxEventLimitExceededError struct {
+}
+
+type MaxLedgerIntractionLimitExceededError struct {
+}
