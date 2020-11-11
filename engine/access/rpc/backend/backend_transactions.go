@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -51,13 +52,15 @@ func (b *backendTransactions) SendTransaction(
 	}
 
 	// send the transaction to the collection node if valid
-	err = b.trySendTransaction(ctx, tx)
+	collAddr, err := b.trySendTransaction(ctx, tx)
 	if err != nil {
 		b.transactionMetrics.TransactionSubmissionFailed()
 		return status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
 	}
 
 	b.transactionMetrics.TransactionReceived(tx.ID(), now)
+
+	log.Info().Msgf("transaction received: %v, forwarded to collection addr: %v", tx.ID(), collAddr)
 
 	// store the transaction locally
 	err = b.transactions.Store(tx)
@@ -73,17 +76,17 @@ func (b *backendTransactions) SendTransaction(
 }
 
 // trySendTransaction tries to transaction to a collection node
-func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
+func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.TransactionBody) (string, error) {
 
 	// if a collection node rpc client was provided at startup, just use that
 	if b.staticCollectionRPC != nil {
-		return b.grpcTxSend(ctx, b.staticCollectionRPC, tx)
+		return "", b.grpcTxSend(ctx, b.staticCollectionRPC, tx)
 	}
 
 	// otherwise choose a random set of collections nodes to try
 	collAddrs, err := b.chooseCollectionNodes(tx, collectionNodesToTry)
 	if err != nil {
-		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
+		return "", fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
 
 	var sendErrors error
@@ -94,10 +97,10 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 		if err != nil {
 			sendErrors = multierror.Append(sendErrors, err)
 		} else {
-			return nil
+			return addr, nil
 		}
 	}
-	return sendErrors
+	return "", sendErrors
 }
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
@@ -170,7 +173,8 @@ func (b *backendTransactions) SendRawTransaction(
 ) error {
 
 	// send the transaction to the collection node
-	return b.trySendTransaction(ctx, tx)
+	_, err := b.trySendTransaction(ctx, tx)
+	return err
 }
 
 func (b *backendTransactions) GetTransaction(_ context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {

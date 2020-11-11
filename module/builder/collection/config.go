@@ -42,8 +42,8 @@ func DefaultConfig() Config {
 		ExpiryBuffer:            15,                              // 15 blocks for collections to be included
 		MaxPayerTransactionRate: 0,                               // no rate limiting
 		UnlimitedPayers:         make(map[flow.Address]struct{}), // no unlimited payers
-		MaxCollectionByteSize:   uint64(1000000),                 // ~1MB
-		MaxCollectionTotalGas:   uint64(1000000),                 // 1M
+		MaxCollectionByteSize:   uint64(10000000),                // ~1MB
+		MaxCollectionTotalGas:   uint64(10000000),                // 1M
 	}
 }
 
