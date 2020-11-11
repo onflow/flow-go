@@ -229,7 +229,7 @@ func (s *thresholdSigner) VerifyAndStageShare(orig int, share Signature) (bool, 
 
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
-		return false, fmt.Errorf("signature share is invalid: %w", err)
+		return false, fmt.Errorf("verification of share failed: %w", err)
 	}
 
 	// check if the share is new
@@ -392,7 +392,7 @@ func EnoughShares(threshold int, sharesNumber int) bool {
 }
 
 // ThresholdSignKeyGen is a key generation for a BLS-based
-// threeshold signature scheme with a trusted dealer.
+// threshold signature scheme with a trusted dealer.
 func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {

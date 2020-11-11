@@ -90,9 +90,10 @@ const blsKMACFunction = "H2C"
 // It expands the message into 1024 bits (required for the optimal SwU hash to curve)
 // tag is the domain separation tag, it is recommended to use a different tag for each signature domain
 func NewBLSKMAC(tag string) hash.Hasher {
-	// prefix the tag with the BLS ciphersuite
+	// postfix the tag with the BLS ciphersuite
 	kmacTag := []byte(tag + blsCipherSuite)
 	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
+	// (tested by TestBLSBLS12381Hasher)
 	kmac, _ := hash.NewKMAC_128(kmacTag, []byte(blsKMACFunction), minHashSizeBLSBLS12381)
 	return kmac
 }
