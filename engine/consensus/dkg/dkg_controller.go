@@ -5,19 +5,20 @@ Feldman DKG node.
 
 The state-machine can be represented as follows:
 
-+-------+  /Run() +---------+  /EndPhase0() +---------+  /EndPhase1() +---------+  /End()   +----------+
-| Init  | ----->  | Phase 0 | ------------> | Phase 1 | ------------> | Phase 2 | --------> | Shutdown |
-+-------+         +---------+               +---------+               +---------+           +----------+
-   |                   |                         |                         |                      ^
-   v___________________v_________________________v_________________________v______________________|
++-------+  /Run() +---------+  /EndPhase0() +---------+  /EndPhase1() +---------+  /End()   +-----+     +----------+
+| Init  | ----->  | Phase 0 | ------------> | Phase 1 | ------------> | Phase 2 | --------> | End | --> | Shutdown |
++-------+         +---------+               +---------+               +---------+           +-----+     +----------+
+   |                   |                         |                         |                                 ^
+   v___________________v_________________________v_________________________v_________________________________|
                                             /Shutdown()
 
-The controller is always in one of 5 states:
+The controller is always in one of 6 states:
 	- Init: Default state before the instance is started
 	- Phase 0: 1st phase of the JF DKG protocol while it's running
 	- Phase 1: 2nd phase of the JF DKG protocol while it's running
 	- Phase 2: 3rd phase of the JF DKG protocol while it's running
-	- Shutdown: When the controller is stopped
+	- End: When the DKG protocol is finished
+	- Shutdown: When the controller and all its routines are stopped
 
 The controller exposes the following functions to trigger transitions:
 
@@ -28,9 +29,14 @@ EndPhase0(): Triggers transition from Phase 0 to Phase 1.
 
 EndPhase1(): Triggers transition from Phase 1 to Phase 2.
 
-End(): Ends the DKG protocol and records the artifacts in controller.
+End(): Ends the DKG protocol and records the artifacts in controller. Triggers
+       transition from Phase 2 to End.
 
 Shutdown(): Can be called from any state to stop the DKG instance.
+
+The End and Shutdown states differ in that the End state can only be arrived at
+from Phase 2 and after successfully computing the DKG artifacts. Whereas the
+Shutdown state can be reached from any other state.
 
 */
 package dkg
@@ -141,6 +147,8 @@ func (c *Controller) Run() error {
 			if err != nil {
 				return err
 			}
+		case End:
+			c.Shutdown()
 		case Shutdown:
 			return nil
 		}
@@ -149,44 +157,35 @@ func (c *Controller) Run() error {
 
 // EndPhase0 notifies the controller to end phase 0, and start phase 1
 func (c *Controller) EndPhase0() error {
-	defer func() {
-		c.SetState(Phase1)
-		close(c.h0Ch)
-	}()
-
 	state := c.GetState()
 	if state != Phase0 {
 		return NewInvalidStateTransitionError(state, Phase1)
 	}
+
+	c.SetState(Phase1)
+	close(c.h0Ch)
 
 	return nil
 }
 
 // EndPhase1 notifies the controller to end phase 1, and start phase 2
 func (c *Controller) EndPhase1() error {
-	defer func() {
-		c.SetState(Phase2)
-		close(c.h1Ch)
-	}()
-
 	state := c.GetState()
 	if state != Phase1 {
 		return NewInvalidStateTransitionError(state, Phase2)
 	}
+
+	c.SetState(Phase2)
+	close(c.h1Ch)
 
 	return nil
 }
 
 // End terminates the DKG state machine and records the artifacts.
 func (c *Controller) End() error {
-	defer func() {
-		c.SetState(Shutdown)
-		close(c.endCh)
-	}()
-
 	state := c.GetState()
 	if state != Phase2 {
-		return NewInvalidStateTransitionError(state, Shutdown)
+		return NewInvalidStateTransitionError(state, End)
 	}
 
 	c.log.Debug().Msg("DKG engine end")
@@ -206,11 +205,15 @@ func (c *Controller) End() error {
 	c.publicKeys = publicKeys
 	c.artifactsLock.Unlock()
 
+	c.SetState(End)
+	close(c.endCh)
+
 	return nil
 }
 
 // Shutdown stops the controller regardless of the current state.
 func (c *Controller) Shutdown() {
+	c.SetState(Shutdown)
 	close(c.shutdownCh)
 }
 
@@ -275,7 +278,6 @@ func (c *Controller) phase0() error {
 		case <-c.h0Ch:
 			return nil
 		case <-c.shutdownCh:
-			c.SetState(Shutdown)
 			return nil
 		}
 	}
@@ -301,7 +303,6 @@ func (c *Controller) phase1() error {
 		case <-c.h1Ch:
 			return nil
 		case <-c.shutdownCh:
-			c.SetState(Shutdown)
 			return nil
 		}
 	}
@@ -327,7 +328,6 @@ func (c *Controller) phase2() error {
 		case <-c.endCh:
 			return nil
 		case <-c.shutdownCh:
-			c.SetState(Shutdown)
 			return nil
 		}
 	}

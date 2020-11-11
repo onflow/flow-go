@@ -12,6 +12,7 @@ const (
 	Phase0
 	Phase1
 	Phase2
+	End
 	Shutdown
 )
 
@@ -24,6 +25,8 @@ func (s State) String() string {
 		return "Phase1"
 	case Phase2:
 		return "Phase2"
+	case End:
+		return "End"
 	case Shutdown:
 		return "Shutdown"
 	default:
