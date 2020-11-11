@@ -59,6 +59,8 @@ func finalList(cmd *cobra.Command, args []string) {
 
 	// reconcile nodes from staking contract nodes
 	reconcileNodes(allNodes, stakingNodes)
+
+	// TODO: output a new nodes-config.json ... what is this config?
 }
 
 func readStakingContractDetails() []model.NodeInfo {
@@ -91,8 +93,39 @@ func readStakingContractDetails() []model.NodeInfo {
 
 func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 	// check node count
+	if len(nodes) != len(stakingNodes) {
+		log.Error().Int("nodes", len(nodes)).Int("staked nodes", len(stakingNodes)).
+			Msg("staked node count does not match internal and parnter node count")
+	}
+
+	var nodesByAddress map[string]model.NodeInfo
+	for _, node := range nodes {
+		nodesByAddress[node.Address] = node
+	}
+
 	// check node id mismatch
-	// check node type mismathc
+	for _, stakedNode := range stakingNodes {
+		matchingNode := nodesByAddress[stakedNode.Address]
+
+		if matchingNode.NodeID != stakedNode.NodeID {
+			log.Error().String("staked node", stakedNode.NodeID.String()).
+				String("node", matchingNode.NodeID.String()).
+				Msg("node id does not match staked contract nodeID")
+		}
+	}
+
+	// check node type mismatch
+	for _, stakedNode := range stakingNodes {
+		matchingNode := nodesByAddress[stakedNode.Address]
+
+		if matchingNode.NodeID != stakedNode.NodeID {
+			log.Error().String("staked node", stakedNode.NodeID.String()).
+				String("staked node type", stakedNode.Role.String()).
+				String("node", matchingNode.NodeID.String()).
+				String("node type", matchingNode.Role.String()).
+				Msg("node type does not match")
+		}
+	}
 }
 
 func assembleInternalNodesWithoutStake() []model.NodeInfo {
