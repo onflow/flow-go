@@ -239,20 +239,22 @@ func (part DKGParticipant) EncodeRLP(w io.Writer) error {
 // service events emitted as of the reference block. Events not yet emitted are
 // represented by ZeroID.
 type EpochStatus struct {
-	CurrentEpoch EventIDs // Epoch Preparation Events for the current Epoch
-	NextEpoch    EventIDs // Epoch Preparation Events for the next Epoch
+	FirstBlockID Identifier // ID of the first block in current epoch
+	CurrentEpoch EventIDs   // EpochSetup and EpochCommit events for the current epoch
+	NextEpoch    EventIDs   // EpochSetup and EpochCommit events for the next epoch
 }
 
+// EventIDs is a container for IDs of epoch service events.
 type EventIDs struct {
 	// SetupID is the ID of the EpochSetup event for the respective Epoch
 	SetupID Identifier
-
 	// CommitID is the ID of the EpochCommit event for the respective Epoch
 	CommitID Identifier
 }
 
-func NewEpochStatus(currentSetup, currentCommit, nextSetup, nextCommit Identifier) *EpochStatus {
+func NewEpochStatus(firstBlockID, currentSetup, currentCommit, nextSetup, nextCommit Identifier) *EpochStatus {
 	return &EpochStatus{
+		FirstBlockID: firstBlockID,
 		CurrentEpoch: EventIDs{
 			SetupID:  currentSetup,
 			CommitID: currentCommit,
@@ -268,6 +270,10 @@ func NewEpochStatus(currentSetup, currentCommit, nextSetup, nextCommit Identifie
 func (es *EpochStatus) Valid() bool {
 
 	if es == nil {
+		return false
+	}
+	// must reference first block of current epoch
+	if es.FirstBlockID == ZeroID {
 		return false
 	}
 	// must reference event IDs for current epoch
