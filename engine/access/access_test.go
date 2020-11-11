@@ -486,7 +486,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
+		headers, _, _, _, _, blocks, _, _, _ := util.StorageLayer(suite.T(), db)
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
 		results := storage.NewExecutionResults(suite.metrics, db)

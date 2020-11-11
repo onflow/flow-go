@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -15,8 +16,9 @@ import (
 
 func TestReceiptStoreAndRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		results := bstorage.NewExecutionResults(db)
-		store := bstorage.NewExecutionReceipts(db, results)
+		metrics := metrics.NewNoopCollector()
+		results := bstorage.NewExecutionResults(metrics, db)
+		store := bstorage.NewExecutionReceipts(metrics, db, results)
 
 		receipt := unittest.ExecutionReceiptFixture()
 		blockID := unittest.IdentifierFixture()
@@ -35,8 +37,9 @@ func TestReceiptStoreAndRetrieve(t *testing.T) {
 
 func TestReceiptStoreTwice(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		results := bstorage.NewExecutionResults(db)
-		store := bstorage.NewExecutionReceipts(db, results)
+		metrics := metrics.NewNoopCollector()
+		results := bstorage.NewExecutionResults(metrics, db)
+		store := bstorage.NewExecutionReceipts(metrics, db, results)
 
 		receipt := unittest.ExecutionReceiptFixture()
 		blockID := unittest.IdentifierFixture()
@@ -56,8 +59,9 @@ func TestReceiptStoreTwice(t *testing.T) {
 
 func TestReceiptStoreTwoDifferentReceiptsShouldFail(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		results := bstorage.NewExecutionResults(db)
-		store := bstorage.NewExecutionReceipts(db, results)
+		metrics := metrics.NewNoopCollector()
+		results := bstorage.NewExecutionResults(metrics, db)
+		store := bstorage.NewExecutionReceipts(metrics, db, results)
 
 		receipt1 := unittest.ExecutionReceiptFixture()
 		receipt2 := unittest.ExecutionReceiptFixture()
@@ -82,8 +86,9 @@ func TestReceiptStoreTwoDifferentReceiptsShouldFail(t *testing.T) {
 
 func TestReceiptStoreTwoDifferentReceiptsShouldOKIfResultAreSame(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		results := bstorage.NewExecutionResults(db)
-		store := bstorage.NewExecutionReceipts(db, results)
+		metrics := metrics.NewNoopCollector()
+		results := bstorage.NewExecutionResults(metrics, db)
+		store := bstorage.NewExecutionReceipts(metrics, db, results)
 
 		receipt1 := unittest.ExecutionReceiptFixture()
 		receipt2 := unittest.ExecutionReceiptFixture()
@@ -106,8 +111,9 @@ func TestReceiptStoreTwoDifferentReceiptsShouldOKIfResultAreSame(t *testing.T) {
 
 func TestReceiptLookupWithBlockIDAllExecutionID(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		results := bstorage.NewExecutionResults(db)
-		store := bstorage.NewExecutionReceipts(db, results)
+		metrics := metrics.NewNoopCollector()
+		results := bstorage.NewExecutionResults(metrics, db)
+		store := bstorage.NewExecutionReceipts(metrics, db, results)
 
 		// common block ID for the two ER
 		blockID := unittest.IdentifierFixture()

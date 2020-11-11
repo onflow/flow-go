@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -14,7 +15,8 @@ import (
 
 func TestResultStoreAndRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewExecutionResults(db)
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewExecutionResults(metrics, db)
 
 		result := unittest.ExecutionResultFixture()
 		blockID := unittest.IdentifierFixture()
@@ -33,7 +35,8 @@ func TestResultStoreAndRetrieve(t *testing.T) {
 
 func TestResultStoreTwice(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewExecutionResults(db)
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewExecutionResults(metrics, db)
 
 		result := unittest.ExecutionResultFixture()
 		blockID := unittest.IdentifierFixture()
@@ -53,7 +56,8 @@ func TestResultStoreTwice(t *testing.T) {
 
 func TestResultStoreTwoDifferentResultsShouldFail(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewExecutionResults(db)
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewExecutionResults(metrics, db)
 
 		result1 := unittest.ExecutionResultFixture()
 		result2 := unittest.ExecutionResultFixture()

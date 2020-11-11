@@ -451,6 +451,12 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	}
 }
 
+func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
+	result := ExecutionResultFixture(WithBlock(block))
+	receipt := ExecutionReceiptFixture(WithResult(result))
+	return receipt
+}
+
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
