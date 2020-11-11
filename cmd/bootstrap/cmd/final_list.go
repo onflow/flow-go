@@ -108,8 +108,8 @@ func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 		matchingNode := nodesByAddress[stakedNode.Address]
 
 		if matchingNode.NodeID != stakedNode.NodeID {
-			log.Error().String("staked node", stakedNode.NodeID.String()).
-				String("node", matchingNode.NodeID.String()).
+			log.Error().Str("staked node", stakedNode.NodeID.String()).
+				Str("node", matchingNode.NodeID.String()).
 				Msg("node id does not match staked contract nodeID")
 		}
 	}
@@ -119,10 +119,10 @@ func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 		matchingNode := nodesByAddress[stakedNode.Address]
 
 		if matchingNode.NodeID != stakedNode.NodeID {
-			log.Error().String("staked node", stakedNode.NodeID.String()).
-				String("staked node type", stakedNode.Role.String()).
-				String("node", matchingNode.NodeID.String()).
-				String("node type", matchingNode.Role.String()).
+			log.Error().Str("staked node", stakedNode.NodeID.String()).
+				Str("staked node type", stakedNode.Role.String()).
+				Str("node", matchingNode.NodeID.String()).
+				Str("node type", matchingNode.Role.String()).
 				Msg("node type does not match")
 		}
 	}
