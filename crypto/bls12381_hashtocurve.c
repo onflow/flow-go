@@ -5,149 +5,7 @@
 
 extern prec_st* bls_prec;
 
-#if (hashToPoint == SWU)
-
-static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
-	fp_t t0, t1, t2, t3;
-
-	fp_null(t0);
-	fp_null(t1);
-	fp_null(t2);
-	fp_null(t3);
-
-	TRY {
-		fp_new(t0);
-		fp_new(t1);
-		fp_new(t2);
-		fp_new(t3);
-
-		/* t0 = t^2. */
-		fp_sqr(t0, t);
-		/* Compute f(u) such that u^3 + b is a square. */ 
-		fp_set_dig(p->x, -u);
-		fp_neg(p->x, p->x);
-		ep_rhs(t1, p); // t1 = u0^3 + b  --> should be precomputed
-		/* Compute t1 = (-f(u) + t^2), t2 = t1 * t^2 and invert if non-zero. */
-		fp_add(t1, t1, t0);
-		fp_mul(t2, t1, t0);
-		if (!fp_is_zero(t2)) {
-			/* Compute inverse of u^3 * t2 and fix later. */
-			fp_mul(t2, t2, p->x);
-			fp_mul(t2, t2, p->x);
-			fp_mul(t2, t2, p->x);
-			fp_inv(t2, t2);
-		}
-		/* Compute t0 = t^4 * u * sqrt(-3)/t2. */
-		fp_sqr(t0, t0);
-		fp_mul(t0, t0, t2);
-		fp_mul(t0, t0, p->x);
-		fp_mul(t0, t0, p->x);
-		fp_mul(t0, t0, p->x);
-		/* Compute constant u * sqrt(-3). */
-		fp_copy(t3, core_get()->srm3); // --> should be precomputed
-		for (int i = 1; i < -u; i++) {
-			fp_add(t3, t3, core_get()->srm3);
-		}
-		fp_mul(t0, t0, t3);
-		/* Compute (u * sqrt(-3) + u)/2 - t0. */
-		fp_add_dig(p->x, t3, -u);
-		fp_hlv(p->y, p->x);
-		fp_sub(p->x, p->y, t0);
-		ep_rhs(p->y, p);
-		if (!fp_srt(p->y, p->y)) {
-			/* Now try t0 - (u * sqrt(-3) - u)/2. */
-			fp_sub_dig(p->x, t3, -u);
-			fp_hlv(p->y, p->x);
-			fp_sub(p->x, t0, p->y);
-			ep_rhs(p->y, p);
-			if (!fp_srt(p->y, p->y)) {
-				/* Finally, try (u - t1^2 / t2). */
-				fp_sqr(p->x, t1);
-				fp_mul(p->x, p->x, t1);
-				fp_mul(p->x, p->x, t2);
-				fp_sub_dig(p->x, p->x, -u);
-				ep_rhs(p->y, p);
-				fp_srt(p->y, p->y);
-			}
-		}
-		if (negate) {
-			fp_neg(p->y, p->y);
-		}
-		fp_set_dig(p->z, 1);
-		p->norm = 1;
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fp_free(t0);
-		fp_free(t1);
-		fp_free(t2);
-		fp_free(t3);
-	}
-}
-
-// Maps a 384 bits number to G1
-// Optimized Shallue–van de Woestijne encoding from Section 3 of
-// https://eprint.iacr.org/2019/403.pdf.
-// taken and modified from Relic library
-static void map_to_G1_swu(ep_t p, const uint8_t *digest, const int len) {
-	bn_t k, pm1o2;
-	fp_t t;
-	ep_t q;
-	uint8_t sec_digest[RLC_MD_LEN_SH384];
-	int neg;
-
-	bn_null(k);
-	bn_null(pm1o2);
-	fp_null(t);
-	ep_null(q);
-
-	TRY {
-		bn_new(k);
-		bn_new(pm1o2);
-		fp_new(t);
-		ep_new(q);
-
-		pm1o2->sign = RLC_POS;
-		pm1o2->used = RLC_FP_DIGS;
-		dv_copy(pm1o2->dp, fp_prime_get(), RLC_FP_DIGS);
-		bn_hlv(pm1o2, pm1o2);
-		bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, len));
-		fp_prime_conv(t, k);
-		fp_prime_back(k, t);
-		neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
-
-        ep_swu_b12(p, t, -3, neg);
-        md_map_sh384(sec_digest, digest, len);
-        bn_read_bin(k, sec_digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN_SH384));
-        fp_prime_conv(t, k);
-        neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
-        ep_swu_b12(q, t, -3, neg);
-        ep_add(p, p, q);
-        ep_norm(p, p);
-        /* multiply by the prime parameter z to get the correct group. */
-        fp_prime_get_par(k);
-        bn_neg(k, k);
-        bn_add_dig(k, k, 1);
-        if (bn_bits(k) < RLC_DIG) {
-            ep_mul_dig(p, p, k->dp[0]);
-        } else {
-            ep_mul(p, p, k);
-        }
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		bn_free(k);
-		bn_free(pm1o2);
-		fp_free(t);
-		ep_free(q);
-	}
-}
-
-#elif (hashToPoint == HASHCHECK)
+#if (hashToPoint == HASHCHECK)
 // Simple hashing to G1 as described in the original BLS paper 
 // https://www.iacr.org/archive/asiacrypt2001/22480516.pdf
 // taken and modified from Relic library
@@ -161,7 +19,7 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 	fp_null(t);
 	ep_null(q);
 
-	TRY {
+	RLC_TRY {
 		bn_new(k);
 		bn_new(pm1o2);
 		fp_new(t);
@@ -183,7 +41,7 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
         while (1) {
             ep_rhs(t, p);
             if (fp_srt(p->y, t)) {
-                p->norm = 1;
+                p->coord = BASIC;
                 break;
             }
             fp_add_dig(p->x, p->x, 1);
@@ -197,10 +55,10 @@ static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
             ep_mul_basic(p, p, k);
         }
 	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+	RLC_CATCH_ANY {
+		RLC_THROW(ERR_CAUGHT);
 	}
-	FINALLY {
+	RLC_FINALLY {
 		bn_free(k);
 		bn_free(pm1o2);
 		fp_free(t);
@@ -215,7 +73,8 @@ const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xD91DD2E13CE144AF, 0x92C6E9ED90D2EB35, 0x0680447A8E5FF9A6,
 };
 
-const uint64_t p_1div2_data[Fp_DIGITS] = {
+// (p-1)/2 converted to Montgomery form
+const uint64_t fp_p_1div2_data[Fp_DIGITS] = {
     0xa1fafffffffe5557, 0x995bfff976a3fffe, 0x03f41d24d174ceb4,
     0xf6547998c1995dbd, 0x778a468f507a6034, 0x020559931f7f8103,
 };
@@ -420,7 +279,7 @@ static inline void map_to_E1_swu(ep_t p, const fp_t t) {
         fp_mul(fp_tmp[5], fp_tmp[5], t);           // t^3 * sqrtCand
         fp_mul(fp_tmp[2], fp_tmp[2], fp_tmp[0]);  // b * t^2 * (t^4 - t^2 + 1)
         fp_neg_basic(fp_tmp[2], fp_tmp[2]);        // N = - b * t^2 * (t^4 - t^2 + 1)
-    } else if (dv_cmp(bls_prec->p_1div2, t, Fp_DIGITS) ==  RLC_LT) {
+    } else if (dv_cmp(bls_prec->fp_p_1div2, t, Fp_DIGITS) ==  RLC_LT) {
         // g(X0(t)) was square and t is negative, so negate y
         fp_neg_basic(fp_tmp[5], fp_tmp[5]);  // negate y because t is negative
     }
@@ -430,7 +289,7 @@ static inline void map_to_E1_swu(ep_t p, const fp_t t) {
     fp_mul(p->x, fp_tmp[2], fp_tmp[1]);  // X = N*D
     fp_mul(p->y, fp_tmp[5], fp_tmp[3]);  // Y = y*D^3
     fp_copy(p->z, fp_tmp[1]);
-    p->norm = 0;
+    p->coord = JACOB;
     
     for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
     free(fp_tmp);
@@ -533,7 +392,7 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     fp_sqr(fp_tmp[12], r->z);                // Zo^2
     fp_mul(r->y, fp_tmp[16], fp_tmp[14]);  // Ny Dx
     fp_mul(r->y, r->y, fp_tmp[12]);   // Yo = Ny Dx Zo^2
-    r->norm = 0;
+    r->coord = JACOB;
     
     for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
     free(fp_tmp);
@@ -556,9 +415,9 @@ static void clear_cofactor(ep_t out, const ep_t in) {
 // the result is stored in p
 // msg is the input message to hash, must be at least 2*(FP_BYTES+16) = 128 bytes
 static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
-    TRY {
+    RLC_TRY {
         if (len < 2*(Fp_BYTES+16)) {
-            THROW(ERR_NO_BUFFER);
+            RLC_THROW(ERR_NO_BUFFER);
         }
 
         fp_t t1, t2;
@@ -572,22 +431,28 @@ static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
 
         ep_t p_temp;
         ep_new(p_temp);
+        // first mapping
         map_to_E1_swu(p_temp, t1); // map to E1
+        eval_iso11(p_temp, p_temp); // map to E
+        // second mapping
         map_to_E1_swu(p, t2); // map to E1
-        ep_add_projc(p, p, p_temp);
-        eval_iso11(p_temp, p); // map to E
+        eval_iso11(p, p); // map to E
+        // sum and clear the cofactor
+        // TODO: implement point addition in E1 and apply the isogeny map
+        // only once.
+        ep_add_jacob(p, p, p_temp);
         clear_cofactor(p, p_temp); // map to G1
         ep_free(p_temp);
     }
-    CATCH_ANY {
-		THROW(ERR_CAUGHT);
+    RLC_CATCH_ANY {
+		RLC_THROW(ERR_CAUGHT);
 	}
 }
 
 // This is a testing funstion for the Optimized SwU core
 void opswu_test(uint8_t *out, const uint8_t *msg, int len){
     if (len != Fp_BYTES) {
-            THROW(ERR_NO_BUFFER);
+            RLC_THROW(ERR_NO_BUFFER);
     }
     fp_t t;
     bn_t tmp;
