@@ -35,3 +35,29 @@ func TestRoleList_Contains(t *testing.T) {
 	assert.False(t, roleList.Contains(flow.RoleCollection))
 
 }
+
+// TestRoleList_DUnion evaluates correctness of Union method of RoleList.
+func TestRoleList_Union(t *testing.T) {
+	this := flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+	other := flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+
+	union := this.Union(other)
+
+	// asserts length of role lists
+	assert.Len(t, union, 3)
+	assert.Len(t, this, 2)
+	assert.Len(t, other, 2)
+
+	// asserts content of role lists
+	// this
+	assert.Contains(t, this, flow.RoleConsensus)
+	assert.Contains(t, this, flow.RoleVerification)
+	// other
+	assert.Contains(t, other, flow.RoleConsensus)
+	assert.Contains(t, other, flow.RoleExecution)
+	// union
+	assert.Contains(t, union, flow.RoleConsensus)
+	assert.Contains(t, union, flow.RoleVerification)
+	assert.Contains(t, union, flow.RoleExecution)
+
+}
