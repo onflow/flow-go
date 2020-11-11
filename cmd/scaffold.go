@@ -72,6 +72,8 @@ type Storage struct {
 	Index        storage.Index
 	Identities   storage.Identities
 	Guarantees   storage.Guarantees
+	Receipts     storage.ExecutionReceipts
+	Results      storage.ExecutionResults
 	Seals        storage.Seals
 	Payloads     storage.Payloads
 	Blocks       storage.Blocks
@@ -363,8 +365,8 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
-	results := bstorage.NewExecutionResults(fnb.DB)
-	receipts := bstorage.NewExecutionReceipts(fnb.DB, results)
+	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
+	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
@@ -377,6 +379,8 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	fnb.Storage = Storage{
 		Headers:      headers,
 		Guarantees:   guarantees,
+		Receipts:     receipts,
+		Results:      results,
 		Seals:        seals,
 		Index:        index,
 		Payloads:     payloads,

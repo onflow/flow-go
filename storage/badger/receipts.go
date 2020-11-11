@@ -7,6 +7,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -15,42 +17,64 @@ import (
 type ExecutionReceipts struct {
 	db      *badger.DB
 	results *ExecutionResults
+	cache   *Cache
 }
 
-func NewExecutionReceipts(db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
+func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
+	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		return func(tx *badger.Txn) error {
+			receipt := val.(*flow.ExecutionReceipt)
+			// store the receipt-specific metadata
+			err := operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receipt.ID(), receipt.Meta()))(tx)
+			if err != nil {
+				return fmt.Errorf("could not store receipt metadata: %w", err)
+			}
+			err = results.store(&receipt.ExecutionResult)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store result: %w", err)
+			}
+			return nil
+		}
+	}
+
+	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		receiptID := key.(flow.Identifier)
+		return func(tx *badger.Txn) (interface{}, error) {
+			var meta flow.ExecutionReceiptMeta
+			err := operation.RetrieveExecutionReceiptMeta(receiptID, &meta)(tx)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve receipt meta: %w", err)
+			}
+			result, err := results.byID(meta.ResultID)(tx)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve result: %w", err)
+			}
+			return flow.ExecutionReceiptFromMeta(meta, *result), nil
+		}
+	}
+
 	return &ExecutionReceipts{
 		db:      db,
 		results: results,
+		cache: newCache(collector,
+			withLimit(flow.DefaultTransactionExpiry+100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceIndex)),
 	}
 }
 
 func (r *ExecutionReceipts) store(receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		// store the receipt-specific metadata
-		err := operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receipt.ID(), receipt.Meta()))(tx)
-		if err != nil {
-			return fmt.Errorf("could not store receipt metadata: %w", err)
-		}
-		err = r.results.store(&receipt.ExecutionResult)(tx)
-		if err != nil {
-			return fmt.Errorf("could not store result: %w", err)
-		}
-		return nil
-	}
+	return r.cache.Put(receipt.ID(), receipt)
 }
 
 func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*flow.ExecutionReceipt, error) {
 	return func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
-		var meta flow.ExecutionReceiptMeta
-		err := operation.RetrieveExecutionReceiptMeta(receiptID, &meta)(tx)
+		val, err := r.cache.Get(receiptID)(tx)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve receipt meta: %w", err)
+			return nil, err
 		}
-		result, err := r.results.byID(meta.ResultID)(tx)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve result: %w", err)
-		}
-		return flow.ExecutionReceiptFromMeta(meta, *result), nil
+		return val.(*flow.ExecutionReceipt), nil
 	}
 }
 
