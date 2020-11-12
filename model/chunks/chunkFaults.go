@@ -91,7 +91,7 @@ type CFInvalidVerifiableChunk struct {
 }
 
 func (cf CFInvalidVerifiableChunk) String() string {
-	return fmt.Sprint("invalid verifiable chunk due to ", cf.reason, cf.details.Error())
+	return fmt.Sprintf("invalid verifiable chunk due to %s: %s", cf.reason, cf.details.Error())
 }
 
 // ChunkIndex returns chunk index of the faulty chunk

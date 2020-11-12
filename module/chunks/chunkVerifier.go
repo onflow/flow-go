@@ -51,7 +51,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 		transactions = append(transactions, tx)
 	}
 
-	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Result, vc.Header, transactions, vc.EndState)
+	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Collection, vc.Result, vc.Header, transactions)
 }
 
 // SystemChunkVerify verifies a given VerifiableChunk corresponding to a system chunk.
@@ -69,32 +69,62 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	tx := fvm.Transaction(txBody)
 	transactions := []*fvm.TransactionProcedure{tx}
 
-	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Result, vc.Header, transactions, vc.EndState)
+	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Collection, vc.Result, vc.Header, transactions)
 }
 
 func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
 	result *flow.ExecutionResult,
 	header *flow.Header,
-	transactions []*fvm.TransactionProcedure,
-	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
-
-	// TODO check collection hash to match
-	// TODO check datapack hash to match
-	// TODO check the number of transactions and computation used
-
-	chIndex := chunk.Index
-	execResID := result.ID()
-
-	// build a block context
-	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
+	transactions []*fvm.TransactionProcedure) ([]byte, chmodels.ChunkFault, error) {
 
 	if chunkDataPack == nil {
 		return nil, nil, fmt.Errorf("missing chunk data pack")
 	}
 
+	chIndex := chunk.Index
+	execResID := result.ID()
+
+	// check that the ChunkDataPack refers to the correct Chunk
+	if chunkDataPack.ChunkID != chunk.ID() {
+		return nil,
+			chmodels.NewCFInvalidVerifiableChunk(
+				"invalid Chunk ID",
+				fmt.Errorf("ChunkDataPack.ChunkID (%s) does not match the provided Chunk (%s)", chunkDataPack.ChunkID, chunk.ID()),
+				chIndex,
+				execResID),
+			nil
+	}
+
+	// check that the ChunkDataPack refers to the correct Collection
+	if collection.ID() != chunkDataPack.CollectionID {
+		// NOTE: the execution nodes set the CollectionID of the system chunk's
+		// DataPack to Zero (cf. engin/execution/ingestion/ingestion.go saveExecutionResult).
+		// But Zero is not the natural ID for an empty collection, as computed by
+		// the ID function (cf. model/flow/collection.go). So we have to account for
+		// this special case.
+		if !(chunkDataPack.CollectionID == flow.ZeroID && collection.Len() == 0) {
+			return nil,
+				chmodels.NewCFInvalidVerifiableChunk(
+					"invalid Collection ID",
+					fmt.Errorf("ChunkDataPack.CollectionID (%s) does not match the provided Collection (%s)", chunkDataPack.CollectionID, collection.ID()),
+					chIndex,
+					execResID),
+				nil
+		}
+	}
+
+	// TODO:
+	// * Check number of transactions
+	// * Check gas used
+	// This is dependant on updating the execution nodes to set these values
+
+	// build a block context
+	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
+
 	// constructing a partial trie given chunk data package
-	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunkDataPack.StartState, partial.DefaultPathFinderVersion)
+	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunk.StartState, partial.DefaultPathFinderVersion)
 
 	if err != nil {
 		// TODO provide more details based on the error type
@@ -112,7 +142,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 		registerKey := executionState.RegisterIDToKey(registerID)
 
-		query, err := ledger.NewQuery(chunkDataPack.StartState, []ledger.Key{registerKey})
+		query, err := ledger.NewQuery(chunk.StartState, []ledger.Key{registerKey})
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create query: %w", err)
@@ -138,8 +168,6 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
-
-		// tx := fvm.Transaction(txBody)
 
 		err := fcv.vm.Run(blockCtx, tx, txView)
 		if err != nil {
@@ -169,7 +197,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	regs, values := chunkView.Delta().RegisterUpdates()
 
 	update, err := ledger.NewUpdate(
-		chunkDataPack.StartState,
+		chunk.StartState,
 		executionState.RegisterIDSToKeys(regs),
 		executionState.RegisterValuesToValues(values),
 	)
@@ -194,8 +222,8 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// TODO check if exec node provided register touches that was not used (no read and no update)
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
-	if !bytes.Equal(expEndStateComm, endState) {
-		return nil, chmodels.NewCFNonMatchingFinalState(expEndStateComm, endState, chIndex, execResID), nil
+	if !bytes.Equal(expEndStateComm, chunk.EndState) {
+		return nil, chmodels.NewCFNonMatchingFinalState(expEndStateComm, chunk.EndState, chIndex, execResID), nil
 	}
 	return chunkView.SpockSecret(), nil, nil
 }

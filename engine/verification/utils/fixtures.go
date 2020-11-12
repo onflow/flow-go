@@ -238,13 +238,8 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 }
 
 func SystemChunkCollectionFixture(serviceAddress flow.Address) (*flow.Collection, *flow.CollectionGuarantee) {
-	tx := fvm.SystemChunkTransaction(serviceAddress)
-	collection := &flow.Collection{
-		Transactions: []*flow.TransactionBody{tx},
-	}
-
+	collection := &flow.Collection{}
 	guarantee := collection.Guarantee()
-
 	return collection, &guarantee
 }
 
@@ -306,8 +301,7 @@ func executeCollection(
 			BlockID:         executableBlock.ID(),
 			// TODO: record gas used
 			TotalComputationUsed: 0,
-			// TODO: record number of txs
-			NumberOfTransactions: 0,
+			NumberOfTransactions: uint64(collection.Len()),
 		},
 		Index:    uint64(chunkIndex),
 		EndState: endStateCommitment,

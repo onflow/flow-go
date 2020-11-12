@@ -58,6 +58,38 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	assert.NotNil(s.T(), spockSecret)
 }
 
+// TestDifferentChunkIDs tests that a CFInvalidVerifiableChunk error is returned
+// when the DataPack's chunk ID does not match the chunk's.
+func (s *ChunkVerifierTestSuite) TestDifferentChunkIDs() {
+	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
+	assert.NotNil(s.T(), vch)
+	// modify the data pack's chunk ID
+	vch.ChunkDataPack.ChunkID = unittest.IdentifierFixture()
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
+	_, ok := chFaults.(*chunksmodels.CFInvalidVerifiableChunk)
+	assert.True(s.T(), ok)
+}
+
+// TestInvalidCollectionID checks that a CFInvalidVerifiableChunk error is
+// returned if the DataPack's CollectionID is incosistant with the set of
+// transactions.
+func (s *ChunkVerifierTestSuite) TestInvalidCollectionID() {
+	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
+	assert.NotNil(s.T(), vch)
+	// modify the verifiable chunk's end state
+	vch.ChunkDataPack.CollectionID = unittest.IdentifierFixture()
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
+	_, ok := chFaults.(*chunksmodels.CFInvalidVerifiableChunk)
+	assert.True(s.T(), ok)
+	fmt.Println(chFaults)
+}
+
 // TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	s.T().Skip("Check new partial ledger for missing keys")
@@ -141,9 +173,17 @@ func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
 func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
 	assert.NotNil(s.T(), vch)
+
 	col := unittest.CollectionFixture(0)
+
+	vch.Chunk.NumberOfTransactions = uint64(col.Len())
+	vch.Chunk.EndState = vch.Chunk.StartState
+
+	vch.ChunkDataPack.ChunkID = vch.Chunk.ID()
+	vch.ChunkDataPack.CollectionID = col.ID()
+
 	vch.Collection = &col
-	vch.EndState = vch.ChunkDataPack.StartState
+
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
@@ -178,8 +218,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	id1 := flow.NewRegisterID("00", "", "")
 	value1 := []byte{'a'}
 
-	id2Bytes := make([]byte, 32)
-	id2Bytes[0] = byte(5)
 	id2 := flow.NewRegisterID("05", "", "")
 	value2 := []byte{'b'}
 	UpdatedValue2 := []byte{'B'}
@@ -231,17 +269,20 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		// Chunk setup
 		chunk := flow.Chunk{
 			ChunkBody: flow.ChunkBody{
-				CollectionIndex: 0,
-				StartState:      startState,
-				BlockID:         blockID,
+				CollectionIndex:      0,
+				StartState:           startState,
+				BlockID:              blockID,
+				NumberOfTransactions: uint64(coll.Len()),
 			},
-			Index: 0,
+			Index:    0,
+			EndState: endState,
 		}
 
 		chunkDataPack := flow.ChunkDataPack{
-			ChunkID:    chunk.ID(),
-			StartState: startState,
-			Proof:      proof,
+			ChunkID:      chunk.ID(),
+			StartState:   startState,
+			Proof:        proof,
+			CollectionID: coll.ID(),
 		}
 
 		// ExecutionResult setup
