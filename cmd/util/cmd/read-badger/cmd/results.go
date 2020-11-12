@@ -13,13 +13,13 @@ var flagResultID string
 func init() {
 	rootCmd.AddCommand(resultsCmd)
 
-	resultsCmd.Flags().StringVar(&flagBlockID, "block-id", "", "the block ID of which to query the result")
-	resultsCmd.Flags().StringVar(&flagResultID, "result-id", "", "the ID of the result")
+	resultsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block identifier of which to query the result")
+	resultsCmd.Flags().StringVarP(&flagResultID, "id", "i", "", "the identifier of the result")
 }
 
 var resultsCmd = &cobra.Command{
 	Use:   "results",
-	Short: "get result by --block-id or --result-id",
+	Short: "get result by block or result ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
@@ -30,7 +30,6 @@ var resultsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting result by block id: %v", blockID)
-
 			result, err := storages.Results.ByBlockID(blockID)
 			if err != nil {
 				log.Fatal().Err(err).Msgf("could not get result")
@@ -46,8 +45,7 @@ var resultsCmd = &cobra.Command{
 				log.Fatal().Err(err).Msg("malformed result ID")
 			}
 
-			log.Info().Msgf("getting results by result id: %v", resultID)
-
+			log.Info().Msgf("getting result by id: %v", resultID)
 			result, err := storages.Results.ByID(resultID)
 			if err != nil {
 				log.Fatal().Err(err).Msgf("could not get result")

@@ -13,24 +13,23 @@ var flagReceiptID string
 func init() {
 	rootCmd.AddCommand(receiptsCmd)
 
-	receiptsCmd.Flags().StringVar(&flagBlockID, "block-id", "", "the block ID of which to query the receipt")
-	receiptsCmd.Flags().StringVar(&flagReceiptID, "receipt-id", "", "the ID of the receipt")
+	receiptsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block identifier of which to query the receipt")
+	receiptsCmd.Flags().StringVarP(&flagReceiptID, "id", "i", "", "the identifier of the receipt")
 }
 
 var receiptsCmd = &cobra.Command{
 	Use:   "receipts",
-	Short: "get receipt by --block-id or --receipt-id",
+	Short: "get receipt by block or receipt ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
 		if flagBlockID != "" {
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed block ID")
+				log.Fatal().Err(err).Msg("malformed block identifier")
 			}
 
 			log.Info().Msgf("getting receipt by block id: %v", blockID)
-
 			receipt, err := storages.Receipts.ByBlockID(blockID)
 			if err != nil {
 				log.Fatal().Err(err).Msgf("could not get receipt")
@@ -43,11 +42,10 @@ var receiptsCmd = &cobra.Command{
 		if flagReceiptID != "" {
 			receiptID, err := flow.HexStringToIdentifier(flagReceiptID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed receipt ID")
+				log.Fatal().Err(err).Msg("malformed receipt identifier")
 			}
 
-			log.Info().Msgf("getting receipts by receipt id: %v", receiptID)
-
+			log.Info().Msgf("getting receipt by id: %v", receiptID)
 			receipt, err := storages.Receipts.ByID(receiptID)
 			if err != nil {
 				log.Fatal().Err(err).Msgf("could not get receipt")
