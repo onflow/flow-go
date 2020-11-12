@@ -49,6 +49,8 @@ func (g *GoogleBucket) GetFiles(ctx context.Context, client *storage.Client, pre
 		if err != nil {
 			return nil, err
 		}
+
+		files = append(files, attrs.Name)
 	}
 
 	return files, nil
