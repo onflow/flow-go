@@ -14,8 +14,8 @@ import (
 type EpochBuilder struct {
 	t          *testing.T
 	state      protocol.State
-	setupOpts  []func(*flow.EpochSetup)
-	commitOpts []func(*flow.EpochCommit)
+	setupOpts  []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
+	commitOpts []func(*flow.EpochCommit) // options to apply to the EpochCommit event
 }
 
 func NewEpochBuilder(t *testing.T, state protocol.State) *EpochBuilder {
@@ -27,18 +27,18 @@ func NewEpochBuilder(t *testing.T, state protocol.State) *EpochBuilder {
 	return builder
 }
 
-// WithSetupOpts adds options for the epoch setup event. For options
+// UsingSetupOpts sets options for the epoch setup event. For options
 // targeting the same field, those added here will take precedence
 // over defaults.
-func (builder *EpochBuilder) WithSetupOpts(opts ...func(*flow.EpochSetup)) *EpochBuilder {
+func (builder *EpochBuilder) UsingSetupOpts(opts ...func(*flow.EpochSetup)) *EpochBuilder {
 	builder.setupOpts = opts
 	return builder
 }
 
-// WithCommitOpts adds options for the epoch setup event. For options
+// UsingCommitOpts sets options for the epoch setup event. For options
 // targeting the same field, those added here will take precedence
 // over defaults.
-func (builder *EpochBuilder) WithCommitOpts(opts ...func(*flow.EpochCommit)) *EpochBuilder {
+func (builder *EpochBuilder) UsingCommitOpts(opts ...func(*flow.EpochCommit)) *EpochBuilder {
 	builder.commitOpts = opts
 	return builder
 }
@@ -55,7 +55,7 @@ func (builder *EpochBuilder) WithCommitOpts(opts ...func(*flow.EpochCommit)) *Ep
 // the EpochSetup service event. Block D contains a seal for block C containing
 // the EpochCommit service event.
 //
-// To build a sequence of epochs, we call BuildEpoch, then Complete, and so on.
+// To build a sequence of epochs, we call BuildEpoch, then CompleteEpoch, and so on.
 //
 func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
@@ -147,10 +147,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	return builder
 }
 
-// Complete caps off the current epoch by building the first block of the next
-// epoch. We must be in the Committed phase to call Complete. Once the epoch
+// CompleteEpoch caps off the current epoch by building the first block of the next
+// epoch. We must be in the Committed phase to call CompleteEpoch. Once the epoch
 // has been capped off, we can build the next epoch with BuildEpoch.
-func (builder *EpochBuilder) Complete() {
+func (builder *EpochBuilder) CompleteEpoch() {
 
 	phase, err := builder.state.Final().Phase()
 	require.Nil(builder.t, err)

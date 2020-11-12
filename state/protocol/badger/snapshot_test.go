@@ -212,18 +212,18 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		// C - height 2 - setup phase
 		// D - height 3 - committed phase
 		epochBuilder.
-			WithSetupOpts(unittest.WithParticipants(epoch2Identities)).
+			UsingSetupOpts(unittest.WithParticipants(epoch2Identities)).
 			BuildEpoch().
-			Complete()
+			CompleteEpoch()
 		// build blocks WITHIN epoch 2 - PREPARING epoch 3
 		// A - height 4
 		// B - height 5 - staking phase
 		// C - height 6 - setup phase
 		// D - height 7 - committed phase
 		epochBuilder.
-			WithSetupOpts(unittest.WithParticipants(epoch3Identities)).
+			UsingSetupOpts(unittest.WithParticipants(epoch3Identities)).
 			BuildEpoch().
-			Complete()
+			CompleteEpoch()
 
 		t.Run("should be able to query at root block", func(t *testing.T) {
 			snapshot := state.AtHeight(0)
