@@ -52,6 +52,8 @@ typedef uint8_t byte;
 
 typedef struct prec_ {
     #if (hashToPoint == OPSWU)
+    bn_st p_3div4;
+    fp_st fp_p_1div2; 
     // coefficients of E1(Fp)
     fp_st a1;
     fp_st b1; 
@@ -65,8 +67,7 @@ typedef struct prec_ {
     bn_st beta;
     bn_st z2_1_by3;
     #endif
-    bn_st p_3div4;
-    fp_st p_1div2;
+    bn_st p_1div2;
 } prec_st;
 
 // Utility functions
@@ -113,5 +114,8 @@ void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);
 void     ep2_print_(char*, ep2_st*);
+
+// BLS based SPoCK
+int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 
 #endif
