@@ -1,8 +1,11 @@
 package cmd
 
-import "github.com/onflow/flow-go/cmd/util/cmd/common"
+import (
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/storage"
+)
 
-func InitStorages() *common.Storages {
+func InitStorages() *storage.All {
 	db := common.InitStorage(flagDatadir)
 	storages := common.InitStorages(db)
 	return storages

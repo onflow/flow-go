@@ -10,9 +10,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	protocolbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/storage"
 )
 
-func InitProtocolState(db *badger.DB, storages *Storages) (protocol.State, error) {
+func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, error) {
 	metrics := &metrics.NoopCollector{}
 	tracer := trace.NewNoopTracer()
 	distributor := events.NewDistributor()
