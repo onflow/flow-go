@@ -77,6 +77,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	var otherEpochIdentities flow.IdentityList
 	phase := status.Phase()
 	switch phase {
+	// during staking phase (the beginning of the epoch) we include identities
+	// from the previous epoch that are now un-staking
 	case flow.EpochPhaseStaking:
 
 		first, err := s.state.AtBlockID(status.FirstBlockID).Head()
@@ -106,6 +108,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 			}
 		}
 
+	// during setup and committed phases (the end of the epoch) we include
+	// identities that will join in the next epoch
 	case flow.EpochPhaseSetup, flow.EpochPhaseCommitted:
 
 		nextSetup, err := s.state.epoch.setups.ByID(status.NextEpoch.SetupID)

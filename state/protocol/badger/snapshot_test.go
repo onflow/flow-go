@@ -164,7 +164,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	epoch1Identities := unittest.IdentityListFixture(20, unittest.WithAllRoles())
 	// 1 identity added at epoch 2 that was not present in epoch 1
 	addedAtEpoch2 := unittest.IdentityFixture()
-	// 1 identity removed in epoch 2 that was present in epoch
+	// 1 identity removed in epoch 2 that was present in epoch 1
 	removedAtEpoch2 := epoch1Identities.Sample(1)[0]
 	// epoch 2 has partial overlap with epoch 1
 	epoch2Identities := append(
