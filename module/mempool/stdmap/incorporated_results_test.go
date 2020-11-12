@@ -11,7 +11,8 @@ import (
 )
 
 func TestIncorporatedResults(t *testing.T) {
-	pool := NewIncorporatedResults(1000)
+	pool, err := NewIncorporatedResults(1000)
+	require.NoError(t, err)
 
 	ir1 := unittest.IncorporatedResultFixture()
 	t.Run("Adding first incorporated result", func(t *testing.T) {
@@ -78,7 +79,8 @@ func TestIncorporatedResults(t *testing.T) {
 func TestIncorporatedResultsEjectSize(t *testing.T) {
 
 	t.Run("check ejection of block with only a single result", func(t *testing.T) {
-		pool := NewIncorporatedResults(10)
+		pool, err := NewIncorporatedResults(10)
+		require.NoError(t, err)
 
 		// insert 20 items (10 above limit)
 		for i := 0; i < 20; i++ {
@@ -91,7 +93,8 @@ func TestIncorporatedResultsEjectSize(t *testing.T) {
 
 	t.Run("check ejection of block with multiple results", func(t *testing.T) {
 		var ejector EjectFunc = NewLRUEjector().Eject
-		mempool := NewIncorporatedResults(10, WithEject(ejector))
+		mempool, err := NewIncorporatedResults(10, WithEject(ejector))
+		require.NoError(t, err)
 
 		for b := 0; b < 10; b++ {
 			result := unittest.ExecutionResultFixture()

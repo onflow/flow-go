@@ -2,6 +2,7 @@ package stdmap
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/model"
@@ -18,7 +19,7 @@ type IncorporatedResults struct {
 }
 
 // NewIncorporatedResults creates a mempool for the incorporated results.
-func NewIncorporatedResults(limit uint, opts ...OptionFunc) *IncorporatedResults {
+func NewIncorporatedResults(limit uint, opts ...OptionFunc) (*IncorporatedResults, error) {
 	mempool := &IncorporatedResults{
 		size:    0,
 		backend: NewBackend(append(opts, WithLimit(limit))...),
@@ -29,9 +30,12 @@ func NewIncorporatedResults(limit uint, opts ...OptionFunc) *IncorporatedResults
 		incorporatedResultMap := entity.(*model.IncorporatedResultMap)
 		mempool.size -= uint(len(incorporatedResultMap.IncorporatedResults))
 	}
-	mempool.backend.RegisterEjectionCallback(adjustSizeOnEjection)
+	err := mempool.backend.RegisterEjectionCallback(adjustSizeOnEjection)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ejection callback with IncorporatedResults mempool's backend")
+	}
 
-	return mempool
+	return mempool, nil
 }
 
 // Add adds an IncorporatedResult to the mempool.
