@@ -572,6 +572,7 @@ func TestReadSafety(t *testing.T) {
 	// modify returned slice
 	data[0].Value = []byte("new value")
 
+	// read again
 	data, err = forest.Read(read)
 	require.NoError(t, err)
 	require.Len(t, data, 1)
