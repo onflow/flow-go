@@ -573,10 +573,10 @@ func TestReadSafety(t *testing.T) {
 	data[0].Value = []byte("new value")
 
 	// read again
-	data, err = forest.Read(read)
+	data2, err := forest.Read(read)
 	require.NoError(t, err)
-	require.Len(t, data, 1)
-	require.Equal(t, v0, data[0])
+	require.Len(t, data2, 1)
+	require.Equal(t, v0, data2[0])
 }
 
 // TestUpdateWithWrongPathSize verifies that attempting to update a trie with a wrong path size
