@@ -17,7 +17,7 @@ var (
 var finalListCmd = &cobra.Command{
 	Use:   "finallist",
 	Short: "",
-	Long:  ``,
+	Long:  "",
 	Run:   finalList,
 }
 
