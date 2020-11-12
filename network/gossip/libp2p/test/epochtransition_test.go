@@ -133,13 +133,9 @@ func (ts *MutableIdentityTableSuite) TestNodeRemoved() {
 	removeIndex := rand.Intn(len(ts.ids))
 	removedID := ts.ids[removeIndex]
 
-	fmt.Println("tsids", len(ts.ids))
-
 	// remove the identity at that index from the ids
 	newIDs := ts.ids.Filter(filter.Not(filter.HasNodeID(removedID.NodeID)))
 	ts.ids = newIDs
-
-	fmt.Println("newids", len(newIDs))
 
 	// create a list of engines except for the removed node
 	var newEngines []*MeshEngine
