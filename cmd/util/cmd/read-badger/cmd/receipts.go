@@ -13,8 +13,8 @@ var flagReceiptID string
 func init() {
 	rootCmd.AddCommand(receiptsCmd)
 
-	receiptsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block identifier of which to query the receipt")
-	receiptsCmd.Flags().StringVarP(&flagReceiptID, "id", "i", "", "the identifier of the receipt")
+	receiptsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block id of which to query the receipt")
+	receiptsCmd.Flags().StringVarP(&flagReceiptID, "id", "i", "", "the id of the receipt")
 }
 
 var receiptsCmd = &cobra.Command{
@@ -26,13 +26,13 @@ var receiptsCmd = &cobra.Command{
 		if flagBlockID != "" {
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed block identifier")
+				log.Fatal().Err(err).Msg("malformed block id")
 			}
 
 			log.Info().Msgf("getting receipt by block id: %v", blockID)
 			receipt, err := storages.Receipts.ByBlockID(blockID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get receipt")
+				log.Fatal().Err(err).Msgf("could not get receipt for block id: %v", blockID)
 			}
 
 			common.PrettyPrintEntity(receipt)
@@ -42,13 +42,13 @@ var receiptsCmd = &cobra.Command{
 		if flagReceiptID != "" {
 			receiptID, err := flow.HexStringToIdentifier(flagReceiptID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed receipt identifier")
+				log.Fatal().Err(err).Msg("malformed receipt id")
 			}
 
 			log.Info().Msgf("getting receipt by id: %v", receiptID)
 			receipt, err := storages.Receipts.ByID(receiptID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get receipt")
+				log.Fatal().Err(err).Msgf("could not get receipt with id: %v", receiptID)
 			}
 
 			common.PrettyPrintEntity(receipt)

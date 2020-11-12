@@ -11,7 +11,7 @@ import (
 func init() {
 	rootCmd.AddCommand(transactionsCmd)
 
-	transactionsCmd.Flags().StringVarP(&flagTransactionID, "id", "i", "", "the identifier of the transaction")
+	transactionsCmd.Flags().StringVarP(&flagTransactionID, "id", "i", "", "the id of the transaction")
 	_ = transactionsCmd.MarkFlagRequired("id")
 }
 
@@ -23,13 +23,13 @@ var transactionsCmd = &cobra.Command{
 
 		transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("malformed transaction identifier")
+			log.Fatal().Err(err).Msg("malformed transaction id")
 		}
 
 		log.Info().Msgf("getting transaction by id: %v", transactionID)
 		tx, err := storages.Transactions.ByID(transactionID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not get transaction by identifer")
+			log.Fatal().Err(err).Msgf("could not get transaction with id: %v", transactionID)
 		}
 
 		common.PrettyPrintEntity(tx)

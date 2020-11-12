@@ -10,7 +10,7 @@ import (
 func init() {
 	rootCmd.AddCommand(commitsCmd)
 
-	commitsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block identifier of which to query the state commitment")
+	commitsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block id of which to query the state commitment")
 	_ = commitsCmd.MarkFlagRequired("block-id")
 }
 
@@ -22,13 +22,13 @@ var commitsCmd = &cobra.Command{
 
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("malformed block identifier")
+			log.Fatal().Err(err).Msg("malformed block id")
 		}
 
 		log.Info().Msgf("getting commit by block id: %v", blockID)
 		commit, err := storages.Commits.ByBlockID(blockID)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not get commit")
+			log.Fatal().Err(err).Msgf("could not get commit for block id: %v", blockID)
 		}
 
 		log.Info().Msgf("commit: %x", commit)

@@ -12,8 +12,8 @@ var flagSealID string
 func init() {
 	rootCmd.AddCommand(sealsCmd)
 
-	sealsCmd.Flags().StringVarP(&flagSealID, "id", "i", "", "the identifier of the seal")
-	sealsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block identifier of which to query the seal")
+	sealsCmd.Flags().StringVarP(&flagSealID, "id", "i", "", "the id of the seal")
+	sealsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block id of which to query the seal")
 }
 
 var sealsCmd = &cobra.Command{
@@ -25,13 +25,13 @@ var sealsCmd = &cobra.Command{
 		if flagSealID != "" {
 			sealID, err := flow.HexStringToIdentifier(flagSealID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed seal identifier")
+				log.Fatal().Err(err).Msg("malformed seal id")
 			}
 
 			log.Info().Msgf("getting seal by id: %v", sealID)
 			seal, err := storages.Seals.ByID(sealID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get seal with identifer: %v", sealID)
+				log.Fatal().Err(err).Msgf("could not get seal with id: %v", sealID)
 			}
 
 			common.PrettyPrintEntity(seal)
@@ -41,13 +41,13 @@ var sealsCmd = &cobra.Command{
 		if flagBlockID != "" {
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed block identifier")
+				log.Fatal().Err(err).Msg("malformed block id")
 			}
 
 			log.Info().Msgf("getting seal by block id: %v", blockID)
 			seal, err := storages.Seals.ByBlockID(blockID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get seal for block with identifer: %v", blockID)
+				log.Fatal().Err(err).Msgf("could not get seal for block id: %v", blockID)
 			}
 
 			common.PrettyPrintEntity(seal)

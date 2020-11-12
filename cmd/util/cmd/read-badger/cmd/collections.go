@@ -14,8 +14,8 @@ var flagTransactionID string
 func init() {
 	rootCmd.AddCommand(collectionsCmd)
 
-	collectionsCmd.Flags().StringVarP(&flagCollectionID, "id", "i", "", "the identifier of the collection")
-	collectionsCmd.Flags().StringVarP(&flagTransactionID, "transaction-id", "t", "", "the identifier of the transaction")
+	collectionsCmd.Flags().StringVarP(&flagCollectionID, "id", "i", "", "the id of the collection")
+	collectionsCmd.Flags().StringVarP(&flagTransactionID, "transaction-id", "t", "", "the id of the transaction")
 }
 
 var collectionsCmd = &cobra.Command{
@@ -27,13 +27,13 @@ var collectionsCmd = &cobra.Command{
 		if flagCollectionID != "" {
 			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed collection idenitifer")
+				log.Fatal().Err(err).Msg("malformed collection id")
 			}
 
 			log.Info().Msgf("getting collection by id: %v", collectionID)
 			collection, err := storages.Collections.ByID(collectionID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get collection")
+				log.Fatal().Err(err).Msgf("could not get collection with id: %v", collectionID)
 			}
 
 			common.PrettyPrintEntity(collection)
@@ -43,13 +43,13 @@ var collectionsCmd = &cobra.Command{
 		if flagTransactionID != "" {
 			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed transaction indentifer")
+				log.Fatal().Err(err).Msg("malformed transaction id")
 			}
 
 			log.Info().Msgf("getting collections by transaction id: %v", transactionID)
 			collections, err := storages.Collections.LightByTransactionID(transactionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("could not get collections")
+				log.Fatal().Err(err).Msgf("could not get collections for transaction id: %v", transactionID)
 			}
 
 			common.PrettyPrintEntity(collections)
