@@ -12,23 +12,33 @@ const (
 	// tx validation errors
 	errCodeInvalidTxByteSizeError     = 1
 	errCodeInvalidReferenceBlockError = 2
-	errCodeInvalidScriptError         = 3
+	errCodeExpiredTransactionError    = 3
+	errCodeInvalidScriptError         = 4
+	errCodeInvalidGasLimitError       = 5
+	errCodeInvalidAddressError        = 6
+	errCodeInvalidArgumentError       = 7
 
-	errCodeMissingPayer                          = 2
-	errCodeInvalidSignaturePublicKeyDoesNotExist = 3
-	errCodeInvalidSignaturePublicKeyRevoked      = 4
-	errCodeInvalidSignatureVerification          = 5
+	// execution errors
+	errCodeProposalMissingSignatureError  = 50
+	errCodeProposalSeqNumberMismatchError = 51
 
-	errCodeInvalidProposalKeyPublicKeyDoesNotExist = 6
-	errCodeInvalidProposalKeyPublicKeyRevoked      = 7
-	errCodeInvalidProposalKeySequenceNumber        = 8
-	errCodeInvalidProposalKeyMissingSignature      = 9
+	errCodePayloadSignatureError           = 60
+	errCodePayloadSignatureKeyError        = 61
+	errCodeRevokedPayloadSignatureKeyError = 62
 
-	errCodeInvalidHashAlgorithm = 10
+	errCodeEnvelopeSignatureError           = 70
+	errCodeEnvelopeSignatureKeyError        = 71
+	errCodeRevokedEnvelopeSignatureKeyError = 72
 
-	// tx execution errors
+	errCodeAuthorizationError = 80
 
-	errCodeExecution = 100
+	errCodeCadenceRunTimeError = 100
+
+	errCodeInsufficientStorageError              = 200
+	errCodeInsufficientTokenBalanceError         = 201
+	errCodeMaxGasExceededError                   = 202
+	errCodeMaxEventLimitExceededError            = 203
+	errCodeMaxLedgerIntractionLimitExceededError = 204
 )
 
 // TransactionValidationError captures a transaction validation error
@@ -92,6 +102,7 @@ func (e ExpiredTransactionError) Code() uint32 {
 // this error is the result of failure in any of the following conditions:
 // - script is empty
 // - script can not be parsed by the cadence parser
+// - comment-only script, len(program.Declarations) == 0
 type InvalidScriptError struct {
 	ParserErr error
 }
@@ -417,6 +428,21 @@ type CadenceRunTimeError struct {
 
 // account doesn't have enough storage
 type InsufficientStorageError struct {
+	Capacity uint64
+	Used     uint64
+	Needed   uint64
+}
+
+func (e InsufficientStorageError) TxHash() flow.Identifier {
+	return e.TxHash
+}
+
+func (e InsufficientStorageError) Error() string {
+	return fmt.Sprintf("insufficient account storage, available space is %d but %d is needed %s", Capacity-Used, Needed)
+}
+
+func (e InsufficientStorageError) Code() uint32 {
+	return errInsufficientStorageError
 }
 
 // - if user can pay for the tx fees
