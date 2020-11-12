@@ -203,7 +203,7 @@ IDLoop:
 	return dup
 }
 
-// Map returns a new identity list
+// Map returns a new identity list with the map function f applied to each identity.
 func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 	dup := make(IdentityList, 0, len(il))
 	for _, identity := range il {
