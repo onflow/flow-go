@@ -16,7 +16,7 @@ func (h Hash) Equal(input Hash) bool {
 
 // Hex returns the hex string representation of the hash.
 func (h Hash) Hex() string {
-	return fmt.Sprintf("%#x", h)
+	return fmt.Sprintf("%#x", []byte(h))
 }
 
 // String returns the hex string representation of the hash.

@@ -77,7 +77,7 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * [non interactive](https://www.iacr.org/archive/pkc2003/25670031/25670031.pdf) threshold signature reconstruction.
     * supports only BLS 12-381 curve with the same features above.
     * (t+1) signatures are required to reconstruct the threshold signature.
-    * a centralized key generation is provided.
+    * key generation (single dealer) to provide the set of keys.
     * provides a stateless api and a stateful api. 
 
  * Future features:
@@ -89,16 +89,18 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
 All supported Distributed Key Generation protocols are [discrete log based](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.50.2737&rep=rep1&type=pdf) and are implemented for the same BLS setup on the BLS 12-381 curve. The protocols generate key sets for the BLS-based threshold signature. 
 
  * Feldman VSS
-    * simple centralized verifiable secret sharing.
-    * 1-to-1 messaging is not encrypted, the caller must make sure the 1-to-1 messaging channel preserves confidentialiy. 
-    * 1-to-n broadcasting assume all destination nodes receive the same copy of the message.
- * Feldman VSS Qual
-    * based on Feldman VSS.
-    * implements a complaint mechanism to qualify/disqualify the leader.
+    * simple verifiable secret sharing with a single dealer.
+    * the library does not implement the communication channels between participants. The caller should implement the methods `PrivateSend` (1-to-1 messaging) and `Broadcast` (1-to-n messaging)  
+    * 1-to-1 messaging must be a private channel, the caller must make sure the channel preserves confidentialiy and authenticates the sender. 
+    * 1-to-n broadcasting assume all destination nodes receive the same copy of the message. The channel should also authenticate the broadcaster.
+    * It is recommended that both communication channels are unique per protocol instance. This could be achieved by prepending the messages to send/broadcast by a unique protocol instance ID.
+ * Feldman VSS Qual. 
+    * an extension of the simple Feldman VSS.
+    * implements a complaint mechanism to qualify/disqualify the dealer.
  * Joint Feldman (Pedersen)
-    * decentralized generation.
-    * based on multiple parallel instances of Feldman VSS Qual with multiple leaders.
-    * same assumptions about the 1-to-1 and 1-to-n messaging channels as Feldman VSS. 
+    * distributed generation.
+    * based on multiple parallel instances of Feldman VSS Qual with multiple dealers.
+    * same assumptions about the communication channels as in Feldman VSS. 
 
 
 
