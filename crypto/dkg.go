@@ -3,16 +3,17 @@
 package crypto
 
 // DKG stands for distributed key generation. In this library, DKG
-// refers discrete-log based protocols that generate keys for a BLS-based
+// refers to discrete-log based protocols that generate keys for a BLS-based
 // threshold signature scheme.
-// BLS is used with the BLS12381 curve.
+// BLS is used with the BLS12-381 curve.
 
 // These protocols mainly generate a BLS key pair and share the secret key
 // among (n) participants in a way that any (t+1) key shares allow reconstructing
-// the initial key (and also reconstructing a BLS signature of the initial key).
+// the initial key (and also reconstructing a BLS threshold signature under the initial key).
 // We refer to the initial key pair by group private and group public key.
-// (t) is the threshold parameter and is fixed for all protocols to maximize
-// the unforgeability and robustness, with a value of t = floor((n-1)/2).
+// (t) is the threshold parameter. Although the API allows using arbitrary values of (t),
+// Flow uses DKG with the value t = floor((n-1)/2) to optimize for unforgeability and robustness
+// of the threshold signature scheme using the output keys.
 
 // Private keys are scalar in Zr, where r is the group order of G1/G2.
 // Public keys are in G2.
@@ -124,16 +125,22 @@ const (
 // An instance of a DKGProcessor is needed for each node in order to
 // particpate in a DKG protocol
 type DKGProcessor interface {
-	// PrivateSend sends a private message to a destination.
-	// The data to be sent is confidential and the function
-	// must make sure data is encrypted before being shared
-	// on a public channel, in a way that it is only received
-	// by the destination participant.
+	// PrivateSend sends a message to a destination over
+	// a private channel. The channel must preserve the
+	// confidentiality of the message and should authenticate
+	// the sender.
+	// It is recommended that the private channel is unique per
+	// protocol instance. This can be achieved by prepending all
+	// messages by a unique instance ID.
 	PrivateSend(dest int, data []byte)
 	// Broadcast broadcasts a message to all participants.
 	// This function assumes all nodes have received the same message,
 	// failing to do so, the protocol can be broken.
 	// The broadcasted message is public and not confidential.
+	// The broadcasting channel should authenticate the sender.
+	// It is recommended that the broadcasting channel is unique per
+	// protocol instance. This can be achieved by prepending all
+	// messages by a unique instance ID.
 	Broadcast(data []byte)
 	// Blacklist flags that a node is misbehaving and that it got
 	// disqualified from the protocol. Such behavior deserves
