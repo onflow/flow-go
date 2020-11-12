@@ -162,13 +162,15 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 	// start with 20 identities in epoch 1
 	epoch1Identities := unittest.IdentityListFixture(20, unittest.WithAllRoles())
-	// add and remove 1 identitiy in epoch 2
+	// 1 identity added at epoch 2 that was not present in epoch 1
 	addedAtEpoch2 := unittest.IdentityFixture()
+	// 1 identity removed in epoch 2 that was present in epoch
 	removedAtEpoch2 := epoch1Identities.Sample(1)[0]
+	// epoch 2 has partial overlap with epoch 1
 	epoch2Identities := append(
 		epoch1Identities.Filter(filter.Not(filter.HasNodeID(removedAtEpoch2.NodeID))),
 		addedAtEpoch2)
-	// completely different set of identities in epoch 3
+	// epoch 3 has no overlap with epoch 2
 	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 
 	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
@@ -212,22 +214,21 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					identities, err := snapshot.Identities(filter.Any)
 					require.Nil(t, err)
 
-					// should contain all current epoch identities
-					currentEpochIdentities := identities.Filter(filter.HasNodeID(epoch1Identities.NodeIDs()...))
-					require.Equal(t, len(epoch1Identities), len(currentEpochIdentities))
+					// should have the right number of identities
+					assert.Equal(t, len(epoch1Identities)+1, len(identities))
+
 					// all current epoch identities should match configuration from EpochSetup event
-					for i := 0; i < len(epoch1Identities); i++ {
-						assert.Equal(t, epoch1Identities[i], currentEpochIdentities[i])
+					for _, expected := range epoch1Identities {
+						actual, exists := identities.ByNodeID(expected.NodeID)
+						require.True(t, exists)
+						assert.Equal(t, expected, actual)
 					}
 
-					// should contain next epoch identity with 0 weight
+					// should contain single next epoch identity with 0 weight
 					nextEpochIdentity := identities.Filter(filter.HasNodeID(addedAtEpoch2.NodeID))[0]
 					assert.Equal(t, uint64(0), nextEpochIdentity.Stake) // should have 0 weight
 					nextEpochIdentity.Stake = addedAtEpoch2.Stake
 					assert.Equal(t, addedAtEpoch2, nextEpochIdentity) // should be equal besides weight
-
-					// should contain no other identities
-					assert.Equal(t, identities, len(currentEpochIdentities)+1)
 				})
 			}
 		})
@@ -239,22 +240,21 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			identities, err := snapshot.Identities(filter.Any)
 			require.Nil(t, err)
 
-			// should contain all current epoch identities
-			currentEpochIdentities := identities.Filter(filter.HasNodeID(epoch2Identities.NodeIDs()...))
-			require.Equal(t, len(epoch2Identities), len(currentEpochIdentities))
+			// should have the right number of identities
+			assert.Equal(t, len(epoch2Identities)+1, len(identities))
+
 			// all current epoch identities should match configuration from EpochSetup event
-			for i := 0; i < len(epoch2Identities); i++ {
-				assert.Equal(t, epoch2Identities[i], currentEpochIdentities[i])
+			for _, expected := range epoch2Identities {
+				actual, exists := identities.ByNodeID(expected.NodeID)
+				require.True(t, exists)
+				assert.Equal(t, expected, actual)
 			}
 
-			// should contain next epoch identity with 0 weight
-			nextEpochIdentity := identities.Filter(filter.HasNodeID(addedAtEpoch2.NodeID))[0]
-			assert.Equal(t, uint64(0), nextEpochIdentity.Stake) // should have 0 weight
-			nextEpochIdentity.Stake = addedAtEpoch2.Stake
-			assert.Equal(t, addedAtEpoch2, nextEpochIdentity) // should be equal besides weight
-
-			// should contain no other identities
-			assert.Equal(t, identities, len(currentEpochIdentities)+1)
+			// should contain single previous epoch identity with 0 weight
+			lastEpochIdentity := identities.Filter(filter.HasNodeID(removedAtEpoch2.NodeID))[0]
+			assert.Equal(t, uint64(0), lastEpochIdentity.Stake) // should have 0 weight
+			lastEpochIdentity.Stake = removedAtEpoch2.Stake     // overwrite weight
+			assert.Equal(t, removedAtEpoch2, lastEpochIdentity) // should be equal besides weight
 		})
 
 		t.Run("should not include previous epoch after staking phase", func(t *testing.T) {
@@ -270,25 +270,24 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					identities, err := snapshot.Identities(filter.Any)
 					require.Nil(t, err)
 
-					// should contain all current epoch identities
-					currentEpochIdentities := identities.Filter(filter.HasNodeID(epoch2Identities.NodeIDs()...))
-					require.Equal(t, len(epoch2Identities), len(currentEpochIdentities))
+					// should have the right number of identities
+					assert.Equal(t, len(epoch2Identities)+len(epoch3Identities), len(identities))
+
 					// all current epoch identities should match configuration from EpochSetup event
-					for i := 0; i < len(epoch2Identities); i++ {
-						assert.Equal(t, epoch2Identities[i], currentEpochIdentities[i])
+					for _, expected := range epoch2Identities {
+						actual, exists := identities.ByNodeID(expected.NodeID)
+						require.True(t, exists)
+						assert.Equal(t, expected, actual)
 					}
 
 					// should contain next epoch identities with 0 weight
-					nextEpochIdentities := identities.Filter(filter.HasNodeID(epoch3Identities.NodeIDs()...))
-					require.Equal(t, len(epoch3Identities), len(nextEpochIdentities))
-					for i := 0; i < len(epoch3Identities); i++ {
-						assert.Equal(t, uint64(0), nextEpochIdentities[i].Stake) // should have 0 weight
-						nextEpochIdentities[i].Stake = epoch3Identities[i].Stake
-						assert.Equal(t, epoch3Identities[i], nextEpochIdentities[i]) // should be equal besides weight
+					for _, expected := range epoch3Identities {
+						actual, exists := identities.ByNodeID(expected.NodeID)
+						require.True(t, exists)
+						assert.Equal(t, uint64(0), actual.Stake) // should have 0 weight
+						actual.Stake = expected.Stake            // overwrite weight
+						assert.Equal(t, expected, actual)        // should be equal besides weight
 					}
-
-					// should contain no other identities
-					assert.Equal(t, identities, len(currentEpochIdentities)+len(nextEpochIdentities))
 				})
 			}
 		})
