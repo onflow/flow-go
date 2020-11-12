@@ -184,6 +184,9 @@ type IdentityFilter func(*Identity) bool
 // IdentityOrder is a sort for identities.
 type IdentityOrder func(*Identity, *Identity) bool
 
+// IdentityMapFunc is a modifier function for map operations for identities.
+type IdentityMapFunc func(Identity) Identity
+
 // IdentityList is a list of nodes.
 type IdentityList []*Identity
 
@@ -200,18 +203,33 @@ IDLoop:
 	return dup
 }
 
+// Map returns a new identity list
+func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
+	dup := make(IdentityList, 0, len(il))
+	for _, identity := range il {
+		next := f(*identity)
+		dup = append(dup, &next)
+	}
+	return dup
+}
+
 // Selector returns an identity filter function that selects only identities
 // within this identity list.
 func (il IdentityList) Selector() IdentityFilter {
 
-	lookup := make(map[Identifier]struct{})
-	for _, identity := range il {
-		lookup[identity.NodeID] = struct{}{}
-	}
+	lookup := il.Lookup()
 	return func(identity *Identity) bool {
 		_, exists := lookup[identity.NodeID]
 		return exists
 	}
+}
+
+func (il IdentityList) Lookup() map[Identifier]struct{} {
+	lookup := make(map[Identifier]struct{})
+	for _, identity := range il {
+		lookup[identity.NodeID] = struct{}{}
+	}
+	return lookup
 }
 
 // Order will sort the list using the given sort function.
