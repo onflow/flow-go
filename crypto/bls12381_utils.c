@@ -183,6 +183,7 @@ void ep2_print_(char* s, ep2_st* p) {
 
 // generates a random number less than the order r
 void bn_randZr_star(bn_t x) {
+    // reduce the modular reduction bias
     int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
     byte* seed = (byte*) malloc(seed_len);
     rand_bytes(seed, seed_len);
@@ -194,7 +195,7 @@ void bn_randZr(bn_t x) {
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
-
+    // reduce the modular reduction bias
     bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
     bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
     bn_mod(x, x, r);

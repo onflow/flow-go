@@ -1,9 +1,5 @@
 package encoding
 
-import (
-	"github.com/onflow/flow-go/crypto"
-)
-
 // List of domain separation tags for protocol signatures.
 //
 // Each Protocol-level signature involves hashing an entity.
@@ -12,13 +8,16 @@ import (
 // a domain tag that specifies the type of the signed object.
 
 func tag(domain string) string {
-	return protocolPrefix + domain + crypto.BLSCipherSuite
+	return protocolPrefix + domain
 }
 
 // Flow protocol version and prefix
 const protocolPrefix = "FLOW-V0.0_"
 
 var (
+	// POPTag is used to generate proofs of possessions of the BLS private key
+	// POPTag tag value must be different than all the other tags.
+	POPTag = tag("Proof-of-Possession")
 	// RandomBeaconTag is used for threshold signatures in the random beacon
 	RandomBeaconTag = tag("Random-Beacon")
 	// ConsensusVoteTag is used for Consensus Hotstuff votes
@@ -31,6 +30,4 @@ var (
 	ResultApprovalTag = tag("Result-Approval")
 	// SPOCKTag is used to generate SPoCK proofs
 	SPOCKTag = tag("SPoCK")
-	// POPTag is used to generate proofs of possessions of the private key
-	POPTag = tag("Proof-of-Possession")
 )

@@ -18,9 +18,23 @@ func TestECDSA(t *testing.T) {
 		ECDSAP256,
 		ECDSASecp256k1,
 	}
+
+	minSeed := map[SigningAlgorithm]int{
+		ECDSAP256:      KeyGenSeedMinLenECDSAP256,
+		ECDSASecp256k1: KeyGenSeedMinLenECDSASecp256k1,
+	}
+
+	maxSeed := map[SigningAlgorithm]int{
+		ECDSAP256:      KeyGenSeedMaxLenECDSA,
+		ECDSASecp256k1: KeyGenSeedMaxLenECDSA,
+	}
+
 	for _, curve := range ecdsaCurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 		halg := hash.NewSHA3_256()
+		// test key generation seed limits
+		testKeyGenSeed(t, curve, minSeed[curve], maxSeed[curve])
+		// test consistency
 		testGenSignVerify(t, curve, halg)
 	}
 }
