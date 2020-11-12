@@ -56,6 +56,9 @@ type Storages struct {
 	Transactions       storage.Transactions
 	TransactionResults storage.TransactionResults
 	Collections        storage.Collections
+	EpochStatuses      storage.EpochStatuses
+	Events             storage.Events
+	// ClusterBlocks      storage.ClusterBlocks
 }
 
 func InitStorages(db *badger.DB) *Storages {
@@ -77,6 +80,9 @@ func InitStorages(db *badger.DB) *Storages {
 	transactions := storagebadger.NewTransactions(metrics, db)
 	transactionResults := storagebadger.NewTransactionResults(db)
 	collections := storagebadger.NewCollections(db, transactions)
+	epochStatuses := storagebadger.NewEpochStatuses(metrics, db)
+	events := storagebadger.NewEvents(db)
+	// cluserBlocks := storagebadger.NewClusterBlocks(db, "", headers, "")
 
 	return &Storages{
 		Headers:            headers,
@@ -95,5 +101,7 @@ func InitStorages(db *badger.DB) *Storages {
 		Transactions:       transactions,
 		TransactionResults: transactionResults,
 		Collections:        collections,
+		EpochStatuses:      epochStatuses,
+		Events:             events,
 	}
 }
