@@ -1,6 +1,7 @@
 package state
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -36,6 +37,9 @@ func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) 
 }
 
 func (m MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error) {
+
+	fmt.Printf("Getting %x %x %s\n", owner, controller, key)
+
 	k := fullKey(owner, controller, key)
 	m.RegisterTouches[k] = true
 	return m.Registers[k], nil

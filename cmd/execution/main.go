@@ -98,7 +98,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
-			vmCtx := fvm.NewContext(node.FvmOptions...)
+			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 
 			manager, err := computation.New(
 				node.Logger,

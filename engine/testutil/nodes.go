@@ -306,6 +306,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	vm := fvm.New(rt)
 
 	vmCtx := fvm.NewContext(
+		node.Log,
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(node.Blocks),
 	)
@@ -617,6 +618,7 @@ func VerificationNode(t testing.TB,
 		vm := fvm.New(rt)
 
 		vmCtx := fvm.NewContext(
+			node.Log,
 			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(node.Blocks),
 		)
