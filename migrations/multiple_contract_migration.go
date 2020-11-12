@@ -120,7 +120,7 @@ func (m *MultipleContractMigration) migrateValue(p ledger.Payload) ([]ledger.Pay
 			Str("address", address.Hex()).
 			Str("code", code).
 			Msg("Cannot parse program at address")
-		return []ledger.Payload{}, err
+		return nil, err
 	}
 
 	if len(program.Declarations) == 0 {
@@ -165,7 +165,7 @@ func (m *MultipleContractMigration) migrateValue(p ledger.Payload) ([]ledger.Pay
 			Str("address", address.Hex()).
 			Str("code", code).
 			Msg("Two declarations of the same type at address")
-		return []ledger.Payload{}, fmt.Errorf("wwo declarations of the same type at address %s", address.Hex())
+		return []ledger.Payload{}, fmt.Errorf("two declarations of the same type at address %s", address.Hex())
 	}
 
 	var interfaceDeclaration ast.Declaration
