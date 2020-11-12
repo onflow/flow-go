@@ -306,8 +306,7 @@ func executeCollection(
 			BlockID:         executableBlock.ID(),
 			// TODO: record gas used
 			TotalComputationUsed: 0,
-			// TODO: record number of txs
-			NumberOfTransactions: 0,
+			NumberOfTransactions: uint64(collection.Len()),
 		},
 		Index:    uint64(chunkIndex),
 		EndState: endStateCommitment,
