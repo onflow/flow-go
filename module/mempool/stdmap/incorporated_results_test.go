@@ -92,32 +92,60 @@ func TestIncorporatedResultsEjectSize(t *testing.T) {
 	})
 
 	t.Run("check ejection of block with multiple results", func(t *testing.T) {
-		var ejector EjectFunc = NewLRUEjector().Eject
+		// custom ejector which ejects only model.IncorporatedResultMap for given result
+		result := unittest.ExecutionResultFixture()
+		targetForEjection := result.ID()
+		ejector := func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+			for id, entity := range entities {
+				if id == targetForEjection {
+					return id, entity
+				}
+			}
+			panic("missing target ID")
+		}
+
+		// init mempool
 		mempool, err := NewIncorporatedResults(10, WithEject(ejector))
 		require.NoError(t, err)
 
-		for b := 0; b < 10; b++ {
-			result := unittest.ExecutionResultFixture()
+		// add 3 IncorporatedResult structs for
+		for r := 1; r <= 10; r++ {
 			// insert 3 different IncorporatedResult for the same result
-			for i := 0; i < 3; i++ {
-				a := unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(result))
-				_, _ = mempool.Add(a)
-			}
+			addIncorporatedResults(t, mempool, result, 3)
 			// The mempool stores all IncorporatedResult for the same result internally in one data structure.
-			// Therefore, all results for the same result consume only capacity 1.
+			// Therefore, all IncorporatedResults for the same result consume only capacity 1.
+			require.Equal(t, uint(3*r), mempool.Size())
+
+			result = unittest.ExecutionResultFixture()
 		}
-		// mempool should now be at capacity limit
+		// mempool should now be at capacity limit: storing IncorporatedResults for 10 different base results
 		require.Equal(t, uint(30), mempool.Size())
 
-		// Adding another element should overflow the mempool;
-		_, _ = mempool.Add(unittest.IncorporatedResult.Fixture())
+		// Adding an IncorporatedResult for a previously unknown base result should overflow the mempool:
+		added, err := mempool.Add(unittest.IncorporatedResult.Fixture())
+		require.True(t, added)
+		require.NoError(t, err)
 
 		// The mempool stores all IncorporatedResult for the same result internally in one data structure.
 		// Hence, eviction should lead to _all_ IncorporatedResult for a single result being dropped.
-		//  * for this specific test, we use the LRU ejector
-		//  * this ejector drops the result that was added earliest
-		// Hence, we expect 3 IncorporatedResult for each of the results 1, 2, ..., 9
-		// plus one result for result 10
+		// For this specific test, we always evict the IncorporatedResult for the first base result.
+		// Hence, we expect:
+		//   * 3 IncorporatedResult for each of the results 2, 3, ..., 10
+		//   * plus one result for result 11
 		require.Equal(t, uint(9*3+1), mempool.Size())
+		if uint(9*3+1) != mempool.Size() {
+			assert.FailNow(t, "")
+		}
 	})
+}
+
+// addIncorporatedResults generates 3 different IncorporatedResults structures
+// for the baseResult and adds those to the mempool
+func addIncorporatedResults(t *testing.T, mempool *IncorporatedResults, baseResult *flow.ExecutionResult, num uint) {
+	for ; num > 0; num-- {
+		a := unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(baseResult))
+		added, err := mempool.Add(a)
+		require.True(t, added)
+		require.NoError(t, err)
+	}
 }
