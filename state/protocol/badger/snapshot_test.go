@@ -56,14 +56,38 @@ func TestHead(t *testing.T) {
 func TestIdentities(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
-		identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+		identities := unittest.IdentityListFixture(20, unittest.WithAllRoles())
 		root, result, seal := unittest.BootstrapFixture(identities)
 		err := state.Mutate().Bootstrap(root, result, seal)
-		require.NoError(t, err)
+		require.Nil(t, err)
 
-		actual, err := state.Final().Identities(filter.Any)
-		require.NoError(t, err)
-		assert.ElementsMatch(t, identities, actual)
+		t.Run("no filter", func(t *testing.T) {
+			actual, err := state.Final().Identities(filter.Any)
+			require.Nil(t, err)
+			assert.ElementsMatch(t, identities, actual)
+		})
+
+		t.Run("single identity", func(t *testing.T) {
+			expected := identities.Sample(1)[0]
+			actual, err := state.Final().Identity(expected.NodeID)
+			require.Nil(t, err)
+			assert.Equal(t, expected, actual)
+		})
+
+		t.Run("filtered", func(t *testing.T) {
+			filters := []flow.IdentityFilter{
+				filter.HasRole(flow.RoleCollection),
+				filter.HasNodeID(identities.SamplePct(0.1).NodeIDs()...),
+				filter.HasStake(true),
+			}
+
+			for _, filterfunc := range filters {
+				expected := identities.Filter(filterfunc)
+				actual, err := state.Final().Identities(filterfunc)
+				require.Nil(t, err)
+				assert.ElementsMatch(t, expected, actual)
+			}
+		})
 	})
 }
 
@@ -201,6 +225,17 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			BuildEpoch().
 			Complete()
 
+		t.Run("should be able to query at root block", func(t *testing.T) {
+			snapshot := state.AtHeight(0)
+			identities, err := snapshot.Identities(filter.Any)
+			require.Nil(t, err)
+
+			// should have the right number of identities
+			assert.Equal(t, len(epoch1Identities), len(identities))
+			// should have all epoch 1 identities
+			assert.ElementsMatch(t, epoch1Identities, identities)
+		})
+
 		t.Run("should include next epoch after staking phase", func(t *testing.T) {
 
 			// get a snapshot from setup phase and commit phase of epoch 1
@@ -216,13 +251,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 					// should have the right number of identities
 					assert.Equal(t, len(epoch1Identities)+1, len(identities))
-
 					// all current epoch identities should match configuration from EpochSetup event
-					for _, expected := range epoch1Identities {
-						actual, exists := identities.ByNodeID(expected.NodeID)
-						require.True(t, exists)
-						assert.Equal(t, expected, actual)
-					}
+					assert.ElementsMatch(t, epoch1Identities, identities.Filter(epoch1Identities.Selector()))
 
 					// should contain single next epoch identity with 0 weight
 					nextEpochIdentity := identities.Filter(filter.HasNodeID(addedAtEpoch2.NodeID))[0]
@@ -242,13 +272,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 			// should have the right number of identities
 			assert.Equal(t, len(epoch2Identities)+1, len(identities))
-
 			// all current epoch identities should match configuration from EpochSetup event
-			for _, expected := range epoch2Identities {
-				actual, exists := identities.ByNodeID(expected.NodeID)
-				require.True(t, exists)
-				assert.Equal(t, expected, actual)
-			}
+			assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
 
 			// should contain single previous epoch identity with 0 weight
 			lastEpochIdentity := identities.Filter(filter.HasNodeID(removedAtEpoch2.NodeID))[0]
@@ -272,13 +297,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 					// should have the right number of identities
 					assert.Equal(t, len(epoch2Identities)+len(epoch3Identities), len(identities))
-
 					// all current epoch identities should match configuration from EpochSetup event
-					for _, expected := range epoch2Identities {
-						actual, exists := identities.ByNodeID(expected.NodeID)
-						require.True(t, exists)
-						assert.Equal(t, expected, actual)
-					}
+					assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
 
 					// should contain next epoch identities with 0 weight
 					for _, expected := range epoch3Identities {
