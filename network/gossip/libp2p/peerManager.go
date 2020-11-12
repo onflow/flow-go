@@ -123,7 +123,7 @@ func (pm *PeerManager) updatePeers() {
 }
 
 func (pm *PeerManager) connect(ids flow.IdentityList) {
-	pm.logger.Debug().
+	pm.logger.Trace().
 		Str("peers", fmt.Sprintf("%v", ids.NodeIDs())).
 		Msg("connecting to peers")
 

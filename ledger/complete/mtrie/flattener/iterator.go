@@ -92,7 +92,7 @@ func (i *NodeIterator) Next() bool {
 		// we still need to dig into the right child is, if n is p's left child.
 		parent := i.peek()
 		if parent.LeftChild() == n {
-			i.dig(parent.RigthChild())
+			i.dig(parent.RightChild())
 		}
 		return true
 	}
@@ -127,7 +127,7 @@ func (i *NodeIterator) dig(n *node.Node) {
 			n = lChild
 			continue
 		}
-		if rChild := n.RigthChild(); rChild != nil {
+		if rChild := n.RightChild(); rChild != nil {
 			n = rChild
 			continue
 		}
