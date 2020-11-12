@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -61,6 +62,7 @@ func finalList(cmd *cobra.Command, args []string) {
 	reconcileNodes(allNodes, stakingNodes)
 
 	// TODO: output a new nodes-config.json ... what is this config?
+	writeJSON(fmt.Sprintf(flagOutdir, "node-config.json"), allNodes)
 }
 
 func readStakingContractDetails() []model.NodeInfo {
