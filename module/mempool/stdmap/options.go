@@ -29,12 +29,3 @@ func WithEject(eject EjectFunc) OptionFunc {
 		be.eject = eject
 	}
 }
-
-// WithEject can be provided to the backend on creation in order to set a custom
-// eject function to pick the entity to be evicted upon overflow, as well as
-// hooking into it for additional cleanup work.
-func WithEjectionCallbacks(callbacks ...OnEjection) OptionFunc {
-	return func(be *Backend) {
-		be.ejectionCallbacks = append(be.ejectionCallbacks, callbacks...)
-	}
-}
