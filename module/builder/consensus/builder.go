@@ -309,7 +309,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 		initialState := nextErToBeSealed.Chunks[0].StartState
 		if !bytes.Equal(initialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect in finalized")
+			nextSealJSON, _ := json.Marshal(next)
+			lastSealJSON, _ := json.Marshal(last)
+
+			return nil, fmt.Errorf("seal execution states do not connect in finalized for block: %v, expecting start state for last sealed block(%v): %x, actual start state: %x. nextSealJSON: %s, lastSealJSON: %s",
+				blockID, last.BlockID, last.FinalState, initialState, string(nextSealJSON), string(lastSealJSON))
 		}
 
 		seals = append(seals, next.Seal)
