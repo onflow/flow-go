@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	keyExists         = "exists"
-	keyCode           = "code"
-	keyContractNames  = "contract_names"
-	keyPublicKeyCount = "public_key_count"
-	keyStorageUsed    = "storage_used"
+	keyExists          = "exists"
+	keyCode            = "code"
+	keyContractNames   = "contract_names"
+	keyPublicKeyCount  = "public_key_count"
+	keyStorageUsed     = "storage_used"
 	keyStorageCapacity = "storage_capacity"
-	uint64StorageSize = 8
+	uint64StorageSize  = 8
 )
 
 var (
