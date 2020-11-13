@@ -200,8 +200,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		// topology manager
 		var topManager topology.Manager
 		topManager = topology.NewStatefulTopologyManager(top,
-			subscriptionManager,
-			topology.LinearFanoutFunc)
+			subscriptionManager)
 
 		// creates network instance
 		net, err := libp2p.NewNetwork(fnb.Logger,
