@@ -730,10 +730,13 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_ = e.seals.Add(&flow.IncorporatedResultSeal{
+	_, err = e.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	})
+	if err != nil {
+		return fmt.Errorf("failed to store IncorporatedResultSeal in mempool: %w", err)
+	}
 
 	return nil
 }

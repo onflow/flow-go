@@ -32,7 +32,7 @@ func Test_Size(t *testing.T) {
 	})
 }
 
-// Test_Limit checks that ExecStateForkSuppressor is reporting the size limit of the wrapped mempool
+// Test_Limit checks that ExecStateForkSuppressor is reporting the capacity limit of the wrapped mempool
 func Test_Limit(t *testing.T) {
 	WithExecStateForkSuppressor(t, func(wrapper *ExecStateForkSuppressor, wrappedMempool *mempool.IncorporatedResultSeals) {
 		wrappedMempool.On("Limit").Return(uint(227)).Once()
@@ -47,8 +47,8 @@ func Test_Add(t *testing.T) {
 	WithExecStateForkSuppressor(t, func(wrapper *ExecStateForkSuppressor, wrappedMempool *mempool.IncorporatedResultSeals) {
 		irSeals := unittest.IncorporatedResultSeal.Fixtures(7)
 		wrappedMempool.On("Size").Return(uint(0)).Once()
-
-		wrappedMempool.Add()
+		// TODO FIX ME
+		_, _ = wrappedMempool.Add(irSeals[0])
 
 	})
 }

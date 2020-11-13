@@ -8,12 +8,13 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/rs/zerolog"
 )
 
 var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel error
@@ -29,7 +30,7 @@ var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel
 //   * For each candidate seal inserted into the mempool, inspect the state
 //     transition for the respective block.
 //   * If this is the first seal for a block, store the seal as an archetype
-//     for the state transition into the internal map `byBlockID`.
+//     for the state transition into the internal map `sealsForBlock`.
 //   * If the mempool already knows about a state transition for a block,
 //     and a second seal for the same block is inserted, check whether
 //     the seal has the same state transition.
@@ -42,11 +43,14 @@ var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel
 type ExecStateForkSuppressor struct {
 	mutex            sync.RWMutex
 	seals            mempool.IncorporatedResultSeals
-	byBlockID        map[flow.Identifier]*flow.IncorporatedResultSeal
+	sealsForBlock    map[flow.Identifier]sealSet // map BlockID -> set of IncorporatedResultSeal
 	execForkDetected bool
 	db               *badger.DB
 	log              zerolog.Logger
 }
+
+// sealSet is a set of seals; internally represented as a map from sealID -> to seal
+type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 
 func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, db *badger.DB, log zerolog.Logger) (*ExecStateForkSuppressor, error) {
 	flag, err := readExecutionForkDetectedFlag(db, false)
@@ -57,33 +61,47 @@ func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, db *badge
 	wrapper := ExecStateForkSuppressor{
 		mutex:            sync.RWMutex{},
 		seals:            seals,
-		byBlockID:        make(map[flow.Identifier]*flow.IncorporatedResultSeal),
+		sealsForBlock:    make(map[flow.Identifier]sealSet),
 		execForkDetected: flag,
 		db:               db,
 		log:              log.With().Str("mempool", "ExecStateForkSuppressor").Logger(),
 	}
-
-	// add ejection callback, which deletes the
-	onEject := func(entity flow.Entity) {
-		// uncaught type assertion; should never panic as mempool.IncorporatedResultSeals only stores IncorporatedResultSeal
-		irSeal := entity.(*flow.IncorporatedResultSeal)
-		wrapper.byBlockID[irSeal.Seal.BlockID]
-		delete(wrapper.byBlockID, irSeal.Seal.BlockID)
-		wrapper.log.Debug("ejected ")
-	}
-	seals.RegisterEjectionCallbacks(onEject)
+	seals.RegisterEjectionCallbacks(wrapper.onEject)
 
 	return &wrapper, nil
 }
 
-// Add adds the given seal to the mempool. Return value indicates whether or not
-// seal was added to mempool.
+// onEject is the callback, which the wrapped mempool should call whenever it ejects an element
+func (s *ExecStateForkSuppressor) onEject(entity flow.Entity) {
+	// uncaught type assertion; should never panic as mempool.IncorporatedResultSeals only stores IncorporatedResultSeal
+	irSeal := entity.(*flow.IncorporatedResultSeal)
+	sealID := irSeal.ID()
+	blockID := irSeal.Seal.BlockID
+	log := s.log.With().
+		Hex("seal_id", sealID[:]).
+		Hex("block_id", blockID[:]).
+		Logger()
+	set, found := s.sealsForBlock[irSeal.Seal.BlockID]
+	if !found {
+		// In the current implementation, this cannot happen, as every entity in the mempool is also contained in sealsForBlock.
+		// we nevertheless perform this sanity check here, to catch future inconsistent code modifications
+		log.Fatal().Msg("inconsistent state detected: seal not in secondary index")
+	}
+	if len(set) > 1 {
+		delete(set, irSeal.ID())
+	} else {
+		delete(s.sealsForBlock, irSeal.Seal.BlockID)
+	}
+	log.Debug().Msg("ejected seal")
+}
+
+// Add adds the given seal to the mempool. Return value indicates whether or not seal was added to mempool.
 // Error returns:
 //   * engine.InvalidInputError (sentinel error)
 //     In case a seal fails one of the required consistency checks;
 //   * ExecutionForkErr (sentinel error)
 //     In case a fork in the execution state has been detected.
-func (s *ExecStateForkSuppressor) Add(irSeal *flow.IncorporatedResultSeal) (bool, error) {
+func (s *ExecStateForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -91,35 +109,52 @@ func (s *ExecStateForkSuppressor) Add(irSeal *flow.IncorporatedResultSeal) (bool
 		return false, ExecutionForkErr
 	}
 
-	// this wrapper is a temporary safety layer; we check all conditions that are
+	// STEP 1: ensure locally that newSeal's start and end state are non-empty values
+	// This wrapper is a temporary safety layer; we check all conditions that are
 	// required for its correct functioning locally, to not delegate safety-critical
 	// implementation aspects to external components
-	// => ensure locally that irSeal's start and end state are non-empty values
-	err := s.enforceValidStates(irSeal)
+	err := s.enforceValidStates(newSeal)
 	if err != nil {
 		return false, fmt.Errorf("invalid candidate seal: %w", err)
 	}
-	blockID := irSeal.Seal.BlockID
+	blockID := newSeal.Seal.BlockID
 
-	// check whether we already have a seal for the same block in the mempool:
-	otherSeal, found := s.byBlockID[blockID]
+	// STEP 2: enforce that newSeal's state transition does not conflict with other stored seals for the same block
+	otherSeals, found := s.sealsForBlock[blockID]
 	if found {
 		// already other seal for this block in mempool => compare consistency of results' state transitions
-		err := s.enforceConsistentStateTransitions(irSeal, otherSeal)
+		otherSeal := getArbitraryElement(otherSeals) // cannot be nil, as otherSeals is guaranteed to always contain at least one element
+		err := s.enforceConsistentStateTransitions(newSeal, otherSeal)
 		if err != nil {
 			return false, fmt.Errorf("state consistency check failed: %w", err)
 		}
 	} // no conflicting state transition for this block known
 
-	added, err := s.seals.Add(irSeal) // internally de-duplicates
+	// STEP 3: add newSeal to the wrapped mempool
+	added, err := s.seals.Add(newSeal) // internally de-duplicates
 	if err != nil {
 		return added, fmt.Errorf("failed to add seal to wrapped mempool: %w", err)
 	}
-	if added && !found {
-		// no other seal for this block in mempool => store seal as archetype result for block
-		s.byBlockID[blockID] = irSeal
+	if !added { // if underlying mempool did not accept the seal => nothing to do anymore
+		return false, nil
 	}
-	return added, nil
+
+	// STEP 4: add newSeal to secondary index of this wrapper
+	// CAUTION: the following edge case needs to be considered:
+	//  * the mempool only holds one old seal for this block
+	//  * upon adding the new seal, the mempool might decide to eject the old seal
+	//  * during the ejection, we will delete the entire set from the `sealsForBlock`
+	//    because at this time, it only held the single old seal, which was ejected
+	// Therefore, the value for `found` in the line below might
+	// have a different value than in the earlier call above.
+	blockSeals, found := s.sealsForBlock[blockID]
+	if !found {
+		// no other seal for this block was in mempool before => create a set for the seals for this block
+		blockSeals := make(sealSet)
+		s.sealsForBlock[blockID] = blockSeals
+	}
+	blockSeals[newSeal.ID()] = newSeal
+	return true, nil
 }
 
 // All returns all the IncorporatedResultSeals in the mempool
@@ -144,7 +179,7 @@ func (s *ExecStateForkSuppressor) Rem(id flow.Identifier) bool {
 	seal, found := s.seals.ByID(id)
 	if found {
 		s.seals.Rem(id)
-		delete(s.byBlockID, seal.Seal.BlockID)
+		delete(s.sealsForBlock, seal.Seal.BlockID)
 	}
 	return found
 }
@@ -168,7 +203,7 @@ func (s *ExecStateForkSuppressor) Limit() uint {
 func (s *ExecStateForkSuppressor) Clear() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.byBlockID = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	s.sealsForBlock = make(map[flow.Identifier]sealSet)
 	s.seals.Clear()
 }
 
@@ -232,21 +267,29 @@ func (s *ExecStateForkSuppressor) enforceValidStates(irSeal *flow.IncorporatedRe
 	return nil
 }
 
+// getArbitraryElement picks and returns an arbitrary element from the set. Returns nil, if set is empty.
+func getArbitraryElement(set sealSet) *flow.IncorporatedResultSeal {
+	for _, seal := range set {
+		return seal
+	}
+	return nil
+}
+
 // enforceConsistentStateTransitions checks whether the execution results in the seals
 // have matching state transitions. If a fork in the execution state is detected:
 //   * wrapped mempool is cleared
 //   * internal execForkDetected flag is ste to true
 //   * the new value of execForkDetected is persisted to data base
 // and ExecutionForkErr (sentinel error) is returned
-func (s *ExecStateForkSuppressor) enforceConsistentStateTransitions(irSeal1, irSeal2 *flow.IncorporatedResultSeal) error {
-	if irSeal1.IncorporatedResult.Result.ID() == irSeal2.IncorporatedResult.Result.ID() {
+func (s *ExecStateForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal) error {
+	if irSeal.IncorporatedResult.Result.ID() == irSeal2.IncorporatedResult.Result.ID() {
 		// happy case: candidate seals are for the same result
 		return nil
 	}
 	// the results for the seals have different IDs
 	// => check whether initial and final state match in both seals
 
-	sc1json, err := json.Marshal(irSeal1)
+	sc1json, err := json.Marshal(irSeal)
 	if err != nil {
 		return fmt.Errorf("failed to marshal candidate seal to json: %w", err)
 	}
@@ -260,8 +303,8 @@ func (s *ExecStateForkSuppressor) enforceConsistentStateTransitions(irSeal1, irS
 		Logger()
 
 	// unsafe: we assume validity of states has been checked before
-	irSeal1InitialState, _ := irSeal1.IncorporatedResult.Result.InitialStateCommit()
-	irSeal1FinalState, _ := irSeal1.IncorporatedResult.Result.FinalStateCommitment()
+	irSeal1InitialState, _ := irSeal.IncorporatedResult.Result.InitialStateCommit()
+	irSeal1FinalState, _ := irSeal.IncorporatedResult.Result.FinalStateCommitment()
 	irSeal2InitialState, _ := irSeal2.IncorporatedResult.Result.InitialStateCommit()
 	irSeal2FinalState, _ := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
 
