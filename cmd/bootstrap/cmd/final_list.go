@@ -159,54 +159,38 @@ func assembleInternalNodesWithoutStake() []model.NodeInfo {
 func assemblePartnerNodesWithoutStake() []model.NodeInfo {
 	partners := readPartnerNodes()
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
-
-	var nodes []model.NodeInfo
-	for _, partner := range partners {
-		validateAddressFormat(partner.Address)
-
-		// validate every single partner node
-		nodeID := validateNodeID(partner.NodeID)
-		networkPubKey := validateNetworkPubKey(partner.NetworkPubKey)
-		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
-
-		node := model.NewPublicNodeInfo(
-			nodeID,
-			partner.Role,
-			partner.Address,
-			1000,
-			networkPubKey,
-			stakingPubKey,
-		)
-		nodes = append(nodes, node)
-	}
-
-	return nodes
+	return createPublicNodeInfo(partners)
 }
 
 func readStakingContractDetails() []model.NodeInfo {
 	var stakingNodes []model.NodeInfoPub
 	path := filepath.Join(flagStakingNodesDir, "node-infos.pub.json")
 	readJSON(path, &stakingNodes)
+	return createPublicNodeInfo(stakingNodes)
+}
 
-	var nodes []model.NodeInfo
-	for _, staking := range stakingNodes {
-		validateAddressFormat(staking.Address)
+func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
+	var publicInfoNodes []model.NodeInfo
+	for _, n := range nodes {
+		validateAddressFormat(n.Address)
 
 		// validate every single partner node
-		nodeID := validateNodeID(staking.NodeID)
-		networkPubKey := validateNetworkPubKey(staking.NetworkPubKey)
-		stakingPubKey := validateStakingPubKey(staking.StakingPubKey)
+		nodeID := validateNodeID(n.NodeID)
+		networkPubKey := validateNetworkPubKey(n.NetworkPubKey)
+		stakingPubKey := validateStakingPubKey(n.StakingPubKey)
 
+		// stake set to 1000 to give equal weight to each node
 		node := model.NewPublicNodeInfo(
 			nodeID,
-			staking.Role,
-			staking.Address,
-			staking.Stake,
+			n.Role,
+			n.Address,
+			1000,
 			networkPubKey,
 			stakingPubKey,
 		)
-		nodes = append(nodes, node)
+
+		publicInfoNodes = append(publicInfoNodes, node)
 	}
 
-	return nodes
+	return publicInfoNodes
 }
