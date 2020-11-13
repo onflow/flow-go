@@ -76,11 +76,11 @@ type Controller struct {
 	endCh      chan struct{}
 	shutdownCh chan struct{}
 
-	// private fields that hold the DKG artifacts when the protocol run to
+	// private fields that hold the DKG artifacts when the protocol runs to
 	// completion
-	privateShare crypto.PrivateKey
-	publicShare  crypto.PublicKey
-	publicKeys   []crypto.PublicKey
+	privateShare   crypto.PrivateKey
+	publicKeys     []crypto.PublicKey
+	groupPublicKey crypto.PublicKey
 
 	// artifactsLock protects access to artifacts
 	artifactsLock sync.Mutex
@@ -192,7 +192,7 @@ func (c *Controller) End() error {
 
 	// end and retrieve products of the DKG protocol
 	c.dkgLock.Lock()
-	privateShare, publicShare, publicKeys, err := c.dkg.End()
+	privateShare, groupPublicKey, publicKeys, err := c.dkg.End()
 	c.dkgLock.Unlock()
 
 	if err != nil {
@@ -201,7 +201,7 @@ func (c *Controller) End() error {
 
 	c.artifactsLock.Lock()
 	c.privateShare = privateShare
-	c.publicShare = publicShare
+	c.groupPublicKey = groupPublicKey
 	c.publicKeys = publicKeys
 	c.artifactsLock.Unlock()
 
@@ -222,7 +222,7 @@ func (c *Controller) Shutdown() {
 func (c *Controller) GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey) {
 	c.artifactsLock.Lock()
 	defer c.artifactsLock.Unlock()
-	return c.privateShare, c.publicShare, c.publicKeys
+	return c.privateShare, c.groupPublicKey, c.publicKeys
 }
 
 /*******************************************************************************

@@ -17,16 +17,24 @@ import (
 // node is a test object that simulates a running instance of the DKG protocol
 // where transitions from one phase to another are dictated by a timer.
 type node struct {
-	id            int
-	controller    *Controller
-	phaseDuration time.Duration
+	id             int
+	controller     *Controller
+	phase0Duration time.Duration
+	phase1Duration time.Duration
+	phase2Duration time.Duration
 }
 
-func newNode(id int, controller *Controller, phaseDuration time.Duration) *node {
+func newNode(id int, controller *Controller,
+	phase0Duration time.Duration,
+	phase1Duration time.Duration,
+	phase2Duration time.Duration) *node {
+
 	return &node{
-		id:            id,
-		controller:    controller,
-		phaseDuration: phaseDuration,
+		id:             id,
+		controller:     controller,
+		phase0Duration: phase0Duration,
+		phase1Duration: phase1Duration,
+		phase2Duration: phase2Duration,
 	}
 }
 
@@ -37,20 +45,20 @@ func (n *node) run() error {
 	}()
 
 	// Wait and trigger transition from Phase 0 to Phase 1
-	err := n.delayedTask(n.phaseDuration, n.controller.EndPhase0)
+	err := n.delayedTask(n.phase0Duration, n.controller.EndPhase0)
 	if err != nil {
 		return err
 	}
 
 	// Wait and trigger transition from Phase 1 to Phase 2
-	err = n.delayedTask(n.phaseDuration, n.controller.EndPhase1)
+	err = n.delayedTask(n.phase1Duration, n.controller.EndPhase1)
 	if err != nil {
 		return err
 	}
 
 	// Wait and retrieve DKG results
 	err = n.delayedTask(
-		n.phaseDuration,
+		n.phase2Duration,
 		func() error {
 			err := n.controller.End()
 			return err
@@ -79,6 +87,11 @@ func (proc *processor) PrivateSend(dest int, data []byte) {
 	proc.channels[dest] <- DKGMessage{Orig: proc.id, Data: data}
 }
 
+// ATTENTION: Normally the processor requires Broadcast to provide guaranteed
+// delivery (either all nodes receive the message or none of them receive it).
+// Here we are just assuming that with a long enough duration for phases 1 and
+// 2, all nodes are guaranteed to see everyone's messages. So it is important
+// to set timeouts carefully in the tests.
 func (proc *processor) Broadcast(data []byte) {
 	for i := 0; i < len(proc.channels); i++ {
 		if i == proc.id {
@@ -93,26 +106,29 @@ func (proc *processor) Blacklist(node int) {}
 func (proc *processor) FlagMisbehavior(node int, logData string) {}
 
 type testCase struct {
-	totalNodes    int
-	phaseDuration time.Duration
+	totalNodes     int
+	phase0Duration time.Duration
+	phase1Duration time.Duration
+	phase2Duration time.Duration
 }
 
-// TestDKGNormal tests the controller in optimal conditions, when all nodes are
+// TestDKGHappyPath tests the controller in optimal conditions, when all nodes are
 // working correctly.
-func TestDKGNormal(t *testing.T) {
-	// define different test cases with varying number of nodes, and phase
-	// durations
+func TestDKGHappyPath(t *testing.T) {
+	// Define different test cases with varying number of nodes, and phase
+	// durations. Since these are all happy path cases, there are no messages
+	// sent during phase 1 and 2, all messaging is done in phase 0. So we can
+	// can set shorter durations for phase 1 and 2..
 	testCases := []testCase{
-		testCase{totalNodes: 5, phaseDuration: time.Second},
-		testCase{totalNodes: 10, phaseDuration: time.Second},
-		testCase{totalNodes: 15, phaseDuration: 3 * time.Second},
-		testCase{totalNodes: 20, phaseDuration: 3 * time.Second},
+		testCase{totalNodes: 5, phase0Duration: time.Second, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond},
+		testCase{totalNodes: 10, phase0Duration: time.Second, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond},
+		testCase{totalNodes: 15, phase0Duration: 5 * time.Second, phase1Duration: 2 * time.Second, phase2Duration: 2 * time.Second},
 	}
 
 	// run each test case
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("%d nodes", tc.totalNodes), func(t *testing.T) {
-			testDKG(t, tc.totalNodes, tc.totalNodes, tc.phaseDuration)
+			testDKG(t, tc.totalNodes, tc.totalNodes, tc.phase0Duration, tc.phase1Duration, tc.phase2Duration)
 		})
 	}
 }
@@ -123,10 +139,9 @@ func TestDKGThreshold(t *testing.T) {
 	// define different test cases with varying number of nodes, and phase
 	// durations
 	testCases := []testCase{
-		testCase{totalNodes: 5, phaseDuration: time.Second},
-		testCase{totalNodes: 10, phaseDuration: time.Second},
-		testCase{totalNodes: 15, phaseDuration: 3 * time.Second},
-		testCase{totalNodes: 20, phaseDuration: 3 * time.Second},
+		testCase{totalNodes: 5, phase0Duration: time.Second, phase1Duration: time.Second, phase2Duration: time.Second},
+		testCase{totalNodes: 10, phase0Duration: time.Second, phase1Duration: time.Second, phase2Duration: time.Second},
+		testCase{totalNodes: 15, phase0Duration: 5 * time.Second, phase1Duration: 2 * time.Second, phase2Duration: 2 * time.Second},
 	}
 
 	// run each test case
@@ -136,19 +151,13 @@ func TestDKGThreshold(t *testing.T) {
 		gn := tc.totalNodes - optimalThreshold(tc.totalNodes)
 
 		t.Run(fmt.Sprintf("%d/%d nodes", gn, tc.totalNodes), func(t *testing.T) {
-			testDKG(t, tc.totalNodes, gn, tc.phaseDuration)
+			testDKG(t, tc.totalNodes, gn, tc.phase0Duration, tc.phase1Duration, tc.phase2Duration)
 		})
 	}
 }
 
-// ATTENTION: This test seems to indicate that nodes end up with a different set
-// of public keys when the phase duration is short.
-func TestDKGShortDuration(t *testing.T) {
-	testDKG(t, 20, 20, 2*time.Second)
-}
-
-func testDKG(t *testing.T, totalNodes int, goodNodes int, phaseDuration time.Duration) {
-	nodes := initNodes(t, totalNodes, phaseDuration)
+func testDKG(t *testing.T, totalNodes int, goodNodes int, phase0Duration, phase1Duration, phase2Duration time.Duration) {
+	nodes := initNodes(t, totalNodes, phase0Duration, phase1Duration, phase2Duration)
 	gnodes := nodes[:goodNodes]
 
 	// Start all the good nodes in parallel
@@ -160,14 +169,14 @@ func testDKG(t *testing.T, totalNodes int, goodNodes int, phaseDuration time.Dur
 	}
 
 	// Wait until they are all shutdown
-	wait(t, gnodes, 5*phaseDuration)
+	wait(t, gnodes, 5*phase0Duration)
 
 	// Check that all nodes have agreed on the same set of public keys
 	checkArtifacts(t, gnodes, totalNodes)
 }
 
 // Initialise nodes and communication channels.
-func initNodes(t *testing.T, n int, phaseDuration time.Duration) []*node {
+func initNodes(t *testing.T, n int, phase0Duration, phase1Duration, phase2Duration time.Duration) []*node {
 	// Create the channels through which the nodes will communicate
 	channels := make([]chan DKGMessage, 0, n)
 	for i := 0; i < n; i++ {
@@ -195,7 +204,7 @@ func initNodes(t *testing.T, n int, phaseDuration time.Duration) []*node {
 			channels[i],
 			zerolog.New(os.Stderr).With().Int("id", i).Logger())
 
-		node := newNode(i, controller, phaseDuration)
+		node := newNode(i, controller, phase0Duration, phase1Duration, phase2Duration)
 
 		nodes = append(nodes, node)
 	}
@@ -232,14 +241,23 @@ func wait(t *testing.T, nodes []*node, timeout time.Duration) {
 func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 	for i := 1; i < len(nodes); i++ {
 		require.NotEmpty(t, nodes[i].controller.privateShare)
-		require.NotEmpty(t, nodes[i].controller.publicShare)
+		require.NotEmpty(t, nodes[i].controller.groupPublicKey)
+
+		require.Equal(t, nodes[0].controller.groupPublicKey, nodes[i].controller.groupPublicKey,
+			"node %d has a different groupPubKey than node 0: %s %s",
+			i,
+			nodes[i].controller.groupPublicKey,
+			nodes[0].controller.groupPublicKey)
+
 		require.Len(t, nodes[i].controller.publicKeys, totalNodes)
 
 		for j := 0; j < totalNodes; j++ {
 			if !reflect.DeepEqual(nodes[0].controller.publicKeys[j], nodes[i].controller.publicKeys[j]) {
-				t.Fatalf("pubs[%d] differ: %s, %s", j,
-					nodes[0].controller.publicKeys[j].String(),
-					nodes[i].controller.publicKeys[j].String())
+				t.Fatalf("node %d has a different pubs[%d] than node 0: %s, %s",
+					i,
+					j,
+					nodes[0].controller.publicKeys[j],
+					nodes[i].controller.publicKeys[j])
 			}
 		}
 
