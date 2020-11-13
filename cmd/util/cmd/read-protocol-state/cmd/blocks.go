@@ -46,7 +46,7 @@ type Reader struct {
 	blocks storage.Blocks
 }
 
-func NewReader(state protocol.State, storages *common.Storages) *Reader {
+func NewReader(state protocol.State, storages *storage.All) *Reader {
 	return &Reader{
 		state:  state,
 		blocks: storages.Blocks,

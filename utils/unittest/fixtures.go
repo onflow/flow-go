@@ -509,7 +509,7 @@ func WithApproverID(id flow.Identifier) func(*flow.ResultApproval) {
 
 func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.Body.Attestation.BlockID = id
+		ra.Body.BlockID = id
 	}
 }
 

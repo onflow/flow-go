@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestLRUEjector_Track evaluates that tracking a new item adds the item to the ejector table.
@@ -232,25 +231,4 @@ func (m MockEntity) ID() flow.Identifier {
 
 func (m MockEntity) Checksum() flow.Identifier {
 	return flow.Identifier{}
-}
-
-// Check that size is decremented everytime an item is removed
-func TestSizeEjector(t *testing.T) {
-	var size uint
-
-	ejector := NewSizeEjector(&size)
-
-	entities := make(map[flow.Identifier]flow.Entity, 100)
-	for i := 0; i < 100; i++ {
-		id := unittest.IdentifierFixture()
-		entities[id] = MockEntity{}
-		size++
-	}
-
-	for i := 0; i < 50; i++ {
-		_, _ = ejector.Eject(entities)
-	}
-
-	require.Equal(t, uint(50), size)
-
 }
