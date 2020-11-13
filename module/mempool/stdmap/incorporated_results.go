@@ -2,7 +2,6 @@ package stdmap
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/model"
@@ -19,21 +18,18 @@ type IncorporatedResults struct {
 }
 
 // NewIncorporatedResults creates a mempool for the incorporated results.
-func NewIncorporatedResults(limit uint, opts ...OptionFunc) (*IncorporatedResults, error) {
+func NewIncorporatedResults(options ...OptionFunc) (*IncorporatedResults, error) {
 	mempool := &IncorporatedResults{
-		size:    0,
-		backend: NewBackend(append(opts, WithLimit(limit))...),
+		size: 0,
 	}
 
-	adjustSizeOnEjection := func(entity flow.Entity) {
+	// ejection callback to update local size tracking
+	adjustSizeOnEjection := func(key flow.Identifier, entity flow.Entity) {
 		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultMap:
 		incorporatedResultMap := entity.(*model.IncorporatedResultMap)
 		mempool.size -= uint(len(incorporatedResultMap.IncorporatedResults))
 	}
-	err := mempool.backend.RegisterEjectionCallback(adjustSizeOnEjection)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ejection callback with IncorporatedResults mempool's backend")
-	}
+	mempool.backend = NewBackend(WithLimit(limit), WithEjectionCallback(adjustSizeOnEjection))
 
 	return mempool, nil
 }

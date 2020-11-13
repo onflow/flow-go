@@ -4,7 +4,6 @@ package stdmap
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/model"
@@ -35,21 +34,18 @@ func key(resultID flow.Identifier, chunkIndex uint64) flow.Identifier {
 }
 
 // NewApprovals creates a new memory pool for result approvals.
-func NewApprovals(limit uint, opts ...OptionFunc) (*Approvals, error) {
+func NewApprovals(limit uint) (*Approvals, error) {
 	mempool := &Approvals{
-		size:    0,
-		backend: NewBackend(append(opts, WithLimit(limit))...),
+		size: 0,
 	}
 
-	adjustSizeOnEjection := func(entity flow.Entity) {
+	// ejection callback to update local size tracking
+	adjustSizeOnEjection := func(key flow.Identifier, entity flow.Entity) {
 		// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
 		approvalMapEntity := entity.(*model.ApprovalMapEntity)
 		mempool.size -= uint(len(approvalMapEntity.Approvals))
 	}
-	err := mempool.backend.RegisterEjectionCallback(adjustSizeOnEjection)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ejection callback with Approvals mempool's backend")
-	}
+	mempool.backend = NewBackend(WithLimit(limit), WithEjectionCallback(adjustSizeOnEjection))
 
 	return mempool, nil
 }

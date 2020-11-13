@@ -112,7 +112,7 @@ func NewBackend(options ...OptionFunc) *Backend {
 		Backdata:         NewBackdata(),
 		limit:            uint(math.MaxUint32),
 		eject:            EjectTrueRandom,
-		ejectionCallback: nil,
+		ejectionCallback: func(flow.Identifier, flow.Entity) { /* noop */ },
 	}
 	for _, option := range options {
 		option(&b)
@@ -231,12 +231,7 @@ func (b *Backend) reduce() {
 			key, _ = EjectFakeRandom(b.entities)
 		}
 
-		// remove the key
-		delete(b.entities, key)
-
-		// notify callback
-		if b.ejectionCallback != nil {
-			b.ejectionCallback(entity)
-		}
+		delete(b.entities, key)         // remove the key
+		b.ejectionCallback(key, entity) // notify callback
 	}
 }
