@@ -26,15 +26,11 @@ func keyPublicKey(index uint64) string {
 
 type Accounts struct {
 	ledger Ledger
-	*addresses
 }
 
-func NewAccounts(ledger Ledger, chain flow.Chain) *Accounts {
-	addresses := newAddresses(ledger, chain)
-
+func NewAccounts(ledger Ledger) *Accounts {
 	return &Accounts{
-		ledger:    ledger,
-		addresses: addresses,
+		ledger: ledger,
 	}
 }
 
@@ -83,17 +79,14 @@ func (a *Accounts) Exists(address flow.Address) (bool, error) {
 	return false, nil
 }
 
-func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	addressState, err := a.addresses.GetAddressGeneratorState()
+// Create account sets all required registers on an address.
+func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Address) error {
+	exists, err := a.Exists(newAddress)
 	if err != nil {
-		return flow.EmptyAddress, err
+		return err
 	}
-
-	// generate the new account address
-	var newAddress flow.Address
-	newAddress, err = addressState.NextAddress()
-	if err != nil {
-		return flow.EmptyAddress, err
+	if exists {
+		return fmt.Errorf("account with address %s already exists", newAddress.Hex())
 	}
 
 	// mark that this account exists
@@ -101,15 +94,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, err
 
 	a.ledger.Set(string(newAddress.Bytes()), string(newAddress.Bytes()), keyCode, nil)
 
-	err = a.SetAllPublicKeys(newAddress, publicKeys)
-	if err != nil {
-		return flow.EmptyAddress, err
-	}
-
-	// update the address state
-	a.addresses.SetAddressGeneratorState(addressState)
-
-	return newAddress, nil
+	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {

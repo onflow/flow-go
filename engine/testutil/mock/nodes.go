@@ -140,7 +140,7 @@ type ExecutionNode struct {
 }
 
 func (en ExecutionNode) Ready() {
-	lifecycle.AllReady(
+	<-lifecycle.AllReady(
 		en.Ledger,
 		en.ReceiptsEngine,
 		en.IngestionEngine,
