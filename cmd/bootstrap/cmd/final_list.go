@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var (
@@ -56,76 +57,75 @@ func finalList(cmd *cobra.Command, args []string) {
 	stakingNodes := readStakingContractDetails()
 
 	// merge internal and partner node infos
-	allNodes := mergeNodeInfos(flowNodes, partnerNodes)
+	mixedNodeInfos := mergeNodeInfos(flowNodes, partnerNodes)
 
 	// reconcile nodes from staking contract nodes
-	reconcileNodes(allNodes, stakingNodes)
+	reconcileNodes(mixedNodeInfos, stakingNodes)
 
-	// TODO: output a new nodes-config.json ... what is this config?
-	writeJSON(fmt.Sprintf(flagOutdir, "node-config.json"), allNodes)
-}
-
-func readStakingContractDetails() []model.NodeInfo {
-	var stakingNodes []model.NodeInfoPub
-	path := filepath.Join(flagStakingNodesDir, "node-infos.pub.json")
-	readJSON(path, &stakingNodes)
-
-	var nodes []model.NodeInfo
-	for _, staking := range stakingNodes {
-		validateAddressFormat(staking.Address)
-
-		// validate every single partner node
-		nodeID := validateNodeID(staking.NodeID)
-		networkPubKey := validateNetworkPubKey(staking.NetworkPubKey)
-		stakingPubKey := validateStakingPubKey(staking.StakingPubKey)
-
-		node := model.NewPublicNodeInfo(
-			nodeID,
-			staking.Role,
-			staking.Address,
-			0,
-			networkPubKey,
-			stakingPubKey,
-		)
-		nodes = append(nodes, node)
-	}
-
-	return nodes
+	// write node-config.json with the new list of nodes to be used for the `finalize` command
+	writeJSON(fmt.Sprintf(flagOutdir, "node-config.json"), model.ToPublicNodeInfoList(mixedNodeInfos))
 }
 
 func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 	// check node count
 	if len(nodes) != len(stakingNodes) {
 		log.Error().Int("nodes", len(nodes)).Int("staked nodes", len(stakingNodes)).
-			Msg("staked node count does not match internal and parnter node count")
+			Msg("staked node count does not match flow and parnter node count")
 	}
 
-	var nodesByAddress map[string]model.NodeInfo
+	var nodesByID map[flow.Identifier]model.NodeInfo
 	for _, node := range nodes {
-		nodesByAddress[node.Address] = node
-	}
-
-	// check node id mismatch
-	for _, stakedNode := range stakingNodes {
-		matchingNode := nodesByAddress[stakedNode.Address]
-
-		if matchingNode.NodeID != stakedNode.NodeID {
-			log.Error().Str("staked node", stakedNode.NodeID.String()).
-				Str("node", matchingNode.NodeID.String()).
-				Msg("node id does not match staked contract nodeID")
-		}
+		nodesByID[node.NodeID] = node
 	}
 
 	// check node type mismatch
 	for _, stakedNode := range stakingNodes {
-		matchingNode := nodesByAddress[stakedNode.Address]
+		matchingNode, ok := nodesByID[stakedNode.NodeID]
+		if !ok {
+			log.Warn().Str("staked node id", stakedNode.NodeID.String()).
+				Msg("no matching node found in non-contract nodes list")
+			continue
+		}
 
-		if matchingNode.NodeID != stakedNode.NodeID {
-			log.Error().Str("staked node", stakedNode.NodeID.String()).
+		// check node type
+		if matchingNode.Role != stakedNode.Role {
+			log.Warn().Str("staked node", stakedNode.NodeID.String()).
 				Str("staked node type", stakedNode.Role.String()).
 				Str("node", matchingNode.NodeID.String()).
 				Str("node type", matchingNode.Role.String()).
 				Msg("node type does not match")
+		}
+
+		// check address match
+		if matchingNode.Address != stakedNode.Address {
+			log.Warn().Str("staked node address", stakedNode.Address).
+				Str("node address", matchingNode.Address).
+				Msg("address do not match")
+		}
+
+		// flow nodes contain private key info
+		if matchingNode.NetworkPubKey != nil {
+			// check networking pubkey match
+			matchNodeKey := matchingNode.NetworkPubKey().String()
+			stakedNodeKey := stakedNode.NetworkPubKey().String()
+
+			if matchNodeKey != stakedNodeKey {
+				log.Warn().Str("staked network key", stakedNodeKey).
+					Str("network key", matchNodeKey).
+					Msg("networking keys do not match")
+			}
+		}
+
+		// flow nodes contain priv atekey info
+		if matchingNode.StakingPubKey != nil {
+			matchNodeKey := matchingNode.StakingPubKey().String()
+			stakedNodeKey := stakedNode.StakingPubKey().String()
+
+			if matchNodeKey != stakedNodeKey {
+				log.Warn().Str("staked staking key", stakedNodeKey).
+					Str("staking key", matchNodeKey).
+					Msg("staking keys do not match")
+			}
 		}
 	}
 }
@@ -145,7 +145,7 @@ func assembleInternalNodesWithoutStake() []model.NodeInfo {
 			nodeID,
 			internal.Role,
 			internal.Address,
-			0,
+			1000,
 			internal.NetworkPrivKey,
 			internal.StakingPrivKey,
 		)
@@ -173,7 +173,35 @@ func assemblePartnerNodesWithoutStake() []model.NodeInfo {
 			nodeID,
 			partner.Role,
 			partner.Address,
-			0,
+			1000,
+			networkPubKey,
+			stakingPubKey,
+		)
+		nodes = append(nodes, node)
+	}
+
+	return nodes
+}
+
+func readStakingContractDetails() []model.NodeInfo {
+	var stakingNodes []model.NodeInfoPub
+	path := filepath.Join(flagStakingNodesDir, "node-infos.pub.json")
+	readJSON(path, &stakingNodes)
+
+	var nodes []model.NodeInfo
+	for _, staking := range stakingNodes {
+		validateAddressFormat(staking.Address)
+
+		// validate every single partner node
+		nodeID := validateNodeID(staking.NodeID)
+		networkPubKey := validateNetworkPubKey(staking.NetworkPubKey)
+		stakingPubKey := validateStakingPubKey(staking.StakingPubKey)
+
+		node := model.NewPublicNodeInfo(
+			nodeID,
+			staking.Role,
+			staking.Address,
+			staking.Stake,
 			networkPubKey,
 			stakingPubKey,
 		)
