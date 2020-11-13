@@ -104,7 +104,7 @@ func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 		}
 
 		// flow nodes contain private key info
-		if matchingNode.NetworkPubKey != nil {
+		if matchingNode.NetworkPubKey().String() != "" {
 			// check networking pubkey match
 			matchNodeKey := matchingNode.NetworkPubKey().String()
 			stakedNodeKey := stakedNode.NetworkPubKey().String()
@@ -117,7 +117,7 @@ func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 		}
 
 		// flow nodes contain priv atekey info
-		if matchingNode.StakingPubKey != nil {
+		if matchingNode.StakingPubKey().String() != "" {
 			matchNodeKey := matchingNode.StakingPubKey().String()
 			stakedNodeKey := stakedNode.StakingPubKey().String()
 
