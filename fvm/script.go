@@ -71,7 +71,10 @@ func (i ScriptInvocator) Process(
 	proc *ScriptProcedure,
 	ledger state.Ledger,
 ) error {
-	env := newEnvironment(ctx, ledger)
+	env, err := newEnvironment(ctx, ledger)
+	if err != nil {
+		return err
+	}
 
 	location := runtime.ScriptLocation(proc.ID[:])
 

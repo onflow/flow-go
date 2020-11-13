@@ -1,11 +1,13 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -25,12 +27,11 @@ func NewExecutionReceipts(db *badger.DB, results *ExecutionResults) *ExecutionRe
 func (r *ExecutionReceipts) store(receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// store the receipt-specific metadata
-		err := operation.InsertExecutionReceiptMeta(receipt.ID(), receipt.Meta())(tx)
+		err := operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receipt.ID(), receipt.Meta()))(tx)
 		if err != nil {
 			return fmt.Errorf("could not store receipt metadata: %w", err)
 		}
-		// store the result -- don't error if the result has already been stored
-		err = operation.SkipDuplicates(r.results.store(&receipt.ExecutionResult))(tx)
+		err = r.results.store(&receipt.ExecutionResult)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store result: %w", err)
 		}
@@ -75,7 +76,46 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 }
 
 func (r *ExecutionReceipts) Index(blockID, receiptID flow.Identifier) error {
-	return operation.RetryOnConflict(r.db.Update, operation.IndexExecutionReceipt(blockID, receiptID))
+	return operation.RetryOnConflict(r.db.Update, func(tx *badger.Txn) error {
+		err := operation.IndexExecutionReceipt(blockID, receiptID)(tx)
+		if err == nil {
+			return nil
+		}
+
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return err
+		}
+
+		// when trying to index a receipt for a block, and there is already a receipt indexed for this block,
+		// double check if the indexed receipt has the same result.
+		// if the result is the same, we could skip indexing the receipt
+		// if the result is different, then return error
+		var storedReceiptID flow.Identifier
+		err = operation.LookupExecutionReceipt(blockID, &storedReceiptID)(tx)
+		if err != nil {
+			return fmt.Errorf("there is a receipt stored already, but cannot retrieve the ID of it: %w", err)
+		}
+
+		storedReceipt, err := r.byID(storedReceiptID)(tx)
+		if err != nil {
+			return fmt.Errorf("there is a receipt stored already, but cannot retrieve of it: %w", err)
+		}
+
+		storingReceipt, err := r.byID(receiptID)(tx)
+		if err != nil {
+			return fmt.Errorf("attempting to index a receipt, but the receipt is not stored yet: %w", err)
+		}
+
+		storedResultID := storedReceipt.ExecutionResult.ID()
+		storingResultID := storingReceipt.ExecutionResult.ID()
+		if storedResultID != storingResultID {
+			return fmt.Errorf(
+				"storing receipt that is different from the already stored one for block: %v, storing receipt: %v, stored receipt: %v. storing result: %v, stored result: %v, %w",
+				blockID, receiptID, storedReceiptID, storingResultID, storedResultID, storage.ErrDataMismatch)
+		}
+
+		return nil
+	})
 }
 
 func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error) {
