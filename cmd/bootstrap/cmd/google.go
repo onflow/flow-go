@@ -13,19 +13,19 @@ import (
 )
 
 // GoogleBucket ...
-type GoogleBucket struct {
+type googleBucket struct {
 	Name string
 }
 
 // NewGoogleBucket ...
-func NewGoogleBucket(bucketName string) *GoogleBucket {
-	return &GoogleBucket{
+func newGoogleBucket(bucketName string) *googleBucket {
+	return &googleBucket{
 		Name: bucketName,
 	}
 }
 
 // NewClient ...
-func (g *GoogleBucket) NewClient(ctx context.Context) (*storage.Client, error) {
+func (g *googleBucket) newClient(ctx context.Context) (*storage.Client, error) {
 	client, err := storage.NewClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (g *GoogleBucket) NewClient(ctx context.Context) (*storage.Client, error) {
 }
 
 // GetFiles ...
-func (g *GoogleBucket) GetFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]string, error) {
+func (g *googleBucket) getFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]string, error) {
 	it := client.Bucket(g.Name).Objects(ctx, &storage.Query{
 		Prefix:    prefix,
 		Delimiter: delimiter,
@@ -57,7 +57,7 @@ func (g *GoogleBucket) GetFiles(ctx context.Context, client *storage.Client, pre
 }
 
 // DownloadFile ...
-func (g *GoogleBucket) DownloadFile(ctx context.Context, client *storage.Client, destination, source string) error {
+func (g *googleBucket) downloadFile(ctx context.Context, client *storage.Client, destination, source string) error {
 
 	// create dir of destination
 	dir := filepath.Dir(destination)
