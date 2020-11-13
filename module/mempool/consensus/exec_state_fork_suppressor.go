@@ -54,14 +54,26 @@ func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, db *badge
 		return nil, fmt.Errorf("failed to interface with storage: %w", err)
 	}
 
-	return &ExecStateForkSuppressor{
+	wrapper := ExecStateForkSuppressor{
 		mutex:            sync.RWMutex{},
 		seals:            seals,
 		byBlockID:        make(map[flow.Identifier]*flow.IncorporatedResultSeal),
 		execForkDetected: flag,
 		db:               db,
 		log:              log.With().Str("mempool", "ExecStateForkSuppressor").Logger(),
-	}, nil
+	}
+
+	// add ejection callback, which deletes the
+	onEject := func(entity flow.Entity) {
+		// uncaught type assertion; should never panic as mempool.IncorporatedResultSeals only stores IncorporatedResultSeal
+		irSeal := entity.(*flow.IncorporatedResultSeal)
+		wrapper.byBlockID[irSeal.Seal.BlockID]
+		delete(wrapper.byBlockID, irSeal.Seal.BlockID)
+		wrapper.log.Debug("ejected ")
+	}
+	seals.RegisterEjectionCallbacks(onEject)
+
+	return &wrapper, nil
 }
 
 // Add adds the given seal to the mempool. Return value indicates whether or not
@@ -79,6 +91,10 @@ func (s *ExecStateForkSuppressor) Add(irSeal *flow.IncorporatedResultSeal) (bool
 		return false, ExecutionForkErr
 	}
 
+	// this wrapper is a temporary safety layer; we check all conditions that are
+	// required for its correct functioning locally, to not delegate safety-critical
+	// implementation aspects to external components
+	// => ensure locally that irSeal's start and end state are non-empty values
 	err := s.enforceValidStates(irSeal)
 	if err != nil {
 		return false, fmt.Errorf("invalid candidate seal: %w", err)
@@ -100,7 +116,6 @@ func (s *ExecStateForkSuppressor) Add(irSeal *flow.IncorporatedResultSeal) (bool
 		return added, fmt.Errorf("failed to add seal to wrapped mempool: %w", err)
 	}
 	if added && !found {
-		// We only store the
 		// no other seal for this block in mempool => store seal as archetype result for block
 		s.byBlockID[blockID] = irSeal
 	}
@@ -155,6 +170,11 @@ func (s *ExecStateForkSuppressor) Clear() {
 	defer s.mutex.Unlock()
 	s.byBlockID = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 	s.seals.Clear()
+}
+
+// RegisterEjectionCallbacks adds the provided OnEjection callbacks
+func (s *ExecStateForkSuppressor) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
+	s.seals.RegisterEjectionCallbacks(callbacks...)
 }
 
 // readExecutionForkDetectedFlag attempts to read the flag ExecutionForkDetected from the database.

@@ -84,7 +84,7 @@ func TestIncorporatedResultsEjectSize(t *testing.T) {
 
 		// insert 20 items (10 above limit)
 		for i := 0; i < 20; i++ {
-			_, _ = pool.Add(unittest.IncorporatedResultFixture())
+			_, _ = pool.Add(unittest.IncorporatedResult.Fixture())
 		}
 
 		// 10 items should have been evicted, so size 10

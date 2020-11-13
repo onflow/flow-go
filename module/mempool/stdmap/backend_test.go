@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -155,8 +156,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 			require.False(t, pool.Has(id))
 		}()
 	}
-	err := pool.RegisterEjectionCallback(ensureEntityNotInMempool)
-	require.NoError(t, err)
+	pool.RegisterEjectionCallbacks(ensureEntityNotInMempool)
 
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)
@@ -173,13 +173,53 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 	require.Equal(t, uint(limit), pool.Size(), "expected mempool to be at max capacity limit")
 }
 
-// TestBackend_ErrorOnRepeatedEjectionCallback verifies that the Backend errors is the
-// ejection callback is set repeatedly
-func TestBackend_ErrorOnRepeatedEjectionCallback(t *testing.T) {
-	pool := NewBackend()
-	err := pool.RegisterEjectionCallback(func(entity flow.Entity) {})
-	require.NoError(t, err)
+// TestBackend_Multiple_OnEjectionCallbacks verifies that the Backend
+//  handles multiple ejection callbacks correctly
+func TestBackend_Multiple_OnEjectionCallbacks(t *testing.T) {
+	// ejection callback counts number of calls
+	calls := uint64(0)
+	callback := func(entity flow.Entity) {
+		atomic.AddUint64(&calls, 1)
+	}
 
-	err = pool.RegisterEjectionCallback(func(entity flow.Entity) {})
-	require.Error(t, err)
+	// construct backend
+	const (
+		limit = 3
+	)
+	pool := NewBackend(WithLimit(limit))
+	pool.RegisterEjectionCallbacks(callback, callback)
+
+	t.Run("fill mempool up to limit", func(t *testing.T) {
+		addRandomEntities(t, pool, limit)
+		require.Equal(t, uint(limit), pool.Size(), "expected mempool to be at max capacity limit")
+		require.Equal(t, uint64(0), atomic.LoadUint64(&calls))
+	})
+
+	t.Run("add elements beyond limit", func(t *testing.T) {
+		addRandomEntities(t, pool, 2) // as we registered callback _twice_, we should receive 2 calls per ejection
+		require.Equal(t, uint(limit), pool.Size(), "expected mempool to be at max capacity limit")
+		require.Equal(t, uint64(4), atomic.LoadUint64(&calls))
+	})
+
+	t.Run("fill mempool up to limit", func(t *testing.T) {
+		atomic.StoreUint64(&calls, uint64(0))
+		pool.RegisterEjectionCallbacks(callback) // now we have registered the callback three times
+		addRandomEntities(t, pool, 7)            // => we should receive 3 calls per ejection
+		require.Equal(t, uint(limit), pool.Size(), "expected mempool to be at max capacity limit")
+		require.Equal(t, uint64(21), atomic.LoadUint64(&calls))
+	})
+}
+
+func addRandomEntities(t *testing.T, backend *Backend, num int) {
+	// add swarm-number of items to backend
+	wg := sync.WaitGroup{}
+	wg.Add(num)
+	for ; num > 0; num-- {
+		go func() {
+			randID := unittest.IdentifierFixture()
+			backend.Add(fake(randID[:])) // creates and adds a fake item to the mempool
+			wg.Done()
+		}()
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "failed to add elements in time")
 }

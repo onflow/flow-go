@@ -205,7 +205,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)
 
-	seals := stdmap.NewIncorporatedResultSeals(1000)
+	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)

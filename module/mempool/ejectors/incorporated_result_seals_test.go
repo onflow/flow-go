@@ -21,7 +21,7 @@ func TestLatestSealEjector(t *testing.T) {
 		headers := storage.NewHeaders(metrics.NewNoopCollector(), db)
 		ejector := NewLatestIncorporatedResultSeal(headers)
 
-		pool := stdmap.NewIncorporatedResultSeals(N, stdmap.WithEject(ejector.Eject))
+		pool := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(N), stdmap.WithEject(ejector.Eject))
 
 		var (
 			maxHeader flow.Header

@@ -1,6 +1,9 @@
 package stdmap
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
+)
 
 // IncorporatedResultSeals implements the incorporated result seals memory pool
 // of the consensus nodes, used to store seals that need to be added to blocks.
@@ -9,9 +12,9 @@ type IncorporatedResultSeals struct {
 }
 
 // NewIncorporatedResults creates a mempool for the incorporated result seals
-func NewIncorporatedResultSeals(limit uint, opts ...OptionFunc) *IncorporatedResultSeals {
+func NewIncorporatedResultSeals(opts ...OptionFunc) *IncorporatedResultSeals {
 	return &IncorporatedResultSeals{
-		Backend: NewBackend(append(opts, WithLimit(limit))...),
+		Backend: NewBackend(opts...),
 	}
 }
 
@@ -49,4 +52,9 @@ func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 // Clear removes all entities from the pool.
 func (ir *IncorporatedResultSeals) Clear() {
 	ir.Backend.Clear()
+}
+
+// RegisterEjectionCallbacks adds the provided OnEjection callbacks
+func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
+	ir.Backend.RegisterEjectionCallbacks(callbacks...)
 }

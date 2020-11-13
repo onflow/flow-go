@@ -132,7 +132,7 @@ func main() {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
 			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
-			seals = stdmap.NewIncorporatedResultSeals(sealLimit, stdmap.WithEject(ejector.Eject))
+			seals = stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit), stdmap.WithEject(ejector.Eject))
 			return nil
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
