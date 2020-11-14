@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/cadence/runtime/parser2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -99,12 +101,16 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 		return err
 	}
 
-	// TODO check account/payer signatures
-
 	err = v.checkAddresses(tx)
 	if err != nil {
 		return err
 	}
+
+	err = v.checkSignatureFormat(tx)
+	if err != nil {
+		return err
+	}
+	// TODO replace checkSignatureFormat by verifying the account/payer signatures
 
 	return nil
 }
@@ -226,6 +232,37 @@ func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 		if index > v.options.MaxAddressIndex {
 			return InvalidAddressError{Address: address}
 		}
+	}
+
+	return nil
+}
+
+func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) error {
+
+	for _, signature := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
+		// check the format of the signature is valid.
+		// a valid signature is an ECDSA signature of either P-256 or secp256k1 curve.
+		ecdsaSignature := signature.Signature
+
+		// check if the signature could be a P-256 signature
+		valid, err := crypto.SignatureFormatCheck(crypto.ECDSAP256, ecdsaSignature)
+		if err != nil {
+			return fmt.Errorf("could not check the signature format (%s): %w", signature, err)
+		}
+		if valid {
+			continue
+		}
+
+		// check if the signature could be a secp256k1 signature
+		valid, err = crypto.SignatureFormatCheck(crypto.ECDSASecp256k1, ecdsaSignature)
+		if err != nil {
+			return fmt.Errorf("could not check the signature format (%s): %w", signature, err)
+		}
+		if valid {
+			continue
+		}
+
+		return InvalidSignatureError{Signature: signature}
 	}
 
 	return nil
