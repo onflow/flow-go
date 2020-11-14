@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -357,6 +358,11 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 		result, err := historicalNode.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
 		if err == nil {
 			// Found on a historical node. Report
+			if result.GetStatus() == entities.TransactionStatus_PENDING {
+				// This is on a historical node. No transactions from it will ever be
+				// executed, therefore we should consider this expired
+				result.Status = entities.TransactionStatus_EXPIRED
+			}
 			return access.MessageToTransactionResult(result), nil
 		}
 		// Otherwise, if not found, just continue
