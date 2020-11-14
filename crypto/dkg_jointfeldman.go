@@ -21,6 +21,13 @@ import (
 // This is a fully distributed generation. The secret is a BLS
 // private key generated jointly by all the participants.
 
+// (t) is the threshold parameter. Although the API allows using arbitrary values of (t),
+// the DKG protocol is secure in the presence of up to (t) malicious participants
+// only for (t) values less than n/2.
+// Joint-Feldman is the protocol implemented in Flow, (t) being set to the maximum value
+// t = floor((n-1)/2) to optimize for unforgeability and robustness of the threshold
+// signature scheme using the output keys.
+
 // In each feldman VSS istance, the leader generates a chunk of the
 // the private key of a BLS threshold signature scheme.
 // Using the complaints mechanism, each leader is qualified or disqualified

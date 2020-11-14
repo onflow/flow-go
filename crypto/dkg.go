@@ -11,7 +11,7 @@ package crypto
 // among (n) participants in a way that any (t+1) key shares allow reconstructing
 // the initial key (and also reconstructing a BLS threshold signature under the initial key).
 // We refer to the initial key pair by group private and group public key.
-// (t) is the threshold parameter. Although the API allows using arbitrary values of (t),
+// (t) is the threshold parameter.
 // Flow uses DKG with the value t = floor((n-1)/2) to optimize for unforgeability and robustness
 // of the threshold signature scheme using the output keys.
 
