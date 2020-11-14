@@ -54,8 +54,15 @@ type JointFeldmanState struct {
 
 // NewJointFeldman creates a new instance of a Joint Feldman protocol.
 //
+// size if the total number of nodes (n).
+// threshold is the threshold parameter (t). the DKG protocol is secure in the
+// presence of up to (t) malicious participants only for (t) values less than n/2.
+// currentIndex is the index of the node creating the new DKG instance.
+// processor is the DKGProcessor instance required to connect the node to the
+// communication channels.
+//
 // An instance is run by a single node and is usable for only one protocol.
-// In order to run the protocol again, a new instance needs to be created
+// In order to run the protocol again, a new instance needs to be created.
 func NewJointFeldman(size int, threshold int, currentIndex int,
 	processor DKGProcessor) (DKGState, error) {
 
