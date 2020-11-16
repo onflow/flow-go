@@ -182,12 +182,11 @@ type IndexBoundTopology struct {
 }
 
 // Returns a subset of ids bounded by [minIndex, maxIndex) for the SparseTopology
-func (ibt IndexBoundTopology) ChannelSubset(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
+func (ibt IndexBoundTopology) SubsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
 	sub := ids[ibt.minIndex:ibt.maxIndex]
 	return sub, nil
 }
-func (ibt IndexBoundTopology) Subset(ids flow.IdentityList, shouldHave flow.IdentityList) (flow.IdentityList,
-	error) {
+func (ibt IndexBoundTopology) SubsetRole(ids flow.IdentityList, shouldHave flow.IdentityList, roles flow.RoleList) (flow.IdentityList, error) {
 	if len(ids) == 0 {
 		return ids, nil
 	}

@@ -54,7 +54,7 @@ func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.Id
 		if role == flow.RoleCollection {
 			continue
 		}
-		roleFanout, err := stm.topology.Subset(ids.Filter(filter.HasRole(role)), nil)
+		roleFanout, err := stm.topology.SubsetRole(ids.Filter(filter.HasRole(role)), nil, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for role %s: %w", role, err)
 		}
@@ -72,7 +72,7 @@ func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.Id
 		shouldHave := make([]*flow.Identity, len(myFanout))
 		copy(shouldHave, myFanout)
 
-		topicFanout, err := stm.topology.ChannelSubset(ids, nil, myChannel)
+		topicFanout, err := stm.topology.SubsetChannel(ids, nil, myChannel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", myChannel, err)
 		}

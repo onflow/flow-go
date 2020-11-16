@@ -34,7 +34,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState,
 // Subset samples and returns a connected graph of the subscribers to the topic from the ids.
 // A connected graph fanout means that the subset of ids returned by this method on different nodes collectively
 // construct a connected graph component among all the subscribers to the topic.
-func (t *TopicBasedTopology) ChannelSubset(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
+func (t *TopicBasedTopology) SubsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
 	var subscribers flow.IdentityList
 	var involvedRoles flow.RoleList
 
@@ -77,10 +77,10 @@ func (t *TopicBasedTopology) ChannelSubset(ids flow.IdentityList, shouldHave flo
 	// samples subscribers of a connected graph
 	// subscriberSample := t.graphSampler.SampleConnectedGraph(subscribers, shouldHave)
 
-	return t.Subset(subscribers, shouldHave)
+	return t.SubsetRole(subscribers, shouldHave, nil)
 }
 
-func (t TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.IdentityList) (flow.IdentityList, error) {
+func (t TopicBasedTopology) SubsetRole(ids flow.IdentityList, shouldHave flow.IdentityList, roles flow.RoleList) (flow.IdentityList, error) {
 	return t.graphSampler.SampleConnectedGraph(ids, shouldHave), nil
 }
 
