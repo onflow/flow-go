@@ -37,9 +37,9 @@ func (l *LinearFanoutGraphSampler) SampleConnectedGraph(all flow.IdentityList,
 	var err error
 
 	if shouldHave == nil {
-		result, err = l.connectedGraph(all, l.seed)
+		result, err = l.connectedGraph(all)
 	} else {
-		result, err = l.conditionalConnectedGraph(all, shouldHave, l.seed)
+		result, err = l.conditionalConnectedGraph(all, shouldHave)
 	}
 
 	if err != nil {
@@ -51,8 +51,7 @@ func (l *LinearFanoutGraphSampler) SampleConnectedGraph(all flow.IdentityList,
 // conditionalConnectedGraph returns a random subset of length (n+1)/2, which includes the shouldHave
 // set of identifiers.
 // If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
-func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flow.IdentityList,
-	seed int64) (flow.IdentityList, error) {
+func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flow.IdentityList) (flow.IdentityList, error) {
 	// total sample size
 	totalSize := LinearFanoutFunc(len(all))
 
@@ -69,18 +68,18 @@ func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flo
 
 	// others are all excluding should have ones
 	others := all.Filter(filter.Not(filter.In(shouldHave)))
-	others = others.DeterministicSample(uint(subsetSize), seed)
+	others = others.DeterministicSample(uint(subsetSize), l.seed)
 	return others.Union(shouldHave), nil
 }
 
 // connectedGraph returns a random subset of length (n+1)/2.
 // If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
-func (l *LinearFanoutGraphSampler) connectedGraph(all flow.IdentityList, seed int64) (flow.IdentityList, error) {
+func (l *LinearFanoutGraphSampler) connectedGraph(all flow.IdentityList) (flow.IdentityList, error) {
 	if len(all) == 0 {
 		return nil, fmt.Errorf("empty identity list")
 	}
 	// choose (n+1)/2 random nodes so that each node in the graph will have a degree >= (n+1) / 2,
 	// guaranteeing a connected graph.
 	size := uint(LinearFanoutFunc(len(all)))
-	return all.DeterministicSample(size, seed), nil
+	return all.DeterministicSample(size, l.seed), nil
 }
