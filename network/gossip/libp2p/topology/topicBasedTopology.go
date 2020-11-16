@@ -31,56 +31,35 @@ func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState,
 	return t, nil
 }
 
-// Subset samples and returns a connected graph of the subscribers to the topic from the ids.
-// A connected graph fanout means that the subset of ids returned by this method on different nodes collectively
-// construct a connected graph component among all the subscribers to the topic.
-func (t *TopicBasedTopology) SubsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
-	var subscribers flow.IdentityList
-	var involvedRoles flow.RoleList
-
-	if _, ok := engine.IsClusterChannelID(topic); ok {
-		// extracts cluster peer ids to which the node belongs to.
-		clusterPeers, err := t.clusterPeers()
-		if err != nil {
-			return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", t.me.String(), err)
-		}
-
-		subscribers = clusterPeers
-
-		involvedRoles = flow.RoleList{flow.RoleCollection}
-		shouldHave = shouldHave.Filter(filter.HasNodeID(subscribers.NodeIDs()...))
+// SubsetChannel returns a random subset of the identity list that is passed. `shouldHave` represents set of
+// identities that should be included in the returned subset.
+// Returned identities should all subscribed to the specified `channel`.
+// Note: this method should not include identity of its executor.
+func (t *TopicBasedTopology) SubsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList,
+	channel string) (flow.IdentityList, error) {
+	if _, ok := engine.IsClusterChannelID(channel); ok {
+		return t.clusterChannelHandler(ids, shouldHave)
 	} else {
-		// not a cluster-based topic.
-		//
-		// extracts flow roles subscribed to topic.
-		roles, ok := engine.RolesByChannelID(topic)
-		if !ok {
-			return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", topic)
-		}
-
-		// extract ids of subscribers to the topic
-		subscribers = ids.Filter(filter.HasRole(roles...))
-		involvedRoles = roles
+		return t.nonClusterChannelHandler(ids, shouldHave, channel)
 	}
+}
 
-	// excludes the node itself from its topology
-	subscribers = subscribers.Filter(t.notMeFilter)
-
+// SubsetRole returns a random subset of the identity list that is passed. `shouldHave` represents set of
+// identities that should be included in the returned subset.
+// Returned identities should all be of one of the specified `roles`.
+// Note: this method should not include identity of its executor.
+func (t TopicBasedTopology) SubsetRole(ids flow.IdentityList, shouldHave flow.IdentityList, roles flow.RoleList) (flow.IdentityList, error) {
 	if shouldHave != nil {
 		// excludes irrelevant roles from should have set
-		shouldHave = shouldHave.Filter(filter.HasRole(involvedRoles...))
+		shouldHave = shouldHave.Filter(filter.HasRole(roles...))
 
-		// excludes the node itself from its topology
+		// excludes the node itself from should have set
 		shouldHave = shouldHave.Filter(t.notMeFilter)
 	}
 
-	// samples subscribers of a connected graph
-	// subscriberSample := t.graphSampler.SampleConnectedGraph(subscribers, shouldHave)
+	// excludes the node itself from ids
+	ids = ids.Filter(t.notMeFilter)
 
-	return t.SubsetRole(subscribers, shouldHave, nil)
-}
-
-func (t TopicBasedTopology) SubsetRole(ids flow.IdentityList, shouldHave flow.IdentityList, roles flow.RoleList) (flow.IdentityList, error) {
 	return t.graphSampler.SampleConnectedGraph(ids, shouldHave), nil
 }
 
@@ -98,4 +77,33 @@ func (t TopicBasedTopology) clusterPeers() (flow.IdentityList, error) {
 	}
 
 	return myCluster, nil
+}
+
+// clusterChannelHandler returns a connected graph fanout of peers in the same cluster as executor of this instance.
+func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentityList) (flow.IdentityList, error) {
+	// extracts cluster peer ids to which the node belongs to.
+	clusterPeers, err := t.clusterPeers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", t.me.String(), err)
+	}
+
+	// samples a connected graph topology from the cluster peers
+	return t.SubsetRole(clusterPeers, shouldHave.Filter(filter.HasNodeID(clusterPeers.NodeIDs()...)), flow.RoleList{flow.RoleCollection})
+}
+
+// clusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
+// The returned sample contains `shouldHave` ones that also subscribed to `channel`.
+func (t TopicBasedTopology) nonClusterChannelHandler(ids, shouldHave flow.IdentityList, channel string) (flow.IdentityList, error) {
+	if _, ok := engine.IsClusterChannelID(channel); ok {
+		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
+	}
+
+	// extracts flow roles subscribed to topic.
+	roles, ok := engine.RolesByChannelID(channel)
+	if !ok {
+		return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", channel)
+	}
+
+	// samples a connected graph topology
+	return t.SubsetRole(ids.Filter(filter.HasRole(roles...)), shouldHave, roles)
 }
