@@ -49,7 +49,7 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootBlockID, nil, false)
 
 	// create stream from node 1 to node 2
-	testOneToOneMessagingIsAllowed(h.T(), node1, address2)
+	testOneToOneMessagingSucceeds(h.T(), node1, address2)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
@@ -72,7 +72,7 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// attempt to create a stream from node 1 (old chain) to node 2 (new chain)
 	// this time it should fail since node 2 is using a different public key
 	// (and therefore has a different libp2p node id)
-	testOneToOneMessagingIsNotAllowed(h.T(), node1, address2)
+	testOneToOneMessagingFails(h.T(), node1, address2)
 }
 
 // TestOneToOneCrosstalkPrevention tests that a node from the old chain cannot talk directly to a node in the new chain
@@ -94,7 +94,7 @@ func (h *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootID1, nil, false)
 
 	// create stream from node 2 to node 1
-	testOneToOneMessagingIsAllowed(h.T(), node2, address1)
+	testOneToOneMessagingSucceeds(h.T(), node2, address1)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
@@ -114,7 +114,7 @@ func (h *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 
 	// attempt to create a stream from node 2 (new chain) to node 1 (old chain)
 	// this time it should fail since node 2 is listening on a different protocol
-	testOneToOneMessagingIsNotAllowed(h.T(), node2, address1)
+	testOneToOneMessagingFails(h.T(), node2, address1)
 }
 
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
@@ -158,7 +158,7 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	time.Sleep(time.Second)
 
 	// assert that node 1 can successfully send a message to node 2 via PubSub
-	testOneToKMessagingIsAllowed(ctx, h.T(), node1, sub2, topicBeforeSpork)
+	testOneToKMessagingSucceeds(ctx, h.T(), node1, sub2, topicBeforeSpork)
 
 	// mimic that node1 now is part of the new spork while node2 remains on the old spork
 
@@ -175,10 +175,10 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	assert.NoError(h.T(), err)
 
 	// assert that node 1 can no longer send a message to node 2 via PubSub
-	testOneToKMessagingIsNotAllowed(ctx, h.T(), node1, sub2, topicAfterSpork)
+	testOneToKMessagingFails(ctx, h.T(), node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingIsAllowed(t *testing.T, sourceNode *P2PNode, dstnAddress NodeAddress) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *P2PNode, dstnAddress NodeAddress) {
 	// create stream from node 1 to node 2
 	s, err := sourceNode.CreateStream(context.Background(), dstnAddress)
 	// assert that stream creation succeeded
@@ -186,7 +186,7 @@ func testOneToOneMessagingIsAllowed(t *testing.T, sourceNode *P2PNode, dstnAddre
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingIsNotAllowed(t *testing.T, sourceNode *P2PNode, dstnAddress NodeAddress) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode *P2PNode, dstnAddress NodeAddress) {
 	// create stream from source node to destination address
 	_, err := sourceNode.CreateStream(context.Background(), dstnAddress)
 	// assert that stream creation failed
@@ -195,7 +195,7 @@ func testOneToOneMessagingIsNotAllowed(t *testing.T, sourceNode *P2PNode, dstnAd
 	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocol not supported.*", err)
 }
 
-func testOneToKMessagingIsAllowed(ctx context.Context,
+func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
 	sourceNode *P2PNode,
 	dstnSub *pubsub.Subscription,
@@ -214,7 +214,7 @@ func testOneToKMessagingIsAllowed(ctx context.Context,
 	}, 5*time.Second)
 }
 
-func testOneToKMessagingIsNotAllowed(ctx context.Context,
+func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
 	sourceNode *P2PNode,
 	dstnSub *pubsub.Subscription,
