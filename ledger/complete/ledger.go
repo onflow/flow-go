@@ -257,7 +257,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	//
 	tries, _ := l.forest.GetTries()
 	for _, t := range tries {
-		fmt.Println(">>>>", t.RootHash())
+		fmt.Println(">>>>", t.StringRootHash())
 	}
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
