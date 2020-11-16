@@ -254,6 +254,11 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	targetPathFinderVersion uint8,
 	outputFilePath string) (ledger.State, error) {
 
+	//
+	tries, _ := l.forest.GetTries()
+	for _, t := range tries {
+		fmt.Println(">>>>", t.StringRootHash())
+	}
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
