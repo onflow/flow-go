@@ -3,7 +3,10 @@ package libp2p
 import (
 	"context"
 	"testing"
+	"time"
 
+	golog "github.com/ipfs/go-log"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -15,20 +18,22 @@ import (
 // without needing any additional support in Flow other than providing the new root block ID.
 // Sporking can be supported by two ways:
 // 1. Updating the network key of a node after it is moved from the old chain to the new chain
-// 2. Updating the Flow Libp2p protocol ID in the code
+// 2. Updating the Flow Libp2p protocol ID suffix to prevent one-to-one messaging across sporks and
+//    updating the channel ID suffix to prevent one-to-K messaging (PubSub) across sporks.
 // 1 and 2 both can independently ensure that nodes from the old chain cannot communicate with nodes on the new chain
 // These tests are just to reconfirm the network behaviour and provide a test bed for future tests for sporking, if needed
 type SporkingTestSuite struct {
 	LibP2PNodeTestSuite
 }
 
-func TestHardSpooningTestSuite(t *testing.T) {
+func TestSporkingTestSuite(t *testing.T) {
+	golog.SetAllLoggers(golog.LevelDebug)
 	suite.Run(t, new(SporkingTestSuite))
 }
 
-// TestNetworkKeyChangedAfterHardSpoon tests that a node from the old chain cannot talk to a node in the new chain if it's
-// network key is updated even if the libp2p protocol id remains the same
-func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
+// TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
+// if it's network key is updated while the libp2p protocol ID remains the same
+func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 
 	// create and start node 1 on localhost and random port
 	node1key, err := generateNetworkingKey("abc")
@@ -42,13 +47,9 @@ func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	node2key, err := generateNetworkingKey("def")
 	assert.NoError(h.T(), err)
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootBlockID, nil, false)
-	h.T().Logf(" %s node started on %s:%s", node2.name, address2.IP, address2.Port)
-	h.T().Logf("libp2p ID for %s: %s", node2.name, node2.libP2PHost.ID())
 
 	// create stream from node 1 to node 2
-	s, err := node1.CreateStream(context.Background(), address2)
-	assert.NoError(h.T(), err)
-	assert.NotNil(h.T(), s)
+	testOneToOneMessagingIsAllowed(h.T(), node1, address2)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
@@ -63,8 +64,6 @@ func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	// start node2 with the same name, ip and port but with the new key
 	node2, address2New := h.CreateNode(node2.name, node2keyNew, address2.IP, address2.Port, rootBlockID, nil, false)
 	defer h.StopNode(node2)
-	h.T().Logf(" %s node again started on %s:%s", node2.name, address2New.IP, address2New.Port)
-	h.T().Logf("new libp2p ID for %s: %s", node2.name, node2.libP2PHost.ID())
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(h.T(), address2.IP, address2New.IP)
@@ -73,16 +72,12 @@ func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	// attempt to create a stream from node 1 (old chain) to node 2 (new chain)
 	// this time it should fail since node 2 is using a different public key
 	// (and therefore has a different libp2p node id)
-	_, err = node1.CreateStream(context.Background(), address2)
-	// assert that stream creation failed
-	assert.Error(h.T(), err)
-	// assert that it failed with the expected error
-	assert.Regexp(h.T(), ".*failed to negotiate security protocol.*", err)
+	testOneToOneMessagingIsNotAllowed(h.T(), node1, address2)
 }
 
-// TestProtocolChangeAfterHardSpoon tests that a node from the old chain cannot talk to a node in the new chain if
-// the Flow libp2p protocol ID is updated but the network keys are kept the same.
-func (h *SporkingTestSuite) TestProtocolChangeAfterHardSpoon() {
+// TestOneToOneCrosstalkPrevention tests that a node from the old chain cannot talk directly to a node in the new chain
+// if the Flow libp2p protocol ID is updated while the network keys are kept the same.
+func (h *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 
 	// root id before spork
 	rootID1 := unittest.BlockFixture().ID().String()
@@ -92,20 +87,14 @@ func (h *SporkingTestSuite) TestProtocolChangeAfterHardSpoon() {
 	assert.NoError(h.T(), err)
 	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootID1, nil, false)
 	defer h.StopNode(node1)
-	h.T().Logf(" %s node started on %s:%s", node1.name, address1.IP, address1.Port)
-	h.T().Logf("libp2p ID for %s: %s", node1.name, node1.libP2PHost.ID())
 
 	// create and start node 2 on localhost and random port
 	node2key, err := generateNetworkingKey("def")
 	assert.NoError(h.T(), err)
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootID1, nil, false)
-	h.T().Logf(" %s node started on %s:%s", node2.name, address2.IP, address2.Port)
-	h.T().Logf("libp2p ID for %s: %s", node2.name, node2.libP2PHost.ID())
 
 	// create stream from node 2 to node 1
-	s, err := node2.CreateStream(context.Background(), address1)
-	assert.NoError(h.T(), err)
-	assert.NotNil(h.T(), s)
+	testOneToOneMessagingIsAllowed(h.T(), node2, address1)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
@@ -118,8 +107,6 @@ func (h *SporkingTestSuite) TestProtocolChangeAfterHardSpoon() {
 	// start node2 with the same name, ip and port but with the new key
 	node2, address2New := h.CreateNode(node2.name, node2key, address2.IP, address2.Port, rootID2, nil, false)
 	defer h.StopNode(node2)
-	h.T().Logf(" %s node again started on %s:%s", node2.name, address2New.IP, address2New.Port)
-	h.T().Logf("new libp2p ID for %s: %s", node2.name, node2.libP2PHost.ID())
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(h.T(), address2.IP, address2New.IP)
@@ -127,9 +114,119 @@ func (h *SporkingTestSuite) TestProtocolChangeAfterHardSpoon() {
 
 	// attempt to create a stream from node 2 (new chain) to node 1 (old chain)
 	// this time it should fail since node 2 is listening on a different protocol
-	_, err = node2.CreateStream(context.Background(), address1)
+	testOneToOneMessagingIsNotAllowed(h.T(), node2, address1)
+}
+
+// TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
+// if the channel ID is updated while the network keys are kept the same.
+func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
+	// test channel
+	testChannelID := "test_channel"
+
+	// root id before spork
+	rootIDBeforeSpork := unittest.BlockFixture().ID().String()
+
+	node1key, err := generateNetworkingKey("abc")
+	assert.NoError(h.T(), err)
+
+	// create and start node 1 on localhost and random port
+	node1, _ := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
+	defer h.StopNode(node1)
+
+	// create and start node 2 on localhost and random port with the same root block ID
+	node2key, err := generateNetworkingKey("def")
+	assert.NoError(h.T(), err)
+	node2, addr2 := h.CreateNode("node1", node2key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
+	defer h.StopNode(node1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// spork topic is derived by suffixing the channelID with the root block ID
+	topicBeforeSpork := testChannelID + "-" + rootIDBeforeSpork
+
+	// both nodes are initially on the same spork and subscribed to the same topic
+	_, err = node1.Subscribe(ctx, topicBeforeSpork)
+	assert.NoError(h.T(), err)
+	sub2, err := node2.Subscribe(ctx, topicBeforeSpork)
+	assert.NoError(h.T(), err)
+
+	// add node 2 as a peer of node 1
+	node1.AddPeer(ctx, addr2)
+
+	// let the node form the mesh
+	time.Sleep(time.Second)
+
+	// assert that node 1 can successfully send a message to node 2 via PubSub
+	testOneToKMessagingIsAllowed(ctx, h.T(), node1, sub2, topicBeforeSpork)
+
+	// mimic that node1 now is part of the new spork while node2 remains on the old spork
+
+	// new root id after spork
+	rootIDAfterSpork := unittest.BlockFixture().ID().String()
+
+	// topic after the spork
+	topicAfterSpork := testChannelID + "-" + rootIDAfterSpork
+
+	// unsubscribe node1 from topicBeforeSpork and subscribe it to topicAfterSpork
+	err = node1.UnSubscribe(topicBeforeSpork)
+	assert.NoError(h.T(), err)
+	_, err = node1.Subscribe(ctx, topicAfterSpork)
+	assert.NoError(h.T(), err)
+
+	// assert that node 1 can no longer send a message to node 2 via PubSub
+	testOneToKMessagingIsNotAllowed(ctx, h.T(), node1, sub2, topicAfterSpork)
+}
+
+func testOneToOneMessagingIsAllowed(t *testing.T, sourceNode *P2PNode, dstnAddress NodeAddress) {
+	// create stream from node 1 to node 2
+	s, err := sourceNode.CreateStream(context.Background(), dstnAddress)
+	// assert that stream creation succeeded
+	assert.NoError(t, err)
+	assert.NotNil(t, s)
+}
+
+func testOneToOneMessagingIsNotAllowed(t *testing.T, sourceNode *P2PNode, dstnAddress NodeAddress) {
+	// create stream from source node to destination address
+	_, err := sourceNode.CreateStream(context.Background(), dstnAddress)
 	// assert that stream creation failed
-	assert.Error(h.T(), err)
+	assert.Error(t, err)
 	// assert that it failed with the expected error
-	assert.Regexp(h.T(), ".*protocol not supported.*", err)
+	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocol not supported.*", err)
+}
+
+func testOneToKMessagingIsAllowed(ctx context.Context,
+	t *testing.T,
+	sourceNode *P2PNode,
+	dstnSub *pubsub.Subscription,
+	topic string) {
+
+	// send a 1-k message from source node to destination node
+	payload := []byte("hello")
+	err := sourceNode.Publish(ctx, topic, payload)
+	assert.NoError(t, err)
+
+	// assert that the message is received by the destination node
+	unittest.AssertReturnsBefore(t, func() {
+		msg, err := dstnSub.Next(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, payload, msg.Data)
+	}, 5*time.Second)
+}
+
+func testOneToKMessagingIsNotAllowed(ctx context.Context,
+	t *testing.T,
+	sourceNode *P2PNode,
+	dstnSub *pubsub.Subscription,
+	topic string) {
+
+	// send a 1-k message from source node to destination node
+	payload := []byte("hello")
+	err := sourceNode.Publish(ctx, topic, payload)
+	assert.NoError(t, err)
+
+	// assert that the message is never received by the destination node
+	_ = unittest.RequireNeverReturnBefore(t, func() {
+		_, _ = dstnSub.Next(ctx)
+	}, 1*time.Second, "nodes on different sporks were able to communicate")
 }
