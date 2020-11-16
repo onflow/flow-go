@@ -47,6 +47,12 @@ func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flo
 	// total sample size
 	totalSize := LinearFanoutFunc(len(all))
 
+	if totalSize < len(shouldHave) {
+		// should have set is larger than the required sample for connectivity
+		// hence the should have set itself is sufficient to make a connected component.
+		return shouldHave
+	}
+
 	// subset size excluding should have ones
 	subsetSize := totalSize - len(shouldHave)
 
