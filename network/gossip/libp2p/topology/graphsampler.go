@@ -9,9 +9,9 @@ import (
 // nodes (with different seeds) create a connected graph.
 type ConnectedGraphSampler interface {
 	// SampleConnectedGraph receives two lists: `all` and `shouldHave`. It then samples a connected fanout
-	// for the caller that includes all members of the `shouldHave` set that belong to `all`.
+	// for the caller that includes all members of the `shouldHave` set.
 	// Independent invocations of this method over different nodes must create a connected graph.
 	// The term fanout is the set of nodes that this instance should get connected to in order to create a
 	// connected graph.
-	SampleConnectedGraph(all flow.IdentityList, shouldHave flow.IdentityList) flow.IdentityList
+	SampleConnectedGraph(all flow.IdentityList, shouldHave flow.IdentityList) (flow.IdentityList, error)
 }
