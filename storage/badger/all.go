@@ -26,10 +26,6 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	collections := NewCollections(db, transactions)
 	events := NewEvents(db)
 
-	clusterPayloads := NewClusterPayloads(metrics, db)
-	// TODO: need to fix this
-	clusterBlocks := NewClusterBlocks(db, "", headers, clusterPayloads)
-
 	return &storage.All{
 		Headers:            headers,
 		Guarantees:         guarantees,
@@ -48,6 +44,5 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		TransactionResults: transactionResults,
 		Collections:        collections,
 		Events:             events,
-		ClusterBlocks:      clusterBlocks,
 	}
 }
