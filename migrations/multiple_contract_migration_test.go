@@ -40,9 +40,8 @@ func TestMultipleContractMigration(t *testing.T) {
 			},
 		}
 		for i, k := range keys {
-			m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 			t.Run(fmt.Sprintf("%d. key %s", i, k.String()), func(t *testing.T) {
-				_, err := m.Migrate([]ledger.Payload{{
+				_, err := migrations.Migrate([]ledger.Payload{{
 					Key:   k,
 					Value: nil,
 				}})
@@ -52,7 +51,6 @@ func TestMultipleContractMigration(t *testing.T) {
 	})
 
 	t.Run("Non code registers are not migrated", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, []byte("")),
@@ -65,14 +63,13 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte("some value 1234"),
 		}
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 		require.Equal(t, migrated[0], payload)
 	})
 
 	t.Run("Non address registers are not migrated", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, []byte("234")),
@@ -85,14 +82,13 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte("some value 1234"),
 		}
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 		require.Equal(t, migrated[0], payload)
 	})
 
 	t.Run("Empty code registers are removed", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
@@ -105,13 +101,12 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte{},
 		}
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 0)
 	})
 
 	t.Run("Registers are migrated only once", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
@@ -119,64 +114,28 @@ func TestMultipleContractMigration(t *testing.T) {
 				ledger.NewKeyPart(state.KeyPartKey, []byte("code")),
 			},
 		}
-		payload := ledger.Payload{
+		payload1 := ledger.Payload{
 			Key:   key,
 			Value: []byte{},
 		}
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
-		require.NoError(t, err)
-		require.Len(t, migrated, 0)
-
-		payload = ledger.Payload{
-			Key:   key,
-			Value: []byte("123"),
-		}
-
-		migrated, err = m.Migrate([]ledger.Payload{payload})
-		require.NoError(t, err)
-		require.Len(t, migrated, 1)
-		// because code was already migrated the migration is skipped just returning the register
-		// this is a way to test the cache works
-		// in real scenarios there wouldn't be two code registers on one address
-		require.Equal(t, migrated[0], payload)
-	})
-
-	t.Run("Registers are migrated only once", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
-		key := ledger.Key{
-			KeyParts: []ledger.KeyPart{
-				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
-				ledger.NewKeyPart(state.KeyPartController, []byte("")),
-				ledger.NewKeyPart(state.KeyPartKey, []byte("code")),
-			},
-		}
-		payload := ledger.Payload{
+		payload2 := ledger.Payload{
 			Key:   key,
 			Value: []byte{},
 		}
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
-		require.NoError(t, err)
-		require.Len(t, migrated, 0)
-
-		payload = ledger.Payload{
-			Key:   key,
-			Value: []byte("123"),
-		}
-
-		migrated, err = m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload1,payload2})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
+
 		// because code was already migrated the migration is skipped just returning the register
 		// this is a way to test the cache works
 		// in real scenarios there wouldn't be two code registers on one address
-		require.Equal(t, migrated[0], payload)
+		require.Equal(t, migrated[0], payload2)
 	})
 
 	t.Run("If code cannot be parsed return error", func(t *testing.T) {
 
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
@@ -189,13 +148,12 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte("{!@#$%234985yhtgv3yr9b  dvomngifn ..."),
 		}
 
-		_, err := m.Migrate([]ledger.Payload{payload})
+		_, err := migrations.Migrate([]ledger.Payload{payload})
 		require.Error(t, err)
 	})
 
 	t.Run("If there are multiple errors they are aggregated", func(t *testing.T) {
 
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key1 := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
@@ -219,14 +177,13 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte("{!@#$%234985yhtgv3yr9b  dvomngifn ..."),
 		}
 
-		_, err := m.Migrate([]ledger.Payload{payload1, payload2})
+		_, err := migrations.Migrate([]ledger.Payload{payload1, payload2})
 		require.Error(t, err)
 		require.Len(t, err.(*migrations.MultipleContractMigrationError).Errors, 2)
 	})
 
 	t.Run("If code has only one contract, migrate it to the new key", func(t *testing.T) {
 
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
@@ -240,7 +197,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.Test")
@@ -249,7 +206,6 @@ func TestMultipleContractMigration(t *testing.T) {
 
 	// this case was not allowed before, so it shouldn't really happen
 	t.Run("If code has only one interface, migrate it to the new key", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
@@ -263,7 +219,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.Test")
@@ -272,7 +228,6 @@ func TestMultipleContractMigration(t *testing.T) {
 
 	// this case was not allowed before, so it shouldn't really happen
 	t.Run("If code has more than two declarations, return error", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
@@ -290,12 +245,11 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		_, err := m.Migrate([]ledger.Payload{payload})
+		_, err := migrations.Migrate([]ledger.Payload{payload})
 		require.Error(t, err)
 	})
 
 	t.Run("If code has no declarations, return error", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
@@ -311,12 +265,11 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		_, err := m.Migrate([]ledger.Payload{payload})
+		_, err := migrations.Migrate([]ledger.Payload{payload})
 		require.Error(t, err)
 	})
 
 	t.Run("If code has two declarations, correctly split them (interface first)", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		address := flow.HexToAddress("01")
 
 		key := ledger.Key{
@@ -361,7 +314,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			// some unrelated comments
 		`, address.HexWithPrefix())
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 2)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
@@ -370,7 +323,6 @@ func TestMultipleContractMigration(t *testing.T) {
 		require.Equal(t, string(migrated[1].Value), expectedContractCode)
 	})
 	t.Run("If code has two declarations, correctly split them (ugly formatting)", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		address := flow.HexToAddress("01")
 
 		key := ledger.Key{
@@ -403,7 +355,7 @@ func TestMultipleContractMigration(t *testing.T) {
 				// some code 
 			}// some unrelated comments`, address.HexWithPrefix())
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 2)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
@@ -413,7 +365,6 @@ func TestMultipleContractMigration(t *testing.T) {
 	})
 
 	t.Run("If code has two declarations, correctly split them (interface last)", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		address := flow.HexToAddress("01")
 
 		key := ledger.Key{
@@ -458,7 +409,7 @@ func TestMultipleContractMigration(t *testing.T) {
 				// some code 
 			}`, address.HexWithPrefix())
 
-		migrated, err := m.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 2)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
@@ -468,7 +419,6 @@ func TestMultipleContractMigration(t *testing.T) {
 	})
 
 	t.Run("If code has two declarations of the same type return error", func(t *testing.T) {
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		address := flow.HexToAddress("01")
 
 		key := ledger.Key{
@@ -496,16 +446,15 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		_, err := m.Migrate([]ledger.Payload{payload})
+		_, err := migrations.Migrate([]ledger.Payload{payload})
 		require.Error(t, err)
 	})
 
 	t.Run("If exceptional migration for owner exists, use it", func(t *testing.T) {
 		address := flow.HexToAddress("01")
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		called := false
 
-		m.ExceptionalMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
+		migrations.ExceptionalMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
 			called = true
 			return []ledger.Payload{payload}, nil
 		}
@@ -521,16 +470,15 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte{},
 		}
 
-		_, err := m.Migrate([]ledger.Payload{payload})
+		_, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.True(t, called)
 	})
 	t.Run("If exceptional migration for a different owner exists, dont use it", func(t *testing.T) {
 		address := flow.HexToAddress("01")
-		m := migrations.NewMultipleContractMigration(zerolog.Logger{})
 		called := false
 
-		m.ExceptionalMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
+		migrations.ExceptionalMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
 			called = true
 			return []ledger.Payload{payload}, nil
 		}
@@ -546,7 +494,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte{},
 		}
 
-		_, err := m.Migrate([]ledger.Payload{payload})
+		_, err := migrations.Migrate([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.False(t, called)
 	})
