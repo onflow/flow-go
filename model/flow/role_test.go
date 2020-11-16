@@ -36,7 +36,7 @@ func TestRoleList_Contains(t *testing.T) {
 
 }
 
-// TestRoleList_DUnion evaluates correctness of Union method of RoleList.
+// TestRoleList_Union evaluates correctness of Union method of RoleList.
 func TestRoleList_Union(t *testing.T) {
 	this := flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 	other := flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
