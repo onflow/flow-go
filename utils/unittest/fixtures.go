@@ -46,13 +46,29 @@ func InvalidAddressFixture() flow.Address {
 	return addr
 }
 
-func TransactionSignatureFixture() flow.TransactionSignature {
+func InvalidFormatSignature() flow.TransactionSignature {
 	return flow.TransactionSignature{
 		Address:     AddressFixture(),
 		SignerIndex: 0,
-		Signature:   SeedFixture(64),
+		Signature:   make([]byte, crypto.SignatureLenECDSAP256), // zero signature is invalid
 		KeyIndex:    1,
 	}
+}
+
+func TransactionSignatureFixture() flow.TransactionSignature {
+	sigLen := crypto.SignatureLenECDSAP256
+	s := flow.TransactionSignature{
+		Address:     AddressFixture(),
+		SignerIndex: 0,
+		Signature:   SeedFixture(sigLen),
+		KeyIndex:    1,
+	}
+	// make sure the ECDSA signature passes the format check
+	s.Signature[sigLen/2] = 0
+	s.Signature[0] = 0
+	s.Signature[sigLen/2-1] |= 1
+	s.Signature[sigLen-1] |= 1
+	return s
 }
 
 func ProposalKeyFixture() flow.ProposalKey {
@@ -509,7 +525,7 @@ func WithApproverID(id flow.Identifier) func(*flow.ResultApproval) {
 
 func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.Body.Attestation.BlockID = id
+		ra.Body.BlockID = id
 	}
 }
 
@@ -864,7 +880,7 @@ func ChunkDataPackFixture(identifier flow.Identifier) *flow.ChunkDataPack {
 // SeedFixture returns a random []byte with length n
 func SeedFixture(n int) []byte {
 	var seed = make([]byte, n)
-	_, _ = crand.Read(seed[0:n])
+	_, _ = crand.Read(seed)
 	return seed
 }
 

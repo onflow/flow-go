@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/model"
 )
@@ -21,37 +20,38 @@ import (
 // where chunk_key is an identifier obtained by combining the approval's result
 // ID and chunk index.
 type Approvals struct {
+	// Concurrency: the mempool internally re-uses the backend's lock
+
 	backend *Backend
-	size    *uint
+	size    uint
 }
 
 // key computes the composite key used to index an approval in the backend. It
 // hashes the resultID and the chunkIndex together.
 func key(resultID flow.Identifier, chunkIndex uint64) flow.Identifier {
-
-	// convert chunkIndex into Identifier
-	hasher := hash.NewSHA3_256()
-	chunkIndexBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(chunkIndexBytes, chunkIndex)
-	chunkIndexHash := hasher.ComputeHash(chunkIndexBytes)
-	chunkIndexID := flow.HashToID(chunkIndexHash)
-
-	// compute composite identifier
-	return flow.ConcatSum(resultID, chunkIndexID)
+	chunkIndexBytes := flow.Identifier{} // null value: zero-filled
+	binary.LittleEndian.PutUint64(chunkIndexBytes[:], chunkIndex)
+	return flow.ConcatSum(resultID, chunkIndexBytes) // compute composite identifier
 }
 
 // NewApprovals creates a new memory pool for result approvals.
-func NewApprovals(limit uint) (*Approvals, error) {
-	var size uint
-	ejector := NewSizeEjector(&size)
-	a := &Approvals{
-		size: &size,
-		backend: NewBackend(
-			WithLimit(limit),
-			WithEject(ejector.Eject),
-		),
+func NewApprovals(limit uint, opts ...OptionFunc) (*Approvals, error) {
+	mempool := &Approvals{
+		size:    0,
+		backend: NewBackend(append(opts, WithLimit(limit))...),
 	}
-	return a, nil
+
+	adjustSizeOnEjection := func(entity flow.Entity) {
+		// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
+		approvalMapEntity := entity.(*model.ApprovalMapEntity)
+		mempool.size -= uint(len(approvalMapEntity.Approvals))
+	}
+	err := mempool.backend.RegisterEjectionCallback(adjustSizeOnEjection)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ejection callback with Approvals mempool's backend")
+	}
+
+	return mempool, nil
 }
 
 // Add adds a result approval to the mempool.
@@ -69,22 +69,17 @@ func (a *Approvals) Add(approval *flow.ResultApproval) (bool, error) {
 		if !ok {
 			// no record with key is available in the mempool, initialise chunkApprovals.
 			chunkApprovals = make(map[flow.Identifier]*flow.ResultApproval)
-			backdata[chunkKey] = model.ApprovalMapEntity{
+			backdata[chunkKey] = &model.ApprovalMapEntity{
 				ChunkKey:   chunkKey,
 				ResultID:   approval.Body.ExecutionResultID,
 				ChunkIndex: approval.Body.ChunkIndex,
 				Approvals:  chunkApprovals,
 			}
 		} else {
-			approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
-			if !ok {
-				return fmt.Errorf("unexpected entity type %T", entity)
-			}
-
-			chunkApprovals = approvalMapEntity.Approvals
+			// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
+			chunkApprovals = entity.(*model.ApprovalMapEntity).Approvals
 			if _, ok := chunkApprovals[approval.Body.ApproverID]; ok {
-				// approval is already associated with the chunk key and
-				// approver, no need to append
+				// approval is already associated with the chunk key and approver => no need to append
 				return nil
 			}
 		}
@@ -92,7 +87,7 @@ func (a *Approvals) Add(approval *flow.ResultApproval) (bool, error) {
 		// appends approval to the map
 		chunkApprovals[approval.Body.ApproverID] = approval
 		appended = true
-		*a.size++
+		a.size++
 		return nil
 	})
 
@@ -106,19 +101,14 @@ func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 
 	removed := false
 	err := a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-		var chunkApprovals map[flow.Identifier]*flow.ResultApproval
-
 		entity, ok := backdata[chunkKey]
 		if !ok {
 			// no approvals for this chunk
 			return nil
 		}
-		approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
-		if !ok {
-			return fmt.Errorf("unexpected entity type %T", entity)
-		}
+		// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
+		chunkApprovals := entity.(*model.ApprovalMapEntity).Approvals
 
-		chunkApprovals = approvalMapEntity.Approvals
 		if _, ok := chunkApprovals[approval.Body.ApproverID]; !ok {
 			// no approval for this chunk and approver
 			return nil
@@ -133,7 +123,7 @@ func (a *Approvals) RemApproval(approval *flow.ResultApproval) (bool, error) {
 		}
 
 		removed = true
-		*a.size--
+		a.size--
 		return nil
 	})
 
@@ -150,18 +140,12 @@ func (a *Approvals) RemChunk(resultID flow.Identifier, chunkIndex uint64) (bool,
 		if !exists {
 			return nil
 		}
-
-		approvalMapEntity, ok := entity.(model.ApprovalMapEntity)
-		if !ok {
-			return fmt.Errorf("unexpected entity type %T", entity)
-		}
-
-		*a.size = *a.size - uint(len(approvalMapEntity.Approvals))
+		// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
+		approvalMapEntity := entity.(*model.ApprovalMapEntity)
 
 		delete(backdata, chunkKey)
-
+		a.size -= uint(len(approvalMapEntity.Approvals))
 		removed = true
-
 		return nil
 	})
 
@@ -182,7 +166,7 @@ func (a *Approvals) ByChunk(resultID flow.Identifier, chunkIndex uint64) map[flo
 			return nil
 		}
 		// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
-		for i, app := range entity.(model.ApprovalMapEntity).Approvals {
+		for i, app := range entity.(*model.ApprovalMapEntity).Approvals {
 			approvals[i] = app
 		}
 		return nil
@@ -198,7 +182,7 @@ func (a *Approvals) All() []*flow.ResultApproval {
 	_ = a.backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		for _, entity := range backdata {
 			// uncaught type assertion; should never panic as the mempool only stores ApprovalMapEntity:
-			for _, approval := range entity.(model.ApprovalMapEntity).Approvals {
+			for _, approval := range entity.(*model.ApprovalMapEntity).Approvals {
 				res = append(res, approval)
 			}
 		}
@@ -214,5 +198,5 @@ func (a *Approvals) Size() uint {
 	// we need run utilize the backend's lock.
 	a.backend.RLock()
 	defer a.backend.RUnlock()
-	return *a.size
+	return a.size
 }
