@@ -34,7 +34,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState,
 // Subset samples and returns a connected graph of the subscribers to the topic from the ids.
 // A connected graph fanout means that the subset of ids returned by this method on different nodes collectively
 // construct a connected graph component among all the subscribers to the topic.
-func (t *TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
+func (t *TopicBasedTopology) ChannelSubset(ids flow.IdentityList, shouldHave flow.IdentityList, topic string) (flow.IdentityList, error) {
 	var subscribers flow.IdentityList
 	var involvedRoles flow.RoleList
 
@@ -48,7 +48,7 @@ func (t *TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.Ident
 		subscribers = clusterPeers
 
 		involvedRoles = flow.RoleList{flow.RoleCollection}
-		shouldHave = shouldHave.Filter(filter.HasRole(flow.RoleCollection))
+		shouldHave = shouldHave.Filter(filter.HasNodeID(subscribers.NodeIDs()...))
 	} else {
 		// not a cluster-based topic.
 		//
@@ -75,9 +75,13 @@ func (t *TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.Ident
 	}
 
 	// samples subscribers of a connected graph
-	subscriberSample := t.graphSampler.SampleConnectedGraph(subscribers, shouldHave)
+	// subscriberSample := t.graphSampler.SampleConnectedGraph(subscribers, shouldHave)
 
-	return subscriberSample, nil
+	return t.Subset(subscribers, shouldHave)
+}
+
+func (t TopicBasedTopology) Subset(ids flow.IdentityList, shouldHave flow.IdentityList) (flow.IdentityList, error) {
+	return t.graphSampler.SampleConnectedGraph(ids, shouldHave), nil
 }
 
 // clusterPeers returns the list of other nodes within the same cluster as this node.
