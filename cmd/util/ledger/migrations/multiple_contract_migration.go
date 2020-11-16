@@ -119,28 +119,28 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 	}
 	declarations := program.Declarations
 
-	// extract import declarations
-	nonImportDeclarations := make([]ast.Declaration, 0)
+	// find import declarations
 	importDeclarations := make([]ast.Declaration, 0)
-
 	for _, d := range declarations {
 		if _, isImport := d.(*ast.ImportDeclaration); isImport {
 			importDeclarations = append(importDeclarations, d)
-		} else {
-			nonImportDeclarations = append(nonImportDeclarations, d)
 		}
 	}
 
+	// sort them backwards because we will be slicing the code string
 	sort.SliceStable(importDeclarations, func(i, j int) bool {
 		return importDeclarations[i].StartPosition().Offset > importDeclarations[j].StartPosition().Offset
 	})
 
 	imports := ""
 	for _, d := range importDeclarations {
+		// aggregate imports for later use
 		imports = imports + code[d.StartPosition().Offset:d.EndPosition().Offset+1] + "\n"
+		// remove imports from the code
 		code = code[:d.StartPosition().Offset] + code[d.EndPosition().Offset+1:]
 	}
 
+	// parse the code again to get accurate locations of the remaining declarations
 	program, err = parser2.ParseProgram(code)
 	if err != nil {
 		l.Error().
@@ -225,8 +225,9 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 		interfaceCode = code[:split]
 	}
 
-	// add import to contract code
+	// add original imports and interface import to contract code
 	contractCode = fmt.Sprintf("%simport %s from %s\n%s", imports, interfaceDeclaration.DeclarationIdentifier().Identifier, address.HexWithPrefix(), contractCode)
+	// add original imports to interface code
 	interfaceCode = imports + interfaceCode
 
 	interfaceKey := addNameToKey(p.Key, interfaceDeclaration.DeclarationIdentifier().Identifier)

@@ -21,6 +21,9 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
 	led, err := complete.NewLedger(dir, 1000, &metrics.NoopCollector{}, log, nil, complete.DefaultPathFinderVersion)
+	if err != nil {
+		return fmt.Errorf("cannot create new ledger: %w", err)
+	}
 
 	filePath := path.Join(outputDir, "root.checkpoint")
 	newState, err := led.ExportCheckpointAt(targetHash, []ledger.Migration{migrations.MultipleContractMigration}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, filePath)

@@ -2,13 +2,15 @@ package migrations_test
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestMultipleContractMigration(t *testing.T) {
@@ -124,7 +126,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte{},
 		}
 
-		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload1,payload2})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload1, payload2})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 

@@ -80,6 +80,6 @@ func run(*cobra.Command, []string) {
 
 	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("error extracting the execution state: %w", err)
+		log.Fatal().Err(err).Msgf("error extracting the execution state")
 	}
 }
