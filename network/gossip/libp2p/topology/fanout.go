@@ -11,6 +11,6 @@ type FanoutFunc func(size int) int
 // LinearFanoutFunc guarantees full network connectivity in a deterministic way.
 // Given system of `size` nodes, it returns `size+1/2`.
 var LinearFanoutFunc FanoutFunc = func(size int) int {
-	fanout := math.Ceil(float64(size) / 2)
-	return int(fanout) + 1
+	fanout := math.Ceil(float64(size+1) / 2)
+	return int(fanout)
 }
