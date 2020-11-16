@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -39,41 +38,51 @@ func newNode(id int, controller *Controller,
 }
 
 func (n *node) run() error {
+
+	// runErrCh is used to receive potential errors from the async DKG run
+	// routine
+	runErrCh := make(chan error)
+
 	// start the DKG controller
 	go func() {
-		_ = n.controller.Run()
+		runErrCh <- n.controller.Run()
 	}()
 
-	// Wait and trigger transition from Phase 0 to Phase 1
-	err := n.delayedTask(n.phase0Duration, n.controller.EndPhase0)
-	if err != nil {
-		return err
-	}
+	// timers to control phase transitions
+	var phase0Timer <-chan time.Time
+	var phase1Timer <-chan time.Time
+	var phase2Timer <-chan time.Time
 
-	// Wait and trigger transition from Phase 1 to Phase 2
-	err = n.delayedTask(n.phase1Duration, n.controller.EndPhase1)
-	if err != nil {
-		return err
-	}
+	phase0Timer = time.After(n.phase0Duration)
 
-	// Wait and retrieve DKG results
-	err = n.delayedTask(
-		n.phase2Duration,
-		func() error {
+	for {
+		select {
+		case err := <-runErrCh:
+			// received an error from the async run routine
+			return fmt.Errorf("Async Run error: %w", err)
+		case <-phase0Timer:
+			// end of phase 0
+			err := n.controller.EndPhase0()
+			if err != nil {
+				return fmt.Errorf("Error transitioning to Phase 1: %w", err)
+			}
+			phase1Timer = time.After(n.phase1Duration)
+		case <-phase1Timer:
+			// end of phase 1
+			err := n.controller.EndPhase1()
+			if err != nil {
+				return fmt.Errorf("Error transitioning to Phase 2: %w", err)
+			}
+			phase2Timer = time.After(n.phase2Duration)
+		case <-phase2Timer:
+			// end of phase 2
 			err := n.controller.End()
-			return err
-		})
-	if err != nil {
-		return err
+			if err != nil {
+				return fmt.Errorf("Error ending DKG: %w", err)
+			}
+			return nil
+		}
 	}
-
-	return nil
-}
-
-func (n *node) delayedTask(delay time.Duration, task func() error) error {
-	timer := time.After(delay)
-	<-timer
-	return task()
 }
 
 // processor is an implementation of DKGProcessor that enables nodes to exchange
@@ -81,6 +90,7 @@ func (n *node) delayedTask(delay time.Duration, task func() error) error {
 type processor struct {
 	id       int
 	channels []chan DKGMessage
+	logger   zerolog.Logger
 }
 
 func (proc *processor) PrivateSend(dest int, data []byte) {
@@ -101,9 +111,13 @@ func (proc *processor) Broadcast(data []byte) {
 	}
 }
 
-func (proc *processor) Blacklist(node int) {}
+func (proc *processor) Blacklist(node int) {
+	proc.logger.Debug().Msgf("node %d blacklisted node %d", proc.id, node)
+}
 
-func (proc *processor) FlagMisbehavior(node int, logData string) {}
+func (proc *processor) FlagMisbehavior(node int, logData string) {
+	proc.logger.Debug().Msgf("node %d flagged node %d: %s", proc.id, node, logData)
+}
 
 type testCase struct {
 	totalNodes     int
@@ -190,9 +204,12 @@ func initNodes(t *testing.T, n int, phase0Duration, phase1Duration, phase2Durati
 		seed := make([]byte, 20)
 		_, _ = rand.Read(seed)
 
+		logger := zerolog.New(os.Stderr).With().Int("id", i).Logger()
+
 		processor := &processor{
 			id:       i,
 			channels: channels,
+			logger:   logger,
 		}
 
 		dkg, err := crypto.NewJointFeldman(n, optimalThreshold(n), i, processor)
@@ -202,7 +219,7 @@ func initNodes(t *testing.T, n int, phase0Duration, phase1Duration, phase2Durati
 			dkg,
 			seed,
 			channels[i],
-			zerolog.New(os.Stderr).With().Int("id", i).Logger())
+			logger)
 
 		node := newNode(i, controller, phase0Duration, phase1Duration, phase2Duration)
 
@@ -243,7 +260,7 @@ func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 		require.NotEmpty(t, nodes[i].controller.privateShare)
 		require.NotEmpty(t, nodes[i].controller.groupPublicKey)
 
-		require.Equal(t, nodes[0].controller.groupPublicKey, nodes[i].controller.groupPublicKey,
+		require.True(t, nodes[0].controller.groupPublicKey.Equals(nodes[i].controller.groupPublicKey),
 			"node %d has a different groupPubKey than node 0: %s %s",
 			i,
 			nodes[i].controller.groupPublicKey,
@@ -252,7 +269,7 @@ func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 		require.Len(t, nodes[i].controller.publicKeys, totalNodes)
 
 		for j := 0; j < totalNodes; j++ {
-			if !reflect.DeepEqual(nodes[0].controller.publicKeys[j], nodes[i].controller.publicKeys[j]) {
+			if !nodes[0].controller.publicKeys[j].Equals(nodes[i].controller.publicKeys[j]) {
 				t.Fatalf("node %d has a different pubs[%d] than node 0: %s, %s",
 					i,
 					j,
