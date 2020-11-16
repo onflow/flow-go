@@ -152,7 +152,8 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	assert.NoError(h.T(), err)
 
 	// add node 2 as a peer of node 1
-	node1.AddPeer(ctx, addr2)
+	err = node1.AddPeer(ctx, addr2)
+	assert.NoError(h.T(), err)
 
 	// let the node form the mesh
 	time.Sleep(time.Second)
