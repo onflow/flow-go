@@ -181,7 +181,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		// creates graph sampler topology, topology manager, and subscription managers
+		// creates graph sampler, topology, topology manager, and subscription managers
 		//
 		// graph sampler
 		graphSampler, err := topology.NewLinearFanoutGraphSampler(fnb.NodeID)
@@ -199,8 +199,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		subscriptionManager := libp2p.NewChannelSubscriptionManager(fnb.Middleware)
 
 		// topology manager
-		var topManager topology.Manager
-		topManager = topology.NewStatefulTopologyManager(top,
+		topManager := topology.NewStatefulTopologyManager(top,
 			subscriptionManager)
 
 		// creates network instance
