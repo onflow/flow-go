@@ -7,12 +7,14 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
+// LinearFanoutGraphSampler samples a guaranteed connected graph fanout, i.e., independent instances
+// of this module with distinct seeds generate a connected graph.
 type LinearFanoutGraphSampler struct {
 	seed       int64
 	fanoutFunc FanoutFunc
 }
 
-// NewLinearFanoutGraphSampler creates and returns a LinearFanoutGraphSampler
+// NewLinearFanoutGraphSampler creates and returns a LinearFanoutGraphSampler.
 func NewLinearFanoutGraphSampler(id flow.Identifier) (*LinearFanoutGraphSampler, error) {
 	seed, err := seedFromID(id)
 	if err != nil {
