@@ -51,7 +51,7 @@ func InvalidFormatSignature() flow.TransactionSignature {
 		Address:     AddressFixture(),
 		SignerIndex: 0,
 		Signature:   make([]byte, crypto.SignatureLenECDSAP256), // zero signature is invalid
-		KeyID:       1,
+		KeyIndex:    1,
 	}
 }
 
@@ -61,7 +61,7 @@ func TransactionSignatureFixture() flow.TransactionSignature {
 		Address:     AddressFixture(),
 		SignerIndex: 0,
 		Signature:   SeedFixture(sigLen),
-		KeyID:       1,
+		KeyIndex:    1,
 	}
 	// make sure the ECDSA signature passes the format check
 	s.Signature[sigLen/2] = 0
