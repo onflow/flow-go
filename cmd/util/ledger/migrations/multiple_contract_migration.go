@@ -2,13 +2,16 @@ package migrations
 
 import (
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/parser2"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
-	"strings"
 )
 
 type MultipleContractMigrationError struct {
@@ -28,7 +31,7 @@ func (e *MultipleContractMigrationError) Error() string {
 }
 
 var (
-	MultipleContractsSpecialMigrations = make(map[string]func(ledger.Payload, zerolog.Logger) ([]ledger.Payload, error), 0)
+	MultipleContractsSpecialMigrations = make(map[string]func(ledger.Payload, zerolog.Logger) ([]ledger.Payload, error))
 )
 
 func MultipleContractMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
@@ -114,8 +117,42 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 			Msg("Cannot parse program at address")
 		return nil, err
 	}
+	declarations := program.Declarations
 
-	if len(program.Declarations) == 0 {
+	// extract import declarations
+	nonImportDeclarations := make([]ast.Declaration, 0)
+	importDeclarations := make([]ast.Declaration, 0)
+
+	for _, d := range declarations {
+		if _, isImport := d.(*ast.ImportDeclaration); isImport {
+			importDeclarations = append(importDeclarations, d)
+		} else {
+			nonImportDeclarations = append(nonImportDeclarations, d)
+		}
+	}
+
+	sort.SliceStable(importDeclarations, func(i, j int) bool {
+		return importDeclarations[i].StartPosition().Offset > importDeclarations[j].StartPosition().Offset
+	})
+
+	imports := ""
+	for _, d := range importDeclarations {
+		imports = imports + code[d.StartPosition().Offset:d.EndPosition().Offset+1] + "\n"
+		code = code[:d.StartPosition().Offset] + code[d.EndPosition().Offset+1:]
+	}
+
+	program, err = parser2.ParseProgram(code)
+	if err != nil {
+		l.Error().
+			Err(err).
+			Str("address", address.Hex()).
+			Str("code", code).
+			Msg("Cannot parse program at address after removing declarations")
+		return nil, err
+	}
+	declarations = program.Declarations
+
+	if len(declarations) == 0 {
 		// If there is no declarations. Only comments? was this legal before?
 		// error just in case
 		// alternative would be removing the register
@@ -126,7 +163,7 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 		return []ledger.Payload{}, fmt.Errorf("no declarations at address %s", address.Hex())
 	}
 
-	if len(program.Declarations) > 2 {
+	if len(declarations) > 2 {
 		l.Error().
 			Str("address", address.Hex()).
 			Str("code", code).
@@ -134,12 +171,12 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 		return []ledger.Payload{}, fmt.Errorf("more than two declarations at address %s", address.Hex())
 	}
 
-	if len(program.Declarations) == 1 {
+	if len(declarations) == 1 {
 		// If there is one declaration move it to the new key
 		l.Debug().
 			Str("address", address.Hex()).
 			Msg("Single contract or interface at address moved to new key")
-		p.Key = addNameToKey(p.Key, program.Declarations[0].DeclarationIdentifier().Identifier)
+		p.Key = addNameToKey(p.Key, declarations[0].DeclarationIdentifier().Identifier)
 		return []ledger.Payload{p}, nil
 	}
 
@@ -149,8 +186,8 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 		Str("address", address.Hex()).
 		Msg("Two declarations on an address, splitting into two parts")
 
-	_, oneIsInterface := program.Declarations[0].(*ast.InterfaceDeclaration)
-	_, twoIsInterface := program.Declarations[1].(*ast.InterfaceDeclaration)
+	_, oneIsInterface := declarations[0].(*ast.InterfaceDeclaration)
+	_, twoIsInterface := declarations[1].(*ast.InterfaceDeclaration)
 	if oneIsInterface == twoIsInterface {
 		// declarations of same type! should not happen
 		l.Error().
@@ -163,11 +200,11 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 	var interfaceDeclaration ast.Declaration
 	var contractDeclaration ast.Declaration
 	if oneIsInterface {
-		interfaceDeclaration = program.Declarations[0]
-		contractDeclaration = program.Declarations[1]
+		interfaceDeclaration = declarations[0]
+		contractDeclaration = declarations[1]
 	} else {
-		interfaceDeclaration = program.Declarations[1]
-		contractDeclaration = program.Declarations[0]
+		interfaceDeclaration = declarations[1]
+		contractDeclaration = declarations[0]
 	}
 
 	interfaceStart := interfaceDeclaration.StartPosition().Offset
@@ -189,7 +226,8 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 	}
 
 	// add import to contract code
-	contractCode = fmt.Sprintf("import %s from %s\n%s", interfaceDeclaration.DeclarationIdentifier().Identifier, address.HexWithPrefix(), contractCode)
+	contractCode = fmt.Sprintf("%simport %s from %s\n%s", imports, interfaceDeclaration.DeclarationIdentifier().Identifier, address.HexWithPrefix(), contractCode)
+	interfaceCode = imports + interfaceCode
 
 	interfaceKey := addNameToKey(p.Key, interfaceDeclaration.DeclarationIdentifier().Identifier)
 	contractKey := addNameToKey(p.Key, contractDeclaration.DeclarationIdentifier().Identifier)

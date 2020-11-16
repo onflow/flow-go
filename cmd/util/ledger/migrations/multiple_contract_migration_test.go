@@ -418,6 +418,82 @@ func TestMultipleContractMigration(t *testing.T) {
 		require.Equal(t, string(migrated[1].Value), expectedContractCode)
 	})
 
+	t.Run("If code has two declarations, correctly split them (imports)", func(t *testing.T) {
+		address := flow.HexToAddress("01")
+
+		key := ledger.Key{
+			KeyParts: []ledger.KeyPart{
+				ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+				ledger.NewKeyPart(state.KeyPartController, []byte("")),
+				ledger.NewKeyPart(state.KeyPartKey, []byte("code")),
+			},
+		}
+		contract := `
+			import NonFungibleToken from 0x631e88ae7f1d7c20
+			import NonFungibleToken from 0x631e88ae7f1d7c20
+			
+			// some comments about Test
+			pub contract Test {
+				// some code 
+			}
+
+			import NonFungibleToken from 0x631e88ae7f1d7c20
+
+			// some comments about ITest
+			pub contract interface ITest {
+				// some code 
+			}
+
+
+			import NonFungibleToken from 0x631e88ae7f1d7c20
+			// some unrelated comments
+		`
+		payload := ledger.Payload{
+			Key:   key,
+			Value: []byte(contract),
+		}
+
+		expectedInterfaceCode := `import NonFungibleToken from 0x631e88ae7f1d7c20
+import NonFungibleToken from 0x631e88ae7f1d7c20
+import NonFungibleToken from 0x631e88ae7f1d7c20
+import NonFungibleToken from 0x631e88ae7f1d7c20
+
+
+			
+
+			// some comments about ITest
+			pub contract interface ITest {
+				// some code 
+			}
+
+
+			
+			// some unrelated comments
+		`
+
+		expectedContractCode := fmt.Sprintf(`import NonFungibleToken from 0x631e88ae7f1d7c20
+import NonFungibleToken from 0x631e88ae7f1d7c20
+import NonFungibleToken from 0x631e88ae7f1d7c20
+import NonFungibleToken from 0x631e88ae7f1d7c20
+import ITest from %s
+
+			
+			
+			
+			// some comments about Test
+			pub contract Test {
+				// some code 
+			}`, address.HexWithPrefix())
+
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
+		require.NoError(t, err)
+		require.Len(t, migrated, 2)
+		require.Equal(t, string(migrated[1].Key.KeyParts[2].Value), "code.Test")
+		require.Equal(t, string(migrated[1].Value), expectedContractCode)
+		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
+		require.Equal(t, string(migrated[0].Value), expectedInterfaceCode)
+	})
+
 	t.Run("If code has two declarations of the same type return error", func(t *testing.T) {
 		address := flow.HexToAddress("01")
 
