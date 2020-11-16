@@ -223,7 +223,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 	// iterates over collection nodes
 	for _, id := range suite.ids.Filter(filter.HasRole(flow.RoleCollection)) {
 		// creates a graph sampler for the node
-		graphSampler, err := topology.NewLinearFanoutGraphSampler(suite.me.NodeID)
+		graphSampler, err := topology.NewLinearFanoutGraphSampler(id.NodeID)
 		require.NoError(suite.T(), err)
 
 		// creates a channelID-based topology for node
