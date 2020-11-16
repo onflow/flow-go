@@ -89,6 +89,15 @@ func BlockFixture() flow.Block {
 	return BlockWithParentFixture(&header)
 }
 
+func BlockFixtures(number int) []*flow.Block {
+	blocks := make([]*flow.Block, 0, number)
+	for ; number > 0; number-- {
+		block := BlockFixture()
+		blocks = append(blocks, &block)
+	}
+	return blocks
+}
+
 func ProposalFixture() *messages.BlockProposal {
 	block := BlockFixture()
 	return ProposalFromBlock(&block)

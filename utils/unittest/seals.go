@@ -8,9 +8,10 @@ type sealFactory struct{}
 
 func (f *sealFactory) Fixture(opts ...func(*flow.Seal)) *flow.Seal {
 	seal := &flow.Seal{
-		BlockID:    IdentifierFixture(),
-		ResultID:   IdentifierFixture(),
-		FinalState: StateCommitmentFixture(),
+		BlockID:                IdentifierFixture(),
+		ResultID:               IdentifierFixture(),
+		FinalState:             StateCommitmentFixture(),
+		AggregatedApprovalSigs: Seal.AggregatedSignatureFixtures(3), // 3 chunks
 	}
 	for _, apply := range opts {
 		apply(seal)
@@ -33,6 +34,7 @@ func (f *sealFactory) WithResult(result *flow.ExecutionResult) func(*flow.Seal) 
 		seal.ResultID = result.ID()
 		seal.BlockID = result.BlockID
 		seal.FinalState = finalState
+		seal.AggregatedApprovalSigs = Seal.AggregatedSignatureFixtures(len(result.Chunks))
 	}
 }
 
@@ -51,5 +53,20 @@ func (f *sealFactory) WithBlock(block *flow.Header) func(*flow.Seal) {
 func (f *sealFactory) WithServiceEvents(events ...flow.ServiceEvent) func(*flow.Seal) {
 	return func(seal *flow.Seal) {
 		seal.ServiceEvents = events
+	}
+}
+
+func (f *sealFactory) AggregatedSignatureFixtures(number int) []flow.AggregatedSignature {
+	sigs := make([]flow.AggregatedSignature, 0, number)
+	for ; number > 0; number-- {
+		sigs = append(sigs, Seal.AggregatedSignatureFixture())
+	}
+	return sigs
+}
+
+func (f *sealFactory) AggregatedSignatureFixture() flow.AggregatedSignature {
+	return flow.AggregatedSignature{
+		VerifierSignatures: SignaturesFixture(7),
+		SignerIDs:          IdentifierListFixture(7),
 	}
 }

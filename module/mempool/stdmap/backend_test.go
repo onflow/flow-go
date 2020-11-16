@@ -102,6 +102,18 @@ func TestAdjust(t *testing.T) {
 	})
 }
 
+// Test that size mempool deduplicates based on ID
+func Test_DeduplicationByID(t *testing.T) {
+	item1 := fake("A")
+	item2 := fake("A") // identical ID, but different instance
+	assert.True(t, item1.ID() == item2.ID())
+
+	pool := NewBackend()
+	pool.Add(item1)
+	pool.Add(item2)
+	assert.Equal(t, uint(1), pool.Size())
+}
+
 // TestBackend_RunLimitChecking defines a backend with size limit of `limit`. It then
 // starts adding `swarm`-many items concurrently to the backend each on a separate goroutine,
 // where `swarm` > `limit`,
