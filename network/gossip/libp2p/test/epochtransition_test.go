@@ -98,6 +98,7 @@ func (ts *MutableIdentityTableSuite) TestNewNodeAdded() {
 	// create the id, middleware and network for a new node
 	ids, mws, nets := generateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, false)
 	newID := ids[0]
+	ts.nets = append(ts.nets, nets[0])
 	newMiddleware := mws[0]
 
 	newIDs := append(ts.ids, ids...)
