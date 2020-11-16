@@ -2,9 +2,9 @@ package migrations_test
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/migrations"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -41,7 +41,7 @@ func TestMultipleContractMigration(t *testing.T) {
 		}
 		for i, k := range keys {
 			t.Run(fmt.Sprintf("%d. key %s", i, k.String()), func(t *testing.T) {
-				_, err := migrations.Migrate([]ledger.Payload{{
+				_, err := migrations.MultipleContractMigration([]ledger.Payload{{
 					Key:   k,
 					Value: nil,
 				}})
@@ -63,7 +63,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte("some value 1234"),
 		}
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 		require.Equal(t, migrated[0], payload)
@@ -82,7 +82,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte("some value 1234"),
 		}
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 		require.Equal(t, migrated[0], payload)
@@ -101,7 +101,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte{},
 		}
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 0)
 	})
@@ -124,7 +124,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte{},
 		}
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload1,payload2})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload1,payload2})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 
@@ -148,7 +148,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte("{!@#$%234985yhtgv3yr9b  dvomngifn ..."),
 		}
 
-		_, err := migrations.Migrate([]ledger.Payload{payload})
+		_, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.Error(t, err)
 	})
 
@@ -177,7 +177,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte("{!@#$%234985yhtgv3yr9b  dvomngifn ..."),
 		}
 
-		_, err := migrations.Migrate([]ledger.Payload{payload1, payload2})
+		_, err := migrations.MultipleContractMigration([]ledger.Payload{payload1, payload2})
 		require.Error(t, err)
 		require.Len(t, err.(*migrations.MultipleContractMigrationError).Errors, 2)
 	})
@@ -197,7 +197,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.Test")
@@ -219,7 +219,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 1)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.Test")
@@ -245,7 +245,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		_, err := migrations.Migrate([]ledger.Payload{payload})
+		_, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.Error(t, err)
 	})
 
@@ -265,7 +265,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		_, err := migrations.Migrate([]ledger.Payload{payload})
+		_, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.Error(t, err)
 	})
 
@@ -314,7 +314,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			// some unrelated comments
 		`, address.HexWithPrefix())
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 2)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
@@ -355,7 +355,7 @@ func TestMultipleContractMigration(t *testing.T) {
 				// some code 
 			}// some unrelated comments`, address.HexWithPrefix())
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 2)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
@@ -409,7 +409,7 @@ func TestMultipleContractMigration(t *testing.T) {
 				// some code 
 			}`, address.HexWithPrefix())
 
-		migrated, err := migrations.Migrate([]ledger.Payload{payload})
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 2)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
@@ -446,7 +446,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte(contract),
 		}
 
-		_, err := migrations.Migrate([]ledger.Payload{payload})
+		_, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.Error(t, err)
 	})
 
@@ -454,7 +454,7 @@ func TestMultipleContractMigration(t *testing.T) {
 		address := flow.HexToAddress("01")
 		called := false
 
-		migrations.ExceptionalMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
+		migrations.MultipleContractsSpecialMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
 			called = true
 			return []ledger.Payload{payload}, nil
 		}
@@ -470,7 +470,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte{},
 		}
 
-		_, err := migrations.Migrate([]ledger.Payload{payload})
+		_, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.True(t, called)
 	})
@@ -478,7 +478,7 @@ func TestMultipleContractMigration(t *testing.T) {
 		address := flow.HexToAddress("01")
 		called := false
 
-		migrations.ExceptionalMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
+		migrations.MultipleContractsSpecialMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
 			called = true
 			return []ledger.Payload{payload}, nil
 		}
@@ -494,7 +494,7 @@ func TestMultipleContractMigration(t *testing.T) {
 			Value: []byte{},
 		}
 
-		_, err := migrations.Migrate([]ledger.Payload{payload})
+		_, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.False(t, called)
 	})

@@ -28,10 +28,10 @@ func (e *MultipleContractMigrationError) Error() string {
 }
 
 var (
-	ExceptionalMigrations= make(map[string]func(ledger.Payload, zerolog.Logger) ([]ledger.Payload, error), 0)
+	MultipleContractsSpecialMigrations = make(map[string]func(ledger.Payload, zerolog.Logger) ([]ledger.Payload, error), 0)
 )
 
-func Migrate(payload []ledger.Payload) ([]ledger.Payload, error) {
+func MultipleContractMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 	migratedPayloads := make([]ledger.Payload, 0)
 	errors := make([]error, 0)
 	// the cache keeps a record of already migrated addresses
@@ -84,7 +84,7 @@ func migrateRegister(p ledger.Payload, cache map[string]struct{}, logger zerolog
 	// we are going to migrate this
 	cache[registerId.Owner] = struct{}{}
 
-	if em, hasEM := ExceptionalMigrations[registerId.Owner]; hasEM {
+	if em, hasEM := MultipleContractsSpecialMigrations[registerId.Owner]; hasEM {
 		logger.Info().
 			Err(err).
 			Str("address", flow.BytesToAddress([]byte(registerId.Owner)).HexWithPrefix()).

@@ -23,7 +23,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	led, err := complete.NewLedger(dir, 1000, &metrics.NoopCollector{}, log, nil, complete.DefaultPathFinderVersion)
 
 	filePath := path.Join(outputDir, "root.checkpoint")
-	newState, err := led.ExportCheckpointAt(targetHash, []ledger.Migration{migrations.NoOpMigration}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, filePath)
+	newState, err := led.ExportCheckpointAt(targetHash, []ledger.Migration{migrations.MultipleContractMigration}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, filePath)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
