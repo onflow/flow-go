@@ -84,8 +84,7 @@ func (r RoleList) Contains(role Role) bool {
 }
 
 // Union returns a new role list containing every role that occurs in
-// either `r`, or `other`, or both. There are no duplicates in the output,
-// where duplicates are identities with the same node role.
+// either `r`, or `other`, or both. There are no duplicate roles in the output,
 func (r RoleList) Union(other RoleList) RoleList {
 	// stores the output, the union of the two lists
 	union := make(RoleList, 0, len(r)+len(other))
