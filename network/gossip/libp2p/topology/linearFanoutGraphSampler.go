@@ -34,30 +34,26 @@ func NewLinearFanoutGraphSampler(id flow.Identifier) (*LinearFanoutGraphSampler,
 func (l *LinearFanoutGraphSampler) SampleConnectedGraph(all flow.IdentityList,
 	shouldHave flow.IdentityList) (flow.IdentityList, error) {
 	var result flow.IdentityList
-	var err error
+
+	if len(all) == 0 {
+		return nil, fmt.Errorf("empty identity list")
+	}
 
 	if shouldHave == nil {
-		result, err = l.connectedGraph(all)
+		result = l.connectedGraph(all)
 	} else {
-		result, err = l.conditionalConnectedGraph(all, shouldHave)
+		result = l.conditionalConnectedGraph(all, shouldHave)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("could not sample a connected graph: %w", err)
-	}
-	return result, err
+	return result, nil
 }
 
 // conditionalConnectedGraph returns a random subset of length (n+1)/2, which includes the shouldHave
 // set of identifiers.
 // If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
-func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flow.IdentityList) (flow.IdentityList, error) {
+func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flow.IdentityList) flow.IdentityList {
 	// total sample size
 	totalSize := LinearFanoutFunc(len(all))
-
-	if len(all) == 0 {
-		return nil, fmt.Errorf("empty identity list")
-	}
 
 	if totalSize < len(shouldHave) {
 		// total fanout size needed is already satisfied by shouldHave set.
@@ -70,17 +66,14 @@ func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flo
 	// others are all excluding should have ones
 	others := all.Filter(filter.Not(filter.In(shouldHave)))
 	others = others.DeterministicSample(uint(subsetSize), l.seed)
-	return others.Union(shouldHave), nil
+	return others.Union(shouldHave)
 }
 
 // connectedGraph returns a random subset of length (n+1)/2.
 // If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
-func (l *LinearFanoutGraphSampler) connectedGraph(all flow.IdentityList) (flow.IdentityList, error) {
-	if len(all) == 0 {
-		return nil, fmt.Errorf("empty identity list")
-	}
+func (l *LinearFanoutGraphSampler) connectedGraph(all flow.IdentityList) flow.IdentityList {
 	// choose (n+1)/2 random nodes so that each node in the graph will have a degree >= (n+1) / 2,
 	// guaranteeing a connected graph.
 	size := uint(LinearFanoutFunc(len(all)))
-	return all.DeterministicSample(size, l.seed), nil
+	return all.DeterministicSample(size, l.seed)
 }
