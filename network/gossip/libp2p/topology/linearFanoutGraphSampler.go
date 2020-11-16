@@ -60,7 +60,8 @@ func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flo
 	}
 
 	if totalSize < len(shouldHave) {
-		return nil, fmt.Errorf("length of should have set (%d) must be less than all (%d)", totalSize, len(shouldHave))
+		// total fanout size needed is already satisfied by shouldHave set.
+		return shouldHave, nil
 	}
 
 	// subset size excluding should have ones
