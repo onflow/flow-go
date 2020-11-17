@@ -63,11 +63,11 @@ func (r *BaseReporter) Report(payloads []ledger.Payload) error {
 		r.regCountByAccounts[string(owner)] += 1
 		r.storageUsedByAccounts[string(owner)] += len(p.Value)
 
-		if strings.Contains(string(p.Key.KeyParts[2].Value), "publicflowTokenBalance") {
+		if strings.Contains(string(p.Key.KeyParts[2].Value), "flow") {
 			ownerAddress := common.BytesToAddress(owner)
 			// TODO handle error
-			decoded, _ := interpreter.DecodeValue(p.Value, &ownerAddress, nil)
-			fmt.Println(">>>", p.Key.String(), decoded)
+			decoded, err := interpreter.DecodeValue(p.Value, &ownerAddress, nil)
+			fmt.Println(">>>", string(p.Key.KeyParts[2].Value), p.Key.String(), decoded, err)
 		}
 	}
 
