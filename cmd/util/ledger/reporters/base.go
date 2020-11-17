@@ -60,7 +60,7 @@ func (r *BaseReporter) Report(payloads []ledger.Payload) error {
 		// owner
 		owner := p.Key.KeyParts[0].Value
 		r.accounts[string(owner)] = true
-		r.regCountByAccounts[string(owner)] += 1
+		r.regCountByAccounts[string(owner)]++
 		r.storageUsedByAccounts[string(owner)] += len(p.Value)
 
 		if strings.Contains(string(p.Key.KeyParts[2].Value), "storageflowTokenVault") {
