@@ -199,6 +199,7 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
+	first, err := q.snap.state.headers.ByBlockID(status)
 	return NewCommittedEpoch(setup, commit)
 }
 

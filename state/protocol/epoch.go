@@ -8,13 +8,16 @@ import (
 // given a Snapshot. It only exists to simplify the main Snapshot interface.
 type EpochQuery interface {
 
-	// Current returns the current epoch as of this snapshot.
+	// Current returns the current epoch as of this snapshot. All valid snapshots
+	// have a current epoch.
 	Current() Epoch
 
-	// Next returns the next epoch as of this snapshot.
+	// Next returns the next epoch as of this snapshot. Valid snapshots must
+	// have a next epoch available after the transition to epoch setup phase.
 	Next() Epoch
 
 	// ByCounter returns an arbitrary epoch by counter.
+	// TODO: remove
 	ByCounter(counter uint64) Epoch
 }
 
@@ -37,6 +40,9 @@ type Epoch interface {
 
 	// Counter returns the Epoch's counter.
 	Counter() (uint64, error)
+
+	// FirstBlock returns the header of the first block of this epoch.
+	FirstBlock() (*flow.Header, error)
 
 	// FinalView returns the largest view number which still belongs to this epoch.
 	FinalView() (uint64, error)
