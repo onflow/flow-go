@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -120,8 +121,6 @@ func (h *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
 // if the channel ID is updated while the network keys are kept the same.
 func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
-	// test channel
-	testChannelID := "test_channel"
 
 	// root id before spork
 	rootIDBeforeSpork := unittest.BlockFixture().ID().String()
@@ -142,7 +141,7 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	defer cancel()
 
 	// spork topic is derived by suffixing the channelID with the root block ID
-	topicBeforeSpork := testChannelID + "-" + rootIDBeforeSpork
+	topicBeforeSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDBeforeSpork)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(ctx, topicBeforeSpork)
@@ -164,7 +163,7 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	rootIDAfterSpork := unittest.BlockFixture().ID().String()
 
 	// topic after the spork
-	topicAfterSpork := testChannelID + "-" + rootIDAfterSpork
+	topicAfterSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDAfterSpork)
 
 	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
