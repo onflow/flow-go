@@ -128,6 +128,14 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	return len(v) > 0, nil
 }
 
+func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
+	return e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
+}
+
+func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
+	return e.accounts.GetStorageCapacity(flow.BytesToAddress(address.Bytes()))
+}
+
 func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
