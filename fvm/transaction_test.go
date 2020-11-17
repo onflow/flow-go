@@ -105,7 +105,7 @@ func TestTopShotSafety(t *testing.T) {
 		topShotContractAddress := flow.HexToAddress(TopShotContractAddress)
 
 		runtimeError := runtime.Error{
-			Err: &runtime.ExtendedParsingCheckingError{
+			Err: &runtime.ParsingCheckingError{
 				Err: sema.CheckerError{
 					Errors: []error{&sema.ImportedProgramError{
 						CheckerError:   &sema.CheckerError{},

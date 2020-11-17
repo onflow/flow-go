@@ -125,7 +125,7 @@ func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
 			i.logger.Err(err).Msg("found checking error for TopShot contract but exception is not RuntimeError")
 			return
 		}
-		ee, is := re.Err.(*runtime.ExtendedParsingCheckingError)
+		ee, is := re.Err.(*runtime.ParsingCheckingError)
 		if !is {
 			i.logger.Err(err).Msg("found checking error for TopShot contract but exception is not ExtendedParsingCheckingError")
 			return
