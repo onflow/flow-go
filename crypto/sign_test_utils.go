@@ -72,6 +72,23 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	}
 }
 
+func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int) {
+	// valid seed lengths
+	seed := make([]byte, minLen)
+	_, err := GeneratePrivateKey(salg, seed)
+	assert.NoError(t, err)
+	seed = make([]byte, maxLen)
+	_, err = GeneratePrivateKey(salg, seed)
+	assert.NoError(t, err)
+	// invalid seed lengths
+	seed = make([]byte, minLen-1)
+	_, err = GeneratePrivateKey(salg, seed)
+	assert.Error(t, err)
+	seed = make([]byte, maxLen+1)
+	_, err = GeneratePrivateKey(salg, seed)
+	assert.Error(t, err)
+}
+
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	t.Logf("Testing encode/decode for %s", salg)
 	r := time.Now().UnixNano()
@@ -89,6 +106,9 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(salg, seed)
 		assert.Nil(t, err, "the key generation has failed")
+		seed[0] ^= 1 // alter the seed to get a new private key
+		distinctSk, err := GeneratePrivateKey(salg, seed)
+		require.NoError(t, err)
 
 		// check private key encoding
 		skBytes := sk.Encode()
@@ -97,6 +117,8 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		assert.True(t, sk.Equals(skCheck), "key equality check failed")
 		skCheckBytes := skCheck.Encode()
 		assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
+		distinctSkBytes := distinctSk.Encode()
+		assert.NotEqual(t, skBytes, distinctSkBytes, "keys should be different")
 
 		// check public key encoding
 		pk := sk.PublicKey()
@@ -106,6 +128,8 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		assert.True(t, pk.Equals(pkCheck), "key equality check failed")
 		pkCheckBytes := pkCheck.Encode()
 		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+		distinctPkBytes := distinctSk.PublicKey().Encode()
+		assert.NotEqual(t, pkBytes, distinctPkBytes, "keys should be different")
 	}
 
 	// test invalid private keys (equal to the curve group order)
