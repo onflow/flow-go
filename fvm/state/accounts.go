@@ -9,6 +9,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
+	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -415,7 +416,7 @@ func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController b
 		return err
 	}
 
-	sizeChange := int64(len(value) - len(oldValue))
+	sizeChange := int64(RegisterSize(address, isController, key, value) - RegisterSize(address, isController, key, oldValue))
 	if sizeChange == 0 {
 		// register size has not changed. Nothing to do
 		return nil
@@ -443,6 +444,22 @@ func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController b
 	// this puts us back in the setValue method.
 	// The difference is that storage_used update exits early from this function so there isn't any recursion.
 	return a.setStorageUsed(address, newSize)
+}
+
+func RegisterSize(address flow.Address, isController bool, key string, value flow.RegisterValue) int {
+	if len(value) == 0 {
+		// registers with empty value won't (or don't) exist when stored
+		return 0
+	}
+
+	var registerID flow.RegisterID
+	if isController {
+		registerID = flow.NewRegisterID(string(address.Bytes()), string(address.Bytes()), key)
+	} else {
+		registerID = flow.NewRegisterID(string(address.Bytes()), "", key)
+	}
+	registerKey := state.RegisterIDToKey(registerID)
+	return registerKey.Size() + len(value)
 }
 
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
