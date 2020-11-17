@@ -43,7 +43,7 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_UnconditionalSa
 	require.NoError(suite.T(), err)
 
 	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
-	// the size of greater than or equal to applying LinearFanoutFunc over the original set.
+	// the size equal to applying LinearFanoutFunc over the original set.
 	expectedFanout := LinearFanoutFunc(len(suite.all))
 	require.Equal(suite.T(), len(sample), expectedFanout)
 
@@ -54,14 +54,15 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_UnconditionalSa
 // TestLinearFanout_ConditionalSampling evaluates that sampling a connected graph fanout with a shouldHave set
 // follows the LinearFanoutFunc, and it also does not contain duplicate element.
 func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_ConditionalSampling() {
-	// samples 10 ids into shouldHave and excludes them from all into others.
+	// samples 10 ids into `shouldHave` set.
 	shouldHave := suite.all.Sample(10)
 
+	// samples a connected graph of `all` that includes `shouldHave` set.
 	sample, err := suite.firstNodeSampler.SampleConnectedGraph(suite.all, shouldHave)
 	require.NoError(suite.T(), err)
 
 	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
-	// the size of greater than or equal to applying LinearFanoutFunc over the original set.
+	// the size equal to applying LinearFanoutFunc over the original set.
 	expectedFanout := LinearFanoutFunc(len(suite.all))
 	require.Equal(suite.T(), len(sample), expectedFanout)
 
@@ -75,7 +76,7 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_ConditionalSamp
 }
 
 // TestLinearFanoutSmallerAll evaluates that sampling a connected graph fanout with a shouldHave set
-// that is greater than `all` set in size, returns the `shouldHave` set.
+// that is greater than required fanout, returns the `shouldHave` set instead.
 func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
 	// samples 10 ids into 'shouldHave'.
 	shouldHave := suite.all.Sample(10)
