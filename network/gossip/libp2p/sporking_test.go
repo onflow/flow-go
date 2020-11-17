@@ -137,7 +137,7 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	node2key, err := generateNetworkingKey("def")
 	assert.NoError(h.T(), err)
 	node2, addr2 := h.CreateNode("node1", node2key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
-	defer h.StopNode(node1)
+	defer h.StopNode(node2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
