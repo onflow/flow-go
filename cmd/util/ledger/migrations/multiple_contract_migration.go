@@ -134,10 +134,12 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 
 	imports := ""
 	for _, d := range importDeclarations {
+		importStart := d.StartPosition().Offset
+		importEnd := d.EndPosition().Offset + 1
 		// aggregate imports for later use
-		imports = imports + code[d.StartPosition().Offset:d.EndPosition().Offset+1] + "\n"
+		imports = imports + code[importStart:importEnd] + "\n"
 		// remove imports from the code
-		code = code[:d.StartPosition().Offset] + code[d.EndPosition().Offset+1:]
+		code = code[:importStart] + code[importEnd:]
 	}
 
 	// parse the code again to get accurate locations of the remaining declarations
@@ -152,7 +154,8 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 	}
 	declarations = program.Declarations
 
-	if len(declarations) == 0 {
+	switch len(declarations) {
+	case 0:
 		// If there is no declarations. Only comments? was this legal before?
 		// error just in case
 		// alternative would be removing the register
@@ -161,86 +164,82 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 			Str("code", code).
 			Msg("No declarations at address")
 		return []ledger.Payload{}, fmt.Errorf("no declarations at address %s", address.Hex())
-	}
-
-	if len(declarations) > 2 {
-		l.Error().
-			Str("address", address.Hex()).
-			Str("code", code).
-			Msg("More than two declarations at address")
-		return []ledger.Payload{}, fmt.Errorf("more than two declarations at address %s", address.Hex())
-	}
-
-	if len(declarations) == 1 {
+	case 1:
 		// If there is one declaration move it to the new key
 		l.Debug().
 			Str("address", address.Hex()).
 			Msg("Single contract or interface at address moved to new key")
 		p.Key = addNameToKey(p.Key, declarations[0].DeclarationIdentifier().Identifier)
 		return []ledger.Payload{p}, nil
-	}
+	case 2:
+		// We have two declarations. Due to the current rules one of them is an interface and one is a contract.
+		// the contract will need an import to the interface.
+		l.Info().
+			Str("address", address.Hex()).
+			Msg("Two declarations on an address, splitting into two parts")
 
-	// We have two declarations. Due to the current rules one of them is an interface and one is a contract.
-	// the contract will need an import to the interface.
-	l.Info().
-		Str("address", address.Hex()).
-		Msg("Two declarations on an address, splitting into two parts")
+		_, oneIsInterface := declarations[0].(*ast.InterfaceDeclaration)
+		_, twoIsInterface := declarations[1].(*ast.InterfaceDeclaration)
+		if oneIsInterface == twoIsInterface {
+			// declarations of same type! should not happen
+			l.Error().
+				Str("address", address.Hex()).
+				Str("code", code).
+				Msg("Two declarations of the same type at address")
+			return []ledger.Payload{}, fmt.Errorf("two declarations of the same type at address %s", address.Hex())
+		}
 
-	_, oneIsInterface := declarations[0].(*ast.InterfaceDeclaration)
-	_, twoIsInterface := declarations[1].(*ast.InterfaceDeclaration)
-	if oneIsInterface == twoIsInterface {
-		// declarations of same type! should not happen
+		var interfaceDeclaration ast.Declaration
+		var contractDeclaration ast.Declaration
+		if oneIsInterface {
+			interfaceDeclaration = declarations[0]
+			contractDeclaration = declarations[1]
+		} else {
+			interfaceDeclaration = declarations[1]
+			contractDeclaration = declarations[0]
+		}
+
+		interfaceStart := interfaceDeclaration.StartPosition().Offset
+		interfaceEnd := interfaceDeclaration.EndPosition().Offset
+		contractStart := contractDeclaration.StartPosition().Offset
+		contractEnd := contractDeclaration.EndPosition().Offset
+
+		var contractCode string
+		var interfaceCode string
+
+		if contractStart < interfaceStart {
+			split := contractEnd + 1
+			contractCode = code[:split]
+			interfaceCode = code[split:]
+		} else {
+			split := interfaceEnd + 1
+			contractCode = code[split:]
+			interfaceCode = code[:split]
+		}
+
+		// add original imports and interface import to contract code
+		contractCode = fmt.Sprintf("%simport %s from %s\n%s", imports, interfaceDeclaration.DeclarationIdentifier().Identifier, address.HexWithPrefix(), contractCode)
+		// add original imports to interface code
+		interfaceCode = imports + interfaceCode
+
+		interfaceKey := addNameToKey(p.Key, interfaceDeclaration.DeclarationIdentifier().Identifier)
+		contractKey := addNameToKey(p.Key, contractDeclaration.DeclarationIdentifier().Identifier)
+		return []ledger.Payload{
+			{
+				Key:   interfaceKey,
+				Value: []byte(interfaceCode),
+			}, {
+				Key:   contractKey,
+				Value: []byte(contractCode),
+			},
+		}, nil
+	default:
 		l.Error().
 			Str("address", address.Hex()).
 			Str("code", code).
-			Msg("Two declarations of the same type at address")
-		return []ledger.Payload{}, fmt.Errorf("two declarations of the same type at address %s", address.Hex())
+			Msg("More than two declarations at address")
+		return []ledger.Payload{}, fmt.Errorf("more than two declarations at address %s", address.Hex())
 	}
-
-	var interfaceDeclaration ast.Declaration
-	var contractDeclaration ast.Declaration
-	if oneIsInterface {
-		interfaceDeclaration = declarations[0]
-		contractDeclaration = declarations[1]
-	} else {
-		interfaceDeclaration = declarations[1]
-		contractDeclaration = declarations[0]
-	}
-
-	interfaceStart := interfaceDeclaration.StartPosition().Offset
-	interfaceEnd := interfaceDeclaration.EndPosition().Offset
-	contractStart := contractDeclaration.StartPosition().Offset
-	contractEnd := contractDeclaration.EndPosition().Offset
-
-	var contractCode string
-	var interfaceCode string
-
-	if contractStart < interfaceStart {
-		split := contractEnd + 1
-		contractCode = code[:split]
-		interfaceCode = code[split:]
-	} else {
-		split := interfaceEnd + 1
-		contractCode = code[split:]
-		interfaceCode = code[:split]
-	}
-
-	// add original imports and interface import to contract code
-	contractCode = fmt.Sprintf("%simport %s from %s\n%s", imports, interfaceDeclaration.DeclarationIdentifier().Identifier, address.HexWithPrefix(), contractCode)
-	// add original imports to interface code
-	interfaceCode = imports + interfaceCode
-
-	interfaceKey := addNameToKey(p.Key, interfaceDeclaration.DeclarationIdentifier().Identifier)
-	contractKey := addNameToKey(p.Key, contractDeclaration.DeclarationIdentifier().Identifier)
-	return []ledger.Payload{
-		{
-			Key:   interfaceKey,
-			Value: []byte(interfaceCode),
-		}, {
-			Key:   contractKey,
-			Value: []byte(contractCode),
-		},
-	}, nil
 }
 
 // if it is a address
