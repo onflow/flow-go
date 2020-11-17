@@ -63,7 +63,7 @@ func (r *BaseReporter) Report(payloads []ledger.Payload) error {
 		r.regCountByAccounts[string(owner)] += 1
 		r.storageUsedByAccounts[string(owner)] += len(p.Value)
 
-		if strings.Contains(string(p.Key.KeyParts[2].Value), "flow") {
+		if strings.Contains(string(p.Key.KeyParts[2].Value), "storageflowTokenVault") {
 			ownerAddress := common.BytesToAddress(owner)
 			// TODO handle error
 			decoded, err := interpreter.DecodeValue(p.Value, &ownerAddress, nil)
