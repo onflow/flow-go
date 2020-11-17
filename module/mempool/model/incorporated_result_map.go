@@ -12,13 +12,13 @@ type IncorporatedResultMap struct {
 
 // ID implements flow.Entity.ID for IncorporatedResultMap to make it capable of
 // being stored directly in mempools and storage.
-func (a IncorporatedResultMap) ID() flow.Identifier {
+func (a *IncorporatedResultMap) ID() flow.Identifier {
 	return a.ExecutionResult.ID()
 }
 
 // CheckSum implements flow.Entity.CheckSum for IncorporatedResultMap to make it
 // capable of being stored directly in mempools and storage. It makes the id of
 // the entire IncorporatedResultMap.
-func (a IncorporatedResultMap) Checksum() flow.Identifier {
+func (a *IncorporatedResultMap) Checksum() flow.Identifier {
 	return flow.MakeID(a)
 }

@@ -33,7 +33,11 @@ func FromRandomSource(indices []uint32, sor []byte) ([]byte, error) {
 	}
 
 	// create the key used for the KMAC by concatenating all indices
-	key := make([]byte, 4*len(indices))
+	keyLen := 4 * len(indices)
+	if keyLen < hash.KmacMinKeyLen {
+		keyLen = hash.KmacMinKeyLen
+	}
+	key := make([]byte, keyLen)
 	for i, index := range indices {
 		binary.LittleEndian.PutUint32(key[4*i:4*i+4], index)
 	}
