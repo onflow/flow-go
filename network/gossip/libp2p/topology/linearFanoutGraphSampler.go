@@ -51,7 +51,6 @@ func (l *LinearFanoutGraphSampler) SampleConnectedGraph(all flow.IdentityList,
 
 // conditionalConnectedGraph returns a random subset of length (n+1)/2, which includes the shouldHave
 // set of identifiers.
-// If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
 func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flow.IdentityList) (flow.IdentityList,
 	error) {
 	// checks `shouldHave` be a subset of `all`
@@ -79,7 +78,6 @@ func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flo
 }
 
 // connectedGraph returns a random subset of length (n+1)/2.
-// If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
 func (l *LinearFanoutGraphSampler) connectedGraph(all flow.IdentityList) flow.IdentityList {
 	// choose (n+1)/2 random nodes so that each node in the graph will have a degree >= (n+1) / 2,
 	// guaranteeing a connected graph.
