@@ -249,7 +249,7 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.Subs
 // GenerateTopologyManager creates a default stateful topology manager per topology and its corresponding subscription
 //manager.
 func GenerateTopologyManager(t *testing.T, subMngrs []channel.SubscriptionManager, tops []topology.Topology) []topology.Manager {
-	topMngrs := make([]topology.Manager, 0, len(tops))
+	topMngrs := make([]topology.Manager, len(tops))
 	for i := 0; i < len(tops); i++ {
 		var topMngr topology.Manager
 		var err error
