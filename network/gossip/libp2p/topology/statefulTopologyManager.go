@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
 )
 
@@ -29,16 +28,14 @@ func NewStatefulTopologyManager(topology Topology, subMngr channel.SubscriptionM
 // MakeTopology receives identity list of entire network and constructs identity list of topology
 // of this instance. A node directly communicates with its topology identity list on epidemic dissemination
 // of the messages (i.e., publish and multicast).
-// Independent invocations of MakeTopology on different nodes collaboratively
-// constructs a connected graph of nodes that enables them talking to each other.
+// Independent invocations of MakeTopology on different nodes collaboratively must construct a cohesive
+// connected graph of nodes that enables them talking to each other.
 func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.IdentityList, error) {
-	var myFanout flow.IdentityList
-
-	// samples a connected component fanout from each topic and takes the
-	// union of all fanouts.
 	myChannelIDs := stm.subMngr.GetChannelIDs()
 	if len(myChannelIDs) == 0 {
 		// no subscribed channel id, hence skip topology creation
+		// we do not return an error at this state as invocation of MakeTopology may happen before
+		// node subscribing to all its channels.
 		return flow.IdentityList{}, nil
 	}
 
@@ -47,30 +44,27 @@ func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.Id
 	for _, myChannel := range myChannelIDs {
 		roles, ok := engine.RolesByChannelID(myChannel)
 		if !ok {
-			return nil, fmt.Errorf("could not extract roles for channel %s", myChannel)
+			return nil, fmt.Errorf("could not extract roles for channel: %s", myChannel)
 		}
 		myInteractingRoles = myInteractingRoles.Union(roles)
 	}
-	//fmt.Println("roles:")
 
+	// builds a connected component per role this node interact with,
+	var myFanout flow.IdentityList
 	for _, role := range myInteractingRoles {
 		if role == flow.RoleCollection {
+			// we do not build connected component for collection nodes based on their role
+			// rather we build it based on their cluster identity in the next step.
 			continue
 		}
-		roleFanout, err := stm.topology.SubsetRole(ids.Filter(filter.HasRole(role)), nil, nil)
+		roleFanout, err := stm.topology.SubsetRole(ids, nil, flow.RoleList{role})
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for role %s: %w", role, err)
 		}
 		myFanout = myFanout.Union(roleFanout)
-		//fmt.Println(len(myFanout), role, "AN", len(myFanout.Filter(filter.HasRole(flow.RoleAccess))),
-		//	"CON", len(myFanout.Filter(filter.HasRole(flow.RoleConsensus))),
-		//	"COL", len(myFanout.Filter(filter.HasRole(flow.RoleCollection))),
-		//	"EN", len(myFanout.Filter(filter.HasRole(flow.RoleExecution))),
-		//	"VN", len(myFanout.Filter(filter.HasRole(flow.RoleVerification))))
 	}
 
-	//fmt.Println("channels:")
-
+	// stitches the role-based components that subscribed to the same channel id together.
 	for _, myChannel := range myChannelIDs {
 		shouldHave := make([]*flow.Identity, len(myFanout))
 		copy(shouldHave, myFanout)
@@ -80,12 +74,6 @@ func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.Id
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", myChannel, err)
 		}
 		myFanout = myFanout.Union(topicFanout)
-		// roles, _ := engine.RolesByChannelID(myChannel)
-		//fmt.Println(len(myFanout), myChannel, roles, "AN", len(myFanout.Filter(filter.HasRole(flow.RoleAccess))),
-		//	"CON", len(myFanout.Filter(filter.HasRole(flow.RoleConsensus))),
-		//	"COL", len(myFanout.Filter(filter.HasRole(flow.RoleCollection))),
-		//	"EN", len(myFanout.Filter(filter.HasRole(flow.RoleExecution))),
-		//	"VN", len(myFanout.Filter(filter.HasRole(flow.RoleVerification))))
 	}
 
 	if len(myFanout) == 0 {
