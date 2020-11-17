@@ -147,6 +147,10 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
 	v.delta.Set(owner, controller, key, value)
 }
 
+func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
+	return v.delta.RegisterUpdates()
+}
+
 func (v *View) updateSpock(value []byte) error {
 	_, err := v.spockSecretHasher.Write(value)
 	if err != nil {
