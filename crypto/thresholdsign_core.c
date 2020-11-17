@@ -108,7 +108,7 @@ int G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t* 
             return INVALID;
         Zr_lagrangeCoefficientAtZero(bn_lagr_coef, signers[i], signers, len);
         ep_mul_lwnaf(mult, share, bn_lagr_coef);
-        ep_add_projc(acc, acc, mult);
+        ep_add_jacob(acc, acc, mult);
     }
     // export the result
     ep_write_bin_compact(dest, acc, SIGNATURE_LEN);
