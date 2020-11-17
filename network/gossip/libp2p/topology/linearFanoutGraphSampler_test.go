@@ -13,8 +13,8 @@ import (
 
 type LinearFanoutGraphSamplerTestSuite struct {
 	suite.Suite
-	sampler *LinearFanoutGraphSampler
-	all     flow.IdentityList
+	firstNodeSampler *LinearFanoutGraphSampler
+	all              flow.IdentityList
 }
 
 // TestNewLinearFanoutGraphSamplerTestSuite runs all tests in this test suite.
@@ -26,16 +26,18 @@ func TestNewLinearFanoutGraphSamplerTestSuite(t *testing.T) {
 func (suite *LinearFanoutGraphSamplerTestSuite) SetupTest() {
 	suite.all = unittest.IdentityListFixture(100, unittest.WithAllRoles())
 
+	// creates a graph sampler for the first node in `all` list
+	// we use this sampler for some isolated unit testing down the suite.
 	sampler, err := NewLinearFanoutGraphSampler(suite.all[0].NodeID)
 	require.NoError(suite.T(), err)
-
-	suite.sampler = sampler
+	suite.firstNodeSampler = sampler
 }
 
 // TestLinearFanoutNoShouldHave evaluates that sampling a connected graph fanout
-// follows the LinearFanoutFunc, and it also does not contain duplicate element.
+// with an empty `shouldHave` list follows the LinearFanoutFunc,
+// and it also does not contain duplicate element.
 func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNoShouldHave() {
-	sample, err := suite.sampler.SampleConnectedGraph(suite.all, nil)
+	sample, err := suite.firstNodeSampler.SampleConnectedGraph(suite.all, nil)
 	require.NoError(suite.T(), err)
 
 	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
@@ -53,7 +55,7 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutWithShouldHave()
 	// samples 10 ids into shouldHave and excludes them from all into others.
 	shouldHave := suite.all.Sample(10)
 
-	sample, err := suite.sampler.SampleConnectedGraph(suite.all, shouldHave)
+	sample, err := suite.firstNodeSampler.SampleConnectedGraph(suite.all, shouldHave)
 	require.NoError(suite.T(), err)
 
 	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
@@ -80,7 +82,7 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
 
 	// total size of smallerAll is 15, and it requires a linear fanout of 8 which is less than
 	// size of `shouldHave` set, so the shouldHave itself should return
-	sample, err := suite.sampler.SampleConnectedGraph(smallerAll, shouldHave)
+	sample, err := suite.firstNodeSampler.SampleConnectedGraph(smallerAll, shouldHave)
 	require.NoError(suite.T(), err)
 	require.Equal(suite.T(), len(sample), len(shouldHave))
 	require.ElementsMatch(suite.T(), sample, shouldHave)
@@ -95,7 +97,7 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetShouldH
 	excludedAll := suite.all.Filter(filter.Not(filter.HasNodeID(shouldHave[0].NodeID)))
 
 	// since `shouldHave` is not a subset of `excludedAll` it should return an error
-	_, err := suite.sampler.SampleConnectedGraph(excludedAll, shouldHave)
+	_, err := suite.firstNodeSampler.SampleConnectedGraph(excludedAll, shouldHave)
 	require.Error(suite.T(), err)
 }
 
@@ -106,15 +108,15 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetEmptyAl
 	shouldHave := suite.all.Sample(10)
 
 	// sampling with empty all should return an error
-	_, err := suite.sampler.SampleConnectedGraph(flow.IdentityList{}, shouldHave)
+	_, err := suite.firstNodeSampler.SampleConnectedGraph(flow.IdentityList{}, shouldHave)
 	require.Error(suite.T(), err)
 
 	// sampling with empty all should return an error
-	_, err = suite.sampler.SampleConnectedGraph(flow.IdentityList{}, nil)
+	_, err = suite.firstNodeSampler.SampleConnectedGraph(flow.IdentityList{}, nil)
 	require.Error(suite.T(), err)
 
 	// sampling with empty all should return an error
-	_, err = suite.sampler.SampleConnectedGraph(nil, nil)
+	_, err = suite.firstNodeSampler.SampleConnectedGraph(nil, nil)
 	require.Error(suite.T(), err)
 }
 
