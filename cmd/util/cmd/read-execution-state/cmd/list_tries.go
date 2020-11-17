@@ -1,4 +1,4 @@
-package list_tries
+package cmd
 
 import (
 	"fmt"
@@ -6,28 +6,26 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-
-	"github.com/onflow/flow-go/ledger/complete/mtrie"
 )
 
-var cmd = &cobra.Command{
+var listTriesCmd = &cobra.Command{
 	Use:   "list-tries",
-	Short: "Lists root hashes of all tries",
-	Run:   run,
+	Short: "lists root hashes of all tries",
+	Run:   listTries,
 }
 
-var stateLoader func() *mtrie.Forest = nil
-
-func Init(f func() *mtrie.Forest) *cobra.Command {
-	stateLoader = f
-
-	return cmd
+func init() {
+	RootCmd.AddCommand(listTriesCmd)
 }
 
-func run(*cobra.Command, []string) {
+func listTries(*cobra.Command, []string) {
 	startTime := time.Now()
 
-	mForest := stateLoader()
+	// load execution state
+	mForest, err := loadExecutionState()
+	if err != nil {
+		log.Fatal().Err(err).Msg("error while loading execution state")
+	}
 
 	tries, err := mForest.GetTries()
 	if err != nil {

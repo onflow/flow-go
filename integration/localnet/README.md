@@ -4,6 +4,7 @@ FLITE is a tool for running a full version of the Flow blockchain.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
 ## Table of Contents
 
 - [Bootstrapping](#bootstrapping)
@@ -18,7 +19,7 @@ FLITE is a tool for running a full version of the Flow blockchain.
 
 ## Bootstrapping
 
-Before running the Flow network it is necessary to run a bootstrapping process. 
+Before running the Flow network it is necessary to run a bootstrapping process.
 This generates keys for each of the nodes and a genesis block to build on.
 
 Bootstrap a new network:

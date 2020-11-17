@@ -1,4 +1,4 @@
-package list_accounts
+package cmd
 
 import (
 	"bytes"
@@ -15,32 +15,28 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var cmd = &cobra.Command{
+var listAccountsCmd = &cobra.Command{
 	Use:   "list-accounts",
-	Short: "Lists accounts on given chain (from first to address generator state saved)",
-	Run:   run,
+	Short: "lists accounts on given chain (from first to address generator state saved)",
+	Run:   listAccounts,
 }
 
-var stateLoader func() *mtrie.Forest = nil
-var flagStateCommitment string
-var flagChain string
+var (
+	flagStateCommitment string
+	flagChain           string
+)
 
-func Init(f func() *mtrie.Forest) *cobra.Command {
-	stateLoader = f
+func init() {
+	RootCmd.AddCommand(listAccountsCmd)
 
-	cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
-		"State commitment (64 chars, hex-encoded)")
-	_ = cmd.MarkFlagRequired("state-commitment")
+	listAccountsCmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "", "State commitment (64 chars, hex-encoded)")
+	_ = listAccountsCmd.MarkFlagRequired("state-commitment")
 
-	cmd.Flags().StringVar(&flagChain, "chain", "",
-		"Chain name")
-	_ = cmd.MarkFlagRequired("chain")
-
-	return cmd
+	listAccountsCmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
+	_ = listAccountsCmd.MarkFlagRequired("chain")
 }
 
 func getChain(chainName string) (chain flow.Chain, err error) {
@@ -53,10 +49,13 @@ func getChain(chainName string) (chain flow.Chain, err error) {
 	return
 }
 
-func run(*cobra.Command, []string) {
+func listAccounts(*cobra.Command, []string) {
 	startTime := time.Now()
 
-	forest := stateLoader()
+	forest, err := loadExecutionState()
+	if err != nil {
+		log.Fatal().Err(err).Msg("error while loading execution state")
+	}
 
 	stateCommitment, err := hex.DecodeString(flagStateCommitment)
 	if err != nil {
