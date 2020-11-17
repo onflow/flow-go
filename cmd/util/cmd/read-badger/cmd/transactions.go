@@ -21,6 +21,7 @@ var transactionsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
+		log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 		transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("malformed transaction id")

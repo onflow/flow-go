@@ -25,6 +25,7 @@ var collectionsCmd = &cobra.Command{
 		storages := InitStorages()
 
 		if flagCollectionID != "" {
+			log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed collection id")
@@ -41,6 +42,7 @@ var collectionsCmd = &cobra.Command{
 		}
 
 		if flagTransactionID != "" {
+			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed transaction id")

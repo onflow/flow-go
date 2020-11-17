@@ -24,6 +24,7 @@ var resultsCmd = &cobra.Command{
 		storages := InitStorages()
 
 		if flagBlockID != "" {
+			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed block id")
@@ -40,6 +41,7 @@ var resultsCmd = &cobra.Command{
 		}
 
 		if flagResultID != "" {
+			log.Info().Msgf("got flag result id: %s", flagResultID)
 			resultID, err := flow.HexStringToIdentifier(flagResultID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed result id")

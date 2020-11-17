@@ -24,6 +24,7 @@ var sealsCmd = &cobra.Command{
 		storages := InitStorages()
 
 		if flagSealID != "" {
+			log.Info().Msgf("got flag seal id: %s", flagSealID)
 			sealID, err := flow.HexStringToIdentifier(flagSealID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed seal id")
@@ -40,6 +41,7 @@ var sealsCmd = &cobra.Command{
 		}
 
 		if flagBlockID != "" {
+			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed block id")

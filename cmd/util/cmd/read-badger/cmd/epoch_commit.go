@@ -23,6 +23,7 @@ var epochCommitCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
+		log.Info().Msgf("got flag commit id: %s", flagEpochCommitID)
 		commitID, err := flow.HexStringToIdentifier(flagEpochCommitID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("malformed epoch commit id")

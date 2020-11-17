@@ -32,12 +32,14 @@ var eventsCmd = &cobra.Command{
 			return
 		}
 
+		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("malformed block id")
 		}
 
 		if flagTransactionID != "" {
+			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed transaction id")
@@ -62,7 +64,6 @@ var eventsCmd = &cobra.Command{
 				"flow.EpochCommit":    flow.EventEpochCommit,
 				"flow.EpochSetup":     flow.EventEpochSetup,
 			}
-
 			if event, ok := validEvents[flagEventType]; ok {
 				log.Info().Msgf("getting events for block id: %v, event type: %s", blockID, flagEventType)
 				events, err := storages.Events.ByBlockIDEventType(blockID, event)

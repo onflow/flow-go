@@ -34,6 +34,7 @@ var clusterBlocksCmd = &cobra.Command{
 		clusterPayloads := badger.NewClusterPayloads(metrics, db)
 
 		// get chain id
+		log.Info().Msgf("got flag chain name: %s", flagChainName)
 		chainID := flow.ChainID(flagChainName)
 		clusterBlocks := badger.NewClusterBlocks(db, chainID, headers, clusterPayloads)
 
@@ -43,18 +44,18 @@ var clusterBlocksCmd = &cobra.Command{
 		}
 
 		if flagClusterBlockID != "" {
+			log.Info().Msgf("got flag cluster block id: %s", flagClusterBlockID)
 			clusterBlockID, err := flow.HexStringToIdentifier(flagClusterBlockID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed cluster block id")
 			}
 
-			log.Info().Msgf("getting ckuster block by id: %v", clusterBlockID)
+			log.Info().Msgf("getting cluster block by id: %v", clusterBlockID)
 			clusterBlock, err := clusterBlocks.ByID(clusterBlockID)
 			if err != nil {
 				log.Fatal().Err(err).Msgf("could not get cluster block with id: %v", clusterBlockID)
 			}
 
-			log.Info().Msgf("block id: %v", clusterBlock.ID())
 			common.PrettyPrint(clusterBlock)
 			return
 		}
@@ -67,7 +68,6 @@ var clusterBlocksCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("block id: %v", clusterBlock.ID())
-			log.Info().Msgf("block height: %d", flagHeight)
 			common.PrettyPrint(clusterBlock)
 			return
 		}

@@ -24,6 +24,7 @@ var receiptsCmd = &cobra.Command{
 		storages := InitStorages()
 
 		if flagBlockID != "" {
+			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed block id")
@@ -40,6 +41,7 @@ var receiptsCmd = &cobra.Command{
 		}
 
 		if flagReceiptID != "" {
+			log.Info().Msgf("got flag receipt id: %s", flagReceiptID)
 			receiptID, err := flow.HexStringToIdentifier(flagReceiptID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("malformed receipt id")

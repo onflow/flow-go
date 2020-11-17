@@ -23,6 +23,7 @@ var chunkDataPackCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
+		log.Info().Msgf("got flag chunk id: %s", flagChunkID)
 		chunkID, err := flow.HexStringToIdentifier(flagChunkID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("malformed chunk id")

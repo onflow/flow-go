@@ -23,6 +23,7 @@ var blocksCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
+		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("malformed block id")

@@ -21,6 +21,7 @@ var guaranteesCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
+		log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 		collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("malformed collection idenitifer")
