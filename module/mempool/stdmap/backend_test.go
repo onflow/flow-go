@@ -132,5 +132,54 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 	}
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
+}
 
+// TestBackend_RegisterEjectionCallback verifies that the Backend calls the
+// ejection callbacks whenever it ejects a stored entity due to size limitations.
+func TestBackend_RegisterEjectionCallback(t *testing.T) {
+	const (
+		limit = 10
+		swarm = 20
+	)
+	pool := NewBackend(WithLimit(limit))
+
+	// on ejection callback: test whether ejected identity is no longer part of the mempool
+	ensureEntityNotInMempool := func(entity flow.Entity) {
+		id := entity.ID()
+		go func() {
+			e, found := pool.ByID(id)
+			require.False(t, found)
+			require.Nil(t, e)
+		}()
+		go func() {
+			require.False(t, pool.Has(id))
+		}()
+	}
+	err := pool.RegisterEjectionCallback(ensureEntityNotInMempool)
+	require.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(swarm)
+	for i := 0; i < swarm; i++ {
+		go func(x int) {
+			// creates and adds a fake item to the mempool
+			item := fake(fmt.Sprintf("item%d", x))
+			pool.Add(item)
+			wg.Done()
+		}(i)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "test could not finish on time")
+	require.Equal(t, uint(limit), pool.Size(), "expected mempool to be at max capacity limit")
+}
+
+// TestBackend_ErrorOnRepeatedEjectionCallback verifies that the Backend errors is the
+// ejection callback is set repeatedly
+func TestBackend_ErrorOnRepeatedEjectionCallback(t *testing.T) {
+	pool := NewBackend()
+	err := pool.RegisterEjectionCallback(func(entity flow.Entity) {})
+	require.NoError(t, err)
+
+	err = pool.RegisterEjectionCallback(func(entity flow.Entity) {})
+	require.Error(t, err)
 }
