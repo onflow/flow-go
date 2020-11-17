@@ -73,7 +73,7 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutWithShouldHave()
 // TestLinearFanoutSmallerAll evaluates that sampling a connected graph fanout with a shouldHave set
 // that is greater than `all` set in size, returns the `shouldHave` set.
 func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
-	// samples 10 ids into 'shouldHave' and excludes them from all into others.
+	// samples 10 ids into 'shouldHave'.
 	shouldHave := suite.all.Sample(10)
 	// samples a smaller component of all with 5 nodes and combines with `shouldHave`
 	smallerAll := suite.all.Filter(filter.Not(filter.In(shouldHave))).Sample(5).Union(shouldHave)
@@ -89,13 +89,32 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
 // TestLinearFanoutNonSubsetShouldHave evaluates that trying to sample a connected graph when `shouldHave`
 // is not a subset of `all` returns an error.
 func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetShouldHave() {
-	// samples 10 ids into 'shouldHave' and excludes them from all into others.
+	// samples 10 ids into 'shouldHave',
 	shouldHave := suite.all.Sample(10)
 	// samples excludes one of the `shouldHave` ids from all, hence it is no longer a subset
 	excludedAll := suite.all.Filter(filter.Not(filter.HasNodeID(shouldHave[0].NodeID)))
 
 	// since `shouldHave` is not a subset of `excludedAll` it should return an error
 	_, err := suite.sampler.SampleConnectedGraph(excludedAll, shouldHave)
+	require.Error(suite.T(), err)
+}
+
+// TestLinearFanoutNonSubsetEmptyAll evaluates that trying to sample a connected graph when `all`
+// is empty returns an error.
+func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetEmptyAll() {
+	// samples 10 ids into 'shouldHave'.
+	shouldHave := suite.all.Sample(10)
+
+	// sampling with empty all should return an error
+	_, err := suite.sampler.SampleConnectedGraph(flow.IdentityList{}, shouldHave)
+	require.Error(suite.T(), err)
+
+	// sampling with empty all should return an error
+	_, err = suite.sampler.SampleConnectedGraph(flow.IdentityList{}, nil)
+	require.Error(suite.T(), err)
+
+	// sampling with empty all should return an error
+	_, err = suite.sampler.SampleConnectedGraph(nil, nil)
 	require.Error(suite.T(), err)
 }
 
