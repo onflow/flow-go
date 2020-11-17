@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func checkBytes(t *testing.T, input, expected, result []byte) {
@@ -143,15 +146,22 @@ func TestKmac128(t *testing.T) {
 	}
 	outputSize := 32
 
-	alg, _ := NewKMAC_128(key, customizers[0], outputSize)
+	alg, err := NewKMAC_128(key, customizers[0], outputSize)
+	require.Nil(t, err)
 	_, _ = alg.Write(input[0:2])
 	_, _ = alg.Write(input[2:])
 	hash := alg.SumHash()
 	checkBytes(t, input, expected[0], hash)
 
 	for i := 0; i < len(customizers); i++ {
-		alg, _ = NewKMAC_128(key, customizers[i], outputSize)
+		alg, err = NewKMAC_128(key, customizers[i], outputSize)
+		require.Nil(t, err)
 		hash = alg.ComputeHash(input)
 		checkBytes(t, input, expected[i], hash)
 	}
+
+	// test short key length
+	_, err = NewKMAC_128(key[:15], customizers[0], outputSize)
+	assert.Error(t, err)
+
 }
