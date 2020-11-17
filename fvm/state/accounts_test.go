@@ -296,7 +296,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, storageUsed, uint64(67+33+46)) // exists: 1 byte, storage_ used & capacity 16 bytes, other 34
+		require.Equal(t, storageUsed, uint64(67+33+46))
 	})
 }
 
