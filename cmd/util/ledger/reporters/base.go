@@ -2,6 +2,7 @@ package reporters
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -18,7 +19,7 @@ type BaseReporter struct {
 	accounts              map[string]bool
 	regCountByAccounts    map[string]int
 	storageUsedByAccounts map[string]int
-	log                   zerolog.Logger
+	logger                zerolog.Logger
 }
 
 func NewBaseReporter(chainID flow.ChainID) *BaseReporter {
@@ -47,6 +48,7 @@ func NewBaseReporter(chainID flow.ChainID) *BaseReporter {
 		accounts:              make(map[string]bool),
 		regCountByAccounts:    make(map[string]int),
 		storageUsedByAccounts: make(map[string]int),
+		logger:                zerolog.New(os.Stderr).With().Timestamp().Logger(),
 	}
 }
 
@@ -63,10 +65,10 @@ func (r *BaseReporter) Report(payloads []ledger.Payload) error {
 		}
 	}
 
-	r.log.Info().Msgf("Chain: %s", r.chain)
+	r.logger.Info().Msgf("Chain: %s", r.chain)
 
 	// number of accounts
-	r.log.Info().Msgf("Number of unique accounts %d", len(r.accounts))
+	r.logger.Info().Msgf("Number of unique accounts %d", len(r.accounts))
 
 	// accounts with most storage
 	// median storage used
