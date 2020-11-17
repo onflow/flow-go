@@ -1,7 +1,6 @@
 package test
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 	"testing"
@@ -442,14 +441,9 @@ func SetupMockVerifierEng(t testing.TB,
 
 			// ensure the received chunk matches one we expect
 			for _, vc := range vChunks {
-				if chunk.ID() == vID {
+				if vc.Chunk.ID() == vID {
 					// mark it as seen and decrement the waitgroup
 					receivedChunks[vID] = struct{}{}
-					// checks end states match as expected
-					if !bytes.Equal(vchunk.EndState, vc.EndState) {
-						t.Logf("end states are not equal: expected %x got %x", vchunk.EndState, chunk.EndState)
-						t.Fail()
-					}
 					wg.Done()
 					return
 				}
@@ -465,15 +459,6 @@ func SetupMockVerifierEng(t testing.TB,
 }
 
 func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunkData {
-	var endState flow.StateCommitment
-	// last chunk
-	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
-		finalState, ok := er.Receipt.ExecutionResult.FinalStateCommitment()
-		require.True(t, ok)
-		endState = finalState
-	} else {
-		endState = er.Receipt.ExecutionResult.Chunks[chunkIndex+1].StartState
-	}
 
 	return &verification.VerifiableChunkData{
 		Chunk:         er.Receipt.ExecutionResult.Chunks[chunkIndex],
@@ -481,7 +466,6 @@ func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecu
 		Result:        &er.Receipt.ExecutionResult,
 		Collection:    er.Collections[chunkIndex],
 		ChunkDataPack: er.ChunkDataPacks[chunkIndex],
-		EndState:      endState,
 	}
 }
 

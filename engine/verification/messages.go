@@ -13,5 +13,4 @@ type VerifiableChunkData struct {
 	Result        *flow.ExecutionResult // execution result of this block
 	Collection    *flow.Collection      // collection corresponding to the chunk
 	ChunkDataPack *flow.ChunkDataPack   // chunk data package needed to verify this chunk
-	EndState      flow.StateCommitment  // state commitment at the end of this chunk
 }

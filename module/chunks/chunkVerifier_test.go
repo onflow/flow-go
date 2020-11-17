@@ -58,38 +58,6 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	assert.NotNil(s.T(), spockSecret)
 }
 
-// TestDifferentChunkIDs tests that a CFInvalidVerifiableChunk error is returned
-// when the DataPack's chunk ID does not match the chunk's.
-func (s *ChunkVerifierTestSuite) TestDifferentChunkIDs() {
-	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
-	assert.NotNil(s.T(), vch)
-	// modify the data pack's chunk ID
-	vch.ChunkDataPack.ChunkID = unittest.IdentifierFixture()
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	assert.Nil(s.T(), spockSecret)
-	_, ok := chFaults.(*chunksmodels.CFInvalidVerifiableChunk)
-	assert.True(s.T(), ok)
-}
-
-// TestInvalidCollectionID checks that a CFInvalidVerifiableChunk error is
-// returned if the DataPack's CollectionID is incosistant with the set of
-// transactions.
-func (s *ChunkVerifierTestSuite) TestInvalidCollectionID() {
-	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
-	assert.NotNil(s.T(), vch)
-	// modify the verifiable chunk's end state
-	vch.ChunkDataPack.CollectionID = unittest.IdentifierFixture()
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	assert.Nil(s.T(), spockSecret)
-	_, ok := chFaults.(*chunksmodels.CFInvalidVerifiableChunk)
-	assert.True(s.T(), ok)
-	fmt.Println(chFaults)
-}
-
 // TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	s.T().Skip("Check new partial ledger for missing keys")
@@ -300,7 +268,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 			Result:        &result,
 			Collection:    &coll,
 			ChunkDataPack: &chunkDataPack,
-			EndState:      endState,
 		}
 	})
 

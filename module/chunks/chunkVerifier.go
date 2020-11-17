@@ -51,7 +51,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 		transactions = append(transactions, tx)
 	}
 
-	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Collection, vc.Result, vc.Header, transactions)
+	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack.Proof, vc.Result, vc.Header, transactions)
 }
 
 // SystemChunkVerify verifies a given VerifiableChunk corresponding to a system chunk.
@@ -69,51 +69,17 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	tx := fvm.Transaction(txBody)
 	transactions := []*fvm.TransactionProcedure{tx}
 
-	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Collection, vc.Result, vc.Header, transactions)
+	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack.Proof, vc.Result, vc.Header, transactions)
 }
 
 func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
-	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection,
+	proof ledger.Proof,
 	result *flow.ExecutionResult,
 	header *flow.Header,
 	transactions []*fvm.TransactionProcedure) ([]byte, chmodels.ChunkFault, error) {
 
-	if chunkDataPack == nil {
-		return nil, nil, fmt.Errorf("missing chunk data pack")
-	}
-
 	chIndex := chunk.Index
 	execResID := result.ID()
-
-	// check that the ChunkDataPack refers to the correct Chunk
-	if chunkDataPack.ChunkID != chunk.ID() {
-		return nil,
-			chmodels.NewCFInvalidVerifiableChunk(
-				"invalid Chunk ID",
-				fmt.Errorf("ChunkDataPack.ChunkID (%s) does not match the provided Chunk (%s)", chunkDataPack.ChunkID, chunk.ID()),
-				chIndex,
-				execResID),
-			nil
-	}
-
-	// check that the ChunkDataPack refers to the correct Collection
-	if collection.ID() != chunkDataPack.CollectionID {
-		// NOTE: the execution nodes set the CollectionID of the system chunk's
-		// DataPack to Zero (cf. engin/execution/ingestion/ingestion.go saveExecutionResult).
-		// But Zero is not the natural ID for an empty collection, as computed by
-		// the ID function (cf. model/flow/collection.go). So we have to account for
-		// this special case.
-		if !(chunkDataPack.CollectionID == flow.ZeroID && collection.Len() == 0) {
-			return nil,
-				chmodels.NewCFInvalidVerifiableChunk(
-					"invalid Collection ID",
-					fmt.Errorf("ChunkDataPack.CollectionID (%s) does not match the provided Collection (%s)", chunkDataPack.CollectionID, collection.ID()),
-					chIndex,
-					execResID),
-				nil
-		}
-	}
 
 	// TODO:
 	// * Check number of transactions
@@ -124,7 +90,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
 
 	// constructing a partial trie given chunk data package
-	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunk.StartState, partial.DefaultPathFinderVersion)
+	psmt, err := partial.NewLedger(proof, chunk.StartState, partial.DefaultPathFinderVersion)
 
 	if err != nil {
 		// TODO provide more details based on the error type
