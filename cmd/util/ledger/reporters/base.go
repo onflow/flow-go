@@ -46,6 +46,7 @@ func NewBaseReporter(chainID flow.ChainID) *BaseReporter {
 		flowTokenAddress:      flowTokenAddress,
 		accounts:              make(map[string]bool),
 		regCountByAccounts:    make(map[string]int),
+		storageUsedByAccounts: make(map[string]int),
 	}
 }
 
