@@ -118,9 +118,9 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetEmptyAl
 	require.Error(suite.T(), err)
 }
 
-// TestConnectedness evaluates that samples returned by the LinearFanoutGraphSampler constitute a
-// connected graph.
-func (suite *LinearFanoutGraphSamplerTestSuite) TestConnectedness() {
+// TestConnectednessUnconditionally evaluates that samples returned by the LinearFanoutGraphSampler with
+// empty `shouldHave` constitute a connected graph.
+func (suite *LinearFanoutGraphSamplerTestSuite) TestConnectednessUnconditionally() {
 	adjMap := make(map[flow.Identifier]flow.IdentityList)
 	for _, id := range suite.all {
 		// creates a graph sampler for the node
@@ -129,6 +129,30 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestConnectedness() {
 
 		// samples a graph and stores it in adjacency map
 		sample, err := graphSampler.SampleConnectedGraph(suite.all, nil)
+		adjMap[id.NodeID] = sample
+	}
+
+	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
+}
+
+// TestConnectednessWithNoShouldHave evaluates that samples returned by the LinearFanoutGraphSampler with
+// some `shouldHave` constitute a connected graph.
+func (suite *LinearFanoutGraphSamplerTestSuite) TestConnectednessConditionally() {
+	adjMap := make(map[flow.Identifier]flow.IdentityList)
+	for _, id := range suite.all {
+		// creates a graph sampler for the node
+		graphSampler, err := NewLinearFanoutGraphSampler(id.NodeID)
+		require.NoError(suite.T(), err)
+
+		// samples a graph and stores it in adjacency map
+		// sampling is done with a non-empty should have subset of 10 randomly chosen ids
+		shouldHave := suite.all.Sample(10)
+		sample, err := graphSampler.SampleConnectedGraph(suite.all, shouldHave)
+
+		// evaluates inclusion of should haves in sample
+		for _, shouldHaveID := range shouldHave {
+			require.Contains(suite.T(), sample, shouldHaveID)
+		}
 		adjMap[id.NodeID] = sample
 	}
 
