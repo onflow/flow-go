@@ -70,7 +70,7 @@ func (p *pointG1) scalarMultG1(res *pointG1, expo *scalar) {
 	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.bn_st)(expo))
 }
 
-// This function is for DEBUG/TEST only
+// This function is for TEST only
 // Exponentiation of g1 in G1
 func genScalarMultG1(res *pointG1, expo *scalar) {
 	C.ep_mult_gen((*C.ep_st)(res), (*C.bn_st)(expo))
@@ -112,11 +112,6 @@ func mapToZr(x *scalar, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 	return nil
-}
-
-// sets a scalar to a small integer
-func (x *scalar) setInt(a int) {
-	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
 }
 
 // writeScalar writes a G2 point in a slice of bytes
