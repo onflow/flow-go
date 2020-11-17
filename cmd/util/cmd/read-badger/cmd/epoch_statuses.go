@@ -16,7 +16,7 @@ func init() {
 }
 
 var epochStatusesCmd = &cobra.Command{
-	Use:   "epochstatuses",
+	Use:   "epoch-statuses",
 	Short: "get epoch statuses by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()

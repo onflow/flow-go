@@ -18,7 +18,7 @@ func init() {
 }
 
 var epochCommitCmd = &cobra.Command{
-	Use:   "epochcommit",
+	Use:   "epoch-commit",
 	Short: "get epoch commit by ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()

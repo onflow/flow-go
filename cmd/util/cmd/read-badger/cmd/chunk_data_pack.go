@@ -18,7 +18,7 @@ func init() {
 }
 
 var chunkDataPackCmd = &cobra.Command{
-	Use:   "chunkdata",
+	Use:   "chunk-data",
 	Short: "get chunk data pack by chunk ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()

@@ -25,7 +25,7 @@ func init() {
 }
 
 var clusterBlocksCmd = &cobra.Command{
-	Use:   "clusterblocks",
+	Use:   "cluster-blocks",
 	Short: "get cluster blocks",
 	Run: func(cmd *cobra.Command, args []string) {
 		metrics := metrics.NewNoopCollector()
