@@ -126,10 +126,9 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	// root id before spork
 	rootIDBeforeSpork := unittest.BlockFixture().ID().String()
 
+	// create and start node 1 on localhost and random port
 	node1key, err := generateNetworkingKey("abc")
 	assert.NoError(h.T(), err)
-
-	// create and start node 1 on localhost and random port
 	node1, _ := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
 	defer h.StopNode(node1)
 
@@ -155,13 +154,11 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	err = node1.AddPeer(ctx, addr2)
 	assert.NoError(h.T(), err)
 
-	// let the node form the mesh
+	// let the two nodes form the mesh
 	time.Sleep(time.Second)
 
 	// assert that node 1 can successfully send a message to node 2 via PubSub
 	testOneToKMessagingSucceeds(ctx, h.T(), node1, sub2, topicBeforeSpork)
-
-	// mimic that node1 now is part of the new spork while node2 remains on the old spork
 
 	// new root id after spork
 	rootIDAfterSpork := unittest.BlockFixture().ID().String()
@@ -169,7 +166,9 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	// topic after the spork
 	topicAfterSpork := testChannelID + "-" + rootIDAfterSpork
 
-	// unsubscribe node1 from topicBeforeSpork and subscribe it to topicAfterSpork
+	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
+	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
+	// and keeping node2 subscribed to topic 'topicBeforeSpork'
 	err = node1.UnSubscribe(topicBeforeSpork)
 	assert.NoError(h.T(), err)
 	_, err = node1.Subscribe(ctx, topicAfterSpork)
@@ -212,7 +211,9 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 		msg, err := dstnSub.Next(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, payload, msg.Data)
-	}, 5*time.Second)
+	},
+		// libp2p hearbeats every second, so at most the message should take 1 second
+		2*time.Second)
 }
 
 func testOneToKMessagingFails(ctx context.Context,
@@ -229,5 +230,8 @@ func testOneToKMessagingFails(ctx context.Context,
 	// assert that the message is never received by the destination node
 	_ = unittest.RequireNeverReturnBefore(t, func() {
 		_, _ = dstnSub.Next(ctx)
-	}, 1*time.Second, "nodes on different sporks were able to communicate")
+	},
+		// libp2p hearbeats every second, so at most the message should take 1 second
+		2*time.Second,
+		"nodes on different sporks were able to communicate")
 }
