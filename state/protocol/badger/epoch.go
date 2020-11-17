@@ -18,7 +18,7 @@ import (
 // Only the EpochSetup event for the epoch has been emitted as of the point
 // at which the epoch was queried.
 type SetupEpoch struct {
-	firstBlock *flow.Header
+	firstView  uint64
 	setupEvent *flow.EpochSetup
 }
 
@@ -26,8 +26,8 @@ func (es *SetupEpoch) Counter() (uint64, error) {
 	return es.setupEvent.Counter, nil
 }
 
-func (es *SetupEpoch) FirstBlock() (*flow.Header, error) {
-	return es.firstBlock, nil
+func (es *SetupEpoch) FirstView() (uint64, error) {
+	panic("TODO")
 }
 
 func (es *SetupEpoch) FinalView() (uint64, error) {
@@ -67,9 +67,8 @@ func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
 	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
 }
 
-func NewSetupEpoch(firstBlock *flow.Header, setupEvent *flow.EpochSetup) *SetupEpoch {
+func NewSetupEpoch(setupEvent *flow.EpochSetup) *SetupEpoch {
 	return &SetupEpoch{
-		firstBlock: firstBlock,
 		setupEvent: setupEvent,
 	}
 }
@@ -118,10 +117,9 @@ func (es *CommittedEpoch) DKG() (protocol.DKG, error) {
 	return &DKG{commitEvent: es.commitEvent}, nil
 }
 
-func NewCommittedEpoch(firstBlock *flow.Header, setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
+func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
 	return &CommittedEpoch{
 		SetupEpoch: SetupEpoch{
-			firstBlock: firstBlock,
 			setupEvent: setupEvent,
 		},
 		commitEvent: commitEvent,
@@ -141,8 +139,8 @@ func (u *InvalidEpoch) Counter() (uint64, error) {
 	return 0, u.err
 }
 
-func (u *InvalidEpoch) FirstBlock() (*flow.Header, error) {
-	return nil, u.err
+func (u *InvalidEpoch) FirstView() (uint64, error) {
+	return 0, u.err
 }
 
 func (u *InvalidEpoch) FinalView() (uint64, error) {

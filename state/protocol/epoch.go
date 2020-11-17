@@ -41,8 +41,8 @@ type Epoch interface {
 	// Counter returns the Epoch's counter.
 	Counter() (uint64, error)
 
-	// FirstBlock returns the header of the first block of this epoch.
-	FirstBlock() (*flow.Header, error)
+	// FirstView returns the first view of this epoch.
+	FirstView() (uint64, error)
 
 	// FinalView returns the largest view number which still belongs to this epoch.
 	FinalView() (uint64, error)
