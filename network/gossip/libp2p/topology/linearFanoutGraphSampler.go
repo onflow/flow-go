@@ -33,7 +33,6 @@ func NewLinearFanoutGraphSampler(id flow.Identifier) (*LinearFanoutGraphSampler,
 // connected graph.
 func (l *LinearFanoutGraphSampler) SampleConnectedGraph(all flow.IdentityList,
 	shouldHave flow.IdentityList) (flow.IdentityList, error) {
-	var result flow.IdentityList
 
 	if len(all) == 0 {
 		return nil, fmt.Errorf("empty identity list")
@@ -75,7 +74,8 @@ func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flo
 	// others are all excluding should have ones
 	others := all.Filter(filter.Not(filter.In(shouldHave)))
 	others = others.DeterministicSample(uint(subsetSize), l.seed)
-	return others.Union(shouldHave)
+
+	return others.Union(shouldHave), nil
 }
 
 // connectedGraph returns a random subset of length (n+1)/2.
