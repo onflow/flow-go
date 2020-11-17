@@ -9,8 +9,11 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
 )
 
+// StatefulTopologyManager implements Manager interface.
+// The term stateful denotes the fact that it tries to optimize fanout by constructing topology state-by-state.
+// Where the next state of topology utilizes nodes chosen in the current state as much as possible, hence to
+// avoid unnecessary redundancies.
 type StatefulTopologyManager struct {
-	fanout   FanoutFunc                  // used to keep track size of constructed topology
 	topology Topology                    // used to sample nodes
 	subMngr  channel.SubscriptionManager // used to keep track topics the node subscribed to
 }
@@ -89,13 +92,4 @@ func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.Id
 		return nil, fmt.Errorf("topology size reached zero")
 	}
 	return myFanout, nil
-}
-
-// MakeTopology receives identity list of entire network and constructs identity list of topology
-// of this instance. A node directly communicates with its topology identity list on epidemic dissemination
-// of the messages (i.e., publish and multicast).
-// Independent invocations of MakeTopology on different nodes collaboratively
-// constructs a connected graph of nodes that enables them talking to each other.
-func (stm *StatefulTopologyManager) Fanout(size int) int {
-	return stm.fanout(size)
 }
