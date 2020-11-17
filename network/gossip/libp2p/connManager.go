@@ -74,7 +74,7 @@ func (c ConnManager) Disconnected(n network.Network, con network.Conn) {
 		String()).Int("total_connections", len(n.Conns())).
 		Logger()
 
-	if con.Stat().Direction == network.DirOutbound {
+	if con.Stat().Direction == network.DirInbound {
 		log.Trace().Msg("inbound connection removed")
 		c.metrics.InboundConnectionRemoved()
 		return
