@@ -14,7 +14,6 @@ import (
 type TopicBasedTopology struct {
 	me           flow.Identifier        // used to keep identifier of the node
 	state        protocol.ReadOnlyState // used to keep a read only protocol state
-	notMeFilter  flow.IdentityFilter    // used to filter out the node itself
 	graphSampler ConnectedGraphSampler  // used to create connected graph sampler
 }
 
@@ -25,7 +24,6 @@ func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState,
 		me:           nodeID,
 		state:        state,
 		graphSampler: graphSampler,
-		notMeFilter:  filter.Not(filter.HasNodeID(nodeID)),
 	}
 
 	return t, nil
@@ -54,11 +52,11 @@ func (t TopicBasedTopology) SubsetRole(ids flow.IdentityList, shouldHave flow.Id
 		shouldHave = shouldHave.Filter(filter.HasRole(roles...))
 
 		// excludes the node itself from should have set
-		shouldHave = shouldHave.Filter(t.notMeFilter)
+		shouldHave = shouldHave.Filter(filter.Not(filter.HasNodeID(t.me)))
 	}
 
 	// excludes the node itself from ids
-	ids = ids.Filter(t.notMeFilter)
+	ids = ids.Filter(filter.Not(filter.HasNodeID(t.me)))
 
 	sample, err := t.graphSampler.SampleConnectedGraph(ids, shouldHave)
 	if err != nil {

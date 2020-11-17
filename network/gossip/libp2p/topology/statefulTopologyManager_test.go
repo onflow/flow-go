@@ -2,6 +2,7 @@ package topology_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/bsipos/thist"
@@ -19,7 +20,6 @@ import (
 
 type StatefulTopologyTestSuite struct {
 	suite.Suite
-	histFlag bool // used to control printing histogram
 }
 
 // TestStatefulTopologyTestSuite runs all tests in this test suite
@@ -27,20 +27,16 @@ func TestStatefulTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(StatefulTopologyTestSuite))
 }
 
-func (suite *StatefulTopologyTestSuite) SetupTest() {
-	suite.histFlag = false
-}
-
 func (suite *StatefulTopologyTestSuite) TestSingleSystemLowScale() {
-	suite.systemScenario(1, 10, 100, 120, 5, 100, 4)
+	suite.multiSystemEndToEndConnectedness(1, 10, 100, 120, 5, 100, 4)
 }
 
 func (suite *StatefulTopologyTestSuite) TestModerateScale() {
-	suite.systemScenario(1, 20, 200, 240, 10, 200, 8)
+	suite.multiSystemEndToEndConnectedness(1, 20, 200, 240, 10, 200, 8)
 }
 
 func (suite *StatefulTopologyTestSuite) TestHighScale() {
-	suite.systemScenario(1, 40, 400, 480, 20, 400, 16)
+	suite.multiSystemEndToEndConnectedness(200, 40, 400, 480, 20, 400, 16)
 }
 
 // generateSystem is a test helper that given number of nodes per role as well as desire number of clusters
@@ -76,10 +72,12 @@ func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, 
 	return state, ids, subMngrs
 }
 
-// systemScenario is a test helper evaluates that generates several systems with specfies number of nodes
-// on each role. It then evaluates that sub-fanout of each role in topology is
-// bound by the fanout function of topology on the role's entire size.
-func (suite *StatefulTopologyTestSuite) systemScenario(system, acc, col, con, exe, ver, cluster int) {
+// multiSystemEndToEndConnectedness is a test helper evaluates end-to-end connectedness of the system graph
+// over several number of systems each with specified number of nodes on each role.
+func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, col, con, exe, ver, cluster int) {
+	// adjacency map keeps graph component of a single channel ID
+	adjMap := make(map[flow.Identifier]flow.IdentityList)
+
 	// creates a histogram to keep average fanout of nodes in systems
 	aveHist := thist.NewHist(nil, fmt.Sprintf("Average fanout for %d systems", system),
 		"fit", 10, false)
@@ -94,15 +92,15 @@ func (suite *StatefulTopologyTestSuite) systemScenario(system, acc, col, con, ex
 
 		totalFanout := 0 // keeps summation of nodes' fanout for statistical reason
 
-		// creates topology and topology manager
+		// creates topology of the nodes
 		for i, id := range ids {
-			// fmt.Println("------", id.Role)
 			fanout := suite.subFanoutScenario(id.NodeID, subMngrs[i], ids, state)
-			systemHist.Update(float64(fanout))
-			totalFanout += fanout
+			adjMap[id.NodeID] = fanout
+			systemHist.Update(float64(len(fanout)))
+			totalFanout += len(fanout)
 		}
 
-		if suite.histFlag {
+		if !suite.skip() {
 			// prints fanout histogram of this system
 			fmt.Println(systemHist.Draw())
 		}
@@ -110,17 +108,19 @@ func (suite *StatefulTopologyTestSuite) systemScenario(system, acc, col, con, ex
 		// keeps track of average fanout per node
 		aveHist.Update(float64(totalFanout) / float64(len(ids)))
 
+		// checks end-to-end connectedness of the topology
+		topology.CheckConnectedness(suite.T(), adjMap, ids)
 	}
 
-	if suite.histFlag {
+	if !suite.skip() {
 		fmt.Println(aveHist.Draw())
 	}
 }
 
-// subFanoutScenario is a test helper that creates a stateful topology manager with a linear fanout function for the
-// node. It then evaluates that sub-fanout of each role in topology is
-// bound by the fanout function of topology on the role's entire size.
-// For example if fanout function is `n+1/2` and we have x consensus nodes,
+// subFanoutScenario is a test helper that creates a StatefulTopologyManager with the LinearFanoutFunc,
+// It then evaluates that sub-fanout of each role in topology is
+// bound by the fanout function of topology on the role's entire size, i.e.,
+// if we have x consensus nodes,
 // then this tests evaluates that no node should have more than or equal to `x+1/2`
 // consensus fanout.
 //
@@ -128,7 +128,7 @@ func (suite *StatefulTopologyTestSuite) systemScenario(system, acc, col, con, ex
 func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
 	subMngr channel.SubscriptionManager,
 	ids flow.IdentityList,
-	state protocol.ReadOnlyState) int {
+	state protocol.ReadOnlyState) flow.IdentityList {
 	// creates a graph sampler for the node
 	graphSampler, err := topology.NewLinearFanoutGraphSampler(me)
 	require.NoError(suite.T(), err)
@@ -142,7 +142,6 @@ func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
 
 	// generates topology of node
 	myFanout, err := topMngr.MakeTopology(ids)
-	// require.GreaterOrEqual(suite.T(), len(myFanout), topology.LinearFanoutFunc(len(ids)))
 	require.NoError(suite.T(), err)
 
 	for _, role := range flow.Roles() {
@@ -153,5 +152,11 @@ func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
 		require.Less(suite.T(), roleFanout, roleTotal)
 	}
 
-	return len(myFanout)
+	return myFanout
+}
+
+// skip returns true if local environment variable AllNetworkTest is found.
+func (suite *StatefulTopologyTestSuite) skip() bool {
+	_, found := os.LookupEnv("AllNetworkTest")
+	return found
 }

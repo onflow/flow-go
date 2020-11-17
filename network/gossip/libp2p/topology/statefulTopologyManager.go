@@ -69,7 +69,7 @@ func (stm *StatefulTopologyManager) MakeTopology(ids flow.IdentityList) (flow.Id
 		shouldHave := make([]*flow.Identity, len(myFanout))
 		copy(shouldHave, myFanout)
 
-		topicFanout, err := stm.topology.SubsetChannel(ids, nil, myChannel)
+		topicFanout, err := stm.topology.SubsetChannel(ids, shouldHave, myChannel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", myChannel, err)
 		}
