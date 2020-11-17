@@ -70,12 +70,12 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutWithShouldHave()
 	}
 }
 
-// TestLinearFanoutEmptyAll evaluates that sampling a connected graph fanout with a shouldHave set
+// TestLinearFanoutSmallerAll evaluates that sampling a connected graph fanout with a shouldHave set
 // that is greater than `all` set in size, returns the `shouldHave` set.
 func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
 	// samples 10 ids into 'shouldHave' and excludes them from all into others.
 	shouldHave := suite.all.Sample(10)
-	// samples a smaller disjoint component of all with 5 nodes and combines with `shouldHave`
+	// samples a smaller component of all with 5 nodes and combines with `shouldHave`
 	smallerAll := suite.all.Filter(filter.Not(filter.In(shouldHave))).Sample(5).Union(shouldHave)
 
 	// total size of smallerAll is 15, and it requires a linear fanout of 8 which is less than
@@ -84,6 +84,19 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
 	require.NoError(suite.T(), err)
 	require.Equal(suite.T(), len(sample), len(shouldHave))
 	require.ElementsMatch(suite.T(), sample, shouldHave)
+}
+
+// TestLinearFanoutNonSubsetShouldHave evaluates that trying to sample a connected graph when `shouldHave`
+// is not a subset of `all` returns an error.
+func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetShouldHave() {
+	// samples 10 ids into 'shouldHave' and excludes them from all into others.
+	shouldHave := suite.all.Sample(10)
+	// samples excludes one of the `shouldHave` ids from all, hence it is no longer a subset
+	excludedAll := suite.all.Filter(filter.Not(filter.HasNodeID(shouldHave[0].NodeID)))
+
+	// since `shouldHave` is not a subset of `excludedAll` it should return an error
+	_, err := suite.sampler.SampleConnectedGraph(excludedAll, shouldHave)
+	require.Error(suite.T(), err)
 }
 
 // uniquenessCheck is a test helper method that fails the test if ids include any duplicate identity.
