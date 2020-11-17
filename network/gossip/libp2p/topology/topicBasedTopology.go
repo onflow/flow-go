@@ -60,7 +60,12 @@ func (t TopicBasedTopology) SubsetRole(ids flow.IdentityList, shouldHave flow.Id
 	// excludes the node itself from ids
 	ids = ids.Filter(t.notMeFilter)
 
-	return t.graphSampler.SampleConnectedGraph(ids, shouldHave), nil
+	sample, err := t.graphSampler.SampleConnectedGraph(ids, shouldHave)
+	if err != nil {
+		return nil, fmt.Errorf("could not sample a connected graph: %w", err)
+	}
+
+	return sample, nil
 }
 
 // clusterPeers returns the list of other nodes within the same cluster as this node.

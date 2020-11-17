@@ -40,18 +40,27 @@ func (l *LinearFanoutGraphSampler) SampleConnectedGraph(all flow.IdentityList,
 	}
 
 	if shouldHave == nil {
-		result = l.connectedGraph(all)
+		return l.connectedGraph(all), nil
 	} else {
-		result = l.conditionalConnectedGraph(all, shouldHave)
+		sample, err := l.conditionalConnectedGraph(all, shouldHave)
+		if err != nil {
+			return nil, fmt.Errorf("could not sample graph conditionally: %w", err)
+		}
+		return sample, nil
 	}
-
-	return result, nil
 }
 
 // conditionalConnectedGraph returns a random subset of length (n+1)/2, which includes the shouldHave
 // set of identifiers.
 // If each node connects to the nodes returned by connectedGraph, the graph of such nodes is connected.
-func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flow.IdentityList) flow.IdentityList {
+func (l *LinearFanoutGraphSampler) conditionalConnectedGraph(all, shouldHave flow.IdentityList) (flow.IdentityList,
+	error) {
+	// checks `shouldHave` be a subset of `all`
+	nonMembers := shouldHave.Filter(filter.Not(filter.In(all)))
+	if len(nonMembers) != 0 {
+		return nil, fmt.Errorf("should have identities is not a subset of all: %v", nonMembers)
+	}
+
 	// total sample size
 	totalSize := LinearFanoutFunc(len(all))
 
