@@ -168,7 +168,7 @@ func (v *View) Touch(owner, controller, key string) {
 
 // Delete removes a register in this view.
 func (v *View) Delete(owner, controller, key string) {
-	v.delta.Delete(owner, controller, key)
+	v.Set(owner, controller, key, nil)
 }
 
 // Delta returns a record of the registers that were mutated in this view.

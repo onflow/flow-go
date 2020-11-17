@@ -50,31 +50,6 @@ func TestDelta_Set(t *testing.T) {
 	assert.True(t, exists)
 }
 
-func TestDelta_Delete(t *testing.T) {
-	registerID1 := "fruit"
-
-	t.Run("ValueNotSet", func(t *testing.T) {
-		d := delta.NewDelta()
-
-		d.Delete(registerID1, "", "")
-
-		b, exists := d.Get(registerID1, "", "")
-		assert.Nil(t, b)
-		assert.True(t, exists)
-	})
-
-	t.Run("ValueSet", func(t *testing.T) {
-		d := delta.NewDelta()
-
-		d.Set(registerID1, "", "", []byte("apple"))
-		d.Delete(registerID1, "", "")
-
-		b, exists := d.Get(registerID1, "", "")
-		assert.Nil(t, b)
-		assert.True(t, exists)
-	})
-}
-
 func TestDelta_MergeWith(t *testing.T) {
 	registerID1 := "fruit"
 
@@ -114,7 +89,7 @@ func TestDelta_MergeWith(t *testing.T) {
 		d2 := delta.NewDelta()
 
 		d1.Set(registerID1, "", "", flow.RegisterValue("apple"))
-		d1.Delete(registerID1, "", "")
+		d1.Set(registerID1, "", "", nil)
 
 		d2.Set(registerID1, "", "", flow.RegisterValue("orange"))
 
@@ -130,7 +105,7 @@ func TestDelta_MergeWith(t *testing.T) {
 
 		d1.Set(registerID1, "", "", flow.RegisterValue("apple"))
 
-		d2.Delete(registerID1, "", "")
+		d2.Set(registerID1, "", "", nil)
 
 		d1.MergeWith(d2)
 
