@@ -75,9 +75,9 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_ConditionalSamp
 	}
 }
 
-// TestLinearFanoutSmallerAll evaluates that sampling a connected graph fanout with a shouldHave set
+// TestLinearFanout_SmallerAll evaluates that sampling a connected graph fanout with a shouldHave set
 // that is greater than required fanout, returns the `shouldHave` set instead.
-func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
+func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_SmallerAll() {
 	// samples 10 ids into 'shouldHave'.
 	shouldHave := suite.all.Sample(10)
 	// samples a smaller component of all with 5 nodes and combines with `shouldHave`
@@ -91,9 +91,9 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
 	require.ElementsMatch(suite.T(), sample, shouldHave)
 }
 
-// TestLinearFanoutNonSubsetShouldHave evaluates that trying to sample a connected graph when `shouldHave`
+// TestLinearFanout_SubsetViolence evaluates that trying to sample a connected graph when `shouldHave`
 // is not a subset of `all` returns an error.
-func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetShouldHave() {
+func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_SubsetViolence() {
 	// samples 10 ids into 'shouldHave',
 	shouldHave := suite.all.Sample(10)
 	// samples excludes one of the `shouldHave` ids from all, hence it is no longer a subset
@@ -104,9 +104,9 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetShouldH
 	require.Error(suite.T(), err)
 }
 
-// TestLinearFanoutNonSubsetEmptyAll evaluates that trying to sample a connected graph when `all`
+// TestLinearFanout_EmptyAllSet evaluates that trying to sample a connected graph when `all`
 // is empty returns an error.
-func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetEmptyAll() {
+func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_EmptyAllSet() {
 	// samples 10 ids into 'shouldHave'.
 	shouldHave := suite.all.Sample(10)
 
