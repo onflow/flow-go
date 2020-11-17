@@ -73,7 +73,8 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
 	// STEP 1 - look for an epoch matching this view for which we have already
 	// pre-computed leader selection. Epochs last ~500k views, so we find the
-	// epoch here 99.99% of the time.
+	// epoch here 99.99% of the time. Since epochs are long-lived, it is fine
+	// for this to be linear in the number of epochs we have observed.
 	for _, epoch := range c.leaders {
 		if view >= epoch.selection.FirstView() && view <= epoch.selection.FinalView() {
 			index, err := epoch.selection.LeaderIndexForView(view)
@@ -84,8 +85,32 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		}
 	}
 
-	// STEP 2 - pre-compute leader selection for next epoch, then proceed under
-	// the assumption that the view is from the next epoch.
+	// STEP 2 - we haven't yet computed leader selection for an epoch containing
+	// the requested view. We compute leader selection for the current epoch
+	// (w.r.t. the finalized head) at initialization then compute leader selection
+	// for the next epoch when we encounter any view for which we don't know
+	// the leader. The series of epochs we have computed leaders for is strictly
+	// consecutive, meaning we know the leader for all views V where:
+	//
+	//   V >= oldestEpoch.firstView && V <= newestEpoch.finalView
+	//
+	// Thus, the requested view is either before oldestEpoch.firstView or after
+	// newestEpoch.finalView.
+	//
+	// CASE 1: V < oldestEpoch.firstView
+	// If the view is before the first view we've computed the leader for, this
+	// represents an invalid query because we only guarantee the protocol state
+	// will contain epoch information for the current and next epoch - such a query
+	// must be for a view within a previous epoch. This case will return an error.
+	//TODO is there a case where need this? What if a consensus node restarts in
+	// the first block of a new epoch and still receives old blocks? What about
+	// adjudicating challenges referencing older blocks?
+	//
+	// CASE 2: V > newestEpoch.finalView
+	// If the view is after the last view we've computed the leader for, we
+	// assume the view is within the next epoch (w.r.t. the finalized head).
+	// This assumption is equivalent to assuming that we build at least one
+	// block in every epoch, which is anyway a requirement for valid epochs.
 	next := c.state.Final().Epochs().Next()
 	err := c.computeLeaderSelection(next)
 	if err != nil {
@@ -116,7 +141,8 @@ func (c *Consensus) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
 }
 
 // computeLeaderSelection pre-computes and stores the leader selection for the
-// given epoch.
+// given epoch. Computing leader selection for the same epoch multiple times
+// is a no-op.
 func (c *Consensus) computeLeaderSelection(epoch protocol.Epoch) error {
 
 	counter, err := epoch.Counter()
