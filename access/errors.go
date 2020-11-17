@@ -61,6 +61,16 @@ func (e InvalidAddressError) Error() string {
 	return fmt.Sprintf("invalid address: %s", e.Address)
 }
 
+// InvalidSignatureError indicates that a transaction contains a signature
+// with a wrong format.
+type InvalidSignatureError struct {
+	Signature flow.TransactionSignature
+}
+
+func (e InvalidSignatureError) Error() string {
+	return fmt.Sprintf("invalid signature: %s", e.Signature)
+}
+
 // InvalidTxByteSizeError indicates that a transaction byte size exceeds the maximum.
 type InvalidTxByteSizeError struct {
 	Maximum uint64

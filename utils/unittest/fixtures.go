@@ -46,13 +46,29 @@ func InvalidAddressFixture() flow.Address {
 	return addr
 }
 
-func TransactionSignatureFixture() flow.TransactionSignature {
+func InvalidFormatSignature() flow.TransactionSignature {
 	return flow.TransactionSignature{
 		Address:     AddressFixture(),
 		SignerIndex: 0,
-		Signature:   SeedFixture(64),
+		Signature:   make([]byte, crypto.SignatureLenECDSAP256), // zero signature is invalid
 		KeyID:       1,
 	}
+}
+
+func TransactionSignatureFixture() flow.TransactionSignature {
+	sigLen := crypto.SignatureLenECDSAP256
+	s := flow.TransactionSignature{
+		Address:     AddressFixture(),
+		SignerIndex: 0,
+		Signature:   SeedFixture(sigLen),
+		KeyID:       1,
+	}
+	// make sure the ECDSA signature passes the format check
+	s.Signature[sigLen/2] = 0
+	s.Signature[0] = 0
+	s.Signature[sigLen/2-1] |= 1
+	s.Signature[sigLen-1] |= 1
+	return s
 }
 
 func ProposalKeyFixture() flow.ProposalKey {
@@ -147,7 +163,7 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 }
 
 func StateInteractionsFixture() *delta.Snapshot {
-	return delta.NewView(nil).Interactions()
+	return &delta.NewView(nil).Interactions().Snapshot
 }
 
 func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier) flow.Block {
@@ -509,7 +525,7 @@ func WithApproverID(id flow.Identifier) func(*flow.ResultApproval) {
 
 func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.Body.Attestation.BlockID = id
+		ra.Body.BlockID = id
 	}
 }
 
@@ -864,7 +880,7 @@ func ChunkDataPackFixture(identifier flow.Identifier) *flow.ChunkDataPack {
 // SeedFixture returns a random []byte with length n
 func SeedFixture(n int) []byte {
 	var seed = make([]byte, n)
-	_, _ = crand.Read(seed[0:n])
+	_, _ = crand.Read(seed)
 	return seed
 }
 
@@ -1067,4 +1083,31 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
 	seal := SealFixture(SealFromResult(result), WithServiceEvents(setup.ServiceEvent(), commit.ServiceEvent()))
 	return root, result, seal
+}
+
+// ChainFixture creates a list of blocks that forms a chain
+func ChainFixture(nonGenesisCount int) ([]*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	chain := make([]*flow.Block, 0, nonGenesisCount+1)
+
+	participants := IdentityListFixture(5, WithAllRoles())
+	genesis, result, seal := BootstrapFixture(participants)
+	chain = append(chain, genesis)
+
+	children := ChainFixtureFrom(nonGenesisCount, genesis.Header)
+	chain = append(chain, children...)
+	return chain, result, seal
+}
+
+// ChainFixtureFrom creates a chain of blocks starting from a given parent block,
+// the total number of blocks in the chain is specified by the given count
+func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
+	blocks := make([]*flow.Block, 0, count)
+
+	for i := 0; i < count; i++ {
+		block := BlockWithParentFixture(parent)
+		blocks = append(blocks, &block)
+		parent = block.Header
+	}
+
+	return blocks
 }
