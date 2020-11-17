@@ -66,7 +66,7 @@ func bruteSearch(value uint64, arr []uint64) (int, error) {
 }
 
 // Test given the same seed, the leader selection will produce the same selection
-func TestDeterminstic(t *testing.T) {
+func TestDeterministic(t *testing.T) {
 	identities := []*flow.Identity{
 		{Stake: 1},
 		{Stake: 2},

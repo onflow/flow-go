@@ -19,6 +19,14 @@ type LeaderSelection struct {
 	epochStartView uint64
 }
 
+func (l LeaderSelection) FirstView() uint64 {
+	return l.epochStartView
+}
+
+func (l LeaderSelection) FinalView() uint64 {
+	return l.epochStartView + uint64(len(l.leaderIndexesForView))
+}
+
 // LeaderIndexForView returns the leader index for given view.
 // If the view is smaller than the epochStartView, an error will be returned.
 func (l LeaderSelection) LeaderIndexForView(view uint64) (int, error) {
