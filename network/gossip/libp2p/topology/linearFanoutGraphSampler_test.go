@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -34,7 +35,8 @@ func (suite *LinearFanoutGraphSamplerTestSuite) SetupTest() {
 // TestLinearFanoutNoShouldHave evaluates that sampling a connected graph fanout
 // follows the LinearFanoutFunc, and it also does not contain duplicate element.
 func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNoShouldHave() {
-	sample := suite.sampler.SampleConnectedGraph(suite.all, nil)
+	sample, err := suite.sampler.SampleConnectedGraph(suite.all, nil)
+	require.NoError(suite.T(), err)
 
 	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
 	// the size of greater than or equal to applying LinearFanoutFunc over the original set.
@@ -51,7 +53,8 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutWithShouldHave()
 	// samples 10 ids into shouldHave and excludes them from all into others.
 	shouldHave := suite.all.Sample(10)
 
-	sample := suite.sampler.SampleConnectedGraph(suite.all, shouldHave)
+	sample, err := suite.sampler.SampleConnectedGraph(suite.all, shouldHave)
+	require.NoError(suite.T(), err)
 
 	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
 	// the size of greater than or equal to applying LinearFanoutFunc over the original set.
@@ -65,6 +68,22 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutWithShouldHave()
 	for _, id := range shouldHave {
 		require.Contains(suite.T(), sample, id)
 	}
+}
+
+// TestLinearFanoutEmptyAll evaluates that sampling a connected graph fanout with a shouldHave set
+// that is greater than `all` set in size, returns the `shouldHave` set.
+func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutSmallerAll() {
+	// samples 10 ids into 'shouldHave' and excludes them from all into others.
+	shouldHave := suite.all.Sample(10)
+	// samples a smaller disjoint component of all with 5 nodes and combines with `shouldHave`
+	smallerAll := suite.all.Filter(filter.Not(filter.In(shouldHave))).Sample(5).Union(shouldHave)
+
+	// total size of smallerAll is 15, and it requires a linear fanout of 8 which is less than
+	// size of `shouldHave` set, so the shouldHave itself should return
+	sample, err := suite.sampler.SampleConnectedGraph(smallerAll, shouldHave)
+	require.NoError(suite.T(), err)
+	require.Equal(suite.T(), len(sample), len(shouldHave))
+	require.ElementsMatch(suite.T(), sample, shouldHave)
 }
 
 // uniquenessCheck is a test helper method that fails the test if ids include any duplicate identity.
