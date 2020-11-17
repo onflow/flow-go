@@ -118,6 +118,23 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNonSubsetEmptyAl
 	require.Error(suite.T(), err)
 }
 
+// TestConnectedness evaluates that samples returned by the LinearFanoutGraphSampler constitute a
+// connected graph.
+func (suite *LinearFanoutGraphSamplerTestSuite) TestConnectedness() {
+	adjMap := make(map[flow.Identifier]flow.IdentityList)
+	for _, id := range suite.all {
+		// creates a graph sampler for the node
+		graphSampler, err := NewLinearFanoutGraphSampler(id.NodeID)
+		require.NoError(suite.T(), err)
+
+		// samples a graph and stores it in adjacency map
+		sample, err := graphSampler.SampleConnectedGraph(suite.all, nil)
+		adjMap[id.NodeID] = sample
+	}
+
+	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
+}
+
 // uniquenessCheck is a test helper method that fails the test if ids include any duplicate identity.
 func (suite *LinearFanoutGraphSamplerTestSuite) uniquenessCheck(ids flow.IdentityList) {
 	seen := make(map[flow.Identity]struct{})
