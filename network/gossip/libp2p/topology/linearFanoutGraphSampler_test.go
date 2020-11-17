@@ -24,6 +24,7 @@ func TestNewLinearFanoutGraphSamplerTestSuite(t *testing.T) {
 
 // SetupTest is executed before any other test method in this test suite.
 func (suite *LinearFanoutGraphSamplerTestSuite) SetupTest() {
+	// creates 100 identities of all roles
 	suite.all = unittest.IdentityListFixture(100, unittest.WithAllRoles())
 
 	// creates a graph sampler for the first node in `all` list
@@ -33,10 +34,11 @@ func (suite *LinearFanoutGraphSamplerTestSuite) SetupTest() {
 	suite.firstNodeSampler = sampler
 }
 
-// TestLinearFanoutNoShouldHave evaluates that sampling a connected graph fanout
+// TestLinearFanout_UnconditionalSampling evaluates that sampling a connected graph fanout
 // with an empty `shouldHave` list follows the LinearFanoutFunc,
 // and it also does not contain duplicate element.
-func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNoShouldHave() {
+func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_UnconditionalSampling() {
+	// samples with no `shouldHave` set.
 	sample, err := suite.firstNodeSampler.SampleConnectedGraph(suite.all, nil)
 	require.NoError(suite.T(), err)
 
@@ -49,9 +51,9 @@ func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutNoShouldHave() {
 	suite.uniquenessCheck(sample)
 }
 
-// TestLinearFanoutNoShouldHave evaluates that sampling a connected graph fanout with a shouldHave set
+// TestLinearFanout_ConditionalSampling evaluates that sampling a connected graph fanout with a shouldHave set
 // follows the LinearFanoutFunc, and it also does not contain duplicate element.
-func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanoutWithShouldHave() {
+func (suite *LinearFanoutGraphSamplerTestSuite) TestLinearFanout_ConditionalSampling() {
 	// samples 10 ids into shouldHave and excludes them from all into others.
 	shouldHave := suite.all.Sample(10)
 
