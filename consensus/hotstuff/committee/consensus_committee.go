@@ -10,11 +10,18 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type EpochLeaders struct {
-	selection  *LeaderSelection  // pre-computed leader selection for this epoch
-	identities flow.IdentityList // initial set of consensus committee members for this epoch
+// epochLeaders is a wrapper structure containing the initial consensus committee
+// and the raw leader selection for an epoch.
+type epochLeaders struct {
+	// pre-computed leader selection for this epoch
+	selection *LeaderSelection
+	// initial set of consensus committee members for this epoch, used only for
+	// mapping a leader index to node ID
+	// CAUTION: does not contain up-to-date weight/ejection info
+	identities flow.IdentityList
 }
 
+// a filter that returns all members of the consensus committee allowed to vote
 var consensusMemberFilter = filter.And(
 	filter.HasStake(true),              // must have non-zero weight
 	filter.HasRole(flow.RoleConsensus), // must be a consensus node
@@ -26,23 +33,20 @@ var consensusMemberFilter = filter.And(
 type Consensus struct {
 	state   protocol.ReadOnlyState   // the protocol state
 	me      flow.Identifier          // the node ID of this node
-	leaders map[uint64]*EpochLeaders // pre-computed leader selection for each epoch
+	leaders map[uint64]*epochLeaders // pre-computed leader selection for each epoch
 }
 
-func NewConsensusCommittee(
-	state protocol.ReadOnlyState,
-	me flow.Identifier,
-) (*Consensus, error) {
+func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*Consensus, error) {
 
 	com := &Consensus{
 		state:   state,
 		me:      me,
-		leaders: make(map[uint64]*EpochLeaders),
+		leaders: make(map[uint64]*epochLeaders),
 	}
 
 	// pre-compute leader selection for current epoch
 	epoch := state.Final().Epochs().Current()
-	err := com.computeLeaderSelection(epoch)
+	err := com.prepareLeaderSelection(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not add leader for epoch: %w", err)
 	}
@@ -111,8 +115,9 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// assume the view is within the next epoch (w.r.t. the finalized head).
 	// This assumption is equivalent to assuming that we build at least one
 	// block in every epoch, which is anyway a requirement for valid epochs.
+	//
 	next := c.state.Final().Epochs().Next()
-	err := c.computeLeaderSelection(next)
+	err := c.prepareLeaderSelection(next)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not compute leader selection for next epoch: %w", err)
 	}
@@ -140,10 +145,10 @@ func (c *Consensus) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
 	return dkg, err
 }
 
-// computeLeaderSelection pre-computes and stores the leader selection for the
+// prepareLeaderSelection pre-computes and stores the leader selection for the
 // given epoch. Computing leader selection for the same epoch multiple times
 // is a no-op.
-func (c *Consensus) computeLeaderSelection(epoch protocol.Epoch) error {
+func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) error {
 
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -164,7 +169,7 @@ func (c *Consensus) computeLeaderSelection(epoch protocol.Epoch) error {
 		return fmt.Errorf("could not get leader selection for current epoch: %w", err)
 	}
 
-	c.leaders[counter] = &EpochLeaders{
+	c.leaders[counter] = &epochLeaders{
 		selection:  selection,
 		identities: identities.Filter(consensusMemberFilter),
 	}
