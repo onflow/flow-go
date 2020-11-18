@@ -18,7 +18,6 @@ var (
 	flagBlockHash         string
 	flagStateCommitment   string
 	flagDatadir           string
-	flagChainID           string
 )
 
 var Cmd = &cobra.Command{
@@ -38,16 +37,12 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")
-	// _ = Cmd.MarkFlagRequired("block-hash")
 
 	Cmd.Flags().StringVar(&flagBlockHash, "block-hash", "",
 		"Block hash (hex-encoded, 64 characters)")
-	// _ = Cmd.MarkFlagRequired("block-hash")
 
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")
-	// _ = Cmd.MarkFlagRequired("datadir")
-
 }
 
 func run(*cobra.Command, []string) {
