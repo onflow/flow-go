@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"path"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -138,7 +137,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		return fmt.Errorf("cannot flatten forest: %w", err)
 	}
 
-	checkpointWriter, err := wal.CreateCheckpointWriterForFile(path.Join(outputDir, wal.RootCheckpointFilename))
+	checkpointWriter, err := wal.CreateCheckpointWriterForFile(outputDir, wal.RootCheckpointFilename)
 	if err != nil {
 		return fmt.Errorf("cannot create checkpointer writer: %w", err)
 	}

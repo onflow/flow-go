@@ -248,7 +248,7 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 }
 
 // ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
-func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migration, targetPathFinderVersion uint8, outputFilePath string) (ledger.State, error) {
+func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migration, targetPathFinderVersion uint8, outputDir, outputFile string) (ledger.State, error) {
 
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
@@ -287,7 +287,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
-	writer, err := wal.CreateCheckpointWriterForFile(outputFilePath)
+	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module/metrics"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 const checkpointFilenamePrefix = "checkpoint."
@@ -24,6 +26,7 @@ const checkpointFilenamePrefix = "checkpoint."
 const MagicBytes uint16 = 0x2137
 const VersionV1 uint16 = 0x01
 const VersionV2 uint16 = 0x02
+const VersionV3 uint16 = 0x02
 
 const RootCheckpointFilename = "root.checkpoint"
 
@@ -182,54 +185,37 @@ func NumberToFilename(n int) string {
 	return fmt.Sprintf("%s%s", checkpointFilenamePrefix, NumberToFilenamePart(n))
 }
 
-type SyncOnCloseFile struct {
-	file *os.File
-	*bufio.Writer
-}
-
-func (s *SyncOnCloseFile) Sync() error {
-	err := s.Flush()
-	if err != nil {
-		return fmt.Errorf("cannot flush buffer: %w", err)
-	}
-	return s.file.Sync()
-
-}
-
-func (s *SyncOnCloseFile) Close() error {
-	defer func() {
-		err := s.file.Close()
-		if err != nil {
-			fmt.Printf("error while closing file: %s", err)
-		}
-	}()
-
-	err := s.Flush()
-	if err != nil {
-		return fmt.Errorf("cannot flush buffer: %w", err)
-	}
-	return s.file.Sync()
-}
-
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	return CreateCheckpointWriter(c.dir, to)
 }
 
 func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
-	filename := path.Join(dir, NumberToFilename(fileNo))
-	return CreateCheckpointWriterForFile(filename)
+	return CreateCheckpointWriterForFile(dir, NumberToFilename(fileNo))
 }
 
-func CreateCheckpointWriterForFile(filename string) (io.WriteCloser, error) {
+func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error) {
+
+	fullname := path.Join(dir, filename)
+
+	if utilsio.FileExists(fullname) {
+		return nil, fmt.Errorf("checkpoint file %s already exists", fullname)
+	}
+
+	tmpFile, err := ioutil.TempFile(dir, "writing-chkpnt-*")
+	if err != nil {
+		return nil, fmt.Errorf("cannot create temporary file for checkpoint %v: %w", tmpFile, err)
+	}
+
 	file, err := os.Create(filename)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create file for checkpoint %s: %w", filename, err)
 	}
 
 	writer := bufio.NewWriter(file)
-	return &SyncOnCloseFile{
-		file:   file,
-		Writer: writer,
+	return &SyncOnCloseRenameFile{
+		file:       file,
+		targetName: fullname,
+		Writer:     writer,
 	}, nil
 }
 
