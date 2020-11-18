@@ -99,14 +99,14 @@ func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, 
 // multiSystemEndToEndConnectedness is a test helper evaluates end-to-end connectedness of the system graph
 // over several number of systems each with specified number of nodes on each role.
 func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, col, con, exe, ver, cluster int) {
-	// adjacency map keeps graph component of a single channel ID
-	adjMap := make(map[flow.Identifier]flow.IdentityList)
-
 	// creates a histogram to keep average fanout of nodes in systems
 	aveHist := thist.NewHist(nil, fmt.Sprintf("Average fanout for %d systems", system),
 		"fit", 10, false)
 
 	for j := 0; j < system; j++ {
+		// adjacency map keeps graph component of a single channel ID
+		adjMap := make(map[flow.Identifier]flow.IdentityList)
+
 		// creates a flow system
 		state, ids, subMngrs := suite.generateSystem(acc, col, con, exe, ver, cluster)
 
@@ -118,7 +118,7 @@ func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system,
 
 		// creates topology of the nodes
 		for i, id := range ids {
-			fanout := suite.subFanoutScenario(id.NodeID, subMngrs[i], ids, state)
+			fanout := suite.topologyScenario(id.NodeID, subMngrs[i], ids, state)
 			adjMap[id.NodeID] = fanout
 			systemHist.Update(float64(len(fanout)))
 			totalFanout += len(fanout)
@@ -141,15 +141,9 @@ func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system,
 	}
 }
 
-// subFanoutScenario is a test helper that creates a StatefulTopologyManager with the LinearFanoutFunc,
-// It then evaluates that sub-fanout of each role in topology is
-// bound by the fanout function of topology on the role's entire size, i.e.,
-// if we have x consensus nodes,
-// then this tests evaluates that no node should have more than or equal to `x+1/2`
-// consensus fanout.
-//
-// It returns the fanout of node.
-func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
+// topologyScenario is a test helper that creates a StatefulTopologyManager with the LinearFanoutFunc,
+// it creates a TopicBasedTopology for the node and returns its fanout.
+func (suite *StatefulTopologyTestSuite) topologyScenario(me flow.Identifier,
 	subMngr channel.SubscriptionManager,
 	ids flow.IdentityList,
 	state protocol.ReadOnlyState) flow.IdentityList {
@@ -167,14 +161,6 @@ func (suite *StatefulTopologyTestSuite) subFanoutScenario(me flow.Identifier,
 	// generates topology of node
 	myFanout, err := topMngr.MakeTopology(ids)
 	require.NoError(suite.T(), err)
-
-	for _, role := range flow.Roles() {
-		// total number of nodes in flow with specified role
-		roleTotal := len(ids.Filter(filter.HasRole(role)))
-		// number of nodes in fanout with specified role
-		roleFanout := topology.LinearFanoutFunc(len(myFanout.Filter(filter.HasRole(role))))
-		require.Less(suite.T(), roleFanout, roleTotal)
-	}
 
 	return myFanout
 }
