@@ -2,7 +2,6 @@ package libp2p
 
 import (
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -20,36 +19,47 @@ type NodeIDRefresher struct {
 
 func NewNodeIDRefresher(logger zerolog.Logger, state protocol.ReadOnlyState, callBack func(list flow.IdentityList) error) *NodeIDRefresher {
 	return &NodeIDRefresher{
-		logger:   logger,
+		logger:   logger.With().Str("component", "network-refresher").Logger(),
 		state:    state,
 		callBack: callBack,
 	}
+}
+
+func (listener *NodeIDRefresher) getLogger() zerolog.Logger {
+
+	log := listener.logger
+
+	// retrieve some contextual information for logging
+	final := listener.state.Final()
+	head, err := final.Head()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get finalized header")
+		return log
+	}
+	log = log.With().Uint64("final_height", head.Height).Logger()
+
+	phase, err := listener.state.Final().Phase()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get epoch phase")
+		return log
+	}
+	log = log.With().Str("epoch_phase", phase.String()).Logger()
+
+	return log
 }
 
 // OnIdentityTableChanged updates the networking layer's list of nodes to connect
 // to when the identity table changes in the protocol state.
 func (listener *NodeIDRefresher) OnIdentityTableChanged() {
 
-	final, err := listener.state.Final().Head()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get finalized height")
-		return
-	}
-	phase, err := listener.state.Final().Phase()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get epoch phase")
-	}
+	log := listener.getLogger()
 
-	log := listener.logger.
-		With().
-		Uint64("final_height", final.Height).
-		Str("epoch_phase", phase.String()).
-		Logger()
+	log.Info().Msg("updating network ids upon identity table change")
 
 	// get the new set of IDs
 	newIDs, err := IDsFromState(listener.state)
 	if err != nil {
-		log.Err(err).Msg("failed to update network ids on identity table change")
+		log.Err(err).Msg("failed to determine new identity table after identity table change")
 		return
 	}
 
@@ -59,6 +69,8 @@ func (listener *NodeIDRefresher) OnIdentityTableChanged() {
 		log.Err(err).Msg("failed to update network ids on identity table change")
 		return
 	}
+
+	log.Info().Msg("successfully updated network ids upon identity table change")
 }
 
 // IDsFromState returns which nodes should be connected to based on the latest
