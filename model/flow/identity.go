@@ -185,6 +185,7 @@ type IdentityFilter func(*Identity) bool
 type IdentityOrder func(*Identity, *Identity) bool
 
 // IdentityMapFunc is a modifier function for map operations for identities.
+// Identities are COPIED from the source slice.
 type IdentityMapFunc func(Identity) Identity
 
 // IdentityList is a list of nodes.
@@ -203,7 +204,12 @@ IDLoop:
 	return dup
 }
 
-// Map returns a new identity list with the map function f applied to each identity.
+// Map returns a new identity list with the map function f applied to a copy of
+// each identity.
+//
+// CAUTION: this relies on structure copy semantics. Map functions that modify
+// an object referenced by the input Identity structure will modify identities
+// in the source slice as well.
 func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 	dup := make(IdentityList, 0, len(il))
 	for _, identity := range il {
