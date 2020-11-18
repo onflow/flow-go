@@ -204,10 +204,7 @@ func GenerateTopologies(t *testing.T, state protocol.State, identities flow.Iden
 		var top topology.Topology
 		var err error
 
-		graphSampler, err := topology.NewLinearFanoutGraphSampler(id.NodeID)
-		require.NoError(t, err)
-
-		top, err = topology.NewTopicBasedTopology(id.NodeID, state, graphSampler)
+		top, err = topology.NewTopicBasedTopology(id.NodeID, state)
 		require.NoError(t, err)
 
 		tops = append(tops, top)
