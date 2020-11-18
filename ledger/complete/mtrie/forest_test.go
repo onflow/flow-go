@@ -542,6 +542,43 @@ func TestDuplicateOverride(t *testing.T) {
 
 }
 
+// TestReadSafety check if payload returned from a forest are safe against modification - ie. copy of the data
+// is returned, instead of a slice
+func TestReadSafety(t *testing.T) {
+	pathByteSize := 2 // path size of 16 bits
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	require.NoError(t, err)
+
+	// path: 1000...
+	p0 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
+	v0 := payloadBySlices([]byte{'A'}, []byte{'A'})
+	paths := []ledger.Path{p0}
+	payloads := []*ledger.Payload{v0}
+	update := &ledger.TrieUpdate{RootHash: forest.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
+	baseRoot, err := forest.Update(update)
+	require.NoError(t, err)
+
+	read := &ledger.TrieRead{RootHash: baseRoot, Paths: paths}
+	data, err := forest.Read(read)
+	require.NoError(t, err)
+
+	require.Len(t, data, 1)
+	require.Equal(t, v0, data[0])
+
+	// modify returned slice
+	data[0].Value = []byte("new value")
+
+	// read again
+	data2, err := forest.Read(read)
+	require.NoError(t, err)
+	require.Len(t, data2, 1)
+	require.Equal(t, v0, data2[0])
+}
+
 // TestUpdateWithWrongPathSize verifies that attempting to update a trie with a wrong path size
 func TestUpdateWithWrongPathSize(t *testing.T) {
 	pathByteSize := 2 // path size of 16 bits
