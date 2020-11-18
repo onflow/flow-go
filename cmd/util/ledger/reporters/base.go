@@ -1,11 +1,7 @@
 package reporters
 
 import (
-	"fmt"
 	"os"
-
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/rs/zerolog"
 
@@ -61,13 +57,12 @@ func (r *BaseReporter) Report(payloads []ledger.Payload) error {
 		r.accounts[string(owner)] = true
 		r.regCountByAccounts[string(owner)]++
 		r.storageUsedByAccounts[string(owner)] += len(p.Value)
-
-		if string(p.Key.KeyParts[2].Value) == "storageflowTokenVault" {
-			ownerAddress := common.BytesToAddress(owner)
-			// TODO handle error
-			decoded, err := interpreter.DecodeValue(p.Value, &ownerAddress, nil)
-			fmt.Println(">>>", string(p.Key.KeyParts[2].Value), p.Key.String(), decoded, err)
-		}
+		// TODO add flow token balance tracker
+		// if string(p.Key.KeyParts[2].Value) == "publicflowTokenBalance" {
+		// ownerAddress := common.BytesToAddress(owner)
+		// decoded, err := interpreter.DecodeValue(p.Value, &ownerAddress, nil)
+		// fmt.Println(">>>", string(p.Key.KeyParts[2].Value), p.Key.String(), decoded, err)
+		// }
 	}
 
 	r.logger.Info().Msgf("Chain: %s", r.chain)
@@ -75,7 +70,7 @@ func (r *BaseReporter) Report(payloads []ledger.Payload) error {
 	// number of accounts
 	r.logger.Info().Msgf("Number of unique accounts %d", len(r.accounts))
 
-	// accounts with most storage
-	// median storage used
+	// TODO accounts with most storage
+	// TODO median storage used
 	return nil
 }
