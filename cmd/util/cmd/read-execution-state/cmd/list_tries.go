@@ -22,12 +22,12 @@ func listTries(*cobra.Command, []string) {
 	startTime := time.Now()
 
 	// load execution state
-	mForest, err := loadExecutionState()
+	forest, err := initForest()
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while loading execution state")
 	}
 
-	tries, err := mForest.GetTries()
+	tries, err := forest.GetTries()
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while getting tries")
 	}

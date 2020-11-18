@@ -9,6 +9,7 @@ import (
 
 var (
 	flagExecutionStateDir string
+	flagDataDir           string
 )
 
 // RootCmd for read-execution-state
@@ -26,6 +27,8 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&flagExecutionStateDir, "execution-state-dir", "d", "", "execution node state dir (where WAL logs are written")
+	RootCmd.PersistentFlags().StringVar(&flagExecutionStateDir, "execution-state-dir", "", "execution node state dir (where WAL logs are written)")
 	_ = RootCmd.MarkPersistentFlagRequired("execution-state-dir")
+
+	RootCmd.PersistentFlags().StringVar(&flagDataDir, "datadir", "", "path to the directory containing the badger dababase")
 }

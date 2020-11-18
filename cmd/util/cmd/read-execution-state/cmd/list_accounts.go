@@ -52,7 +52,7 @@ func getChain(chainName string) (chain flow.Chain, err error) {
 func listAccounts(*cobra.Command, []string) {
 	startTime := time.Now()
 
-	forest, err := loadExecutionState()
+	forest, err := initForest()
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while loading execution state")
 	}

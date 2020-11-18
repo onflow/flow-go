@@ -10,10 +10,12 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+// InitStorage ...
 func InitStorage(datadir string) *badger.DB {
 	return InitStorageWithTruncate(datadir, false)
 }
 
+// InitStorageWithTruncate ...
 func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 	opts := badger.
 		DefaultOptions(datadir).
@@ -39,6 +41,7 @@ func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 	return db
 }
 
+// InitStorages ...
 func InitStorages(db *badger.DB) *storage.All {
 	metrics := &metrics.NoopCollector{}
 
