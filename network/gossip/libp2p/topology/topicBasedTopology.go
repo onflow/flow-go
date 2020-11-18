@@ -12,18 +12,22 @@ import (
 // TopicBasedTopology is a deterministic topology mapping that creates a connected graph component among the nodes
 // involved in each topic.
 type TopicBasedTopology struct {
-	me           flow.Identifier        // used to keep identifier of the node
-	state        protocol.ReadOnlyState // used to keep a read only protocol state
-	graphSampler ConnectedGraphSampler  // used to create connected graph sampler
+	me    flow.Identifier        // used to keep identifier of the node
+	state protocol.ReadOnlyState // used to keep a read only protocol state
+	seed  int64
 }
 
 // NewTopicBasedTopology returns an instance of the TopicBasedTopology.
-func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState,
-	graphSampler ConnectedGraphSampler) (*TopicBasedTopology, error) {
+func NewTopicBasedTopology(nodeID flow.Identifier, state protocol.ReadOnlyState) (*TopicBasedTopology, error) {
+	seed, err := seedFromID(nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate seed from id:%w", err)
+	}
+
 	t := &TopicBasedTopology{
-		me:           nodeID,
-		state:        state,
-		graphSampler: graphSampler,
+		me:    nodeID,
+		state: state,
+		seed:  seed,
 	}
 
 	return t, nil
@@ -55,15 +59,58 @@ func (t TopicBasedTopology) SubsetRole(ids flow.IdentityList, shouldHave flow.Id
 		shouldHave = shouldHave.Filter(filter.Not(filter.HasNodeID(t.me)))
 	}
 
-	// excludes the node itself from ids
+	// excludes the node itself from all
 	ids = ids.Filter(filter.Not(filter.HasNodeID(t.me)))
 
-	sample, err := t.graphSampler.SampleConnectedGraph(ids, shouldHave)
+	sample, err := t.sampleConnectedGraph(ids, shouldHave)
 	if err != nil {
 		return nil, fmt.Errorf("could not sample a connected graph: %w", err)
 	}
 
 	return sample, nil
+}
+
+// sampleConnectedGraph receives two lists: all and shouldHave. It then samples a connected fanout
+// for the caller that includes the shouldHave set. Independent invocations of this method over
+// different nodes, should create a connected graph.
+// Fanout is the set of nodes that this instance should get connected to in order to create a
+// connected graph.
+func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHave flow.IdentityList) (flow.IdentityList, error) {
+
+	if len(all) == 0 {
+		return nil, fmt.Errorf("empty identity list")
+	}
+
+	if shouldHave == nil {
+		// choose (n+1)/2 random nodes so that each node in the graph will have a degree >= (n+1) / 2,
+		// guaranteeing a connected graph.
+		size := uint(LinearFanoutFunc(len(all)))
+		return all.DeterministicSample(size, t.seed), nil
+
+	} else {
+		// checks `shouldHave` be a subset of `all`
+		nonMembers := shouldHave.Filter(filter.Not(filter.In(all)))
+		if len(nonMembers) != 0 {
+			return nil, fmt.Errorf("should have identities is not a subset of all: %v", nonMembers)
+		}
+
+		// total sample size
+		totalSize := LinearFanoutFunc(len(all))
+
+		if totalSize < len(shouldHave) {
+			// total fanout size needed is already satisfied by shouldHave set.
+			return shouldHave, nil
+		}
+
+		// subset size excluding should have ones
+		subsetSize := totalSize - len(shouldHave)
+
+		// others are all excluding should have ones
+		others := all.Filter(filter.Not(filter.In(shouldHave)))
+		others = others.DeterministicSample(uint(subsetSize), t.seed)
+
+		return others.Union(shouldHave), nil
+	}
 }
 
 // clusterPeers returns the list of other nodes within the same cluster as this node.

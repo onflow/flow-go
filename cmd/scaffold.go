@@ -181,16 +181,10 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		// creates graph sampler, topology, topology manager, and subscription managers
+		// creates topology, topology manager, and subscription managers
 		//
-		// graph sampler
-		graphSampler, err := topology.NewLinearFanoutGraphSampler(fnb.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not create graph sampler for topology: %w", err)
-		}
-
 		// topology
-		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.State, graphSampler)
+		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.State)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}

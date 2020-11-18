@@ -70,7 +70,7 @@ func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityL
 // CheckMembership checks each identity in a top list belongs to all identity list.
 func CheckMembership(t *testing.T, top flow.IdentityList, all flow.IdentityList) {
 	for _, id := range top {
-		require.Contains(t, all, id.NodeID)
+		require.Contains(t, all, id)
 	}
 }
 

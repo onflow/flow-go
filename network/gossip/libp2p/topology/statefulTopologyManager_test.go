@@ -153,12 +153,9 @@ func (suite *StatefulTopologyTestSuite) topologyScenario(me flow.Identifier,
 	subMngr channel.SubscriptionManager,
 	ids flow.IdentityList,
 	state protocol.ReadOnlyState) flow.IdentityList {
-	// creates a graph sampler for the node
-	graphSampler, err := topology.NewLinearFanoutGraphSampler(me)
-	require.NoError(suite.T(), err)
 
 	// creates topology of the node
-	top, err := topology.NewTopicBasedTopology(me, state, graphSampler)
+	top, err := topology.NewTopicBasedTopology(me, state)
 	require.NoError(suite.T(), err)
 
 	// creates topology manager
