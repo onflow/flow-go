@@ -127,65 +127,16 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, err
 	}
 
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
-
-	// build the payload so we can get the hash
-	payload := &flow.Payload{
-		Guarantees: insertableGuarantees,
-		Seals:      insertableSeals,
-		Receipts:   insertableReceipts,
-	}
-
-	parent, err := b.headers.ByBlockID(parentID)
+	// assemble the block proposal
+	proposal, err := b.createProposal(parentID,
+		insertableGuarantees,
+		insertableSeals,
+		insertableReceipts,
+		setter)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent: %w", err)
+		return nil, err
 	}
 
-	// calculate the timestamp and cutoffs
-	timestamp := time.Now().UTC()
-	from := parent.Timestamp.Add(b.cfg.minInterval)
-	to := parent.Timestamp.Add(b.cfg.maxInterval)
-
-	// adjust timestamp if outside of cutoffs
-	if timestamp.Before(from) {
-		timestamp = from
-	}
-	if timestamp.After(to) {
-		timestamp = to
-	}
-
-	// construct default block on top of the provided parent
-	header := &flow.Header{
-		ChainID:     parent.ChainID,
-		ParentID:    parentID,
-		Height:      parent.Height + 1,
-		Timestamp:   timestamp,
-		PayloadHash: payload.Hash(),
-
-		// the following fields should be set by the custom function as needed
-		// NOTE: we could abstract all of this away into an interface{} field,
-		// but that would be over the top as we will probably always use hotstuff
-		View:           0,
-		ParentVoterIDs: nil,
-		ParentVoterSig: nil,
-		ProposerID:     flow.ZeroID,
-		ProposerSig:    nil,
-	}
-
-	// apply the custom fields setter of the consensus algorithm
-	err = setter(header)
-	if err != nil {
-		return nil, fmt.Errorf("could not apply setter: %w", err)
-	}
-
-	// insert the proposal into the database
-	proposal := &flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-
-	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
 	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
 
@@ -194,7 +145,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return header, nil
+	return proposal.Header, nil
 }
 
 // getInsertableGuarantees returns the list of CollectionGuarantees that should
@@ -367,7 +318,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
 	}
 
-	// the conensus matching engine can produce different seals for the same
+	// the consensus matching engine can produce different seals for the same
 	// ExecutionResult if it appeared in different blocks. Here we only want to
 	// consider the seals that correspond to results and blocks on the current
 	// fork.
@@ -381,11 +332,12 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// and have different start or end states
 	encounteredInconsistentSealsForSameBlock := false
 
-	// loop through the fork, from parent to last sealed, inspect the payloads'
-	// ExecutionResults, and check for matching IncorporatedResultSeals in the
-	// mempool.
+	// Walk backwards along the fork, from parent to last sealed, inspect the
+	// payloads' ExecutionResults, and check for matching IncorporatedResultSeals
+	// in the mempool.
 	ancestorID := parentID
-	for ancestorID != sealed.ID() {
+	sealedID := sealed.ID()
+	for ancestorID != sealedID {
 
 		ancestor, err := b.blocks.ByID(ancestorID)
 		if err != nil {
@@ -399,69 +351,71 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
-			incorporatedResult := &flow.IncorporatedResult{
-				// ATTENTION:
-				// Here, IncorporatedBlockID should be set to ancestorID,
-				// because that is the block in which the ExecutionResult is
-				// contained. However, in phase 2 of the sealing roadmap, we are
-				// still using a temporary sealing logic where the
-				// IncorporatedBlockID is expected to be the result's block ID.
-				IncorporatedBlockID: receipt.ExecutionResult.BlockID,
-				Result:              &receipt.ExecutionResult,
-			}
+			// ATTENTION:
+			// Here, IncorporatedBlockID (the first argument) should be set to
+			// ancestorID, because that is the block that contains the
+			// ExecutionResult. However, in phase 2 of the sealing roadmap, we
+			// are still using a temporary sealing logic where the
+			// IncorporatedBlockID is expected to be the result's block ID.
+			incorporatedResult := flow.NewIncorporatedResult(
+				receipt.ExecutionResult.BlockID,
+				&receipt.ExecutionResult,
+			)
 
 			// look for a seal that corresponds to this specific incorporated
 			// result. This tells us that the seal is for a result on this fork,
 			// and that it was calculated using the correct block ID for chunk
 			// assignment (the IncorporatedBlockID).
 			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
-			if ok {
-
-				if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
-					return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
-				}
-				if len(irSeal.Seal.FinalState) < 1 {
-					// respective Execution Result should have been rejected by matching engine
-					return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
-				}
-
-				header, err := b.headers.ByBlockID(incorporatedResult.Result.BlockID)
-				if err != nil {
-					return nil, fmt.Errorf("could not get block for id (%x): %w", incorporatedResult.Result.BlockID, err)
-				}
-
-				// Check for other inconsistent seal
-				irSeal2, found := filteredSeals[header.Height]
-				if found && irSeal.Seal.BlockID != irSeal2.Seal.BlockID {
-
-					sc1json, err := json.Marshal(irSeal)
-					if err != nil {
-						return nil, err
-					}
-					sc2json, err := json.Marshal(irSeal2)
-					if err != nil {
-						return nil, err
-					}
-
-					// check whether seals are inconsistent:
-					if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
-						!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
-						fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-						encounteredInconsistentSealsForSameBlock = true
-					} else {
-						fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-					}
-
-				} else {
-					filteredSeals[header.Height] = irSeal
-				}
+			if !ok {
+				continue
 			}
+
+			if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
+				return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
+			}
+			if len(irSeal.Seal.FinalState) < 1 {
+				// respective Execution Result should have been rejected by matching engine
+				return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
+			}
+
+			header, err := b.headers.ByBlockID(incorporatedResult.Result.BlockID)
+			if err != nil {
+				return nil, fmt.Errorf("could not get block for id (%x): %w", incorporatedResult.Result.BlockID, err)
+			}
+
+			// Check for other inconsistent seal
+			irSeal2, found := filteredSeals[header.Height]
+			if found && irSeal.Seal.BlockID != irSeal2.Seal.BlockID {
+
+				sc1json, err := json.Marshal(irSeal)
+				if err != nil {
+					return nil, err
+				}
+				sc2json, err := json.Marshal(irSeal2)
+				if err != nil {
+					return nil, err
+				}
+
+				// check whether seals are inconsistent:
+				if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
+					!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
+					fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+					encounteredInconsistentSealsForSameBlock = true
+				} else {
+					fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
+				}
+
+			} else {
+				filteredSeals[header.Height] = irSeal
+			}
+
 		}
 
 		ancestorID = ancestor.Header.ParentID
 	}
 
-	// return immediadely if there are no seals to collect or if we found
+	// return immediately if there are no seals to collect or if we found
 	// inconsistent seals.
 	if len(filteredSeals) == 0 || encounteredInconsistentSealsForSameBlock {
 		return nil, nil
@@ -633,6 +587,74 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 	sortedReceipts := sortReceipts(receipts)
 
 	return sortedReceipts, nil
+}
+
+// createProposal assembles a block with the provided header and payload
+// information
+func (b *Builder) createProposal(parentID flow.Identifier,
+	guarantees []*flow.CollectionGuarantee,
+	seals []*flow.Seal,
+	receipts []*flow.ExecutionReceipt,
+	setter func(*flow.Header) error) (*flow.Block, error) {
+
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
+
+	// build the payload so we can get the hash
+	payload := &flow.Payload{
+		Guarantees: guarantees,
+		Seals:      seals,
+		Receipts:   receipts,
+	}
+
+	parent, err := b.headers.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent: %w", err)
+	}
+
+	// calculate the timestamp and cutoffs
+	timestamp := time.Now().UTC()
+	from := parent.Timestamp.Add(b.cfg.minInterval)
+	to := parent.Timestamp.Add(b.cfg.maxInterval)
+
+	// adjust timestamp if outside of cutoffs
+	if timestamp.Before(from) {
+		timestamp = from
+	}
+	if timestamp.After(to) {
+		timestamp = to
+	}
+
+	// construct default block on top of the provided parent
+	header := &flow.Header{
+		ChainID:     parent.ChainID,
+		ParentID:    parentID,
+		Height:      parent.Height + 1,
+		Timestamp:   timestamp,
+		PayloadHash: payload.Hash(),
+
+		// the following fields should be set by the custom function as needed
+		// NOTE: we could abstract all of this away into an interface{} field,
+		// but that would be over the top as we will probably always use hotstuff
+		View:           0,
+		ParentVoterIDs: nil,
+		ParentVoterSig: nil,
+		ProposerID:     flow.ZeroID,
+		ProposerSig:    nil,
+	}
+
+	// apply the custom fields setter of the consensus algorithm
+	err = setter(header)
+	if err != nil {
+		return nil, fmt.Errorf("could not apply setter: %w", err)
+	}
+
+	proposal := &flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	return proposal, nil
 }
 
 // sortReceipts takes a map of block-height to execution receipt, and returns

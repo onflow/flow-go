@@ -857,7 +857,13 @@ func (e *Engine) requestPending() error {
 	}
 
 	// only request if number of unsealed finalized blocks exceeds the threshold
+	log := e.log.With().
+		Uint64("finalized_height", final.Height).
+		Uint64("sealed_height", sealed.Height).
+		Uint("request_receipt_threshold", e.requestReceiptThreshold).
+		Logger()
 	if uint(final.Height-sealed.Height) < e.requestReceiptThreshold {
+		log.Debug().Msg("skip requesting receipts as number of unsealed finalized blocks is below threshold")
 		return nil
 	}
 
@@ -901,19 +907,11 @@ func (e *Engine) requestPending() error {
 	}
 
 	// request missing execution results, if sealed height is low enough
-	log := e.log.With().
-		Uint64("finalized_height", final.Height).
-		Uint64("sealed_height", sealed.Height).
-		Uint("request_receipt_threshold", e.requestReceiptThreshold).
+	log.Info().
 		Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
-		Logger()
-	if uint(final.Height-sealed.Height) >= e.requestReceiptThreshold {
-		for _, blockID := range missingBlocksOrderedByHeight {
-			e.requester.EntityByID(blockID, filter.Any)
-		}
-		log.Info().Msg("requesting receipts")
-	} else {
-		log.Debug().Msg("skip requesting receipts as difference between sealed and finalized height does not exceed threshold")
+		Msg("requesting receipts")
+	for _, blockID := range missingBlocksOrderedByHeight {
+		e.requester.EntityByID(blockID, filter.Any)
 	}
 
 	return nil
