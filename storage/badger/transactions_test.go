@@ -1,6 +1,7 @@
 package badger_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -8,19 +9,25 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 // TestTransactions tests that a transaction can be stored, retrieved and attempted to be stored again without an error
 func TestTransactions(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := bstorage.NewTransactions(metrics, db)
+		store := badgerstorage.NewTransactions(metrics, db)
+
+		// attempt to get a invalid transaction
+		_, err := store.ByID(unittest.IdentifierFixture())
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// store a transaction in db
 		expected := unittest.TransactionFixture()
-		err := store.Store(&expected.TransactionBody)
+		err = store.Store(&expected.TransactionBody)
 		require.NoError(t, err)
 
 		// retrieve the transaction by ID
