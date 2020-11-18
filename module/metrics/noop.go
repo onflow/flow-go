@@ -23,6 +23,10 @@ func (nc *NoopCollector) QueueDuration(duration time.Duration, priority int)    
 func (nc *NoopCollector) MessageSent(engine string, message string)                              {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)                          {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}
+func (nc *NoopCollector) OutboundConnectionCreated()                                             {}
+func (nc *NoopCollector) OutboundConnectionRemoved()                                             {}
+func (nc *NoopCollector) InboundConnectionCreated()                                              {}
+func (nc *NoopCollector) InboundConnectionRemoved()                                              {}
 func (nc *NoopCollector) RanGC(duration time.Duration)                                           {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                                          {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                                         {}

@@ -21,6 +21,8 @@ type NetworkCollector struct {
 	duplicateMessagesDropped *prometheus.CounterVec
 	queueSize                *prometheus.GaugeVec
 	queueDuration            *prometheus.HistogramVec
+	outboundConnectionCount  prometheus.Gauge
+	inboundConnectionCount   prometheus.Gauge
 }
 
 func NewNetworkCollector() *NetworkCollector {
@@ -64,6 +66,20 @@ func NewNetworkCollector() *NetworkCollector {
 			Help:      "duration [seconds; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5}, // 10ms, 100ms, 500ms, 1s, 2s, 5s
 		}, []string{LabelPriority}),
+
+		outboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
+			Name:      "outbound_connection_count",
+			Help:      "the number of outbound connections of this node",
+		}),
+
+		inboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
+			Name:      "inbound_connection_count",
+			Help:      "the number of inbound connections of this node",
+		}),
 	}
 
 	return nc
@@ -96,4 +112,20 @@ func (nc *NetworkCollector) MessageRemoved(priority int) {
 
 func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) {
 	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
+}
+
+func (nc *NetworkCollector) OutboundConnectionCreated() {
+	nc.outboundConnectionCount.Inc()
+}
+
+func (nc *NetworkCollector) OutboundConnectionRemoved() {
+	nc.outboundConnectionCount.Dec()
+}
+
+func (nc *NetworkCollector) InboundConnectionCreated() {
+	nc.inboundConnectionCount.Inc()
+}
+
+func (nc *NetworkCollector) InboundConnectionRemoved() {
+	nc.inboundConnectionCount.Dec()
 }
