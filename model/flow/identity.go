@@ -219,6 +219,19 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 	return dup
 }
 
+// Copy returns a copy of the receiver. The resulting slice uses a different
+// backing array, meaning appends and insert operations on either slice are
+// guaranteed to only affect that slice.
+//
+// Copy should be used when modifying an existing identity list by either
+// appending new elements, re-ordering, or inserting new elements in an
+// existing index.
+func (il IdentityList) Copy() IdentityList {
+	dup := make(IdentityList, len(il))
+	copy(dup, il)
+	return dup
+}
+
 // Selector returns an identity filter function that selects only identities
 // within this identity list.
 func (il IdentityList) Selector() IdentityFilter {
@@ -240,8 +253,7 @@ func (il IdentityList) Lookup() map[Identifier]struct{} {
 
 // Order will sort the list using the given sort function.
 func (il IdentityList) Order(less IdentityOrder) IdentityList {
-	dup := make(IdentityList, 0, len(il))
-	dup = append(dup, il...)
+	dup := il.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
 		return less(dup[i], dup[j])
 	})
@@ -354,7 +366,7 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	lookup := make(map[Identifier]struct{})
 
 	// add all identities, omitted duplicates
-	for _, identity := range append(il, other...) {
+	for _, identity := range append(il.Copy(), other...) {
 		if _, exists := lookup[identity.NodeID]; exists {
 			continue
 		}

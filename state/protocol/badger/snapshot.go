@@ -68,7 +68,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	}
 
 	// get identities from the current epoch first
-	identities := setup.Participants
+	identities := setup.Participants.Copy()
 	lookup := identities.Lookup()
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
