@@ -169,7 +169,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentityList, error) {
-	n.Lock()
+	n.RLock()
 	defer n.Unlock()
 	top, err := n.topMngr.MakeTopology(n.ids)
 	if err != nil {
