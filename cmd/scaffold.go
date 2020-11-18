@@ -186,7 +186,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		// graph sampler
 		graphSampler, err := topology.NewLinearFanoutGraphSampler(fnb.NodeID)
 		if err != nil {
-			return nil, fmt.Errorf("could not graph sampler for topology: %w", err)
+			return nil, fmt.Errorf("could not create graph sampler for topology: %w", err)
 		}
 
 		// topology
