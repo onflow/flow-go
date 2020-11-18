@@ -46,10 +46,8 @@ func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 	if err != nil {
 		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve epoch status: %w", err)
 	}
-	if !status.Valid() {
-		return flow.EpochPhaseUndefined, fmt.Errorf("invalid epoch status")
-	}
-	return status.Phase(), nil
+	phase, err := status.Phase()
+	return phase, err
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
@@ -75,7 +73,10 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList
-	phase := status.Phase()
+	phase, err := status.Phase()
+	if err != nil {
+		return nil, fmt.Errorf("could not get phase: %w", err)
+	}
 	switch phase {
 	// during staking phase (the beginning of the epoch) we include identities
 	// from the previous epoch that are now un-staking
