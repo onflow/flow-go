@@ -20,5 +20,12 @@ func init() {
 func registers(*cobra.Command, []string) {
 	startTime := time.Now()
 
+	_, executionState, err := initStates()
+	if err != nil {
+		log.Fatal().Err(err).Msg("error loading execution state")
+	}
+
+	executionState.GetProof()
+
 	log.Info().Float64("total_time_s", time.Since(startTime).Seconds()).Msg("finished")
 }
