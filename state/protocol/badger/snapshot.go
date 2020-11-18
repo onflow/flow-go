@@ -86,9 +86,13 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		if err != nil {
 			return nil, fmt.Errorf("could not get first block of epoch: %w", err)
 		}
-		// parent ID may zero if the first block in this epoch is the root block
-		// in this case there are no previous epoch identities to check anyway
-		if first.ParentID == flow.ZeroID {
+		// check whether this is the first epoch after the root block - in this
+		// case there are no previous epoch identities to check anyway
+		root, err := s.state.Params().Root()
+		if err != nil {
+			return nil, fmt.Errorf("could not get root block: %w", err)
+		}
+		if first.Height == root.Height {
 			break
 		}
 
