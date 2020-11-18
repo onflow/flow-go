@@ -25,12 +25,11 @@ func NewNodeIDRefresher(logger zerolog.Logger, state protocol.ReadOnlyState, cal
 	}
 }
 
-func (listener *NodeIDRefresher) getLogger() zerolog.Logger {
+func (listener *NodeIDRefresher) getLogger(final protocol.Snapshot) zerolog.Logger {
 
 	log := listener.logger
 
 	// retrieve some contextual information for logging
-	final := listener.state.Final()
 	head, err := final.Head()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get finalized header")
@@ -52,12 +51,13 @@ func (listener *NodeIDRefresher) getLogger() zerolog.Logger {
 // to when the identity table changes in the protocol state.
 func (listener *NodeIDRefresher) OnIdentityTableChanged() {
 
-	log := listener.getLogger()
+	final := listener.state.Final()
+	log := listener.getLogger(final)
 
 	log.Info().Msg("updating network ids upon identity table change")
 
 	// get the new set of IDs
-	newIDs, err := IDsFromState(listener.state)
+	newIDs, err := final.Identities(NetworkingSetFilter)
 	if err != nil {
 		log.Err(err).Msg("failed to determine new identity table after identity table change")
 		return
@@ -73,10 +73,10 @@ func (listener *NodeIDRefresher) OnIdentityTableChanged() {
 	log.Info().Msg("successfully updated network ids upon identity table change")
 }
 
-// IDsFromState returns which nodes should be connected to based on the latest
-// finalized state. The protocol state includes nodes from the previous/next
-// epoch that should be included in network communication. We omit any nodes
-// that have been ejected.
-func IDsFromState(state protocol.ReadOnlyState) (flow.IdentityList, error) {
-	return state.Final().Identities(filter.Not(filter.Ejected))
-}
+// NetworkingSetFilter is an identity filter that, when applied to the identity
+// table at a given snapshot, returns all nodes that we should communicate with
+// over the networking layer.
+//
+// NOTE: The protocol state includes nodes from the previous/next epoch that should
+// be included in network communication. We omit any nodes that have been ejected.
+var NetworkingSetFilter = filter.Not(filter.Ejected)
