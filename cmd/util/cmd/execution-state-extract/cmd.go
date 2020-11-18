@@ -48,9 +48,6 @@ func init() {
 		"directory that stores the protocol state")
 	// _ = Cmd.MarkFlagRequired("datadir")
 
-	Cmd.Flags().StringVar(&flagChainID, "chainID", "main",
-		"chainID (main or test")
-	_ = Cmd.MarkFlagRequired("chainID")
 }
 
 func run(*cobra.Command, []string) {
@@ -84,20 +81,8 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment))
 
-	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, parseChainID(flagChainID))
+	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %w", err)
-	}
-}
-
-func parseChainID(chainID string) flow.ChainID {
-	switch chainID {
-	case "main":
-		return flow.Mainnet
-	case "test":
-		return flow.Testnet
-	default:
-		log.Fatal().Str("chain_id", chainID).Msg("invalid chain ID")
-		return ""
 	}
 }

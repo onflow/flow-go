@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,7 +18,7 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 	return commits.ByBlockID(blockHash)
 }
 
-func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger, chainID flow.ChainID) error {
+func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
 	led, err := complete.NewLedger(dir, 1000, &metrics.NoopCollector{}, log, nil, complete.DefaultPathFinderVersion)
 
@@ -27,7 +26,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 
 	newState, err := led.ExportCheckpointAt(targetHash,
 		[]ledger.Migration{migrations.NoOpMigration},
-		[]ledger.Reporter{reporters.NewBaseReporter(chainID)},
+		[]ledger.Reporter{},
 		complete.DefaultPathFinderVersion,
 		filePath)
 	if err != nil {
