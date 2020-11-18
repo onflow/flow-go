@@ -100,8 +100,10 @@ func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, 
 // over several number of systems each with specified number of nodes on each role.
 func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, col, con, exe, ver, cluster int) {
 	// creates a histogram to keep average fanout of nodes in systems
-	aveHist := thist.NewHist(nil, fmt.Sprintf("Average fanout for %d systems", system),
-		"fit", 10, false)
+	var aveHist *thist.Hist
+	if suite.printTrace() {
+		aveHist = thist.NewHist(nil, fmt.Sprintf("Average fanout for %d systems", system), "fit", 10, false)
+	}
 
 	for j := 0; j < system; j++ {
 		// adjacency map keeps graph component of a single channel ID
@@ -110,9 +112,11 @@ func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system,
 		// creates a flow system
 		state, ids, subMngrs := suite.generateSystem(acc, col, con, exe, ver, cluster)
 
-		// creates a fanout histogram for this system
-		systemHist := thist.NewHist(nil, fmt.Sprintf("System #%d fanout", j),
-			"auto", -1, false)
+		var systemHist *thist.Hist
+		if suite.printTrace() {
+			// creates a fanout histogram for this system
+			systemHist = thist.NewHist(nil, fmt.Sprintf("System #%d fanout", j), "auto", -1, false)
+		}
 
 		totalFanout := 0 // keeps summation of nodes' fanout for statistical reason
 
@@ -120,23 +124,25 @@ func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system,
 		for i, id := range ids {
 			fanout := suite.topologyScenario(id.NodeID, subMngrs[i], ids, state)
 			adjMap[id.NodeID] = fanout
-			systemHist.Update(float64(len(fanout)))
+
+			if suite.printTrace() {
+				systemHist.Update(float64(len(fanout)))
+			}
 			totalFanout += len(fanout)
 		}
 
-		if !suite.skip() {
+		if suite.printTrace() {
 			// prints fanout histogram of this system
 			fmt.Println(systemHist.Draw())
+			// keeps track of average fanout per node
+			aveHist.Update(float64(totalFanout) / float64(len(ids)))
 		}
-
-		// keeps track of average fanout per node
-		aveHist.Update(float64(totalFanout) / float64(len(ids)))
 
 		// checks end-to-end connectedness of the topology
 		topology.CheckConnectedness(suite.T(), adjMap, ids)
 	}
 
-	if !suite.skip() {
+	if suite.printTrace() {
 		fmt.Println(aveHist.Draw())
 	}
 }
@@ -165,8 +171,8 @@ func (suite *StatefulTopologyTestSuite) topologyScenario(me flow.Identifier,
 	return myFanout
 }
 
-// skip returns true if local environment variable AllNetworkTest is found.
-func (suite *StatefulTopologyTestSuite) skip() bool {
-	_, found := os.LookupEnv("AllNetworkTest")
+// printTrace returns true if local environment variable Trace is found.
+func (suite *StatefulTopologyTestSuite) printTrace() bool {
+	_, found := os.LookupEnv("Trace")
 	return found
 }
