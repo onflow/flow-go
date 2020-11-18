@@ -107,8 +107,8 @@ func main() {
 			return err
 		}).
 		Module("execution results mempool", func(node *cmd.FlowNodeBuilder) error {
-			results = stdmap.NewIncorporatedResults(resultLimit)
-			return nil
+			results, err = stdmap.NewIncorporatedResults(resultLimit)
+			return err
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			receipts, err = stdmap.NewReceipts(receiptLimit)

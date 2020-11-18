@@ -138,7 +138,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	orderedPayloads := make([]*ledger.Payload, len(r.Paths))
 	for i, p := range sortedPaths {
 		for _, j := range pathOrgIndex[string(p)] {
-			orderedPayloads[j] = payloads[i]
+			orderedPayloads[j] = payloads[i].DeepCopy()
 			totalPayloadSize += payloads[i].Size()
 		}
 	}
