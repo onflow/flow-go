@@ -27,16 +27,40 @@ func TestStatefulTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(StatefulTopologyTestSuite))
 }
 
-func (suite *StatefulTopologyTestSuite) TestSingleSystemLowScale() {
+// TestLowScale creates systems with
+// 10 access nodes
+// 100 collection nodes in 4 clusters
+// 120 consensus nodes
+// 5 execution nodes
+// 100 verification nodes
+// and builds a stateful topology for the systems.
+// For each system, it then checks the end-to-end connectedness of the topology graph.
+func (suite *StatefulTopologyTestSuite) TestLowScale() {
 	suite.multiSystemEndToEndConnectedness(1, 10, 100, 120, 5, 100, 4)
 }
 
+// TestModerateScale creates systems with
+// 20 access nodes
+// 200 collection nodes in 8 clusters
+// 240 consensus nodes
+// 10 execution nodes
+// 100 verification nodes
+// and builds a stateful topology for the systems.
+// For each system, it then checks the end-to-end connectedness of the topology graph.
 func (suite *StatefulTopologyTestSuite) TestModerateScale() {
 	suite.multiSystemEndToEndConnectedness(1, 20, 200, 240, 10, 200, 8)
 }
 
+// TestHighScale creates systems with
+// 40 access nodes
+// 400 collection nodes in 16 clusters
+// 480 consensus nodes
+// 20 execution nodes
+// 400 verification nodes
+// and builds a stateful topology for the systems.
+// For each system, it then checks the end-to-end connectedness of the topology graph.
 func (suite *StatefulTopologyTestSuite) TestHighScale() {
-	suite.multiSystemEndToEndConnectedness(200, 40, 400, 480, 20, 400, 16)
+	suite.multiSystemEndToEndConnectedness(1, 40, 400, 480, 20, 400, 16)
 }
 
 // generateSystem is a test helper that given number of nodes per role as well as desire number of clusters
