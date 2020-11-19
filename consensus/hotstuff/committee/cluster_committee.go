@@ -3,6 +3,7 @@ package committee
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -96,4 +97,8 @@ func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
 
 func (c *Cluster) Self() flow.Identifier {
 	return c.me
+}
+
+func (c *Cluster) DKG(_ flow.Identifier) (hotstuff.DKG, error) {
+	panic("queried DKG of cluster committee")
 }
