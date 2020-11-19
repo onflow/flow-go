@@ -15,12 +15,10 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committee"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state"
 	protomock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -72,29 +70,12 @@ func (as *AggregatorSuite) SetupTest() {
 	as.forks = &mocks.Forks{}
 
 	rootHeader := &flow.Header{}
-
-	sig1 := make([]byte, 32)
-	rand.Read(sig1[:])
-	sig2 := make([]byte, 32)
-	rand.Read(sig2[:])
-	c := &signature.Combiner{}
-	combined, err := c.Join(sig1, sig2)
-	require.NoError(as.T(), err)
-
-	rootQC := &flow.QuorumCertificate{
-		View:      rootHeader.View,
-		BlockID:   rootHeader.ID(),
-		SignerIDs: nil,
-		SigData:   combined,
-	}
-
 	as.MockProtocolByBlockID(rootHeader.ID())
 
-	// initialize and pre-generate leader selections from the seed
-	selection, err := leader.NewSelectionForConsensus(10000, rootHeader, rootQC, as.protocol)
-	require.NoError(as.T(), err)
 	// create hotstuff.Committee
-	as.committee, err = committee.NewMainConsensusCommitteeState(as.protocol, as.participants[0].NodeID, selection)
+	// TODO update protocol state mock
+	var err error
+	as.committee, err = committee.NewConsensusCommittee(as.protocol, as.participants[0].NodeID)
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals

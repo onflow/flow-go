@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committee"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -200,12 +199,8 @@ func createNode(
 
 	rootHeader := root.Header
 
-	// initialize and pre-generate leader selections from the seed
-	selection, err := leader.NewSelectionForConsensus(10000, rootHeader, rootQC, state)
-	require.NoError(t, err)
-
 	// selector := filter.HasRole(flow.RoleConsensus)
-	com, err := committee.NewMainConsensusCommitteeState(state, localID, selection)
+	com, err := committee.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
 
 	// initialize the block finalizer
