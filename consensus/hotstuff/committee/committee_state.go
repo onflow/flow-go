@@ -131,6 +131,7 @@ func (c *Committee) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
 //
 // While you can use this constructor to generate a committee state for the main consensus,
 // the function `NewMainConsensusCommitteeState` provides a more concise API.
+// TODO remove
 func New(
 	protocolState protocol.State,
 	blockTranslator BlockTranslator,
@@ -156,6 +157,7 @@ func New(
 //
 // For constructing committees for other HotStuff instances (such as collector HotStuff instances), please use the
 // generic `New` function.
+// TODO remove
 func NewMainConsensusCommitteeState(protocolState protocol.State, myID flow.Identifier, leaderSelection *LeaderSelection) (hotstuff.Committee, error) {
 
 	// finding all consensus members
