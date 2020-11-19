@@ -29,8 +29,9 @@ type hostEnv struct {
 
 	runtime.Metrics
 
-	events []flow.Event
-	logs   []string
+	events             []flow.Event
+	totalEventByteSize uint32
+	logs               []string
 
 	transactionEnv *transactionEnv
 	rng            *rand.Rand
@@ -47,12 +48,13 @@ func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{
-		ctx:              ctx,
-		ledger:           ledger,
-		Metrics:          &noopMetricsCollector{},
-		accounts:         accounts,
-		addressGenerator: generator,
-		uuidGenerator:    uuidGenerator,
+		ctx:                ctx,
+		ledger:             ledger,
+		Metrics:            &noopMetricsCollector{},
+		accounts:           accounts,
+		addressGenerator:   generator,
+		uuidGenerator:      uuidGenerator,
+		totalEventByteSize: uint32(0),
 	}
 
 	if ctx.BlockHeader != nil {
@@ -74,7 +76,7 @@ func (e *hostEnv) seedRNG(header *flow.Header) {
 	e.rng = rand.New(source)
 }
 
-func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
+func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, txIndex uint32) {
 	e.transactionEnv = newTransactionEnv(
 		vm,
 		e.ctx,
@@ -82,6 +84,7 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
 		e.accounts,
 		e.addressGenerator,
 		tx,
+		txIndex,
 	)
 }
 
@@ -185,12 +188,13 @@ func (e *hostEnv) EmitEvent(event cadence.Event) {
 		panic("failed to encode event")
 	}
 
+	e.totalEventByteSize += uint32(len(payload))
 	// TODO limit size
 
 	flowEvent := flow.Event{
 		Type:             flow.EventType(event.EventType.ID()),
-		TransactionID:    e.transactionEnv.ID,
-		TransactionIndex: e.transactionEnv.TxIndex,
+		TransactionID:    e.transactionEnv.TxID(),
+		TransactionIndex: e.transactionEnv.TxIndex(),
 		EventIndex:       uint32(len(e.events)),
 		Payload:          payload,
 	}
@@ -375,6 +379,7 @@ type transactionEnv struct {
 
 	tx          *flow.TransactionBody
 	txIndex     uint32
+	txID        flow.Identifier
 	authorizers []runtime.Address
 }
 
@@ -395,6 +400,7 @@ func newTransactionEnv(
 		addressGenerator: addressGenerator,
 		tx:               tx,
 		txIndex:          txIndex,
+		txID:             tx.ID(),
 	}
 }
 
@@ -408,6 +414,14 @@ func (e *transactionEnv) GetSigningAccounts() []runtime.Address {
 	}
 
 	return e.authorizers
+}
+
+func (e *transactionEnv) TxIndex() uint32 {
+	return e.txIndex
+}
+
+func (e *transactionEnv) TxID() flow.Identifier {
+	return e.txID
 }
 
 func (e *transactionEnv) GetComputationLimit() uint64 {

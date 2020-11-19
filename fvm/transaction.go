@@ -63,7 +63,7 @@ func (i *TransactionInvocator) Process(
 	if err != nil {
 		return err
 	}
-	env.setTransaction(vm, proc.Transaction)
+	env.setTransaction(vm, proc.Transaction, proc.TxIndex)
 
 	location := runtime.TransactionLocation(proc.ID[:])
 
