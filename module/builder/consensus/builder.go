@@ -476,59 +476,53 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 	finalID flow.Identifier,
 	finalHeight uint64) ([]*flow.ExecutionReceipt, error) {
 
-	var sealedHeight uint64
-	err := b.db.View(operation.RetrieveSealedHeight(&sealedHeight))
+	// Get the latest sealed block on this fork, ie the highest block for which
+	// there is a seal in this fork. This block is not necessarily finalized.
+	last, err := b.seals.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could no retrieve sealed height: %w", err)
+		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
+	}
+	sealed, err := b.headers.ByBlockID(last.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
 	}
 
 	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
 	// use it to skip receipts that are not for blocks in the fork.
 	forkBlocks := make(map[flow.Identifier]struct{})
 
-	// Create a lookup table of all the receipts that are already inserted in
-	// finalized unsealed blocks. This will be used to filter out duplicates.
-	finalLookup := make(map[flow.Identifier]struct{})
-	for height := sealedHeight + 1; height <= finalHeight; height++ {
+	// lookup is a lookup table of all the receipts that are contained in
+	// unsealed blocks along the fork. The map tracks the receipt ID and the
+	// height of the block that contains it.
+	lookup := make(map[flow.Identifier]uint64)
 
-		header, err := b.headers.ByHeight(height)
-		if err != nil {
-			return nil, fmt.Errorf("could not get block for height (%d): %w", height, err)
-		}
-
-		index, err := b.index.ByBlockID(header.ID())
-		if err != nil {
-			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", header.ID(), err)
-		}
-
-		forkBlocks[header.ID()] = struct{}{}
-
-		for _, recID := range index.ReceiptIDs {
-			finalLookup[recID] = struct{}{}
-		}
-	}
-
-	// iterate through pending blocks, from parent to final, and keep track of
-	// the receipts already recorded in those blocks.
+	// Walk backwards through the fork, from parent to last sealed block
+	// (excluded), and keep track of the receipts that are contained in those
+	// blocks.
 	ancestorID := parentID
-	pendingLookup := make(map[flow.Identifier]struct{})
-	for ancestorID != finalID {
-		forkBlocks[ancestorID] = struct{}{}
+	for {
 
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-		if ancestor.Height <= finalHeight {
-			return nil, fmt.Errorf("should always build on last finalized block")
+
+		// stop when we encounter the last sealed block
+		if ancestor.Height <= sealed.Height {
+			break
 		}
+
+		forkBlocks[ancestorID] = struct{}{}
+
 		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
+
 		for _, recID := range index.ReceiptIDs {
-			pendingLookup[recID] = struct{}{}
+			lookup[recID] = ancestor.Height
 		}
+
 		ancestorID = ancestor.ParentID
 	}
 
@@ -550,32 +544,29 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 
 		// check whether receipt is for block at or below the sealed and
 		// finalized height
-		if h.Height <= sealedHeight {
+		if h.Height <= sealed.Height {
 			// Block has either already been sealed and finalized  _or_
 			// block is a _sibling_ of a sealed and finalized block.
 			// In either case, we don't need to seal the block anymore
 			// and therefore can discard any ExecutionResults for it.
-			_ = b.recPool.Rem(receipt.ID())
 			continue
 		}
 
-		// if the receipt is already included in a finalized block, remove from
-		// mempool and continue.
-		_, ok := finalLookup[receipt.ID()]
+		// skip receipts that are already included in a block on this fork
+		containingBlockHeight, ok := lookup[receipt.ID()]
 		if ok {
-			_ = b.recPool.Rem(receipt.ID())
+			// if the block that contains the receipt is finalized, remove the
+			// receipt from the mempool
+			if containingBlockHeight <= finalHeight {
+				_ = b.recPool.Rem(receipt.ID())
+			}
+			// if the block is not finalized, skip the receipt but don't remove
+			// it from the mempool
 			continue
 		}
 
-		// if the receipt is already included in a pending block, continue, but
-		// don't remove from mempool.
-		_, ok = pendingLookup[receipt.ID()]
-		if ok {
-			continue
-		}
-
-		// if the receipt is not for a block on this fork, continue, but don't
-		// remove from mempool
+		// skip the receipt if it is not for a block on this fork, but don't
+		// remove it from the mempool
 		if _, ok := forkBlocks[receipt.ExecutionResult.BlockID]; !ok {
 			continue
 		}
