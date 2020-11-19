@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -517,9 +518,11 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	return last, nil
 }
 
-// receiptExtend checks the compliance of the receipt payload. Receipts should
-// correspond to blocks on the fork, should not appear more than once on a fork,
-// and should be sorted by block height (within a payload).
+// receiptExtend checks the compliance of the receipt payload. Receipts should:
+//   * pertain to blocks on the fork
+//   * should not appear more than once on a fork,
+//   * no seal has been included for the respective block in this particular fork
+// We require the receipts to be sorted by block height (within a payload).
 func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	blockID := candidate.ID()
 	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
@@ -528,18 +531,24 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	header := candidate.Header
 	payload := candidate.Payload
 
-	var sealedHeight uint64
-	err := m.state.db.View(operation.RetrieveSealedHeight(&sealedHeight))
+	// Get the latest sealed block on this fork, ie the highest block for which
+	// there is a seal in this fork. This block is not necessarily finalized.
+	last, err := m.state.seals.ByBlockID(header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could no retrieve sealed height: %w", err)
+		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
+	sealed, err := m.state.headers.ByBlockID(last.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+	}
+	sealedHeight := sealed.Height
 
 	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
-	// use it to skip receipts that are not for blocks in the fork.
-	forkBlocks := make(map[flow.Identifier]struct{})
+	// use it to identify receipts that are for blocks not in the fork.
+	forkBlocks := make(map[flow.Identifier]*flow.Header)
 
 	// Create a lookup table of all the receipts that are already in blocks.
-	// This will be used to filter out duplicates.
+	// This will be used to identify duplicate receipts.
 	lookup := make(map[flow.Identifier]struct{})
 
 	// loop through the fork backwards, from parent to last sealed, and keep
@@ -547,13 +556,18 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	ancestorID := header.ParentID
 	for {
 
-		// keep track of blocks we iterate over
-		forkBlocks[ancestorID] = struct{}{}
-
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
 		}
+
+		// break out when we reach the sealed height
+		if ancestor.Height <= sealedHeight {
+			break
+		}
+
+		// keep track of blocks we iterate over
+		forkBlocks[ancestorID] = ancestor
 
 		index, err := m.state.index.ByBlockID(ancestorID)
 		if err != nil {
@@ -563,11 +577,6 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 		// keep track of all receipts we iterate over
 		for _, recID := range index.ReceiptIDs {
 			lookup[recID] = struct{}{}
-		}
-
-		// break out when we reach the sealed height
-		if ancestor.Height <= sealedHeight {
-			break
 		}
 
 		ancestorID = ancestor.ParentID
@@ -581,44 +590,54 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	// check each receipt included in the payload for duplication
 	for _, receipt := range payload.Receipts {
 
-		// if the receipt was already included before, error
-		_, duplicated := lookup[receipt.ID()]
-		if duplicated {
-			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
-		}
-
-		// if the receipt is not for a block on this fork, error
-		if _, ok := forkBlocks[receipt.ExecutionResult.BlockID]; !ok {
-			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
-		}
-
-		// get the reference block to check expiry
-		h, err := m.state.headers.ByBlockID(receipt.ExecutionResult.BlockID)
+		valid, err := IsValidReceipt(receipt, lookup, forkBlocks, prevReceiptHeight)
 		if err != nil {
-			return fmt.Errorf("could not get reference block (%x): %w", receipt.ExecutionResult.BlockID, err)
+			return fmt.Errorf("could not check validity of Execution Receipt %v: %w", receipt.ID(), err)
+		}
+		if !valid {
+			return state.NewInvalidExtensionErrorf("payload includes invalid receipt (%x)", receipt.ID())
 		}
 
-		// check whether receipt is for block at or below the sealed and
-		// finalized height
-		if h.Height <= sealedHeight {
-			// Block has either already been sealed and finalized  _or_
-			// block is a _sibling_ of a sealed and finalized block.
-			// In either case, it's an error
-			return state.NewInvalidExtensionErrorf("payload includes receipt for block below sealed height (%x) (%d/%d)",
-				receipt.ExecutionResult.BlockID,
-				h.Height,
-				sealedHeight)
-		}
-
-		// check receipts are sorted by block height
-		if h.Height < prevReceiptHeight {
-			return state.NewInvalidExtensionError("payload receipts should be sorted by block height")
-		}
-
-		prevReceiptHeight = h.Height
+		// at this point we know that forkBlocks contains the receipt's block
+		// because otherwise the receipt wouldn't be valid and the function
+		// would have already errored-out
+		prevReceiptHeight = forkBlocks[receipt.ExecutionResult.BlockID].Height
 	}
 
 	return nil
+}
+
+// IsValidReceipt checks the validity of a receipt against the following
+// criteria:
+// * the receipt IS NOT in receiptLookup
+// * the receipt's block IS in blockLookup
+// * the receipt's block is higher than minHeight
+func IsValidReceipt(receipt *flow.ExecutionReceipt,
+	receiptLookup map[flow.Identifier]struct{},
+	blockLookup map[flow.Identifier]*flow.Header,
+	minHeight uint64) (bool, error) {
+
+	// if the receipt was already included before, error
+	_, duplicated := receiptLookup[receipt.ID()]
+	if duplicated {
+		log.Debug().Msgf("payload includes duplicate receipt (%x)", receipt.ID())
+		return false, nil
+	}
+
+	// if the receipt is not for a block on this fork, error
+	header, ok := blockLookup[receipt.ExecutionResult.BlockID]
+	if !ok {
+		log.Debug().Msgf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
+		return false, nil
+	}
+
+	// check receipts are sorted by block height
+	if header.Height < minHeight {
+		log.Debug().Msg("payload receipts should be sorted by block height")
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // finding the last sealed block on the chain of which the given block is extending
