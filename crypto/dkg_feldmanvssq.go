@@ -188,8 +188,7 @@ func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
 	}
 
 	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig,
-			wrongFormat+"received message is empty")
+		s.processor.FlagMisbehavior(orig, "received message is empty")
 		return nil
 	}
 
@@ -215,8 +214,8 @@ func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
 		s.receiveComplaintAnswer(index(orig), msg[1:])
 	default:
 		s.processor.FlagMisbehavior(orig,
-			fmt.Sprintf("%s invalid message header, got %d",
-				wrongFormat, dkgMsgTag(msg[0])))
+			fmt.Sprintf("invalid message header, got %d",
+				dkgMsgTag(msg[0])))
 	}
 	return nil
 }
@@ -276,7 +275,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 	// check the share timeout
 	if s.sharesTimeout {
 		s.processor.FlagMisbehavior(int(origin),
-			wrongProtocol+"private share is received after the shares timeout")
+			"private share is received after the shares timeout")
 		return
 	}
 	// only accept private shares from the leader.
@@ -286,13 +285,13 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 
 	if s.xReceived {
 		s.processor.FlagMisbehavior(int(origin),
-			duplicated+"private share was already received")
+			"private share was already received")
 		return
 	}
 	if (len(data)) != shareSize {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("%s invalid share size, expects %d, got %d",
-				wrongFormat, shareSize, len(data)))
+			fmt.Sprintf("invalid share size, expects %d, got %d",
+				shareSize, len(data)))
 		return
 	}
 	// read the node private share
@@ -321,7 +320,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	// check the share timeout
 	if s.sharesTimeout {
 		s.processor.FlagMisbehavior(int(origin),
-			wrongProtocol+"verification vector received after the shares timeout")
+			"verification vector received after the shares timeout")
 		return
 	}
 
@@ -332,13 +331,13 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 
 	if s.vAReceived {
 		s.processor.FlagMisbehavior(int(origin),
-			duplicated+"verification received was already received")
+			"verification received was already received")
 		return
 	}
 	if len(data) != verifVectorSize*(s.threshold+1) {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("%s invalid verification vector size, expects %d, got %d",
-				wrongFormat, verifVectorSize*(s.threshold+1), len(data)))
+			fmt.Sprintf("invalid verification vector size, expects %d, got %d",
+				verifVectorSize*(s.threshold+1), len(data)))
 		return
 	}
 	// read the verification vector
@@ -346,8 +345,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	err := readVerifVector(s.vA, data)
 	if err != nil {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("%s reading the verification vector failed:%w",
-				wrongFormat, err))
+			fmt.Sprintf("reading the verification vector failed:%w", err))
 		return
 	}
 
@@ -398,7 +396,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 	// check the complaints timeout
 	if s.complaintsTimeout {
 		s.processor.FlagMisbehavior(int(origin),
-			wrongProtocol+"complaint received after the complaint timeout")
+			"complaint received after the complaint timeout")
 		return
 	}
 
@@ -408,8 +406,8 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 
 	if len(data) != complaintSize {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("%s invalid complaint size, expects %d, got %d",
-				wrongFormat, complaintSize, len(data)))
+			fmt.Sprintf("invalid complaint size, expects %d, got %d",
+				complaintSize, len(data)))
 		return
 	}
 
@@ -443,7 +441,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 	// check if the complain has been already received
 	if c.received {
 		s.processor.FlagMisbehavior(int(origin),
-			duplicated+"complaint was already received")
+			"complaint was already received")
 		return
 	}
 	c.received = true
@@ -467,8 +465,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	}
 
 	if len(data) == 0 {
-		s.processor.FlagMisbehavior(int(origin),
-			wrongFormat+"complaint answer is empty")
+		s.processor.FlagMisbehavior(int(origin), "complaint answer is empty")
 		return
 	}
 
@@ -476,8 +473,8 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	complainer := index(data[0])
 	if int(complainer) >= s.size {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("%s complainer value is invalid, should be less that %d, got %d",
-				wrongFormat, s.size, int(complainer)))
+			fmt.Sprintf("complainer value is invalid, should be less that %d, got %d",
+				s.size, int(complainer)))
 		return
 	}
 
@@ -507,7 +504,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	// check if the answer has been already received
 	if c.answerReceived {
 		s.processor.FlagMisbehavior(int(origin),
-			duplicated+"complaint answer was already received")
+			"complaint answer was already received")
 		return
 	}
 

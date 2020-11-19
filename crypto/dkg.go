@@ -157,9 +157,3 @@ type DKGProcessor interface {
 	// log describes the misbehavior.
 	FlagMisbehavior(node int, log string)
 }
-
-const (
-	wrongFormat   = "wrong message format:"
-	duplicated    = "message type is duplicated:"
-	wrongProtocol = "message is not compliant with the protocol:"
-)

@@ -144,8 +144,7 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	}
 
 	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig,
-			wrongFormat+"the received message is empty")
+		s.processor.FlagMisbehavior(orig, "the received message is empty")
 		return nil
 	}
 
@@ -163,8 +162,8 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 		s.receiveVerifVector(index(orig), msg[1:])
 	default:
 		s.processor.FlagMisbehavior(orig,
-			fmt.Sprintf("%s the message header is invalid, got %d",
-				wrongFormat, dkgMsgTag(msg[0])))
+			fmt.Sprintf("the message header is invalid, got %d",
+				dkgMsgTag(msg[0])))
 	}
 	return nil
 }
@@ -242,15 +241,14 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	}
 
 	if s.xReceived {
-		s.processor.FlagMisbehavior(int(origin),
-			duplicated+"private share was already received")
+		s.processor.FlagMisbehavior(int(origin), "private share was already received")
 		return
 	}
 
 	if (len(data)) != shareSize {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("%s invalid share size, expects %d, got %d",
-				wrongFormat, shareSize, len(data)))
+			fmt.Sprintf("invalid share size, expects %d, got %d",
+				shareSize, len(data)))
 		return
 	}
 
@@ -274,13 +272,13 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	}
 	if s.vAReceived {
 		s.processor.FlagMisbehavior(int(origin),
-			duplicated+"verification vector was already received")
+			"verification vector was already received")
 		return
 	}
 	if verifVectorSize*(s.threshold+1) != len(data) {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("%s invalid verification vector size, expects %d, got %d",
-				wrongFormat, verifVectorSize*(s.threshold+1), len(data)))
+			fmt.Sprintf("invalid verification vector size, expects %d, got %d",
+				verifVectorSize*(s.threshold+1), len(data)))
 		return
 	}
 	// read the verification vector
@@ -288,8 +286,8 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	err := readVerifVector(s.vA, data)
 	if err != nil {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("%s reading the verification vector failed: %w",
-				wrongFormat, err))
+			fmt.Sprintf("reading the verification vector failed: %w",
+				err))
 		return
 	}
 
