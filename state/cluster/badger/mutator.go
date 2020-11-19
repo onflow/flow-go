@@ -105,6 +105,12 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.clusterID)
 		}
 
+		// check for a specified reference block
+		// we also implicitly check this later, but can fail fast here
+		if payload.ReferenceBlockID == flow.ZeroID {
+			return state.NewInvalidExtensionError("new block has empty reference block ID")
+		}
+
 		// get the chain ID, which determines which cluster state to query
 		chainID := header.ChainID
 
