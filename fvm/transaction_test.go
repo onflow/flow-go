@@ -112,13 +112,11 @@ func TestTopShotSafety(t *testing.T) {
 						ImportLocation: ast.AddressLocation(topShotContractAddress.Bytes()),
 					}},
 				},
-				RuntimeStorage: nil,
-				Functions:      nil,
-				Code:           []byte("tx_code"),
-				Location:       nil,
-				Options:        nil,
-				UseCache:       false,
-				Checker:        nil,
+				Code:     []byte("tx_code"),
+				Location: nil,
+				Options:  nil,
+				UseCache: false,
+				Checker:  nil,
 			},
 		}
 
