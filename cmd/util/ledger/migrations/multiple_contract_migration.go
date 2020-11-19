@@ -1,7 +1,9 @@
 package migrations
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/fxamacker/cbor/v2"
 	"sort"
 	"strings"
 
@@ -68,6 +70,41 @@ func keyToRegisterId(key ledger.Key) (flow.RegisterID, error) {
 	}
 
 	return flow.NewRegisterID(string(key.KeyParts[0].Value), string(key.KeyParts[1].Value), string(key.KeyParts[2].Value)), nil
+}
+
+func createContractNamesKey(originalKey ledger.Key) ledger.Key {
+	return ledger.Key{
+		KeyParts: []ledger.KeyPart{
+			originalKey.KeyParts[0],
+			originalKey.KeyParts[1],
+			{
+				Type:  state.KeyPartKey,
+				Value: []byte("contract_names"),
+			},
+		},
+	}
+}
+
+func encodeContractNames(contractNames []string) ([]byte, error) {
+	sort.Strings(contractNames)
+	var buf bytes.Buffer
+	cborEncoder := cbor.NewEncoder(&buf)
+	err := cborEncoder.Encode(contractNames)
+	if err != nil {
+		return nil, fmt.Errorf("cannot encode contract names")
+	}
+	return buf.Bytes(), nil
+}
+
+func contractsRegister(contractsKey ledger.Key, contractNames []string) (ledger.Payload, error) {
+	encodedContract, err := encodeContractNames(contractNames)
+	if err != nil {
+		return ledger.Payload{}, err
+	}
+	return ledger.Payload{
+		Key:   createContractNamesKey(contractsKey),
+		Value: encodedContract,
+	}, nil
 }
 
 func migrateRegister(p ledger.Payload, cache map[string]struct{}, logger zerolog.Logger) ([]ledger.Payload, error) {
@@ -170,7 +207,11 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 			Str("address", address.Hex()).
 			Msg("Single contract or interface at address moved to new key")
 		p.Key = addNameToKey(p.Key, declarations[0].DeclarationIdentifier().Identifier)
-		return []ledger.Payload{p}, nil
+		contractsRegister, err := contractsRegister(p.Key, []string{declarations[0].DeclarationIdentifier().Identifier})
+		if err != nil {
+			return nil, err
+		}
+		return []ledger.Payload{p, contractsRegister}, nil
 	case 2:
 		// We have two declarations. Due to the current rules one of them is an interface and one is a contract.
 		// the contract will need an import to the interface.
@@ -224,6 +265,11 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 
 		interfaceKey := addNameToKey(p.Key, interfaceDeclaration.DeclarationIdentifier().Identifier)
 		contractKey := addNameToKey(p.Key, contractDeclaration.DeclarationIdentifier().Identifier)
+
+		contractsRegister, err := contractsRegister(p.Key, []string{declarations[0].DeclarationIdentifier().Identifier, declarations[0].DeclarationIdentifier().Identifier})
+		if err != nil {
+			return nil, err
+		}
 		return []ledger.Payload{
 			{
 				Key:   interfaceKey,
@@ -232,6 +278,7 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 				Key:   contractKey,
 				Value: []byte(contractCode),
 			},
+			contractsRegister,
 		}, nil
 	default:
 		l.Error().

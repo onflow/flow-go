@@ -201,7 +201,7 @@ func TestMultipleContractMigration(t *testing.T) {
 
 		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
-		require.Len(t, migrated, 1)
+		require.Len(t, migrated, 2)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.Test")
 		require.Equal(t, string(migrated[0].Value), contract)
 	})
@@ -223,7 +223,7 @@ func TestMultipleContractMigration(t *testing.T) {
 
 		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
-		require.Len(t, migrated, 1)
+		require.Len(t, migrated, 2)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.Test")
 		require.Equal(t, string(migrated[0].Value), contract)
 	})
@@ -318,7 +318,7 @@ func TestMultipleContractMigration(t *testing.T) {
 
 		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
-		require.Len(t, migrated, 2)
+		require.Len(t, migrated, 3)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
 		require.Equal(t, string(migrated[0].Value), expectedInterfaceCode)
 		require.Equal(t, string(migrated[1].Key.KeyParts[2].Value), "code.Test")
@@ -359,7 +359,7 @@ func TestMultipleContractMigration(t *testing.T) {
 
 		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
-		require.Len(t, migrated, 2)
+		require.Len(t, migrated, 3)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
 		require.Equal(t, string(migrated[0].Value), expectedInterfaceCode)
 		require.Equal(t, string(migrated[1].Key.KeyParts[2].Value), "code.Test")
@@ -413,7 +413,7 @@ func TestMultipleContractMigration(t *testing.T) {
 
 		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
-		require.Len(t, migrated, 2)
+		require.Len(t, migrated, 3)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
 		require.Equal(t, string(migrated[0].Value), expectedInterfaceCode)
 		require.Equal(t, string(migrated[1].Key.KeyParts[2].Value), "code.Test")
@@ -489,7 +489,7 @@ import ITest from %s
 
 		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
-		require.Len(t, migrated, 2)
+		require.Len(t, migrated, 3)
 		require.Equal(t, string(migrated[1].Key.KeyParts[2].Value), "code.Test")
 		require.Equal(t, string(migrated[1].Value), expectedContractCode)
 		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "code.ITest")
