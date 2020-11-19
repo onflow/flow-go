@@ -8,10 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/indices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -65,6 +67,22 @@ func (as *AggregatorSuite) SetupTest() {
 	// create a mocked protocol state
 	as.protocol = &protomock.State{}
 	as.protocol.On("Final").Return(as.snapshot)
+
+	// mock out epoch, used for leader selection
+	epochs := &protomock.EpochQuery{}
+	epoch := &protomock.Epoch{}
+	as.snapshot.On("Epochs").Return(epochs)
+	epochs.On("Current").Return(epoch)
+	epoch.On("Counter").Return(uint64(1), nil)
+	epoch.On("InitialIdentities").Return(as.participants, nil)
+	var params []interface{}
+	for _, param := range indices.ProtocolConsensusLeaderSelection {
+		params = append(params, param)
+	}
+	seed := unittest.SeedFixture(32)
+	epoch.On("Seed", params...).Return(seed, nil)
+	epoch.On("FirstView").Return(uint64(0), nil)
+	epoch.On("FinalView").Return(uint64(1000), nil)
 
 	// create a mocked forks
 	as.forks = &mocks.Forks{}

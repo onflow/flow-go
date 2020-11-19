@@ -27,7 +27,8 @@ func (es *SetupEpoch) Counter() (uint64, error) {
 }
 
 func (es *SetupEpoch) FirstView() (uint64, error) {
-	panic("TODO")
+	// TODO
+	return 0, nil
 }
 
 func (es *SetupEpoch) FinalView() (uint64, error) {
