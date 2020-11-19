@@ -3,7 +3,7 @@ package leader
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/indices"
@@ -13,7 +13,7 @@ import (
 // SelectionForEpoch pre-computes and returns leaders for the consensus committee
 // in the given epoch.
 // TODO: this should replace the consensus.go in this package
-func SelectionForEpoch(epoch protocol.Epoch) (*committee.LeaderSelection, error) {
+func SelectionForEpoch(epoch protocol.Epoch) (*committees.LeaderSelection, error) {
 
 	// pre-compute leader selection for the epoch
 	identities, err := epoch.InitialIdentities()
@@ -32,7 +32,7 @@ func SelectionForEpoch(epoch protocol.Epoch) (*committee.LeaderSelection, error)
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch final view: %w", err)
 	}
-	leaders, err := committee.ComputeLeaderSelectionFromSeed(
+	leaders, err := committees.ComputeLeaderSelectionFromSeed(
 		firstView,
 		seed,
 		int(finalView-firstView+1), // add 1 because both first/final view are inclusive
@@ -43,7 +43,7 @@ func SelectionForEpoch(epoch protocol.Epoch) (*committee.LeaderSelection, error)
 
 // SelectionForCluster pre-computes and returns leaders for the given cluster
 // committee in the given epoch.
-func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*committee.LeaderSelection, error) {
+func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*committees.LeaderSelection, error) {
 
 	// sanity check to ensure the cluster and epoch match
 	counter, err := epoch.Counter()
@@ -61,7 +61,7 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*commi
 	firstView := cluster.RootBlock().Header.View
 	// TODO what is a good value here?
 	finalView := firstView + EstimatedSixMonthOfViews
-	leaders, err := committee.ComputeLeaderSelectionFromSeed(
+	leaders, err := committees.ComputeLeaderSelectionFromSeed(
 		firstView,
 		seed,
 		int(finalView-firstView+1),

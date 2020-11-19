@@ -1,5 +1,5 @@
 // (c) 2020 Dapper Labs - ALL RIGHTS RESERVED
-package committee
+package committees
 
 import (
 	"fmt"

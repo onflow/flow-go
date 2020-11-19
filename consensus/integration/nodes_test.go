@@ -13,7 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -200,7 +200,7 @@ func createNode(
 	rootHeader := root.Header
 
 	// selector := filter.HasRole(flow.RoleConsensus)
-	com, err := committee.NewConsensusCommittee(state, localID)
+	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
 
 	// initialize the block finalizer
@@ -226,7 +226,7 @@ func createNode(
 	pending := []*flow.Header{}
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		com, build, final, persist, signer, comp, rootHeader,
+		committee, build, final, persist, signer, comp, rootHeader,
 		rootQC, rootHeader, pending, consensus.WithInitialTimeout(hotstuffTimeout), consensus.WithMinTimeout(hotstuffTimeout))
 
 	require.NoError(t, err)

@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
@@ -70,15 +70,17 @@ func (f *HotStuffFactory) Create(
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
 	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
-	clusterCommittee, err := committee.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
+	var committee hotstuff.Committee
+	var err error
+	committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster committee: %w", err)
 	}
-	clusterCommittee = committee.NewMetricsWrapper(clusterCommittee, metrics) // wrapper for measuring time spent determining consensus committee relations
+	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
 	staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, f.me)
-	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(clusterCommittee, staking, f.me.NodeID())
+	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(committee, staking, f.me.NodeID())
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	persist := persister.New(f.db, cluster.ChainID())
@@ -93,14 +95,14 @@ func (f *HotStuffFactory) Create(
 		notifier,
 		metrics,
 		headers,
-		clusterCommittee,
+		committee,
 		builder,
 		updater,
 		persist,
 		signer,
 		communicator,
-		rootHeader,
-		rootQC,
+		cluster.RootBlock().Header,
+		cluster.RootQC(),
 		finalized,
 		pending,
 		f.opts...,

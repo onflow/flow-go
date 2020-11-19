@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -75,7 +75,7 @@ func (as *AggregatorSuite) SetupTest() {
 	// create hotstuff.Committee
 	// TODO update protocol state mock
 	var err error
-	as.committee, err = committee.NewConsensusCommittee(as.protocol, as.participants[0].NodeID)
+	as.committee, err = committees.NewConsensusCommittee(as.protocol, as.participants[0].NodeID)
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
