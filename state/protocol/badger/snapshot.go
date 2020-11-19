@@ -46,10 +46,8 @@ func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 	if err != nil {
 		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve epoch status: %w", err)
 	}
-	if !status.Valid() {
-		return flow.EpochPhaseUndefined, fmt.Errorf("invalid epoch status")
-	}
-	return status.Phase(), nil
+	phase, err := status.Phase()
+	return phase, err
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
@@ -70,12 +68,15 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	}
 
 	// get identities from the current epoch first
-	identities := setup.Participants
+	identities := setup.Participants.Copy()
 	lookup := identities.Lookup()
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList
-	phase := status.Phase()
+	phase, err := status.Phase()
+	if err != nil {
+		return nil, fmt.Errorf("could not get phase: %w", err)
+	}
 	switch phase {
 	// during staking phase (the beginning of the epoch) we include identities
 	// from the previous epoch that are now un-staking
@@ -85,9 +86,13 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		if err != nil {
 			return nil, fmt.Errorf("could not get first block of epoch: %w", err)
 		}
-		// parent ID may zero if the first block in this epoch is the root block
-		// in this case there are no previous epoch identities to check anyway
-		if first.ParentID == flow.ZeroID {
+		// check whether this is the first epoch after the root block - in this
+		// case there are no previous epoch identities to check anyway
+		root, err := s.state.Params().Root()
+		if err != nil {
+			return nil, fmt.Errorf("could not get root block: %w", err)
+		}
+		if first.Height == root.Height {
 			break
 		}
 

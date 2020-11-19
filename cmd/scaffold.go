@@ -182,7 +182,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 		nodeRole := nodeID.Role
 
-		participants, err := libp2p.IDsFromState(fnb.State)
+		participants, err := fnb.State.Final().Identities(libp2p.NetworkingSetFilter)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}

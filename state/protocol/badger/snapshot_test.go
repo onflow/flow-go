@@ -313,3 +313,18 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		})
 	})
 }
+
+// test that we can retrieve identities after a spork where the parent ID of the
+// root block is non-nil
+func TestSnapshot_PostSporkIdentities(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
+		expected := unittest.CompleteIdentitySet()
+		root, result, seal := unittest.BootstrapFixture(expected)
+		err := state.Mutate().Bootstrap(root, result, seal)
+		require.Nil(t, err)
+
+		actual, err := state.Final().Identities(filter.Any)
+		require.Nil(t, err)
+		assert.ElementsMatch(t, expected, actual)
+	})
+}
