@@ -176,12 +176,16 @@ func (e *hostEnv) Log(message string) {
 	e.logs = append(e.logs, message)
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) error {
+func (e *hostEnv) EmitEvent(event cadence.Event) {
 
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
-		return fmt.Errorf("failed to encode event: %w", err)
+		// TODO return error
+		// return fmt.Errorf("failed to encode event: %w", err)
+		panic("failed to encode event")
 	}
+
+	// TODO limit size
 
 	flowEvent := flow.Event{
 		Type:             flow.EventType(event.EventType.ID()),
@@ -192,6 +196,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	}
 
 	e.events = append(e.events, flowEvent)
+	// return nil
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
