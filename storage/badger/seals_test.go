@@ -27,7 +27,7 @@ func TestRetrieveWithoutStore(t *testing.T) {
 	})
 }
 
-func TestSealStoreRetrieveByBlockID(t *testing.T) {
+func TestSealStoreRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := badgerstorage.NewSeals(metrics, db)
@@ -43,6 +43,7 @@ func TestSealStoreRetrieveByBlockID(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expected, seal)
 
+		// TODO: failing why?
 		seal, err = store.ByBlockID(expected.BlockID)
 		require.NoError(t, err)
 		require.Equal(t, expected, seal)
