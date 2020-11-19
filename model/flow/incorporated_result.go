@@ -1,6 +1,8 @@
 package flow
 
-import "github.com/onflow/flow-go/crypto"
+import (
+	"github.com/onflow/flow-go/crypto"
+)
 
 // IncorporatedResult is a wrapper around an ExecutionResult which contains the
 // ID of the first block on its fork in which it was incorporated.
@@ -35,7 +37,14 @@ func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResu
 // ID implements flow.Entity.ID for IncorporatedResult to make it capable of
 // being stored directly in mempools and storage.
 func (ir *IncorporatedResult) ID() Identifier {
-	return MakeID(ir)
+	body := struct {
+		IncorporatedBlockID Identifier
+		Result              *ExecutionResult
+	}{
+		IncorporatedBlockID: ir.IncorporatedBlockID,
+		Result:              ir.Result,
+	}
+	return MakeID(body)
 }
 
 // CheckSum implements flow.Entity.CheckSum for IncorporatedResult to make it

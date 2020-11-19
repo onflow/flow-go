@@ -81,15 +81,19 @@ func (s *ExecStateForkSuppressor) onEject(entity flow.Entity) {
 		Hex("seal_id", sealID[:]).
 		Hex("block_id", blockID[:]).
 		Logger()
+
+	// CAUTION: potential edge case:
+	// Upon adding a new seal, the ejector of the wrapped mempool decides to eject the element which was just added.
+	// In this case, the ejected seal is _not_ the secondary index.
+	//  (a) we don't have any seals for the respective block stored in the secondary index (yet).
+	//  (b) the secondary index contains only one seal for the block, which
+	//      is different than the seal just ejected
 	set, found := s.sealsForBlock[irSeal.Seal.BlockID]
-	if !found {
-		// In the current implementation, this cannot happen, as every entity in the mempool is also contained in sealsForBlock.
-		// we nevertheless perform this sanity check here, to catch future inconsistent code modifications
-		log.Fatal().Msg("inconsistent state detected: seal not in secondary index")
+	if !found { // case (a)
+		return
 	}
-	if len(set) > 1 {
-		delete(set, irSeal.ID())
-	} else {
+	delete(set, irSeal.ID())
+	if len(set) == 0 {
 		delete(s.sealsForBlock, irSeal.Seal.BlockID)
 	}
 	log.Debug().Msg("ejected seal")
@@ -99,14 +103,12 @@ func (s *ExecStateForkSuppressor) onEject(entity flow.Entity) {
 // Error returns:
 //   * engine.InvalidInputError (sentinel error)
 //     In case a seal fails one of the required consistency checks;
-//   * ExecutionForkErr (sentinel error)
-//     In case a fork in the execution state has been detected.
 func (s *ExecStateForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	if s.execForkDetected {
-		return false, ExecutionForkErr
+		return false, nil
 	}
 
 	// STEP 1: ensure locally that newSeal's start and end state are non-empty values
@@ -125,6 +127,11 @@ func (s *ExecStateForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (boo
 		// already other seal for this block in mempool => compare consistency of results' state transitions
 		otherSeal := getArbitraryElement(otherSeals) // cannot be nil, as otherSeals is guaranteed to always contain at least one element
 		err := s.enforceConsistentStateTransitions(newSeal, otherSeal)
+		if errors.Is(err, ExecutionForkErr) {
+			s.seals.Clear()
+			s.execForkDetected = true
+			return false, nil
+		}
 		if err != nil {
 			return false, fmt.Errorf("state consistency check failed: %w", err)
 		}
@@ -139,6 +146,13 @@ func (s *ExecStateForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (boo
 		return false, nil
 	}
 
+	// STEP 4: check whether wrapped mempool ejected the newSeal right away;
+	// important to prevent memory leak
+	newSealID := newSeal.ID()
+	if _, exists := s.seals.ByID(newSealID); !exists {
+		return added, nil
+	}
+
 	// STEP 4: add newSeal to secondary index of this wrapper
 	// CAUTION: the following edge case needs to be considered:
 	//  * the mempool only holds one old seal for this block
@@ -146,14 +160,14 @@ func (s *ExecStateForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (boo
 	//  * during the ejection, we will delete the entire set from the `sealsForBlock`
 	//    because at this time, it only held the single old seal, which was ejected
 	// Therefore, the value for `found` in the line below might
-	// have a different value than in the earlier call above.
+	// be different than the value in the earlier call above.
 	blockSeals, found := s.sealsForBlock[blockID]
 	if !found {
 		// no other seal for this block was in mempool before => create a set for the seals for this block
-		blockSeals := make(sealSet)
+		blockSeals = make(sealSet)
 		s.sealsForBlock[blockID] = blockSeals
 	}
-	blockSeals[newSeal.ID()] = newSeal
+	blockSeals[newSealID] = newSeal
 	return true, nil
 }
 
@@ -179,7 +193,17 @@ func (s *ExecStateForkSuppressor) Rem(id flow.Identifier) bool {
 	seal, found := s.seals.ByID(id)
 	if found {
 		s.seals.Rem(id)
-		delete(s.sealsForBlock, seal.Seal.BlockID)
+		set, found := s.sealsForBlock[seal.Seal.BlockID]
+		if !found {
+			// In the current implementation, this cannot happen, as every entity in the mempool is also contained in sealsForBlock.
+			// we nevertheless perform this sanity check here, to catch future inconsistent code modifications
+			s.log.Fatal().Msg("inconsistent state detected: seal not in secondary index")
+		}
+		if len(set) > 1 {
+			delete(set, id)
+		} else {
+			delete(s.sealsForBlock, seal.Seal.BlockID)
+		}
 	}
 	return found
 }
@@ -310,8 +334,6 @@ func (s *ExecStateForkSuppressor) enforceConsistentStateTransitions(irSeal, irSe
 
 	if !bytes.Equal(irSeal1InitialState, irSeal2InitialState) || !bytes.Equal(irSeal1FinalState, irSeal2FinalState) {
 		log.Error().Msg("inconsistent seals for the same block")
-		s.seals.Clear()
-		s.execForkDetected = true
 		err := operation.RetryOnConflict(s.db.Update, operation.UpdateExecutionForkDetected(true))
 		if err != nil {
 			return fmt.Errorf("failed to update execution-fork-detected flag: %w", err)
