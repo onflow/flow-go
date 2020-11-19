@@ -146,7 +146,8 @@ type DKGProcessor interface {
 	// disqualified from the protocol. Such behavior deserves
 	// disqualifying as it is flagged to all honest nodes in
 	// the protocol.
-	Blacklist(node int)
+	// log describes the blacklisting reason.
+	Blacklist(node int, log string)
 	// FlagMisbehavior warns that a node is misbehaving.
 	// Such behavior is not necessarily flagged to all nodes and therefore
 	// the node is not disqualified from the protocol. Other mechanisms

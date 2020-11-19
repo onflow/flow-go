@@ -137,10 +137,12 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// check if a complaint has remained without an answer
 	// a leader is disqualified if a complaint was never answered
 	if !s.disqualified {
-		for _, c := range s.complaints {
+		for complainer, c := range s.complaints {
 			if c.received && !c.answerReceived {
 				s.disqualified = true
-				s.processor.Blacklist(int(s.leaderIndex))
+				s.processor.Blacklist(int(s.leaderIndex),
+					fmt.Sprintf("complaint from %d was not answered",
+						complainer))
 				break
 			}
 		}
@@ -241,7 +243,8 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 	// if verif vector is not received, disqualify the leader
 	if !s.vAReceived {
 		s.disqualified = true
-		s.processor.Blacklist(int(s.leaderIndex))
+		s.processor.Blacklist(int(s.leaderIndex),
+			"verification vector was not received")
 		return
 	}
 	// if share is not received, make a complaint
@@ -263,7 +266,9 @@ func (s *feldmanVSSQualState) setComplaintsTimeout() {
 	// (i.e there is no complaint with (!c.received && c.answerReceived)
 	if len(s.complaints) > s.threshold {
 		s.disqualified = true
-		s.processor.Blacklist(int(s.leaderIndex))
+		s.processor.Blacklist(int(s.leaderIndex),
+			fmt.Sprintf("there are %d complaints, they exceeded the threshold %d",
+				len(s.complaints), s.threshold))
 	}
 }
 
@@ -351,11 +356,13 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 
 	s.vAReceived = true
 	// check the (already) registered complaints
-	for complainee, c := range s.complaints {
+	for complainer, c := range s.complaints {
 		if c.received && c.answerReceived {
-			if s.checkComplaint(complainee, c) {
+			if s.checkComplaint(complainer, c) {
 				s.disqualified = true
-				s.processor.Blacklist(int(s.leaderIndex))
+				s.processor.Blacklist(int(s.leaderIndex),
+					fmt.Sprintf("verification vector received: a complaint answer to %d is invalid",
+						complainer))
 				return
 			}
 		}
@@ -380,10 +387,10 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 // assuming a complaint and its answer were received, this function returns
 // - false if the answer is valid
 // - true if the complaint is valid
-func (s *feldmanVSSQualState) checkComplaint(complainee index, c *complaint) bool {
-	// check y[complainee] == share.G2
+func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) bool {
+	// check y[complainer] == share.G2
 	return C.verifyshare((*C.bn_st)(&c.answer),
-		(*C.ep2_st)(&s.y[complainee])) == 0
+		(*C.ep2_st)(&s.y[complainer])) == 0
 }
 
 // data = |complainee|
@@ -444,7 +451,9 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 	if c.answerReceived && s.currentIndex != s.leaderIndex {
 		s.disqualified = s.checkComplaint(origin, c)
 		if s.disqualified {
-			s.processor.Blacklist(int(s.leaderIndex))
+			s.processor.Blacklist(int(s.leaderIndex),
+				fmt.Sprintf("complaint received: complaint answer to %d is invalid",
+					origin))
 		}
 		return
 	}
@@ -482,7 +491,9 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		// check the answer format
 		if len(data) != complainAnswerSize {
 			s.disqualified = true
-			s.processor.Blacklist(int(s.leaderIndex))
+			s.processor.Blacklist(int(s.leaderIndex),
+				fmt.Sprintf("the complaint answer has an invalid length, expects %d, got %d",
+					complainAnswerSize, len(data)))
 			return
 		}
 		// read the complainer private share
@@ -515,7 +526,9 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		)
 		s.disqualified = s.checkComplaint(complainer, c)
 		if s.disqualified {
-			s.processor.Blacklist(int(s.leaderIndex))
+			s.processor.Blacklist(int(s.leaderIndex),
+				fmt.Sprintf("complaint answer received: complaint answer to %d is invalid",
+					complainer))
 		}
 
 		// fix the share of the current node if the complaint in invalid

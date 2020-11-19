@@ -157,10 +157,11 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 		// check if a complaint has remained without an answer
 		// a leader is disqualified if a complaint was never answered
 		if !s.fvss[i].disqualified {
-			for _, c := range s.fvss[i].complaints {
+			for complainer, c := range s.fvss[i].complaints {
 				if c.received && !c.answerReceived {
 					s.fvss[i].disqualified = true
-					s.processor.Blacklist(i)
+					s.processor.Blacklist(i,
+						fmt.Sprintf("complaint from %d was not answered", complainer))
 					disqualifiedTotal++
 					break
 				}
