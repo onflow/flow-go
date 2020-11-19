@@ -3,10 +3,10 @@ package migrations
 import (
 	"bytes"
 	"fmt"
-	"github.com/fxamacker/cbor/v2"
 	"sort"
 	"strings"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/parser2"
 	"github.com/rs/zerolog"

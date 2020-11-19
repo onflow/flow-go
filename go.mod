@@ -10,7 +10,7 @@ require (
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
-	github.com/fxamacker/cbor/v2 v2.2.0
+	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
 	github.com/go-kit/kit v0.9.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.4
@@ -31,7 +31,7 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.10.1
+	github.com/onflow/cadence v0.11.2-0.20201119183852-9f5077ac1fa9
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20201002123512-35d751ebea1d
 	github.com/onflow/flow-go-sdk v0.12.1
 	github.com/onflow/flow-go/crypto v0.9.4

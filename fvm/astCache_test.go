@@ -416,7 +416,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	}
 	wg.Wait()
 
-	location := runtime.AddressContractLocation{AddressLocation: fvm.FlowTokenAddress(chain).Bytes(), Name: "FlowToken"}
+	location := runtime.AddressLocation{Address: runtime.Address(fvm.FlowTokenAddress(chain)), Name: "FlowToken"}
 
 	// Get cached program
 	var program *ast.Program
