@@ -345,7 +345,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	err := readVerifVector(s.vA, data)
 	if err != nil {
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("reading the verification vector failed:%w", err))
+			fmt.Sprintf("reading the verification vector failed:%s", err))
 		return
 	}
 
