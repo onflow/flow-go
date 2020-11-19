@@ -56,7 +56,7 @@ func deductAccountCreationFeeTransaction(
 		SetScript([]byte(fmt.Sprintf(script, serviceAddress))).
 		AddAuthorizer(accountAddress)
 
-	return Transaction(tx)
+	return Transaction(tx, 0)
 }
 
 func deductTransactionFeeTransaction(accountAddress, serviceAddress flow.Address) *TransactionProcedure {
@@ -64,5 +64,6 @@ func deductTransactionFeeTransaction(accountAddress, serviceAddress flow.Address
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deductTransactionFeeTransactionTemplate, serviceAddress))).
 			AddAuthorizer(accountAddress),
+		uint32(0),
 	)
 }

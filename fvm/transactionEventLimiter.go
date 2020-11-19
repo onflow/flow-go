@@ -20,12 +20,7 @@ func (l *TransactionEventLimiter) Process(
 ) error {
 
 	// we don't care about the tx index here
-	fEvents, err := proc.ConvertEvents(0)
-	if err != nil {
-		// TODO wrap the error
-		return err
-	}
-
+	fEvents := proc.Events()
 	totalByteSize := uint(0)
 	for _, f := range fEvents {
 		totalByteSize += f.ByteSize()

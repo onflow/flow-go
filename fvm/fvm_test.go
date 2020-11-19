@@ -86,7 +86,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -119,7 +119,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -143,7 +143,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -215,7 +215,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -239,7 +239,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -335,7 +335,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -416,7 +416,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -550,7 +550,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(blockCtx, tx, ledger)
 		assert.NoError(t, err)
@@ -611,7 +611,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_ = vm.Run(blockCtx, fvm.Transaction(tx), ledger)
+			_ = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger)
 		})
 	})
 
@@ -670,7 +670,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute the transaction
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -760,7 +760,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		assert.NoError(t, err)
@@ -796,7 +796,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 	require.NoError(t, err)
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, 0)
 
 	err = vm.Run(ctx, tx, ledger)
 	assert.NoError(t, err)
@@ -1087,7 +1087,7 @@ func TestWithServiceAccount(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	t.Run("With service account enabled", func(t *testing.T) {
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctxA, tx, ledger)
 		require.NoError(t, err)
@@ -1099,7 +1099,7 @@ func TestWithServiceAccount(t *testing.T) {
 	t.Run("With service account disabled", func(t *testing.T) {
 		ctxB := fvm.NewContextFromParent(ctxA, fvm.WithServiceAccount(false))
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctxB, tx, ledger)
 		require.NoError(t, err)

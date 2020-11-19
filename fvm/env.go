@@ -29,7 +29,7 @@ type hostEnv struct {
 
 	runtime.Metrics
 
-	events []cadence.Event
+	events []flow.Event
 	logs   []string
 
 	transactionEnv *transactionEnv
@@ -85,7 +85,7 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
 	)
 }
 
-func (e *hostEnv) getEvents() []cadence.Event {
+func (e *hostEnv) getEvents() []flow.Event {
 	return e.events
 }
 
@@ -176,8 +176,22 @@ func (e *hostEnv) Log(message string) {
 	e.logs = append(e.logs, message)
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) {
-	e.events = append(e.events, event)
+func (e *hostEnv) EmitEvent(event cadence.Event) error {
+
+	payload, err := jsoncdc.Encode(event)
+	if err != nil {
+		return fmt.Errorf("failed to encode event: %w", err)
+	}
+
+	flowEvent := flow.Event{
+		Type:             flow.EventType(event.EventType.ID()),
+		TransactionID:    e.transactionEnv.ID,
+		TransactionIndex: e.transactionEnv.TxIndex,
+		EventIndex:       uint32(len(e.events)),
+		Payload:          payload,
+	}
+
+	e.events = append(e.events, flowEvent)
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
@@ -202,7 +216,7 @@ func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error
 	return jsoncdc.Decode(b)
 }
 
-func (e *hostEnv) Events() []cadence.Event {
+func (e *hostEnv) Events() []flow.Event {
 	return e.events
 }
 
@@ -355,6 +369,7 @@ type transactionEnv struct {
 	addressGenerator flow.AddressGenerator
 
 	tx          *flow.TransactionBody
+	txIndex     uint32
 	authorizers []runtime.Address
 }
 
@@ -365,6 +380,7 @@ func newTransactionEnv(
 	accounts *state.Accounts,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
+	txIndex uint32,
 ) *transactionEnv {
 	return &transactionEnv{
 		vm:               vm,
@@ -373,6 +389,7 @@ func newTransactionEnv(
 		accounts:         accounts,
 		addressGenerator: addressGenerator,
 		tx:               tx,
+		txIndex:          txIndex,
 	}
 }
 
