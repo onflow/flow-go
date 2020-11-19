@@ -23,7 +23,8 @@ func (f SigningAlgorithm) String() string {
 }
 
 const (
-	// minimum targeted bits of security
+	// Minimum targeted bits of security.
+	// This is used as a reference but it doesn't mean all implemented primitives provide this minimum.
 	securityBits = 128
 
 	// BLS signature scheme lengths
@@ -31,7 +32,7 @@ const (
 	// BLS12-381
 	// p size in bytes, where G1 is defined over the field Zp
 	fieldSize = 48
-	// Points compression: 1 for compressed, 0 for uncompressed
+	// Points compression when serialized: 1 for compressed, 0 for uncompressed
 	compression = 1
 	// SignatureLenBLSBLS12381 is the size of G1 elements
 	SignatureLenBLSBLS12381 = fieldSize * (2 - compression) // the length is divided by 2 if compression is on
@@ -45,9 +46,11 @@ const (
 	// minimum output size as required by the chosen implementation of hash to curve
 	minHashSizeBLSBLS12381 = opSwUInputLenBLSBLS12381
 	// Cipher suite with all the settings
-	BLSCipherSuite = "BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_"
+	blsCipherSuite = "BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_"
 
 	// ECDSA
+
+	KeyGenSeedMaxLenECDSA = 2048 // large enough constant accepted by the implementation
 
 	// NIST P256
 	SignatureLenECDSAP256 = 64
