@@ -3,31 +3,39 @@ package leader
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months
+// SelectionForEpoch pre-computes and returns leaders for the consensus committee
+// in the given epoch.
+// TODO: this should replace the consensus.go in this package
+func SelectionForEpoch(epoch protocol.Epoch) (*LeaderSelection, error) {
 
-func NewSelectionForConsensus(count int, rootHeader *flow.Header, rootQC *flow.QuorumCertificate, st protocol.State) (*committees.LeaderSelection, error) {
-	seed, err := ReadSeed(indices.ProtocolConsensusLeaderSelection, rootHeader, rootQC, st)
+	// pre-compute leader selection for the epoch
+	identities, err := epoch.InitialIdentities()
 	if err != nil {
-		return nil, fmt.Errorf("could not read seed: %w", err)
+		return nil, fmt.Errorf("could not get epoch initial identities: %w", err)
 	}
-
-	// find all consensus nodes identities which contain the stake info
-	identities, err := st.AtBlockID(rootHeader.ID()).Identities(filter.HasRole(flow.RoleConsensus))
+	seed, err := epoch.Seed(indices.ProtocolConsensusLeaderSelection...)
 	if err != nil {
-		return nil, fmt.Errorf("could not get consensus identities: %w", err)
+		return nil, fmt.Errorf("could not get epoch seed: %w", err)
 	}
-
-	selection, err := committees.ComputeLeaderSelectionFromSeed(rootHeader.View, seed, count, identities)
+	firstView, err := epoch.FirstView()
 	if err != nil {
-		return nil, fmt.Errorf("could not compute leader selection from seed: %w", err)
+		return nil, fmt.Errorf("could not get epoch first view: %w", err)
 	}
-
-	return selection, nil
+	finalView, err := epoch.FinalView()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch final view: %w", err)
+	}
+	leaders, err := ComputeLeaderSelectionFromSeed(
+		firstView,
+		seed,
+		int(finalView-firstView+1), // add 1 because both first/final view are inclusive
+		identities.Filter(filter.HasRole(flow.RoleConsensus)),
+	)
+	return leaders, err
 }

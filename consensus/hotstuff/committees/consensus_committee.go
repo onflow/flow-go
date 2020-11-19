@@ -14,7 +14,7 @@ import (
 // and the raw leader selection for an epoch.
 type epochLeaders struct {
 	// pre-computed leader selection for this epoch
-	selection *LeaderSelection
+	selection *leader.LeaderSelection
 	// initial set of consensus committee members for this epoch, used only for
 	// mapping a leader index to node ID
 	// CAUTION: does not contain up-to-date weight/ejection info

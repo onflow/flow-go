@@ -1,4 +1,4 @@
-package committees
+package leader
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months
 
 // LeaderSelection caches the pre-generated leader selections for a certain number of
 // views starting from the epoch start view.

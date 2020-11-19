@@ -23,7 +23,7 @@ type Cluster struct {
 	payloads storage.ClusterPayloads
 	me       flow.Identifier
 	// pre-computed leader selection for the full lifecycle of the cluster
-	selection *LeaderSelection
+	selection *leader.LeaderSelection
 	// initial set of cluster committee members for this epoch, used only for
 	// mapping a leader index to node ID
 	// CAUTION: does not contain up-to-date weight/ejection info
