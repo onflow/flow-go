@@ -144,7 +144,8 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	}
 
 	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, wrongFormat)
+		s.processor.FlagMisbehavior(orig,
+			wrongFormat+"the received message is empty")
 		return nil
 	}
 
@@ -161,7 +162,9 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	case feldmanVSSVerifVec:
 		s.receiveVerifVector(index(orig), msg[1:])
 	default:
-		s.processor.FlagMisbehavior(orig, wrongFormat)
+		s.processor.FlagMisbehavior(orig,
+			fmt.Sprintf("%s the message header is invalid, got %d",
+				wrongFormat, dkgMsgTag(msg[0])))
 	}
 	return nil
 }
@@ -239,12 +242,15 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	}
 
 	if s.xReceived {
-		s.processor.FlagMisbehavior(int(origin), duplicated)
+		s.processor.FlagMisbehavior(int(origin),
+			duplicated+"private share was already received")
 		return
 	}
 
 	if (len(data)) != shareSize {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("%s invalid share size, expects %d, got %d",
+				wrongFormat, shareSize, len(data)))
 		return
 	}
 
@@ -267,18 +273,23 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 		return
 	}
 	if s.vAReceived {
-		s.processor.FlagMisbehavior(int(origin), duplicated)
+		s.processor.FlagMisbehavior(int(origin),
+			duplicated+"verification vector was already received")
 		return
 	}
 	if verifVectorSize*(s.threshold+1) != len(data) {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("%s invalid verification vector size, expects %d, got %d",
+				wrongFormat, verifVectorSize*(s.threshold+1), len(data)))
 		return
 	}
 	// read the verification vector
 	s.vA = make([]pointG2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("%s reading the verification vector failed: %w",
+				wrongFormat, err))
 		return
 	}
 

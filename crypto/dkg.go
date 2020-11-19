@@ -153,11 +153,12 @@ type DKGProcessor interface {
 	// outside DKG could be implemented to synchronize slashing the misbehaving
 	// node by all participating nodes, using the api `Disqualify`. Failing to
 	// do so, the protocol can be broken.
+	// log describes the misbehavior.
 	FlagMisbehavior(node int, log string)
 }
 
 const (
-	wrongFormat   = "wrong message format"
-	duplicated    = "message type is duplicated"
-	wrongProtocol = "message is not compliant with the protocol"
+	wrongFormat   = "wrong message format:"
+	duplicated    = "message type is duplicated:"
+	wrongProtocol = "message is not compliant with the protocol:"
 )
