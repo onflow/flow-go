@@ -31,8 +31,10 @@ var consensusMemberFilter = filter.And(
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee persists across epochs.
 type Consensus struct {
-	state   protocol.ReadOnlyState   // the protocol state
-	me      flow.Identifier          // the node ID of this node
+	state protocol.ReadOnlyState // the protocol state
+	me    flow.Identifier        // the node ID of this node
+	// TODO use uint16 in leader selection impl to halve memory usage
+	// TODO delete old entries, this uses ~200kb memory/day with above optimization
 	leaders map[uint64]*epochLeaders // pre-computed leader selection for each epoch
 }
 
@@ -45,6 +47,7 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 	}
 
 	// pre-compute leader selection for current epoch
+	// TODO compute for previous epoch as well here
 	epoch := state.Final().Epochs().Current()
 	err := com.prepareLeaderSelection(epoch)
 	if err != nil {
@@ -83,7 +86,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		if view >= epoch.selection.FirstView() && view <= epoch.selection.FinalView() {
 			index, err := epoch.selection.LeaderIndexForView(view)
 			if err != nil {
-				return flow.ZeroID, fmt.Errorf("could not get leader index for view %d: %w", view, err)
+				return flow.ZeroID, fmt.Errorf("could not get leader index for view: %w", err)
 			}
 			return epoch.identities[index].NodeID, nil
 		}
@@ -106,9 +109,6 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// represents an invalid query because we only guarantee the protocol state
 	// will contain epoch information for the current and next epoch - such a query
 	// must be for a view within a previous epoch. This case will return an error.
-	//TODO is there a case where need this? What if a consensus node restarts in
-	// the first block of a new epoch and still receives old blocks? What about
-	// adjudicating challenges referencing older blocks?
 	//
 	// CASE 2: V > newestEpoch.finalView
 	// If the view is after the last view we've computed the leader for, we
