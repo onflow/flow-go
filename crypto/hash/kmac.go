@@ -33,11 +33,11 @@ const cSHAKE128BlockSize = 168
 func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) {
 	var k kmac128
 	// check the lengths as per NIST.SP.800-185
-	if len(key) >= KmacMaxParamsLen || len(customizer) >= KmacMaxParamsLen {
+	if len(key) > KmacMaxParamsLen || len(customizer) > KmacMaxParamsLen {
 		return nil,
 			fmt.Errorf("kmac key and customizer lengths must be less than %d", KmacMaxParamsLen)
 	}
-	if outputSize >= KmacMaxParamsLen || outputSize < 0 {
+	if outputSize > KmacMaxParamsLen || outputSize < 0 {
 		return nil,
 			fmt.Errorf("kmac output size must be a positive number less than %d", KmacMaxParamsLen)
 	}
