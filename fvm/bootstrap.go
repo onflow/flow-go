@@ -240,6 +240,7 @@ func deployContractTransaction(address flow.Address, contract []byte) *Transacti
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(address),
+		uint32(0),
 	)
 }
 
@@ -249,6 +250,7 @@ func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte
 			SetScript([]byte(fmt.Sprintf(deployFlowTokenTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(flowToken).
 			AddAuthorizer(service),
+		uint32(0),
 	)
 }
 
@@ -258,6 +260,7 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 			SetScript([]byte(fmt.Sprintf(deployFlowFeesTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(flowFees).
 			AddAuthorizer(service),
+		uint32(0),
 	)
 }
 
@@ -275,6 +278,7 @@ func mintFlowTokenTransaction(
 			SetScript([]byte(fmt.Sprintf(mintFlowTokenTransactionTemplate, fungibleToken, flowToken))).
 			AddArgument(initialSupplyArg).
 			AddAuthorizer(service),
+		uint32(0),
 	)
 }
 
