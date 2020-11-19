@@ -123,38 +123,3 @@ func (q *LRUEjector) Eject(entities map[flow.Identifier]flow.Entity) (flow.Ident
 
 	return oldestID, oldestEntity
 }
-
-// SizeEjector is a wrapper around EjectTrueRandom that can be used to decrement
-// an external size variable everytime an item is removed from the mempool.
-// WARNING: requires external means for concurrency safety
-// As SizeEjector writes to the externally-provided size variable, SizeEjector
-// itself cannot provide concurrency safety for this variable. Instead, the
-// concurrency safety must be implemented through the means of the Mempool which
-// is using the ejector.
-type SizeEjector struct {
-	size *uint
-}
-
-// NewSizeEjector returns a SizeEjector linked to the provided size variable.
-// WARNING: requires external means for concurrency safety
-// As SizeEjector writes to the externally-provided size variable, SizeEjector
-// itself cannot provide concurrency safety for this variable. Instead, the
-// concurrency safety must be implemented through the means of the Mempool which
-// is using the ejector.
-func NewSizeEjector(size *uint) *SizeEjector {
-	return &SizeEjector{
-		size: size,
-	}
-}
-
-// Eject calls EjectTrueRandom and decrements the size variable if an item was
-// returned by EjectTrueRandom.
-func (q *SizeEjector) Eject(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
-	id, entity := EjectTrueRandom(entities)
-
-	if _, ok := entities[id]; ok {
-		*q.size--
-	}
-
-	return id, entity
-}

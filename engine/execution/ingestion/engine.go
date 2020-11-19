@@ -3,9 +3,11 @@ package ingestion
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -545,6 +547,10 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
+	if errors.Is(err, storage.ErrDataMismatch) {
+		e.log.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
+	}
+
 	if err != nil {
 		e.log.Err(err).
 			Hex("block_id", logging.Entity(executableBlock)).
@@ -943,6 +949,19 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 
 	blockView := e.execState.NewView(stateCommit)
 
+	if e.extensiveLogging {
+		args := make([]string, 0)
+		for _, a := range arguments {
+			args = append(args, hex.EncodeToString(a))
+		}
+		e.log.Debug().
+			Hex("block_id", logging.ID(blockID)).
+			Uint64("block_height", block.Height).
+			Hex("state_commitment", stateCommit).
+			Hex("script_hex", script).
+			Str("args", strings.Join(args[:], ",")).
+			Msg("extensive log: executed script content")
+	}
 	return e.computationManager.ExecuteScript(script, arguments, block, blockView)
 }
 

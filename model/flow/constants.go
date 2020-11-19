@@ -19,8 +19,8 @@ const DefaultTransactionExpiryBuffer = 30
 // DefaultMaxGasLimit is the default maximum value for the transaction gas limit.
 const DefaultMaxGasLimit = 9999
 
-// DefaultMaxTxSizeLimit is the default maximum transaction byte size. (64KB)
-const DefaultMaxTxSizeLimit = 64000
+// DefaultMaxTxSizeLimit is the default maximum transaction byte size. (1.5MB)
+const DefaultMaxTxSizeLimit = 1500000
 
 // DefaultAuctionWindow defines the length of the auction window at the beginning of
 // an epoch, during which nodes can bid for seats in the committee. Valid epoch events

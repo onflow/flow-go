@@ -18,7 +18,7 @@ Code structure:
 The bootstrapping will generate the following information:
 
 #### Per node
-* Staking key (BLS key with curve BLS12381)
+* Staking key (BLS key with curve BLS12-381)
 * Networking key (ECDSA key)
 * Random beacon key; _only_ for consensus nodes (BLS based on Joint-Feldman DKG for threshold signatures)
 
