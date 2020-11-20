@@ -3,6 +3,7 @@ package migrations
 import (
 	"bytes"
 	"fmt"
+	"github.com/rs/zerolog"
 	"sort"
 	"strings"
 
@@ -155,9 +156,10 @@ func migrateContract(p ledger.Payload) ([]ledger.Payload, error) {
 			Msg("contract TypeId not in correct format")
 		return nil, fmt.Errorf("contract TypeId not in correct format")
 	}
-
+	newKey := changeKey(p.Key, fmt.Sprintf("contract\x1F%s", pieces[2]))
+	logKeyChange(p.Key, newKey)
 	return []ledger.Payload{{
-		Key:   changeKey(p.Key, fmt.Sprintf("contract\x1F%s", pieces[2])),
+		Key:   newKey,
 		Value: p.Value,
 	}}, nil
 }
@@ -168,6 +170,7 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 	value := p.Value
 	address := flow.BytesToAddress(p.Key.KeyParts[0].Value)
 	if len(value) == 0 {
+		logKeyChange(p.Key)
 		return []ledger.Payload{}, nil
 	}
 
@@ -227,17 +230,19 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 			Str("address", address.Hex()).
 			Str("code", code).
 			Msg("No declarations at address")
-		return []ledger.Payload{}, fmt.Errorf("no declarations at address %s", address.Hex())
+		return nil, fmt.Errorf("no declarations at address %s", address.Hex())
 	case 1:
 		// If there is one declaration move it to the new key
 		log.Debug().
 			Str("address", address.Hex()).
 			Msg("Single contract or interface at address moved to new key")
+		oldKey := p.Key
 		p.Key = addNameToKey(p.Key, declarations[0].DeclarationIdentifier().Identifier)
 		contractsRegister, err := contractsRegister(p.Key, []string{declarations[0].DeclarationIdentifier().Identifier})
 		if err != nil {
 			return nil, err
 		}
+		logKeyChange(oldKey, p.Key, contractsRegister.Key)
 		return []ledger.Payload{p, contractsRegister}, nil
 	case 2:
 		// We have two declarations. Due to the current rules one of them is an interface and one is a contract.
@@ -297,6 +302,7 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 		if err != nil {
 			return nil, err
 		}
+		logKeyChange(p.Key, interfaceKey, contractKey, contractsRegister.Key)
 		return []ledger.Payload{
 			{
 				Key:   interfaceKey,
@@ -328,7 +334,17 @@ func changeKey(key ledger.Key, value string) ledger.Key {
 	newKey := key
 	newKey.KeyParts = make([]ledger.KeyPart, 3)
 	copy(newKey.KeyParts, key.KeyParts)
-	newKeyString := value
-	newKey.KeyParts[2].Value = []byte(newKeyString)
+	newKey.KeyParts[2].Value = []byte(value)
 	return newKey
+}
+
+func logKeyChange(original ledger.Key, changed ...ledger.Key) {
+	arr := zerolog.Arr()
+	for i := range changed {
+		arr.Str(string(changed[i].KeyParts[2].Value))
+	}
+	log.Info().
+		Str("original", string(original.KeyParts[2].Value)).
+		Array("new", arr).
+		Msg("migrated key")
 }
