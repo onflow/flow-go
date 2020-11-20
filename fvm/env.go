@@ -385,9 +385,6 @@ type transactionEnv struct {
 	txIndex uint32
 	txID    flow.Identifier
 
-	// limits
-	maxEventCollectionByteSize uint32
-
 	authorizers []runtime.Address
 }
 
