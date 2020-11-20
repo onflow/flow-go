@@ -184,17 +184,12 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		// creates topology, topology manager, and subscription managers
 		//
 		// topology
-		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.State)
+		// subscription manager
+		subscriptionManager := libp2p.NewChannelSubscriptionManager(fnb.Middleware)
+		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.State, subscriptionManager)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
-
-		// subscription manager
-		subscriptionManager := libp2p.NewChannelSubscriptionManager(fnb.Middleware)
-
-		// topology manager
-		topManager := topology.NewStatefulTopologyManager(top,
-			subscriptionManager)
 
 		// creates network instance
 		net, err := libp2p.NewNetwork(fnb.Logger,
@@ -203,7 +198,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			fnb.Me,
 			fnb.Middleware,
 			10e6,
-			topManager,
+			top,
 			subscriptionManager,
 			fnb.Metrics.Network)
 		if err != nil {
