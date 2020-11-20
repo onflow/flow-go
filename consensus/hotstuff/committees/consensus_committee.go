@@ -54,7 +54,12 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 		return nil, fmt.Errorf("could not add leader for current epoch: %w", err)
 	}
 
-	// pre-compute leader selection for previous epoch, if it exists
+	// Pre-compute leader selection for previous epoch, if it exists.
+	//
+	// This ensures we always know about leader selection for at least one full
+	// epoch into the past, ensuring we are able to not only determine the leader
+	// for block proposals we receive, but also adjudicate consensus-related
+	// challenges up to one epoch into the past.
 	previous := state.Final().Epochs().Previous()
 	_, err = previous.Counter()
 	// if there is no previous epoch, return the committee as-is
@@ -109,11 +114,11 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	}
 
 	// STEP 2 - we haven't yet computed leader selection for an epoch containing
-	// the requested view. We compute leader selection for the current epoch
-	// (w.r.t. the finalized head) at initialization then compute leader selection
-	// for the next epoch when we encounter any view for which we don't know
-	// the leader. The series of epochs we have computed leaders for is strictly
-	// consecutive, meaning we know the leader for all views V where:
+	// the requested view. We compute leader selection for the current and previous
+	// epoch (w.r.t. the finalized head) at initialization then compute leader
+	// selection for the next epoch when we encounter any view for which we don't
+	// know the leader. The series of epochs we have computed leaders for is
+	// strictly consecutive, meaning we know the leader for all views V where:
 	//
 	//   V >= oldestEpoch.firstView && V <= newestEpoch.finalView
 	//
@@ -123,8 +128,9 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// CASE 1: V < oldestEpoch.firstView
 	// If the view is before the first view we've computed the leader for, this
 	// represents an invalid query because we only guarantee the protocol state
-	// will contain epoch information for the current and next epoch - such a query
-	// must be for a view within a previous epoch. This case will return an error.
+	// will contain epoch information for the current, previous, and next epoch -
+	// such a query must be for a view within an epoch at least TWO epochs before
+	// the current epoch when we started up. This is considered an invalid query.
 	//
 	// CASE 2: V > newestEpoch.finalView
 	// If the view is after the last view we've computed the leader for, we
