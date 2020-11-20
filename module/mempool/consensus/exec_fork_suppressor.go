@@ -19,14 +19,14 @@ import (
 
 var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel error
 
-// ExecStateForkSuppressor is a wrapper around a conventional mempool.IncorporatedResultSeals
+// ExecForkSuppressor is a wrapper around a conventional mempool.IncorporatedResultSeals
 // mempool. It implements the following mitigation strategy for execution forks:
 //   * In case two conflicting results are considered sealable for the same block,
 //     sealing should halt. Specifically, two results are considered conflicting,
 //     if they differ in their start or end state.
 //   * Even after a restart, the sealing should not resume.
 //   * We rely on human intervention to resolve the conflict.
-// The ExecStateForkSuppressor implements this mitigation strategy as follows:
+// The ExecForkSuppressor implements this mitigation strategy as follows:
 //   * For each candidate seal inserted into the mempool, inspect the state
 //     transition for the respective block.
 //   * If this is the first seal for a block, store the seal as an archetype
@@ -35,12 +35,12 @@ var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel
 //     and a second seal for the same block is inserted, check whether
 //     the seal has the same state transition.
 //   * If conflicting state transitions for the same block are detected,
-//     ExecStateForkSuppressor sets an internal flag and thereafter
+//     ExecForkSuppressor sets an internal flag and thereafter
 //     reports the mempool as empty, which will lead to the respective
 //     consensus node not including any more seals.
 //   * The flag is stored in a database for persistence across restarts.
 // Implementation is concurrency safe.
-type ExecStateForkSuppressor struct {
+type ExecForkSuppressor struct {
 	mutex            sync.RWMutex
 	seals            mempool.IncorporatedResultSeals
 	sealsForBlock    map[flow.Identifier]sealSet // map BlockID -> set of IncorporatedResultSeal
@@ -52,19 +52,19 @@ type ExecStateForkSuppressor struct {
 // sealSet is a set of seals; internally represented as a map from sealID -> to seal
 type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 
-func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, db *badger.DB, log zerolog.Logger) (*ExecStateForkSuppressor, error) {
+func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, db *badger.DB, log zerolog.Logger) (*ExecForkSuppressor, error) {
 	flag, err := readExecutionForkDetectedFlag(db, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to interface with storage: %w", err)
 	}
 
-	wrapper := ExecStateForkSuppressor{
+	wrapper := ExecForkSuppressor{
 		mutex:            sync.RWMutex{},
 		seals:            seals,
 		sealsForBlock:    make(map[flow.Identifier]sealSet),
 		execForkDetected: flag,
 		db:               db,
-		log:              log.With().Str("mempool", "ExecStateForkSuppressor").Logger(),
+		log:              log.With().Str("mempool", "ExecForkSuppressor").Logger(),
 	}
 	seals.RegisterEjectionCallbacks(wrapper.onEject)
 
@@ -72,7 +72,7 @@ func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, db *badge
 }
 
 // onEject is the callback, which the wrapped mempool should call whenever it ejects an element
-func (s *ExecStateForkSuppressor) onEject(entity flow.Entity) {
+func (s *ExecForkSuppressor) onEject(entity flow.Entity) {
 	// uncaught type assertion; should never panic as mempool.IncorporatedResultSeals only stores IncorporatedResultSeal
 	irSeal := entity.(*flow.IncorporatedResultSeal)
 	sealID := irSeal.ID()
@@ -103,7 +103,7 @@ func (s *ExecStateForkSuppressor) onEject(entity flow.Entity) {
 // Error returns:
 //   * engine.InvalidInputError (sentinel error)
 //     In case a seal fails one of the required consistency checks;
-func (s *ExecStateForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, error) {
+func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -172,21 +172,21 @@ func (s *ExecStateForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (boo
 }
 
 // All returns all the IncorporatedResultSeals in the mempool
-func (s *ExecStateForkSuppressor) All() []*flow.IncorporatedResultSeal {
+func (s *ExecForkSuppressor) All() []*flow.IncorporatedResultSeal {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.seals.All()
 }
 
 // ByID returns an IncorporatedResultSeal by its ID
-func (s *ExecStateForkSuppressor) ByID(identifier flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
+func (s *ExecForkSuppressor) ByID(identifier flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.seals.ByID(identifier)
 }
 
 // Rem removes the IncorporatedResultSeal with id from the mempool
-func (s *ExecStateForkSuppressor) Rem(id flow.Identifier) bool {
+func (s *ExecForkSuppressor) Rem(id flow.Identifier) bool {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -209,14 +209,14 @@ func (s *ExecStateForkSuppressor) Rem(id flow.Identifier) bool {
 }
 
 // Size returns the number of items in the mempool
-func (s *ExecStateForkSuppressor) Size() uint {
+func (s *ExecForkSuppressor) Size() uint {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.seals.Size()
 }
 
 // Limit returns the size limit of the mempool
-func (s *ExecStateForkSuppressor) Limit() uint {
+func (s *ExecForkSuppressor) Limit() uint {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.seals.Limit()
@@ -224,7 +224,7 @@ func (s *ExecStateForkSuppressor) Limit() uint {
 
 // Clear removes all entities from the pool.
 // The wrapper clears the internal state as well as its local (additional) state.
-func (s *ExecStateForkSuppressor) Clear() {
+func (s *ExecForkSuppressor) Clear() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.sealsForBlock = make(map[flow.Identifier]sealSet)
@@ -232,7 +232,7 @@ func (s *ExecStateForkSuppressor) Clear() {
 }
 
 // RegisterEjectionCallbacks adds the provided OnEjection callbacks
-func (s *ExecStateForkSuppressor) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
+func (s *ExecForkSuppressor) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 	s.seals.RegisterEjectionCallbacks(callbacks...)
 }
 
@@ -261,7 +261,7 @@ func readExecutionForkDetectedFlag(db *badger.DB, defaultValue bool) (bool, erro
 // enforceValidStates checks that seal has valid, non-empty, initial and final state.
 // In case a seal fails the check, a detailed error message is logged and an
 // engine.InvalidInputError (sentinel error) is returned.
-func (s *ExecStateForkSuppressor) enforceValidStates(irSeal *flow.IncorporatedResultSeal) error {
+func (s *ExecForkSuppressor) enforceValidStates(irSeal *flow.IncorporatedResultSeal) error {
 	result := irSeal.IncorporatedResult.Result
 
 	initialState, ok := result.InitialStateCommit()
@@ -305,7 +305,7 @@ func getArbitraryElement(set sealSet) *flow.IncorporatedResultSeal {
 //   * internal execForkDetected flag is ste to true
 //   * the new value of execForkDetected is persisted to data base
 // and ExecutionForkErr (sentinel error) is returned
-func (s *ExecStateForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal) error {
+func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal) error {
 	if irSeal.IncorporatedResult.Result.ID() == irSeal2.IncorporatedResult.Result.ID() {
 		// happy case: candidate seals are for the same result
 		return nil
