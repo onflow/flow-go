@@ -91,7 +91,7 @@ func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, 
 	state, _ := topology.CreateMockStateForCollectionNodes(suite.T(),
 		ids.Filter(filter.HasRole(flow.RoleCollection)), uint(cluster))
 
-	subMngrs := test.MockSubscriptionManager(suite.T(), ids)
+	subMngrs := topology.MockSubscriptionManager(suite.T(), ids)
 
 	return state, ids, subMngrs
 }
@@ -155,11 +155,11 @@ func (suite *StatefulTopologyTestSuite) topologyScenario(me flow.Identifier,
 	state protocol.ReadOnlyState) flow.IdentityList {
 
 	// creates topology of the node
-	top, err := topology.NewTopicBasedTopology(me, state)
+	top, err := topology.NewTopicBasedTopology(me, state, subMngr)
 	require.NoError(suite.T(), err)
 
 	// creates topology manager
-	topMngr := topology.NewStatefulTopologyManager(top, subMngr)
+	topMngr := topology.NewStatefulTopologyManager(top)
 
 	// generates topology of node
 	myFanout, err := topMngr.MakeTopology(ids)
