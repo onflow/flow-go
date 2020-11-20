@@ -161,7 +161,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not insert EpochCommit event: %w", err)
 		}
-		err = m.state.epoch.statuses.StoreTx(root.ID(), flow.NewEpochStatus(setup.ID(), commit.ID(), flow.ZeroID, flow.ZeroID))(tx)
+		status, err := flow.NewEpochStatus(root.ID(), setup.ID(), commit.ID(), flow.ZeroID, flow.ZeroID)
+		if err != nil {
+			return fmt.Errorf("could not construct root epoch status: %w", err)
+		}
+		err = m.state.epoch.statuses.StoreTx(root.ID(), status)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochStatus: %w", err)
 		}
@@ -779,20 +783,22 @@ func (m *Mutator) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
 			return nil, fmt.Errorf("missing commit event for starting next epoch")
 		}
-		p := flow.NewEpochStatus(
+		status, err := flow.NewEpochStatus(
+			block.ID(),
 			parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
 			flow.ZeroID, flow.ZeroID,
 		)
-		return p, nil
+		return status, err
 	}
 
 	// Block is in the same epoch as its parent, re-use the same epoch status
 	// IMPORTANT: copy the status to avoid modifying the parent status in the cache
-	blockStatus := flow.NewEpochStatus(
+	status, err := flow.NewEpochStatus(
+		parentStatus.FirstBlockID,
 		parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
 		parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
 	)
-	return blockStatus, nil
+	return status, err
 }
 
 // handleServiceEvents checks the service events within the seals of a block.
@@ -869,7 +875,7 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 
 				// We should only have a single epoch commit event per epoch.
 				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
-					// true iff EpochEpochCommitSetup event for NEXT epoch was already included before
+					// true iff EpochCommit event for NEXT epoch was already included before
 					return nil, state.NewInvalidExtensionError("duplicate epoch commit service event")
 				}
 

@@ -20,10 +20,26 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|acc
 
 // Identity represents a node identity.
 type Identity struct {
-	NodeID        Identifier
-	Address       string
-	Role          Role
-	Stake         uint64
+	// NodeID uniquely identifies a particular node. A node's ID is fixed for
+	// the duration of that node's participation in the network.
+	NodeID  Identifier
+	Address string
+	Role    Role
+	// Stake represents the node's *weight*. The stake (quantity of $FLOW held
+	// in escrow during the node's participation) is strictly managed by the
+	// service account. The protocol software strictly considers weight, which
+	// represents how much voting power a given node has.
+	//
+	// NOTE: Nodes that are registered for an upcoming epoch, or that are in
+	// the process of un-staking, have 0 weight.
+	//
+	// TODO: to be renamed to Weight
+	Stake uint64
+	// Ejected represents whether a node has been permanently removed from the
+	// network. A node may be ejected for either:
+	// * committing one protocol felony
+	// * committing a series of protocol misdemeanours
+	Ejected       bool
 	StakingPubKey crypto.PublicKey
 	NetworkPubKey crypto.PublicKey
 }
@@ -168,6 +184,10 @@ type IdentityFilter func(*Identity) bool
 // IdentityOrder is a sort for identities.
 type IdentityOrder func(*Identity, *Identity) bool
 
+// IdentityMapFunc is a modifier function for map operations for identities.
+// Identities are COPIED from the source slice.
+type IdentityMapFunc func(Identity) Identity
+
 // IdentityList is a list of nodes.
 type IdentityList []*Identity
 
@@ -184,24 +204,56 @@ IDLoop:
 	return dup
 }
 
+// Map returns a new identity list with the map function f applied to a copy of
+// each identity.
+//
+// CAUTION: this relies on structure copy semantics. Map functions that modify
+// an object referenced by the input Identity structure will modify identities
+// in the source slice as well.
+func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
+	dup := make(IdentityList, 0, len(il))
+	for _, identity := range il {
+		next := f(*identity)
+		dup = append(dup, &next)
+	}
+	return dup
+}
+
+// Copy returns a copy of the receiver. The resulting slice uses a different
+// backing array, meaning appends and insert operations on either slice are
+// guaranteed to only affect that slice.
+//
+// Copy should be used when modifying an existing identity list by either
+// appending new elements, re-ordering, or inserting new elements in an
+// existing index.
+func (il IdentityList) Copy() IdentityList {
+	dup := make(IdentityList, len(il))
+	copy(dup, il)
+	return dup
+}
+
 // Selector returns an identity filter function that selects only identities
 // within this identity list.
 func (il IdentityList) Selector() IdentityFilter {
 
-	lookup := make(map[Identifier]struct{})
-	for _, identity := range il {
-		lookup[identity.NodeID] = struct{}{}
-	}
+	lookup := il.Lookup()
 	return func(identity *Identity) bool {
 		_, exists := lookup[identity.NodeID]
 		return exists
 	}
 }
 
+func (il IdentityList) Lookup() map[Identifier]struct{} {
+	lookup := make(map[Identifier]struct{})
+	for _, identity := range il {
+		lookup[identity.NodeID] = struct{}{}
+	}
+	return lookup
+}
+
 // Order will sort the list using the given sort function.
 func (il IdentityList) Order(less IdentityOrder) IdentityList {
-	dup := make(IdentityList, 0, len(il))
-	dup = append(dup, il...)
+	dup := il.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
 		return less(dup[i], dup[j])
 	})
@@ -314,7 +366,7 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	lookup := make(map[Identifier]struct{})
 
 	// add all identities, omitted duplicates
-	for _, identity := range append(il, other...) {
+	for _, identity := range append(il.Copy(), other...) {
 		if _, exists := lookup[identity.NodeID]; exists {
 			continue
 		}
