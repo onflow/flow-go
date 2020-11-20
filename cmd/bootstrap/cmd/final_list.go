@@ -29,7 +29,7 @@ func init() {
 
 func addFinalListFlags() {
 	// partner node info flag
-	finalListCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-infoss", "", "path to a directory containing all parnter nodes details")
+	finalListCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-infos", "", "path to a directory containing all parnter nodes details")
 	_ = finalListCmd.MarkFlagRequired("partner-infos")
 
 	// internal/flow node info flag
