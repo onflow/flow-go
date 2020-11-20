@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -590,7 +589,19 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	// check each receipt included in the payload for duplication
 	for _, receipt := range payload.Receipts {
 
-		valid, err := IsValidReceipt(receipt, lookup, forkBlocks, prevReceiptHeight)
+		// if the receipt was already included before, error
+		_, duplicated := lookup[receipt.ID()]
+		if duplicated {
+			return fmt.Errorf("payload includes duplicate receipt (%x)", receipt.ID())
+		}
+
+		// if the receipt is not for a block on this fork, error
+		header, ok := forkBlocks[receipt.ExecutionResult.BlockID]
+		if !ok {
+			return fmt.Errorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
+		}
+
+		valid, err := IsValidReceipt(receipt)
 		if err != nil {
 			return fmt.Errorf("could not check validity of Execution Receipt %v: %w", receipt.ID(), err)
 		}
@@ -598,45 +609,26 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 			return state.NewInvalidExtensionErrorf("payload includes invalid receipt (%x)", receipt.ID())
 		}
 
-		// at this point we know that forkBlocks contains the receipt's block
-		// because otherwise the receipt wouldn't be valid and the function
-		// would have already errored-out
-		prevReceiptHeight = forkBlocks[receipt.ExecutionResult.BlockID].Height
+		// check receipts are sorted by block height
+		if header.Height < prevReceiptHeight {
+			return fmt.Errorf("payload receipts should be sorted by block height")
+		}
+
+		prevReceiptHeight = header.Height
 	}
 
 	return nil
 }
 
-// IsValidReceipt checks the validity of a receipt against the following
-// criteria:
-// * the receipt IS NOT in receiptLookup
-// * the receipt's block IS in blockLookup
-// * the receipt's block is higher than minHeight
-func IsValidReceipt(receipt *flow.ExecutionReceipt,
-	receiptLookup map[flow.Identifier]struct{},
-	blockLookup map[flow.Identifier]*flow.Header,
-	minHeight uint64) (bool, error) {
+// IsValidReceipt performs checks that are independent of where the receipt was
+// incorporate:
+//
+// - Is the receipt from a valid execution node with non-zero weight (stake)?
+// - Cryptography checks
+// - Does it contain the expected number of chunks?
 
-	// if the receipt was already included before, error
-	_, duplicated := receiptLookup[receipt.ID()]
-	if duplicated {
-		log.Debug().Msgf("payload includes duplicate receipt (%x)", receipt.ID())
-		return false, nil
-	}
-
-	// if the receipt is not for a block on this fork, error
-	header, ok := blockLookup[receipt.ExecutionResult.BlockID]
-	if !ok {
-		log.Debug().Msgf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
-		return false, nil
-	}
-
-	// check receipts are sorted by block height
-	if header.Height < minHeight {
-		log.Debug().Msg("payload receipts should be sorted by block height")
-		return false, nil
-	}
-
+func IsValidReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
+	// TODO fill this out
 	return true, nil
 }
 
