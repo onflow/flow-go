@@ -21,30 +21,31 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-type EpochTransitionTestSuite struct {
+// MutableIdentityTableSuite tests that the networking layer responds correctly
+// to changes to the identity table. When nodes are added, we should update our
+// topology and accept connections from these new nodes. When nodes are removed
+// or ejected we should update our topology and restrict connections from these
+// nodes.
+type MutableIdentityTableSuite struct {
 	suite.Suite
 	ConduitWrapper
-	nets              []*libp2p.Network
-	mws               []*libp2p.Middleware
-	idRefreshers      []*libp2p.NodeIDRefresher
-	engines           []*MeshEngine
-	state             *protocol.ReadOnlyState
-	snapshot          *protocol.Snapshot
-	ids               flow.IdentityList
-	currentEpoch      uint64 //counter to track the current epoch
-	currentEpochPhase flow.EpochPhase
-	epochQuery        *mocks.EpochQuery
-	logger            zerolog.Logger
+	nets         []*libp2p.Network
+	mws          []*libp2p.Middleware
+	idRefreshers []*libp2p.NodeIDRefresher
+	engines      []*MeshEngine
+	state        *protocol.ReadOnlyState
+	snapshot     *protocol.Snapshot
+	ids          flow.IdentityList
+	logger       zerolog.Logger
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
-	suite.Run(t, new(EpochTransitionTestSuite))
+	suite.Run(t, new(MutableIdentityTableSuite))
 }
 
-func (suite *EpochTransitionTestSuite) SetupTest() {
+func (ts *MutableIdentityTableSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
@@ -55,22 +56,16 @@ func (suite *EpochTransitionTestSuite) SetupTest() {
 	suite.ids = ids
 	suite.mws = mws
 
-	// setup current epoch
-	suite.currentEpoch = 0
-	suite.currentEpochPhase = flow.EpochPhaseStaking
-	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.currentEpoch)
-	suite.addEpoch(suite.currentEpoch, suite.ids)
-
 	// setup state related mocks
-	suite.state = new(protocol.ReadOnlyState)
-	suite.snapshot = new(protocol.Snapshot)
-	suite.snapshot.On("Identities", testifymock.Anything).Return(ids, nil)
-	suite.snapshot.On("Epochs").Return(suite.epochQuery)
-	suite.snapshot.On("Phase").Return(
-		func() flow.EpochPhase { return suite.currentEpochPhase },
-		func() error { return nil },
-	)
-	suite.state.On("Final").Return(suite.snapshot, nil)
+	final := unittest.BlockHeaderFixture()
+	ts.state = new(protocol.ReadOnlyState)
+	ts.snapshot = new(protocol.Snapshot)
+	ts.snapshot.On("Head").Return(&final, nil)
+	ts.snapshot.On("Phase").Return(flow.EpochPhaseCommitted, nil)
+	ts.snapshot.On("Identities", testifymock.Anything).Return(
+		func(flow.IdentityFilter) flow.IdentityList { return ts.ids },
+		func(flow.IdentityFilter) error { return nil })
+	ts.state.On("Final").Return(ts.snapshot, nil)
 
 	// all nodes use the same state mock
 	states := make([]*protocol.ReadOnlyState, nodeCount)
@@ -93,16 +88,35 @@ func (suite *EpochTransitionTestSuite) SetupTest() {
 // TearDownTest closes the networks within a specified timeout
 func (suite *EpochTransitionTestSuite) TearDownTest() {
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
+func (ts *MutableIdentityTableSuite) TearDownTest() {
+	for _, net := range ts.nets {
+		select {
+		// closes the network
+		case <-net.Done():
+			continue
+		case <-time.After(3 * time.Second):
+			ts.Suite.Fail("could not stop the network")
+		}
+	}
 }
 
 // TestNewNodeAdded tests that an additional node in the next epoch gets connected to other nodes and can exchange messages
 // in the current epoch
 func (suite *EpochTransitionTestSuite) TestNewNodeAdded() {
+// TestNewNodeAdded tests that when a new node is added to the identity list
+// (ie. as a result of a EpochSetup event) that it can connect to the network.
+func (ts *MutableIdentityTableSuite) TestNewNodeAdded() {
+
 	// create the id, middleware and network for a new node
 	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), 1, suite.logger, 100, nil, !DryRun)
+	ids, mws, nets := generateIDsMiddlewaresNetworks(ts.T(), 1, ts.logger, 100, nil, false)
+	newID := ids[0]
+	ts.nets = append(ts.nets, nets[0])
 	newMiddleware := mws[0]
 
 	newIDs := append(suite.ids, ids...)
+	newIDs := append(ts.ids, ids...)
+	ts.ids = newIDs
 
 	// create a new refresher
 	newIDRefresher := suite.generateNodeIDRefreshers(nets)
@@ -112,57 +126,55 @@ func (suite *EpochTransitionTestSuite) TestNewNodeAdded() {
 	newEngine := GenerateEngines(suite.T(), nets)
 	newEngines := append(suite.engines, newEngine...)
 
-	// update epoch query mock to return new IDs for the next epoch
-	nextEpoch := suite.currentEpoch + 1
-	suite.addEpoch(nextEpoch, newIDs)
-
-	// adjust the epoch phase
-	suite.currentEpochPhase = flow.EpochPhaseSetup
-
-	// trigger an epoch phase change for all networks going from flow.EpochPhaseStaking to flow.EpochPhaseSetup
+	// trigger the identity table change event
 	for _, n := range newIDRefreshers {
-		n.EpochSetupPhaseStarted(nextEpoch, nil)
+		n.OnIdentityTableChanged()
 	}
 
 	// check if the new node has sufficient connections with the existing nodes
 	// if it does, then it has been inducted successfully in the network
-	checkConnectivity(suite.T(), newMiddleware, ids)
+	checkConnectivity(ts.T(), newMiddleware, newIDs.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
 
 	// check that all the engines on this new epoch can talk to each other
 	sendMessagesAndVerify(suite.T(), newIDs, newEngines, suite.Publish)
 }
 
-// TestNodeRemoved tests that a node that is removed in the next epoch remains connected for the current epoch
-func (suite *EpochTransitionTestSuite) TestNodeRemoved() {
+// TestNodeRemoved tests that when an existing node is removed from the identity
+// list (ie. as a result of an ejection or transition into an epoch where that node
+// has un-staked) that it cannot connect to the network.
+func (ts *MutableIdentityTableSuite) TestNodeRemoved() {
+
 	// choose a random node to remove
-	removeIndex := rand.Intn(len(suite.ids))
-	removedID := suite.ids[removeIndex]
-	removedMW := suite.mws[removeIndex]
+	removeIndex := rand.Intn(len(ts.ids))
+	removedID := ts.ids[removeIndex]
 
 	// remove the identity at that index from the ids
-	newIDs := suite.ids.Filter(filter.Not(filter.HasNodeID(removedID.NodeID)))
+	newIDs := ts.ids.Filter(filter.Not(filter.HasNodeID(removedID.NodeID)))
+	ts.ids = newIDs
 
-	// update epoch query mock to return new IDs for the next epoch
-	nextEpoch := suite.currentEpoch + 1
-	suite.addEpoch(nextEpoch, newIDs)
-
-	// adjust the epoch phase
-	suite.currentEpochPhase = flow.EpochPhaseSetup
+	// create a list of engines except for the removed node
+	var newEngines []*MeshEngine
+	for i, eng := range ts.engines {
+		if i == removeIndex {
+			continue
+		}
+		newEngines = append(newEngines, eng)
+	}
 
 	// trigger an epoch phase change for all nodes
 	// from flow.EpochPhaseStaking to flow.EpochPhaseSetup
-	for _, n := range suite.idRefreshers {
-		n.EpochSetupPhaseStarted(nextEpoch, nil)
+	for _, n := range ts.idRefreshers {
+		n.OnIdentityTableChanged()
 	}
 
-	// check if the evicted node still has sufficient connections with the existing nodes
-	checkConnectivity(suite.T(), removedMW, newIDs)
+	// check that all remaining engines can still talk to each other
+	sendMessagesAndVerify(ts.T(), newIDs, newEngines, ts.Publish)
 
-	// check that all the engines on this new epoch can still talk to each other
-	sendMessagesAndVerify(suite.T(), suite.ids, suite.engines, suite.Publish)
+	// TODO check that messages to/from evicted node are not delivered
 }
 
-// checkConnectivity checks that the middleware of a node is directly connected to atleast half of the other nodes
+// checkConnectivity checks that the middleware of a node is directly connected
+// to at least half of the other nodes.
 func checkConnectivity(t *testing.T, mw *libp2p.Middleware, ids flow.IdentityList) {
 	threshold := len(ids) / 2
 	assert.Eventually(t, func() bool {
@@ -175,14 +187,14 @@ func checkConnectivity(t *testing.T, mw *libp2p.Middleware, ids flow.IdentityLis
 			}
 		}
 		return connections >= threshold
-	}, 5*time.Second, time.Millisecond)
+	}, 5*time.Second, time.Millisecond*100)
 }
 
-// sendMessagesAndVerify sends a message from each engine to the other engines and verifies that all the messages are
-// delivered
+// sendMessagesAndVerify sends a message from each engine to the other engines
+// and verifies that all the messages are delivered.
 func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngine, send ConduitSendWrapperFunc) {
 
-	// allows nodes to find each other in case of Mulitcast and Publish
+	// allows nodes to find each other in case of Multicast and Publish
 	optionalSleep(send)
 
 	count := len(engs)
@@ -221,6 +233,7 @@ func (suite *EpochTransitionTestSuite) addEpoch(counter uint64, ids flow.Identit
 }
 
 func (suite *EpochTransitionTestSuite) generateNodeIDRefreshers(nets []*libp2p.Network) []*libp2p.NodeIDRefresher {
+func (ts *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*libp2p.Network) []*libp2p.NodeIDRefresher {
 	refreshers := make([]*libp2p.NodeIDRefresher, len(nets))
 	for i, net := range nets {
 		refreshers[i] = libp2p.NewNodeIDRefresher(suite.logger, suite.state, net.SetIDs)

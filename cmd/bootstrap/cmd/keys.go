@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
+func genNetworkAndStakingKeys() []model.NodeInfo {
 
 	var nodeConfigs []model.NodeConfig
 	readJSON(flagConfig, &nodeConfigs)
