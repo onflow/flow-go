@@ -13,6 +13,7 @@ type Context struct {
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
+	EventCollectionByteSizeLimit     uint64
 	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
@@ -46,9 +47,9 @@ func newContext(ctx Context, opts ...Option) Context {
 
 const AccountKeyWeightThreshold = 1000
 
-const defaultGasLimit = 100000
+const defaultGasLimit = 100_000
 
-const totalEventByteSizeLimit = 10000 // 10KB
+const defaultEventCollectionByteSizeLimit = 128_000 // 128KB
 
 func defaultContext() Context {
 	return Context{
@@ -57,6 +58,7 @@ func defaultContext() Context {
 		Blocks:                           nil,
 		Metrics:                          nil,
 		GasLimit:                         defaultGasLimit,
+		EventCollectionByteSizeLimit:     defaultEventCollectionByteSizeLimit,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
@@ -68,7 +70,6 @@ func defaultContext() Context {
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
 			NewTransactionInvocator(),
-			NewTransactionEventLimiter(totalEventByteSizeLimit),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
@@ -97,6 +98,14 @@ func WithASTCache(cache ASTCache) Option {
 
 // WithGasLimit sets the gas limit for a virtual machine context.
 func WithGasLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.GasLimit = limit
+		return ctx
+	}
+}
+
+// WithEventCollectionSizeLimit sets the event collection byte size limit for a virtual machine context.
+func WithEventCollectionSizeLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.GasLimit = limit
 		return ctx
@@ -135,7 +144,7 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 	}
 }
 
-// WithTransactionSignatureVerifier sets the transaction processors for a
+// WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.
 func WithTransactionProcessors(processors ...TransactionProcessor) Option {
 	return func(ctx Context) Context {

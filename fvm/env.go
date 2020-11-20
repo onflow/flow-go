@@ -26,15 +26,12 @@ type hostEnv struct {
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *UUIDGenerator
-
 	runtime.Metrics
-
 	events             []flow.Event
-	totalEventByteSize uint32
+	totalEventByteSize uint64
 	logs               []string
-
-	transactionEnv *transactionEnv
-	rng            *rand.Rand
+	transactionEnv     *transactionEnv
+	rng                *rand.Rand
 }
 
 func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
@@ -54,7 +51,7 @@ func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
 		accounts:           accounts,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
-		totalEventByteSize: uint32(0),
+		totalEventByteSize: uint64(0),
 	}
 
 	if ctx.BlockHeader != nil {
@@ -188,8 +185,13 @@ func (e *hostEnv) EmitEvent(event cadence.Event) {
 		panic("failed to encode event")
 	}
 
-	e.totalEventByteSize += uint32(len(payload))
-	// TODO limit size
+	e.totalEventByteSize += uint64(len(payload))
+	if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
+		// TODO return error on limit size
+		// TODO define error type
+		panic("max event limit size has exceeded the limit")
+		// return fmt.Errorf("max event limit size has exceeded the limit: %w", err)
+	}
 
 	flowEvent := flow.Event{
 		Type:             flow.EventType(event.EventType.ID()),
@@ -377,9 +379,13 @@ type transactionEnv struct {
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 
-	tx          *flow.TransactionBody
-	txIndex     uint32
-	txID        flow.Identifier
+	tx      *flow.TransactionBody
+	txIndex uint32
+	txID    flow.Identifier
+
+	// limits
+	maxEventCollectionByteSize uint32
+
 	authorizers []runtime.Address
 }
 
@@ -391,6 +397,7 @@ func newTransactionEnv(
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
 	txIndex uint32,
+
 ) *transactionEnv {
 	return &transactionEnv{
 		vm:               vm,
