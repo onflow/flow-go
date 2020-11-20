@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -177,21 +176,12 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 		fnb.Middleware = mw
 
-		participants, err := fnb.State.Final().Identities(filter.Any)
-		if err != nil {
-			return nil, fmt.Errorf("could not get node id: %w", err)
-		}
-		nodeRole := nodeID.Role
-
 		participants, err := fnb.State.Final().Identities(libp2p.NetworkingSetFilter)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		var nodeTopology topology.Topology
-
-		nodeTopology, err = topology.NewTopicBasedTopology(fnb.Me.NodeID(), fnb.State)
-
+		nodeTopology, err := topology.NewTopicBasedTopology(fnb.Me.NodeID(), fnb.State)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
