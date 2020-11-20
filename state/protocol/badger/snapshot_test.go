@@ -3,6 +3,7 @@
 package badger_test
 
 import (
+	"errors"
 	"math/rand"
 	"testing"
 	"time"
@@ -177,6 +178,105 @@ func TestSeed(t *testing.T) {
 	})
 }
 
+// test that we can query current/next/previous epochs from a snapshot
+func TestSnapshot_EpochQuery(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
+
+		identities := unittest.CompleteIdentitySet()
+		root, result, seal := unittest.BootstrapFixture(identities)
+		err := state.Mutate().Bootstrap(root, result, seal)
+		require.Nil(t, err)
+
+		epoch1Counter := seal.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
+		epoch2Counter := epoch1Counter + 1
+
+		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
+		// See EpochBuilder documentation for details of these blocks.
+		//
+		epochBuilder := unittest.NewEpochBuilder(t, state)
+		// build blocks WITHIN epoch 1 - PREPARING epoch 2
+		// A - height 0 (root block)
+		// B - height 1 - staking phase
+		// C - height 2 - setup phase
+		// D - height 3 - committed phase
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+		// build blocks WITHIN epoch 2 - PREPARING epoch 3
+		// A - height 4
+		// B - height 5 - staking phase
+		// C - height 6 - setup phase
+		// D - height 7 - committed phase
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		epoch1Heights := []uint64{0, 1, 2, 3}
+		epoch2Heights := []uint64{4, 5, 6, 7}
+
+		// we should be able to query the current epoch from any block
+		t.Run("Current", func(t *testing.T) {
+			t.Run("epoch 1", func(t *testing.T) {
+				for _, height := range epoch1Heights {
+					counter, err := state.AtHeight(height).Epochs().Current().Counter()
+					require.Nil(t, err)
+					assert.Equal(t, epoch1Counter, counter)
+				}
+			})
+
+			t.Run("epoch 2", func(t *testing.T) {
+				for _, height := range epoch2Heights {
+					counter, err := state.AtHeight(height).Epochs().Current().Counter()
+					require.Nil(t, err)
+					assert.Equal(t, epoch2Counter, counter)
+				}
+			})
+		})
+
+		// we should be unable to query next epoch before it is defined by EpochSetup
+		// event, afterward we should be able to query next epoch
+		t.Run("Next", func(t *testing.T) {
+			t.Run("epoch 1: before next epoch available", func(t *testing.T) {
+				for _, height := range epoch1Heights[:2] {
+					_, err := state.AtHeight(height).Epochs().Next().Counter()
+					assert.Error(t, err)
+					assert.True(t, errors.Is(err, protocol.ErrNextEpochNotSetup))
+				}
+			})
+
+			t.Run("epoch 2: after next epoch available", func(t *testing.T) {
+				for _, height := range epoch1Heights[2:] {
+					counter, err := state.AtHeight(height).Epochs().Next().Counter()
+					require.Nil(t, err)
+					assert.Equal(t, epoch2Counter, counter)
+				}
+			})
+		})
+
+		// we should get a sentinel error when querying previous epoch from the
+		// first epoch after the root block, otherwise we should always be able
+		// to query previous epoch
+		t.Run("Previous", func(t *testing.T) {
+			t.Run("epoch 1", func(t *testing.T) {
+				for _, height := range epoch1Heights {
+					_, err := state.AtHeight(height).Epochs().Previous().Counter()
+					assert.Error(t, err)
+					assert.True(t, errors.Is(err, protocol.ErrNoPreviousEpoch))
+				}
+			})
+
+			t.Run("epoch 2", func(t *testing.T) {
+				for _, height := range epoch2Heights {
+					counter, err := state.AtHeight(height).Epochs().Previous().Counter()
+					require.Nil(t, err)
+					assert.Equal(t, epoch1Counter, counter)
+				}
+			})
+		})
+	})
+}
+
+// test that querying the first view of an epoch returns the appropriate value
 func TestSnapshot_EpochFirstView(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
