@@ -157,7 +157,7 @@ func migrateContract(p ledger.Payload) ([]ledger.Payload, error) {
 		return nil, fmt.Errorf("contract TypeId not in correct format")
 	}
 	newKey := changeKey(p.Key, fmt.Sprintf("contract\x1F%s", pieces[2]))
-	logKeyChange(p.Key, newKey)
+	logKeyChange(address.Hex(), p.Key, newKey)
 	return []ledger.Payload{{
 		Key:   newKey,
 		Value: p.Value,
@@ -241,7 +241,7 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 		if err != nil {
 			return nil, err
 		}
-		logKeyChange(oldKey, p.Key, contractsRegister.Key)
+		logKeyChange(address.Hex(), oldKey, p.Key, contractsRegister.Key)
 		return []ledger.Payload{p, contractsRegister}, nil
 	case 2:
 		// We have two declarations. Due to the current rules one of them is an interface and one is a contract.
@@ -301,7 +301,7 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 		if err != nil {
 			return nil, err
 		}
-		logKeyChange(p.Key, interfaceKey, contractKey, contractsRegister.Key)
+		logKeyChange(address.Hex(), p.Key, interfaceKey, contractKey, contractsRegister.Key)
 		return []ledger.Payload{
 			{
 				Key:   interfaceKey,
@@ -337,13 +337,14 @@ func changeKey(key ledger.Key, value string) ledger.Key {
 	return newKey
 }
 
-func logKeyChange(original ledger.Key, changed ...ledger.Key) {
+func logKeyChange(address string, original ledger.Key, changed ...ledger.Key) {
 	arr := zerolog.Arr()
 	for i := range changed {
 		arr.Str(string(changed[i].KeyParts[2].Value))
 	}
 	log.Info().
 		Str("original", string(original.KeyParts[2].Value)).
+		Str("address", address).
 		Array("new", arr).
 		Msg("migrated key")
 }
