@@ -72,9 +72,9 @@ func TestExtractExecutionState(t *testing.T) {
 			commits := badger.NewCommits(metr, db)
 
 			// generate some oldLedger data
-			size := 4
-			keyMaxByteSize := 10
-			valueMaxByteSize := 10
+			size := 10
+			keyMaxByteSize := 64
+			valueMaxByteSize := 1024
 
 			f, err := complete.NewLedger(execdir, size*10, metr, zerolog.Nop(), nil, complete.DefaultPathFinderVersion)
 			//f, err := oldLedger.NewMTrieStorage(execdir, size*10, metr, nil)
