@@ -18,6 +18,7 @@ type Context struct {
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
+	CadenceLoggingEnabled            bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
@@ -63,6 +64,7 @@ func defaultContext() Context {
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
+		CadenceLoggingEnabled:            false,
 		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
@@ -166,6 +168,15 @@ func WithServiceAccount(enabled bool) Option {
 func WithRestrictedDeployment(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedDeploymentEnabled = enabled
+		return ctx
+	}
+}
+
+// WithCadenceLogging enables or disables cadence logging for a
+// virtual machine context.
+func WithCadenceLogging(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.CadenceLoggingEnabled = enabled
 		return ctx
 	}
 }

@@ -173,7 +173,9 @@ func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) erro
 }
 
 func (e *hostEnv) Log(message string) {
-	e.logs = append(e.logs, message)
+	if e.ctx.CadenceLoggingEnabled {
+		e.logs = append(e.logs, message)
+	}
 }
 
 func (e *hostEnv) EmitEvent(event cadence.Event) {
