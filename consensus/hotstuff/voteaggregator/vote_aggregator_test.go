@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/indices"
+	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -83,6 +84,10 @@ func (as *AggregatorSuite) SetupTest() {
 	epoch.On("Seed", params...).Return(seed, nil)
 	epoch.On("FirstView").Return(uint64(0), nil)
 	epoch.On("FinalView").Return(uint64(1000), nil)
+	// there is no previous epoch
+	previousEpoch := &protomock.Epoch{}
+	epochs.On("Previous").Return(previousEpoch)
+	previousEpoch.On("Counter").Return(uint64(0), protocol.ErrNoPreviousEpoch)
 
 	// create a mocked forks
 	as.forks = &mocks.Forks{}

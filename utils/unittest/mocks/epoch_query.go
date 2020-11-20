@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/state/protocol"
+	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 )
 
 // EpochQuery implements protocol.EpochQuery for testing purposes.
@@ -35,6 +36,14 @@ func (mock *EpochQuery) Current() protocol.Epoch {
 
 func (mock *EpochQuery) Next() protocol.Epoch {
 	return mock.byCounter[mock.counter+1]
+}
+
+func (mock *EpochQuery) Previous() protocol.Epoch {
+	epoch, exists := mock.byCounter[mock.counter-1]
+	if !exists {
+		return bprotocol.NewInvalidEpoch(protocol.ErrNoPreviousEpoch)
+	}
+	return epoch
 }
 
 func (mock *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
