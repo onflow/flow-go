@@ -18,7 +18,7 @@ import (
 // Only the EpochSetup event for the epoch has been emitted as of the point
 // at which the epoch was queried.
 type SetupEpoch struct {
-	firstView  uint64
+	query      *EpochQuery
 	setupEvent *flow.EpochSetup
 }
 
@@ -27,8 +27,15 @@ func (es *SetupEpoch) Counter() (uint64, error) {
 }
 
 func (es *SetupEpoch) FirstView() (uint64, error) {
-	// TODO
-	return 0, nil
+	status, err := es.query.snap.state.epoch.statuses.ByBlockID(es.query.snap.blockID)
+	if err != nil {
+		return 0, fmt.Errorf("could not get epoch status: %w", err)
+	}
+	first, err := es.query.snap.state.headers.ByBlockID(status.FirstBlockID)
+	if err != nil {
+		return 0, fmt.Errorf("could not get epoch first block: %w", err)
+	}
+	return first.View, nil
 }
 
 func (es *SetupEpoch) FinalView() (uint64, error) {
@@ -56,7 +63,7 @@ func (es *SetupEpoch) Clustering() (flow.ClusterList, error) {
 	return clustering, nil
 }
 
-func (es *SetupEpoch) Cluster(index uint) (protocol.Cluster, error) {
+func (es *SetupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
 	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
 }
 
@@ -68,8 +75,9 @@ func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
 	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
 }
 
-func NewSetupEpoch(setupEvent *flow.EpochSetup) *SetupEpoch {
+func (q *EpochQuery) NewSetupEpoch(setupEvent *flow.EpochSetup) *SetupEpoch {
 	return &SetupEpoch{
+		query:      q,
 		setupEvent: setupEvent,
 	}
 }
@@ -118,9 +126,10 @@ func (es *CommittedEpoch) DKG() (protocol.DKG, error) {
 	return &DKG{commitEvent: es.commitEvent}, nil
 }
 
-func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
+func (q *EpochQuery) NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
 	return &CommittedEpoch{
 		SetupEpoch: SetupEpoch{
+			query:      q,
 			setupEvent: setupEvent,
 		},
 		commitEvent: commitEvent,

@@ -270,7 +270,7 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	return NewCommittedEpoch(setup, commit)
+	return q.NewCommittedEpoch(setup, commit)
 }
 
 // Next returns the next epoch.
@@ -308,7 +308,7 @@ func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 		// we currently only support snapshots of the current and next Epoch
 		return NewInvalidEpoch(fmt.Errorf("past epoch"))
 	case counter == currentSetup.Counter:
-		return NewCommittedEpoch(currentSetup, currentCommit)
+		return q.NewCommittedEpoch(currentSetup, currentCommit)
 	case counter == currentSetup.Counter+1:
 		if status.NextEpoch.SetupID == flow.ZeroID {
 			return NewInvalidEpoch(fmt.Errorf("epoch still undefined"))
@@ -319,13 +319,13 @@ func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 		}
 
 		if status.NextEpoch.CommitID == flow.ZeroID {
-			return NewSetupEpoch(nextSetup)
+			return q.NewSetupEpoch(nextSetup)
 		}
 		nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
 		if err != nil {
 			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
 		}
-		return NewCommittedEpoch(nextSetup, nextCommit)
+		return q.NewCommittedEpoch(nextSetup, nextCommit)
 	default:
 		// we currently only support snapshots of the current and next Epoch
 		return NewInvalidEpoch(fmt.Errorf("epoch too far in future"))
