@@ -23,7 +23,7 @@ type TopicBasedTopology struct {
 func NewTopicBasedTopology(nodeID flow.Identifier,
 	state protocol.ReadOnlyState,
 	subMngr channel.SubscriptionManager) (*TopicBasedTopology, error) {
-	seed, err := seedFromID(nodeID)
+	seed, err := intSeedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)
 	}
