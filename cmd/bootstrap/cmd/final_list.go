@@ -139,19 +139,17 @@ func validateNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 
 // validateNodeIDs will go through both sets of nodes and ensure that no node-id
 // are missing. It will log all missing node ID's and throw an error.
-func validateNodeIDs(collectedNodes model.NodeInfo, stakedNodes model.NodeInfo) {
+func validateNodeIDs(collectedNodes []model.NodeInfo, stakedNodes []model.NodeInfo) {
 
 	// go through staking nodes
 	invalidStakingNodes := make([]model.NodeInfo, 0)
-	for _, node := range stakingNodes {
-		if node.NodeID == nil {
+	for _, node := range stakedNodes {
+		if node.NodeID.String() == "" {
 
 			// we warn here but exit later
 			invalidStakingNodes = append(invalidStakingNodes, node)
 			log.Warn().
 				Str("node-address", node.Address).
-				Str("node-network-key", node.NetworkPubKey.String()).
-				Str("node-staking-key", node.StakingPubKey.String()).
 				Msg("missing node-id from staked nodes")
 		}
 	}
@@ -159,14 +157,12 @@ func validateNodeIDs(collectedNodes model.NodeInfo, stakedNodes model.NodeInfo) 
 	// go through staking nodes
 	invalidNodes := make([]model.NodeInfo, 0)
 	for _, node := range collectedNodes {
-		if node.NodeID == nil {
+		if node.NodeID.String() == "" {
 
 			// we warn here but exit later
-			invalidNodes = append(v, node)
+			invalidNodes = append(invalidNodes, node)
 			log.Warn().
 				Str("node-address", node.Address).
-				Str("node-network-key", node.NetworkPubKey.String()).
-				Str("node-staking-key", node.StakingPubKey.String()).
 				Msg("missing node-id from collected nodes")
 		}
 	}
