@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -23,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
-	libp2pmock "github.com/onflow/flow-go/network/gossip/libp2p/mock"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -100,7 +98,7 @@ func GenerateNetworks(t *testing.T,
 	ids flow.IdentityList,
 	mws []*libp2p.Middleware,
 	csize int,
-	topMngrs []topology.Manager,
+	tops []topology.Topology,
 	sms []channel.SubscriptionManager,
 	dryRunMode bool) []*libp2p.Network {
 	count := len(ids)
@@ -108,7 +106,7 @@ func GenerateNetworks(t *testing.T,
 	metrics := metrics.NewNoopCollector()
 
 	// checks if necessary to generate topology managers
-	if topMngrs == nil {
+	if tops == nil {
 		// nil topology managers means generating default ones
 
 		// creates default topology
@@ -119,8 +117,7 @@ func GenerateNetworks(t *testing.T,
 		state, _ := topology.CreateMockStateForCollectionNodes(t,
 			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 		// creates topology instances for the nodes based on their roles
-		tops := GenerateTopologies(t, state, ids)
-		topMngrs = GenerateTopologyManager(t, sms, tops)
+		tops = GenerateTopologies(t, state, ids, sms)
 	}
 
 	for i := 0; i < count; i++ {
@@ -132,7 +129,7 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, topMngrs[i], sms[i], metrics)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -162,11 +159,11 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	n int,
 	log zerolog.Logger,
 	csize int,
-	topMngrs []topology.Manager,
+	tops []topology.Topology,
 	dryRun bool) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
 	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(t, log, ids, mws, csize, topMngrs, sms, dryRun)
+	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
 	return ids, mws, networks
 }
 
@@ -198,13 +195,14 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 
 // CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
 // and returns the slice of topologies.
-func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList) []topology.Topology {
+func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList,
+	subMngrs []channel.SubscriptionManager) []topology.Topology {
 	tops := make([]topology.Topology, 0)
-	for _, id := range identities {
+	for i, id := range identities {
 		var top topology.Topology
 		var err error
 
-		top, err = topology.NewTopicBasedTopology(id.NodeID, state)
+		top, err = topology.NewTopicBasedTopology(id.NodeID, state, subMngrs[i])
 		require.NoError(t, err)
 
 		tops = append(tops, top)
@@ -221,42 +219,6 @@ func GenerateSubscriptionManagers(t *testing.T, mws []*libp2p.Middleware) []chan
 		sms[i] = libp2p.NewChannelSubscriptionManager(mw)
 	}
 	return sms
-}
-
-// MockSubscriptionManager returns a list of mocked subscription manages for the input
-// identities. It only mocks the GetChannelIDs method of the subscription manager. Other methods
-// return an error, as they are not supposed to be invoked.
-func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.SubscriptionManager {
-	require.NotEmpty(t, ids)
-
-	sms := make([]channel.SubscriptionManager, len(ids))
-	for i, id := range ids {
-		sm := &libp2pmock.SubscriptionManager{}
-		err := fmt.Errorf("this method should not be called on mock subscription manager")
-		sm.On("Register", testifymock.Anything, testifymock.Anything).Return(err)
-		sm.On("Unregister", testifymock.Anything).Return(err)
-		sm.On("GetEngine", testifymock.Anything).Return(err)
-		sm.On("GetChannelIDs").Return(engine.ChannelIDsByRole(id.Role))
-		sms[i] = sm
-	}
-
-	return sms
-}
-
-// GenerateTopologyManager creates a default stateful topology manager per topology and its corresponding subscription
-//manager.
-func GenerateTopologyManager(t *testing.T, subMngrs []channel.SubscriptionManager, tops []topology.Topology) []topology.Manager {
-	topMngrs := make([]topology.Manager, len(tops))
-	for i := 0; i < len(tops); i++ {
-		var topMngr topology.Manager
-		var err error
-
-		topMngr = topology.NewStatefulTopologyManager(tops[i], subMngrs[i])
-		require.NoError(t, err)
-
-		topMngrs[i] = topMngr
-	}
-	return topMngrs
 }
 
 // stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
