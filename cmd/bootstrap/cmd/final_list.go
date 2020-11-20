@@ -29,7 +29,7 @@ func init() {
 
 func addFinalListFlags() {
 	// partner node info flag
-	finalListCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-infos", "", "path to a directory containing all parnter nodes details")
+	finalListCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-infoss", "", "path to a directory containing all parnter nodes details")
 	_ = finalListCmd.MarkFlagRequired("partner-infos")
 
 	// internal/flow node info flag
@@ -60,19 +60,23 @@ func finalList(cmd *cobra.Command, args []string) {
 	mixedNodeInfos := mergeNodeInfos(flowNodes, partnerNodes)
 
 	// reconcile nodes from staking contract nodes
-	reconcileNodes(mixedNodeInfos, stakingNodes)
+	validateNodes(mixedNodeInfos, stakingNodes)
 
 	// write node-config.json with the new list of nodes to be used for the `finalize` command
 	writeJSON(fmt.Sprintf(flagOutdir, "node-config.json"), model.ToPublicNodeInfoList(mixedNodeInfos))
 }
 
-func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
+func validateNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 	// check node count
 	if len(nodes) != len(stakingNodes) {
 		log.Error().Int("nodes", len(nodes)).Int("staked nodes", len(stakingNodes)).
 			Msg("staked node count does not match flow and parnter node count")
 	}
 
+	// check staked and collected nodes and make sure node ID are not missing
+	validateNodeIDs(nodes, stakingNodes)
+
+	// create map
 	var nodesByID map[flow.Identifier]model.NodeInfo
 	for _, node := range nodes {
 		nodesByID[node.NodeID] = node
@@ -87,19 +91,22 @@ func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 			continue
 		}
 
-		// check node type
+		// check node type and error if mismatch
 		if matchingNode.Role != stakedNode.Role {
-			log.Warn().Str("staked node", stakedNode.NodeID.String()).
-				Str("staked node type", stakedNode.Role.String()).
+			log.Error().Str("staked node", stakedNode.NodeID.String()).
+				Str("staked node-type", stakedNode.Role.String()).
 				Str("node", matchingNode.NodeID.String()).
-				Str("node type", matchingNode.Role.String()).
+				Str("node-type", matchingNode.Role.String()).
 				Msg("node type does not match")
 		}
 
+		// No need to error adderss, and public keys as they may be different
+		// we only keep node-id constant through out sporks
+
 		// check address match
 		if matchingNode.Address != stakedNode.Address {
-			log.Warn().Str("staked node address", stakedNode.Address).
-				Str("node address", matchingNode.Address).
+			log.Warn().Str("staked node", stakedNode.NodeID.String()).
+				Str("node", matchingNode.NodeID.String()).
 				Msg("address do not match")
 		}
 
@@ -127,6 +134,45 @@ func reconcileNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 					Msg("staking keys do not match")
 			}
 		}
+	}
+}
+
+// validateNodeIDs will go through both sets of nodes and ensure that no node-id
+// are missing. It will log all missing node ID's and throw an error.
+func validateNodeIDs(collectedNodes model.NodeInfo, stakedNodes model.NodeInfo) {
+
+	// go through staking nodes
+	invalidStakingNodes := make([]model.NodeInfo, 0)
+	for _, node := range stakingNodes {
+		if node.NodeID == nil {
+
+			// we warn here but exit later
+			invalidStakingNodes = append(invalidStakingNodes, node)
+			log.Warn().
+				Str("node-address", node.Address).
+				Str("node-network-key", node.NetworkPubKey.String()).
+				Str("node-staking-key", node.StakingPubKey.String()).
+				Msg("missing node-id from staked nodes")
+		}
+	}
+
+	// go through staking nodes
+	invalidNodes := make([]model.NodeInfo, 0)
+	for _, node := range collectedNodes {
+		if node.NodeID == nil {
+
+			// we warn here but exit later
+			invalidNodes = append(v, node)
+			log.Warn().
+				Str("node-address", node.Address).
+				Str("node-network-key", node.NetworkPubKey.String()).
+				Str("node-staking-key", node.StakingPubKey.String()).
+				Msg("missing node-id from collected nodes")
+		}
+	}
+
+	if len(invalidNodes) != 0 || len(invalidStakingNodes) != 0 {
+		log.Fatal().Msg("found missing nodes ids. fix and re-run")
 	}
 }
 
