@@ -170,7 +170,6 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 	value := p.Value
 	address := flow.BytesToAddress(p.Key.KeyParts[0].Value)
 	if len(value) == 0 {
-		logKeyChange(p.Key)
 		return []ledger.Payload{}, nil
 	}
 
