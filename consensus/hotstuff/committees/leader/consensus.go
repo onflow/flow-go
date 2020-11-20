@@ -10,7 +10,9 @@ import (
 )
 
 // SelectionForConsensus pre-computes and returns leaders for the consensus committee
-// in the given epoch.
+// in the given epoch. The consensus committee spans multiple epochs and the leader
+// selection returned here is only valid for the input epoch, so it is necessary to
+// call this for each upcoming epoch.
 func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 
 	// pre-compute leader selection for the epoch

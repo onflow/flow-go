@@ -91,7 +91,6 @@ func (as *AggregatorSuite) SetupTest() {
 	as.MockProtocolByBlockID(rootHeader.ID())
 
 	// create hotstuff.Committee
-	// TODO update protocol state mock
 	var err error
 	as.committee, err = committees.NewConsensusCommittee(as.protocol, as.participants[0].NodeID)
 	require.NoError(as.T(), err)
