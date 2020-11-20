@@ -4,14 +4,10 @@ import "github.com/onflow/flow-go/model/flow"
 
 // Topology provides a subset of nodes which a given node should directly connect to for 1-k messaging
 type Topology interface {
-	// SubsetChannel returns a random subset of the identity list that is passed. `shouldHave` represents set of
-	// identities that should be included in the returned subset.
-	// Returned identities should all subscribed to the specified `channel`.
-	// Note: this method should not include identity of its executor.
-	SubsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList, channel string) (flow.IdentityList, error)
-	// SubsetRole returns a random subset of the identity list that is passed. `shouldHave` represents set of
-	// identities that should be included in the returned subset.
-	// Returned identities should all be of one of the specified `roles`.
-	// Note: this method should not include identity of its executor.
-	SubsetRole(ids flow.IdentityList, shouldHave flow.IdentityList, roles flow.RoleList) (flow.IdentityList, error)
+	// GenerateFanout receives IdentityList of entire network and constructs the fanout IdentityList
+	// of this instance. A node directly communicates with its fanout IdentityList on epidemic dissemination
+	// of the messages (i.e., publish and multicast).
+	// Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
+	// connected graph of nodes that enables them talking to each other.
+	GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 }
