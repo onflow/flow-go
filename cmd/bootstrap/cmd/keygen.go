@@ -39,7 +39,7 @@ var keygenCmd = &cobra.Command{
 
 		// create keys
 		log.Info().Msg("generating internal private networking and staking keys")
-		nodes := genNetworkAndStakingKeys([]model.NodeInfo{})
+		nodes := genNetworkAndStakingKeys()
 		log.Info().Msg("")
 
 		// count roles
@@ -47,6 +47,9 @@ var keygenCmd = &cobra.Command{
 		for role, count := range roleCounts {
 			log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
 		}
+
+		log.Info().Msg("generating node public information")
+		genNodePubInfo(nodes)
 	},
 }
 
@@ -73,4 +76,12 @@ func isEmptyDir(path string) (bool, error) {
 		return true, nil
 	}
 	return false, err // Either not empty or error, suits both cases
+}
+
+func genNodePubInfo(nodes []model.NodeInfo) {
+	pubNodes := make([]model.NodeInfoPub, 0, len(nodes))
+	for _, node := range nodes {
+		pubNodes = append(pubNodes, node.Public())
+	}
+	writeJSON(model.PathInternalNodeInfosPub, pubNodes)
 }
