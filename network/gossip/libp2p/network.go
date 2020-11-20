@@ -32,7 +32,7 @@ type Network struct {
 	ids     flow.IdentityList
 	me      module.Local
 	mw      middleware.Middleware
-	topMngr topology.Manager // used to determine fanout connections
+	top     topology.Topology // used to determine fanout connections
 	metrics module.NetworkMetrics
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
 	queue   queue.MessageQueue
@@ -53,7 +53,7 @@ func NewNetwork(
 	me module.Local,
 	mw middleware.Middleware,
 	csize int,
-	topMngr topology.Manager,
+	top topology.Topology,
 	sm channel.SubscriptionManager,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
@@ -69,7 +69,7 @@ func NewNetwork(
 		me:      me,
 		mw:      mw,
 		rcache:  rcache,
-		topMngr: topMngr,
+		top:     top,
 		metrics: metrics,
 		subMngr: sm,
 	}
@@ -171,7 +171,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 func (n *Network) Topology() (flow.IdentityList, error) {
 	n.Lock()
 	defer n.Unlock()
-	top, err := n.topMngr.MakeTopology(n.ids)
+	top, err := n.top.GenerateFanout(n.ids)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
