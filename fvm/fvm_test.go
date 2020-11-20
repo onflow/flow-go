@@ -177,7 +177,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		require.Len(t, tx.Events, 1)
-		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].EventType.ID())
+		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].Type)
 	})
 }
 
@@ -678,10 +678,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		assert.Len(t, tx.Events, 2)
-		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].EventType.ID())
+		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].Type)
 
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-		address := flow.BytesToAddress(tx.Events[0].Fields[0].(cadence.Address).Bytes())
+		data, err := jsoncdc.Decode(tx.Events[0].Payload)
+		require.NoError(t, err)
+		address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
 		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
 	}
@@ -804,8 +806,13 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	assert.NoError(t, tx.Err)
 
 	require.Len(t, tx.Events, 1)
-	require.Equal(t, string(flow.EventAccountCreated), tx.Events[0].EventType.TypeID)
-	assert.Equal(t, flow.HexToAddress("05"), flow.Address(tx.Events[0].Fields[0].(cadence.Address)))
+	require.Equal(t, string(flow.EventAccountCreated), tx.Events[0].Type)
+
+	data, err := jsoncdc.Decode(tx.Events[0].Payload)
+	require.NoError(t, err)
+	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+
+	assert.Equal(t, flow.HexToAddress("05"), address)
 }
 
 func TestSignatureVerification(t *testing.T) {

@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -194,13 +193,11 @@ func generateCollection(transactionCount int) *entity.CompleteCollection {
 	}
 }
 
-func generateEvents(eventCount int) []cadence.Event {
-	events := make([]cadence.Event, eventCount)
+func generateEvents(eventCount int) []flow.Event {
+	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := cadence.Event{EventType: &cadence.EventType{
-			Identifier: "whatever",
-		}}
+		event := flow.Event{Type: "whatever"}
 		events[i] = event
 	}
 	return events
