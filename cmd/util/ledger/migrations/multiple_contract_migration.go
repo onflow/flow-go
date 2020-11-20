@@ -147,12 +147,19 @@ func migrateContract(p ledger.Payload) ([]ledger.Payload, error) {
 	}
 
 	value := interpreter.NewSomeValueOwningNonCopying(storedValue).Value.(*interpreter.CompositeValue)
-	log.Warn().
-		Str("TypeId", string(value.TypeID)).
-		Str("address", address.Hex()).
-		Msg("Got TypeId")
+	pieces := strings.Split(string(value.TypeID), ".")
+	if len(pieces) != 3 {
+		log.Error().
+			Str("TypeId", string(value.TypeID)).
+			Str("address", address.Hex()).
+			Msg("contract TypeId not in correct format")
+		return nil, fmt.Errorf("contract TypeId not in correct format")
+	}
 
-	return []ledger.Payload{p}, nil
+	return []ledger.Payload{{
+		Key:   changeKey(p.Key, fmt.Sprintf("contract\x1F%s", pieces[2])),
+		Value: p.Value,
+	}}, nil
 }
 
 func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
@@ -314,10 +321,14 @@ func isAddress(id flow.RegisterID) bool {
 }
 
 func addNameToKey(key ledger.Key, name string) ledger.Key {
+	return changeKey(key, fmt.Sprintf("code.%s", name))
+}
+
+func changeKey(key ledger.Key, value string) ledger.Key {
 	newKey := key
 	newKey.KeyParts = make([]ledger.KeyPart, 3)
 	copy(newKey.KeyParts, key.KeyParts)
-	newKeyString := fmt.Sprintf("code.%s", name)
+	newKeyString := value
 	newKey.KeyParts[2].Value = []byte(newKeyString)
 	return newKey
 }
