@@ -1,6 +1,7 @@
 package wal_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path"
@@ -362,6 +363,49 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 	})
+}
+
+func Test_StoringLoadingCheckpoints(t *testing.T) {
+
+	// some hash will be literally copied into the output file
+	// so we can find it and modify - to make sure we get a different checksum
+	// but not fail process by, for example, modifying saved data length causing EOF
+	someHash := []byte{22, 22, 22}
+	forest := &flattener.FlattenedForest{
+		Nodes: []*flattener.StorableNode{
+			{}, {},
+		},
+		Tries: []*flattener.StorableTrie{
+			{}, {
+				RootHash: someHash,
+			},
+		},
+	}
+	buffer := &bytes.Buffer{}
+
+	err := realWAL.StoreCheckpoint(forest, buffer)
+	require.NoError(t, err)
+
+	// copy buffer data
+	bytes2 := buffer.Bytes()[:]
+
+	t.Run("works without data modification", func(t *testing.T) {
+
+		// first buffer reads ok
+		_, err = realWAL.ReadCheckpoint(buffer)
+		require.NoError(t, err)
+	})
+
+	t.Run("detects modified data", func(t *testing.T) {
+
+		index := bytes.Index(bytes2, someHash)
+		bytes2[index] = 23
+
+		_, err = realWAL.ReadCheckpoint(bytes.NewBuffer(bytes2))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "checksum")
+	})
+
 }
 
 func loadIntoForest(forest *mtrie.Forest, forestSequencing *flattener.FlattenedForest) error {

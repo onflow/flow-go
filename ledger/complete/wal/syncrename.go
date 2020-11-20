@@ -3,8 +3,15 @@ package wal
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 )
+
+type WriterSeekerCloser interface {
+	io.Writer
+	io.Seeker
+	io.Closer
+}
 
 // SyncOnCloseRenameFile is a composite of buffered writer over a given file
 // which flushes/sync on closing and renames to `targetName` as a last step.
