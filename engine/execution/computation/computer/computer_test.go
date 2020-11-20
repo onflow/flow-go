@@ -93,15 +93,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection)
 
-		// create dummy events
-		events := generateEvents(eventsPerTransaction)
-
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
 				tx.Err = &fvm.MissingPayerError{}
-				tx.Events = events
+				// create dummy events
+				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
 			}).
 			Return(nil).
 			Times(totalTransactionCount)
@@ -124,7 +122,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
 			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
 				e := result.Events[k]
-				assert.EqualValues(t, expectedEventIndex, e.EventIndex)
+				assert.EqualValues(t, expectedEventIndex, int(e.EventIndex))
 				assert.EqualValues(t, expectedTxIndex, e.TransactionIndex)
 				k++
 			}
@@ -193,11 +191,11 @@ func generateCollection(transactionCount int) *entity.CompleteCollection {
 	}
 }
 
-func generateEvents(eventCount int) []flow.Event {
+func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := flow.Event{Type: "whatever"}
+		event := flow.Event{Type: "whatever", EventIndex: uint32(i), TransactionIndex: txIndex}
 		events[i] = event
 	}
 	return events

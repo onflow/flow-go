@@ -806,7 +806,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	assert.NoError(t, tx.Err)
 
 	require.Len(t, tx.Events, 1)
-	require.Equal(t, string(flow.EventAccountCreated), tx.Events[0].Type)
+	require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
 
 	data, err := jsoncdc.Decode(tx.Events[0].Payload)
 	require.NoError(t, err)

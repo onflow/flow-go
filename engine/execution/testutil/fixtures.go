@@ -191,11 +191,11 @@ func CreateAccountsWithSimpleAddresses(
 
 		for _, event := range tx.Events {
 			if event.Type == flow.EventAccountCreated {
-				field, err := jsoncdc.Decode(event.Payload)
+				data, err := jsoncdc.Decode(event.Payload)
 				if err != nil {
 					return nil, errors.New("error decoding events")
 				}
-				addr = field.ToGoValue().([8]byte)
+				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 				break
 			}
 
