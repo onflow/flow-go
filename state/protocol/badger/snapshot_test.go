@@ -177,6 +177,59 @@ func TestSeed(t *testing.T) {
 	})
 }
 
+func TestSnapshot_EpochFirstView(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
+
+		identities := unittest.CompleteIdentitySet()
+		root, result, seal := unittest.BootstrapFixture(identities)
+		err := state.Mutate().Bootstrap(root, result, seal)
+		require.Nil(t, err)
+
+		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
+		// See EpochBuilder documentation for details of these blocks.
+		//
+		epochBuilder := unittest.NewEpochBuilder(t, state)
+		// build blocks WITHIN epoch 1 - PREPARING epoch 2
+		// A - height 0 (root block)
+		// B - height 1 - staking phase
+		// C - height 2 - setup phase
+		// D - height 3 - committed phase
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+		// build blocks WITHIN epoch 2 - PREPARING epoch 3
+		// A - height 4
+		// B - height 5 - staking phase
+		// C - height 6 - setup phase
+		// D - height 7 - committed phase
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// figure out the expected first views of the epochs
+		epoch1FirstView := root.Header.View
+		epoch2FirstHeader, err := state.AtHeight(4).Head()
+		require.Nil(t, err)
+		epoch2FirstView := epoch2FirstHeader.View
+
+		// check first view for snapshots within epoch 1
+		heights := []uint64{0, 1, 2, 3}
+		for _, height := range heights {
+			actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
+			require.Nil(t, err)
+			assert.Equal(t, epoch1FirstView, actualFirstView)
+		}
+
+		// check first view for snapshots with epoch 2
+		heights = []uint64{4, 5, 6, 7}
+		for _, height := range heights {
+			actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
+			require.Nil(t, err)
+			assert.Equal(t, epoch2FirstView, actualFirstView)
+		}
+	})
+}
+
 // Test querying identities in different epoch phases. During staking phase we
 // should see identities from last epoch and current epoch. After staking phase
 // we should see identities from current epoch and next epoch. Identities from
