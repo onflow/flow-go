@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// intSeedFromID generates a int64 seed from a flow.Identifier
+// intSeedFromID generates a int64 seed from a flow.Identifier.
 func intSeedFromID(id flow.Identifier) (int64, error) {
 	var seed int64
 	buf := bytes.NewBuffer(id[:])
@@ -21,7 +21,8 @@ func intSeedFromID(id flow.Identifier) (int64, error) {
 	return seed, nil
 }
 
-// intSeedFromID generates a int64 seed from a flow.Identifier
+// byteSeedFromID returns SHA3_256 hash value of flow.Identifier to be used as
+// a random number generator seed.
 func byteSeedFromID(id flow.Identifier) ([]byte, error) {
 	h, err := crypto.NewHasher(crypto.SHA3_256)
 	if err != nil {
