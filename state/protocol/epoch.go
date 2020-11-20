@@ -16,9 +16,14 @@ type EpochQuery interface {
 	// have a next epoch available after the transition to epoch setup phase.
 	Next() Epoch
 
-	// ByCounter returns an arbitrary epoch by counter.
-	// TODO: remove
-	ByCounter(counter uint64) Epoch
+	// Previous returns the previous epoch as of this snapshot. Valid snapshots
+	// must have a previous epoch for all epochs except that immediately after
+	// the root block - in other words, if a previous epoch exists, implementations
+	// must arrange to expose it here.
+	//
+	// Returns ErrNoPreviousEpoch in the case that this method is queried w.r.t.
+	// a snapshot from the first epoch after the root block.
+	Previous() Epoch
 }
 
 // Epoch contains the information specific to a certain Epoch (defined

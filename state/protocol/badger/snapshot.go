@@ -157,7 +157,7 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// check if node ID is part of identities
 	if len(identities) == 0 {
-		return nil, protocol.IdentityNotFoundErr{NodeID: nodeID}
+		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return identities[0], nil
 }
@@ -286,6 +286,32 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	return q.ByCounter(setup.Counter + 1)
 }
 
+func (q *EpochQuery) Previous() protocol.Epoch {
+	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	first, err := q.snap.state.headers.ByBlockID(status.FirstBlockID)
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+
+	// CASE 1: we are in the first epoch after the root block, in which case
+	// we return a sentinel error
+	root, err := q.snap.state.Params().Root()
+	if err != nil {
+		return NewInvalidEpoch(err)
+	}
+	if first.Height == root.Height {
+		return NewInvalidEpoch(protocol.ErrNoPreviousEpoch)
+	}
+
+	// CASE 2: we are in any other epoch, return the current epoch w.r.t. the
+	// parent block of the first block in this epoch, which must be in the
+	// previous epoch
+	return q.snap.state.AtBlockID(first.ParentID).Epochs().Current()
+}
+
 // ByCounter returns the epoch with the given counter.
 func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
 
@@ -386,6 +412,6 @@ func (u *InvalidEpochQuery) Next() protocol.Epoch {
 	return NewInvalidEpoch(u.err)
 }
 
-func (u *InvalidEpochQuery) ByCounter(_ uint64) protocol.Epoch {
+func (u *InvalidEpochQuery) Previous() protocol.Epoch {
 	return NewInvalidEpoch(u.err)
 }
