@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
 	protocol2 "github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -21,9 +22,9 @@ type TopicAwareTopologyTestSuite struct {
 	suite.Suite
 	state    protocol2.State   // represents a mocked protocol state
 	all      flow.IdentityList // represents the identity list of all nodes in the system
-	me       flow.Identity     // represents identity of single instance of node that creates topology
 	clusters flow.ClusterList  // represents list of cluster ids of collection nodes
-	fanout   uint              // represents maximum number of connections this peer allows to have
+	subMngr  []channel.SubscriptionManager
+	fanout   uint // represents maximum number of connections this peer allows to have
 }
 
 // TestTopicAwareTopologyTestSuite starts all the tests in this test suite
@@ -49,18 +50,17 @@ func (suite *TopicAwareTopologyTestSuite) SetupTest() {
 	suite.state, suite.clusters = CreateMockStateForCollectionNodes(suite.T(),
 		suite.all.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
 
-	// takes first id as the current nodes id
-	suite.me = *suite.all[0]
+	suite.subMngr = MockSubscriptionManager(suite.T(), suite.all)
 }
 
 // TestTopologySize_Topic verifies that size of each topology fanout per topic is greater than
 // `(k+1)/2` where `k` is number of nodes subscribed to a topic. It does that over 100 random iterations.
 func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 	for i := 0; i < 100; i++ {
-		top, err := NewTopicBasedTopology(suite.me.NodeID, suite.state)
+		top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
 		require.NoError(suite.T(), err)
 
-		topics := engine.ChannelIDsByRole(suite.me.Role)
+		topics := engine.ChannelIDsByRole(suite.all[0].Role)
 		require.Greater(suite.T(), len(topics), 1)
 
 		for _, topic := range topics {
@@ -68,12 +68,12 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 			roles, ok := engine.RolesByChannelID(topic)
 			require.True(suite.T(), ok)
 
-			ids, err := top.SubsetChannel(suite.all, nil, topic)
+			ids, err := top.subsetChannel(suite.all, nil, topic)
 			require.NoError(suite.T(), err)
 
 			// counts total number of nodes that has the roles and are not `suite.me`  (node of interest).
 			total := len(suite.all.Filter(filter.And(filter.HasRole(roles...),
-				filter.Not(filter.HasNodeID(suite.me.NodeID)))))
+				filter.Not(filter.HasNodeID(suite.all[0].NodeID)))))
 			require.True(suite.T(), float64(len(ids)) >= (float64)(total+1)/2)
 		}
 	}
@@ -84,10 +84,10 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 // It also checks the topology against non-inclusion of the node itself in its own topology.
 func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 	// creates a topology using the graph sampler
-	top, err := NewTopicBasedTopology(suite.me.NodeID, suite.state)
+	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
-	topics := engine.ChannelIDsByRole(suite.me.Role)
+	topics := engine.ChannelIDsByRole(suite.all[0].Role)
 	require.Greater(suite.T(), len(topics), 1)
 
 	// for each topic samples 100 topologies
@@ -99,16 +99,16 @@ func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 			current = nil
 
 			// generate a new topology with a the same all, size and seed
-			ids, err := top.SubsetChannel(suite.all, nil, topic)
+			ids, err := top.subsetChannel(suite.all, nil, topic)
 			require.NoError(suite.T(), err)
 
 			// topology should not contain the node itself
-			require.Empty(suite.T(), ids.Filter(filter.HasNodeID(suite.me.NodeID)))
+			require.Empty(suite.T(), ids.Filter(filter.HasNodeID(suite.all[0].NodeID)))
 
 			for _, v := range ids {
 				current = append(current, v.NodeID.String())
 			}
-			// no guarantees about order is made by Topology.SubsetChannel(), hence sort the return values before comparision
+			// no guarantees about order is made by Topology.subsetChannel(), hence sort the return values before comparision
 			sort.Strings(current)
 
 			if previous == nil {
@@ -139,7 +139,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 	topics := engine.ChannelIDsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
-	for _, identity := range suite.all {
+	for i, identity := range suite.all {
 		// extracts all topics node (i) subscribed to
 		if identity.Role != flow.RoleConsensus {
 			continue
@@ -149,9 +149,9 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 		current = nil
 
 		// creates and samples a new topic aware topology for the first topic of consensus nodes
-		top, err := NewTopicBasedTopology(identity.NodeID, suite.state)
+		top, err := NewTopicBasedTopology(identity.NodeID, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
-		ids, err := top.SubsetChannel(suite.all, nil, topics[0])
+		ids, err := top.subsetChannel(suite.all, nil, topics[0])
 		require.NoError(suite.T(), err)
 
 		// topology should not contain the node itself
@@ -178,13 +178,13 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 	// adjacency map keeps graph component of a single channel ID
 	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
-	for _, id := range suite.all {
+	for i, id := range suite.all {
 		// creates a topic-based topology for node
-		top, err := NewTopicBasedTopology(id.NodeID, suite.state)
+		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.SubsetChannel(suite.all, nil, channelID)
+		subset, err := top.subsetChannel(suite.all, nil, channelID)
 		require.NoError(suite.T(), err)
 
 		channelIDAdjMap[id.NodeID] = subset
@@ -203,13 +203,13 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	// iterates over collection nodes
-	for _, id := range suite.all.Filter(filter.HasRole(flow.RoleCollection)) {
+	for i, id := range suite.all.Filter(filter.HasRole(flow.RoleCollection)) {
 		// creates a channelID-based topology for node
-		top, err := NewTopicBasedTopology(id.NodeID, suite.state)
+		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.SubsetChannel(suite.all, nil, channelID)
+		subset, err := top.subsetChannel(suite.all, nil, channelID)
 		require.NoError(suite.T(), err)
 
 		channelIDAdjMap[id.NodeID] = subset
@@ -226,7 +226,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 // and it also does not contain duplicate element.
 func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_UnconditionalSampling() {
 	// samples with no `shouldHave` set.
-	top, err := NewTopicBasedTopology(suite.me.NodeID, suite.state)
+	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
 	sample, err := top.sampleConnectedGraph(suite.all, nil)
@@ -248,7 +248,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_ConditionalSampling()
 	shouldHave := suite.all.Sample(10)
 
 	// creates a topology for the node
-	top, err := NewTopicBasedTopology(suite.me.NodeID, suite.state)
+	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
 	// samples a connected graph of `all` that includes `shouldHave` set.
@@ -278,7 +278,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_SmallerAll() {
 	smallerAll := suite.all.Filter(filter.Not(filter.In(shouldHave))).Sample(5).Union(shouldHave)
 
 	// creates a topology for the node
-	top, err := NewTopicBasedTopology(suite.me.NodeID, suite.state)
+	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
 	// total size of smallerAll is 15, and it requires a linear fanout of 8 which is less than
@@ -298,7 +298,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_SubsetViolence() {
 	excludedAll := suite.all.Filter(filter.Not(filter.HasNodeID(shouldHave[0].NodeID)))
 
 	// creates a topology for the node
-	top, err := NewTopicBasedTopology(suite.me.NodeID, suite.state)
+	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
 	// since `shouldHave` is not a subset of `excludedAll` it should return an error
@@ -313,7 +313,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_EmptyAllSet() {
 	shouldHave := suite.all.Sample(10)
 
 	// creates a topology for the node
-	top, err := NewTopicBasedTopology(suite.me.NodeID, suite.state)
+	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
 	// sampling with empty `all` and non-empty `shouldHave`
@@ -333,9 +333,9 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_EmptyAllSet() {
 // empty `shouldHave` constitute a connected graph.
 func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Unconditionally() {
 	adjMap := make(map[flow.Identifier]flow.IdentityList)
-	for _, id := range suite.all {
+	for i, id := range suite.all {
 		// creates a topology for the node
-		top, err := NewTopicBasedTopology(id.NodeID, suite.state)
+		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples a graph and stores it in adjacency map
@@ -350,9 +350,9 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Unconditionally() {
 // some `shouldHave` constitute a connected graph.
 func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Conditionally() {
 	adjMap := make(map[flow.Identifier]flow.IdentityList)
-	for _, id := range suite.all {
+	for i, id := range suite.all {
 		// creates a topology for the node
-		top, err := NewTopicBasedTopology(id.NodeID, suite.state)
+		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples a graph and stores it in adjacency map
