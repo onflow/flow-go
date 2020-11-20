@@ -76,6 +76,9 @@ func validateNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 	// check staked and collected nodes and make sure node ID are not missing
 	validateNodeIDs(nodes, stakingNodes)
 
+	// print mis matching nodes
+	checkMisMatchingNodes(nodes, stakingNodes)
+
 	// create map
 	var nodesByID map[flow.Identifier]model.NodeInfo
 	for _, node := range nodes {
@@ -169,6 +172,40 @@ func validateNodeIDs(collectedNodes []model.NodeInfo, stakedNodes []model.NodeIn
 
 	if len(invalidNodes) != 0 || len(invalidStakingNodes) != 0 {
 		log.Fatal().Msg("found missing nodes ids. fix and re-run")
+	}
+}
+
+func checkMisMatchingNodes(collectedNodes []model.NodeInfo, stakedNodes []model.NodeInfo) {
+
+	collectedNodesByID := make(map[flow.Identifier]model.NodeInfo)
+	for _, node := range collectedNodes {
+		collectedNodesByID[node.NodeID] = node
+	}
+
+	stakedNodesByID := make(map[flow.Identifier]model.NodeInfo)
+	for _, node := range stakedNodes {
+		stakedNodesByID[node.NodeID] = node
+	}
+
+	// try match collected nodes to staked nodes
+	invalidCollectedNodes := make([]model.NodeInfo, 0)
+	for _, node := range collectedNodes {
+		if _, ok := stakedNodesByID[node.NodeID]; !ok {
+			log.Warn().Str("collected-node-id", node.NodeID.String()).Msg("matching staked node not found for collected node")
+			invalidCollectedNodes = append(invalidCollectedNodes, node)
+		}
+	}
+
+	invalidStakedNodes := make([]model.NodeInfo, 0)
+	for _, node := range stakedNodes {
+		if _, ok := collectedNodesByID[node.NodeID]; !ok {
+			log.Warn().Str("staked-node-id", node.NodeID.String()).Msg("matching collected node not found for staked node")
+			invalidStakedNodes = append(invalidStakedNodes, node)
+		}
+	}
+
+	if len(invalidCollectedNodes) != 0 || len(invalidStakedNodes) != 0 {
+		log.Fatal().Msg("found missing mismatching nodes")
 	}
 }
 
