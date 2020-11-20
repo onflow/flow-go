@@ -17,8 +17,8 @@ var (
 // finallistCmd represents the final list command
 var finalListCmd = &cobra.Command{
 	Use:   "finallist",
-	Short: "",
-	Long:  "",
+	Short: "generates a final list of nodes to be used for next network",
+	Long:  "generates a final list of nodes to be used for next network after validating node data and matching against staking contract nodes ",
 	Run:   finalList,
 }
 
