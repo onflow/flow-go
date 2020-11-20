@@ -23,7 +23,7 @@ type TopologyTestSuite struct {
 	suite.Suite
 }
 
-// TopologyTestSuite runs all tests in this test suite
+// TestTopologyTestSuite runs all tests in this test suite
 func TestTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(TopologyTestSuite))
 }
