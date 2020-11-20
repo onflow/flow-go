@@ -178,21 +178,20 @@ func (e *hostEnv) Log(message string) {
 	}
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) {
+func (e *hostEnv) EmitEvent(event cadence.Event) error {
 
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
-		// TODO return error
-		// return fmt.Errorf("failed to encode event: %w", err)
-		panic("failed to encode event")
+		// TODO maybe we should return an error instead of panic
+		panic(fmt.Errorf("failed to json encode a cadence event: %w", err))
 	}
 
 	e.totalEventByteSize += uint64(len(payload))
 	if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
-		// TODO return error on limit size
-		// TODO define error type
-		panic("max event limit size has exceeded the limit")
-		// return fmt.Errorf("max event limit size has exceeded the limit: %w", err)
+		return &MaxEventSizeLimitExceededError{
+			TotalByteSize: e.totalEventByteSize,
+			Limit:         e.ctx.EventCollectionByteSizeLimit,
+		}
 	}
 
 	flowEvent := flow.Event{
@@ -204,7 +203,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) {
 	}
 
 	e.events = append(e.events, flowEvent)
-	// return nil
+	return nil
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
