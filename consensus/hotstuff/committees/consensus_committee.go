@@ -1,6 +1,7 @@
 package committees
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -47,11 +48,26 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 	}
 
 	// pre-compute leader selection for current epoch
-	// TODO compute for previous epoch as well here
-	epoch := state.Final().Epochs().Current()
-	err := com.prepareLeaderSelection(epoch)
+	current := state.Final().Epochs().Current()
+	err := com.prepareLeaderSelection(current)
 	if err != nil {
-		return nil, fmt.Errorf("could not add leader for epoch: %w", err)
+		return nil, fmt.Errorf("could not add leader for current epoch: %w", err)
+	}
+
+	// pre-compute leader selection for previous epoch, if it exists
+	previous := state.Final().Epochs().Previous()
+	_, err = previous.Counter()
+	// if there is no previous epoch, return the committee as-is
+	if errors.Is(err, protocol.ErrNoPreviousEpoch) {
+		return com, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get previous epoch: %w", err)
+	}
+
+	err = com.prepareLeaderSelection(previous)
+	if err != nil {
+		return nil, fmt.Errorf("could not add leader for previous epoch: %w", err)
 	}
 
 	return com, nil
