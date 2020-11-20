@@ -319,7 +319,9 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 func TestSnapshot_PostSporkIdentities(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 		expected := unittest.CompleteIdentitySet()
-		root, result, seal := unittest.BootstrapFixture(expected)
+		root, result, seal := unittest.BootstrapFixture(expected, func(block *flow.Block) {
+			block.Header.ParentID = unittest.IdentifierFixture()
+		})
 		err := state.Mutate().Bootstrap(root, result, seal)
 		require.Nil(t, err)
 
