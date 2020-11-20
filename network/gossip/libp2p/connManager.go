@@ -51,35 +51,36 @@ func (c ConnManager) ListenCloseNotifee(n network.Network, m multiaddr.Multiaddr
 
 // called by libp2p when a connection opened
 func (c ConnManager) Connected(n network.Network, con network.Conn) {
-
-	log := c.log.With().
-		Str("remote_peer", con.RemoteMultiaddr().String()).
-		Int("total_connections", len(n.Conns())).
-		Logger()
-
-	if con.Stat().Direction == network.DirInbound {
-		log.Trace().Msg("inbound connection established")
-		c.metrics.InboundConnectionCreated()
-		return
-	}
-
-	log.Trace().Msg("outbound connection established")
-	c.metrics.OutboundConnectionCreated()
+	c.logConnectionUpdate(n, con, "connection established")
+	c.updateConnectionMetric(n)
 }
 
 // called by libp2p when a connection closed
 func (c ConnManager) Disconnected(n network.Network, con network.Conn) {
+	c.logConnectionUpdate(n, con, "connection removed")
+	c.updateConnectionMetric(n)
+}
 
-	log := c.log.With().Str("remote_peer", con.RemoteMultiaddr().
-		String()).Int("total_connections", len(n.Conns())).
-		Logger()
-
-	if con.Stat().Direction == network.DirInbound {
-		log.Trace().Msg("inbound connection removed")
-		c.metrics.InboundConnectionRemoved()
-		return
+func (c ConnManager) updateConnectionMetric(n network.Network) {
+	var inbound uint = 0
+	var outbound uint = 0
+	for _, conn := range n.Conns() {
+		switch conn.Stat().Direction {
+		case network.DirInbound:
+			inbound++
+		case network.DirOutbound:
+			outbound++
+		}
 	}
 
-	log.Trace().Msg("outbound connection removed")
-	c.metrics.OutboundConnectionRemoved()
+	c.metrics.InboundConnections(inbound)
+	c.metrics.OutboundConnections(outbound)
+}
+
+func (c ConnManager) logConnectionUpdate(n network.Network, con network.Conn, logMsg string) {
+	c.log.Debug().
+		Str("remote_peer", con.RemoteMultiaddr().String()).
+		Str("direction", con.Stat().Direction.String()).
+		Int("total_connections", len(n.Conns())).
+		Msg(logMsg)
 }

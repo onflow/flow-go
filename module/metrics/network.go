@@ -114,18 +114,10 @@ func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) 
 	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
 }
 
-func (nc *NetworkCollector) OutboundConnectionCreated() {
-	nc.outboundConnectionCount.Inc()
+func (nc *NetworkCollector) OutboundConnections(connectionCount uint) {
+	nc.outboundConnectionCount.Set(float64(connectionCount))
 }
 
-func (nc *NetworkCollector) OutboundConnectionRemoved() {
-	nc.outboundConnectionCount.Dec()
-}
-
-func (nc *NetworkCollector) InboundConnectionCreated() {
-	nc.inboundConnectionCount.Inc()
-}
-
-func (nc *NetworkCollector) InboundConnectionRemoved() {
-	nc.inboundConnectionCount.Dec()
+func (nc *NetworkCollector) InboundConnections(connectionCount uint) {
+	nc.inboundConnectionCount.Set(float64(connectionCount))
 }

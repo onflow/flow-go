@@ -29,17 +29,11 @@ type NetworkMetrics interface {
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
 	QueueDuration(duration time.Duration, priority int)
 
-	// OutboundConnectionCreated increments the metric tracking the number of outbound connections of this node
-	OutboundConnectionCreated()
+	// OutboundConnections updates the metric tracking the number of outbound connections of this node
+	OutboundConnections(connectionCount uint)
 
-	// OutboundConnectionRemoved decrements the metric tracking the number of outbound connections of this node
-	OutboundConnectionRemoved()
-
-	// InboundConnectionCreated increments the metric tracking the number of inbound connections of this node
-	InboundConnectionCreated()
-
-	// InboundConnectionRemoved decrements the metric tracking the number of inbound connections of this node
-	InboundConnectionRemoved()
+	// InboundConnections updates the metric tracking the number of inbound connections of this node
+	InboundConnections(connectionCount uint)
 }
 
 type EngineMetrics interface {
