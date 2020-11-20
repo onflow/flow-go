@@ -87,12 +87,9 @@ func validateNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 
 	// check node type mismatch
 	for _, stakedNode := range stakingNodes {
-		matchingNode, ok := nodesByID[stakedNode.NodeID]
-		if !ok {
-			log.Warn().Str("staked node id", stakedNode.NodeID.String()).
-				Msg("no matching node found in non-contract nodes list")
-			continue
-		}
+
+		// win have matching node as we have a check before
+		matchingNode := nodesByID[stakedNode.NodeID]
 
 		// check node type and error if mismatch
 		if matchingNode.Role != stakedNode.Role {
