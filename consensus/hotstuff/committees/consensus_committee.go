@@ -164,7 +164,7 @@ func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) error {
 	if err != nil {
 		return fmt.Errorf("could not get initial identities for current epoch: %w", err)
 	}
-	selection, err := leader.SelectionForEpoch(epoch)
+	selection, err := leader.SelectionForConsensus(epoch)
 	if err != nil {
 		return fmt.Errorf("could not get leader selection for current epoch: %w", err)
 	}
