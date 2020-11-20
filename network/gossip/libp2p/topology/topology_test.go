@@ -18,13 +18,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type StatefulTopologyTestSuite struct {
+// TopologyTestSuite tests the end-to-end connectedness of topology
+type TopologyTestSuite struct {
 	suite.Suite
 }
 
-// TestStatefulTopologyTestSuite runs all tests in this test suite
-func TestStatefulTopologyTestSuite(t *testing.T) {
-	suite.Run(t, new(StatefulTopologyTestSuite))
+// TopologyTestSuite runs all tests in this test suite
+func TestTopologyTestSuite(t *testing.T) {
+	suite.Run(t, new(TopologyTestSuite))
 }
 
 // TestLowScale creates systems with
@@ -35,7 +36,7 @@ func TestStatefulTopologyTestSuite(t *testing.T) {
 // 100 verification nodes
 // and builds a stateful topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *StatefulTopologyTestSuite) TestLowScale() {
+func (suite *TopologyTestSuite) TestLowScale() {
 	suite.multiSystemEndToEndConnectedness(1, 10, 100, 120, 5, 100, 4)
 }
 
@@ -47,7 +48,7 @@ func (suite *StatefulTopologyTestSuite) TestLowScale() {
 // 100 verification nodes
 // and builds a stateful topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *StatefulTopologyTestSuite) TestModerateScale() {
+func (suite *TopologyTestSuite) TestModerateScale() {
 	suite.multiSystemEndToEndConnectedness(1, 20, 200, 240, 10, 200, 8)
 }
 
@@ -59,7 +60,7 @@ func (suite *StatefulTopologyTestSuite) TestModerateScale() {
 // 400 verification nodes
 // and builds a stateful topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *StatefulTopologyTestSuite) TestHighScale() {
+func (suite *TopologyTestSuite) TestHighScale() {
 	suite.multiSystemEndToEndConnectedness(1, 40, 400, 480, 20, 400, 16)
 }
 
@@ -70,7 +71,7 @@ func (suite *StatefulTopologyTestSuite) TestHighScale() {
 // - exe: number of execution nodes
 // - ver: number of verification nodes
 // - cluster: number of clusters of collection nodes
-func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster int) (protocol.State,
+func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster int) (protocol.State,
 	flow.IdentityList,
 	[]channel.SubscriptionManager) {
 
@@ -98,7 +99,7 @@ func (suite *StatefulTopologyTestSuite) generateSystem(acc, col, con, exe, ver, 
 
 // multiSystemEndToEndConnectedness is a test helper evaluates end-to-end connectedness of the system graph
 // over several number of systems each with specified number of nodes on each role.
-func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, col, con, exe, ver, cluster int) {
+func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, col, con, exe, ver, cluster int) {
 	// creates a histogram to keep average fanout of nodes in systems
 	var aveHist *thist.Hist
 	if suite.printTrace() {
@@ -149,7 +150,7 @@ func (suite *StatefulTopologyTestSuite) multiSystemEndToEndConnectedness(system,
 
 // topologyScenario is a test helper that creates a StatefulTopologyManager with the LinearFanoutFunc,
 // it creates a TopicBasedTopology for the node and returns its fanout.
-func (suite *StatefulTopologyTestSuite) topologyScenario(me flow.Identifier,
+func (suite *TopologyTestSuite) topologyScenario(me flow.Identifier,
 	subMngr channel.SubscriptionManager,
 	ids flow.IdentityList,
 	state protocol.ReadOnlyState) flow.IdentityList {
@@ -158,18 +159,15 @@ func (suite *StatefulTopologyTestSuite) topologyScenario(me flow.Identifier,
 	top, err := topology.NewTopicBasedTopology(me, state, subMngr)
 	require.NoError(suite.T(), err)
 
-	// creates topology manager
-	topMngr := topology.NewStatefulTopologyManager(top)
-
 	// generates topology of node
-	myFanout, err := topMngr.MakeTopology(ids)
+	myFanout, err := top.GenerateFanout(ids)
 	require.NoError(suite.T(), err)
 
 	return myFanout
 }
 
 // printTrace returns true if local environment variable Trace is found.
-func (suite *StatefulTopologyTestSuite) printTrace() bool {
+func (suite *TopologyTestSuite) printTrace() bool {
 	_, found := os.LookupEnv("Trace")
 	return found
 }
