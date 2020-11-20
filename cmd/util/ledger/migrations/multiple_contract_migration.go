@@ -9,8 +9,10 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/parser2"
-	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,19 +35,15 @@ func (e *MultipleContractMigrationError) Error() string {
 }
 
 var (
-	MultipleContractsSpecialMigrations = make(map[string]func(ledger.Payload, zerolog.Logger) ([]ledger.Payload, error))
+	MultipleContractsSpecialMigrations = make(map[string]func(ledger.Payload) ([]ledger.Payload, error))
 )
 
 func MultipleContractMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 	migratedPayloads := make([]ledger.Payload, 0)
 	errors := make([]error, 0)
-	// the cache keeps a record of already migrated addresses
-	// it is completely ephemeral. If lost, it will only effect performance
-	cache := map[string]struct{}{}
-	logger := zerolog.Logger{}
 
 	for _, p := range payload {
-		results, err := migrateRegister(p, cache, logger)
+		results, err := migrateRegister(p)
 		// dont fail fast... try to collect errors so multiple errors can be addressed at once
 		if err != nil {
 			errors = append(errors, err)
@@ -107,35 +105,57 @@ func contractsRegister(contractsKey ledger.Key, contractNames []string) (ledger.
 	}, nil
 }
 
-func migrateRegister(p ledger.Payload, cache map[string]struct{}, logger zerolog.Logger) ([]ledger.Payload, error) {
+func migrateRegister(p ledger.Payload) ([]ledger.Payload, error) {
 	registerId, err := keyToRegisterId(p.Key)
 	if err != nil {
 		return nil, err
 	}
-	// have we migrated this?
-	if _, alreadyMigrated := cache[registerId.Owner]; alreadyMigrated {
-		// yes, return it as is
-		return []ledger.Payload{p}, nil
-	}
-	if !needsMigration(registerId) {
+	if !isAddress(registerId) {
 		return []ledger.Payload{p}, nil
 	}
 
-	// we are going to migrate this
-	cache[registerId.Owner] = struct{}{}
-
-	if em, hasEM := MultipleContractsSpecialMigrations[registerId.Owner]; hasEM {
-		logger.Info().
-			Err(err).
-			Str("address", flow.BytesToAddress([]byte(registerId.Owner)).HexWithPrefix()).
-			Msg("Using exceptional migration for address")
-		return em(p, logger)
+	switch registerId.Key {
+	case "code":
+		if em, hasEM := MultipleContractsSpecialMigrations[registerId.Owner]; hasEM {
+			log.Info().
+				Err(err).
+				Str("address", flow.BytesToAddress([]byte(registerId.Owner)).HexWithPrefix()).
+				Msg("Using exceptional migration for address")
+			return em(p)
+		}
+		return migrateContractCode(p)
+	case "contract":
+		return migrateContract(p)
+	default:
+		return []ledger.Payload{p}, nil
 	}
-
-	return migrateValue(p, logger)
 }
 
-func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) {
+func migrateContract(p ledger.Payload) ([]ledger.Payload, error) {
+	address := common.BytesToAddress(flow.BytesToAddress(p.Key.KeyParts[0].Value).Bytes())
+	storedData, version := interpreter.StripMagic(p.Value)
+	if len(storedData) == 0 {
+		return []ledger.Payload{}, nil
+	}
+	storedValue, err := interpreter.DecodeValue(storedData, &address, []string{"contract"}, version)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("address", address.Hex()).
+			Msg("Cannot decode contract at address")
+		return nil, err
+	}
+
+	value := interpreter.NewSomeValueOwningNonCopying(storedValue).Value.(*interpreter.CompositeValue)
+	log.Warn().
+		Str("TypeId", string(value.TypeID)).
+		Str("address", address.Hex()).
+		Msg("Got TypeId")
+
+	return []ledger.Payload{p}, nil
+}
+
+func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 
 	// we don't need the the empty code register
 	value := p.Value
@@ -147,7 +167,7 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 	code := string(value)
 	program, err := parser2.ParseProgram(code)
 	if err != nil {
-		l.Error().
+		log.Error().
 			Err(err).
 			Str("address", address.Hex()).
 			Str("code", code).
@@ -182,7 +202,7 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 	// parse the code again to get accurate locations of the remaining declarations
 	program, err = parser2.ParseProgram(code)
 	if err != nil {
-		l.Error().
+		log.Error().
 			Err(err).
 			Str("address", address.Hex()).
 			Str("code", code).
@@ -196,14 +216,14 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 		// If there is no declarations. Only comments? was this legal before?
 		// error just in case
 		// alternative would be removing the register
-		l.Error().
+		log.Error().
 			Str("address", address.Hex()).
 			Str("code", code).
 			Msg("No declarations at address")
 		return []ledger.Payload{}, fmt.Errorf("no declarations at address %s", address.Hex())
 	case 1:
 		// If there is one declaration move it to the new key
-		l.Debug().
+		log.Debug().
 			Str("address", address.Hex()).
 			Msg("Single contract or interface at address moved to new key")
 		p.Key = addNameToKey(p.Key, declarations[0].DeclarationIdentifier().Identifier)
@@ -215,7 +235,7 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 	case 2:
 		// We have two declarations. Due to the current rules one of them is an interface and one is a contract.
 		// the contract will need an import to the interface.
-		l.Info().
+		log.Info().
 			Str("address", address.Hex()).
 			Msg("Two declarations on an address, splitting into two parts")
 
@@ -223,7 +243,7 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 		_, twoIsInterface := declarations[1].(*ast.InterfaceDeclaration)
 		if oneIsInterface == twoIsInterface {
 			// declarations of same type! should not happen
-			l.Error().
+			log.Error().
 				Str("address", address.Hex()).
 				Str("code", code).
 				Msg("Two declarations of the same type at address")
@@ -281,7 +301,7 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 			contractsRegister,
 		}, nil
 	default:
-		l.Error().
+		log.Error().
 			Str("address", address.Hex()).
 			Str("code", code).
 			Msg("More than two declarations at address")
@@ -289,11 +309,7 @@ func migrateValue(p ledger.Payload, l zerolog.Logger) ([]ledger.Payload, error) 
 	}
 }
 
-// if it is a address
-func needsMigration(id flow.RegisterID) bool {
-	if id.Key != "code" {
-		return false
-	}
+func isAddress(id flow.RegisterID) bool {
 	return len([]byte(id.Owner)) == flow.AddressLength
 }
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -106,34 +105,6 @@ func TestMultipleContractMigration(t *testing.T) {
 		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
 		require.NoError(t, err)
 		require.Len(t, migrated, 0)
-	})
-
-	t.Run("Registers are migrated only once", func(t *testing.T) {
-		key := ledger.Key{
-			KeyParts: []ledger.KeyPart{
-				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
-				ledger.NewKeyPart(state.KeyPartController, []byte("")),
-				ledger.NewKeyPart(state.KeyPartKey, []byte("code")),
-			},
-		}
-		payload1 := ledger.Payload{
-			Key:   key,
-			Value: []byte{},
-		}
-
-		payload2 := ledger.Payload{
-			Key:   key,
-			Value: []byte{},
-		}
-
-		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload1, payload2})
-		require.NoError(t, err)
-		require.Len(t, migrated, 1)
-
-		// because code was already migrated the migration is skipped just returning the register
-		// this is a way to test the cache works
-		// in real scenarios there wouldn't be two code registers on one address
-		require.Equal(t, migrated[0], payload2)
 	})
 
 	t.Run("If code cannot be parsed return error", func(t *testing.T) {
@@ -532,7 +503,7 @@ import ITest from %s
 		address := flow.HexToAddress("01")
 		called := false
 
-		migrations.MultipleContractsSpecialMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
+		migrations.MultipleContractsSpecialMigrations[string(address.Bytes())] = func(payload ledger.Payload) ([]ledger.Payload, error) {
 			called = true
 			return []ledger.Payload{payload}, nil
 		}
@@ -556,7 +527,7 @@ import ITest from %s
 		address := flow.HexToAddress("01")
 		called := false
 
-		migrations.MultipleContractsSpecialMigrations[string(address.Bytes())] = func(payload ledger.Payload, logger zerolog.Logger) ([]ledger.Payload, error) {
+		migrations.MultipleContractsSpecialMigrations[string(address.Bytes())] = func(payload ledger.Payload) ([]ledger.Payload, error) {
 			called = true
 			return []ledger.Payload{payload}, nil
 		}
