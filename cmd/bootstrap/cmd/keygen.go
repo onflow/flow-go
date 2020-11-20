@@ -5,8 +5,9 @@ import (
 	"io"
 	"os"
 
-	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/spf13/cobra"
+
+	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
 // keygenCmd represents the key gen command
