@@ -8,6 +8,7 @@ import (
 	golog "github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
@@ -38,7 +39,7 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 
 	// create and start node 1 on localhost and random port
 	node1key, err := generateNetworkingKey("abc")
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootBlockID, nil, false)
 	defer h.StopNode(node1)
 	h.T().Logf(" %s node started on %s:%s", node1.name, address1.IP, address1.Port)
@@ -46,7 +47,7 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 
 	// create and start node 2 on localhost and random port
 	node2key, err := generateNetworkingKey("def")
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootBlockID, nil, false)
 
 	// create stream from node 1 to node 2
@@ -59,7 +60,7 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 
 	// generate a new key
 	node2keyNew, err := generateNetworkingKey("ghi")
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	assert.False(h.T(), node2key.Equals(node2keyNew))
 
 	// start node2 with the same name, ip and port but with the new key
@@ -85,13 +86,13 @@ func (h *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 
 	// create and start node 1 on localhost and random port
 	node1key, err := generateNetworkingKey("abc")
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootID1, nil, false)
 	defer h.StopNode(node1)
 
 	// create and start node 2 on localhost and random port
 	node2key, err := generateNetworkingKey("def")
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootID1, nil, false)
 
 	// create stream from node 2 to node 1
@@ -127,13 +128,13 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 
 	// create and start node 1 on localhost and random port
 	node1key, err := generateNetworkingKey("abc")
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	node1, _ := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
 	defer h.StopNode(node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2key, err := generateNetworkingKey("def")
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	node2, addr2 := h.CreateNode("node1", node2key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
 	defer h.StopNode(node2)
 
@@ -145,13 +146,13 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(ctx, topicBeforeSpork)
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	sub2, err := node2.Subscribe(ctx, topicBeforeSpork)
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 
 	// add node 2 as a peer of node 1
 	err = node1.AddPeer(ctx, addr2)
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 
 	// let the two nodes form the mesh
 	time.Sleep(time.Second)
@@ -169,9 +170,9 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
 	// and keeping node2 subscribed to topic 'topicBeforeSpork'
 	err = node1.UnSubscribe(topicBeforeSpork)
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 	_, err = node1.Subscribe(ctx, topicAfterSpork)
-	assert.NoError(h.T(), err)
+	require.NoError(h.T(), err)
 
 	// assert that node 1 can no longer send a message to node 2 via PubSub
 	testOneToKMessagingFails(ctx, h.T(), node1, sub2, topicAfterSpork)
@@ -181,7 +182,7 @@ func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *P2PNode, dstnAddres
 	// create stream from node 1 to node 2
 	s, err := sourceNode.CreateStream(context.Background(), dstnAddress)
 	// assert that stream creation succeeded
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, s)
 }
 
@@ -203,12 +204,12 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")
 	err := sourceNode.Publish(ctx, topic, payload)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// assert that the message is received by the destination node
 	unittest.AssertReturnsBefore(t, func() {
 		msg, err := dstnSub.Next(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, payload, msg.Data)
 	},
 		// libp2p hearbeats every second, so at most the message should take 1 second
@@ -224,7 +225,7 @@ func testOneToKMessagingFails(ctx context.Context,
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")
 	err := sourceNode.Publish(ctx, topic, payload)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// assert that the message is never received by the destination node
 	_ = unittest.RequireNeverReturnBefore(t, func() {
