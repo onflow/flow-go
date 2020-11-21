@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -112,7 +113,8 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 
 		incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(previousResult),
-			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+			//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
 		)
 		result := unittest.ExecutionResultFixture(
 			unittest.WithBlock(&block),
@@ -140,21 +142,11 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 // IncorporatedResultSeal, which ties the seal to the incorporated result it
 // seals, is also recorded for future access.
 func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
-
-	finalState, _ := incorporatedResult.Result.FinalStateCommitment()
-
-	seal := &flow.Seal{
-		BlockID:    incorporatedResult.Result.BlockID,
-		ResultID:   incorporatedResult.Result.ID(),
-		FinalState: finalState,
-	}
-	bs.chain = append(bs.chain, seal)
-
-	incorporatedResultSeal := &flow.IncorporatedResultSeal{
-		IncorporatedResult: incorporatedResult,
-		Seal:               seal,
-	}
-
+	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
+		unittest.IncorporatedResultSeal.WithResult(incorporatedResult.Result),
+		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatedResult.IncorporatedBlockID),
+	)
+	bs.chain = append(bs.chain, incorporatedResultSeal.Seal)
 	bs.irsMap[incorporatedResultSeal.ID()] = incorporatedResultSeal
 	bs.irsList = append(bs.irsList, incorporatedResultSeal)
 }
@@ -524,19 +516,116 @@ func (bs *BuilderSuite) TestPayloadSealAllValid() {
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
-// TestPayloadSealSomeValid verifies that payload builder errors
-// if IncorporatedResultSeal is included in mempool final state does not match the execution result
-func (bs *BuilderSuite) TestPayloadSealSomeValid() {
-	// start with a mempool configuration that would allow to actually seal something
-	// -> verified in test TestPayloadSealAllValid
+// TestPayloadSealSomeValidOnFork verifies that builder only includes seals whose
+//
+// if an IncorporatedResultSeal is included in mempool, whose final state does not match the execution result
+func (bs *BuilderSuite) TestPayloadSealSomeValidOnFork_old() {
+	// skipping this test:
+	//  * currently, the builder relies on the IncorporatedResultSeal to be constructed
+	//    correctly by the matching engine
+	//  * with the implementation of this test, the matching engine
+	bs.T().Skip()
+
 	bs.pendingSeals = bs.irsMap
 
-	// break a seal: Final state does not match the execution receipt
-	broken := bs.irsList[len(bs.irsList)-1]
-	broken.Seal.FinalState = unittest.StateCommitmentFixture()
+	// add some invalid seals to the mempool
+	for i := 0; i < 8; i++ {
+		invalid := &flow.IncorporatedResultSeal{
+			IncorporatedResult: unittest.IncorporatedResult.Fixture(),
+			Seal:               unittest.Seal.Fixture(),
+		}
+		bs.pendingSeals[invalid.ID()] = invalid
+	}
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
-	bs.Require().Error(err)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
+}
+
+// TestPayloadSealSomeValidOnFork verifies that builder only includes seals whose
+//
+// if an IncorporatedResultSeal is included in mempool, whose final state does not match the execution result
+func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
+	// skipping this test:
+	//  * currently, the builder relies on the IncorporatedResultSeal to be constructed
+	//    correctly by the matching engine
+	//  * with the implementation of this test, the matching engine
+	//bs.T().Skip()
+
+	// in the test setup, we already create a single fork
+	//  [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+	// Where block
+	//   * [first] is sealed and finalized
+	//   * [F0] ... [F3] are finalized but _not_ sealed
+	//   * [A0] ... [A3] are _not_ finalized and _not_ sealed
+	// We now create an additional fork:  [F3] <- [B0] <- [B1] <- ... <- [B7]
+	var forkHead *flow.Block
+	for f := 0; f < 100; f++ {
+		forkHead = bs.blocks[bs.finalID]
+		for i := 0; i < 8; i++ {
+			forkHead = bs.createAndRecordBlock(forkHead)
+			// Method createAndRecordBlock adds a seal for every block into the mempool.
+		}
+	}
+
+	bs.pendingSeals = bs.irsMap
+	_, err := bs.build.BuildOn(forkHead.ID(), bs.setter)
+	bs.Require().NoError(err)
+
+	// expected seals: [F0] <- ... <- [F3] <- [B0] <- ... <- [B7]
+	bs.Assert().Equal(12, len(bs.assembled.Seals), "should have included only valid chain of seals")
+	bs.Assert().ElementsMatch(bs.chain[:4], bs.assembled.Seals[:4], "should have included only valid chain of seals")
+	bs.Assert().Equal(bs.chain[len(bs.chain)-1], bs.assembled.Seals[len(bs.assembled.Seals)-1], "should have included only valid chain of seals")
+	bs.Assert().Equal(bs.chain[len(bs.chain)-2], bs.assembled.Seals[len(bs.assembled.Seals)-2], "should have included only valid chain of seals")
+	bs.Assert().Equal(bs.chain[len(bs.chain)-3], bs.assembled.Seals[len(bs.assembled.Seals)-3], "should have included only valid chain of seals")
+	bs.Assert().Equal(bs.chain[len(bs.chain)-4], bs.assembled.Seals[len(bs.assembled.Seals)-4], "should have included only valid chain of seals")
+	bs.Assert().Equal(bs.chain[len(bs.chain)-5], bs.assembled.Seals[len(bs.assembled.Seals)-5], "should have included only valid chain of seals")
+	bs.Assert().Equal(bs.chain[len(bs.chain)-6], bs.assembled.Seals[len(bs.assembled.Seals)-6], "should have included only valid chain of seals")
+	bs.Assert().Equal(bs.chain[len(bs.chain)-7], bs.assembled.Seals[len(bs.assembled.Seals)-7], "should have included only valid chain of seals")
+	bs.Assert().Equal(bs.chain[len(bs.chain)-8], bs.assembled.Seals[len(bs.assembled.Seals)-8], "should have included only valid chain of seals")
+	//bs.Assert().ElementsMatch(bs.chain[len(bs.chain)-8:], bs.assembled.Seals[4:], "should have included only valid chain of seals")
+
+	//bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
+	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+
+}
+
+// TestPayloadSealSomeValidOnFork verifies that builder only includes seals whose
+//
+// if an IncorporatedResultSeal is included in mempool, whose final state does not match the execution result
+func (bs *BuilderSuite) TestPayloadSealOnlyFork2() {
+	parentBlock := bs.blocks[bs.finalID]
+	previousResult, found := bs.resultForBlock[parentBlock.ID()]
+	if !found {
+		panic("missing execution result for parent")
+	}
+
+	// ======================
+	var incorporatedResultForPrevBlock *flow.IncorporatedResult
+	incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(previousResult),
+		//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
+	)
+	fmt.Println(fmt.Sprintf("IncorporatedResult ID 1: %x", incorporatedResultForPrevBlock.ID()))
+	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
+		unittest.IncorporatedResultSeal.WithResult(incorporatedResultForPrevBlock.Result),
+	)
+	fmt.Println(fmt.Sprintf("incorporated Seal ID 1: %x", incorporatedResultSeal.ID()))
+
+	// ======================
+	incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(previousResult),
+		//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
+	)
+	fmt.Println(fmt.Sprintf("IncorporatedResult ID 2: %x", incorporatedResultForPrevBlock.ID()))
+	incorporatedResultSeal = unittest.IncorporatedResultSeal.Fixture(
+		unittest.IncorporatedResultSeal.WithResult(incorporatedResultForPrevBlock.Result),
+	)
+	fmt.Println(fmt.Sprintf("incorporated Seal ID 2: %x", incorporatedResultSeal.ID()))
+
 }
 
 // TestBuildOn_ConflictingSeals verifies that payload builder does halt sealing (specifically, does _not_

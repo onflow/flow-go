@@ -47,9 +47,3 @@ func (f *incorporatedResultSealFactory) WithIncorporatedBlockID(id flow.Identifi
 		IncorporatedResult.WithIncorporatedBlockID(id)(irSeal.IncorporatedResult)
 	}
 }
-
-func (f *incorporatedResultSealFactory) WithServiceEvents(events ...flow.ServiceEvent) func(*flow.IncorporatedResultSeal) {
-	return func(irSeal *flow.IncorporatedResultSeal) {
-		Seal.WithServiceEvents(events...)(irSeal.Seal)
-	}
-}
