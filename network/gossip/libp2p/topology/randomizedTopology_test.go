@@ -23,6 +23,7 @@ type RandomizedTopologyTestSuite struct {
 	all      flow.IdentityList // represents the identity list of all nodes in the system
 	clusters flow.ClusterList  // represents list of cluster ids of collection nodes
 	subMngr  []channel.SubscriptionManager
+	edgeProb float64
 }
 
 // TestRandomizedTopologyTestSuite starts all the tests in this test suite
@@ -36,6 +37,9 @@ func (suite *RandomizedTopologyTestSuite) SetupTest() {
 	nClusters := 3
 	nCollectors := 100
 	nTotal := 1000
+
+	// sets edge probability to 0.3
+	suite.edgeProb = 0.3
 
 	collectors := unittest.IdentityListFixture(nCollectors, unittest.WithRole(flow.RoleCollection))
 	others := unittest.IdentityListFixture(nTotal, unittest.WithAllRolesExcept(flow.RoleCollection))
@@ -80,7 +84,6 @@ func (suite *RandomizedTopologyTestSuite) TestUnhappyInitialization() {
 // like n = 300, the potential outcomes are large enough (i.e., 10e88) so that the uniqueness is guaranteed.
 // This test however, performs a very weak uniqueness test by checking the uniqueness among consecutive topologies.
 func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
-	edgeProbability := 0.5
 	var previous, current []string
 
 	// for each topic samples 100 topologies
@@ -98,7 +101,7 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 		current = nil
 
 		// creates and samples a new topic aware topology for the first topic of consensus nodes
-		top, err := NewRandomizedTopology(identity.NodeID, edgeProbability, suite.state, suite.subMngr[i])
+		top, err := NewRandomizedTopology(identity.NodeID, suite.edgeProb, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 		ids, err := top.subsetChannel(suite.all, topics[0])
 		require.NoError(suite.T(), err)
@@ -120,7 +123,7 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 	}
 }
 
-// TestConnectedness_NonClusterTopics checks whether graph components corresponding to a
+// TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
 // non-cluster channel ID are individually connected.
 func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannelID() {
 	channelID := engine.TestNetwork
@@ -129,11 +132,11 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 
 	for i, id := range suite.all {
 		// creates a topic-based topology for node
-		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
+		top, err := NewRandomizedTopology(id.NodeID, suite.edgeProb, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.subsetChannel(suite.all, nil, channelID)
+		subset, err := top.subsetChannel(suite.all, channelID)
 		require.NoError(suite.T(), err)
 
 		channelIDAdjMap[id.NodeID] = subset
@@ -153,12 +156,12 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 
 	// iterates over collection nodes
 	for i, id := range suite.all.Filter(filter.HasRole(flow.RoleCollection)) {
-		// creates a channelID-based topology for node
-		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
+		// creates a randomized topology for node
+		top, err := NewRandomizedTopology(id.NodeID, suite.edgeProb, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.subsetChannel(suite.all, nil, channelID)
+		subset, err := top.subsetChannel(suite.all, channelID)
 		require.NoError(suite.T(), err)
 
 		channelIDAdjMap[id.NodeID] = subset
@@ -168,91 +171,6 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 	for _, cluster := range suite.clusters {
 		suite.checkConnectednessByCluster(suite.T(), channelIDAdjMap, cluster)
 	}
-}
-
-// TestLinearFanout_UnconditionalSampling evaluates that sampling a connected graph fanout
-// with an empty `shouldHave` list follows the LinearFanoutFunc,
-// and it also does not contain duplicate element.
-func (suite *RandomizedTopologyTestSuite) TestLinearFanout_UnconditionalSampling() {
-	// samples with no `shouldHave` set.
-	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
-	require.NoError(suite.T(), err)
-
-	sample, err := top.sampleConnectedGraph(suite.all, nil)
-	require.NoError(suite.T(), err)
-
-	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
-	// the size equal to applying LinearFanoutFunc over the original set.
-	expectedFanout := LinearFanoutFunc(len(suite.all))
-	require.Equal(suite.T(), len(sample), expectedFanout)
-
-	// checks sample does not include any duplicate
-	suite.uniquenessCheck(sample)
-}
-
-// TestLinearFanout_ConditionalSampling evaluates that sampling a connected graph fanout with a shouldHave set
-// follows the LinearFanoutFunc, and it also does not contain duplicate element.
-func (suite *RandomizedTopologyTestSuite) TestLinearFanout_ConditionalSampling() {
-	// samples 10 all into `shouldHave` set.
-	shouldHave := suite.all.Sample(10)
-
-	// creates a topology for the node
-	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
-	require.NoError(suite.T(), err)
-
-	// samples a connected graph of `all` that includes `shouldHave` set.
-	sample, err := top.sampleConnectedGraph(suite.all, shouldHave)
-	require.NoError(suite.T(), err)
-
-	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
-	// the size equal to applying LinearFanoutFunc over the original set.
-	expectedFanout := LinearFanoutFunc(len(suite.all))
-	require.Equal(suite.T(), len(sample), expectedFanout)
-
-	// checks sample does not include any duplicate
-	suite.uniquenessCheck(sample)
-
-	// checks inclusion of all shouldHave ones into sample
-	for _, id := range shouldHave {
-		require.Contains(suite.T(), sample, id)
-	}
-}
-
-// TestLinearFanout_SmallerAll evaluates that sampling a connected graph fanout with a shouldHave set
-// that is greater than required fanout, returns the `shouldHave` set instead.
-func (suite *RandomizedTopologyTestSuite) TestLinearFanout_SmallerAll() {
-	// samples 10 all into 'shouldHave'.
-	shouldHave := suite.all.Sample(10)
-	// samples a smaller component of all with 5 nodes and combines with `shouldHave`
-	smallerAll := suite.all.Filter(filter.Not(filter.In(shouldHave))).Sample(5).Union(shouldHave)
-
-	// creates a topology for the node
-	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
-	require.NoError(suite.T(), err)
-
-	// total size of smallerAll is 15, and it requires a linear fanout of 8 which is less than
-	// size of `shouldHave` set, so the shouldHave itself should return
-	sample, err := top.sampleConnectedGraph(smallerAll, shouldHave)
-	require.NoError(suite.T(), err)
-	require.Equal(suite.T(), len(sample), len(shouldHave))
-	require.ElementsMatch(suite.T(), sample, shouldHave)
-}
-
-// TestLinearFanout_SubsetViolence evaluates that trying to sample a connected graph when `shouldHave`
-// is not a subset of `all` returns an error.
-func (suite *RandomizedTopologyTestSuite) TestLinearFanout_SubsetViolence() {
-	// samples 10 all into 'shouldHave',
-	shouldHave := suite.all.Sample(10)
-	// excludes one of the `shouldHave` all from all, hence it is no longer a subset
-	excludedAll := suite.all.Filter(filter.Not(filter.HasNodeID(shouldHave[0].NodeID)))
-
-	// creates a topology for the node
-	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
-	require.NoError(suite.T(), err)
-
-	// since `shouldHave` is not a subset of `excludedAll` it should return an error
-	_, err = top.sampleConnectedGraph(excludedAll, shouldHave)
-	require.Error(suite.T(), err)
 }
 
 // TestLinearFanout_EmptyAllSet evaluates that trying to sample a connected graph when `all`

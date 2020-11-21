@@ -141,6 +141,9 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", r.me.String(), err)
 	}
 
+	// excludes node itself from cluster
+	clusterPeers = clusterPeers.Filter(filter.Not(filter.HasNodeID(r.me)))
+
 	// checks all cluster peers belong to the passed ids list
 	nonMembers := clusterPeers.Filter(filter.Not(filter.In(ids)))
 	if len(nonMembers) > 0 {
