@@ -87,10 +87,13 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 // Returned identities should all subscribed to the specified `channel`.
 // Note: this method should not include identity of its executor.
 func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel string) (flow.IdentityList, error) {
+	// excludes node itself
+	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.me)))
+
 	if _, ok := engine.IsClusterChannelID(channel); ok {
-		return r.clusterChannelHandler(ids)
+		return r.clusterChannelHandler(sampleSpace)
 	} else {
-		return r.nonClusterChannelHandler(ids, channel)
+		return r.nonClusterChannelHandler(sampleSpace, channel)
 	}
 }
 

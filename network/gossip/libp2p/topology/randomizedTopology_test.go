@@ -67,85 +67,20 @@ func (suite *RandomizedTopologyTestSuite) TestUnhappyInitialization() {
 	require.Error(suite.T(), err)
 }
 
-// TestTopologySize_Topic verifies that size of each topology fanout per topic is greater than
-// `(k+1)/2` where `k` is number of nodes subscribed to a topic. It does that over 100 random iterations.
-func (suite *RandomizedTopologyTestSuite) TestTopologySize_Topic() {
-	for i := 0; i < 100; i++ {
-		top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
-		require.NoError(suite.T(), err)
-
-		topics := engine.ChannelIDsByRole(suite.all[0].Role)
-		require.Greater(suite.T(), len(topics), 1)
-
-		for _, topic := range topics {
-			// extracts total number of nodes subscribed to topic
-			roles, ok := engine.RolesByChannelID(topic)
-			require.True(suite.T(), ok)
-
-			ids, err := top.subsetChannel(suite.all, nil, topic)
-			require.NoError(suite.T(), err)
-
-			// counts total number of nodes that has the roles and are not `suite.me`  (node of interest).
-			total := len(suite.all.Filter(filter.And(filter.HasRole(roles...),
-				filter.Not(filter.HasNodeID(suite.all[0].NodeID)))))
-			require.True(suite.T(), float64(len(ids)) >= (float64)(total+1)/2)
-		}
-	}
-}
-
-// TestDeteministicity is a weak test that verifies the same seed generates the same topology for a topic.
-//
-// It also checks the topology against non-inclusion of the node itself in its own topology.
-func (suite *RandomizedTopologyTestSuite) TestDeteministicity() {
-	// creates a topology using the graph sampler
-	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
-	require.NoError(suite.T(), err)
-
-	topics := engine.ChannelIDsByRole(suite.all[0].Role)
-	require.Greater(suite.T(), len(topics), 1)
-
-	// for each topic samples 100 topologies
-	// all topologies for a topic should be the same
-	for _, topic := range topics {
-		var previous, current []string
-		for i := 0; i < 100; i++ {
-			previous = current
-			current = nil
-
-			// generate a new topology with a the same all, size and seed
-			ids, err := top.subsetChannel(suite.all, nil, topic)
-			require.NoError(suite.T(), err)
-
-			// topology should not contain the node itself
-			require.Empty(suite.T(), ids.Filter(filter.HasNodeID(suite.all[0].NodeID)))
-
-			for _, v := range ids {
-				current = append(current, v.NodeID.String())
-			}
-			// no guarantees about order is made by Topology.subsetChannel(), hence sort the return values before comparision
-			sort.Strings(current)
-
-			if previous == nil {
-				continue
-			}
-
-			// assert that a different seed generates a different topology
-			require.Equal(suite.T(), previous, current)
-		}
-	}
-}
-
-// TestUniqueness generates a topology for the first topic of consensus nodes.
+// TestUniqueness is a weak uniqueness check evaluates that no two consecutive connected components
+// on the same channel are the same.
+// It generates a topology for the first topic of consensus nodes.
 // Since topologies are seeded with the node ids, it evaluates that every two consecutive
 // topologies of the same topic for distinct nodes are distinct.
 //
 // It also checks the topology against non-inclusion of the node itself in its own topology.
 //
-// Note: currently we are using a linear fanout for guaranteed delivery, hence there are
+// Note: currently we are using a uniform probability, hence there are
 // C(n, (n+1)/2) many unique topologies for the same topic across different nodes. Even for small numbers
 // like n = 300, the potential outcomes are large enough (i.e., 10e88) so that the uniqueness is guaranteed.
 // This test however, performs a very weak uniqueness test by checking the uniqueness among consecutive topologies.
 func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
+	edgeProbability := 0.5
 	var previous, current []string
 
 	// for each topic samples 100 topologies
@@ -163,9 +98,9 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 		current = nil
 
 		// creates and samples a new topic aware topology for the first topic of consensus nodes
-		top, err := NewTopicBasedTopology(identity.NodeID, suite.state, suite.subMngr[i])
+		top, err := NewRandomizedTopology(identity.NodeID, edgeProbability, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
-		ids, err := top.subsetChannel(suite.all, nil, topics[0])
+		ids, err := top.subsetChannel(suite.all, topics[0])
 		require.NoError(suite.T(), err)
 
 		// topology should not contain the node itself
