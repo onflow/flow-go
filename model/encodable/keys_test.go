@@ -2,13 +2,37 @@ package encodable
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
 )
+
+func isHexString(enc []byte) error {
+	str := string(enc)
+	if len(str) <= 2 {
+		if str == "\"\"" {
+			return nil
+		}
+		return fmt.Errorf("invalid hex: %v", str)
+	}
+
+	// remove the "
+	str = str[1 : len(str)-1]
+	_, err := hex.DecodeString(str)
+	return err
+}
+
+func TestIsHexString(t *testing.T) {
+	require.NoError(t, isHexString([]byte("abcd")))
+	require.NoError(t, isHexString([]byte("\"\"")))
+	require.Error(t, isHexString([]byte("\"")))
+	require.Error(t, isHexString([]byte("QEVX=")))
+}
 
 func TestEncodableNetworkPubKey(t *testing.T) {
 	netw, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, generateRandomSeed(t))
@@ -23,6 +47,8 @@ func TestEncodableNetworkPubKey(t *testing.T) {
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 	require.True(t, key.Equals(dec.PublicKey))
+
+	require.NoError(t, isHexString(enc))
 }
 
 func TestEncodableNetworkPubKeyNil(t *testing.T) {
