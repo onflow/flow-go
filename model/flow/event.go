@@ -45,15 +45,6 @@ func (e Event) ID() Identifier {
 	return MakeID(e.Body())
 }
 
-// ByteSize return size of the event in terms of number of bytes
-func (e Event) ByteSize() uint {
-	return uint(len(e.Type) +
-		len(e.TransactionID) +
-		4 + // tx index
-		4 + // event index
-		len(e.Payload))
-}
-
 // Body returns the body of the execution receipt.
 func (e *Event) Body() interface{} {
 	return wrapEvent(*e)
