@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -11,7 +10,7 @@ import (
 )
 
 var (
-	flagStakingNodesDir string
+	flagStakingNodesPath string
 )
 
 // finallistCmd represents the final list command
@@ -37,8 +36,11 @@ func addFinalListFlags() {
 	_ = finalListCmd.MarkFlagRequired("flow-infos")
 
 	// staking nodes dir containing staking nodes json
-	finalListCmd.Flags().StringVar(&flagStakingNodesDir, "staking-nodes", "", "path to a directory containing a JSON file of all staking nodes")
+	finalListCmd.Flags().StringVar(&flagStakingNodesPath, "staking-nodes", "", "path to a JSON file of all staking nodes")
 	_ = finalListCmd.MarkFlagRequired("staking-nodes")
+
+	finalListCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2,
+		"number of collection clusters")
 }
 
 func finalList(cmd *cobra.Command, args []string) {
@@ -53,7 +55,7 @@ func finalList(cmd *cobra.Command, args []string) {
 	log.Info().Msg("checking constraints on consensus/cluster nodes")
 	checkConstraints(partnerNodes, flowNodes)
 
-	log.Info().Msgf("reading staking contract node information: %s", flagStakingNodesDir)
+	log.Info().Msgf("reading staking contract node information: %s", flagStakingNodesPath)
 	stakingNodes := readStakingContractDetails()
 
 	// merge internal and partner node infos
@@ -240,8 +242,7 @@ func assemblePartnerNodesWithoutStake() []model.NodeInfo {
 
 func readStakingContractDetails() []model.NodeInfo {
 	var stakingNodes []model.NodeInfoPub
-	path := filepath.Join(flagStakingNodesDir, "node-infos.pub.json")
-	readJSON(path, &stakingNodes)
+	readJSON(flagStakingNodesPath, &stakingNodes)
 	return createPublicNodeInfo(stakingNodes)
 }
 
