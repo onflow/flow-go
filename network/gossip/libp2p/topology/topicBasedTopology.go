@@ -102,9 +102,8 @@ func (t *TopicBasedTopology) subsetChannel(ids flow.IdentityList, shouldHave flo
 	channel string) (flow.IdentityList, error) {
 	if _, ok := engine.IsClusterChannelID(channel); ok {
 		return t.clusterChannelHandler(ids, shouldHave)
-	} else {
-		return t.nonClusterChannelHandler(ids, shouldHave, channel)
 	}
+	return t.nonClusterChannelHandler(ids, shouldHave, channel)
 }
 
 // subsetRole returns a random subset of the identity list that is passed. `shouldHave` represents set of
