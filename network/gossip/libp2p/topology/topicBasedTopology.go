@@ -202,7 +202,7 @@ func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentityL
 	return t.subsetRole(clusterPeers, shouldHave.Filter(filter.HasNodeID(clusterPeers.NodeIDs()...)), flow.RoleList{flow.RoleCollection})
 }
 
-// clusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
+// nonClusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
 // The returned sample contains `shouldHave` ones that also subscribed to `channel`.
 func (t TopicBasedTopology) nonClusterChannelHandler(ids, shouldHave flow.IdentityList, channel string) (flow.IdentityList, error) {
 	if _, ok := engine.IsClusterChannelID(channel); ok {
