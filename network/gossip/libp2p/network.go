@@ -32,13 +32,14 @@ type Network struct {
 	ids     flow.IdentityList
 	me      module.Local
 	mw      middleware.Middleware
-	top     topology.Topology
+	top     topology.Topology // used to determine fanout connections
 	metrics module.NetworkMetrics
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
 	queue   queue.MessageQueue
 	ctx     context.Context
 	cancel  context.CancelFunc
-	sm      channel.SubscriptionManager
+	subMngr channel.SubscriptionManager // used to keep track of subscribed channels
+
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -70,7 +71,7 @@ func NewNetwork(
 		rcache:  rcache,
 		top:     top,
 		metrics: metrics,
-		sm:      sm,
+		subMngr: sm,
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 	o.ids = ids
@@ -117,7 +118,7 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 		return nil, fmt.Errorf("unknown channel id: %s, should be registered in topic map", channelID)
 	}
 
-	err := n.sm.Register(channelID, engine)
+	err := n.subMngr.Register(channelID, engine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channelID, err)
 	}
@@ -147,7 +148,7 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 // unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
 // receive messages from that channelID
 func (n *Network) unregister(channelID string) error {
-	err := n.sm.Unregister(channelID)
+	err := n.subMngr.Unregister(channelID)
 	if err != nil {
 		return fmt.Errorf("failed to unregister engine for channelID %s: %w", channelID, err)
 	}
@@ -168,30 +169,13 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentityList, error) {
-	n.RLock()
-	defer n.RUnlock()
-
-	fanout := uint(len(n.ids)+1) / 2
-
-	// gets all the channels that this node has subscribed to
-	myTopics := n.sm.GetChannelIDs()
-	myFanout := flow.IdentityList{}
-
-	if len(myTopics) == 0 {
-		return nil, fmt.Errorf("no subscribed topic found for the node")
+	n.Lock()
+	defer n.Unlock()
+	top, err := n.top.GenerateFanout(n.ids)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
-
-	// samples a connected component fanout from each topic and takes the
-	// union of all fanouts.
-	for _, topic := range myTopics {
-		subset, err := n.top.Subset(n.ids, fanout, topic)
-		if err != nil {
-			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", topic, err)
-		}
-		myFanout = myFanout.Union(subset)
-	}
-
-	return myFanout, nil
+	return top, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
@@ -445,7 +429,7 @@ func (n *Network) sendOnChannel(channelID string, message interface{}, targetIDs
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QueueMessage)
-	eng, err := n.sm.GetEngine(qm.ChannelID)
+	eng, err := n.subMngr.GetEngine(qm.ChannelID)
 	if err != nil {
 		n.logger.Error().
 			Err(err).

@@ -5,6 +5,7 @@ go 1.13
 require (
 	cloud.google.com/go/storage v1.6.0
 	github.com/HdrHistogram/hdrhistogram-go v0.9.0 // indirect
+	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect

@@ -1,15 +1,19 @@
 package topology
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
+	"github.com/onflow/flow-go/network/gossip/libp2p/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -67,10 +71,30 @@ func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityL
 	assert.Equal(t, expectedCount, len(visited))
 }
 
+// MockSubscriptionManager returns a list of mocked subscription manages for the input
+// identities. It only mocks the GetChannelIDs method of the subscription manager. Other methods
+// return an error, as they are not supposed to be invoked.
+func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.SubscriptionManager {
+	require.NotEmpty(t, ids)
+
+	sms := make([]channel.SubscriptionManager, len(ids))
+	for i, id := range ids {
+		sm := &mock.SubscriptionManager{}
+		err := fmt.Errorf("this method should not be called on mock subscription manager")
+		sm.On("Register", testifymock.Anything, testifymock.Anything).Return(err)
+		sm.On("Unregister", testifymock.Anything).Return(err)
+		sm.On("GetEngine", testifymock.Anything).Return(err)
+		sm.On("GetChannelIDs").Return(engine.ChannelIDsByRole(id.Role))
+		sms[i] = sm
+	}
+
+	return sms
+}
+
 // CheckMembership checks each identity in a top list belongs to all identity list.
 func CheckMembership(t *testing.T, top flow.IdentityList, all flow.IdentityList) {
 	for _, id := range top {
-		require.Contains(t, all, id.NodeID)
+		require.Contains(t, all, id)
 	}
 }
 
