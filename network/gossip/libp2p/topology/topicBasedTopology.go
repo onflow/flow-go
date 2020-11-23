@@ -145,7 +145,7 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 	if len(shouldHave) == 0 {
 		// choose (n+1)/2 random nodes so that each node in the graph will have a degree >= (n+1) / 2,
 		// guaranteeing a connected graph.
-		size := uint(LinearFanoutFunc(len(all)))
+		size := uint(LinearFanout(len(all)))
 		return all.DeterministicSample(size, t.seed), nil
 
 	} else {
@@ -156,7 +156,7 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 		}
 
 		// total sample size
-		totalSize := LinearFanoutFunc(len(all))
+		totalSize := LinearFanout(len(all))
 
 		if totalSize < len(shouldHave) {
 			// total fanout size needed is already satisfied by shouldHave set.

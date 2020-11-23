@@ -234,7 +234,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_UnconditionalSampling
 
 	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
 	// the size equal to applying LinearFanoutFunc over the original set.
-	expectedFanout := LinearFanoutFunc(len(suite.all))
+	expectedFanout := LinearFanout(len(suite.all))
 	require.Equal(suite.T(), len(sample), expectedFanout)
 
 	// checks sample does not include any duplicate
@@ -257,7 +257,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_ConditionalSampling()
 
 	// the LinearFanoutGraphSampler utilizes the LinearFanoutFunc. Hence any sample it makes should have
 	// the size equal to applying LinearFanoutFunc over the original set.
-	expectedFanout := LinearFanoutFunc(len(suite.all))
+	expectedFanout := LinearFanout(len(suite.all))
 	require.Equal(suite.T(), len(sample), expectedFanout)
 
 	// checks sample does not include any duplicate
