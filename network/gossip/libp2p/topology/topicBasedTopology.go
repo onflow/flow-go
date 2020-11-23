@@ -148,30 +148,30 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 		size := uint(LinearFanout(len(all)))
 		return all.DeterministicSample(size, t.seed), nil
 
-	} else {
-		// checks `shouldHave` be a subset of `all`
-		nonMembers := shouldHave.Filter(filter.Not(filter.In(all)))
-		if len(nonMembers) != 0 {
-			return nil, fmt.Errorf("should have identities is not a subset of all: %v", nonMembers)
-		}
-
-		// total sample size
-		totalSize := LinearFanout(len(all))
-
-		if totalSize < len(shouldHave) {
-			// total fanout size needed is already satisfied by shouldHave set.
-			return shouldHave, nil
-		}
-
-		// subset size excluding should have ones
-		subsetSize := totalSize - len(shouldHave)
-
-		// others are all excluding should have ones
-		others := all.Filter(filter.Not(filter.In(shouldHave)))
-		others = others.DeterministicSample(uint(subsetSize), t.seed)
-
-		return others.Union(shouldHave), nil
 	}
+	// checks `shouldHave` be a subset of `all`
+	nonMembers := shouldHave.Filter(filter.Not(filter.In(all)))
+	if len(nonMembers) != 0 {
+		return nil, fmt.Errorf("should have identities is not a subset of all: %v", nonMembers)
+	}
+
+	// total sample size
+	totalSize := LinearFanout(len(all))
+
+	if totalSize < len(shouldHave) {
+		// total fanout size needed is already satisfied by shouldHave set.
+		return shouldHave, nil
+	}
+
+	// subset size excluding should have ones
+	subsetSize := totalSize - len(shouldHave)
+
+	// others are all excluding should have ones
+	others := all.Filter(filter.Not(filter.In(shouldHave)))
+	others = others.DeterministicSample(uint(subsetSize), t.seed)
+
+	return others.Union(shouldHave), nil
+
 }
 
 // clusterPeers returns the list of other nodes within the same cluster as this node.
