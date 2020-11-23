@@ -41,14 +41,15 @@ func NewRandomizedTopology(nodeID flow.Identifier, edgeProb float64, state proto
 		return nil, fmt.Errorf("could not generate random number generator: %w", err)
 	}
 
-	return &RandomizedTopology{
+	t := &RandomizedTopology{
 		me:      nodeID,
 		state:   state,
 		subMngr: subMngr,
 		chance:  uint64(100 * edgeProb),
 		rng:     rng,
-	}, nil
+	}
 
+	return t, nil
 }
 
 // GenerateFanout receives IdentityList of entire network and constructs the fanout IdentityList
@@ -173,7 +174,8 @@ func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, chan
 
 // tossBiasedBit returns true with probability equal `r.chance/100`, and returns false otherwise.
 func (r *RandomizedTopology) tossBiasedBit() bool {
-	if r.rng.UintN(100) <= r.chance {
+	draw := r.rng.UintN(100)
+	if draw < r.chance {
 		return true
 	} else {
 		return false
