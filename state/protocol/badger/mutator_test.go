@@ -707,6 +707,51 @@ func TestExtendReceiptsDuplicate(t *testing.T) {
 	})
 }
 
+func TestExtendReceiptsLatestSealed(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		// bootstrap the root block
+		block1, result, seal := unittest.BootstrapFixture(participants)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+		err := state.Mutate().Bootstrap(block1, result, seal)
+		require.NoError(t, err)
+
+		// create block2
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Payload.Guarantees = nil
+		block2.Header.PayloadHash = block2.Payload.Hash()
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		// create a seals for block2
+		seal2 := unittest.SealFixture(
+			unittest.SealWithBlockID(block2.ID()),
+		)
+
+		// create block3 containing a seal for block2
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Payload.Guarantees = nil
+		block3.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal2},
+		})
+		block3.Header.PayloadHash = block3.Payload.Hash()
+		err = state.Mutate().Extend(&block3)
+		require.Nil(t, err)
+
+		// insert a receipt for block 2, which is now the highest sealed block
+		receipt := unittest.ReceiptForBlockFixture(&block2)
+
+		// test that the receipt is rejected
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.Payload.Guarantees = nil
+		block4.Payload.Receipts = append(block4.Payload.Receipts, receipt)
+		block4.Header.PayloadHash = block4.Payload.Hash()
+		err = state.Mutate().Extend(&block4)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
 func TestExtendReceiptsBlockNotOnFork(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 		// bootstrap the root block

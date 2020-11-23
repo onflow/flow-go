@@ -46,9 +46,6 @@ type BuilderSuite struct {
 	pendingReceipts   []*flow.ExecutionReceipt
 	pendingSeals      map[flow.Identifier]*flow.IncorporatedResultSeal // storage for the seal mempool
 
-	// mempool written to by builder
-	incorporatedResults []*flow.IncorporatedResult
-
 	// storage for dbs
 	headers map[flow.Identifier]*flow.Header
 	heights map[uint64]*flow.Header
@@ -74,7 +71,6 @@ type BuilderSuite struct {
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
 	recPool  *mempool.Receipts
-	resPool  *mempool.IncorporatedResults
 
 	// tracking behaviour
 	assembled  *flow.Payload     // built payload
@@ -191,7 +187,6 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.pendingGuarantees = nil
 	bs.pendingSeals = nil
 	bs.pendingReceipts = nil
-	bs.incorporatedResults = nil
 
 	// initialise the dbs
 	bs.lastSeal = nil
@@ -384,15 +379,6 @@ func (bs *BuilderSuite) SetupTest() {
 		recID := args.Get(0).(flow.Identifier)
 		bs.remRecIDs = append(bs.remRecIDs, recID)
 	}).Return(true)
-
-	bs.resPool = &mempool.IncorporatedResults{}
-	bs.resPool.On("Size").Return(uint(0))
-	bs.resPool.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			res := args.Get(0).(*flow.IncorporatedResult)
-			bs.incorporatedResults = append(bs.incorporatedResults, res)
-		},
-	).Return(true)
 
 	// initialize the builder
 	bs.build = NewBuilder(
@@ -598,23 +584,19 @@ func (bs *BuilderSuite) TestPayloadReceiptUnknownBlock() {
 	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts with unknown blocks")
 }
 
-// Receipts for sealed blocks should not be reinserted, and should be removed
-// from the mempool.
+// Receipts for sealed blocks should not be reinserted
 func (bs *BuilderSuite) TestPayloadReceiptSealedBlock() {
 
 	bs.pendingReceipts = []*flow.ExecutionReceipt{}
 
 	// create a valid receipt for a known but sealed block
-	pendingReceiptSealedBlock := unittest.ExecutionReceiptFixture()
-	bs.headers[pendingReceiptSealedBlock.ExecutionResult.BlockID] = &flow.Header{}
+	sealedBlock := bs.blocks[bs.firstID]
+	pendingReceiptSealedBlock := unittest.ReceiptForBlockFixture(sealedBlock)
 	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceiptSealedBlock)
-
-	bs.sealPool.On("ByID", pendingReceiptSealedBlock.ExecutionResult.BlockID).Return(&flow.Seal{}, nil)
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are for sealed blocks")
-	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts with sealed blocks")
 }
 
 // Receipts that are already included in finalized blocks should not be
@@ -623,16 +605,10 @@ func (bs *BuilderSuite) TestPayloadReceiptInFinalizedBlock() {
 
 	bs.pendingReceipts = []*flow.ExecutionReceipt{}
 
-	// create a valid receipt for a known, unsealed block
-	pendingReceipt := unittest.ExecutionReceiptFixture()
-	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{}
+	// try to reinsert a receipt that is already in a finalized block
+	finalBlock := bs.blocks[bs.finalID]
+	pendingReceipt := finalBlock.Payload.Receipts[0]
 	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
-
-	// put the receipt in a finalized block (chosen at random)
-	blockID := bs.finalizedBlockIDs[rand.Intn(len(bs.finalizedBlockIDs))]
-	index := bs.index[blockID]
-	index.ReceiptIDs = append(index.ReceiptIDs, pendingReceipt.ID())
-	bs.index[blockID] = index
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
@@ -645,18 +621,10 @@ func (bs *BuilderSuite) TestPayloadReceiptInFinalizedBlock() {
 func (bs *BuilderSuite) TestPayloadReceiptInPendingBlock() {
 	bs.pendingReceipts = []*flow.ExecutionReceipt{}
 
-	// create a valid receipt for a known, unsealed block
-	lastSealHeader := bs.headers[bs.lastSeal.BlockID]
-	lastSealHeight := lastSealHeader.Height
-	pendingReceipt := unittest.ExecutionReceiptFixture()
-	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{Height: lastSealHeight + 1000}
+	// try to reinsert a receipt that is already in a pending block
+	pendingBlock := bs.blocks[bs.pendingBlockIDs[0]]
+	pendingReceipt := pendingBlock.Payload.Receipts[0]
 	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
-
-	// put the receipt in a pending block (chosen at random)
-	blockID := bs.pendingBlockIDs[rand.Intn(len(bs.pendingBlockIDs))]
-	index := bs.index[blockID]
-	index.ReceiptIDs = append(index.ReceiptIDs, pendingReceipt.ID())
-	bs.index[blockID] = index
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
@@ -670,10 +638,10 @@ func (bs *BuilderSuite) TestPayloadReceiptForBlockNotInFork() {
 	bs.pendingReceipts = []*flow.ExecutionReceipt{}
 
 	// create a valid receipt for a known, unsealed block, not on the fork
-	lastSealHeader := bs.headers[bs.lastSeal.BlockID]
-	lastSealHeight := lastSealHeader.Height
+	first := bs.headers[bs.firstID]
+	firstHeight := first.Height
 	pendingReceipt := unittest.ExecutionReceiptFixture()
-	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{Height: lastSealHeight + 1000}
+	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{Height: firstHeight + 1000}
 	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
