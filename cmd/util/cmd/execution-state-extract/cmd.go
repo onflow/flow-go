@@ -48,6 +48,11 @@ func init() {
 func run(*cobra.Command, []string) {
 	var stateCommitment []byte
 
+	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
+		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
+		return
+	}
+
 	if len(flagBlockHash) > 0 {
 		blockID, err := flow.HexStringToIdentifier(flagBlockHash)
 		if err != nil {
