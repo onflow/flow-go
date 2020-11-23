@@ -164,98 +164,54 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 		subset, err := top.subsetChannel(suite.all, channelID)
 		require.NoError(suite.T(), err)
 
+		uniquenessCheck(suite.T(), subset)
+
 		channelIDAdjMap[id.NodeID] = subset
 	}
 
 	// check that each of the collection clusters forms a connected graph
 	for _, cluster := range suite.clusters {
-		suite.checkConnectednessByCluster(suite.T(), channelIDAdjMap, cluster)
+		checkConnectednessByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
 	}
 }
 
 // TestLinearFanout_EmptyAllSet evaluates that trying to sample a connected graph when `all`
 // is empty returns an error.
 func (suite *RandomizedTopologyTestSuite) TestLinearFanout_EmptyAllSet() {
-	// samples 10 all into 'shouldHave'.
-	shouldHave := suite.all.Sample(10)
-
 	// creates a topology for the node
-	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.state, suite.subMngr[0])
+	top, err := NewRandomizedTopology(suite.all[0].NodeID, suite.edgeProb, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
-	// sampling with empty `all` and non-empty `shouldHave`
-	_, err = top.sampleConnectedGraph(flow.IdentityList{}, shouldHave)
+	// sampling with empty `all`
+	_, err = top.sampleFanout(flow.IdentityList{})
 	require.Error(suite.T(), err)
 
-	// sampling with empty all and nil `shouldHave`
-	_, err = top.sampleConnectedGraph(flow.IdentityList{}, nil)
+	// sampling with empty all
+	_, err = top.sampleFanout(flow.IdentityList{})
 	require.Error(suite.T(), err)
 
-	// sampling with nil all and nil `shouldHave`
-	_, err = top.sampleConnectedGraph(nil, nil)
+	// sampling with nil all
+	_, err = top.sampleFanout(nil)
 	require.Error(suite.T(), err)
 }
 
-// TestConnectedness_Unconditionally evaluates that samples returned by the LinearFanoutGraphSampler with
-// empty `shouldHave` constitute a connected graph.
-func (suite *RandomizedTopologyTestSuite) TestConnectedness_Unconditionally() {
+// TestSampleFanoutConnectedness evaluates that sampleFanout with default edge probability of this suite provides
+// a connected graph,
+func (suite *RandomizedTopologyTestSuite) TestSampleFanoutConnectedness() {
 	adjMap := make(map[flow.Identifier]flow.IdentityList)
 	for i, id := range suite.all {
 		// creates a topology for the node
-		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
+		top, err := NewRandomizedTopology(id.NodeID, suite.edgeProb, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples a graph and stores it in adjacency map
-		sample, err := top.sampleConnectedGraph(suite.all, nil)
+		sample, err := top.sampleFanout(suite.all)
+		require.NoError(suite.T(), err)
+
+		uniquenessCheck(suite.T(), sample)
+
 		adjMap[id.NodeID] = sample
 	}
 
 	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
-}
-
-// TestConnectedness_Conditionally evaluates that samples returned by the LinearFanoutGraphSampler with
-// some `shouldHave` constitute a connected graph.
-func (suite *RandomizedTopologyTestSuite) TestConnectedness_Conditionally() {
-	adjMap := make(map[flow.Identifier]flow.IdentityList)
-	for i, id := range suite.all {
-		// creates a topology for the node
-		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
-		require.NoError(suite.T(), err)
-
-		// samples a graph and stores it in adjacency map
-		// sampling is done with a non-empty `shouldHave` subset of 10 randomly chosen all
-		shouldHave := suite.all.Sample(10)
-		sample, err := top.sampleConnectedGraph(suite.all, shouldHave)
-
-		// evaluates inclusion of should haves in sample
-		for _, shouldHaveID := range shouldHave {
-			require.Contains(suite.T(), sample, shouldHaveID)
-		}
-		adjMap[id.NodeID] = sample
-	}
-
-	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
-}
-
-// uniquenessCheck is a test helper method that fails the test if all include any duplicate identity.
-func (suite *RandomizedTopologyTestSuite) uniquenessCheck(ids flow.IdentityList) {
-	seen := make(map[flow.Identity]struct{})
-	for _, id := range ids {
-		// checks if id is duplicate in ids list
-		_, ok := seen[*id]
-		require.False(suite.T(), ok)
-
-		// marks id as seen
-		seen[*id] = struct{}{}
-	}
-}
-
-// checkConnectednessByCluster is a test helper that checks all nodes belong to a cluster are connected.
-func (suite *RandomizedTopologyTestSuite) checkConnectednessByCluster(t *testing.T,
-	adjMap map[flow.Identifier]flow.IdentityList,
-	cluster flow.IdentityList) {
-	CheckGraphConnected(t,
-		adjMap,
-		suite.all,
-		filter.In(cluster))
 }
