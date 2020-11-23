@@ -517,10 +517,10 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	return last, nil
 }
 
-// receiptExtend checks the compliance of the receipt payload. Receipts should:
-//   * pertain to blocks on the fork
-//   * should not appear more than once on a fork,
-//   * no seal has been included for the respective block in this particular fork
+// receiptExtend checks the compliance of the receipt payload.
+//   * Receipts should pertain to blocks on the fork
+//   * Receipts should not appear more than once on a fork
+//   * No seal has been included for the respective block in this particular fork
 // We require the receipts to be sorted by block height (within a payload).
 func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	blockID := candidate.ID()
@@ -621,14 +621,12 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 }
 
 // IsValidReceipt performs checks that are independent of where the receipt was
-// incorporate:
-//
-// - Is the receipt from a valid execution node with non-zero weight (stake)?
-// - Cryptography checks
-// - Does it contain the expected number of chunks?
-
+// incorporated
 func IsValidReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
-	// TODO fill this out
+	// TODO fill this out. ex:
+	// - Is the receipt from a valid execution node with non-zero weight (stake)?
+	// - Cryptography checks
+	// - Does it contain the expected number of chunks?
 	return true, nil
 }
 
