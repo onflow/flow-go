@@ -12,12 +12,19 @@ func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error
 	l := newLed(payloads)
 	a := state.NewAccounts(l)
 	// fungible token
-	ok, err := a.Exists(flow.HexToAddress("f233dcee88fe0abe"))
+	add := flow.HexToAddress("f233dcee88fe0abe")
+	ok, err := a.Exists(add)
 	if err != nil {
 		return nil, err
 	}
 	if ok {
-		// a.AppendPublicKey()
+		pk := flow.AccountPublicKey{}
+		publicKeyJSON := "{\"PublicKey\":\"ABCDEFGHIJK\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}"
+		err = pk.UnmarshalJSON([]byte(publicKeyJSON))
+		if err != nil {
+			return nil, err
+		}
+		a.AppendPublicKey(add, pk)
 	}
 	return l.Payloads(), nil
 }
