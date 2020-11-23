@@ -37,15 +37,12 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")
-	// _ = Cmd.MarkFlagRequired("block-hash")
 
 	Cmd.Flags().StringVar(&flagBlockHash, "block-hash", "",
 		"Block hash (hex-encoded, 64 characters)")
-	// _ = Cmd.MarkFlagRequired("block-hash")
 
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")
-	// _ = Cmd.MarkFlagRequired("datadir")
 }
 
 func run(*cobra.Command, []string) {
@@ -68,6 +65,7 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msg("cannot get state commitment for block")
 		}
 	}
+
 	if len(flagStateCommitment) > 0 {
 		var err error
 		stateCommitment, err = hex.DecodeString(flagStateCommitment)
@@ -80,6 +78,6 @@ func run(*cobra.Command, []string) {
 
 	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("error extracting the execution state")
+		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}
 }

@@ -5,10 +5,10 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -46,13 +46,16 @@ func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 	if err != nil {
 		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve epoch status: %w", err)
 	}
-	if !status.Valid() {
-		return flow.EpochPhaseUndefined, fmt.Errorf("invalid epoch status")
-	}
-	return status.Phase(), nil
+	phase, err := status.Phase()
+	return phase, err
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+
+	// TODO: CAUTION SHORTCUT
+	// we retrieve identities based on the initial identity table from the EpochSetup
+	// event here -- this will need revision to support mid-epoch identity changes
+	// once slashing is implemented
 
 	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
 	if err != nil {
@@ -64,15 +67,83 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// TODO: CAUTION SHORTCUT
-	// We report the initial identities as of the EpochSetup event here.
-	// Only valid as long as we don't have slashing
-	identities := setup.Participants.Filter(selector)
+	// get identities from the current epoch first
+	identities := setup.Participants.Copy()
+	lookup := identities.Lookup()
 
+	// get identities that are in either last/next epoch but NOT in the current epoch
+	var otherEpochIdentities flow.IdentityList
+	phase, err := status.Phase()
+	if err != nil {
+		return nil, fmt.Errorf("could not get phase: %w", err)
+	}
+	switch phase {
+	// during staking phase (the beginning of the epoch) we include identities
+	// from the previous epoch that are now un-staking
+	case flow.EpochPhaseStaking:
+
+		first, err := s.state.AtBlockID(status.FirstBlockID).Head()
+		if err != nil {
+			return nil, fmt.Errorf("could not get first block of epoch: %w", err)
+		}
+		// check whether this is the first epoch after the root block - in this
+		// case there are no previous epoch identities to check anyway
+		root, err := s.state.Params().Root()
+		if err != nil {
+			return nil, fmt.Errorf("could not get root block: %w", err)
+		}
+		if first.Height == root.Height {
+			break
+		}
+
+		lastStatus, err := s.state.epoch.statuses.ByBlockID(first.ParentID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get last epoch status: %w", err)
+		}
+		lastSetup, err := s.state.epoch.setups.ByID(lastStatus.CurrentEpoch.SetupID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get last epoch setup event: %w", err)
+		}
+
+		for _, identity := range lastSetup.Participants {
+			_, exists := lookup[identity.NodeID]
+			// add identity from previous epoch that is not in current epoch
+			if !exists {
+				otherEpochIdentities = append(otherEpochIdentities, identity)
+			}
+		}
+
+	// during setup and committed phases (the end of the epoch) we include
+	// identities that will join in the next epoch
+	case flow.EpochPhaseSetup, flow.EpochPhaseCommitted:
+
+		nextSetup, err := s.state.epoch.setups.ByID(status.NextEpoch.SetupID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get next epoch setup: %w", err)
+		}
+
+		for _, identity := range nextSetup.Participants {
+			_, exists := lookup[identity.NodeID]
+			// add identity from next epoch that is not in current epoch
+			if !exists {
+				otherEpochIdentities = append(otherEpochIdentities, identity)
+			}
+		}
+
+	default:
+		return nil, fmt.Errorf("invalid epoch phase: %s", phase)
+	}
+
+	// add the identities from next/last epoch, with stake set to 0
+	identities = append(
+		identities,
+		otherEpochIdentities.Map(mapfunc.WithStake(0))...,
+	)
+
+	// apply the filter to the participants
+	identities = identities.Filter(selector)
 	// apply a deterministic sort to the participants
-	sort.Slice(identities, func(i int, j int) bool {
-		return order.ByNodeIDAsc(identities[i], identities[j])
-	})
+	identities = identities.Order(order.ByNodeIDAsc)
 
 	return identities, nil
 }
