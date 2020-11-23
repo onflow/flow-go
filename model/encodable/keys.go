@@ -16,9 +16,17 @@ func toHex(bs []byte) string {
 	return fmt.Sprintf("%x", bs)
 }
 
-func fromHex(b []byte) ([]byte, error) {
+func fromJSONHex(b []byte) ([]byte, error) {
 	var x string
 	if err := json.Unmarshal(b, &x); err != nil {
+		return nil, err
+	}
+	return hex.DecodeString(x)
+}
+
+func fromMsgPackHex(b []byte) ([]byte, error) {
+	var x string
+	if err := msgpack.Unmarshal(b, &x); err != nil {
 		return nil, err
 	}
 	return hex.DecodeString(x)
@@ -38,7 +46,7 @@ func (pub NetworkPubKey) MarshalJSON() ([]byte, error) {
 }
 
 func (pub *NetworkPubKey) UnmarshalJSON(b []byte) error {
-	bz, err := fromHex(b)
+	bz, err := fromJSONHex(b)
 	if err != nil {
 		return err
 	}
@@ -67,7 +75,7 @@ func (priv NetworkPrivKey) MarshalJSON() ([]byte, error) {
 }
 
 func (priv *NetworkPrivKey) UnmarshalJSON(b []byte) error {
-	bz, err := fromHex(b)
+	bz, err := fromJSONHex(b)
 	if err != nil {
 		return err
 	}
@@ -93,7 +101,7 @@ func (pub StakingPubKey) MarshalJSON() ([]byte, error) {
 }
 
 func (pub *StakingPubKey) UnmarshalJSON(b []byte) error {
-	bz, err := fromHex(b)
+	bz, err := fromJSONHex(b)
 	if err != nil {
 		return err
 	}
@@ -121,7 +129,7 @@ func (priv StakingPrivKey) MarshalJSON() ([]byte, error) {
 }
 
 func (priv *StakingPrivKey) UnmarshalJSON(b []byte) error {
-	bz, err := fromHex(b)
+	bz, err := fromJSONHex(b)
 	if err != nil {
 		return err
 	}
@@ -147,7 +155,7 @@ func (pub RandomBeaconPubKey) MarshalJSON() ([]byte, error) {
 }
 
 func (pub *RandomBeaconPubKey) UnmarshalJSON(b []byte) error {
-	bz, err := fromHex(b)
+	bz, err := fromJSONHex(b)
 	if err != nil {
 		return err
 	}
@@ -167,11 +175,7 @@ func (pub RandomBeaconPubKey) MarshalMsgpack() ([]byte, error) {
 }
 
 func (pub *RandomBeaconPubKey) UnmarshalMsgpack(b []byte) error {
-	var x string
-	if err := msgpack.Unmarshal(b, &x); err != nil {
-		return err
-	}
-	bz, err := hex.DecodeString(x)
+	bz, err := fromMsgPackHex(b)
 	if err != nil {
 		return err
 	}
@@ -200,7 +204,7 @@ func (priv RandomBeaconPrivKey) MarshalJSON() ([]byte, error) {
 }
 
 func (priv *RandomBeaconPrivKey) UnmarshalJSON(b []byte) error {
-	bz, err := fromHex(b)
+	bz, err := fromJSONHex(b)
 	if err != nil {
 		return err
 	}
