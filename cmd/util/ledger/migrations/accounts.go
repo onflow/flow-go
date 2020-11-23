@@ -80,7 +80,10 @@ func appendKeyForAccount(accounts *state.Accounts, addressInHex string, encodedK
 		if err != nil {
 			return err
 		}
-		accounts.AppendPublicKey(add, accountKey)
+		err = accounts.AppendPublicKey(add, accountKey)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
