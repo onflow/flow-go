@@ -5,16 +5,17 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 	poolmock "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
