@@ -112,16 +112,16 @@ func (t *TopicBasedTopology) subsetChannel(ids flow.IdentityList, shouldHave flo
 // Returned identities should all be of one of the specified `roles`.
 // Note: this method should not include identity of its executor.
 func (t TopicBasedTopology) subsetRole(ids flow.IdentityList, shouldHave flow.IdentityList, roles flow.RoleList) (flow.IdentityList, error) {
-	if shouldHave != nil {
-		// excludes irrelevant roles from should have set
-		shouldHave = shouldHave.Filter(filter.HasRole(roles...))
+	// excludes irrelevant roles and the node itself from both should have and ids set
+	shouldHave = shouldHave.Filter(filter.And(
+		filter.HasRole(roles...),
+		filter.Not(filter.HasNodeID(t.me)),
+	))
 
-		// excludes the node itself from should have set
-		shouldHave = shouldHave.Filter(filter.Not(filter.HasNodeID(t.me)))
-	}
-
-	// excludes the node itself from all
-	ids = ids.Filter(filter.Not(filter.HasNodeID(t.me)))
+	ids = ids.Filter(filter.And(
+		filter.HasRole(roles...),
+		filter.Not(filter.HasNodeID(t.me)),
+	))
 
 	sample, err := t.sampleConnectedGraph(ids, shouldHave)
 	if err != nil {

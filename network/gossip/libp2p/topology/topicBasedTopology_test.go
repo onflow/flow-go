@@ -329,7 +329,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_EmptyAllSet() {
 	require.Error(suite.T(), err)
 }
 
-// TestConnectedness_Unconditionally evaluates that samples returned by the LinearFanoutGraphSampler with
+// TestConnectedness_Unconditionally evaluates that samples returned by the sampleConnectedGraph with
 // empty `shouldHave` constitute a connected graph.
 func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Unconditionally() {
 	adjMap := make(map[flow.Identifier]flow.IdentityList)
@@ -346,7 +346,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Unconditionally() {
 	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
 }
 
-// TestConnectedness_Conditionally evaluates that samples returned by the LinearFanoutGraphSampler with
+// TestConnectedness_Conditionally evaluates that samples returned by the sampleConnectedGraph with
 // some `shouldHave` constitute a connected graph.
 func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Conditionally() {
 	adjMap := make(map[flow.Identifier]flow.IdentityList)
@@ -368,6 +368,54 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Conditionally() {
 	}
 
 	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
+}
+
+// TestSubsetRoleConnectedness_Conditionally evaluates that subset returned by subsetRole with a non-empty `shouldHave` set
+// is a connected graph among specified roles.
+func (suite *TopicAwareTopologyTestSuite) TestSubsetRoleConnectedness_Conditionally() {
+	adjMap := make(map[flow.Identifier]flow.IdentityList)
+	for i, id := range suite.all {
+		// creates a topology for the node
+		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
+		require.NoError(suite.T(), err)
+
+		// samples a graph among consensus nodes and stores it in adjacency map
+		// sampling is done with a non-empty `shouldHave` subset of 10 randomly
+		// chosen all excluding the node itself.
+		shouldHave := suite.all.Filter(filter.Not(filter.HasNodeID(id.NodeID))).Sample(10)
+		sample, err := top.subsetRole(suite.all, shouldHave, flow.RoleList{flow.RoleConsensus})
+
+		// evaluates inclusion of should haves consensus nodes in sample
+		for _, shouldHaveID := range shouldHave {
+			if shouldHaveID.Role != flow.RoleConsensus {
+				continue
+			}
+			require.Contains(suite.T(), sample, shouldHaveID)
+		}
+		adjMap[id.NodeID] = sample
+	}
+
+	// evaluates connectedness of consensus nodes graph.
+	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.HasRole(flow.RoleConsensus))
+}
+
+// TestSubsetRoleConnectedness_Unconditionally evaluates that subset returned by subsetRole with an `shouldHave` set
+// is a connected graph among specified roles.
+func (suite *TopicAwareTopologyTestSuite) TestSubsetRoleConnectedness_Unconditionally() {
+	adjMap := make(map[flow.Identifier]flow.IdentityList)
+	for i, id := range suite.all {
+		// creates a topology for the node
+		top, err := NewTopicBasedTopology(id.NodeID, suite.state, suite.subMngr[i])
+		require.NoError(suite.T(), err)
+
+		// samples a graph among consensus nodes and stores it in adjacency map
+		// sampling is done with an non-empty set.
+		sample, err := top.subsetRole(suite.all, nil, flow.RoleList{flow.RoleConsensus})
+		adjMap[id.NodeID] = sample
+	}
+
+	// evaluates connectedness of consensus nodes graph.
+	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.HasRole(flow.RoleConsensus))
 }
 
 // uniquenessCheck is a test helper method that fails the test if all include any duplicate identity.
