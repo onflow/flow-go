@@ -11,7 +11,7 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.10.2
 	github.com/onflow/flow-go v0.4.1-0.20200715183900-b337e998d486
-	github.com/onflow/flow-go-sdk v0.12.1
+	github.com/onflow/flow-go-sdk v0.12.2
 	github.com/onflow/flow-go/crypto v0.9.4
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/plus3it/gorecurcopy v0.0.1
