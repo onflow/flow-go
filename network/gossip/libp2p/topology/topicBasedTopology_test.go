@@ -291,7 +291,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_SmallerAll() {
 
 // TestLinearFanout_SubsetViolence evaluates that trying to sample a connected graph when `shouldHave`
 // is not a subset of `all` returns an error.
-func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_SubsetViolence() {
+func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_SubsetViolation() {
 	// samples 10 all into 'shouldHave',
 	shouldHave := suite.all.Sample(10)
 	// excludes one of the `shouldHave` all from all, hence it is no longer a subset
