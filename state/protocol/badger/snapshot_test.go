@@ -13,7 +13,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol"
+	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,7 +24,7 @@ func init() {
 }
 
 func TestHead(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
 		identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		root, result, seal := unittest.BootstrapFixture(identities)
@@ -53,21 +54,45 @@ func TestHead(t *testing.T) {
 }
 
 func TestIdentities(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
-		identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+		identities := unittest.IdentityListFixture(20, unittest.WithAllRoles())
 		root, result, seal := unittest.BootstrapFixture(identities)
 		err := state.Mutate().Bootstrap(root, result, seal)
-		require.NoError(t, err)
+		require.Nil(t, err)
 
-		actual, err := state.Final().Identities(filter.Any)
-		require.NoError(t, err)
-		assert.ElementsMatch(t, identities, actual)
+		t.Run("no filter", func(t *testing.T) {
+			actual, err := state.Final().Identities(filter.Any)
+			require.Nil(t, err)
+			assert.ElementsMatch(t, identities, actual)
+		})
+
+		t.Run("single identity", func(t *testing.T) {
+			expected := identities.Sample(1)[0]
+			actual, err := state.Final().Identity(expected.NodeID)
+			require.Nil(t, err)
+			assert.Equal(t, expected, actual)
+		})
+
+		t.Run("filtered", func(t *testing.T) {
+			filters := []flow.IdentityFilter{
+				filter.HasRole(flow.RoleCollection),
+				filter.HasNodeID(identities.SamplePct(0.1).NodeIDs()...),
+				filter.HasStake(true),
+			}
+
+			for _, filterfunc := range filters {
+				expected := identities.Filter(filterfunc)
+				actual, err := state.Final().Identities(filterfunc)
+				require.Nil(t, err)
+				assert.ElementsMatch(t, expected, actual)
+			}
+		})
 	})
 }
 
 func TestClusters(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
 		nClusters := 3
 		nCollectors := 7
@@ -108,14 +133,14 @@ func TestSeed(t *testing.T) {
 
 	// should not be able to get random beacon seed from a block with no children
 	t.Run("no children", func(t *testing.T) {
-		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 			root, result, seal := unittest.BootstrapFixture(identities)
 			err := state.Mutate().Bootstrap(root, result, seal)
 			require.NoError(t, err)
 
-			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
+			_, err = state.Final().(*bprotocol.Snapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
 			assert.Error(t, err)
 		})
@@ -124,7 +149,7 @@ func TestSeed(t *testing.T) {
 	// should not be able to get random beacon seed from a block with only invalid
 	// or unvalidated children
 	t.Run("un-validated child", func(t *testing.T) {
-		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+		util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 			root, result, seal := unittest.BootstrapFixture(identities)
@@ -139,7 +164,7 @@ func TestSeed(t *testing.T) {
 			err = state.Mutate().Extend(&unvalidatedChild)
 			assert.Nil(t, err)
 
-			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
+			_, err = state.Final().(*bprotocol.Snapshot).Seed(1, 2, 3, 4)
 			t.Log(err)
 			assert.Error(t, err)
 		})
@@ -149,5 +174,157 @@ func TestSeed(t *testing.T) {
 	t.Run("valid child", func(t *testing.T) {
 		t.Skip()
 		// TODO
+	})
+}
+
+// Test querying identities in different epoch phases. During staking phase we
+// should see identities from last epoch and current epoch. After staking phase
+// we should see identities from current epoch and next epoch. Identities from
+// a non-current epoch should have weight 0. Identities that exist in consecutive
+// epochs should be de-duplicated.
+func TestSnapshot_CrossEpochIdentities(t *testing.T) {
+
+	// start with 20 identities in epoch 1
+	epoch1Identities := unittest.IdentityListFixture(20, unittest.WithAllRoles())
+	// 1 identity added at epoch 2 that was not present in epoch 1
+	addedAtEpoch2 := unittest.IdentityFixture()
+	// 1 identity removed in epoch 2 that was present in epoch 1
+	removedAtEpoch2 := epoch1Identities.Sample(1)[0]
+	// epoch 2 has partial overlap with epoch 1
+	epoch2Identities := append(
+		epoch1Identities.Filter(filter.Not(filter.HasNodeID(removedAtEpoch2.NodeID))),
+		addedAtEpoch2)
+	// epoch 3 has no overlap with epoch 2
+	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
+
+	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
+		root, result, seal := unittest.BootstrapFixture(epoch1Identities)
+		err := state.Mutate().Bootstrap(root, result, seal)
+		require.Nil(t, err)
+
+		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
+		// See EpochBuilder documentation for details of these blocks.
+		//
+		epochBuilder := unittest.NewEpochBuilder(t, state)
+		// build blocks WITHIN epoch 1 - PREPARING epoch 2
+		// A - height 0 (root block)
+		// B - height 1 - staking phase
+		// C - height 2 - setup phase
+		// D - height 3 - committed phase
+		epochBuilder.
+			UsingSetupOpts(unittest.WithParticipants(epoch2Identities)).
+			BuildEpoch().
+			CompleteEpoch()
+		// build blocks WITHIN epoch 2 - PREPARING epoch 3
+		// A - height 4
+		// B - height 5 - staking phase
+		// C - height 6 - setup phase
+		// D - height 7 - committed phase
+		epochBuilder.
+			UsingSetupOpts(unittest.WithParticipants(epoch3Identities)).
+			BuildEpoch().
+			CompleteEpoch()
+
+		t.Run("should be able to query at root block", func(t *testing.T) {
+			snapshot := state.AtHeight(0)
+			identities, err := snapshot.Identities(filter.Any)
+			require.Nil(t, err)
+
+			// should have the right number of identities
+			assert.Equal(t, len(epoch1Identities), len(identities))
+			// should have all epoch 1 identities
+			assert.ElementsMatch(t, epoch1Identities, identities)
+		})
+
+		t.Run("should include next epoch after staking phase", func(t *testing.T) {
+
+			// get a snapshot from setup phase and commit phase of epoch 1
+			snapshots := []protocol.Snapshot{state.AtHeight(2), state.AtHeight(3)}
+
+			for _, snapshot := range snapshots {
+				phase, err := snapshot.Phase()
+				require.Nil(t, err)
+
+				t.Run("phase: "+phase.String(), func(t *testing.T) {
+					identities, err := snapshot.Identities(filter.Any)
+					require.Nil(t, err)
+
+					// should have the right number of identities
+					assert.Equal(t, len(epoch1Identities)+1, len(identities))
+					// all current epoch identities should match configuration from EpochSetup event
+					assert.ElementsMatch(t, epoch1Identities, identities.Filter(epoch1Identities.Selector()))
+
+					// should contain single next epoch identity with 0 weight
+					nextEpochIdentity := identities.Filter(filter.HasNodeID(addedAtEpoch2.NodeID))[0]
+					assert.Equal(t, uint64(0), nextEpochIdentity.Stake) // should have 0 weight
+					nextEpochIdentity.Stake = addedAtEpoch2.Stake
+					assert.Equal(t, addedAtEpoch2, nextEpochIdentity) // should be equal besides weight
+				})
+			}
+		})
+
+		t.Run("should include previous epoch in staking phase", func(t *testing.T) {
+
+			// get a snapshot from staking phase of epoch 2
+			snapshot := state.AtHeight(5)
+			identities, err := snapshot.Identities(filter.Any)
+			require.Nil(t, err)
+
+			// should have the right number of identities
+			assert.Equal(t, len(epoch2Identities)+1, len(identities))
+			// all current epoch identities should match configuration from EpochSetup event
+			assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
+
+			// should contain single previous epoch identity with 0 weight
+			lastEpochIdentity := identities.Filter(filter.HasNodeID(removedAtEpoch2.NodeID))[0]
+			assert.Equal(t, uint64(0), lastEpochIdentity.Stake) // should have 0 weight
+			lastEpochIdentity.Stake = removedAtEpoch2.Stake     // overwrite weight
+			assert.Equal(t, removedAtEpoch2, lastEpochIdentity) // should be equal besides weight
+		})
+
+		t.Run("should not include previous epoch after staking phase", func(t *testing.T) {
+
+			// get a snapshot from setup phase and commit phase of epoch 2
+			snapshots := []protocol.Snapshot{state.AtHeight(6), state.AtHeight(7)}
+
+			for _, snapshot := range snapshots {
+				phase, err := snapshot.Phase()
+				require.Nil(t, err)
+
+				t.Run("phase: "+phase.String(), func(t *testing.T) {
+					identities, err := snapshot.Identities(filter.Any)
+					require.Nil(t, err)
+
+					// should have the right number of identities
+					assert.Equal(t, len(epoch2Identities)+len(epoch3Identities), len(identities))
+					// all current epoch identities should match configuration from EpochSetup event
+					assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
+
+					// should contain next epoch identities with 0 weight
+					for _, expected := range epoch3Identities {
+						actual, exists := identities.ByNodeID(expected.NodeID)
+						require.True(t, exists)
+						assert.Equal(t, uint64(0), actual.Stake) // should have 0 weight
+						actual.Stake = expected.Stake            // overwrite weight
+						assert.Equal(t, expected, actual)        // should be equal besides weight
+					}
+				})
+			}
+		})
+	})
+}
+
+// test that we can retrieve identities after a spork where the parent ID of the
+// root block is non-nil
+func TestSnapshot_PostSporkIdentities(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
+		expected := unittest.CompleteIdentitySet()
+		root, result, seal := unittest.BootstrapFixture(expected)
+		err := state.Mutate().Bootstrap(root, result, seal)
+		require.Nil(t, err)
+
+		actual, err := state.Final().Identities(filter.Any)
+		require.Nil(t, err)
+		assert.ElementsMatch(t, expected, actual)
 	})
 }
