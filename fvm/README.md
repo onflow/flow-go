@@ -11,16 +11,17 @@ functionality required by the Flow protocol.
 import (
     "github.com/onflow/cadence/runtime"
     "github.com/onflow/flow-go/fvm"
+    "github.com/onflow/flow-go/fvm/state"
     "github.com/onflow/flow-go/model/flow"
 )
 
 vm := fvm.New(runtime.NewInterpreterRuntime())
 
 tx := flow.NewTransactionBody().
-    SetScript(`transaction { execute { log("Hello, World!") } }`)
+    SetScript([]byte(`transaction { execute { log("Hello, World!") } }`))
 
 ctx := fvm.NewContext()
-ledger := make(fvm.MapLedger)
+ledger := state.NewMapLedger()
 
 txIndex := uint32(0)
 txProc := fvm.Transaction(tx, txIndex)
