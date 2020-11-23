@@ -52,7 +52,7 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 	golog.SetAllLoggers(golog.LevelError)
 
 	// create ids
-	ids, mws := GenerateIDsAndMiddlewares(suite.T(), nodeCount, !DryRun, suite.logger)
+	ids, mws := GenerateIDsAndMiddlewares(suite.T(), nodeCount, !DryRun, suite.logger, unittest.WithAllRoles())
 	suite.ids = ids
 	suite.mws = mws
 

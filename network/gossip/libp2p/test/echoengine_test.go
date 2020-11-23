@@ -40,11 +40,12 @@ func TestStubEngineTestSuite(t *testing.T) {
 }
 
 func (suite *EchoEngineTestSuite) SetupTest() {
-	const count = 2
+	// we need minimum of 2 nodes per role for the topology to function correctly
+	const count = 10
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithRole(flow.RoleConsensus))
+	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
 }
 
 // TearDownTest closes the networks within a specified timeout
