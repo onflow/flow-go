@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"encoding/hex"
 	"strings"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -11,22 +12,77 @@ import (
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	l := newLed(payloads)
 	a := state.NewAccounts(l)
-	// fungible token
-	add := flow.HexToAddress("f233dcee88fe0abe")
-	ok, err := a.Exists(add)
+
+	coreContractEncodedKey := "f847b8402b0bf247520770a4bad19e07f6d6b1e8f0542da564154087e2681b175b4432ec2c7b09a52d34dabe0a887ea0f96b067e52c6a0792dcff730fe78a6c5fbbf0a9c02038203e8"
+
+	// Testnet FungibleToken
+	err := appendKeyForAccount(a, "9a0766d93b6608b7", coreContractEncodedKey)
 	if err != nil {
 		return nil, err
 	}
-	if ok {
-		pk := flow.AccountPublicKey{}
-		publicKeyJSON := "{\"PublicKey\":\"ABCDEFGHIJK\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}"
-		err = pk.UnmarshalJSON([]byte(publicKeyJSON))
-		if err != nil {
-			return nil, err
-		}
-		a.AppendPublicKey(add, pk)
+
+	// Testnet NonFungibleToken
+	err = appendKeyForAccount(a, "631e88ae7f1d7c20", coreContractEncodedKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Testnet FlowToken
+	err = appendKeyForAccount(a, "7e60df042a9c0868", coreContractEncodedKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Testnet FlowFees
+	err = appendKeyForAccount(a, "912d5440f7e3769e", coreContractEncodedKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Testnet Staking
+	err = appendKeyForAccount(a, "9eca2b38b18b5dfe", coreContractEncodedKey)
+	if err != nil {
+		return nil, err
+	}
+
+	nonCoreContractEncodedKey := "f847b840a272d78cfa14eb248d95c12da8c6a24db9fda5ceddc07444080b49ef6cd15a06e88223af8acd235e2ff7a627adb81cf37d0a1384d9985de4bc7a7fc7eb86848402038203e8"
+
+	// Testnet StakingProxy
+	err = appendKeyForAccount(a, "7aad92e5a0715d21", nonCoreContractEncodedKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Testnet LockedTokens
+	err = appendKeyForAccount(a, "95e019a17d0e23d7", nonCoreContractEncodedKey)
+
+	if err != nil {
+		return nil, err
 	}
 	return l.Payloads(), nil
+}
+
+func appendKeyForAccount(accounts *state.Accounts, addressInHex string, encodedKeyInHex string) error {
+	// fungible token
+	add := flow.HexToAddress(addressInHex)
+	ok, err := accounts.Exists(add)
+	if err != nil {
+		return err
+	}
+	// Core Contracts
+	if ok {
+		accountKeyBytes, err := hex.DecodeString(encodedKeyInHex)
+		if err != nil {
+			return err
+		}
+		accountKey, err := flow.DecodeRuntimeAccountPublicKey(accountKeyBytes, 0)
+		if err != nil {
+			return err
+		}
+		accounts.AppendPublicKey(add, accountKey)
+	}
+	return nil
 }
 
 type led struct {
