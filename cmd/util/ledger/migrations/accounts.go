@@ -11,7 +11,14 @@ import (
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	l := newLed(payloads)
 	a := state.NewAccounts(l)
-	a.AppendPublicKey()
+	// fungible token
+	ok, err := a.Exists(flow.HexToAddress("f233dcee88fe0abe"))
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		// a.AppendPublicKey()
+	}
 	return l.Payloads(), nil
 }
 
