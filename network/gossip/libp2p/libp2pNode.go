@@ -27,6 +27,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module"
 	netwk "github.com/onflow/flow-go/network"
 )
 
@@ -74,6 +75,7 @@ func (p *P2PNode) Start(ctx context.Context,
 	rootBlockID string,
 	allowList bool,
 	allowListAddrs []NodeAddress,
+	metrics module.NetworkMetrics,
 	psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
@@ -87,7 +89,7 @@ func (p *P2PNode) Start(ctx context.Context,
 		return err
 	}
 
-	p.conMgr = NewConnManager(logger)
+	p.conMgr = NewConnManager(logger, metrics)
 
 	// create a transport which disables port reuse and web socket.
 	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
