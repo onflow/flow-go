@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"math/rand"
 
 	"github.com/onflow/cadence"
@@ -406,11 +405,6 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
-	log.Info().
-		Str("address", address.Hex()).
-		Str("name", name).
-		Msg("Loading code")
-
 	return e.GetCode(runtime.AddressLocation{
 		Address: address,
 		Name:    name,

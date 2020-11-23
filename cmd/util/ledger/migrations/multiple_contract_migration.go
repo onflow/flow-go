@@ -3,17 +3,17 @@ package migrations
 import (
 	"bytes"
 	"fmt"
-	"github.com/rs/zerolog"
 	"sort"
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/parser2"
-	"github.com/rs/zerolog/log"
-
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/parser2"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
