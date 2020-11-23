@@ -102,7 +102,7 @@ func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster 
 func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, col, con, exe, ver, cluster int) {
 	// creates a histogram to keep average fanout of nodes in systems
 	var aveHist *thist.Hist
-	if suite.shouldPrintTrace() {
+	if suite.trace() {
 		aveHist = thist.NewHist(nil, fmt.Sprintf("Average fanout for %d systems", system), "fit", 10, false)
 	}
 
@@ -114,7 +114,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 		state, ids, subMngrs := suite.generateSystem(acc, col, con, exe, ver, cluster)
 
 		var systemHist *thist.Hist
-		if suite.shouldPrintTrace() {
+		if suite.trace() {
 			// creates a fanout histogram for this system
 			systemHist = thist.NewHist(nil, fmt.Sprintf("System #%d fanout", j), "auto", -1, false)
 		}
@@ -126,13 +126,13 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 			fanout := suite.topologyScenario(id.NodeID, subMngrs[i], ids, state)
 			adjMap[id.NodeID] = fanout
 
-			if suite.shouldPrintTrace() {
+			if suite.trace() {
 				systemHist.Update(float64(len(fanout)))
 			}
 			totalFanout += len(fanout)
 		}
 
-		if suite.shouldPrintTrace() {
+		if suite.trace() {
 			// prints fanout histogram of this system
 			fmt.Println(systemHist.Draw())
 			// keeps track of average fanout per node
@@ -143,7 +143,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 		topology.CheckConnectedness(suite.T(), adjMap, ids)
 	}
 
-	if suite.shouldPrintTrace() {
+	if suite.trace() {
 		fmt.Println(aveHist.Draw())
 	}
 }
@@ -166,8 +166,8 @@ func (suite *TopologyTestSuite) topologyScenario(me flow.Identifier,
 	return myFanout
 }
 
-// printTrace returns true if local environment variable Trace is found.
-func (suite *TopologyTestSuite) shouldPrintTrace() bool {
+// trace returns true if local environment variable Trace is found.
+func (suite *TopologyTestSuite) trace() bool {
 	_, found := os.LookupEnv("Trace")
 	return found
 }
