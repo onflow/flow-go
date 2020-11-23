@@ -34,6 +34,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
 	}
-	log.Info().Msg("New state commitment for the exported state is :" + newState.String())
+
+	log.Info().Msg("New state commitment for the exported state is :" + newState.String() + "(base64: " + newState.Base64() + " )")
 	return nil
 }
