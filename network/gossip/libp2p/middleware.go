@@ -182,6 +182,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		m.rootBlockID,
 		true,
 		nodeAddrsWhiteList,
+		m.metrics,
 		psOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
