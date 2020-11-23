@@ -79,8 +79,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 
 	// stitches the role-based components that subscribed to the same channel id together.
 	for _, myChannel := range myChannelIDs {
-		shouldHave := make([]*flow.Identity, len(myFanout))
-		copy(shouldHave, myFanout)
+		shouldHave := myFanout.Copy()
 
 		topicFanout, err := t.subsetChannel(ids, shouldHave, myChannel)
 		if err != nil {
