@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -42,7 +43,8 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
-	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun)
+	// both nodes should be of the same role to get connected on epidemic dissemination
+	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithRole(flow.RoleConsensus))
 }
 
 // TearDownTest closes the networks within a specified timeout
