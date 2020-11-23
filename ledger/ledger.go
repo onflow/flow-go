@@ -276,7 +276,7 @@ func (v Value) MarshalJSON() ([]byte, error) {
 // Migration defines how to convert the given slice of input payloads into an slice of output payloads
 type Migration func(payloads []Payload) ([]Payload, error)
 
-// Reporter accpets an slice ledger payloads and report the state of the ledger
+// Reporter accepts slice ledger payloads and reports the state of the ledger
 type Reporter interface {
 	Report(payloads []Payload) error
 }
