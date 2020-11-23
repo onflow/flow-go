@@ -142,7 +142,7 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 		return nil, fmt.Errorf("empty identity list")
 	}
 
-	if shouldHave == nil {
+	if len(shouldHave) == 0 {
 		// choose (n+1)/2 random nodes so that each node in the graph will have a degree >= (n+1) / 2,
 		// guaranteeing a connected graph.
 		size := uint(LinearFanoutFunc(len(all)))
