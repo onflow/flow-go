@@ -19,10 +19,14 @@ type Snapshot interface {
 	// we should build the next block in the context of the selected state.
 	Head() (*flow.Header, error)
 
-	// Identities returns a list of identities at the selected point of
-	// the protocol state history. It allows us to provide optional upfront
-	// filters which can be used by the implementation to speed up database
-	// lookups.
+	// Identities returns a list of identities at the selected point of the
+	// protocol state history. At the beginning of an epoch, this list includes
+	// identities from the previous epoch that are un-staking during the current
+	// epoch. At the end of an epoch, this includes identities scheduled to join
+	// in the next epoch but are not active yet.
+	//
+	// It allows us to provide optional upfront filters which can be used by the
+	// implementation to speed up database lookups.
 	Identities(selector flow.IdentityFilter) (flow.IdentityList, error)
 
 	// Identity attempts to retrieve the node with the given identifier at the
