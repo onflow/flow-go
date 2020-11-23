@@ -167,14 +167,15 @@ func (pub RandomBeaconPubKey) MarshalMsgpack() ([]byte, error) {
 }
 
 func (pub *RandomBeaconPubKey) UnmarshalMsgpack(b []byte) error {
-	bz, err := fromHex(b)
+	var x string
+	if err := msgpack.Unmarshal(b, &x); err != nil {
+		return err
+	}
+	bz, err := hex.DecodeString(x)
 	if err != nil {
 		return err
 	}
 
-	if len(bz) == 0 {
-		return nil
-	}
 	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, bz)
 	return err
 }

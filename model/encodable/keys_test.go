@@ -233,6 +233,23 @@ func TestEncodableRandomBeaconPrivKeyNil(t *testing.T) {
 	require.NoError(t, isHexString(enc))
 }
 
+func TestEncodableRandomBeaconPrivKeyMsgPack(t *testing.T) {
+	randbeac, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, generateRandomSeed(t))
+	require.NoError(t, err)
+	key := RandomBeaconPubKey{randbeac.PublicKey()}
+	oldPubKey := key.PublicKey
+
+	b, err := key.MarshalMsgpack()
+	require.NoError(t, err)
+
+	fmt.Printf("bytes: %d", len(b))
+
+	err = key.UnmarshalMsgpack(b)
+	require.NoError(t, err)
+
+	require.Equal(t, oldPubKey, key.PublicKey)
+}
+
 func generateRandomSeed(t *testing.T) []byte {
 	seed := make([]byte, 48)
 	n, err := rand.Read(seed)
