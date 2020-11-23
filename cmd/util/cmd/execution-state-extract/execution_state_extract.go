@@ -21,7 +21,9 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
 	led, err := complete.NewLedger(dir, 1000, &metrics.NoopCollector{}, log, nil, complete.DefaultPathFinderVersion)
-
+	if err != nil {
+		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
+	}
 	filePath := path.Join(outputDir, "root.checkpoint")
 
 	newState, err := led.ExportCheckpointAt(targetHash,
@@ -30,7 +32,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		complete.DefaultPathFinderVersion,
 		filePath)
 	if err != nil {
-		return fmt.Errorf("cannot create WAL: %w", err)
+		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
 	}
 	log.Info().Msg("New state commitment for the exported state is :" + newState.String())
 	return nil
