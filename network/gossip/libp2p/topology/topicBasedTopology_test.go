@@ -340,6 +340,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Unconditionally() {
 
 		// samples a graph and stores it in adjacency map
 		sample, err := top.sampleConnectedGraph(suite.all, nil)
+		require.NoError(suite.T(), err)
 		adjMap[id.NodeID] = sample
 	}
 
@@ -359,6 +360,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Conditionally() {
 		// sampling is done with a non-empty `shouldHave` subset of 10 randomly chosen all
 		shouldHave := suite.all.Sample(10)
 		sample, err := top.sampleConnectedGraph(suite.all, shouldHave)
+		require.NoError(suite.T(), err)
 
 		// evaluates inclusion of should haves in sample
 		for _, shouldHaveID := range shouldHave {
