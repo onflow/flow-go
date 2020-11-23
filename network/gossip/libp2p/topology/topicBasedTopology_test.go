@@ -372,14 +372,14 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Conditionally() {
 
 // uniquenessCheck is a test helper method that fails the test if all include any duplicate identity.
 func (suite *TopicAwareTopologyTestSuite) uniquenessCheck(ids flow.IdentityList) {
-	seen := make(map[flow.Identity]struct{})
+	seen := make(map[flow.Identifier]struct{})
 	for _, id := range ids {
 		// checks if id is duplicate in ids list
-		_, ok := seen[*id]
+		_, ok := seen[id.NodeID]
 		require.False(suite.T(), ok)
 
 		// marks id as seen
-		seen[*id] = struct{}{}
+		seen[id.NodeID] = struct{}{}
 	}
 }
 
