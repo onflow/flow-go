@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -65,7 +63,7 @@ func finalList(cmd *cobra.Command, args []string) {
 	validateNodes(mixedNodeInfos, stakingNodes)
 
 	// write node-config.json with the new list of nodes to be used for the `finalize` command
-	writeJSON(fmt.Sprintf(flagOutdir, "node-config.json"), model.ToPublicNodeInfoList(mixedNodeInfos))
+	writeJSON(model.PathFinallist, model.ToPublicNodeInfoList(mixedNodeInfos))
 }
 
 func validateNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
@@ -82,7 +80,7 @@ func validateNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
 	checkMisMatchingNodes(nodes, stakingNodes)
 
 	// create map
-	var nodesByID map[flow.Identifier]model.NodeInfo
+	nodesByID := make(map[flow.Identifier]model.NodeInfo)
 	for _, node := range nodes {
 		nodesByID[node.NodeID] = node
 	}
