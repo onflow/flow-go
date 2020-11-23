@@ -167,7 +167,7 @@ func (suite *TopologyTestSuite) topologyScenario(me flow.Identifier,
 }
 
 // printTrace returns true if local environment variable Trace is found.
-func (suite *TopologyTestSuite) printTrace() bool {
+func (suite *TopologyTestSuite) shouldPrintTrace() bool {
 	_, found := os.LookupEnv("Trace")
 	return found
 }
