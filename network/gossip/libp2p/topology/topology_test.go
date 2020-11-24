@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/bsipos/thist"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -155,8 +156,10 @@ func (suite *TopologyTestSuite) topologyScenario(me flow.Identifier,
 	ids flow.IdentityList,
 	state protocol.ReadOnlyState) flow.IdentityList {
 
+	logger := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+
 	// creates topology of the node
-	top, err := topology.NewTopicBasedTopology(me, state, subMngr)
+	top, err := topology.NewTopicBasedTopology(me, logger, state, subMngr)
 	require.NoError(suite.T(), err)
 
 	// generates topology of node

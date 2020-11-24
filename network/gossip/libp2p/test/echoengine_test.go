@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -40,12 +39,11 @@ func TestStubEngineTestSuite(t *testing.T) {
 }
 
 func (suite *EchoEngineTestSuite) SetupTest() {
-	// we need minimum of 2 nodes per role for the topology to function correctly
-	const count = 10
+	const count = 2
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	golog.SetAllLoggers(golog.LevelError)
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
+	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun)
 }
 
 // TearDownTest closes the networks within a specified timeout

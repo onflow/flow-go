@@ -3,6 +3,8 @@ package topology
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -16,11 +18,13 @@ type TopicBasedTopology struct {
 	me      flow.Identifier             // used to keep identifier of the node
 	state   protocol.ReadOnlyState      // used to keep a read only protocol state
 	subMngr channel.SubscriptionManager // used to keep track topics the node subscribed to
+	logger  zerolog.Logger
 	seed    int64
 }
 
 // NewTopicBasedTopology returns an instance of the TopicBasedTopology.
 func NewTopicBasedTopology(nodeID flow.Identifier,
+	logger zerolog.Logger,
 	state protocol.ReadOnlyState,
 	subMngr channel.SubscriptionManager) (*TopicBasedTopology, error) {
 	seed, err := seedFromID(nodeID)
@@ -33,6 +37,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier,
 		state:   state,
 		seed:    seed,
 		subMngr: subMngr,
+		logger:  logger.With().Str("component:", "topic-based-topology").Logger(),
 	}
 
 	return t, nil
@@ -49,6 +54,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 		// no subscribed channel id, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
 		// node subscribing to all its channels.
+		t.logger.Warn().Msg("skips generating fanout with no subscribed channels")
 		return flow.IdentityList{}, nil
 	}
 
@@ -91,6 +97,9 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 	if len(myFanout) == 0 {
 		return nil, fmt.Errorf("topology size reached zero")
 	}
+	t.logger.Debug().
+		Int("fanout", len(myFanout)).
+		Msg("fanout successfully generated")
 	return myFanout, nil
 }
 
@@ -138,7 +147,8 @@ func (t TopicBasedTopology) subsetRole(ids flow.IdentityList, shouldHave flow.Id
 func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHave flow.IdentityList) (flow.IdentityList, error) {
 
 	if len(all) == 0 {
-		return nil, fmt.Errorf("empty identity list")
+		t.logger.Warn().Msg("skips sampling connected graph with zero nodes")
+		return flow.IdentityList{}, nil
 	}
 
 	if len(shouldHave) == 0 {
