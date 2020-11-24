@@ -20,18 +20,27 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	led, err := complete.NewLedger(dir, 1000, &metrics.NoopCollector{}, log, nil, 0)
 
+	led, err := complete.NewLedger(dir, 1000, &metrics.NoopCollector{}, log, nil, 0)
+	if err != nil {
+		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
+	}
 	filePath := path.Join(outputDir, "root.checkpoint")
 
 	newState, err := led.ExportCheckpointAt(targetHash,
-		[]ledger.Migration{migrations.NoOpMigration},
+		[]ledger.Migration{migrations.MultipleContractMigration},
 		[]ledger.Reporter{},
 		complete.DefaultPathFinderVersion,
 		filePath)
 	if err != nil {
-		return fmt.Errorf("cannot create WAL: %w", err)
+		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
 	}
-	log.Info().Msg("New state commitment for the exported state is :" + newState.String())
+
+	log.Info().Msgf(
+		"New state commitment for the exported state is: %s (base64: %s)",
+		newState.String(),
+		newState.Base64(),
+	)
+
 	return nil
 }

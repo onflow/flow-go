@@ -13,6 +13,11 @@ type NetworkMetrics struct {
 	mock.Mock
 }
 
+// InboundConnections provides a mock function with given fields: connectionCount
+func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
+	_m.Called(connectionCount)
+}
+
 // MessageAdded provides a mock function with given fields: priority
 func (_m *NetworkMetrics) MessageAdded(priority int) {
 	_m.Called(priority)
@@ -36,6 +41,11 @@ func (_m *NetworkMetrics) NetworkMessageReceived(sizeBytes int, topic string, me
 // NetworkMessageSent provides a mock function with given fields: sizeBytes, topic, messageType
 func (_m *NetworkMetrics) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
 	_m.Called(sizeBytes, topic, messageType)
+}
+
+// OutboundConnections provides a mock function with given fields: connectionCount
+func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
+	_m.Called(connectionCount)
 }
 
 // QueueDuration provides a mock function with given fields: duration, priority
