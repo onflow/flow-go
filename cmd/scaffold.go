@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/validators"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	storerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -181,7 +182,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 		nodeRole := nodeID.Role
 
-		participants, err := libp2p.IDsFromState(fnb.State)
+		participants, err := fnb.State.Final().Identities(libp2p.NetworkingSetFilter)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
@@ -204,7 +205,8 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		fnb.Network = net
 
 		idRefresher := libp2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
-		fnb.ProtocolEvents.AddConsumer(idRefresher)
+		idEvents := gadgets.NewIdentityDeltas(idRefresher.OnIdentityTableChanged)
+		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, err
 	})

@@ -5,9 +5,10 @@
 package mocks
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	flow "github.com/onflow/flow-go/model/flow"
-	reflect "reflect"
 )
 
 // MockConduit is a mock of Conduit interface
