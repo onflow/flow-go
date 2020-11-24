@@ -86,6 +86,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		blocks := new(storage.Blocks)
 
 		execCtx := fvm.NewContext(
+			log,
 			fvm.WithChain(chain),
 			fvm.WithBlocks(blocks),
 		)

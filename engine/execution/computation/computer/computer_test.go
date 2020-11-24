@@ -24,7 +24,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
 
@@ -51,7 +51,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
 
@@ -78,7 +78,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
 
