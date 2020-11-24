@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -48,7 +49,7 @@ func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProc
 	ctx = NewContextFromParent(
 		ctx,
 		WithTransactionProcessors(
-			NewTransactionInvocator(),
+			NewTransactionInvocator(zerolog.Nop()),
 		),
 	)
 
