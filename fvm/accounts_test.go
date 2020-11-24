@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,7 +21,7 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 	ctx = fvm.NewContextFromParent(
 		ctx,
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	)
 
 	txBody := flow.NewTransactionBody().
@@ -228,7 +229,7 @@ func TestCreateAccount(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Single account",
@@ -298,7 +299,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(true),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Unauthorized account payer",
@@ -399,7 +400,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Add to empty key list",
@@ -559,7 +560,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Non-existent key",

@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -21,29 +22,29 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: AuthAccount, service: AuthAccount) {
-                signer.setCode("%s".decodeHex())
+                signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
-            }`, encoded)),
+            }`, contractName, encoded)),
 		).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
 }
 
-func CreateUnauthorizedContractDeploymentTransaction(contract string, authorizer flow.Address) *flow.TransactionBody {
+func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: AuthAccount) {
-                signer.setCode("%s".decodeHex())
+                signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
-            }`, encoded)),
+            }`, contractName, encoded)),
 		).
 		AddAuthorizer(authorizer)
 }
@@ -147,9 +148,10 @@ func CreateAccountsWithSimpleAddresses(
 	chain flow.Chain,
 ) ([]flow.Address, error) {
 	ctx := fvm.NewContext(
+		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(),
+			fvm.NewTransactionInvocator(zerolog.Nop()),
 		),
 	)
 

@@ -16,6 +16,7 @@ var (
 	flagExecutionStateDir string
 	flagOutputDir         string
 	flagBlockHash         string
+	flagStateCommitment   string
 	flagDatadir           string
 )
 
@@ -34,37 +35,54 @@ func init() {
 		"Directory to write new Execution State to")
 	_ = Cmd.MarkFlagRequired("output-dir")
 
+	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
+		"state commitment (hex-encoded, 64 characters)")
+
 	Cmd.Flags().StringVar(&flagBlockHash, "block-hash", "",
 		"Block hash (hex-encoded, 64 characters)")
-	_ = Cmd.MarkFlagRequired("block-hash")
 
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")
-	_ = Cmd.MarkFlagRequired("datadir")
 }
 
 func run(*cobra.Command, []string) {
+	var stateCommitment []byte
 
-	blockID, err := flow.HexStringToIdentifier(flagBlockHash)
-	if err != nil {
-		log.Fatal().Err(err).Msg("malformed block hash")
+	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
+		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
+		return
 	}
 
-	db := common.InitStorage(flagDatadir)
-	defer db.Close()
+	if len(flagBlockHash) > 0 {
+		blockID, err := flow.HexStringToIdentifier(flagBlockHash)
+		if err != nil {
+			log.Fatal().Err(err).Msg("malformed block hash")
+		}
 
-	cache := &metrics.NoopCollector{}
-	commits := badger.NewCommits(cache, db)
+		db := common.InitStorage(flagDatadir)
+		defer db.Close()
 
-	stateCommitment, err := getStateCommitment(commits, blockID)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get state commitment for block")
+		cache := &metrics.NoopCollector{}
+		commits := badger.NewCommits(cache, db)
+
+		stateCommitment, err = getStateCommitment(commits, blockID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot get state commitment for block")
+		}
+	}
+
+	if len(flagStateCommitment) > 0 {
+		var err error
+		stateCommitment, err = hex.DecodeString(flagStateCommitment)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot get decode the state commitment")
+		}
 	}
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment))
 
-	err = extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
+	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot generate checkpoint with state commitment")
+		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}
 }

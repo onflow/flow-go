@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -23,14 +24,15 @@ type Context struct {
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
+	Logger                           zerolog.Logger
 }
 
 // SetValueHandler receives a value written by the Cadence runtime.
 type SetValueHandler func(owner flow.Address, key string, value cadence.Value) error
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(opts ...Option) Context {
-	return newContext(defaultContext(), opts...)
+func NewContext(logger zerolog.Logger, opts ...Option) Context {
+	return newContext(defaultContext(logger), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -52,7 +54,7 @@ const defaultGasLimit = 100_000
 
 const defaultEventCollectionByteSizeLimit = 128_000 // 128KB
 
-func defaultContext() Context {
+func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
 		ASTCache:                         nil,
@@ -71,11 +73,12 @@ func defaultContext() Context {
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
-			NewTransactionInvocator(),
+			NewTransactionInvocator(logger),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
 		},
+		Logger: logger,
 	}
 }
 

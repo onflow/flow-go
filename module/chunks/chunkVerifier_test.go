@@ -38,7 +38,7 @@ func (s *ChunkVerifierTestSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	vm := new(vmMock)
-	vmCtx := fvm.NewContext()
+	vmCtx := fvm.NewContext(zerolog.Nop())
 
 	s.verifier = chunks.NewChunkVerifier(vm, vmCtx)
 }
