@@ -5,10 +5,11 @@
 package mocks
 
 import (
+	reflect "reflect"
+
 	v2 "github.com/dgraph-io/badger/v2"
 	gomock "github.com/golang/mock/gomock"
 	flow "github.com/onflow/flow-go/model/flow"
-	reflect "reflect"
 )
 
 // MockBlocks is a mock of Blocks interface
