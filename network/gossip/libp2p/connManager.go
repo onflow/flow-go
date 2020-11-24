@@ -5,21 +5,25 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/module"
 )
 
 // ConnManager provides an implementation of Libp2p's ConnManager interface (https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnManager)
 // It is called back by libp2p when certain events occur such as opening/closing a stream, opening/closing connection etc.
-// This implementation only logs the call back for debugging purposes.
+// This implementation updates networking metrics when a peer connection is added or removed
 type ConnManager struct {
-	connmgr.NullConnMgr                  // a null conn mgr provided by libp2p to allow implementing only the functions needed
-	n                   network.Notifiee // the notifiee callback provided by libp2p
-	log                 zerolog.Logger   // logger to log connection, stream and other statistics about libp2p
+	connmgr.NullConnMgr                       // a null conn mgr provided by libp2p to allow implementing only the functions needed
+	n                   network.Notifiee      // the notifiee callback provided by libp2p
+	log                 zerolog.Logger        // logger to log connection, stream and other statistics about libp2p
+	metrics             module.NetworkMetrics // metrics to report connection statistics
 }
 
-func NewConnManager(log zerolog.Logger) ConnManager {
+func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics) ConnManager {
 	cn := ConnManager{
 		log:         log,
 		NullConnMgr: connmgr.NullConnMgr{},
+		metrics:     metrics,
 	}
 	n := &network.NotifyBundle{ListenCloseF: cn.ListenCloseNotifee,
 		ListenF:       cn.ListenNotifee,
@@ -47,10 +51,36 @@ func (c ConnManager) ListenCloseNotifee(n network.Network, m multiaddr.Multiaddr
 
 // called by libp2p when a connection opened
 func (c ConnManager) Connected(n network.Network, con network.Conn) {
-	c.log.Debug().Str("remote_peer", con.RemotePeer().String()).Int("total_conns", len(n.Conns())).Msg("opened connection")
+	c.logConnectionUpdate(n, con, "connection established")
+	c.updateConnectionMetric(n)
 }
 
 // called by libp2p when a connection closed
 func (c ConnManager) Disconnected(n network.Network, con network.Conn) {
-	c.log.Debug().Str("remote_peer", con.RemotePeer().String()).Int("total_conns", len(n.Conns())).Msg("closed connection")
+	c.logConnectionUpdate(n, con, "connection removed")
+	c.updateConnectionMetric(n)
+}
+
+func (c ConnManager) updateConnectionMetric(n network.Network) {
+	var inbound uint = 0
+	var outbound uint = 0
+	for _, conn := range n.Conns() {
+		switch conn.Stat().Direction {
+		case network.DirInbound:
+			inbound++
+		case network.DirOutbound:
+			outbound++
+		}
+	}
+
+	c.metrics.InboundConnections(inbound)
+	c.metrics.OutboundConnections(outbound)
+}
+
+func (c ConnManager) logConnectionUpdate(n network.Network, con network.Conn, logMsg string) {
+	c.log.Debug().
+		Str("remote_peer", con.RemoteMultiaddr().String()).
+		Str("direction", con.Stat().Direction.String()).
+		Int("total_connections", len(n.Conns())).
+		Msg(logMsg)
 }

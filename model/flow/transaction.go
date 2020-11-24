@@ -64,6 +64,26 @@ func (tb TransactionBody) Fingerprint() []byte {
 	})
 }
 
+func (tb TransactionBody) ByteSize() uint {
+	size := 0
+	size += len(tb.ReferenceBlockID)
+	size += len(tb.Script)
+	for _, arg := range tb.Arguments {
+		size += len(arg)
+	}
+	size += 8 // gas size
+	size += tb.ProposalKey.ByteSize()
+	size += AddressLength                       // payer address
+	size += len(tb.Authorizers) * AddressLength // Authorizers
+	for _, s := range tb.PayloadSignatures {
+		size += s.ByteSize()
+	}
+	for _, s := range tb.EnvelopeSignatures {
+		size += s.ByteSize()
+	}
+	return uint(size)
+}
+
 func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
@@ -109,7 +129,7 @@ func (tb *TransactionBody) SetGasLimit(limit uint64) *TransactionBody {
 func (tb *TransactionBody) SetProposalKey(address Address, keyID uint64, sequenceNum uint64) *TransactionBody {
 	proposalKey := ProposalKey{
 		Address:        address,
-		KeyID:          keyID,
+		KeyIndex:       keyID,
 		SequenceNumber: sequenceNum,
 	}
 	tb.ProposalKey = proposalKey
@@ -272,7 +292,7 @@ func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []
 	return TransactionSignature{
 		Address:     address,
 		SignerIndex: signerIndex,
-		KeyID:       keyID,
+		KeyIndex:    keyID,
 		Signature:   sig,
 	}
 }
@@ -303,7 +323,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 		ReferenceBlockID:          tb.ReferenceBlockID[:],
 		GasLimit:                  tb.GasLimit,
 		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
-		ProposalKeyID:             tb.ProposalKey.KeyID,
+		ProposalKeyID:             tb.ProposalKey.KeyIndex,
 		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
 		Payer:                     tb.Payer.Bytes(),
 		Authorizers:               authorizers,
@@ -382,16 +402,36 @@ func (f TransactionField) String() string {
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
 type ProposalKey struct {
 	Address        Address
-	KeyID          uint64
+	KeyIndex       uint64
 	SequenceNumber uint64
+}
+
+// ByteSize returns the byte size of the proposal key
+func (p ProposalKey) ByteSize() int {
+	keyIDLen := 8
+	sequenceNumberLen := 8
+	return len(p.Address) + keyIDLen + sequenceNumberLen
 }
 
 // A TransactionSignature is a signature associated with a specific account key.
 type TransactionSignature struct {
 	Address     Address
 	SignerIndex int
-	KeyID       uint64
+	KeyIndex    uint64
 	Signature   []byte
+}
+
+// String returns the string representation of a transaction signature.
+func (s TransactionSignature) String() string {
+	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s",
+		s.Address, s.SignerIndex, s.KeyIndex, s.Signature)
+}
+
+// ByteSize returns the byte size of the transaction signature
+func (s TransactionSignature) ByteSize() int {
+	signerIndexLen := 8
+	keyIDLen := 8
+	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature)
 }
 
 func (s TransactionSignature) Fingerprint() []byte {
@@ -405,7 +445,7 @@ func (s TransactionSignature) canonicalForm() interface{} {
 		Signature   []byte
 	}{
 		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-		KeyID:       uint(s.KeyID),       // int is not RLP-serializable
+		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
 		Signature:   s.Signature,
 	}
 }
@@ -414,7 +454,7 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 	return func(i, j int) bool {
 		sigA := signatures[i]
 		sigB := signatures[j]
-		return sigA.SignerIndex < sigB.SignerIndex || sigA.KeyID < sigB.KeyID
+		return sigA.SignerIndex < sigB.SignerIndex || sigA.KeyIndex < sigB.KeyIndex
 	}
 }
 

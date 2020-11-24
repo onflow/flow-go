@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -24,7 +25,6 @@ type EpochComponents struct {
 	prop     module.Engine
 	sync     module.Engine
 	hotstuff module.HotStuff
-	// TODO: ingest/txpool should also be epoch-dependent, possibly managed by this engine
 }
 
 // Ready starts all epoch components.
@@ -48,6 +48,7 @@ type Engine struct {
 	log          zerolog.Logger
 	me           module.Local
 	state        protocol.State
+	pools        *epochs.TransactionPools  // epoch-scoped transaction pools
 	factory      EpochComponentsFactory    // consolidates creating epoch for an epoch
 	voter        module.ClusterRootQCVoter // manages process of voting for next epoch's QC
 	heightEvents events.Heights            // allows subscribing to particular heights
@@ -60,6 +61,7 @@ func New(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
+	pools *epochs.TransactionPools,
 	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
@@ -70,6 +72,7 @@ func New(
 		log:            log,
 		me:             me,
 		state:          state,
+		pools:          pools,
 		voter:          voter,
 		factory:        factory,
 		heightEvents:   heightEvents,
@@ -277,6 +280,7 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	select {
 	case <-components.Done():
 		delete(e.epochs, counter)
+		e.pools.ForEpoch(counter).Clear()
 		return nil
 	case <-time.After(e.startupTimeout):
 		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)

@@ -25,7 +25,7 @@ func (v *TransactionSignatureVerifier) Process(
 	proc *TransactionProcedure,
 	ledger state.Ledger,
 ) error {
-	accounts := state.NewAccounts(ledger, ctx.Chain)
+	accounts := state.NewAccounts(ledger)
 
 	return v.verifyTransactionSignatures(proc.Transaction, accounts)
 }
@@ -69,7 +69,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	if !proposalKeyVerified {
 		return &InvalidProposalKeyMissingSignatureError{
 			Address:  tx.ProposalKey.Address,
-			KeyIndex: tx.ProposalKey.KeyID,
+			KeyIndex: tx.ProposalKey.KeyIndex,
 		}
 	}
 
@@ -133,12 +133,12 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	txSig flow.TransactionSignature,
 	message []byte,
 ) (*flow.AccountPublicKey, error) {
-	accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyID)
+	accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
 	if err != nil {
 		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
 			return nil, &InvalidSignaturePublicKeyDoesNotExistError{
 				Address:  txSig.Address,
-				KeyIndex: txSig.KeyID,
+				KeyIndex: txSig.KeyIndex,
 			}
 		}
 
@@ -148,7 +148,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	if accountKey.Revoked {
 		return nil, &InvalidSignaturePublicKeyRevokedError{
 			Address:  txSig.Address,
-			KeyIndex: txSig.KeyID,
+			KeyIndex: txSig.KeyIndex,
 		}
 	}
 
@@ -163,7 +163,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		if errors.Is(err, ErrInvalidHashAlgorithm) {
 			return nil, &InvalidHashAlgorithmError{
 				Address:  txSig.Address,
-				KeyIndex: txSig.KeyID,
+				KeyIndex: txSig.KeyIndex,
 				HashAlgo: accountKey.HashAlgo,
 			}
 		}
@@ -174,7 +174,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	if !valid {
 		return nil, &InvalidSignatureVerificationError{
 			Address:  txSig.Address,
-			KeyIndex: txSig.KeyID,
+			KeyIndex: txSig.KeyIndex,
 		}
 	}
 
@@ -192,5 +192,5 @@ func (v *TransactionSignatureVerifier) sigIsForProposalKey(
 	txSig flow.TransactionSignature,
 	proposalKey flow.ProposalKey,
 ) bool {
-	return txSig.Address == proposalKey.Address && txSig.KeyID == proposalKey.KeyID
+	return txSig.Address == proposalKey.Address && txSig.KeyIndex == proposalKey.KeyIndex
 }

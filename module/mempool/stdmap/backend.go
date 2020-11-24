@@ -3,6 +3,7 @@
 package stdmap
 
 import (
+	"fmt"
 	"math"
 	"sync"
 
@@ -86,6 +87,11 @@ func (b *Backdata) All() []flow.Entity {
 	return entities
 }
 
+// Clear removes all entities from the pool.
+func (b *Backdata) Clear() {
+	b.entities = make(map[flow.Identifier]flow.Entity)
+}
+
 // Hash will use a merkle root hash to hash all items.
 func (b *Backdata) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
@@ -95,16 +101,18 @@ func (b *Backdata) Hash() flow.Identifier {
 type Backend struct {
 	sync.RWMutex
 	Backdata
-	limit uint
-	eject EjectFunc
+	limit            uint
+	eject            EjectFunc
+	ejectionCallback OnEjection
 }
 
 // NewBackend creates a new memory pool backend.
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		Backdata: NewBackdata(),
-		limit:    uint(math.MaxUint32),
-		eject:    EjectTrueRandom,
+		Backdata:         NewBackdata(),
+		limit:            uint(math.MaxUint32),
+		eject:            EjectTrueRandom,
+		ejectionCallback: nil,
 	}
 	for _, option := range options {
 		option(&b)
@@ -181,11 +189,30 @@ func (b *Backend) All() []flow.Entity {
 	return b.Backdata.All()
 }
 
+// Clear removes all entities from the pool.
+func (b *Backend) Clear() {
+	b.Lock()
+	defer b.Unlock()
+	b.Backdata.Clear()
+}
+
 // Hash will use a merkle root hash to hash all items.
 func (b *Backend) Hash() flow.Identifier {
 	b.RLock()
 	defer b.RUnlock()
 	return b.Backdata.Hash()
+}
+
+// RegisterEjectionCallback sets the provided OnEjection callback
+// errors if another callback was already registered
+func (b *Backend) RegisterEjectionCallback(callback OnEjection) error {
+	b.Lock()
+	defer b.Unlock()
+	if b.ejectionCallback != nil {
+		return fmt.Errorf("OnEjection callback already set")
+	}
+	b.ejectionCallback = callback
+	return nil
 }
 
 // reduce will reduce the size of the kept entities until we are within the
@@ -199,12 +226,17 @@ func (b *Backend) reduce() {
 		key, _ := b.eject(b.entities)
 
 		// if the key is not actually part of the map, use stupid fallback eject
-		_, ok := b.entities[key]
+		entity, ok := b.entities[key]
 		if !ok {
 			key, _ = EjectFakeRandom(b.entities)
 		}
 
 		// remove the key
 		delete(b.entities, key)
+
+		// notify callback
+		if b.ejectionCallback != nil {
+			b.ejectionCallback(entity)
+		}
 	}
 }

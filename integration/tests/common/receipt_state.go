@@ -70,10 +70,14 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	b1, ok := bs.HighestFinalized()
 	if ok {
 		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())
-		initialFinalizedSC = r1.ExecutionResult.FinalStateCommit
+		r1finalState, ok := r1.ExecutionResult.FinalStateCommitment()
+		require.True(t, ok)
+		initialFinalizedSC = r1finalState
 	}
 
-	currentHeight := b1.Header.Height + 1
+	initFinalizedheight := b1.Header.Height
+	currentHeight := initFinalizedheight + 1
+
 	currentID := b1.Header.ID()
 	var b2 *messages.BlockProposal
 	var r2 *flow.ExecutionReceipt
@@ -85,7 +89,9 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		}
 		currentID = b2.Header.ID()
 		r2 = rs.WaitForReceiptFromAny(t, b2.Header.ID())
-		if bytes.Compare(initialFinalizedSC, r2.ExecutionResult.FinalStateCommit) == 0 {
+		r2finalState, ok := r2.ExecutionResult.FinalStateCommitment()
+		require.True(t, ok)
+		if bytes.Compare(initialFinalizedSC, r2finalState) == 0 {
 			// received a new execution result for the next finalized block, but it has the same final state commitment
 			// check the next finalized block
 			currentHeight++
@@ -94,7 +100,9 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		return true
 	}, receiptStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive an execution receipt with a different state commitment from %x within %v seconds,"+
+			" initial finalized height: %v "+
 			" last block checked height %v, last block checked ID %x", initialFinalizedSC, receiptStateTimeout,
+			initFinalizedheight,
 			currentHeight, currentID))
 
 	return b2, r2

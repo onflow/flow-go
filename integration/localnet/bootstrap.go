@@ -24,7 +24,7 @@ const (
 	DockerComposeFile        = "./docker-compose.nodes.yml"
 	DockerComposeFileVersion = "3.7"
 	PrometheusTargetsFile    = "./targets.nodes.json"
-	DefaultCollectionCount   = 1
+	DefaultCollectionCount   = 3
 	DefaultConsensusCount    = 3
 	DefaultExecutionCount    = 1
 	DefaultVerificationCount = 1
@@ -220,7 +220,7 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 			services[container.ContainerName] = prepareExecutionService(container, numExecution)
 			numExecution++
 		case flow.RoleVerification:
-			services[container.ContainerName] = prepareService(container, numVerification)
+			services[container.ContainerName] = prepareVerificationService(container, numVerification)
 			numVerification++
 		case flow.RoleAccess:
 			services[container.ContainerName] = prepareAccessService(container, numAccess)
@@ -298,6 +298,18 @@ func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
+		fmt.Sprintf("--chunk-alpha=1"),
+	)
+
+	return service
+}
+
+func prepareVerificationService(container testnet.ContainerConfig, i int) Service {
+	service := prepareService(container, i)
+
+	service.Command = append(
+		service.Command,
+		fmt.Sprintf("--chunk-alpha=1"),
 	)
 
 	return service

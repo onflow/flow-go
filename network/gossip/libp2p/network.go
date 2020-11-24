@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -23,6 +24,7 @@ type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
+	sync.RWMutex
 	logger          zerolog.Logger
 	codec           network.Codec
 	ids             flow.IdentityList
@@ -67,19 +69,15 @@ func NewNetwork(
 		metrics:         metrics,
 		subscriptionMgr: newSubscriptionManager(mw),
 	}
-
-	o.SetIDs(ids)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	o.cancel = cancel
-	o.ctx = ctx
+	o.ctx, o.cancel = context.WithCancel(context.Background())
+	o.ids = ids
 
 	// setup the message queue
 	// create priority queue
-	o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
+	o.queue = queue.NewMessageQueue(o.ctx, queue.GetEventPriority, metrics)
 
 	// create workers to read from the queue and call queueSubmitFunc
-	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+	queue.CreateQueueWorkers(o.ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
 
 	return o, nil
 }
@@ -148,6 +146,8 @@ func (n *Network) unregister(channelID string) error {
 
 // Identity returns a map of all flow.Identifier to flow identity by querying the flow state
 func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
+	n.RLock()
+	defer n.RUnlock()
 	identifierToID := make(map[flow.Identifier]flow.Identity)
 	for _, id := range n.ids {
 		identifierToID[id.NodeID] = *id
@@ -156,40 +156,43 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 }
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
-func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	subset, err := n.top.Subset(n.ids, n.fanout())
+func (n *Network) Topology() (flow.IdentityList, error) {
+	n.RLock()
+	defer n.RUnlock()
+	// fanout is currently set to half of the system size for connectivity assurance
+	fanout := uint(len(n.ids)+1) / 2
+	subset, err := n.top.Subset(n.ids, fanout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
 	}
-
-	// creates a map of all the selected ids
-	topMap := make(map[flow.Identifier]flow.Identity)
-	for _, id := range subset {
-		topMap[id.NodeID] = *id
-	}
-	return topMap, nil
+	return subset, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
-
 	err := n.processNetworkMessage(nodeID, msg)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
-
 	return nil
 }
 
-func (n *Network) SetIDs(ids flow.IdentityList) {
-	// remove this node id from the list of fanout target ids to avoid self-dial
-	idsMinusMe := ids.Filter(n.me.NotMeFilter())
-	n.ids = idsMinusMe
-}
+// SetIDs updates the identity list cached by the network layer
+func (n *Network) SetIDs(ids flow.IdentityList) error {
 
-// fanout returns the node fanout derived from the identity list
-func (n *Network) fanout() uint {
-	// fanout is currently set to half of the system size for connectivity assurance
-	return uint(len(n.ids)+1) / 2
+	// remove self from id
+	ids = ids.Filter(n.me.NotMeFilter())
+
+	n.Lock()
+	n.ids = ids
+	n.Unlock()
+
+	// update the allow list
+	err := n.mw.UpdateAllowList()
+	if err != nil {
+		return fmt.Errorf("failed to update middleware allow list: %w", err)
+	}
+
+	return nil
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
@@ -327,9 +330,6 @@ func (n *Network) unicast(channelID string, message interface{}, targetID flow.I
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
-	n.logger.Debug().
-		Msg("message successfully unicasted")
-
 	return nil
 }
 
@@ -344,11 +344,6 @@ func (n *Network) publish(channelID string, message interface{}, targetIDs ...fl
 	if err != nil {
 		return fmt.Errorf("failed to publish on channel ID %s: %w", channelID, err)
 	}
-
-	n.logger.
-		Debug().
-		Str("channel_id", channelID).
-		Msg("message successfully published")
 
 	return nil
 }
@@ -365,12 +360,6 @@ func (n *Network) multicast(channelID string, message interface{}, num uint, tar
 	if err != nil {
 		return fmt.Errorf("failed to multicast on channel ID %s: %w", channelID, err)
 	}
-
-	n.logger.
-		Debug().
-		Str("channel_id", channelID).
-		Uint("target_count", num).
-		Msg("message successfully multicasted")
 
 	return nil
 }

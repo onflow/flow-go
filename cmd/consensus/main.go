@@ -68,10 +68,10 @@ func main() {
 		err            error
 		privateDKGData *bootstrap.DKGParticipantPriv
 		guarantees     mempool.Guarantees
-		results        mempool.Results
+		results        mempool.IncorporatedResults
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
-		seals          mempool.Seals
+		seals          mempool.IncorporatedResultSeals
 		prov           *provider.Engine
 		requesterEng   *requester.Engine
 		syncCore       *synchronization.Core
@@ -107,7 +107,7 @@ func main() {
 			return err
 		}).
 		Module("execution results mempool", func(node *cmd.FlowNodeBuilder) error {
-			results, err = stdmap.NewResults(resultLimit)
+			results, err = stdmap.NewIncorporatedResults(resultLimit)
 			return err
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -131,12 +131,12 @@ func main() {
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
-			ejector := ejectors.NewLatestSeal(node.Storage.Headers)
-			seals, err = stdmap.NewSeals(sealLimit, stdmap.WithEject(ejector.Eject))
-			return err
+			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
+			seals = stdmap.NewIncorporatedResultSeals(sealLimit, stdmap.WithEject(ejector.Eject))
+			return nil
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
-			conMetrics = metrics.NewConsensusCollector(node.Tracer)
+			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -174,6 +174,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
+				conMetrics,
 				node.Network,
 				node.State,
 				node.Me,
@@ -182,7 +183,6 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Index,
 				results,
-				receipts,
 				approvals,
 				seals,
 				assigner,

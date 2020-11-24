@@ -7,6 +7,11 @@ type Payload struct {
 	Receipts   []*ExecutionReceipt
 }
 
+// EmptyPayload returns an empty block payload.
+func EmptyPayload() Payload {
+	return Payload{}
+}
+
 // Hash returns the root hash of the payload.
 func (p Payload) Hash() Identifier {
 	collHash := MerkleRoot(GetIDs(p.Guarantees)...)

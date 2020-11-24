@@ -41,6 +41,8 @@ import (
 	"github.com/onflow/flow-go/module/chunks"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
@@ -140,13 +142,11 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 
 	node := GenericNode(t, hub, identity, identities, chainID, options...)
 
-	pool, err := stdmap.NewTransactions(1000)
-	require.NoError(t, err)
-
+	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
 	transactions := storage.NewTransactions(node.Metrics, node.DB)
 	collections := storage.NewCollections(node.DB, transactions)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collectioningest.DefaultConfig())
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, chainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
 
 	selector := filter.HasRole(flow.RoleAccess, flow.RoleVerification)
@@ -157,12 +157,11 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.ProvideCollections, selector, retrieve)
 	require.NoError(t, err)
 
-	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collections, transactions)
+	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
 	require.NoError(t, err)
 
 	return testmock.CollectionNode{
 		GenericNode:     node,
-		Pool:            pool,
 		Collections:     collections,
 		Transactions:    transactions,
 		IngestionEngine: ingestionEngine,
@@ -197,7 +196,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
 
-	results, err := stdmap.NewResults(1000)
+	results, err := stdmap.NewIncorporatedResults(1000)
 	require.NoError(t, err)
 
 	receipts, err := stdmap.NewReceipts(1000)
@@ -206,8 +205,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)
 
-	seals, err := stdmap.NewSeals(1000)
-	require.NoError(t, err)
+	seals := stdmap.NewIncorporatedResultSeals(1000)
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
@@ -222,8 +220,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	requireApprovals := true
 
-	// match approvals and results
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, sealedResultsDB, node.Headers, node.Index, results, receipts, approvals, seals, assigner, requireApprovals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Metrics, node.Net, node.State, node.Me, requesterEng, sealedResultsDB, node.Headers, node.Index, results, approvals, seals, assigner, requireApprovals)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{
@@ -274,7 +271,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	dbDir := unittest.TempDir(t)
 
 	metricsCollector := &metrics.NoopCollector{}
-	ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), nil)
+	ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), nil, completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()
@@ -310,6 +307,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	vm := fvm.New(rt)
 
 	vmCtx := fvm.NewContext(
+		node.Log,
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(node.Blocks),
 	)
@@ -621,6 +619,7 @@ func VerificationNode(t testing.TB,
 		vm := fvm.New(rt)
 
 		vmCtx := fvm.NewContext(
+			node.Log,
 			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(node.Blocks),
 		)

@@ -19,7 +19,7 @@ func (c *TransactionSequenceNumberChecker) Process(
 	proc *TransactionProcedure,
 	ledger state.Ledger,
 ) error {
-	accounts := state.NewAccounts(ledger, ctx.Chain)
+	accounts := state.NewAccounts(ledger)
 
 	return c.checkAndIncrementSequenceNumber(proc.Transaction, accounts)
 }
@@ -30,12 +30,12 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 ) error {
 	proposalKey := tx.ProposalKey
 
-	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyID)
+	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
 		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
 			return &InvalidProposalKeyPublicKeyDoesNotExistError{
 				Address:  proposalKey.Address,
-				KeyIndex: proposalKey.KeyID,
+				KeyIndex: proposalKey.KeyIndex,
 			}
 		}
 
@@ -45,7 +45,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	if accountKey.Revoked {
 		return &InvalidProposalKeyPublicKeyRevokedError{
 			Address:  proposalKey.Address,
-			KeyIndex: proposalKey.KeyID,
+			KeyIndex: proposalKey.KeyIndex,
 		}
 	}
 
@@ -54,7 +54,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	if !valid {
 		return &InvalidProposalKeySequenceNumberError{
 			Address:           proposalKey.Address,
-			KeyIndex:          proposalKey.KeyID,
+			KeyIndex:          proposalKey.KeyIndex,
 			CurrentSeqNumber:  accountKey.SeqNumber,
 			ProvidedSeqNumber: proposalKey.SequenceNumber,
 		}
@@ -62,7 +62,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey.SeqNumber++
 
-	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyID, accountKey)
+	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
 		return err
 	}

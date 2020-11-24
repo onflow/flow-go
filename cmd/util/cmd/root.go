@@ -14,8 +14,7 @@ import (
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
 	"github.com/onflow/flow-go/cmd/util/cmd/find-block"
 	"github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
-	read_mappings "github.com/onflow/flow-go/cmd/util/cmd/read-mappings"
-	recalculate_mappings "github.com/onflow/flow-go/cmd/util/cmd/recalculate-mappings"
+	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 )
 
 var (
@@ -54,8 +53,7 @@ func addCommands() {
 	rootCmd.AddCommand(find.Cmd)
 	rootCmd.AddCommand(read.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
-	rootCmd.AddCommand(read_mappings.Cmd)
-	rootCmd.AddCommand(recalculate_mappings.Cmd)
+	rootCmd.AddCommand(truncate_database.Cmd)
 }
 
 func initConfig() {

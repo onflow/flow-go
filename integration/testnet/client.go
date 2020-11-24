@@ -98,12 +98,12 @@ func (c *Client) Events(ctx context.Context, typ string) ([]client.BlockEvents, 
 
 // DeployContract submits a transaction to deploy a contract with the given
 // code to the root account.
-func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.CadenceCode) error {
+func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) error {
 
 	code := dsl.Transaction{
 		Import: dsl.Import{},
 		Content: dsl.Prepare{
-			Content: dsl.UpdateAccountCode{Code: contract.ToCadence()},
+			Content: dsl.UpdateAccountCode{Code: contract.ToCadence(), Name: contract.Name},
 		},
 	}
 
@@ -120,7 +120,7 @@ func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contr
 // SignTransaction signs the transaction using the proposer's key
 func (c *Client) SignTransaction(tx *sdk.Transaction) (*sdk.Transaction, error) {
 
-	err := tx.SignEnvelope(tx.Payer, tx.ProposalKey.KeyID, c.signer)
+	err := tx.SignEnvelope(tx.Payer, tx.ProposalKey.KeyIndex, c.signer)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 
 	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)
 	errCount := 0
-	for result == nil || (result.Status != sdk.TransactionStatusFinalized && result.Status != sdk.TransactionStatusSealed) {
+	for result == nil || (result.Status != sdk.TransactionStatusSealed) {
 		time.Sleep(time.Second)
 		result, err = c.client.GetTransactionResult(ctx, id)
 		if err != nil {

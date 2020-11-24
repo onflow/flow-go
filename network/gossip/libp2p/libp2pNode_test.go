@@ -22,16 +22,18 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
 const tickForAssertEventually = 100 * time.Millisecond
+
+var rootBlockID = unittest.IdentifierFixture().String()
 
 type LibP2PNodeTestSuite struct {
 	suite.Suite
@@ -46,16 +48,19 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 }
 
 // SetupTests initiates the test setups prior to each test
-func (l *LibP2PNodeTestSuite) SetupTest() {
-	l.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	l.ctx, l.cancel = context.WithCancel(context.Background())
-	golog.SetAllLoggers(golog.LevelWarn)
+func (suite *LibP2PNodeTestSuite) SetupTest() {
+	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	golog.SetAllLoggers(golog.LevelError)
+	suite.ctx, suite.cancel = context.WithCancel(context.Background())
+}
+
+func (suite *LibP2PNodeTestSuite) TearDownTest() {
+	suite.cancel()
 }
 
 // TestMultiAddress evaluates correct translations from
 // dns and ip4 to libp2p multi-address
-func (l *LibP2PNodeTestSuite) TestMultiAddress() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 	tt := []struct {
 		address      NodeAddress
 		multiaddress string
@@ -88,31 +93,29 @@ func (l *LibP2PNodeTestSuite) TestMultiAddress() {
 
 	for _, tc := range tt {
 		actualAddress := MultiaddressStr(tc.address)
-		assert.Equal(l.Suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
+		assert.Equal(suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 
 }
 
-func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
-	defer l.cancel()
-
+func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 	// creates a single
-	nodes, _ := l.CreateNodes(1, nil, false)
+	nodes, _ := suite.CreateNodes(1, nil, false)
 
 	// stops the created node
 	done, err := nodes[0].Stop()
-	assert.NoError(l.Suite.T(), err)
+	assert.NoError(suite.T(), err)
 	<-done
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
 // their libp2p info. It generates an address, and checks whether repeated translations
 // yields the same info or not.
-func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
+func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("node%d", i)
 		key, err := generateNetworkingKey(name)
-		require.NoError(l.Suite.T(), err)
+		require.NoError(suite.T(), err)
 
 		// creates node-i address
 		address := NodeAddress{
@@ -124,34 +127,33 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 
 		// translates node-i address into info
 		info, err := GetPeerInfo(address)
-		require.NoError(l.Suite.T(), err)
+		require.NoError(suite.T(), err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
 			rinfo, err := GetPeerInfo(address)
-			require.NoError(l.Suite.T(), err)
-			assert.True(l.Suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
+			require.NoError(suite.T(), err)
+			assert.True(suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
 		}
 	}
 }
 
 // TestAddPeers checks if nodes can be added as peers to a given node
-func (l *LibP2PNodeTestSuite) TestAddPeers() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestAddPeers() {
 
 	count := 3
 
 	// create nodes
-	nodes, addrs := l.CreateNodes(count, nil, false)
-	defer l.StopNodes(nodes)
+	nodes, addrs := suite.CreateNodes(count, nil, false)
+	defer suite.StopNodes(nodes)
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, p := range addrs[1:] {
-		require.NoError(l.Suite.T(), nodes[0].AddPeer(l.ctx, p))
+		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, p))
 	}
 
 	// Checks if all 3 nodes have been added as peers to the first node
-	assert.Len(l.Suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
+	assert.Len(suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
 
 	// Checks whether the first node is connected to the rest
 	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
@@ -159,29 +161,28 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 		if nodes[0].libP2PHost.ID().String() == peer.String() {
 			continue
 		}
-		assert.Eventuallyf(l.Suite.T(), func() bool {
+		assert.Eventuallyf(suite.T(), func() bool {
 			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
 		}, 2*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
 	}
 }
 
 // TestAddPeers checks if nodes can be added as peers to a given node
-func (l *LibP2PNodeTestSuite) TestRemovePeers() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 
 	count := 3
 
 	// create nodes
-	nodes, addrs := l.CreateNodes(count, nil, false)
-	defer l.StopNodes(nodes)
+	nodes, addrs := suite.CreateNodes(count, nil, false)
+	defer suite.StopNodes(nodes)
 
 	// add nodes two and three to the first node as its peers
 	for _, p := range addrs[1:] {
-		require.NoError(l.Suite.T(), nodes[0].AddPeer(l.ctx, p))
+		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, p))
 	}
 
 	// check if all 3 nodes have been added as peers to the first node
-	assert.Len(l.Suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
+	assert.Len(suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
 
 	// check whether the first node is connected to the rest
 	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
@@ -189,46 +190,46 @@ func (l *LibP2PNodeTestSuite) TestRemovePeers() {
 		if nodes[0].libP2PHost.ID().String() == peer.String() {
 			continue
 		}
-		assert.Eventually(l.Suite.T(), func() bool {
+		assert.Eventually(suite.T(), func() bool {
 			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
 		}, 2*time.Second, tickForAssertEventually)
 	}
 
 	// disconnect from each peer and assert that the connection no longer exists
 	for _, p := range addrs[1:] {
-		require.NoError(l.Suite.T(), nodes[0].RemovePeer(l.ctx, p))
+		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, p))
 		pInfo, err := GetPeerInfo(p)
-		assert.NoError(l.Suite.T(), err)
-		assert.Equal(l.Suite.T(), network.NotConnected, nodes[0].libP2PHost.Network().Connectedness(pInfo.ID))
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), network.NotConnected, nodes[0].libP2PHost.Network().Connectedness(pInfo.ID))
 	}
 }
 
 // TestCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
-func (l *LibP2PNodeTestSuite) TestCreateStream() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestCreateStream() {
+
 	count := 2
 
 	// Creates nodes
-	nodes, addrs := l.CreateNodes(count, nil, false)
-	defer l.StopNodes(nodes)
+	nodes, addrs := suite.CreateNodes(count, nil, false)
+	defer suite.StopNodes(nodes)
 
 	address2 := addrs[1]
 
-	flowProtocolID := generateProtocolID(rootID)
+	flowProtocolID := generateProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
+	require.Equal(suite.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
 	for i := 0; i < 100; i++ {
 		anotherStream, err := nodes[0].CreateStream(context.Background(), address2)
 		// Assert that a stream was returned without error
-		require.NoError(l.T(), err)
-		require.NotNil(l.T(), anotherStream)
+		require.NoError(suite.T(), err)
+		require.NotNil(suite.T(), anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(l.T(), i+1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(suite.T(), i+1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 		// assert that the same connection is reused
-		require.Len(l.T(), nodes[0].libP2PHost.Network().Conns(), 1)
+		require.Len(suite.T(), nodes[0].libP2PHost.Network().Conns(), 1)
 		streams = append(streams, anotherStream)
 	}
 
@@ -243,13 +244,13 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 		}()
 		wg.Wait()
 		// assert that the stream count within libp2p decremented
-		require.Equal(l.T(), i, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(suite.T(), i, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 	}
 }
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
-func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
+
 	count := 2
 	ch := make(chan string, count)
 
@@ -257,92 +258,166 @@ func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
 	handler := func(s network.Stream) {
 		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 		str, err := rw.ReadString('\n')
-		assert.NoError(l.T(), err)
+		assert.NoError(suite.T(), err)
 		ch <- str
 	}
 
 	// Creates peers
-	peers, addrs := l.CreateNodes(count, handler, false)
-	defer l.StopNodes(peers)
-	require.Len(l.T(), addrs, count)
+	peers, addrs := suite.CreateNodes(count, handler, false)
+	defer suite.StopNodes(peers)
+	require.Len(suite.T(), addrs, count)
 
 	addr1 := addrs[0]
 	addr2 := addrs[1]
 
 	// Create stream from node 1 to node 2
 	s1, err := peers[0].CreateStream(context.Background(), addr2)
-	assert.NoError(l.T(), err)
+	assert.NoError(suite.T(), err)
 	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
 
 	// Send message from node 1 to 2
 	msg := "hello\n"
 	_, err = rw.WriteString(msg)
-	assert.NoError(l.T(), err)
+	assert.NoError(suite.T(), err)
 
 	// Flush the stream
-	assert.NoError(l.T(), rw.Flush())
+	assert.NoError(suite.T(), rw.Flush())
 
 	// Wait for the message to be received
 	select {
 	case rcv := <-ch:
-		require.Equal(l.T(), msg, rcv)
+		require.Equal(suite.T(), msg, rcv)
 	case <-time.After(1 * time.Second):
-		assert.Fail(l.T(), "message not received")
+		assert.Fail(suite.T(), "message not received")
 	}
 
 	// Create stream from node 2 to node 1
 	s2, err := peers[1].CreateStream(context.Background(), addr1)
-	assert.NoError(l.T(), err)
+	assert.NoError(suite.T(), err)
 	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
 
 	// Send message from node 2 to 1
 	msg = "hey\n"
 	_, err = rw.WriteString(msg)
-	assert.NoError(l.T(), err)
+	assert.NoError(suite.T(), err)
 
 	// Flush the stream
-	assert.NoError(l.T(), rw.Flush())
+	assert.NoError(suite.T(), rw.Flush())
 
 	select {
 	case rcv := <-ch:
-		require.Equal(l.T(), msg, rcv)
+		require.Equal(suite.T(), msg, rcv)
 	case <-time.After(3 * time.Second):
-		assert.Fail(l.T(), "message not received")
+		assert.Fail(suite.T(), "message not received")
 	}
 }
 
 // TestCreateStreamTimeoutWithUnresponsiveNode tests that the CreateStream call does not block longer than the default
 // unicast timeout interval
-func (l *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() {
 
 	// creates a regular node
-	peers, addrs := l.CreateNodes(1, nil, false)
-	defer l.StopNodes(peers)
-	require.Len(l.T(), addrs, 1)
+	peers, addrs := suite.CreateNodes(1, nil, false)
+	defer suite.StopNodes(peers)
+	require.Len(suite.T(), addrs, 1)
 
 	// create a silent node which never replies
-	listener, silentNodeAddress := newSilentNode(l.T())
-	defer listener.Close()
+	listener, silentNodeAddress := newSilentNode(suite.T())
+	defer func() {
+		require.NoError(suite.T(), listener.Close())
+	}()
 
 	// setup the context to expire after the default timeout
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
 	defer cancel()
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
-	grace := 10 * time.Millisecond
+	grace := 1 * time.Second
 	var err error
-	unittest.AssertReturnsBefore(l.T(),
+	unittest.AssertReturnsBefore(suite.T(),
 		func() {
 			_, err = peers[0].CreateStream(ctx, silentNodeAddress)
 		},
 		DefaultUnicastTimeout+grace)
-	assert.Error(l.T(), err)
+	assert.Error(suite.T(), err)
+}
+
+// TestCreateStreamIsConcurrent tests that CreateStream calls can be made concurrently such that one blocked call
+// does not block another concurrent call.
+func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
+
+	// bump up the unicast timeout to a high value
+	unicastTimeout = time.Hour
+
+	// create two regular node
+	goodPeers, goodAddrs := suite.CreateNodes(2, nil, false)
+	defer suite.StopNodes(goodPeers)
+	require.Len(suite.T(), goodAddrs, 2)
+
+	// create a silent node which never replies
+	listener, silentNodeAddress := newSilentNode(suite.T())
+	defer func() {
+		require.NoError(suite.T(), listener.Close())
+	}()
+
+	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
+	blockedCallCh := unittest.RequireNeverReturnBefore(suite.T(),
+		func() {
+			_, _ = goodPeers[0].CreateStream(suite.ctx, silentNodeAddress) // this call will block
+		},
+		1*time.Second,
+		"CreateStream attempt to the unresponsive peer did not block")
+
+	// requires same peer can still connect to the other regular peer without being blocked
+	unittest.RequireReturnsBefore(suite.T(),
+		func() {
+			_, err := goodPeers[0].CreateStream(suite.ctx, goodAddrs[1])
+			require.NoError(suite.T(), err)
+		},
+		1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
+
+	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
+	// good address
+	unittest.RequireNeverClosedWithin(suite.T(), blockedCallCh, 1*time.Millisecond,
+		"CreateStream attempt to the unresponsive peer did not block after connecting to good node")
+
+}
+
+// TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
+func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
+
+	// create two nodes
+	peers, addrs := suite.CreateNodes(2, nil, false)
+	defer suite.StopNodes(peers)
+	require.Len(suite.T(), addrs, 2)
+
+	wg := sync.WaitGroup{}
+
+	// create a gate which gates the call to CreateStream for all concurrent go routines
+	gate := make(chan struct{})
+
+	createStream := func() {
+		<-gate
+		_, err := peers[0].CreateStream(suite.ctx, addrs[1])
+		assert.NoError(suite.T(), err) // assert that stream was successfully created
+		wg.Done()
+	}
+
+	// kick off 10 concurrent calls to CreateStream
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go createStream()
+	}
+	// open the gate by closing the channel
+	close(gate)
+
+	// no call should block
+	unittest.AssertReturnsBefore(suite.T(), wg.Wait, 10*time.Second)
 }
 
 // TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
-func (l *LibP2PNodeTestSuite) TestStreamClosing() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
+
 	count := 10
 	ch := make(chan string, count)
 	defer close(ch)
@@ -360,9 +435,9 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 						s.Close()
 						return
 					}
-					assert.Fail(l.T(), fmt.Sprintf("received error %v", err))
+					assert.Fail(suite.T(), fmt.Sprintf("received error %v", err))
 					err = s.Reset()
-					assert.NoError(l.T(), err)
+					assert.NoError(suite.T(), err)
 					return
 				}
 				select {
@@ -376,51 +451,50 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 	}
 
 	// Creates peers
-	peers, addrs := l.CreateNodes(2, handler, false)
-	defer l.StopNodes(peers)
+	peers, addrs := suite.CreateNodes(2, handler, false)
+	defer suite.StopNodes(peers)
 
 	for i := 0; i < count; i++ {
 		// Create stream from node 1 to node 2 (reuse if one already exists)
 		s, err := peers[0].CreateStream(context.Background(), addrs[1])
-		assert.NoError(l.T(), err)
+		assert.NoError(suite.T(), err)
 		w := bufio.NewWriter(s)
 
 		// Send message from node 1 to 2
 		msg := fmt.Sprintf("hello%d\n", i)
 		_, err = w.WriteString(msg)
-		assert.NoError(l.T(), err)
+		assert.NoError(suite.T(), err)
 
 		// Flush the stream
-		assert.NoError(l.T(), w.Flush())
+		assert.NoError(suite.T(), w.Flush())
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func(s network.Stream) {
 			defer wg.Done()
 			// close the stream
 			err := helpers.FullClose(s)
-			require.NoError(l.T(), err)
+			require.NoError(suite.T(), err)
 		}(s)
 		// wait for stream to be closed
 		wg.Wait()
 
 		// wait for the message to be received
-		select {
-		case rcv := <-ch:
-			require.Equal(l.T(), msg, rcv)
-		case <-time.After(10 * time.Second):
-			require.Fail(l.T(), fmt.Sprintf("message %s not received", msg))
-			break
-		}
+		unittest.RequireReturnsBefore(suite.T(),
+			func() {
+				rcv := <-ch
+				require.Equal(suite.T(), msg, rcv)
+			},
+			10*time.Second,
+			fmt.Sprintf("message %s not received", msg))
 	}
 }
 
 // TestPing tests that a node can ping another node
-func (l *LibP2PNodeTestSuite) TestPing() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestPing() {
 
 	// creates two nodes
-	nodes, nodeAddr := l.CreateNodes(2, nil, false)
-	defer l.StopNodes(nodes)
+	nodes, nodeAddr := suite.CreateNodes(2, nil, false)
+	defer suite.StopNodes(nodes)
 
 	node1 := nodes[0]
 	node2 := nodes[1]
@@ -428,76 +502,75 @@ func (l *LibP2PNodeTestSuite) TestPing() {
 	node2Addr := nodeAddr[1]
 
 	// test node1 can ping node 2
-	_, err := node1.Ping(l.ctx, node2Addr)
-	require.NoError(l.T(), err)
+	_, err := node1.Ping(suite.ctx, node2Addr)
+	require.NoError(suite.T(), err)
 
 	// test node 2 can ping node 1
-	_, err = node2.Ping(l.ctx, node1Addr)
-	require.NoError(l.T(), err)
+	_, err = node2.Ping(suite.ctx, node1Addr)
+	require.NoError(suite.T(), err)
 }
 
 // TestConnectionGating tests node allow listing by peer.ID
-func (l *LibP2PNodeTestSuite) TestConnectionGating() {
-	defer l.cancel()
+func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 
 	// create 2 nodes
-	nodes, nodeAddrs := l.CreateNodes(2, nil, true)
+	nodes, nodeAddrs := suite.CreateNodes(2, nil, true)
 
 	node1 := nodes[0]
 	node1Addr := nodeAddrs[0]
-	defer l.StopNode(node1)
+	defer suite.StopNode(node1)
 
 	node2 := nodes[1]
 	node2Addr := nodeAddrs[1]
-	defer l.StopNode(node2)
+	defer suite.StopNode(node2)
 
 	requireError := func(err error) {
-		require.Error(l.T(), err)
-		require.True(l.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection))
+		require.Error(suite.T(), err)
+		require.True(suite.T(), errors.Is(err, swarm.ErrGaterDisallowedConnection))
 	}
 
-	l.Run("outbound connection to a not-allowed node is rejected", func() {
+	suite.Run("outbound connection to a not-allowed node is rejected", func() {
 		// node1 and node2 both have no allowListed peers
-		_, err := node1.CreateStream(l.ctx, node2Addr)
+		_, err := node1.CreateStream(suite.ctx, node2Addr)
 		requireError(err)
-		_, err = node2.CreateStream(l.ctx, node1Addr)
+		_, err = node2.CreateStream(suite.ctx, node1Addr)
 		requireError(err)
 	})
 
-	l.Run("inbound connection from an allowed node is rejected", func() {
+	suite.Run("inbound connection from an allowed node is rejected", func() {
 
 		// node1 allowlists node2 but node2 does not allowlists node1
 		err := node1.UpdateAllowlist([]NodeAddress{node2Addr}...)
-		require.NoError(l.T(), err)
+		require.NoError(suite.T(), err)
 
 		// node1 attempts to connect to node2
 		// node2 should reject the inbound connection
-		_, err = node1.CreateStream(l.ctx, node2Addr)
-		require.Error(l.T(), err)
+		_, err = node1.CreateStream(suite.ctx, node2Addr)
+		require.Error(suite.T(), err)
 	})
 
-	l.Run("outbound connection to an approved node is allowed", func() {
+	suite.Run("outbound connection to an approved node is allowed", func() {
 
 		// node1 allowlists node2
 		err := node1.UpdateAllowlist([]NodeAddress{node2Addr}...)
-		require.NoError(l.T(), err)
+		require.NoError(suite.T(), err)
 		// node2 allowlists node1
 		err = node2.UpdateAllowlist([]NodeAddress{node1Addr}...)
-		require.NoError(l.T(), err)
+		require.NoError(suite.T(), err)
 
 		// node1 should be allowed to connect to node2
-		_, err = node1.CreateStream(l.ctx, node2Addr)
-		require.NoError(l.T(), err)
+		_, err = node1.CreateStream(suite.ctx, node2Addr)
+		require.NoError(suite.T(), err)
 		// node2 should be allowed to connect to node1
-		_, err = node2.CreateStream(l.ctx, node1Addr)
-		require.NoError(l.T(), err)
+		_, err = node2.CreateStream(suite.ctx, node1Addr)
+		require.NoError(suite.T(), err)
 	})
 }
 
 // CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandler, allowList bool) ([]*P2PNode, []NodeAddress) {
+func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandler, allowList bool) ([]*P2PNode, []NodeAddress) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*P2PNode
@@ -505,7 +578,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandl
 	defer func() {
 		if err != nil && nodes != nil {
 			// stops all nodes upon an error in starting even one single node
-			l.StopNodes(nodes)
+			suite.StopNodes(nodes)
 		}
 	}()
 
@@ -515,17 +588,17 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandl
 
 		name := fmt.Sprintf("node%d", i+1)
 		pkey, err := generateNetworkingKey(name)
-		require.NoError(l.Suite.T(), err)
+		require.NoError(suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler, allowList)
+		n, nodeID := suite.CreateNode(name, pkey, "0.0.0.0", "0", rootBlockID, handler, allowList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
 	return nodes, nodeAddrs
 }
 
-func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
+func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
 	handler network.StreamHandler, allowList bool) (*P2PNode, NodeAddress) {
 	n := &P2PNode{}
 	nodeID := NodeAddress{
@@ -544,30 +617,31 @@ func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip str
 		handlerFunc = func(network.Stream) {}
 	}
 
-	err := n.Start(l.ctx, nodeID, l.logger, key, handlerFunc, rootID, allowList, nil)
-	require.NoError(l.T(), err)
-	require.Eventuallyf(l.T(), func() bool {
+	noopMetrics := metrics.NewNoopCollector()
+	err := n.Start(suite.ctx, nodeID, suite.logger, key, handlerFunc, rootID, allowList, nil, noopMetrics)
+	require.NoError(suite.T(), err)
+	require.Eventuallyf(suite.T(), func() bool {
 		ip, p, err := n.GetIPPort()
 		return err == nil && ip != "" && p != ""
 	}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %s", name))
 
 	// get the actual IP and port that have been assigned by the subsystem
 	nodeID.IP, nodeID.Port, err = n.GetIPPort()
-	require.NoError(l.T(), err)
+	require.NoError(suite.T(), err)
 
 	return n, nodeID
 }
 
 // StopNodes stop all nodes in the input slice
-func (l *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
+func (suite *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
 	for _, n := range nodes {
-		l.StopNode(n)
+		suite.StopNode(n)
 	}
 }
 
-func (l *LibP2PNodeTestSuite) StopNode(node *P2PNode) {
+func (suite *LibP2PNodeTestSuite) StopNode(node *P2PNode) {
 	done, err := node.Stop()
-	assert.NoError(l.Suite.T(), err)
+	assert.NoError(suite.T(), err)
 	<-done
 }
 

@@ -3,8 +3,10 @@ package trie
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
@@ -144,7 +146,7 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]*ledger.Payload, 
 	}
 
 	if len(rpaths) > 0 {
-		p, err := mt.read(head.RigthChild(), rpaths)
+		p, err := mt.read(head.RightChild(), rpaths)
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +225,7 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 		defer wg.Done()
 		lChild, lErr = update(treeHeight, nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
 	}()
-	rChild, rErr = update(treeHeight, nodeHeight-1, parentNode.RigthChild(), rpaths, rpayloads)
+	rChild, rErr = update(treeHeight, nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
 	wg.Wait()
 	if lErr != nil || rErr != nil {
 		var merr *multierror.Error
@@ -333,7 +335,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	}
 
 	if len(lpaths) > 0 {
-		if rChild := head.RigthChild(); rChild != nil {
+		if rChild := head.RightChild(); rChild != nil {
 			nodeHash := rChild.Hash()
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
@@ -366,7 +368,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 				}
 			}
 		}
-		err := mt.proofs(head.RigthChild(), rpaths, rproofs)
+		err := mt.proofs(head.RightChild(), rpaths, rproofs)
 		if err != nil {
 			return err
 		}
@@ -384,7 +386,56 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	return o.PathLength() == mt.PathLength() && bytes.Equal(o.RootHash(), mt.RootHash())
 }
 
+// DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
+func (mt *MTrie) DumpAsJSON(w io.Writer) error {
+
+	// Use encoder to prevent building entire trie in memory
+	enc := json.NewEncoder(w)
+
+	err := mt.dumpAsJSON(mt.root, enc)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
+	if n.IsLeaf() {
+		err := encoder.Encode(n.Payload())
+		if err != nil {
+			return err
+		}
+	}
+
+	if lChild := n.LeftChild(); lChild != nil {
+		err := mt.dumpAsJSON(lChild, encoder)
+		if err != nil {
+			return err
+		}
+	}
+
+	if rChild := n.RightChild(); rChild != nil {
+		err := mt.dumpAsJSON(rChild, encoder)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]
 func EmptyTrieRootHash(pathByteSize int) []byte {
 	return node.NewEmptyTreeRoot(8 * pathByteSize).Hash()
+}
+
+// AllPayloads returns all payloads
+func (mt *MTrie) AllPayloads() []ledger.Payload {
+	return mt.root.AllPayloads()
+}
+
+// IsAValidTrie verifies the content of the trie for potential issues
+func (mt *MTrie) IsAValidTrie() bool {
+	// TODO add checks on the health of node max height ...
+	return mt.root.VerifyCachedHash()
 }

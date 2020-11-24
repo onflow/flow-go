@@ -19,22 +19,23 @@ int get_sk_len() {
     return SK_LEN;
 }
 
-// checks an input scalar is less than the groups order (r)
+// checks an input scalar a satisfies 0 < a < r
+// where (r) is the order of G1/G2
 int check_membership_Zr(const bn_t a){
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
-    int res = bn_cmp(a,r);
-    if (res == RLC_LT) return VALID;
-    return INVALID;
+    if (bn_cmp(a,r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) 
+        return INVALID; 
+    return VALID;
 }
 
 // checks if input point s is on the curve E1
 // and is in the subgroup G1
-static int check_membership_G1(const ep_t p){
+int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
-    if (!ep_is_valid(p))
+    if (!ep_on_curve(p))
         return INVALID;
     // check p is in G1
     #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
@@ -55,8 +56,10 @@ static int check_membership_G1(const ep_t p){
 // TODO: switch to the faster Bowe check 
 int check_membership_G2(const ep2_t p){
 #if MEMBERSHIP_CHECK
-    // check p is on curve
-    if (!ep2_is_valid((ep2_st*)p))
+    // check p is on curve and is non-identity
+    if (!ep2_on_curve((ep2_st*)p) || ep2_is_infty((ep2_st*)p))
+        return INVALID;
+    if (ep2_is_infty((ep2_st*)p))
         return INVALID;
     // check p is in G2
     #if MEMBERSHIP_CHECK_G2 == EXP_ORDER
@@ -108,7 +111,7 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
     ep2_new(&elemsG2[0]);
-    ep2_neg(elemsG2[0], &core_get()->ep2_g); // could be hardcoded 
+    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
 
     fp12_t pair;
     fp12_new(&pair);
@@ -121,7 +124,7 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
 #elif SINGLE_PAIRING   
     fp12_t pair1, pair2;
     fp12_new(&pair1); fp12_new(&pair2);
-    pp_map_oatep_k12(pair1, elemsG1[0], &core_get()->ep2_g);
+    pp_map_oatep_k12(pair1, elemsG1[0], core_get()->ep2_g);
     pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
 
     int res = fp12_cmp(pair1, pair2);
@@ -169,7 +172,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
 
     // elemsG2[0] = -g2
     ep2_new(&elemsG2[0]);
-    ep2_neg(elemsG2[0], &core_get()->ep2_g); // could be hardcoded 
+    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
 
     // map all hashes to G1
     int offset = 0;
@@ -244,7 +247,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
 
     // elemsG2[0] = -g2
     ep2_new(&elemsG2[0]);
-    ep2_neg(elemsG2[0], &core_get()->ep2_g); // could be hardcoded 
+    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
 
     // set the public keys
     for (int i=1; i < nb_pks+1; i++) {
@@ -352,7 +355,7 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
     t->left = build_tree(left_len, &pks[0], &sigs[0]);
     t->right = build_tree(right_len, &pks[left_len], &sigs[left_len]);
     // sum the children
-    ep_add_projc(t->sig, t->left->sig, t->right->sig);
+    ep_add_jacob(t->sig, t->left->sig, t->right->sig);
     ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
     return t;
 }

@@ -46,53 +46,34 @@ func TestPRGseeding(t *testing.T) {
 	assert.True(t, sk1.Equals(&sk2), "private keys should be equal")
 }
 
-// TestG1 helps debugging but is not a unit test
-func TestG1(t *testing.T) {
+// G1 and G2 scalar multiplication
+func BenchmarkScalarMult(b *testing.B) {
 	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
 	seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
-	var res pointG1
-	genScalarMultG1(&res, &expo)
 
-}
+	// G1 bench
+	b.Run("G1", func(b *testing.B) {
+		var res pointG1
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			genScalarMultG1(&res, &expo)
+		}
+		b.StopTimer()
+	})
 
-// G1 bench
-func BenchmarkG1(b *testing.B) {
-	blsInstance.reInit()
-	seed := make([]byte, securityBits/8)
-	rand.Read(seed)
-	seedRelic(seed)
-	var expo scalar
-	randZr(&expo)
-	var res pointG1
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		genScalarMultG1(&res, &expo)
-	}
-	b.StopTimer()
-	return
-}
-
-// G2 bench
-func BenchmarkG2(b *testing.B) {
-	blsInstance.reInit()
-	seed := make([]byte, securityBits/8)
-	rand.Read(seed)
-	seedRelic(seed)
-	var expo scalar
-	randZr(&expo)
-	var res pointG2
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		genScalarMultG2(&res, &expo)
-	}
-	b.StopTimer()
-	return
+	// G2 bench
+	b.Run("G2", func(b *testing.B) {
+		var res pointG2
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			genScalarMultG2(&res, &expo)
+		}
+		b.StopTimer()
+	})
 }
 
 // Hashing to G1 bench
@@ -123,10 +104,10 @@ func TestOpSwuHashToG1(t *testing.T) {
 		"027c48089c1c93756b0820f7cec9fcd7d5c31c7c47825eb5e9d90ed9d82fdd31b4aeca2b94d48033a260aa4e0651820e",
 	}
 	expected := []string{
-		"8cb46e12d85fc2f7ac9dbb68c3d62d206a2f0a90d85d25c13e3c6fdf8f0b44096c3ba3ecdcd57d95c5ad0727d6025188",
+		"acb46e12d85fc2f7ac9dbb68c3d62d206a2f0a90d85d25c13e3c6fdf8f0b44096c3ba3ecdcd57d95c5ad0727d6025188",
 		"b6251e8d37663a78eed9ad6f1a0eb1915733a74acc2e1b4428d63aa78b765786f3ff56f6abace6ae88494f138acf8eca",
 		"accd59ffa4cbe6d721d4b4a41c8f12d7d8a9e2bd60e218471c45d6c340feb2b1e193932c4169945f40dc214a9e1766fe",
-		"a21671a9cbbbf73c429d32bf9a07b64141118a00301d8a1a07de587818d788b37ed0b568c6ede80bd31426bafc142981",
+		"821671a9cbbbf73c429d32bf9a07b64141118a00301d8a1a07de587818d788b37ed0b568c6ede80bd31426bafc142981",
 	}
 
 	output := make([]byte, SignatureLenBLSBLS12381)
@@ -146,19 +127,23 @@ func TestSubgroupCheckG1(t *testing.T) {
 	rand.Read(seed)
 	seedRelic(seed)
 
-	simple := 0
-	bowe := 1
 	// tests for simple membership check
-	check := checkG1Test(1, simple) // point in G1
-	assert.True(t, check)
-	check = checkG1Test(0, simple) // point in E1\G1
-	assert.False(t, check)
+	t.Run("simple check", func(t *testing.T) {
+		simple := 0
+		check := checkG1Test(1, simple) // point in G1
+		assert.True(t, check)
+		check = checkG1Test(0, simple) // point in E1\G1
+		assert.False(t, check)
+	})
 
 	// tests for Bowe membership check
-	check = checkG1Test(1, bowe) // point in G1
-	assert.True(t, check)
-	check = checkG1Test(0, bowe) // point in E1\G1
-	assert.False(t, check)
+	t.Run("bowe check", func(t *testing.T) {
+		bowe := 1
+		check := checkG1Test(1, bowe) // point in G1
+		assert.True(t, check)
+		check = checkG1Test(0, bowe) // point in E1\G1
+		assert.False(t, check)
+	})
 }
 
 // G1 membership check bench

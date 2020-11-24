@@ -15,16 +15,19 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+
+	"github.com/onflow/flow-go-sdk/crypto"
 )
 
 var _ runtime.Interface = &hostEnv{}
 var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
-	ctx           Context
-	ledger        state.Ledger
-	accounts      *state.Accounts
-	uuidGenerator *UUIDGenerator
+	ctx              Context
+	ledger           state.Ledger
+	accounts         *state.Accounts
+	addressGenerator flow.AddressGenerator
+	uuidGenerator    *UUIDGenerator
 
 	runtime.Metrics
 
@@ -35,18 +38,31 @@ type hostEnv struct {
 	rng            *rand.Rand
 }
 
-func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
-	accounts := state.NewAccounts(ledger, ctx.Chain)
+func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
+	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
+	if err != nil {
+		panic(fmt.Errorf("cannot create hasher: %w", err))
+	}
+	return hasher.ComputeHash(data)
+}
+
+func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
+	accounts := state.NewAccounts(ledger)
+	generator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+	if err != nil {
+		return nil, err
+	}
 
 	uuids := state.NewUUIDs(ledger)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{
-		ctx:           ctx,
-		ledger:        ledger,
-		Metrics:       &noopMetricsCollector{},
-		accounts:      accounts,
-		uuidGenerator: uuidGenerator,
+		ctx:              ctx,
+		ledger:           ledger,
+		Metrics:          &noopMetricsCollector{},
+		accounts:         accounts,
+		addressGenerator: generator,
+		uuidGenerator:    uuidGenerator,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -57,7 +73,7 @@ func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
 		env.Metrics = &metricsCollector{ctx.Metrics}
 	}
 
-	return env
+	return env, nil
 }
 
 func (e *hostEnv) seedRNG(header *flow.Header) {
@@ -74,6 +90,7 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
 		e.ctx,
 		e.ledger,
 		e.accounts,
+		e.addressGenerator,
 		tx,
 	)
 }
@@ -115,23 +132,81 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	return len(v) > 0, nil
 }
 
-func (e *hostEnv) ResolveImport(location runtime.Location) ([]byte, error) {
-	addressLocation, ok := location.(runtime.AddressLocation)
+func (e *hostEnv) ResolveLocation(
+	identifiers []runtime.Identifier,
+	location runtime.Location,
+) []runtime.ResolvedLocation {
+
+	addressLocation, isAddress := location.(runtime.AddressLocation)
+
+	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
+	// then return a single resolved location which declares all identifiers.
+
+	if !isAddress {
+		return []runtime.ResolvedLocation{
+			{
+				Location:    location,
+				Identifiers: identifiers,
+			},
+		}
+	}
+
+	// if the location is an address,
+	// and no specific identifiers where requested in the import statement,
+	// then fetch all identifiers at this address
+
+	if len(identifiers) == 0 {
+		address := flow.Address(addressLocation.Address)
+		contractNames, err := e.accounts.GetContractNames(address)
+		if err != nil {
+			panic(err)
+		}
+
+		// if there are no contractNames deployed,
+		// then return no resolved locations
+
+		if len(contractNames) == 0 {
+			return nil
+		}
+
+		identifiers = make([]ast.Identifier, len(contractNames))
+
+		for i := range identifiers {
+			identifiers[i] = runtime.Identifier{
+				Identifier: contractNames[i],
+			}
+		}
+	}
+
+	// return one resolved location per identifier.
+	// each resolved location is an address contract location
+
+	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
+	for i := range resolvedLocations {
+		identifier := identifiers[i]
+		resolvedLocations[i] = runtime.ResolvedLocation{
+			Location: runtime.AddressLocation{
+				Address: addressLocation.Address,
+				Name:    identifier.Identifier,
+			},
+			Identifiers: []runtime.Identifier{identifier},
+		}
+	}
+
+	return resolvedLocations
+}
+
+func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
+	contractLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
-		return nil, nil
+		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
 
-	address := flow.BytesToAddress(addressLocation)
+	address := flow.BytesToAddress(contractLocation.Address.Bytes())
 
-	code, err := e.accounts.GetCode(address)
+	code, err := e.accounts.GetContract(contractLocation.Name, address)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, err
-	}
-
-	if code == nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("no code deployed at address %s", address)
 	}
 
 	return code, nil
@@ -147,8 +222,7 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
 		if addressLocation, ok := location.(runtime.AddressLocation); ok {
-			address := flow.BytesToAddress(addressLocation)
-			e.accounts.TouchCode(address)
+			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
 		}
 	}
 
@@ -321,13 +395,53 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 	return e.transactionEnv.RemoveAccountKey(address, index)
 }
 
-func (e *hostEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
+func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	if e.transactionEnv == nil {
-		panic("UpdateAccountCode is not supported by this environment")
+		panic("UpdateAccountContractCode is not supported by this environment")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.UpdateAccountCode(address, code)
+	return e.transactionEnv.UpdateAccountContractCode(address, name, code)
+}
+
+func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
+	return e.GetCode(runtime.AddressLocation{
+		Address: address,
+		Name:    name,
+	})
+}
+
+func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+	if e.transactionEnv == nil {
+		panic("RemoveAccountContractCode is not supported by this environment")
+	}
+
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.transactionEnv.RemoveAccountContractCode(address, name)
+}
+
+func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
+	accountAddress := flow.Address(address)
+
+	// must be signed by the service account
+	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return fmt.Errorf("code deployment requires authorization from the service account")
+	}
+
+	return e.accounts.SetContract(name, accountAddress, code)
+}
+
+func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+	accountAddress := flow.Address(address)
+
+	// must be signed by the service account
+	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return fmt.Errorf("code deployment requires authorization from the service account")
+	}
+
+	return e.accounts.DeleteContract(name, accountAddress)
 }
 
 func (e *hostEnv) GetSigningAccounts() []runtime.Address {
@@ -341,10 +455,11 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 // Transaction Environment
 
 type transactionEnv struct {
-	vm       *VirtualMachine
-	ctx      Context
-	ledger   state.Ledger
-	accounts *state.Accounts
+	vm               *VirtualMachine
+	ctx              Context
+	ledger           state.Ledger
+	accounts         *state.Accounts
+	addressGenerator flow.AddressGenerator
 
 	tx          *flow.TransactionBody
 	authorizers []runtime.Address
@@ -355,14 +470,16 @@ func newTransactionEnv(
 	ctx Context,
 	ledger state.Ledger,
 	accounts *state.Accounts,
+	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
 ) *transactionEnv {
 	return &transactionEnv{
-		vm:       vm,
-		ctx:      ctx,
-		ledger:   ledger,
-		accounts: accounts,
-		tx:       tx,
+		vm:               vm,
+		ctx:              ctx,
+		ledger:           ledger,
+		accounts:         accounts,
+		addressGenerator: addressGenerator,
+		tx:               tx,
 	}
 }
 
@@ -399,9 +516,12 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		}
 	}
 
-	var flowAddress flow.Address
+	flowAddress, err := e.addressGenerator.NextAddress()
+	if err != nil {
+		return address, err
+	}
 
-	flowAddress, err = e.accounts.Create(nil)
+	err = e.accounts.Create(nil, flowAddress)
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return address, err
@@ -499,29 +619,11 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	return encodedPublicKey, nil
 }
 
-// UpdateAccountCode updates the deployed code on an existing account.
-//
-// This function returns an error if the specified account does not exist or is
-// not a valid signing account.
-func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
-	accountAddress := flow.Address(address)
-
-	// currently, every transaction that sets account code (deploys/updates contracts)
-	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("code deployment requires authorization from the service account")
-	}
-
-	return e.accounts.SetCode(accountAddress, code)
-}
-
 func (e *transactionEnv) isAuthorizer(address runtime.Address) bool {
 	for _, accountAddress := range e.GetSigningAccounts() {
 		if accountAddress == address {
 			return true
 		}
 	}
-
 	return false
 }

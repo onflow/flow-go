@@ -24,6 +24,7 @@ type BootstrapProcedure struct {
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
 	initialTokenSupply      cadence.UFix64
+	addressGenerator        flow.AddressGenerator
 }
 
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
@@ -44,8 +45,12 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 	b.ledger = ledger
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(ledger, ctx.Chain)
-	b.accounts.InitAddressGeneratorState()
+	b.accounts = state.NewAccounts(ledger)
+	addressGenerator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create address generator: %s", err.Error()))
+	}
+	b.addressGenerator = addressGenerator
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
@@ -63,7 +68,12 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := b.accounts.Create(nil)
+	address, err := b.addressGenerator.NextAddress()
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate address: %s", err))
+	}
+
+	err = b.accounts.Create(nil, address)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -72,7 +82,12 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := b.accounts.Create([]flow.AccountPublicKey{accountKey})
+	address, err := b.addressGenerator.NextAddress()
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate address: %s", err))
+	}
+
+	err = b.accounts.Create([]flow.AccountPublicKey{accountKey}, address)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
@@ -85,7 +100,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(fungibleToken, contracts.FungibleToken()),
+		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
 		b.ledger,
 	)
 	if err != nil {
@@ -141,7 +156,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract),
+		deployContractTransaction(service, contract, "FlowServiceAccount"),
 		b.ledger,
 	)
 	if err != nil {
@@ -166,7 +181,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 const deployContractTransactionTemplate = `
 transaction {
   prepare(signer: AuthAccount) {
-    signer.setCode("%s".decodeHex())
+    signer.contracts.add(name: "%s", code: "%s".decodeHex())
   }
 }
 `
@@ -175,7 +190,7 @@ const deployFlowTokenTransactionTemplate = `
 transaction {
   prepare(flowTokenAccount: AuthAccount, serviceAccount: AuthAccount) {
     let adminAccount = serviceAccount
-    flowTokenAccount.setCode("%s".decodeHex(), adminAccount)
+    flowTokenAccount.contracts.add(name: "FlowToken", code: "%s".decodeHex(), adminAccount: adminAccount)
   }
 }
 `
@@ -184,7 +199,7 @@ const deployFlowFeesTransactionTemplate = `
 transaction {
   prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
     let adminAccount = serviceAccount
-    flowFeesAccount.setCode("%s".decodeHex(), adminAccount)
+    flowFeesAccount.contracts.add(name: "FlowFees", code: "%s".decodeHex(), adminAccount: adminAccount)
   }
 }
 `
@@ -220,10 +235,10 @@ transaction(amount: UFix64) {
 }
 `
 
-func deployContractTransaction(address flow.Address, contract []byte) *TransactionProcedure {
+func deployContractTransaction(address flow.Address, contract []byte, contractName string) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, hex.EncodeToString(contract)))).
+			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, contractName, hex.EncodeToString(contract)))).
 			AddAuthorizer(address),
 	)
 }
