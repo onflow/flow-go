@@ -25,7 +25,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
-	execCtx := fvm.NewContext(fvm.WithChain(chain))
+	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
