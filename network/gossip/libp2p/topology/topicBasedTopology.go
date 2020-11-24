@@ -89,10 +89,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 
 		topicFanout, err := t.subsetChannel(ids, shouldHave, myChannel)
 		if err != nil {
-			t.logger.Warn().
-				Err(err).
-				Str("channel_id", myChannel).
-				Msg("skips handling fanout for channel")
+			return nil, fmt.Errorf("could not generate fanout for topic %s: %w", myChannel, err)
 		}
 		myFanout = myFanout.Union(topicFanout)
 	}
@@ -150,7 +147,7 @@ func (t TopicBasedTopology) subsetRole(ids flow.IdentityList, shouldHave flow.Id
 func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHave flow.IdentityList) (flow.IdentityList, error) {
 
 	if len(all) == 0 {
-		t.logger.Warn().Msg("skips sampling connected graph with zero nodes")
+		t.logger.Debug().Msg("skips sampling connected graph with zero nodes")
 		return flow.IdentityList{}, nil
 	}
 
