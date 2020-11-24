@@ -45,7 +45,7 @@ func (c *ContainerConfig) ImageName() string {
 	if c.Ghost {
 		return defaultRegistry + "/ghost:latest"
 	}
-	return fmt.Sprintf(defaultRegistry+"/%s:latest", c.Role.String())
+	return fmt.Sprintf("%s/%s:latest", defaultRegistry, c.Role.String())
 }
 
 // Container represents a test Docker container for a generic Flow node.
