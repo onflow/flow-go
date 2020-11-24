@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -64,13 +65,11 @@ func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error
 }
 
 func appendKeyForAccount(accounts *state.Accounts, addressInHex string, encodedKeyInHex string) error {
-	// fungible token
-	add := flow.HexToAddress(addressInHex)
-	ok, err := accounts.Exists(add)
+	address := flow.HexToAddress(addressInHex)
+	ok, err := accounts.Exists(address)
 	if err != nil {
 		return err
 	}
-	// Core Contracts
 	if ok {
 		accountKeyBytes, err := hex.DecodeString(encodedKeyInHex)
 		if err != nil {
@@ -80,10 +79,13 @@ func appendKeyForAccount(accounts *state.Accounts, addressInHex string, encodedK
 		if err != nil {
 			return err
 		}
-		err = accounts.AppendPublicKey(add, accountKey)
+		err = accounts.AppendPublicKey(address, accountKey)
 		if err != nil {
 			return err
 		}
+	} else {
+		// if not exist log and return gracefully
+		fmt.Println("warning account does not exist: ", addressInHex)
 	}
 	return nil
 }
