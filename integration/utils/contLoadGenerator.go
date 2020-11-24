@@ -373,7 +373,11 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 		SetScript(addKeysScript).
 		AddAuthorizer(*acc.address).
 		SetReferenceBlockID(blockRef).
-		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
+		SetProposalKey(
+			*lg.serviceAccount.address,
+			lg.serviceAccount.accountKey.Index,
+			lg.serviceAccount.accountKey.SequenceNumber,
+		).
 		SetPayer(*lg.serviceAccount.address)
 
 	err = addKeysTx.AddArgument(cadenceKeysArray)
