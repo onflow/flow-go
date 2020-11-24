@@ -146,7 +146,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
 	PeerUpdateInterval = 5 * time.Millisecond
-	unittest.RequireClosesBefore(suite.T(), pm.Ready(), 2*time.Second)
+	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*PeerUpdateInterval,
 		"ConnectPeers is not running on UpdateIntervals")
@@ -182,7 +182,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
 
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
-	unittest.RequireClosesBefore(suite.T(), pm.Ready(), 2*time.Second)
+	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
 		"ConnectPeers is not running on startup")
@@ -221,19 +221,24 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// start the peer manager
 	// this should trigger the first update and which will block on the ConnectPeers to return
-	unittest.RequireClosesBefore(suite.T(), pm.Ready(), 2*time.Second)
+	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
+
+	// assert that the first update started
+	assert.Eventually(suite.T(), func() bool {
+		return connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 1)
+	}, 3*time.Second, 100*time.Millisecond)
 
 	// makes 10 concurrent request for peer update
 	unittest.RequireConcurrentCallsReturnBefore(suite.T(), pm.RequestPeerUpdate, 10, time.Second,
 		"concurrent peer update requests could not return on time")
 
-	// allow the first (periodic/on-demand) and the second (on-demand) update to finish
+	// allow the first periodic update (which should be currently blocked) to finish
 	connectPeerGate <- time.Now()
 
-	// requires two calls to ConnectPeers were made
+	// assert that only two calls to ConnectPeers were made (one by the periodic update and one by the on-demand update)
 	assert.Eventually(suite.T(), func() bool {
 		return connector.AssertNumberOfCalls(suite.T(), "ConnectPeers", 2)
-	}, 3*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 100*time.Millisecond)
 }
 
 // assertListsEqual asserts that two identity list are equal ignoring the order

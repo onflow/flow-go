@@ -38,7 +38,7 @@ func (s *ChunkVerifierTestSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	vm := new(vmMock)
-	vmCtx := fvm.NewContext()
+	vmCtx := fvm.NewContext(zerolog.Nop())
 
 	s.verifier = chunks.NewChunkVerifier(vm, vmCtx)
 }
@@ -194,7 +194,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	metricsCollector := &metrics.NoopCollector{}
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, _ := completeLedger.NewLedger(dbDir, 1000, metricsCollector, zerolog.Nop(), nil)
+		f, _ := completeLedger.NewLedger(dbDir, 1000, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
 
 		keys := executionState.RegisterIDSToKeys(ids)
 		update, err := ledger.NewUpdate(
