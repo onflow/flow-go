@@ -5,10 +5,9 @@
 package mocks
 
 import (
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
 	flow "github.com/onflow/flow-go/model/flow"
+	reflect "reflect"
 )
 
 // MockEngine is a mock of Engine interface
