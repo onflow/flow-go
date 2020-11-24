@@ -28,8 +28,9 @@ const (
 	errCodeExecution = 100
 )
 
-var ErrAccountNotFound = errors.New("account not found")
-var ErrInvalidHashAlgorithm = errors.New("invalid hash algorithm")
+const (
+	failureCodeLedger = 1000
+)
 
 // An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
 //
@@ -41,6 +42,14 @@ type Error interface {
 	Code() uint32
 	Error() string
 }
+
+type Failure interface {
+	FailureCode()
+	Error()
+}
+
+var ErrAccountNotFound = errors.New("account not found")
+var ErrInvalidHashAlgorithm = errors.New("invalid hash algorithm")
 
 // A MissingSignatureError indicates that a transaction is missing a required signature.
 type MissingSignatureError struct {
