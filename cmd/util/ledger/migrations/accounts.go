@@ -40,12 +40,6 @@ func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error
 		return nil, err
 	}
 
-	// Testnet Staking
-	err = appendKeyForAccount(a, "9eca2b38b18b5dfe", coreContractEncodedKey)
-	if err != nil {
-		return nil, err
-	}
-
 	nonCoreContractEncodedKey := "f847b840a272d78cfa14eb248d95c12da8c6a24db9fda5ceddc07444080b49ef6cd15a06e88223af8acd235e2ff7a627adb81cf37d0a1384d9985de4bc7a7fc7eb86848402038203e8"
 
 	// Testnet StakingProxy
