@@ -89,7 +89,10 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 
 		topicFanout, err := t.subsetChannel(ids, shouldHave, myChannel)
 		if err != nil {
-			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", myChannel, err)
+			t.logger.Warn().
+				Err(err).
+				Str("channel_id", myChannel).
+				Msg("skips handling fanout for channel")
 		}
 		myFanout = myFanout.Union(topicFanout)
 	}
