@@ -27,7 +27,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	filePath := path.Join(outputDir, "root.checkpoint")
 
 	newState, err := led.ExportCheckpointAt(targetHash,
-		[]ledger.Migration{migrations.NoOpMigration},
+		[]ledger.Migration{migrations.MultipleContractMigration},
 		[]ledger.Reporter{},
 		complete.DefaultPathFinderVersion,
 		filePath)
@@ -35,6 +35,11 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
 	}
 
-	log.Info().Msg("New state commitment for the exported state is :" + newState.String() + "(base64: " + newState.Base64() + " )")
+	log.Info().Msgf(
+		"New state commitment for the exported state is: %s (base64: %s)",
+		newState.String(),
+		newState.Base64(),
+	)
+
 	return nil
 }

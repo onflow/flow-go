@@ -75,7 +75,9 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		initialFinalizedSC = r1finalState
 	}
 
-	currentHeight := b1.Header.Height + 1
+	initFinalizedheight := b1.Header.Height
+	currentHeight := initFinalizedheight + 1
+
 	currentID := b1.Header.ID()
 	var b2 *messages.BlockProposal
 	var r2 *flow.ExecutionReceipt
@@ -98,7 +100,9 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		return true
 	}, receiptStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive an execution receipt with a different state commitment from %x within %v seconds,"+
+			" initial finalized height: %v "+
 			" last block checked height %v, last block checked ID %x", initialFinalizedSC, receiptStateTimeout,
+			initFinalizedheight,
 			currentHeight, currentID))
 
 	return b2, r2
