@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p"
 	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p/mock"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const testChannel = "test-channel"
@@ -46,14 +45,10 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	golog.SetAllLoggers(golog.LevelError)
 
 	m.size = 2 // operates on two middlewares
-
 	m.metrics = metrics.NewNoopCollector()
-
 	// create and start the middlewares
-	var err error
-	// both nodes should be of the same role to get connected on epidemic dissemination
-	m.ids, m.mws = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger, unittest.WithRole(flow.RoleConsensus))
-	require.NoError(m.T(), err)
+	m.ids, m.mws = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
 
