@@ -120,13 +120,15 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 }
 
 type Validator struct {
-	state    *State
+	state    protocol.State
+	index    storage.Index
 	verifier module.Verifier
 }
 
-func NewReceiptValidator(state *State) *Validator {
+func NewReceiptValidator(state protocol.State, index storage.Index) *Validator {
 	rv := &Validator{
 		state:    state,
+		index:    index,
 		verifier: signature.NewAggregationVerifier(encoding.ExecutionReceiptTag),
 	}
 
@@ -158,9 +160,9 @@ func (v *Validator) ensureStakedNodeWithRole(nodeID flow.Identifier, identity *f
 	return nil
 }
 
-func (v *Validator) identityForNode(block *flow.Header, nodeID flow.Identifier) (*flow.Identity, error) {
+func (v *Validator) identityForNode(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	// get the identity of the origin node
-	identity, err := v.state.AtBlockID(block.ID()).Identity(nodeID)
+	identity, err := v.state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
 			return nil, engine.NewInvalidInputErrorf("unknown node identity: %w", err)
@@ -204,7 +206,7 @@ func (v *Validator) verifyChunksFormat(result *flow.ExecutionResult) error {
 	// approved
 	requiredChunks := 1 // system chunk: must exist for block's ExecutionResult, even if block payload itself is empty
 
-	index, err := v.state.index.ByBlockID(result.BlockID)
+	index, err := v.index.ByBlockID(result.BlockID)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return err
@@ -222,12 +224,7 @@ func (v *Validator) verifyChunksFormat(result *flow.ExecutionResult) error {
 }
 
 func (v *Validator) Validate(receipt *flow.ExecutionReceipt) error {
-	head, err := v.state.headers.ByBlockID(receipt.ExecutionResult.BlockID)
-	if err != nil {
-		return err
-	}
-
-	identity, err := v.identityForNode(head, receipt.ExecutorID)
+	identity, err := v.identityForNode(receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 
 	err = v.ensureStakedNodeWithRole(receipt.ExecutorID, identity, flow.RoleExecution)
 	if err != nil {
