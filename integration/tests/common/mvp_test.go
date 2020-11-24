@@ -92,7 +92,15 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	serviceAddress := sdk.Address(serviceAccountClient.Chain.ServiceAddress())
 
 	// Generate the account creation transaction
-	createAccountTx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, []byte(CounterContract.ToCadence()), serviceAddress).
+	createAccountTx := templates.CreateAccount(
+		[]*sdk.AccountKey{accountKey},
+		[]templates.Contract{
+			{
+				Name:   CounterContract.Name,
+				Source: CounterContract.ToCadence(),
+			},
+		},
+		serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(root.ID())).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress)
