@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
@@ -186,11 +188,15 @@ func TestTopShotSafety(t *testing.T) {
 			}
 		`
 
-		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "code", []byte(topShotCode))
+		encodedName, err := encodeContractNames([]string{"TopShot"})
+		require.NoError(t, err)
+
+		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "contract_names", encodedName)
+		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "code.TopShot", []byte(topShotCode))
 
 		context := NewContext(log)
 
-		err := txInvocator.Process(vm, context, proc, ledger)
+		err = txInvocator.Process(vm, context, proc, ledger)
 		require.Error(t, err)
 
 		expected := addressToSpewBytesString(topShotContractAddress)
@@ -198,6 +204,17 @@ func TestTopShotSafety(t *testing.T) {
 		require.Contains(t, buffer.String(), expected)
 	})
 
+}
+
+func encodeContractNames(contractNames []string) ([]byte, error) {
+	sort.Strings(contractNames)
+	var buf bytes.Buffer
+	cborEncoder := cbor.NewEncoder(&buf)
+	err := cborEncoder.Encode(contractNames)
+	if err != nil {
+		return nil, fmt.Errorf("cannot encode contract names")
+	}
+	return buf.Bytes(), nil
 }
 
 func addressToSpewBytesString(topShotContractAddress flow.Address) string {
