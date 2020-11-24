@@ -1,10 +1,17 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
@@ -107,6 +114,134 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	// make sure that there is no extra data
 	if len(participants) != len(commit.DKGParticipants) {
 		return fmt.Errorf("DKG data contains extra entries")
+	}
+
+	return nil
+}
+
+type Validator struct {
+	state    *State
+	verifier module.Verifier
+}
+
+func NewReceiptValidator(state *State) *Validator {
+	rv := &Validator{
+		state:    state,
+		verifier: signature.NewAggregationVerifier(encoding.ExecutionReceiptTag),
+	}
+
+	return rv
+}
+
+// checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
+//   * is an authorized member of the network
+//   * has _positive_ weight
+//   * and has the expected role
+// Returns the following errors:
+//   * sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
+//   * generic error indicating a fatal internal bug
+// Note: the method receives the block header as proof of its existence.
+// Therefore, we consider the case where the respective block is unknown to the
+// protocol state as a symptom of a fatal implementation bug.
+func (v *Validator) ensureStakedNodeWithRole(nodeID flow.Identifier, identity *flow.Identity, expectedRole flow.Role) error {
+
+	// check that the origin is a verification node
+	if identity.Role != expectedRole {
+		return engine.NewInvalidInputErrorf("expected node %x to have identity %s but got %s", nodeID, expectedRole, identity.Role)
+	}
+
+	// check if the identity has a stake
+	if identity.Stake == 0 {
+		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
+	}
+
+	return nil
+}
+
+func (v *Validator) identityForNode(block *flow.Header, nodeID flow.Identifier) (*flow.Identity, error) {
+	// get the identity of the origin node
+	identity, err := v.state.AtBlockID(block.ID()).Identity(nodeID)
+	if err != nil {
+		if protocol.IsIdentityNotFound(err) {
+			return nil, engine.NewInvalidInputErrorf("unknown node identity: %w", err)
+		}
+		// unexpected exception
+		return nil, fmt.Errorf("failed to retrieve node identity: %w", err)
+	}
+
+	return identity, nil
+}
+
+func (v *Validator) verifySignature(receipt *flow.ExecutionReceipt, nodeIdentity *flow.Identity) error {
+	id := receipt.ID()
+	valid, err := v.verifier.Verify(id[:], receipt.ExecutorSignature, nodeIdentity.StakingPubKey)
+	if err != nil {
+		return fmt.Errorf("failed to verify signature: %w", err)
+	}
+
+	if !valid {
+		return engine.NewInvalidInputErrorf("Invalid signature for (%x)", nodeIdentity.NodeID)
+	}
+
+	return nil
+}
+
+func (v *Validator) verifyChunksFormat(result *flow.ExecutionResult) error {
+	for index, chunk := range result.Chunks.Items() {
+		if uint(index) != chunk.CollectionIndex {
+			return fmt.Errorf("invalid CollectionIndex, expected %d got %d", index, chunk.CollectionIndex)
+		}
+
+		if chunk.BlockID != result.BlockID {
+			return fmt.Errorf("invalid blockID, expected %s got %s", result.BlockID, chunk.BlockID)
+		}
+	}
+
+	// we create one chunk per collection, plus the
+	// system chunk. so we can check if the chunk number matches with the
+	// number of guarantees plus one; this will ensure the execution receipt
+	// cannot lie about having less chunks and having the remaining ones
+	// approved
+	requiredChunks := 1 // system chunk: must exist for block's ExecutionResult, even if block payload itself is empty
+
+	index, err := v.state.index.ByBlockID(result.BlockID)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return err
+		}
+		// reaching this line means the block is empty, i.e. it has no payload => we expect only the system chunk
+	} else {
+		requiredChunks += len(index.CollectionIDs)
+	}
+
+	if result.Chunks.Len() != requiredChunks {
+		return fmt.Errorf("invalid number of chunks, expected %d got %d", requiredChunks, result.Chunks.Len())
+	}
+
+	return nil
+}
+
+func (v *Validator) Validate(receipt *flow.ExecutionReceipt) error {
+	head, err := v.state.headers.ByBlockID(receipt.ExecutionResult.BlockID)
+	if err != nil {
+		return err
+	}
+
+	identity, err := v.identityForNode(head, receipt.ExecutorID)
+
+	err = v.ensureStakedNodeWithRole(receipt.ExecutorID, identity, flow.RoleExecution)
+	if err != nil {
+		return err
+	}
+
+	err = v.verifySignature(receipt, identity)
+	if err != nil {
+		return err
+	}
+
+	err = v.verifyChunksFormat(&receipt.ExecutionResult)
+	if err != nil {
+		return err
 	}
 
 	return nil
