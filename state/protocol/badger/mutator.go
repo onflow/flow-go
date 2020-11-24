@@ -18,6 +18,12 @@ type Mutator struct {
 	state *State
 }
 
+func NewMutator(state *State) *Mutator {
+	return &Mutator{
+		state: state,
+	}
+}
+
 func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
 	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
@@ -413,17 +419,6 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
 
-	// map each seal to the block it is sealing for easy lookup; we will need to
-	// successfully connect _all_ of these seals to the last sealed block for
-	// the payload to be valid
-	byBlock := make(map[flow.Identifier]*flow.Seal)
-	for _, seal := range payload.Seals {
-		byBlock[seal.BlockID] = seal
-	}
-	if len(payload.Seals) != len(byBlock) {
-		return nil, state.NewInvalidExtensionErrorf("multiple seals for the same block")
-	}
-
 	// get the parent's block seal, which constitutes the beginning of the
 	// sealing chain; if no seals are part of the payload, it will also be used
 	// for the candidate block, which remains at the same sealed state
@@ -436,6 +431,17 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	// block as the last sealed block of the given block.
 	if len(payload.Seals) == 0 {
 		return last, nil
+	}
+
+	// map each seal to the block it is sealing for easy lookup; we will need to
+	// successfully connect _all_ of these seals to the last sealed block for
+	// the payload to be valid
+	byBlock := make(map[flow.Identifier]*flow.Seal)
+	for _, seal := range payload.Seals {
+		byBlock[seal.BlockID] = seal
+	}
+	if len(payload.Seals) != len(byBlock) {
+		return nil, state.NewInvalidExtensionErrorf("multiple seals for the same block")
 	}
 
 	// get the last sealed block; we use its height to iterate forwards through
@@ -456,6 +462,11 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
 
+	// incorporatedResults collects the _first_ appearance of unsealed execution
+	// results on the fork, along with the ID of the block in which they are
+	// incorporated.
+	incorporatedResults := make(map[flow.Identifier]*flow.IncorporatedResult)
+
 	// we now go from last sealed height plus one to finalized height and check
 	// if we have the seal for each of them step by step; often we will not even
 	// enter this loop, because last sealed height is higher than finalized
@@ -466,16 +477,35 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		if len(byBlock) == 0 {
 			return last, nil
 		}
+
 		header, err := m.state.headers.ByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block for sealed height (%d): %w", height, err)
 		}
+
 		blockID := header.ID()
 		next, found := byBlock[blockID]
 		if !found {
 			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
 		}
+
 		delete(byBlock, blockID)
+
+		block, err := m.state.blocks.ByID(blockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block %x: %w", blockID, err)
+		}
+
+		// Collect execution results from receipts. We are visiting the blocks
+		// in ascending order, so if the lookup table already contains an entry
+		// for an execution result, we don't need top updated it.
+		for _, receipt := range block.Payload.Receipts {
+			resultID := receipt.ExecutionResult.ID()
+			if _, ok := incorporatedResults[resultID]; !ok {
+				incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, &receipt.ExecutionResult)
+			}
+		}
+
 		last = next
 	}
 	// In case no seals are left, we skip the remaining part:
@@ -504,21 +534,68 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		if len(byBlock) == 0 {
 			return last, nil
 		}
+
 		pendingID := pendingIDs[i]
 		next, found := byBlock[pendingID]
 		if !found {
 			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
 		}
+
 		delete(byBlock, pendingID)
+
+		block, err := m.state.blocks.ByID(pendingID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block %x: %w", pendingID, err)
+		}
+
+		for _, receipt := range block.Payload.Receipts {
+			resultID := receipt.ExecutionResult.ID()
+			if _, ok := incorporatedResults[resultID]; !ok {
+				incorporatedResults[resultID] = flow.NewIncorporatedResult(pendingID, &receipt.ExecutionResult)
+			}
+		}
+
 		last = next
 	}
 
 	// This is just a sanity check; at this point, no seals should be left.
 	if len(byBlock) > 0 {
-		return nil, fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
+		return nil, state.NewInvalidExtensionErrorf("not all seals connected to state (left: %d)", len(byBlock))
+	}
+
+	// If we have made it this far, all the seals in the payload form a valid
+	// chain on top of the last seal. Now we need to check that each seal
+	// corresponds to an ExecutionResult that was incorporated in a block on
+	// this fork, and check the integrity of the seal against the first
+	// appearance of this ExecutionResult.
+
+	for _, seal := range payload.Seals {
+		incorporatedResult, ok := incorporatedResults[seal.ResultID]
+		if !ok {
+			return nil, state.NewInvalidExtensionErrorf("seal %x does not correspond to a result on this fork", seal.ID())
+		}
+
+		valid, err := IsValidSeal(seal, incorporatedResult)
+		if err != nil {
+			return nil, fmt.Errorf("could not check validity of Seal %v: %w", seal.ID(), err)
+		}
+		if !valid {
+			return nil, state.NewInvalidExtensionErrorf("payload includes invalid seal (%x)", seal.ID())
+		}
 	}
 
 	return last, nil
+}
+
+// IsValidSeal checks the crytographic integrity of the seal and checks that
+// the seal has collected enough approval signatures based on the chunk
+// assignment of the corresponding incorporated result.
+func IsValidSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) (bool, error) {
+	// TODO
+	// Check cryptographic integrity
+	// Check the aggregated signatures against set of assigned verifiers
+	// How do we get the ChunkAssigner?
+	return true, nil
 }
 
 // receiptExtend checks the compliance of the receipt payload.
@@ -596,13 +673,13 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 		// if the receipt was already included before, error
 		_, duplicated := lookup[receipt.ID()]
 		if duplicated {
-			return fmt.Errorf("payload includes duplicate receipt (%x)", receipt.ID())
+			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
 		}
 
 		// if the receipt is not for a block on this fork, error
 		header, ok := forkBlocks[receipt.ExecutionResult.BlockID]
 		if !ok {
-			return fmt.Errorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
+			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
 		}
 
 		valid, err := IsValidReceipt(receipt)
@@ -615,7 +692,7 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 
 		// check receipts are sorted by block height
 		if header.Height < prevReceiptHeight {
-			return fmt.Errorf("payload receipts should be sorted by block height")
+			return state.NewInvalidExtensionError("payload receipts should be sorted by block height")
 		}
 
 		prevReceiptHeight = header.Height

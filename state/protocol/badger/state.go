@@ -113,8 +113,5 @@ func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 }
 
 func (s *State) Mutate() protocol.Mutator {
-	m := &Mutator{
-		state: s,
-	}
-	return m
+	return NewMutator(s)
 }
