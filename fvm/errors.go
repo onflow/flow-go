@@ -30,6 +30,7 @@ const (
 
 const (
 	failureCodeLedger = 1000
+	failureCodeLedger
 )
 
 // An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
