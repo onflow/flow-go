@@ -69,3 +69,37 @@ func (r *Role) UnmarshalText(text []byte) error {
 func Roles() []Role {
 	return []Role{RoleCollection, RoleConsensus, RoleExecution, RoleVerification, RoleAccess}
 }
+
+// RoleList defines a slice of roles in flow system.
+type RoleList []Role
+
+// Contains returns true if RoleList contains the role, otherwise false.
+func (r RoleList) Contains(role Role) bool {
+	for _, each := range r {
+		if each == role {
+			return true
+		}
+	}
+	return false
+}
+
+// Union returns a new role list containing every role that occurs in
+// either `r`, or `other`, or both. There are no duplicate roles in the output,
+func (r RoleList) Union(other RoleList) RoleList {
+	// stores the output, the union of the two lists
+	union := make(RoleList, 0, len(r)+len(other))
+
+	// efficient lookup to avoid duplicates
+	added := make(map[Role]struct{})
+
+	// adds all roles, skips duplicates
+	for _, role := range append(r, other...) {
+		if _, exists := added[role]; exists {
+			continue
+		}
+		union = append(union, role)
+		added[role] = struct{}{}
+	}
+
+	return union
+}
