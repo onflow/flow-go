@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -32,7 +33,7 @@ func (m mockRuntime) ExecuteTransaction(script []byte, arguments [][]byte, runti
 	return m.executeTxResult
 }
 
-func (m mockRuntime) ParseAndCheckProgram(code []byte, runtimeInterface runtime.Interface, location runtime.Location) error {
+func (m mockRuntime) ParseAndCheckProgram(code []byte, runtimeInterface runtime.Interface, location runtime.Location) (*sema.Checker, error) {
 	panic("should not be used")
 }
 
@@ -69,8 +70,11 @@ func TestTopShotSafety(t *testing.T) {
 		runtimeError := runtime.Error{
 			Err: sema.CheckerError{
 				Errors: []error{&sema.ImportedProgramError{
-					CheckerError:   &sema.CheckerError{},
-					ImportLocation: ast.AddressLocation([]byte{0, 1, 2}),
+					CheckerError: &sema.CheckerError{},
+					ImportLocation: ast.AddressLocation{
+						Name:    "NotTopshot",
+						Address: common.BytesToAddress([]byte{0, 1, 2}),
+					},
 				}},
 			},
 		}
@@ -88,8 +92,11 @@ func TestTopShotSafety(t *testing.T) {
 		runtimeError := runtime.Error{
 			Err: sema.CheckerError{
 				Errors: []error{&sema.ImportedProgramError{
-					CheckerError:   &sema.CheckerError{},
-					ImportLocation: ast.AddressLocation(topShotContract),
+					CheckerError: &sema.CheckerError{},
+					ImportLocation: ast.AddressLocation{
+						Name:    "Topshot",
+						Address: common.BytesToAddress(topShotContract),
+					},
 				}},
 			},
 		}
@@ -108,8 +115,11 @@ func TestTopShotSafety(t *testing.T) {
 			Err: &runtime.ParsingCheckingError{
 				Err: sema.CheckerError{
 					Errors: []error{&sema.ImportedProgramError{
-						CheckerError:   &sema.CheckerError{},
-						ImportLocation: ast.AddressLocation(topShotContractAddress.Bytes()),
+						CheckerError: &sema.CheckerError{},
+						ImportLocation: ast.AddressLocation{
+							Name:    "TopShot",
+							Address: common.BytesToAddress(topShotContractAddress.Bytes()),
+						},
 					}},
 				},
 				Code:     []byte("tx_code"),

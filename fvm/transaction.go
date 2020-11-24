@@ -117,7 +117,7 @@ func (i *TransactionInvocator) Process(
 // checking failures in this contract indicate the unexpected computation happening.
 // This is a temporary measure.
 func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
-
+	fmt.Println("ERROR", err)
 	e := err.Error()
 	if strings.Contains(e, TopShotContractAddress) && strings.Contains(e, "checking") {
 		re, isRuntime := err.(runtime.Error)
