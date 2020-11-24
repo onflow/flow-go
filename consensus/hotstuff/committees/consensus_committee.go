@@ -3,6 +3,7 @@ package committees
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
@@ -29,9 +30,12 @@ var consensusMemberFilter = filter.And(
 	filter.Not(filter.Ejected),         // must not be ejected
 )
 
+var leadersForEpochNotYetComputedErr = fmt.Errorf("leader selection for epoch not yet computed")
+
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee persists across epochs.
 type Consensus struct {
+	sync.RWMutex
 	state protocol.ReadOnlyState // the protocol state
 	me    flow.Identifier        // the node ID of this node
 	// TODO use uint16 in leader selection impl to halve memory usage
@@ -47,8 +51,10 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 		leaders: make(map[uint64]*epochLeaders),
 	}
 
+	epochs := state.Final().Epochs()
+
 	// pre-compute leader selection for current epoch
-	current := state.Final().Epochs().Current()
+	current := epochs.Current()
 	err := com.prepareLeaderSelection(current)
 	if err != nil {
 		return nil, fmt.Errorf("could not add leader for current epoch: %w", err)
@@ -60,7 +66,7 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 	// epoch into the past, ensuring we are able to not only determine the leader
 	// for block proposals we receive, but also adjudicate consensus-related
 	// challenges up to one epoch into the past.
-	previous := state.Final().Epochs().Previous()
+	previous := epochs.Previous()
 	_, err = previous.Counter()
 	// if there is no previous epoch, return the committee as-is
 	if errors.Is(err, protocol.ErrNoPreviousEpoch) {
@@ -79,39 +85,34 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 }
 
 func (c *Consensus) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	identities, err := c.state.AtBlockID(blockID).Identities(filter.And(
+	return c.state.AtBlockID(blockID).Identities(filter.And(
 		consensusMemberFilter,
 		selector,
 	))
-	return identities, err
 }
 
 func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
-	identities, err := c.Identities(blockID, filter.HasNodeID(nodeID))
+	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get identity (id=%s): %w", nodeID, err)
+		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
-	if len(identities) != 1 {
-		return nil, fmt.Errorf("found invalid number (%d) of identities for node id (%s)", len(identities), nodeID)
+	if !consensusMemberFilter(identity) {
+		return nil, fmt.Errorf("node with ID %x is not a valid consensus committee member at block %x", nodeID, blockID)
 	}
-	return identities[0], nil
+	return identity, nil
 }
 
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
-	// STEP 1 - look for an epoch matching this view for which we have already
-	// pre-computed leader selection. Epochs last ~500k views, so we find the
-	// epoch here 99.99% of the time. Since epochs are long-lived, it is fine
-	// for this to be linear in the number of epochs we have observed.
-	for _, epoch := range c.leaders {
-		if view >= epoch.selection.FirstView() && view <= epoch.selection.FinalView() {
-			index, err := epoch.selection.LeaderIndexForView(view)
-			if err != nil {
-				return flow.ZeroID, fmt.Errorf("could not get leader index for view: %w", err)
-			}
-			return epoch.identities[index].NodeID, nil
-		}
+	// try to retrieve the leader from a pre-computed LeaderSelection
+	id, err := c.precomputedLeaderForView(view)
+	if err == nil {
+		return id, nil
 	}
+	if !errors.Is(err, leadersForEpochNotYetComputedErr) {
+		return flow.ZeroID, err
+	}
+	// we only reach the following code, if we got a leadersForEpochNotYetComputedErr
 
 	// STEP 2 - we haven't yet computed leader selection for an epoch containing
 	// the requested view. We compute leader selection for the current and previous
@@ -138,8 +139,10 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// This assumption is equivalent to assuming that we build at least one
 	// block in every epoch, which is anyway a requirement for valid epochs.
 	//
+	c.Lock()
+	defer c.Unlock()
 	next := c.state.Final().Epochs().Next()
-	err := c.prepareLeaderSelection(next)
+	err = c.prepareLeaderSelection(next)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not compute leader selection for next epoch: %w", err)
 	}
@@ -163,8 +166,31 @@ func (c *Consensus) Self() flow.Identifier {
 }
 
 func (c *Consensus) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
-	dkg, err := c.state.AtBlockID(blockID).Epochs().Current().DKG()
-	return dkg, err
+	return c.state.AtBlockID(blockID).Epochs().Current().DKG()
+}
+
+// precomputedLeaderForView retrieves the leader from the precomputed
+// LeaderSelection in `c.leaders`
+// Error returns:
+//   * leadersForEpochNotYetComputedErr [sentinel error] if there is no Epoch for view stored in `c.leaders`
+//   * unspecific error in case of unexpected problems and bugs
+func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, error) {
+	c.RLock()
+	defer c.RUnlock()
+	// STEP 1 - look for an epoch matching this view for which we have already
+	// pre-computed leader selection. Epochs last ~500k views, so we find the
+	// epoch here 99.99% of the time. Since epochs are long-lived, it is fine
+	// for this to be linear in the number of epochs we have observed.
+	for _, epoch := range c.leaders {
+		if view >= epoch.selection.FirstView() && view <= epoch.selection.FinalView() {
+			index, err := epoch.selection.LeaderIndexForView(view)
+			if err != nil {
+				return flow.ZeroID, fmt.Errorf("could not get leader index for view: %w", err)
+			}
+			return epoch.identities[index].NodeID, nil
+		}
+	}
+	return flow.ZeroID, leadersForEpochNotYetComputedErr
 }
 
 // prepareLeaderSelection pre-computes and stores the leader selection for the
