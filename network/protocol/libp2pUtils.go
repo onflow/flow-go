@@ -1,4 +1,4 @@
-package libp2p
+package protocol
 
 // All utilities for libp2p not natively provided by the library.
 

@@ -1,27 +1,27 @@
-package network
+package protocol
 
 import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/network/middleware"
+	"github.com/onflow/flow-go/network"
 )
 
 // ChannelSubscriptionManager manages the engine to channelID subscription
 type ChannelSubscriptionManager struct {
 	mu      sync.RWMutex
-	engines map[string]Engine
-	mw      middleware.Middleware
+	engines map[string]network.Engine
+	mw      network.Middleware
 }
 
-func NewChannelSubscriptionManager(mw middleware.Middleware) *ChannelSubscriptionManager {
+func NewChannelSubscriptionManager(mw network.Middleware) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
-		engines: make(map[string]Engine),
+		engines: make(map[string]network.Engine),
 		mw:      mw,
 	}
 }
 
-func (sm *ChannelSubscriptionManager) Register(channelID string, engine Engine) error {
+func (sm *ChannelSubscriptionManager) Register(channelID string, engine network.Engine) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -64,7 +64,7 @@ func (sm *ChannelSubscriptionManager) Unregister(channelID string) error {
 	return nil
 }
 
-func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (Engine, error) {
+func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engine, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 

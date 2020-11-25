@@ -1,4 +1,4 @@
-package network
+package protocol
 
 import (
 	"context"
@@ -12,10 +12,9 @@ import (
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/internal"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/middleware"
-	"github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/network/queue"
 	"github.com/onflow/flow-go/network/topology"
 )
@@ -27,17 +26,17 @@ type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 type Network struct {
 	sync.RWMutex
 	logger  zerolog.Logger
-	codec   Codec
+	codec   network.Codec
 	ids     flow.IdentityList
 	me      module.Local
-	mw      middleware.Middleware
+	mw      network.Middleware
 	top     topology.Topology // used to determine fanout connections
 	metrics module.NetworkMetrics
-	rcache  *cache.RcvCache // used to deduplicate incoming messages
+	rcache  *internal.RcvCache // used to deduplicate incoming messages
 	queue   queue.MessageQueue
 	ctx     context.Context
 	cancel  context.CancelFunc
-	subMngr SubscriptionManager // used to keep track of subscribed channels
+	subMngr network.SubscriptionManager // used to keep track of subscribed channels
 
 }
 
@@ -47,17 +46,17 @@ type Network struct {
 // csize determines the size of the cache dedicated to keep track of received messages
 func NewNetwork(
 	log zerolog.Logger,
-	codec Codec,
+	codec network.Codec,
 	ids flow.IdentityList,
 	me module.Local,
-	mw middleware.Middleware,
+	mw network.Middleware,
 	csize int,
 	top topology.Topology,
-	sm SubscriptionManager,
+	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
 
-	rcache, err := cache.NewRcvCache(csize)
+	rcache, err := internal.NewRcvCache(csize)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
@@ -112,7 +111,7 @@ func (n *Network) Done() <-chan struct{} {
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(channelID string, engine Engine) (Conduit, error) {
+func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
 	if _, ok := channels.RolesByChannelID(channelID); !ok {
 		return nil, fmt.Errorf("unknown channel id: %s, should be registered in topic map", channelID)
 	}
@@ -130,7 +129,7 @@ func (n *Network) Register(channelID string, engine Engine) (Conduit, error) {
 	ctx, cancel := context.WithCancel(n.ctx)
 
 	// create the conduit
-	conduit := &protocol.Conduit{
+	conduit := &Conduit{
 		ctx:       ctx,
 		cancel:    cancel,
 		channelID: channelID,

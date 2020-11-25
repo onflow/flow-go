@@ -1,4 +1,4 @@
-package libp2p
+package protocol
 
 import (
 	"bufio"
@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -329,7 +328,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 	}()
 
 	// setup the context to expire after the default timeout
-	ctx, cancel := context.WithTimeout(context.Background(), protocol.DefaultUnicastTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
 	defer cancel()
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
@@ -339,7 +338,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 		func() {
 			_, err = peers[0].CreateStream(ctx, silentNodeAddress)
 		},
-		protocol.DefaultUnicastTimeout+grace)
+		DefaultUnicastTimeout+grace)
 	assert.Error(suite.T(), err)
 }
 

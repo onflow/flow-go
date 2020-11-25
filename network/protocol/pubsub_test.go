@@ -1,4 +1,4 @@
-package network
+package protocol
 
 import (
 	"context"
@@ -20,8 +20,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/libp2p"
-	"github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -144,7 +142,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 // CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*protocol.Node) {
+func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*Node) {
 	// keeps track of errors on creating a node
 	var err error
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -161,11 +159,11 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 	for i := 1; i <= count; i++ {
 
 		name := fmt.Sprintf("node%d", i)
-		pkey, err := libp2p.generateNetworkingKey(name)
+		pkey, err := generateNetworkingKey(name)
 		require.NoError(psts.Suite.T(), err)
 
-		n := &protocol.Node{}
-		nodeID := protocol.NodeAddress{
+		n := &Node{}
+		nodeID := NodeAddress{
 			Name:   name,
 			IP:     "0.0.0.0",        // localhost
 			Port:   "0",              // random Port number
@@ -174,19 +172,19 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 
 		psOption := pubsub.WithDiscovery(d)
 		noopMetrics := metrics.NewNoopCollector()
-		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, libp2p.rootBlockID, false, nil, noopMetrics, psOption)
+		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootBlockID, false, nil, noopMetrics, psOption)
 		require.NoError(psts.Suite.T(), err)
 		require.Eventuallyf(psts.Suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()
 			return err == nil && ip != "" && p != ""
-		}, 3*time.Second, libp2p.tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
+		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
 		nodes = append(nodes, n)
 	}
 	return nodes
 }
 
 // StopNodes stop all nodes in the input slice
-func (psts *PubSubTestSuite) StopNodes(nodes []*protocol.Node) {
+func (psts *PubSubTestSuite) StopNodes(nodes []*Node) {
 	for _, n := range nodes {
 		done, err := n.Stop()
 		assert.NoError(psts.Suite.T(), err)

@@ -1,4 +1,4 @@
-package libp2p
+package protocol
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/protocol"
 )
 
 // readConnection reads the incoming stream and calls the callback until the remote closes the stream or the context is
@@ -35,7 +34,7 @@ func newReadConnection(ctx context.Context,
 	maxMsgSize int) *readConnection {
 
 	if maxMsgSize <= 0 {
-		maxMsgSize = protocol.DefaultMaxUnicastMsgSize
+		maxMsgSize = DefaultMaxUnicastMsgSize
 	}
 
 	c := readConnection{

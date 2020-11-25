@@ -1,4 +1,4 @@
-package network
+package protocol
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
-	mock2 "github.com/onflow/flow-go/network/mock"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -52,7 +52,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	var extraIDs flow.IdentityList
 
 	// create the connector mock to check ids requested for connect and disconnect
-	connector := new(mock2.Connector)
+	connector := new(mocknetwork.Connector)
 	connector.On("ConnectPeers", suite.ctx, testifymock.AnythingOfType("flow.IdentityList")).
 		Run(func(args testifymock.Arguments) {
 			idArg := args[1].(flow.IdentityList)
@@ -128,7 +128,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 		return currentIDs, nil
 	}
 
-	connector := new(mock2.Connector)
+	connector := new(mocknetwork.Connector)
 	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
 	mu := &sync.Mutex{}     // provides mutual exclusion on calls to `ConnectPeers`
 	count := 0
@@ -168,7 +168,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	count := 0
 	times := 2 // we expect it to be called twice overall
 	wg.Add(1)  // this accounts for one invocation, the other invocation is subsequent
-	connector := new(mock2.Connector)
+	connector := new(mocknetwork.Connector)
 	// captures the first periodic update initiated after start to complete
 	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
 		mu.Lock()
@@ -206,7 +206,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	ctx, cancel := context.WithCancel(suite.ctx)
 	defer cancel()
 
-	connector := new(mock2.Connector)
+	connector := new(mocknetwork.Connector)
 	// connectPeerGate channel gates the return of the connector
 	connectPeerGate := make(chan time.Time)
 	defer close(connectPeerGate)

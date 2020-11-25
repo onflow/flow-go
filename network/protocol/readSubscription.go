@@ -1,4 +1,4 @@
-package libp2p
+package protocol
 
 import (
 	"context"
@@ -22,8 +22,8 @@ type readSubscription struct {
 	callback func(msg *message.Message)
 }
 
-// NewReadSubscription reads the messages coming in on the subscription
-func NewReadSubscription(ctx context.Context,
+// newReadSubscription reads the messages coming in on the subscription
+func newReadSubscription(ctx context.Context,
 	sub *pubsub.Subscription,
 	callback func(msg *message.Message),
 	log zerolog.Logger,
@@ -44,9 +44,9 @@ func NewReadSubscription(ctx context.Context,
 	return &r
 }
 
-// ReceiveLoop must be run in a goroutine. It continuously receives
+// receiveLoop must be run in a goroutine. It continuously receives
 // messages for the topic and calls the callback synchronously
-func (r *readSubscription) ReceiveLoop(wg *sync.WaitGroup) {
+func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 
 	defer wg.Done()
 	defer r.log.Debug().Msg("exiting receive routine")

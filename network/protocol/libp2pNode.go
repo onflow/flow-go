@@ -1,5 +1,5 @@
 // Package libp2p encapsulates the libp2p library
-package libp2p
+package protocol
 
 import (
 	"context"
@@ -61,7 +61,7 @@ type Node struct {
 	ps                   *pubsub.PubSub                  // the reference to the pubsub instance
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
-	conMgr               network2.ConnManager            // the connection manager passed in to libp2p
+	conMgr               ConnManager                     // the connection manager passed in to libp2p
 	connGater            *connGater                      // the connection gator passed in to libp2p
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 }
@@ -88,7 +88,7 @@ func (n *Node) Start(ctx context.Context,
 		return err
 	}
 
-	n.conMgr = network2.NewConnManager(logger, metrics)
+	n.conMgr = NewConnManager(logger, metrics)
 
 	// create a transport which disables port reuse and web socket.
 	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)

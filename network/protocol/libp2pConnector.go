@@ -1,4 +1,4 @@
-package libp2p
+package protocol
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/protocol"
 )
 
 // libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
@@ -21,7 +20,7 @@ type libp2pConnector struct {
 	host             host.Host
 }
 
-var _ protocol.Connector = &libp2pConnector{}
+var _ Connector = &libp2pConnector{}
 
 func NewLibp2pConnector(host host.Host) (*libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
