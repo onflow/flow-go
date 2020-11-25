@@ -188,7 +188,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
 
-	libp2pConnector, err := NewLibp2pConnector(m.libP2PNode.Host())
+	libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host())
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}

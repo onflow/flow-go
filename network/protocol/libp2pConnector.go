@@ -22,7 +22,7 @@ type libp2pConnector struct {
 
 var _ Connector = &libp2pConnector{}
 
-func NewLibp2pConnector(host host.Host) (*libp2pConnector, error) {
+func newLibp2pConnector(host host.Host) (*libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
