@@ -120,7 +120,7 @@ type FlowNodeBuilder struct {
 	ProtocolEvents    *events.Distributor
 	State             *protocol.State
 	Middleware        *protocol2.Middleware
-	Network           *network.Network
+	Network           *protocol2.Network
 	MsgValidators     []validators.MessageValidator
 	FvmOptions        []fvm.Option
 	modules           []namedModuleFunc
@@ -186,14 +186,14 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		//
 		// topology
 		// subscription manager
-		subscriptionManager := network.NewChannelSubscriptionManager(fnb.Middleware)
+		subscriptionManager := protocol2.NewChannelSubscriptionManager(fnb.Middleware)
 		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State, subscriptionManager)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
 
 		// creates network instance
-		net, err := network.NewNetwork(fnb.Logger,
+		net, err := protocol2.NewNetwork(fnb.Logger,
 			codec,
 			participants,
 			fnb.Me,
