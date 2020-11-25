@@ -128,8 +128,6 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 		otherSeal := getArbitraryElement(otherSeals) // cannot be nil, as otherSeals is guaranteed to always contain at least one element
 		err := s.enforceConsistentStateTransitions(newSeal, otherSeal)
 		if errors.Is(err, ExecutionForkErr) {
-			s.seals.Clear()
-			s.execForkDetected = true
 			return false, nil
 		}
 		if err != nil {
@@ -155,10 +153,10 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 
 	// STEP 4: add newSeal to secondary index of this wrapper
 	// CAUTION: the following edge case needs to be considered:
-	//  * the mempool only holds one old seal for this block
-	//  * upon adding the new seal, the mempool might decide to eject the old seal
+	//  * the mempool only holds a single other seal (denominated as `otherSeal`) for this block
+	//  * upon adding the new seal, the mempool might decide to eject otherSeal
 	//  * during the ejection, we will delete the entire set from the `sealsForBlock`
-	//    because at this time, it only held the single old seal, which was ejected
+	//    because at this time, it only held otherSeal, which was ejected
 	// Therefore, the value for `found` in the line below might
 	// be different than the value in the earlier call above.
 	blockSeals, found := s.sealsForBlock[blockID]
@@ -310,7 +308,7 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 		// happy case: candidate seals are for the same result
 		return nil
 	}
-	// the results for the seals have different IDs
+	// the results for the seals have different IDs (!)
 	// => check whether initial and final state match in both seals
 
 	sc1json, err := json.Marshal(irSeal)
@@ -334,13 +332,14 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 
 	if !bytes.Equal(irSeal1InitialState, irSeal2InitialState) || !bytes.Equal(irSeal1FinalState, irSeal2FinalState) {
 		log.Error().Msg("inconsistent seals for the same block")
+		s.seals.Clear()
+		s.execForkDetected = true
 		err := operation.RetryOnConflict(s.db.Update, operation.UpdateExecutionForkDetected(true))
 		if err != nil {
 			return fmt.Errorf("failed to update execution-fork-detected flag: %w", err)
 		}
 		return ExecutionForkErr
-	} else {
-		log.Warn().Msg("seals with different ID but consistent state transition")
-		return nil
 	}
+	log.Warn().Msg("seals with different ID but consistent state transition")
+	return nil
 }

@@ -19,6 +19,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// Test_ImplementsInterfaces is a compile-time check:
+// verifies that ExecForkSuppressor implements mempool.IncorporatedResultSeals interface
+func Test_ImplementsInterfaces(t *testing.T) {
+	var _ mempool.IncorporatedResultSeals = &ExecForkSuppressor{}
+}
+
 // Test_Construction verifies correctness of the initial size and limit values
 func Test_Construction(t *testing.T) {
 	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
@@ -364,7 +370,7 @@ func Test_AddRem_SmokeTest(t *testing.T) {
 
 // WithExecStateForkSuppressor
 //  1. constructs a mock (aka `wrappedMempool`) of an IncorporatedResultSeals mempool
-//  2. wrapps `wrappedMempool` in a ExecForkSuppressor
+//  2. wraps `wrappedMempool` in a ExecForkSuppressor
 //  3. ensures that initializing the wrapper did not error
 //  4. executes the `testLogic`
 func WithExecStateForkSuppressor(t testing.TB, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals)) {
