@@ -4,7 +4,6 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -234,9 +233,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// roadmap (https://github.com/dapperlabs/flow-go/issues/4872)
 
 	// create a mapping of block to seal for all seals in our pool
-	byBlock, err := b.block2SealMap()
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct map from blockID to seal: %w", err)
+	byBlock := make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	for _, irSeal := range b.sealPool.All() {
+		byBlock[irSeal.Seal.BlockID] = irSeal
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -407,55 +406,4 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	return header, nil
-}
-
-// block2SealMap creates a map: blockID -> seal
-// from all seals in our mempool. Its also checks for inconsistent seals:
-// we consider two seals as inconsistent, if they have different start or end states
-func (b *Builder) block2SealMap() (map[flow.Identifier]*flow.IncorporatedResultSeal, error) {
-	// TODO: the following implementation is somewhat temporary and contains a lot of sanity checks
-	//       probably should be cleaned up once we have full sealing
-	encounteredInconsistentSealsForSameBlock := false
-	byBlock := make(map[flow.Identifier]*flow.IncorporatedResultSeal)
-	for _, irSeal := range b.sealPool.All() {
-		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
-			sc1json, err := json.Marshal(irSeal)
-			if err != nil {
-				return nil, err
-			}
-			sc2json, err := json.Marshal(irSeal2)
-			if err != nil {
-				return nil, err
-			}
-			block, err := b.headers.ByBlockID(irSeal.Seal.BlockID)
-			if err != nil {
-				// not finding the block for a seal is a fatal, internal error: respective Execution Result should have been rejected by matching engine
-				// we still print as much of the error message as we can about the inconsistent seals
-				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s\n", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-				return nil, fmt.Errorf("could not retrieve block for seal: %w", err)
-			}
-
-			// matching engine only adds seals to the mempool that have final and initial state
-			irSealInitialState, _ := irSeal.IncorporatedResult.Result.InitialStateCommit()
-			irSealFinalState, _ := irSeal.IncorporatedResult.Result.FinalStateCommitment()
-			irSeal2InitialState, _ := irSeal2.IncorporatedResult.Result.InitialStateCommit()
-			irSeal2FinalState, _ := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
-
-			// check whether seals are inconsistent:
-			if !bytes.Equal(irSealFinalState, irSeal2FinalState) || !bytes.Equal(irSealInitialState, irSeal2InitialState) {
-				fmt.Printf("ERROR: inconsistent seals for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
-				encounteredInconsistentSealsForSameBlock = true
-			} else {
-				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v at height %d: %s and %s\n", irSeal.Seal.BlockID, block.Height, string(sc1json), string(sc2json))
-			}
-		} else {
-			byBlock[irSeal.Seal.BlockID] = irSeal
-		}
-	}
-	if encounteredInconsistentSealsForSameBlock {
-		// in case we find inconsistent seals, do not seal anything,
-		// so that inconsistent seals won't impact finalization
-		byBlock = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
-	}
-	return byBlock, nil
 }
