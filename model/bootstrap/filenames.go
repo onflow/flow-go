@@ -18,6 +18,7 @@ var (
 	// public genesis information
 	DirnamePublicBootstrap    = "public-root-information"
 	PathInternalNodeInfosPub  = filepath.Join(DirnamePublicBootstrap, "node-internal-infos.pub.json")
+	PathFinallist             = filepath.Join(DirnamePublicBootstrap, "finallist.pub.json")
 	PathNodeInfosPub          = filepath.Join(DirnamePublicBootstrap, "node-infos.pub.json")
 	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
 	PathNodeInfoPub           = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID

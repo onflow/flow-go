@@ -6,6 +6,7 @@ about it [here](https://github.com/onflow/flow).
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
 ## Table of Contents
 
 - [Getting started](#getting-started)
@@ -23,10 +24,10 @@ about it [here](https://github.com/onflow/flow).
 
 ## Getting started
 
-* To install all dependencies and tools, see the [project setup](#installation) guide
-* To dig into more documentation about Flow, see the [documentation](#documentation)
-* To learn how to contribute, see the [contributing guide](/CONTRIBUTING.md)
-* To see information on developing Flow, see the [development workflow](#development-workflow)
+- To install all dependencies and tools, see the [project setup](#installation) guide
+- To dig into more documentation about Flow, see the [documentation](#documentation)
+- To learn how to contribute, see the [contributing guide](/CONTRIBUTING.md)
+- To see information on developing Flow, see the [development workflow](#development-workflow)
 
 ## Documentation
 
@@ -38,18 +39,18 @@ to documentation for relevant components used by that work stream.
 
 The following table lists all work streams and links to their home directory and documentation:
 
-| Work Stream    | Home directory  |
-| -------------- | --------------- |
-| Access Node | [/cmd/access](/cmd/access) |
-| Collection Node | [/cmd/collection](/engine/collection) |
-| Consensus Node | [/cmd/consensus](/engine/consensus) |
-| Execution Node | [/engine/execution](/engine/execution) |
-| Verification Node | [/cmd/verification](/cmd/verification) |
-| HotStuff | [/consensus/hotstuff](/consensus/hotstuff) |
-| Storage | [/storage](/storage) |
-| Ledger | [/ledger](/ledger) |
-| Networking | [/network](/network/) |
-| Cryptography | [/crypto](/crypto) |
+| Work Stream       | Home directory                             |
+| ----------------- | ------------------------------------------ |
+| Access Node       | [/cmd/access](/cmd/access)                 |
+| Collection Node   | [/cmd/collection](/engine/collection)      |
+| Consensus Node    | [/cmd/consensus](/engine/consensus)        |
+| Execution Node    | [/engine/execution](/engine/execution)     |
+| Verification Node | [/cmd/verification](/cmd/verification)     |
+| HotStuff          | [/consensus/hotstuff](/consensus/hotstuff) |
+| Storage           | [/storage](/storage)                       |
+| Ledger            | [/ledger](/ledger)                         |
+| Networking        | [/network](/network/)                      |
+| Cryptography      | [/crypto](/crypto)                         |
 
 ## Installation
 
@@ -77,6 +78,7 @@ make install-tools
 At this point, you should be ready to build, test, and run Flow! 🎉
 
 Note: if there is error about "relic" or "crypto", trying force removing the relic build and reinstall the tools again:
+
 ```bash
 rm -rf crypto/relic
 make install-tools
@@ -106,11 +108,13 @@ make integration-test
 The recommended way to build and run Flow for local development is using Docker.
 
 Build a Docker image for all nodes:
+
 ```bash
 make docker-build-flow
 ```
 
 Build a Docker image for a particular node role (replace `$ROLE` with `collection`, `consensus`, etc.):
+
 ```bash
 make docker-build-$ROLE
 ```

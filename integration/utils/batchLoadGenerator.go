@@ -164,7 +164,7 @@ func (lg *BatchLoadGenerator) setupServiceAccountKeys() error {
 		SetScript(addKeysScript).
 		AddAuthorizer(*lg.serviceAccount.address).
 		SetReferenceBlockID(blockRef).
-		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
+		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.Index, lg.serviceAccount.accountKey.SequenceNumber).
 		SetPayer(*lg.serviceAccount.address)
 
 	err = addKeysTx.AddArgument(cadenceKeysArray)
@@ -175,7 +175,7 @@ func (lg *BatchLoadGenerator) setupServiceAccountKeys() error {
 	lg.serviceAccount.signerLock.Lock()
 	defer lg.serviceAccount.signerLock.Unlock()
 
-	err = addKeysTx.SignEnvelope(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.signer)
+	err = addKeysTx.SignEnvelope(*lg.serviceAccount.address, lg.serviceAccount.accountKey.Index, lg.serviceAccount.signer)
 	if err != nil {
 		return err
 	}

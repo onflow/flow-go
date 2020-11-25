@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -616,7 +617,8 @@ func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip
 		handlerFunc = func(network.Stream) {}
 	}
 
-	err := n.Start(suite.ctx, nodeID, suite.logger, key, handlerFunc, rootID, allowList, nil)
+	noopMetrics := metrics.NewNoopCollector()
+	err := n.Start(suite.ctx, nodeID, suite.logger, key, handlerFunc, rootID, allowList, nil, noopMetrics)
 	require.NoError(suite.T(), err)
 	require.Eventuallyf(suite.T(), func() bool {
 		ip, p, err := n.GetIPPort()
