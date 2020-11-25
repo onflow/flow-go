@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
-	protocol2 "github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,7 +22,7 @@ import (
 // theory assumptions behind the schemes, e.g., random oracle model of hashes
 type TopicAwareTopologyTestSuite struct {
 	suite.Suite
-	state    protocol2.State   // represents a mocked protocol state
+	state    protocol.State    // represents a mocked protocol state
 	all      flow.IdentityList // represents the identity list of all nodes in the system
 	clusters flow.ClusterList  // represents list of cluster ids of collection nodes
 	subMngr  []network.SubscriptionManager

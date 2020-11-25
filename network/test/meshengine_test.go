@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network/protocol"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,9 +28,9 @@ import (
 // of engines over a complete graph
 type MeshEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                     // used as a wrapper around conduit methods
-	nets           []*protocol.Network // used to keep track of the networks
-	ids            flow.IdentityList   // used to keep track of the identifiers associated with networks
+	ConduitWrapper                   // used as a wrapper around conduit methods
+	nets           []*p2p.Network    // used to keep track of the networks
+	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
@@ -105,25 +105,25 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
 // TestMaxMessageSize_Submit evaluates the messageSizeScenario scenario using
 // the Submit method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Submit() {
-	suite.messageSizeScenario(suite.Submit, protocol.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Submit, p2p.DefaultMaxPubSubMsgSize)
 }
 
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
 // the Unicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
-	suite.messageSizeScenario(suite.Unicast, protocol.DefaultMaxUnicastMsgSize)
+	suite.messageSizeScenario(suite.Unicast, p2p.DefaultMaxUnicastMsgSize)
 }
 
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using
 // the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Multicast() {
-	suite.messageSizeScenario(suite.Multicast, protocol.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Multicast, p2p.DefaultMaxPubSubMsgSize)
 }
 
 // TestMaxMessageSize_Publish evaluates the messageSizeScenario scenario using the
 // Publish method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Publish() {
-	suite.messageSizeScenario(suite.Publish, protocol.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Publish, p2p.DefaultMaxPubSubMsgSize)
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Publish

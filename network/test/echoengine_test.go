@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network/protocol"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -25,9 +25,9 @@ import (
 // single message from one engine to the other one through different scenarios.
 type EchoEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                     // used as a wrapper around conduit methods
-	nets           []*protocol.Network // used to keep track of the networks
-	ids            flow.IdentityList   // used to keep track of the identifiers associated with networks
+	ConduitWrapper                   // used as a wrapper around conduit methods
+	nets           []*p2p.Network    // used to keep track of the networks
+	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
 }
 
 // Some tests are skipped to speedup the build.

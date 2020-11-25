@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/json"
-	protocol2 "github.com/onflow/flow-go/network/protocol"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -73,19 +73,19 @@ func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identi
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*protocol2.Middleware {
+func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*p2p.Middleware {
 	metrics := metrics.NewNoopCollector()
-	mws := make([]*protocol2.Middleware, len(identities))
+	mws := make([]*p2p.Middleware, len(identities))
 	for i, id := range identities {
 		// creating middleware of nodes
-		mw, err := protocol2.NewMiddleware(log,
+		mw, err := p2p.NewMiddleware(log,
 			json.NewCodec(),
 			id.Address,
 			id.NodeID,
 			keys[i],
 			metrics,
-			protocol2.DefaultMaxUnicastMsgSize,
-			protocol2.DefaultMaxPubSubMsgSize,
+			p2p.DefaultMaxUnicastMsgSize,
+			p2p.DefaultMaxPubSubMsgSize,
 			rootBlockID)
 		require.NoError(t, err)
 		mws[i] = mw
@@ -97,13 +97,13 @@ func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.Ident
 func GenerateNetworks(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
-	mws []*protocol2.Middleware,
+	mws []*p2p.Middleware,
 	csize int,
 	tops []topology.Topology,
 	sms []network.SubscriptionManager,
-	dryRunMode bool) []*protocol2.Network {
+	dryRunMode bool) []*p2p.Network {
 	count := len(ids)
-	nets := make([]*protocol2.Network, 0)
+	nets := make([]*p2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
 
 	// checks if necessary to generate topology managers
@@ -130,7 +130,7 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := protocol2.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
+		net, err := p2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -149,7 +149,7 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
 	log zerolog.Logger) (flow.IdentityList,
-	[]*protocol2.Middleware) {
+	[]*p2p.Middleware) {
 
 	ids, keys := GenerateIDs(t, n, dryRunMode)
 	mws := GenerateMiddlewares(t, log, ids, keys)
@@ -161,7 +161,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []topology.Topology,
-	dryRun bool) (flow.IdentityList, []*protocol2.Middleware, []*protocol2.Network) {
+	dryRun bool) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network) {
 	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
@@ -169,7 +169,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 }
 
 // GenerateEngines generates MeshEngines for the given networks
-func GenerateEngines(t *testing.T, nets []*protocol2.Network) []*MeshEngine {
+func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
@@ -212,19 +212,19 @@ func GenerateTopologies(t *testing.T, state protocol.State, identities flow.Iden
 }
 
 // GenerateSubscriptionManagers creates and returns a ChannelSubscriptionManager for each middleware object.
-func GenerateSubscriptionManagers(t *testing.T, mws []*protocol2.Middleware) []network.SubscriptionManager {
+func GenerateSubscriptionManagers(t *testing.T, mws []*p2p.Middleware) []network.SubscriptionManager {
 	require.NotEmpty(t, mws)
 
 	sms := make([]network.SubscriptionManager, len(mws))
 	for i, mw := range mws {
-		sms[i] = protocol2.NewChannelSubscriptionManager(mw)
+		sms[i] = p2p.NewChannelSubscriptionManager(mw)
 	}
 	return sms
 }
 
 // stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
 // duration.
-func stopNetworks(t *testing.T, nets []*protocol2.Network, duration time.Duration) {
+func stopNetworks(t *testing.T, nets []*p2p.Network, duration time.Duration) {
 	// casts nets instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(nets))
 	for _, net := range nets {

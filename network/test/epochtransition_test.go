@@ -18,8 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network/protocol"
-	protocol2 "github.com/onflow/flow-go/network/protocol"
+	"github.com/onflow/flow-go/network/p2p"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,9 +31,9 @@ import (
 type MutableIdentityTableSuite struct {
 	suite.Suite
 	ConduitWrapper
-	nets         []*protocol.Network
-	mws          []*protocol.Middleware
-	idRefreshers []*protocol.NodeIDRefresher
+	nets         []*p2p.Network
+	mws          []*p2p.Middleware
+	idRefreshers []*p2p.NodeIDRefresher
 	engines      []*MeshEngine
 	state        *mockprotocol.ReadOnlyState
 	snapshot     *mockprotocol.Snapshot
@@ -161,7 +160,7 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 
 // checkConnectivity checks that the middleware of a node is directly connected
 // to at least half of the other nodes.
-func checkConnectivity(t *testing.T, mw *protocol2.Middleware, ids flow.IdentityList) {
+func checkConnectivity(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) {
 	threshold := len(ids) / 2
 	assert.Eventually(t, func() bool {
 		connections := 0
@@ -210,10 +209,10 @@ func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngi
 	unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 }
 
-func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*protocol2.Network) []*protocol.NodeIDRefresher {
-	refreshers := make([]*protocol.NodeIDRefresher, len(nets))
+func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*p2p.Network) []*p2p.NodeIDRefresher {
+	refreshers := make([]*p2p.NodeIDRefresher, len(nets))
 	for i, net := range nets {
-		refreshers[i] = protocol.NewNodeIDRefresher(suite.logger, suite.state, net.SetIDs)
+		refreshers[i] = p2p.NewNodeIDRefresher(suite.logger, suite.state, net.SetIDs)
 	}
 	return refreshers
 }
