@@ -12,7 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
-	network2 "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/internal"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -123,7 +123,7 @@ func NodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := network2.PublicKey(flowIdentity.NetworkPubKey)
+	lkey, err := internal.PublicKey(flowIdentity.NetworkPubKey)
 	if err != nil {
 		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
