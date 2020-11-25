@@ -25,32 +25,54 @@ const (
 
 	errCodeInvalidHashAlgorithm = 10
 
-	errCodeExecution = 100
+	errCodeAccountNotFound           = 20
+	errCodeAccountAlreadyExist       = 21
+	errCodeAccountCodeNotFound       = 22
+	errCodeAccountPublicKeyNotFound  = 23
+	errCodeAccountPublicKeyIsRevoked = 24
+
+	errCodeMethodNotSupported = 99
+	errCodeExecution          = 100
+	errCodeRestrictedAccess   = 999
 )
 
-const (
-	failureCodeLedger = 1000
-	failureCodeLedger
-)
-
-// An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
+// An Error represents a non-fatal error that is expected during normal operation of the virtual machine (outcome of interface method calls).
 //
-// VM errors are distinct from fatal errors, which indicate an unexpected failure
-// in the VM (i.e. storage, stack overflow).
-//
+// Note that fatal errors or unexpected behaviors are captured by failures and not errors.
 // Each VM error is identified by a unique error code that is returned to the user.
 type Error interface {
 	Code() uint32
 	Error() string
 }
 
-type Failure interface {
-	FailureCode()
-	Error()
-}
-
 var ErrAccountNotFound = errors.New("account not found")
 var ErrInvalidHashAlgorithm = errors.New("invalid hash algorithm")
+
+// A MethodNotSupportedError indicates that this method is not supported in this environment
+type MethodNotSupportedError struct {
+	Method string
+}
+
+func (e *MethodNotSupportedError) Error() string {
+	return fmt.Sprintf("method %s is not supported by this execution environment.", e.Method)
+}
+
+func (e *MethodNotSupportedError) Code() uint32 {
+	return errCodeMethodNotSupported
+}
+
+// A RestrictedAccessError indicates that temporarily this method is restricted and requires special authorization
+type RestrictedAccessError struct {
+	Details string
+}
+
+func (e *RestrictedAccessError) Error() string {
+	return fmt.Sprintf("RestrictedAccessError: %s", e.Details)
+}
+
+func (e *RestrictedAccessError) Code() uint32 {
+	return errCodeRestrictedAccess
+}
 
 // A MissingSignatureError indicates that a transaction is missing a required signature.
 type MissingSignatureError struct {
@@ -223,6 +245,75 @@ func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithm
 }
 
+// An AccountNotFoundError indicates that account does not exist at the given address.
+type AccountNotFoundError struct {
+	Address flow.Address
+}
+
+func (e *AccountNotFoundError) Error() string {
+	return fmt.Sprintf("no account found with address %s", e.Address)
+}
+
+func (e *AccountNotFoundError) Code() uint32 {
+	return errCodeAccountNotFound
+}
+
+// An AccountAlreadyExistError indicates that an account already exist with this address.
+type AccountAlreadyExistError struct {
+	Address flow.Address
+}
+
+func (e *AccountAlreadyExistError) Error() string {
+	return fmt.Sprintf("An account account already exist with address %s", e.Address)
+}
+
+func (e *AccountAlreadyExistError) Code() uint32 {
+	return errCodeAccountAlreadyExist
+}
+
+// An AccountCodeNotFoundError indicates that the given account doesn't have the requested code.
+// TODO RAMTIN - include code name ???
+type AccountCodeNotFoundError struct {
+	Address flow.Address
+}
+
+func (e *AccountCodeNotFoundError) Error() string {
+	return fmt.Sprintf("the account with address %s doesn't have the requested code", e.Address)
+}
+
+func (e *AccountCodeNotFoundError) Code() uint32 {
+	return errCodeAccountCodeNotFound
+}
+
+// An AccountPublicKeyNotFound indicates that the public key for the given account and index is not found.
+type AccountPublicKeyNotFound struct {
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *AccountPublicKeyNotFound) Error() string {
+	return fmt.Sprintf("public key not found at index %d for account %s", e.KeyIndex, e.Address)
+}
+
+func (e *AccountPublicKeyNotFound) Code() uint32 {
+	return errCodeAccountPublicKeyNotFound
+}
+
+// An AccountPublicKeyIsRevoked indicates that the public key for the given account and index is revoked.
+type AccountPublicKeyIsRevoked struct {
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *AccountPublicKeyIsRevoked) Error() string {
+	return fmt.Sprintf("public key at index %d for account %s is revoked", e.KeyIndex, e.Address)
+}
+
+func (e *AccountPublicKeyIsRevoked) Code() uint32 {
+	return errCodeAccountPublicKeyIsRevoked
+}
+
+// TODO RAMTIN deal with this
 type ExecutionError struct {
 	Err runtime.Error
 }

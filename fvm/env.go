@@ -41,7 +41,7 @@ type hostEnv struct {
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
 	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
 	if err != nil {
-		panic(fmt.Errorf("cannot create hasher: %w", err))
+		panic(HasherFailure{err, "can not create hasher", hashAlgorithm})
 	}
 	return hasher.ComputeHash(data)
 }
@@ -248,10 +248,10 @@ func (e *hostEnv) EmitEvent(event cadence.Event) {
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
+	// TODO add not supported
 	uuid, err := e.uuidGenerator.GenerateUUID()
 	if err != nil {
-		// TODO - Return error once Cadence interface accommodates it
-		panic(fmt.Errorf("cannot get UUID: %w", err))
+		panic(&UUIDGeneratorFailure{err})
 	}
 
 	return uuid
@@ -314,24 +314,24 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 // Block Environment Functions
 
 // GetCurrentBlockHeight returns the current block height.
-func (e *hostEnv) GetCurrentBlockHeight() uint64 {
+func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	if e.ctx.BlockHeader == nil {
-		panic("GetCurrentBlockHeight is not supported by this environment")
+		return 0, &MethodNotSupportedError{"GetCurrentBlockHeight"}
 	}
 
-	return e.ctx.BlockHeader.Height
+	return e.ctx.BlockHeader.Height, nil
 }
 
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
-func (e *hostEnv) UnsafeRandom() uint64 {
+func (e *hostEnv) UnsafeRandom() (uint64, error) {
 	if e.rng == nil {
-		panic("UnsafeRandom is not supported by this environment")
+		return 0, &MethodNotSupportedError{"UnsafeRandom"}
 	}
 
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
-	return binary.LittleEndian.Uint64(buf)
+	return binary.LittleEndian.Uint64(buf), nil
 }
 
 func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
@@ -346,7 +346,7 @@ func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
 // GetBlockAtHeight returns the block at the given height.
 func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	if e.ctx.Blocks == nil {
-		panic("GetBlockAtHeight is not supported by this environment")
+		return runtime.Block{}, false, &MethodNotSupportedError{"GetBlockAtHeight"}
 	}
 
 	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
@@ -356,10 +356,10 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	block, err := e.ctx.Blocks.ByHeight(height)
 	// TODO: remove dependency on storage
 	if errors.Is(err, storage.ErrNotFound) {
+		// TODO (Ramtin, block not found error)
 		return runtime.Block{}, false, nil
 	} else if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return runtime.Block{}, false, fmt.Errorf("unexpected failure of GetBlockAtHeight, height %v: %w", height, err)
+		panic(StorageFailure{err, fmt.Sprintf("cannot load block %d", height)})
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -370,16 +370,24 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 
 func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	if e.transactionEnv == nil {
-		panic("CreateAccount is not supported by this environment")
+		return runtime.Address{}, &MethodNotSupportedError{"CreateAccount"}
 	}
 
+	address, err = e.transactionEnv.CreateAccount(payer)
+
+	// TODO if error type is
+	// ErrAccountNotFound          = errors.New("account not found")
+	// return AccountNotFoundError
+
+	// TODO RAMTIN
+	// switch error type
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.CreateAccount(payer)
+	return address, err
 }
 
 func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	if e.transactionEnv == nil {
-		panic("AddAccountKey is not supported by this environment")
+		return &MethodNotSupportedError{"AddAccountKey"}
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -388,7 +396,7 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 
 func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	if e.transactionEnv == nil {
-		panic("RemoveAccountKey is not supported by this environment")
+		return nil, &MethodNotSupportedError{"RemoveAccountKey"}
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -397,7 +405,7 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	if e.transactionEnv == nil {
-		panic("UpdateAccountContractCode is not supported by this environment")
+		return &MethodNotSupportedError{"UpdateAccountContractCode"}
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -413,7 +421,7 @@ func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (
 
 func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
 	if e.transactionEnv == nil {
-		panic("RemoveAccountContractCode is not supported by this environment")
+		return &MethodNotSupportedError{"RemoveAccountContractCode"}
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -425,9 +433,13 @@ func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name
 
 	// must be signed by the service account
 	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("code deployment requires authorization from the service account")
+		return &RestrictedAccessError{"code deployment requires authorization from the service account"}
 	}
+
+	// TODO(Ramtin)
+	// handle errors
+	// if ledger Error
+	// fvm.LedgerFailure{err}
 
 	return e.accounts.SetContract(name, accountAddress, code)
 }
@@ -437,19 +449,18 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 
 	// must be signed by the service account
 	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("code deployment requires authorization from the service account")
+		return &RestrictedAccessError{"code deployment requires authorization from the service account"}
 	}
 
 	return e.accounts.DeleteContract(name, accountAddress)
 }
 
-func (e *hostEnv) GetSigningAccounts() []runtime.Address {
+func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	if e.transactionEnv == nil {
-		panic("GetSigningAccounts is not supported by this environment")
+		return nil, &MethodNotSupportedError{"GetSigningAccounts"}
 	}
 
-	return e.transactionEnv.GetSigningAccounts()
+	return e.transactionEnv.GetSigningAccounts(), nil
 }
 
 // Transaction Environment
@@ -500,6 +511,7 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+	// TODO Ramtin
 	if e.ctx.ServiceAccountEnabled {
 		err = e.vm.invokeMetaTransaction(
 			e.ctx,
@@ -553,13 +565,12 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey
 
 	ok, err = e.accounts.Exists(accountAddress)
 	if err != nil {
+		// TODO RAMTIN (Switch on error type)
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return err
 	}
-
 	if !ok {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("account with address %s does not exist", address)
+		return &AccountNotFoundError{accountAddress}
 	}
 
 	var publicKey flow.AccountPublicKey
@@ -571,6 +582,7 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey
 
 	err = e.accounts.AppendPublicKey(accountAddress, publicKey)
 	if err != nil {
+		// TODO RAMTIN (switch error return type)
 		return fmt.Errorf("failed to add public key to account: %w", err)
 	}
 
@@ -593,12 +605,12 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if !ok {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("account with address %s does not exist", address)
+		return nil, &AccountNotFoundError{accountAddress}
 	}
 
 	if keyIndex < 0 {
-		return nil, fmt.Errorf("key index must be positve, received %d", keyIndex)
+		// TODO change keyIndex to uint and get rid of this error
+		return nil, fmt.Errorf("key index must be positive, received %d", keyIndex)
 	}
 
 	var publicKey flow.AccountPublicKey
