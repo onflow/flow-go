@@ -18,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/protocol"
 	protocol2 "github.com/onflow/flow-go/network/protocol"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,12 +32,12 @@ import (
 type MutableIdentityTableSuite struct {
 	suite.Suite
 	ConduitWrapper
-	nets         []*protocol2.Network
-	mws          []*protocol2.Middleware
-	idRefreshers []*network.NodeIDRefresher
+	nets         []*protocol.Network
+	mws          []*protocol.Middleware
+	idRefreshers []*protocol.NodeIDRefresher
 	engines      []*MeshEngine
-	state        *protocol.ReadOnlyState
-	snapshot     *protocol.Snapshot
+	state        *mockprotocol.ReadOnlyState
+	snapshot     *mockprotocol.Snapshot
 	ids          flow.IdentityList
 	logger       zerolog.Logger
 }
@@ -59,8 +59,8 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 
 	// setup state related mocks
 	final := unittest.BlockHeaderFixture()
-	suite.state = new(protocol.ReadOnlyState)
-	suite.snapshot = new(protocol.Snapshot)
+	suite.state = new(mockprotocol.ReadOnlyState)
+	suite.snapshot = new(mockprotocol.Snapshot)
 	suite.snapshot.On("Head").Return(&final, nil)
 	suite.snapshot.On("Phase").Return(flow.EpochPhaseCommitted, nil)
 	suite.snapshot.On("Identities", testifymock.Anything).Return(
@@ -69,7 +69,7 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot, nil)
 
 	// all nodes use the same state mock
-	states := make([]*protocol.ReadOnlyState, nodeCount)
+	states := make([]*mockprotocol.ReadOnlyState, nodeCount)
 	for i := 0; i < nodeCount; i++ {
 		states[i] = suite.state
 	}
@@ -210,10 +210,10 @@ func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngi
 	unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 }
 
-func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*protocol2.Network) []*network.NodeIDRefresher {
-	refreshers := make([]*network.NodeIDRefresher, len(nets))
+func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*protocol2.Network) []*protocol.NodeIDRefresher {
+	refreshers := make([]*protocol.NodeIDRefresher, len(nets))
 	for i, net := range nets {
-		refreshers[i] = network.NewNodeIDRefresher(suite.logger, suite.state, net.SetIDs)
+		refreshers[i] = protocol.NewNodeIDRefresher(suite.logger, suite.state, net.SetIDs)
 	}
 	return refreshers
 }
