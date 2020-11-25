@@ -1,5 +1,5 @@
 // Package libp2p encapsulates the libp2p library
-package protocol
+package p2p
 
 import (
 	"context"
