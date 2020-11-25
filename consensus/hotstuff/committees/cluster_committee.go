@@ -24,10 +24,10 @@ type Cluster struct {
 	me       flow.Identifier
 	// pre-computed leader selection for the full lifecycle of the cluster
 	selection *leader.LeaderSelection
-	// initial set of cluster committee members for this epoch, used only for
-	// mapping a leader index to node ID
-	// CAUTION: does not contain up-to-date weight/ejection info
-	identities flow.IdentityList
+	// a filter that returns all members of the cluster committee allowed to vote
+	clusterMemberFilter flow.IdentityFilter
+	// initial set of cluster members, WITHOUT updated weight
+	initialClusterMembers flow.IdentityList
 }
 
 func NewClusterCommittee(
@@ -44,11 +44,12 @@ func NewClusterCommittee(
 	}
 
 	com := &Cluster{
-		state:      state,
-		payloads:   payloads,
-		me:         me,
-		selection:  selection,
-		identities: cluster.Members(),
+		state:                 state,
+		payloads:              payloads,
+		me:                    me,
+		selection:             selection,
+		clusterMemberFilter:   cluster.Members().Selector(),
+		initialClusterMembers: cluster.Members(),
 	}
 	return com, nil
 }
@@ -65,13 +66,13 @@ func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilt
 	if payload.ReferenceBlockID != flow.ZeroID {
 		identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(filter.And(
 			selector,
-			c.identities.Selector(),
+			c.clusterMemberFilter,
 		))
 		return identities, err
 	}
 
 	// otherwise, this is a root block, in which case we use the initial cluster members
-	return c.identities.Filter(selector), nil
+	return c.initialClusterMembers.Filter(selector), nil
 }
 
 func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
@@ -87,12 +88,7 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 }
 
 func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
-
-	index, err := c.selection.LeaderForView(view)
-	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not get leader for view: %w", err)
-	}
-	return c.identities[index].NodeID, nil
+	return c.selection.LeaderForView(view)
 }
 
 func (c *Cluster) Self() flow.Identifier {
