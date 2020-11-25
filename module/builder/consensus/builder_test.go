@@ -590,40 +590,6 @@ func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 
 }
 
-// TestBuildOn_ConflictingSeals verifies that payload builder does halt sealing (specifically, does _not_
-// include any seals), if the seals mempool contains seals with conflicting final or initial states.
-func (bs *BuilderSuite) TestPayloadSeal_ConflictingSeals() {
-	// start with a mempool configuration that would allow to actually seal something
-	// -> verified in test TestPayloadSealAllValid
-	bs.pendingSeals = bs.irsMap
-
-	// take last seal:
-	// create an alternative result for the same block
-	seal := bs.irsList[len(bs.irsList)-1]
-	block := bs.blocks[seal.IncorporatedResult.Result.BlockID]
-	previousResult := bs.resultForBlock[block.Header.ParentID]
-	altResult := unittest.ExecutionResultFixture( // alternative result for same block
-		unittest.WithBlock(block),
-		unittest.WithPreviousResult(*previousResult),
-	)
-	// add IncorporatedResult and sealing candidate to mempools
-	altIR := unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithResult(altResult),
-		unittest.IncorporatedResult.WithIncorporatedBlockID(seal.IncorporatedResult.IncorporatedBlockID),
-	)
-	bs.chainSeal(altIR)
-
-	// add 4 guarantees to the pool
-	bs.pendingGuarantees = unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(bs.finalID))
-
-	// we expect sealing to halt (i.e. the payload does not include any seals)
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
-	bs.Require().NoError(err)
-	bs.Assert().Empty(bs.assembled.Seals, "sealing should halt if there are conflicting seals for same block")
-	// aside from halted sealing, block payload should still continue to include collection guarantees
-	bs.Assert().ElementsMatch(bs.pendingGuarantees, bs.assembled.Guarantees, "should have guarantees from mempool in payload")
-}
-
 func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 
 	// remove the seal at the start
