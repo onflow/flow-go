@@ -110,7 +110,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// know the leader. The series of epochs we have computed leaders for is
 	// strictly consecutive, meaning we know the leader for all views V where:
 	//
-	//   V >= oldestEpoch.firstView && V <= newestEpoch.finalView
+	//   oldestEpoch.firstView <= V <= newestEpoch.finalView
 	//
 	// Thus, the requested view is either before oldestEpoch.firstView or after
 	// newestEpoch.finalView.
