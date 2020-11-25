@@ -159,6 +159,8 @@ func migrateDeferredValueOfContractValue(
 	registerKeySuffix := registerID.Key[len(deferredValueOfContractValuePrefix):]
 
 	rawAddress := string(payloadKeyAddress(payload))
+	address := common.BytesToAddress(flow.BytesToAddress([]byte(rawAddress)).Bytes())
+
 	contractName, ok := mappings[rawAddress]
 	if !ok {
 		return nil, fmt.Errorf("missing contract name for address: %s", address)
@@ -176,7 +178,6 @@ func migrateDeferredValueOfContractValue(
 		Value: payload.Value,
 	}
 
-	address := common.BytesToAddress(flow.BytesToAddress([]byte(rawAddress)).Bytes())
 
 	logKeyChange(address.Hex(), payload.Key, newPayload.Key)
 
