@@ -178,7 +178,7 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	testOneToKMessagingFails(ctx, h.T(), node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *P2PNode, dstnAddress NodeAddress) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, dstnAddress NodeAddress) {
 	// create stream from node 1 to node 2
 	s, err := sourceNode.CreateStream(context.Background(), dstnAddress)
 	// assert that stream creation succeeded
@@ -186,7 +186,7 @@ func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *P2PNode, dstnAddres
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingFails(t *testing.T, sourceNode *P2PNode, dstnAddress NodeAddress) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, dstnAddress NodeAddress) {
 	// create stream from source node to destination address
 	_, err := sourceNode.CreateStream(context.Background(), dstnAddress)
 	// assert that stream creation failed
@@ -197,7 +197,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode *P2PNode, dstnAddress N
 
 func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
-	sourceNode *P2PNode,
+	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
 	topic string) {
 
@@ -218,7 +218,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 
 func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
-	sourceNode *P2PNode,
+	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
 	topic string) {
 

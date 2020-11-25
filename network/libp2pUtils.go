@@ -112,8 +112,8 @@ func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
 	return addr, nil
 }
 
-// nodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
-func nodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
+// NodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
+func NodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
 
 	// split the node address into ip and port
 	ip, port, err := net.SplitHostPort(flowIdentity.Address)

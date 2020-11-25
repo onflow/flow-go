@@ -142,7 +142,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 // CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*P2PNode) {
+func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*Node) {
 	// keeps track of errors on creating a node
 	var err error
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -162,7 +162,7 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 		pkey, err := generateNetworkingKey(name)
 		require.NoError(psts.Suite.T(), err)
 
-		n := &P2PNode{}
+		n := &Node{}
 		nodeID := NodeAddress{
 			Name:   name,
 			IP:     "0.0.0.0",        // localhost
@@ -184,7 +184,7 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 }
 
 // StopNodes stop all nodes in the input slice
-func (psts *PubSubTestSuite) StopNodes(nodes []*P2PNode) {
+func (psts *PubSubTestSuite) StopNodes(nodes []*Node) {
 	for _, n := range nodes {
 		done, err := n.Stop()
 		assert.NoError(psts.Suite.T(), err)

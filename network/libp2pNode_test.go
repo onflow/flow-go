@@ -571,10 +571,10 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 // CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandler, allowList bool) ([]*P2PNode, []NodeAddress) {
+func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandler, allowList bool) ([]*Node, []NodeAddress) {
 	// keeps track of errors on creating a node
 	var err error
-	var nodes []*P2PNode
+	var nodes []*Node
 
 	defer func() {
 		if err != nil && nodes != nil {
@@ -600,8 +600,8 @@ func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamH
 }
 
 func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
-	handler network.StreamHandler, allowList bool) (*P2PNode, NodeAddress) {
-	n := &P2PNode{}
+	handler network.StreamHandler, allowList bool) (*Node, NodeAddress) {
+	n := &Node{}
 	nodeID := NodeAddress{
 		Name:   name,
 		IP:     ip,
@@ -634,13 +634,13 @@ func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip
 }
 
 // StopNodes stop all nodes in the input slice
-func (suite *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
+func (suite *LibP2PNodeTestSuite) StopNodes(nodes []*Node) {
 	for _, n := range nodes {
 		suite.StopNode(n)
 	}
 }
 
-func (suite *LibP2PNodeTestSuite) StopNode(node *P2PNode) {
+func (suite *LibP2PNodeTestSuite) StopNode(node *Node) {
 	done, err := node.Stop()
 	assert.NoError(suite.T(), err)
 	<-done

@@ -58,7 +58,7 @@ type Middleware struct {
 	codec             network.Codec
 	ov                middleware.Overlay
 	wg                *sync.WaitGroup
-	libP2PNode        *network.P2PNode
+	libP2PNode        *network.Node
 	me                flow.Identifier
 	host              string
 	port              string
@@ -81,7 +81,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
-	p2p := &network.P2PNode{}
+	p2p := &network.Node{}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if len(validators) == 0 {
@@ -352,13 +352,13 @@ func (m *Middleware) nodeAddressFromID(id flow.Identifier) (network.NodeAddress,
 		return network.NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
 	}
 
-	return network.nodeAddressFromIdentity(flowIdentity)
+	return network.NodeAddressFromIdentity(flowIdentity)
 }
 
 func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]network.NodeAddress, error) {
 	var nodeAddrs []network.NodeAddress
 	for _, identity := range identityMap {
-		nodeAddress, err := network.nodeAddressFromIdentity(identity)
+		nodeAddress, err := network.NodeAddressFromIdentity(identity)
 		if err != nil {
 			return nil, err
 		}
@@ -381,7 +381,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	log.Info().Msg("incoming connection established")
 
 	//create a new readConnection with the context of the middleware
-	conn := network.newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
+	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
 
 	// kick off the receive loop to continuously receive messages
 	m.wg.Add(1)

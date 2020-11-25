@@ -51,8 +51,8 @@ type NodeAddress struct {
 	PubKey lcrypto.PubKey
 }
 
-// P2PNode manages the the libp2p node.
-type P2PNode struct {
+// Node manages the the libp2p node.
+type Node struct {
 	sync.Mutex
 	name                 string                          // friendly human readable Name of the node
 	libP2PHost           host.Host                       // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
@@ -66,7 +66,7 @@ type P2PNode struct {
 }
 
 // Start starts a libp2p node on the given address.
-func (p *P2PNode) Start(ctx context.Context,
+func (p *Node) Start(ctx context.Context,
 	n NodeAddress,
 	logger zerolog.Logger,
 	key lcrypto.PrivKey,
@@ -160,7 +160,7 @@ func (p *P2PNode) Start(ctx context.Context,
 }
 
 // Stop stops the libp2p node.
-func (p *P2PNode) Stop() (chan struct{}, error) {
+func (p *Node) Stop() (chan struct{}, error) {
 	var result error
 	done := make(chan struct{})
 	p.logger.Debug().Str("name", p.name).Msg("unsubscribing from all topics")
@@ -210,7 +210,7 @@ func (p *P2PNode) Stop() (chan struct{}, error) {
 }
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
-func (p *P2PNode) AddPeer(ctx context.Context, peer NodeAddress) error {
+func (p *Node) AddPeer(ctx context.Context, peer NodeAddress) error {
 	pInfo, err := GetPeerInfo(peer)
 	if err != nil {
 		return fmt.Errorf("failed to add peer %s: %w", peer.Name, err)
@@ -225,7 +225,7 @@ func (p *P2PNode) AddPeer(ctx context.Context, peer NodeAddress) error {
 }
 
 // RemovePeer closes the connection with the peer
-func (p *P2PNode) RemovePeer(ctx context.Context, peer NodeAddress) error {
+func (p *Node) RemovePeer(ctx context.Context, peer NodeAddress) error {
 	pInfo, err := GetPeerInfo(peer)
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
@@ -239,7 +239,7 @@ func (p *P2PNode) RemovePeer(ctx context.Context, peer NodeAddress) error {
 }
 
 // CreateStream returns an existing stream connected to n if it exists or adds node n as a peer and creates a new stream with it
-func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
+func (p *Node) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
 
 	// Get the PeerID
 	peerID, err := peer.IDFromPublicKey(n.PubKey)
@@ -258,7 +258,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 // tryCreateNewStream makes at most maxAttempts to create a stream with the target peer
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
-func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetID peer.ID, maxAttempts int) (network.Stream, error) {
+func (p *Node) tryCreateNewStream(ctx context.Context, n NodeAddress, targetID peer.ID, maxAttempts int) (network.Stream, error) {
 	var errs, err error
 	var s network.Stream
 	var retries = 0
@@ -345,14 +345,14 @@ func GetPeerInfos(addrs ...NodeAddress) ([]peer.AddrInfo, error) {
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
-func (p *P2PNode) GetIPPort() (string, string, error) {
+func (p *Node) GetIPPort() (string, string, error) {
 	return IPPortFromMultiAddress(p.libP2PHost.Network().ListenAddresses()...)
 }
 
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (p *P2PNode) Subscribe(ctx context.Context, topic string) (*pubsub.Subscription, error) {
+func (p *Node) Subscribe(ctx context.Context, topic string) (*pubsub.Subscription, error) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -382,7 +382,7 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic string) (*pubsub.Subscrip
 }
 
 // UnSubscribe cancels the subscriber and closes the topic.
-func (p *P2PNode) UnSubscribe(topic string) error {
+func (p *Node) UnSubscribe(topic string) error {
 	p.Lock()
 	defer p.Unlock()
 	// Remove the Subscriber from the cache
@@ -412,7 +412,7 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 }
 
 // Publish publishes the given payload on the topic
-func (p *P2PNode) Publish(ctx context.Context, topic string, data []byte) error {
+func (p *Node) Publish(ctx context.Context, topic string, data []byte) error {
 	ps, found := p.topics[topic]
 	if !found {
 		return fmt.Errorf("could not find topic (%s)", topic)
@@ -425,7 +425,7 @@ func (p *P2PNode) Publish(ctx context.Context, topic string, data []byte) error 
 }
 
 // Ping pings a remote node and returns the time it took to ping the remote node if successful or the error
-func (p *P2PNode) Ping(ctx context.Context, target NodeAddress) (time.Duration, error) {
+func (p *Node) Ping(ctx context.Context, target NodeAddress) (time.Duration, error) {
 
 	pingError := func(err error) (time.Duration, error) {
 		return -1, fmt.Errorf("failed to ping %s (%s:%s): %w", target.Name, target.IP, target.Port, err)
@@ -510,7 +510,7 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 }
 
 // UpdateAllowlist allows the peer allowlist to be updated
-func (p *P2PNode) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
+func (p *Node) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
 	whilelistPInfos, err := GetPeerInfos(allowListAddrs...)
 	if err != nil {
 		return fmt.Errorf("failed to create approved list of peers: %w", err)
@@ -520,7 +520,7 @@ func (p *P2PNode) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
 }
 
 // IsConnected returns true is address is a direct peer of this node else false
-func (p *P2PNode) IsConnected(address NodeAddress) (bool, error) {
+func (p *Node) IsConnected(address NodeAddress) (bool, error) {
 	pInfo, err := GetPeerInfo(address)
 	if err != nil {
 		return false, err
