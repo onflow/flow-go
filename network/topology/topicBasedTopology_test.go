@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network/channel"
+	"github.com/onflow/flow-go/network"
 	protocol2 "github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -25,7 +25,7 @@ type TopicAwareTopologyTestSuite struct {
 	state    protocol2.State   // represents a mocked protocol state
 	all      flow.IdentityList // represents the identity list of all nodes in the system
 	clusters flow.ClusterList  // represents list of cluster ids of collection nodes
-	subMngr  []channel.SubscriptionManager
+	subMngr  []network.SubscriptionManager
 	logger   zerolog.Logger
 	fanout   uint // represents maximum number of connections this peer allows to have
 }

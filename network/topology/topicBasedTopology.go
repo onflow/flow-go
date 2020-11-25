@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network/channel"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -17,7 +17,7 @@ import (
 type TopicBasedTopology struct {
 	me      flow.Identifier             // used to keep identifier of the node
 	state   protocol.ReadOnlyState      // used to keep a read only protocol state
-	subMngr channel.SubscriptionManager // used to keep track topics the node subscribed to
+	subMngr network.SubscriptionManager // used to keep track topics the node subscribed to
 	logger  zerolog.Logger
 	seed    int64
 }
@@ -26,7 +26,7 @@ type TopicBasedTopology struct {
 func NewTopicBasedTopology(nodeID flow.Identifier,
 	logger zerolog.Logger,
 	state protocol.ReadOnlyState,
-	subMngr channel.SubscriptionManager) (*TopicBasedTopology, error) {
+	subMngr network.SubscriptionManager) (*TopicBasedTopology, error) {
 	seed, err := seedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)

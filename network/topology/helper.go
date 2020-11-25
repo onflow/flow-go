@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network/channel"
+	"github.com/onflow/flow-go/network"
 	mock2 "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -74,10 +74,10 @@ func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityL
 // MockSubscriptionManager returns a list of mocked subscription manages for the input
 // identities. It only mocks the GetChannelIDs method of the subscription manager. Other methods
 // return an error, as they are not supposed to be invoked.
-func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []channel.SubscriptionManager {
+func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.SubscriptionManager {
 	require.NotEmpty(t, ids)
 
-	sms := make([]channel.SubscriptionManager, len(ids))
+	sms := make([]network.SubscriptionManager, len(ids))
 	for i, id := range ids {
 		sm := &mock2.SubscriptionManager{}
 		err := fmt.Errorf("this method should not be called on mock subscription manager")

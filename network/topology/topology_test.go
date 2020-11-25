@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network/channel"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -74,7 +74,7 @@ func (suite *TopologyTestSuite) TestHighScale() {
 // - cluster: number of clusters of collection nodes
 func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster int) (protocol.State,
 	flow.IdentityList,
-	[]channel.SubscriptionManager) {
+	[]network.SubscriptionManager) {
 
 	collector, _ := test.GenerateIDs(suite.T(), col, test.DryRun, unittest.WithRole(flow.RoleCollection))
 	access, _ := test.GenerateIDs(suite.T(), acc, test.DryRun, unittest.WithRole(flow.RoleAccess))
@@ -152,7 +152,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 // topologyScenario is a test helper that creates a StatefulTopologyManager with the LinearFanoutFunc,
 // it creates a TopicBasedTopology for the node and returns its fanout.
 func (suite *TopologyTestSuite) topologyScenario(me flow.Identifier,
-	subMngr channel.SubscriptionManager,
+	subMngr network.SubscriptionManager,
 	ids flow.IdentityList,
 	state protocol.ReadOnlyState) flow.IdentityList {
 
