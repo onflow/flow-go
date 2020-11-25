@@ -14,9 +14,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channel"
-	"github.com/onflow/flow-go/network/internal"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/middleware"
+	"github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/network/queue"
 	"github.com/onflow/flow-go/network/topology"
 )
@@ -131,7 +131,7 @@ func (n *Network) Register(channelID string, engine Engine) (Conduit, error) {
 	ctx, cancel := context.WithCancel(n.ctx)
 
 	// create the conduit
-	conduit := &internal.Conduit{
+	conduit := &protocol.Conduit{
 		ctx:       ctx,
 		cancel:    cancel,
 		channelID: channelID,

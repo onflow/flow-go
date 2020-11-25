@@ -5,18 +5,18 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/internal"
+	"github.com/onflow/flow-go/network/protocol"
 )
 
 type Conduit struct {
 	channelID string
 	ctx       context.Context
 	cancel    context.CancelFunc
-	submit    internal.SubmitFunc
-	publish   internal.PublishFunc
-	unicast   internal.UnicastFunc
-	multicast internal.MulticastFunc
-	close     internal.CloseFunc
+	submit    protocol.SubmitFunc
+	publish   protocol.PublishFunc
+	unicast   protocol.UnicastFunc
+	multicast protocol.MulticastFunc
+	close     protocol.CloseFunc
 }
 
 func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
