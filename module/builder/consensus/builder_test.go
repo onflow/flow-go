@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -588,43 +587,6 @@ func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 
 	//bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-
-}
-
-// TestPayloadSealSomeValidOnFork verifies that builder only includes seals whose
-//
-// if an IncorporatedResultSeal is included in mempool, whose final state does not match the execution result
-func (bs *BuilderSuite) TestPayloadSealOnlyFork2() {
-	parentBlock := bs.blocks[bs.finalID]
-	previousResult, found := bs.resultForBlock[parentBlock.ID()]
-	if !found {
-		panic("missing execution result for parent")
-	}
-
-	// ======================
-	var incorporatedResultForPrevBlock *flow.IncorporatedResult
-	incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithResult(previousResult),
-		//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
-		unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
-	)
-	fmt.Println(fmt.Sprintf("IncorporatedResult ID 1: %x", incorporatedResultForPrevBlock.ID()))
-	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
-		unittest.IncorporatedResultSeal.WithResult(incorporatedResultForPrevBlock.Result),
-	)
-	fmt.Println(fmt.Sprintf("incorporated Seal ID 1: %x", incorporatedResultSeal.ID()))
-
-	// ======================
-	incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithResult(previousResult),
-		//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
-		unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
-	)
-	fmt.Println(fmt.Sprintf("IncorporatedResult ID 2: %x", incorporatedResultForPrevBlock.ID()))
-	incorporatedResultSeal = unittest.IncorporatedResultSeal.Fixture(
-		unittest.IncorporatedResultSeal.WithResult(incorporatedResultForPrevBlock.Result),
-	)
-	fmt.Println(fmt.Sprintf("incorporated Seal ID 2: %x", incorporatedResultSeal.ID()))
 
 }
 
