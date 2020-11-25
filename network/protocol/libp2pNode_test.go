@@ -345,10 +345,6 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 // TestCreateStreamIsConcurrent tests that CreateStream calls can be made concurrently such that one blocked call
 // does not block another concurrent call.
 func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
-
-	//// bump up the unicast timeout to a high value
-	//protocol.unicastTimeout = time.Hour
-
 	// create two regular node
 	goodPeers, goodAddrs := suite.CreateNodes(2, nil, false)
 	defer suite.StopNodes(goodPeers)
