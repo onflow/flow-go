@@ -91,6 +91,10 @@ func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*
 	return identity, nil
 }
 
+// LeaderForView returns the node ID of the leader for the given view. Returns
+// the following errors:
+//  * epoch containing the requested view has not been set up (protocol.ErrNextEpochNotSetup)
+//  * any other error indicates an unexpected internal error
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
 	// try to retrieve the leader from a pre-computed LeaderSelection

@@ -35,7 +35,11 @@ func (mock *EpochQuery) Current() protocol.Epoch {
 }
 
 func (mock *EpochQuery) Next() protocol.Epoch {
-	return mock.byCounter[mock.counter+1]
+	epoch, exists := mock.byCounter[mock.counter+1]
+	if !exists {
+		return bprotocol.NewInvalidEpoch(protocol.ErrNextEpochNotSetup)
+	}
+	return epoch
 }
 
 func (mock *EpochQuery) Previous() protocol.Epoch {
