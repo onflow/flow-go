@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -29,9 +28,9 @@ import (
 // of engines over a complete graph
 type MeshEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                    // used as a wrapper around conduit methods
-	nets           []*network.Network // used to keep track of the networks
-	ids            flow.IdentityList  // used to keep track of the identifiers associated with networks
+	ConduitWrapper                     // used as a wrapper around conduit methods
+	nets           []*protocol.Network // used to keep track of the networks
+	ids            flow.IdentityList   // used to keep track of the identifiers associated with networks
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
@@ -298,7 +297,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[0].NodeID))).NodeIDs()
 
 	// generates and sends an event of custom size to the network
-	payload := network.NetworkPayloadFixture(suite.T(), size)
+	payload := networkPayloadFixture(suite.T(), size)
 	event := &message.TestMessage{
 		Text: string(payload),
 	}

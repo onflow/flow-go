@@ -32,7 +32,7 @@ import (
 type MutableIdentityTableSuite struct {
 	suite.Suite
 	ConduitWrapper
-	nets         []*network.Network
+	nets         []*protocol2.Network
 	mws          []*protocol2.Middleware
 	idRefreshers []*network.NodeIDRefresher
 	engines      []*MeshEngine
@@ -210,7 +210,7 @@ func sendMessagesAndVerify(t *testing.T, ids flow.IdentityList, engs []*MeshEngi
 	unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 }
 
-func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*network.Network) []*network.NodeIDRefresher {
+func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*protocol2.Network) []*network.NodeIDRefresher {
 	refreshers := make([]*network.NodeIDRefresher, len(nets))
 	for i, net := range nets {
 		refreshers[i] = network.NewNodeIDRefresher(suite.logger, suite.state, net.SetIDs)

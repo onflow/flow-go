@@ -15,12 +15,12 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	message2 "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channel"
 	"github.com/onflow/flow-go/network/codec/json"
 	protocol2 "github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/network/topology"
@@ -100,10 +100,10 @@ func GenerateNetworks(t *testing.T,
 	mws []*protocol2.Middleware,
 	csize int,
 	tops []topology.Topology,
-	sms []channel.SubscriptionManager,
-	dryRunMode bool) []*network.Network {
+	sms []network.SubscriptionManager,
+	dryRunMode bool) []*protocol2.Network {
 	count := len(ids)
-	nets := make([]*network.Network, 0)
+	nets := make([]*protocol2.Network, 0)
 	metrics := metrics.NewNoopCollector()
 
 	// checks if necessary to generate topology managers
@@ -130,7 +130,7 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := network.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
+		net, err := protocol2.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -161,7 +161,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []topology.Topology,
-	dryRun bool) (flow.IdentityList, []*protocol2.Middleware, []*network.Network) {
+	dryRun bool) (flow.IdentityList, []*protocol2.Middleware, []*protocol2.Network) {
 	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
@@ -169,7 +169,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 }
 
 // GenerateEngines generates MeshEngines for the given networks
-func GenerateEngines(t *testing.T, nets []*network.Network) []*MeshEngine {
+func GenerateEngines(t *testing.T, nets []*protocol2.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
@@ -197,7 +197,7 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 // CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
 // and returns the slice of topologies.
 func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList,
-	subMngrs []channel.SubscriptionManager, logger zerolog.Logger) []topology.Topology {
+	subMngrs []network.SubscriptionManager, logger zerolog.Logger) []topology.Topology {
 	tops := make([]topology.Topology, 0)
 	for i, id := range identities {
 		var top topology.Topology
@@ -212,19 +212,19 @@ func GenerateTopologies(t *testing.T, state protocol.State, identities flow.Iden
 }
 
 // GenerateSubscriptionManagers creates and returns a ChannelSubscriptionManager for each middleware object.
-func GenerateSubscriptionManagers(t *testing.T, mws []*protocol2.Middleware) []channel.SubscriptionManager {
+func GenerateSubscriptionManagers(t *testing.T, mws []*protocol2.Middleware) []network.SubscriptionManager {
 	require.NotEmpty(t, mws)
 
-	sms := make([]channel.SubscriptionManager, len(mws))
+	sms := make([]network.SubscriptionManager, len(mws))
 	for i, mw := range mws {
-		sms[i] = network.NewChannelSubscriptionManager(mw)
+		sms[i] = protocol2.NewChannelSubscriptionManager(mw)
 	}
 	return sms
 }
 
 // stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
 // duration.
-func stopNetworks(t *testing.T, nets []*network.Network, duration time.Duration) {
+func stopNetworks(t *testing.T, nets []*protocol2.Network, duration time.Duration) {
 	// casts nets instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(nets))
 	for _, net := range nets {
@@ -233,4 +233,41 @@ func stopNetworks(t *testing.T, nets []*network.Network, duration time.Duration)
 
 	unittest.RequireCloseBefore(t, lifecycle.AllDone(comps...), duration,
 		"could not stop the networks")
+}
+
+// networkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
+// The primary goal of utilizing this helper function is to apply stress tests on the network layer by
+// sending large messages to transmit.
+func networkPayloadFixture(t *testing.T, size uint) []byte {
+	// reserves 1000 bytes for the message headers, encoding overhead, and libp2p message overhead.
+	overhead := 1000
+	require.Greater(t, int(size), overhead, "could not generate message below size threshold")
+	emptyEvent := &message2.TestMessage{
+		Text: "",
+	}
+
+	// encodes the message
+	codec := json.NewCodec()
+	empty, err := codec.Encode(emptyEvent)
+	require.NoError(t, err)
+
+	// max possible payload size
+	payloadSize := int(size) - overhead - len(empty)
+	payload := make([]byte, payloadSize)
+
+	// populates payload with random bytes
+	for i := range payload {
+		payload[i] = 'a' // a utf-8 char that translates to 1-byte when converted to a string
+	}
+
+	event := emptyEvent
+	event.Text = string(payload)
+	// encode event the way the network would encode it to get the size of the message
+	// just to do the size check
+	encodedEvent, err := codec.Encode(event)
+	require.NoError(t, err)
+
+	require.InDelta(t, len(encodedEvent), int(size), float64(overhead))
+
+	return payload
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/cache"
-	"github.com/onflow/flow-go/network/channel"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/middleware"
 	"github.com/onflow/flow-go/network/protocol"
@@ -38,7 +37,7 @@ type Network struct {
 	queue   queue.MessageQueue
 	ctx     context.Context
 	cancel  context.CancelFunc
-	subMngr channel.SubscriptionManager // used to keep track of subscribed channels
+	subMngr SubscriptionManager // used to keep track of subscribed channels
 
 }
 
@@ -54,7 +53,7 @@ func NewNetwork(
 	mw middleware.Middleware,
 	csize int,
 	top topology.Topology,
-	sm channel.SubscriptionManager,
+	sm SubscriptionManager,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
 

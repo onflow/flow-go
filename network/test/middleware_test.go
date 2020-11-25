@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	message2 "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/message"
 	mock2 "github.com/onflow/flow-go/network/mock"
@@ -240,11 +239,11 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	msg := createMessage(firstNode, lastNode, "")
 
 	// creates a network payload beyond the maximum message size
-	// Note: NetworkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
+	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
 	// so the generated payload is 1000 bytes below the maximum unicast message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := network.NetworkPayloadFixture(m.T(), uint(protocol.DefaultMaxUnicastMsgSize)+1000)
+	payload := networkPayloadFixture(m.T(), uint(protocol.DefaultMaxUnicastMsgSize)+1000)
 	event := &message2.TestMessage{
 		Text: string(payload),
 	}
@@ -273,11 +272,11 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	msg.TargetIDs = append(msg.TargetIDs, lastNode[:])
 
 	// creates a network payload beyond the maximum message size
-	// Note: NetworkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
+	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
 	// so the generated payload is 1000 bytes below the maximum publish message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := network.NetworkPayloadFixture(m.T(), uint(protocol.DefaultMaxPubSubMsgSize)+1000)
+	payload := networkPayloadFixture(m.T(), uint(protocol.DefaultMaxPubSubMsgSize)+1000)
 	event := &message2.TestMessage{
 		Text: string(payload),
 	}
