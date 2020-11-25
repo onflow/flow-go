@@ -24,6 +24,10 @@ var (
 	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
 )
 
+func newLedgerGetError(key string, address flow.Address, err error) error {
+	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
+}
+
 func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
@@ -290,10 +294,6 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), contractKey(contractName), contract)
 
 	return nil
-}
-
-func newLedgerGetError(key string, address flow.Address, err error) error {
-	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
 }
 
 func (a *Accounts) setContractNames(contractNames contractNames, address flow.Address) error {
