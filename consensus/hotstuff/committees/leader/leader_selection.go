@@ -32,14 +32,14 @@ func (l LeaderSelection) FinalView() uint64 {
 // LeaderIndexForView returns the leader index for given view.
 // If the view is smaller than the epochStartView, an error will be returned.
 func (l LeaderSelection) LeaderIndexForView(view uint64) (int, error) {
-	if view < l.epochStartView {
-		return 0, fmt.Errorf("view (%v) is smaller than the epochStartView (%v)", view, l.epochStartView)
+	if view < l.FirstView() {
+		return -1, fmt.Errorf("view (%d) before first view of epoch (%d)", view, l.FirstView())
+	}
+	if view > l.FinalView() {
+		return -1, fmt.Errorf("view (%d) after last view of epoch (%d)", view, l.FirstView())
 	}
 
 	index := int(view - l.epochStartView)
-	if index >= len(l.leaderIndexesForView) {
-		return 0, fmt.Errorf("view out of cached range: %v", view)
-	}
 	return l.leaderIndexesForView[index], nil
 }
 
