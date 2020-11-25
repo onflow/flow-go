@@ -547,4 +547,55 @@ import ITest from %s
 		require.NoError(t, err)
 		require.False(t, called)
 	})
+
+	t.Run("contract object", func(t *testing.T) {
+
+		key := ledger.Key{
+			KeyParts: []ledger.KeyPart{
+				ledger.NewKeyPart(state.KeyPartOwner, flow.HexToAddress("01").Bytes()),
+				ledger.NewKeyPart(state.KeyPartController, []byte("")),
+				ledger.NewKeyPart(state.KeyPartKey, []byte("contract")),
+			},
+		}
+		payload := ledger.Payload{
+			Key:   key,
+			Value: []byte{
+				// tag
+				0xd8, 0x84,
+				// map, 4 pairs of items follow
+				0xa4,
+				// key 0
+				0x0,
+				// tag
+				0xd8, 0xC0,
+				// byte sequence, length 1
+				0x41,
+				// positive integer 1
+				0x1,
+				// key 1
+				0x1,
+				// UTF-8 string, length 18
+				0x72,
+				// A.0x1.SimpleStruct
+				0x41,
+				0x2E, 0x30, 0x78, 0x31,
+				0x2E, 0x53, 0x69, 0x6d, 0x70, 0x6c, 0x65, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74,
+				// key 2
+				0x2,
+				// positive integer 1
+				0x1,
+				// key 3
+				0x3,
+				// map, 0 pairs of items follow
+				0xa0,
+			},
+		}
+
+		migrated, err := migrations.MultipleContractMigration([]ledger.Payload{payload})
+		require.NoError(t, err)
+		require.Len(t, migrated, 1)
+		require.Equal(t, string(migrated[0].Key.KeyParts[2].Value), "contract\x1fSimpleStruct")
+		require.Equal(t, migrated[0].Value, payload.Value)
+	})
+
 }
