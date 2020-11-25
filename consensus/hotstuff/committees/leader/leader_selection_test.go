@@ -70,22 +70,22 @@ func bruteSearch(value uint64, arr []uint64) (int, error) {
 
 // Test given the same seed, the leader selection will produce the same selection
 func TestDeterministic(t *testing.T) {
-	identities := []*flow.Identity{
-		{Stake: 1},
-		{Stake: 2},
-		{Stake: 3},
-		{Stake: 4},
+
+	const N_VIEWS = 100
+	const N_NODES = 4
+
+	identities := unittest.IdentityListFixture(N_NODES)
+	for i, identity := range identities {
+		identity.Stake = uint64(i + 1)
 	}
 
-	count := 100
-
-	leaders1, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+	leaders1, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	leaders2, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+	leaders2, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	for i := 0; i < count; i++ {
+	for i := 0; i < N_VIEWS; i++ {
 		l1, err := leaders1.LeaderForView(uint64(i))
 		require.NoError(t, err)
 
@@ -97,12 +97,14 @@ func TestDeterministic(t *testing.T) {
 }
 
 func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
-	identities := unittest.IdentityListFixture(4)
+
+	const N_VIEWS = 100
+	const N_NODES = 4
+
+	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
 		identity.Stake = uint64(i)
 	}
-
-	count := 100
 
 	seed1 := make([]byte, 16)
 	seed1[0] = 34
@@ -110,14 +112,14 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 	seed2 := make([]byte, 16)
 	seed2[0] = 8
 
-	leaders1, err := ComputeLeaderSelectionFromSeed(0, seed1, count, identities)
+	leaders1, err := ComputeLeaderSelectionFromSeed(0, seed1, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	leaders2, err := ComputeLeaderSelectionFromSeed(0, seed2, count, identities)
+	leaders2, err := ComputeLeaderSelectionFromSeed(0, seed2, N_VIEWS, identities)
 	require.NoError(t, err)
 
 	diff := 0
-	for view := 0; view < count; view++ {
+	for view := 0; view < N_VIEWS; view++ {
 		l1, err := leaders1.LeaderForView(uint64(view))
 		require.NoError(t, err)
 
@@ -137,14 +139,12 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 // won't go too far from that.
 func TestLeaderSelectionAreWeighted(t *testing.T) {
 
-	const (
-		N_VIEWS = 100000
-		N_NODES = 4
-	)
+	const N_VIEWS = 100000
+	const N_NODES = 4
 
-	identities := make(flow.IdentityList, 0, N_NODES)
-	for i := 0; i < N_NODES; i++ {
-		identities = append(identities, unittest.IdentityFixture(unittest.WithStake(uint64(i+1))))
+	identities := unittest.IdentityListFixture(N_NODES)
+	for i, identity := range identities {
+		identity.Stake = uint64(i + 1)
 	}
 
 	leaders, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
@@ -179,6 +179,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 
 func BenchmarkLeaderSelection(b *testing.B) {
 
+	const N_VIEWS = 15000000
 	const N_NODES = 20
 
 	identities := make([]*flow.Identity, 0, N_NODES)
@@ -187,7 +188,7 @@ func BenchmarkLeaderSelection(b *testing.B) {
 	}
 
 	for n := 0; n < b.N; n++ {
-		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 15000000, identities)
+		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 
 		require.NoError(b, err)
 	}
