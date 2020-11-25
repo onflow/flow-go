@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/internal"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/middleware"
 	"github.com/onflow/flow-go/network/validators"
@@ -188,7 +189,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
 
-	libp2pConnector, err := network.NewLibp2pConnector(m.libP2PNode.libP2PHost)
+	libp2pConnector, err := network.NewLibp2pConnector(m.libP2PNode.Host())
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
@@ -381,11 +382,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	log.Info().Msg("incoming connection established")
 
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
+	conn := internal.NewReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
 
 	// kick off the receive loop to continuously receive messages
 	m.wg.Add(1)
-	go conn.receiveLoop(m.wg)
+	go conn.ReceiveLoop(m.wg)
 }
 
 // Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
@@ -399,11 +400,11 @@ func (m *Middleware) Subscribe(channelID string) error {
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := network.newReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
+	rs := internal.NewReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
-	go rs.receiveLoop(m.wg)
+	go rs.ReceiveLoop(m.wg)
 
 	// update peers to add some nodes interested in the same topic as direct peers
 	m.peerManager.RequestPeerUpdate()
@@ -512,7 +513,7 @@ func (m *Middleware) UpdateAllowList() error {
 
 // IsConnected returns true if this node is connected to the node with id nodeID
 func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
-	nodeAddress, err := network.nodeAddressFromIdentity(identity)
+	nodeAddress, err := network.NodeAddressFromIdentity(identity)
 	if err != nil {
 		return false, err
 	}
