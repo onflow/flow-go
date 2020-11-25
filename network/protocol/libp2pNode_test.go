@@ -1,4 +1,4 @@
-package network
+package libp2p
 
 import (
 	"bufio"
@@ -347,8 +347,8 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 // does not block another concurrent call.
 func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 
-	// bump up the unicast timeout to a high value
-	protocol.unicastTimeout = time.Hour
+	//// bump up the unicast timeout to a high value
+	//protocol.unicastTimeout = time.Hour
 
 	// create two regular node
 	goodPeers, goodAddrs := suite.CreateNodes(2, nil, false)

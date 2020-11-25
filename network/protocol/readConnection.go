@@ -1,4 +1,4 @@
-package internal
+package libp2p
 
 import (
 	"context"
@@ -27,7 +27,7 @@ type readConnection struct {
 }
 
 // newReadConnection creates a new readConnection
-func NewReadConnection(ctx context.Context,
+func newReadConnection(ctx context.Context,
 	stream libp2pnetwork.Stream,
 	callback func(msg *message.Message),
 	log zerolog.Logger,
@@ -49,9 +49,9 @@ func NewReadConnection(ctx context.Context,
 	return &c
 }
 
-// ReceiveLoop must be run in a goroutine and it continuously reads messages from the peer until
+// receiveLoop must be run in a goroutine and it continuously reads messages from the peer until
 // either the remote closes the stream or the context is cancelled
-func (rc *readConnection) ReceiveLoop(wg *sync.WaitGroup) {
+func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 
 	defer wg.Done()
 	defer rc.log.Debug().Msg("exiting receive routine")

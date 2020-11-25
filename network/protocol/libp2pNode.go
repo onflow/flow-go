@@ -1,5 +1,5 @@
 // Package libp2p encapsulates the libp2p library
-package network
+package libp2p
 
 import (
 	"context"
@@ -28,6 +28,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	network2 "github.com/onflow/flow-go/network"
 )
 
 const (
@@ -60,7 +61,7 @@ type Node struct {
 	ps                   *pubsub.PubSub                  // the reference to the pubsub instance
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
-	conMgr               ConnManager                     // the connection manager passed in to libp2p
+	conMgr               network2.ConnManager            // the connection manager passed in to libp2p
 	connGater            *connGater                      // the connection gator passed in to libp2p
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 }
@@ -87,7 +88,7 @@ func (n *Node) Start(ctx context.Context,
 		return err
 	}
 
-	n.conMgr = NewConnManager(logger, metrics)
+	n.conMgr = network2.NewConnManager(logger, metrics)
 
 	// create a transport which disables port reuse and web socket.
 	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
@@ -249,7 +250,7 @@ func (n *Node) CreateStream(ctx context.Context, nodeAddress NodeAddress) (netwo
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := n.tryCreateNewStream(ctx, nodeAddress, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", nodeAddress.Name, nodeAddress.IP,
+		return nil, network2.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", nodeAddress.Name, nodeAddress.IP,
 			nodeAddress.Port,
 			err))
 	}

@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/network/libp2p"
+	"github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -25,7 +27,7 @@ import (
 // 1 and 2 both can independently ensure that nodes from the old chain cannot communicate with nodes on the new chain
 // These tests are just to reconfirm the network behaviour and provide a test bed for future tests for sporking, if needed
 type SporkingTestSuite struct {
-	LibP2PNodeTestSuite
+	libp2p.LibP2PNodeTestSuite
 }
 
 func TestSporkingTestSuite(t *testing.T) {
@@ -38,17 +40,17 @@ func TestSporkingTestSuite(t *testing.T) {
 func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 
 	// create and start node 1 on localhost and random port
-	node1key, err := generateNetworkingKey("abc")
+	node1key, err := libp2p.generateNetworkingKey("abc")
 	require.NoError(h.T(), err)
-	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootBlockID, nil, false)
+	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", libp2p.rootBlockID, nil, false)
 	defer h.StopNode(node1)
 	h.T().Logf(" %s node started on %s:%s", node1.name, address1.IP, address1.Port)
 	h.T().Logf("libp2p ID for %s: %s", node1.name, node1.libP2PHost.ID())
 
 	// create and start node 2 on localhost and random port
-	node2key, err := generateNetworkingKey("def")
+	node2key, err := libp2p.generateNetworkingKey("def")
 	require.NoError(h.T(), err)
-	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootBlockID, nil, false)
+	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", libp2p.rootBlockID, nil, false)
 
 	// create stream from node 1 to node 2
 	testOneToOneMessagingSucceeds(h.T(), node1, address2)
@@ -59,12 +61,12 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	h.StopNode(node2)
 
 	// generate a new key
-	node2keyNew, err := generateNetworkingKey("ghi")
+	node2keyNew, err := libp2p.generateNetworkingKey("ghi")
 	require.NoError(h.T(), err)
 	assert.False(h.T(), node2key.Equals(node2keyNew))
 
 	// start node2 with the same name, ip and port but with the new key
-	node2, address2New := h.CreateNode(node2.name, node2keyNew, address2.IP, address2.Port, rootBlockID, nil, false)
+	node2, address2New := h.CreateNode(node2.name, node2keyNew, address2.IP, address2.Port, libp2p.rootBlockID, nil, false)
 	defer h.StopNode(node2)
 
 	// make sure the node2 indeed came up on the old ip and port
@@ -85,13 +87,13 @@ func (h *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	rootID1 := unittest.BlockFixture().ID().String()
 
 	// create and start node 1 on localhost and random port
-	node1key, err := generateNetworkingKey("abc")
+	node1key, err := libp2p.generateNetworkingKey("abc")
 	require.NoError(h.T(), err)
 	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootID1, nil, false)
 	defer h.StopNode(node1)
 
 	// create and start node 2 on localhost and random port
-	node2key, err := generateNetworkingKey("def")
+	node2key, err := libp2p.generateNetworkingKey("def")
 	require.NoError(h.T(), err)
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootID1, nil, false)
 
@@ -127,13 +129,13 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	rootIDBeforeSpork := unittest.BlockFixture().ID().String()
 
 	// create and start node 1 on localhost and random port
-	node1key, err := generateNetworkingKey("abc")
+	node1key, err := libp2p.generateNetworkingKey("abc")
 	require.NoError(h.T(), err)
 	node1, _ := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
 	defer h.StopNode(node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
-	node2key, err := generateNetworkingKey("def")
+	node2key, err := libp2p.generateNetworkingKey("def")
 	require.NoError(h.T(), err)
 	node2, addr2 := h.CreateNode("node1", node2key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
 	defer h.StopNode(node2)
@@ -178,7 +180,7 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	testOneToKMessagingFails(ctx, h.T(), node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, dstnAddress NodeAddress) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *protocol.Node, dstnAddress protocol.NodeAddress) {
 	// create stream from node 1 to node 2
 	s, err := sourceNode.CreateStream(context.Background(), dstnAddress)
 	// assert that stream creation succeeded
@@ -186,7 +188,7 @@ func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, dstnAddress N
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, dstnAddress NodeAddress) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode *protocol.Node, dstnAddress protocol.NodeAddress) {
 	// create stream from source node to destination address
 	_, err := sourceNode.CreateStream(context.Background(), dstnAddress)
 	// assert that stream creation failed
@@ -197,7 +199,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, dstnAddress Node
 
 func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
-	sourceNode *Node,
+	sourceNode *protocol.Node,
 	dstnSub *pubsub.Subscription,
 	topic string) {
 
@@ -218,7 +220,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 
 func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
-	sourceNode *Node,
+	sourceNode *protocol.Node,
 	dstnSub *pubsub.Subscription,
 	topic string) {
 

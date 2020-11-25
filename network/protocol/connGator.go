@@ -1,4 +1,4 @@
-package network
+package libp2p
 
 import (
 	"sync"

@@ -1,4 +1,4 @@
-package internal
+package libp2p
 
 import (
 	"context"
@@ -22,7 +22,7 @@ type readSubscription struct {
 	callback func(msg *message.Message)
 }
 
-// newReadSubscription reads the messages coming in on the subscription
+// NewReadSubscription reads the messages coming in on the subscription
 func NewReadSubscription(ctx context.Context,
 	sub *pubsub.Subscription,
 	callback func(msg *message.Message),

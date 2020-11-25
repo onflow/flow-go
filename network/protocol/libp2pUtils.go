@@ -1,4 +1,4 @@
-package network
+package libp2p
 
 // All utilities for libp2p not natively provided by the library.
 
@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
+	network2 "github.com/onflow/flow-go/network"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -99,7 +100,7 @@ func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 //    |-- NetworkPublicKey --->   |-- ID
 func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
 
-	nodeAddress, err := nodeAddressFromIdentity(id)
+	nodeAddress, err := NodeAddressFromIdentity(id)
 	if err != nil {
 		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
 	}
@@ -122,7 +123,7 @@ func NodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := PublicKey(flowIdentity.NetworkPubKey)
+	lkey, err := network2.PublicKey(flowIdentity.NetworkPubKey)
 	if err != nil {
 		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
