@@ -262,14 +262,13 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		return nil, fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
-	l.logger.Info().Msg("Checking validity of the trie at the given state...")
-
+	// TODO enable validity check of trie
 	// only check validity of the trie we are interested in
-	if !t.IsAValidTrie() {
-		return nil, fmt.Errorf("trie is not valid: %w", err)
-	}
-
-	l.logger.Info().Msg("Trie is valid.")
+	// l.logger.Info().Msg("Checking validity of the trie at the given state...")
+	// if !t.IsAValidTrie() {
+	//	 return nil, fmt.Errorf("trie is not valid: %w", err)
+	// }
+	// l.logger.Info().Msg("Trie is valid.")
 
 	// get all payloads
 	payloads := t.AllPayloads()
