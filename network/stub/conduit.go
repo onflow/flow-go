@@ -5,18 +5,18 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/internal"
 )
 
 type Conduit struct {
 	channelID string
 	ctx       context.Context
 	cancel    context.CancelFunc
-	submit    libp2p.SubmitFunc
-	publish   libp2p.PublishFunc
-	unicast   libp2p.UnicastFunc
-	multicast libp2p.MulticastFunc
-	close     libp2p.CloseFunc
+	submit    internal.SubmitFunc
+	publish   internal.PublishFunc
+	unicast   internal.UnicastFunc
+	multicast internal.MulticastFunc
+	close     internal.CloseFunc
 }
 
 func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {

@@ -25,10 +25,10 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
-	"github.com/onflow/flow-go/network/gossip/libp2p"
-	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
-	"github.com/onflow/flow-go/network/gossip/libp2p/validators"
+	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/network/validators"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -118,8 +118,8 @@ type FlowNodeBuilder struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             *protocol.State
-	Middleware        *libp2p.Middleware
-	Network           *libp2p.Network
+	Middleware        *network.Middleware
+	Network           *network.Network
 	MsgValidators     []validators.MessageValidator
 	FvmOptions        []fvm.Option
 	modules           []namedModuleFunc
@@ -167,8 +167,8 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxUnicastMsgSize, libp2p.DefaultMaxPubSubMsgSize,
+		mw, err := network.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
+			fnb.networkKey, fnb.Metrics.Network, network.DefaultMaxUnicastMsgSize, network.DefaultMaxPubSubMsgSize,
 			fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
 		if err != nil {
@@ -176,7 +176,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 		fnb.Middleware = mw
 
-		participants, err := fnb.State.Final().Identities(libp2p.NetworkingSetFilter)
+		participants, err := fnb.State.Final().Identities(network.NetworkingSetFilter)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
@@ -185,14 +185,14 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		//
 		// topology
 		// subscription manager
-		subscriptionManager := libp2p.NewChannelSubscriptionManager(fnb.Middleware)
+		subscriptionManager := network.NewChannelSubscriptionManager(fnb.Middleware)
 		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State, subscriptionManager)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
 
 		// creates network instance
-		net, err := libp2p.NewNetwork(fnb.Logger,
+		net, err := network.NewNetwork(fnb.Logger,
 			codec,
 			participants,
 			fnb.Me,
@@ -207,7 +207,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		fnb.Network = net
 
-		idRefresher := libp2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
+		idRefresher := network.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
 		idEvents := gadgets.NewIdentityDeltas(idRefresher.OnIdentityTableChanged)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
