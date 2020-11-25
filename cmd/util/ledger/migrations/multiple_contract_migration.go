@@ -39,12 +39,12 @@ var (
 	MultipleContractsSpecialMigrations = make(map[string]func(ledger.Payload) ([]ledger.Payload, error))
 )
 
-func MultipleContractMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
-	migratedPayloads := make([]ledger.Payload, 0)
-	errors := make([]error, 0)
+func MultipleContractMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 
-	for _, p := range payload {
-		results, err := migrateRegister(p)
+	migratedPayloads, contractValueMappings, errors := migrateContractValues(payloads)
+
+	for _, p := range payloads {
+		results, err := migrateNonContractValue(p, contractValueMappings)
 		// dont fail fast... try to collect errors so multiple errors can be addressed at once
 		if err != nil {
 			errors = append(errors, err)
@@ -52,6 +52,7 @@ func MultipleContractMigration(payload []ledger.Payload) ([]ledger.Payload, erro
 		}
 		migratedPayloads = append(migratedPayloads, results...)
 	}
+
 	if len(errors) != 0 {
 		return nil, &MultipleContractMigrationError{
 			Errors: errors,
@@ -68,7 +69,11 @@ func keyToRegisterId(key ledger.Key) (flow.RegisterID, error) {
 		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
 	}
 
-	return flow.NewRegisterID(string(key.KeyParts[0].Value), string(key.KeyParts[1].Value), string(key.KeyParts[2].Value)), nil
+	return flow.NewRegisterID(
+		string(key.KeyParts[0].Value),
+		string(key.KeyParts[1].Value),
+		string(key.KeyParts[2].Value),
+	), nil
 }
 
 func createContractNamesKey(originalKey ledger.Key) ledger.Key {
@@ -106,37 +111,130 @@ func contractsRegister(contractsKey ledger.Key, contractNames []string) (ledger.
 	}, nil
 }
 
-func migrateRegister(p ledger.Payload) ([]ledger.Payload, error) {
-	registerId, err := keyToRegisterId(p.Key)
+const deferredValueOfContractValuePrefix = "contract\x1f"
+
+func migrateNonContractValue(p ledger.Payload, contractValueMappings map[string]string) ([]ledger.Payload, error) {
+	registerID, err := keyToRegisterId(p.Key)
 	if err != nil {
 		return nil, err
 	}
-	if !isAddress(registerId) {
+
+	// ignore contract value registers, they have already been migrated
+	if registerID.Key == "contract" {
+		return nil, nil
+	}
+
+	if !isAddress(registerID) {
 		return []ledger.Payload{p}, nil
 	}
 
-	switch registerId.Key {
-	case "code":
-		if em, hasEM := MultipleContractsSpecialMigrations[registerId.Owner]; hasEM {
+	// migrate contract code register
+	if registerID.Key == "code" {
+		if em, hasEM := MultipleContractsSpecialMigrations[registerID.Owner]; hasEM {
 			log.Info().
 				Err(err).
-				Str("address", flow.BytesToAddress([]byte(registerId.Owner)).HexWithPrefix()).
+				Str("address", flow.BytesToAddress([]byte(registerID.Owner)).HexWithPrefix()).
 				Msg("Using exceptional migration for address")
 			return em(p)
 		}
 		return migrateContractCode(p)
-	case "contract":
-		return migrateContract(p)
-	default:
-		return []ledger.Payload{p}, nil
 	}
+
+	// migrate deferred value of contract value
+	if strings.HasPrefix(registerID.Key, deferredValueOfContractValuePrefix) {
+		return migrateDeferredValueOfContractValue(p, registerID, contractValueMappings)
+	}
+
+	return []ledger.Payload{p}, nil
 }
 
-func migrateContract(p ledger.Payload) ([]ledger.Payload, error) {
-	address := common.BytesToAddress(flow.BytesToAddress(p.Key.KeyParts[0].Value).Bytes())
+func migrateDeferredValueOfContractValue(
+	payload ledger.Payload,
+	registerID flow.RegisterID,
+	mappings map[string]string,
+) (
+	[]ledger.Payload,
+	error,
+) {
+	registerKeySuffix := registerID.Key[len(deferredValueOfContractValuePrefix):]
+
+	address := string(payloadKeyAddress(payload))
+	contractName, ok := mappings[address]
+	if !ok {
+		return nil, fmt.Errorf("missing contract name for address: %s", address)
+	}
+
+	newRegisterKey := strings.Join([]string{
+		deferredValueOfContractValuePrefix,
+		contractName,
+		"\x1f",
+		registerKeySuffix,
+	}, "")
+
+	newPayload := ledger.Payload{
+		Key: changeKey(payload.Key, newRegisterKey),
+		Value: payload.Value,
+	}
+
+	return []ledger.Payload{newPayload}, nil
+}
+
+func migrateContractValues(payloads []ledger.Payload) ([]ledger.Payload, map[string]string, []error) {
+	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
+	contractValueMappings := make(map[string]string)
+	errors := make([]error, 0)
+
+	for _, p := range payloads {
+		registerID, err := keyToRegisterId(p.Key)
+		if err != nil {
+			// dont fail fast... try to collect errors so multiple errors can be addressed at once
+			errors = append(errors, err)
+			continue
+		}
+
+		if !isAddress(registerID) {
+			continue
+		}
+
+		if registerID.Key != "contract" {
+			continue
+		}
+
+		results, mapping, err := migrateContractValue(p)
+		if err != nil {
+			// dont fail fast... try to collect errors so multiple errors can be addressed at once
+			errors = append(errors, err)
+			continue
+		}
+		migratedPayloads = append(migratedPayloads, results...)
+
+		if mapping != nil {
+			if _, ok := contractValueMappings[string(mapping.address)]; ok {
+				err = fmt.Errorf(
+					"contract value mapping for address %v already exists",
+					mapping.address,
+				)
+				errors = append(errors, err)
+				continue
+			}
+			contractValueMappings[string(mapping.address)] = mapping.contractName
+		}
+	}
+
+	return migratedPayloads, contractValueMappings, errors
+}
+
+type contractValueMapping struct {
+	address []byte
+	contractName string
+}
+
+func migrateContractValue(p ledger.Payload) ([]ledger.Payload, *contractValueMapping, error) {
+	rawAddress := payloadKeyAddress(p)
+	address := common.BytesToAddress(flow.BytesToAddress(rawAddress).Bytes())
 	storedData, version := interpreter.StripMagic(p.Value)
 	if len(storedData) == 0 {
-		return []ledger.Payload{}, nil
+		return []ledger.Payload{}, nil, nil
 	}
 	storedValue, err := interpreter.DecodeValue(storedData, &address, []string{"contract"}, version)
 	if err != nil {
@@ -144,7 +242,7 @@ func migrateContract(p ledger.Payload) ([]ledger.Payload, error) {
 			Err(err).
 			Str("address", address.Hex()).
 			Msg("Cannot decode contract at address")
-		return nil, err
+		return nil, nil, err
 	}
 
 	value := interpreter.NewSomeValueOwningNonCopying(storedValue).Value.(*interpreter.CompositeValue)
@@ -154,21 +252,39 @@ func migrateContract(p ledger.Payload) ([]ledger.Payload, error) {
 			Str("TypeId", string(value.TypeID)).
 			Str("address", address.Hex()).
 			Msg("contract TypeId not in correct format")
-		return nil, fmt.Errorf("contract TypeId not in correct format")
+		return nil, nil, fmt.Errorf("contract TypeId not in correct format")
 	}
-	newKey := changeKey(p.Key, fmt.Sprintf("contract\x1F%s", pieces[2]))
+
+	contractName := pieces[2]
+
+	newKey := changeKey(p.Key, fmt.Sprintf("contract\x1F%s", contractName))
+
 	logKeyChange(address.Hex(), p.Key, newKey)
-	return []ledger.Payload{{
-		Key:   newKey,
-		Value: p.Value,
-	}}, nil
+
+	newPayloads := []ledger.Payload{
+		{
+			Key:   newKey,
+			Value: p.Value,
+		},
+	}
+
+	mapping := &contractValueMapping{
+		address:      rawAddress,
+		contractName: contractName,
+	}
+
+	return newPayloads, mapping, nil
+}
+
+func payloadKeyAddress(p ledger.Payload) []byte {
+	return p.Key.KeyParts[0].Value
 }
 
 func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 
 	// we don't need the the empty code register
 	value := p.Value
-	address := flow.BytesToAddress(p.Key.KeyParts[0].Value)
+	address := flow.BytesToAddress(payloadKeyAddress(p))
 	if len(value) == 0 {
 		return []ledger.Payload{}, nil
 	}
