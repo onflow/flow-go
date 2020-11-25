@@ -154,7 +154,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// if we get to this point, we are guaranteed to have inserted the leader
 	// selection for the next epoch
 	nextEpochLeaders := c.leaders[nextCounter]
-	index, err := nextEpochLeaders.selection.LeaderIndexForView(view)
+	index, err := nextEpochLeaders.selection.LeaderForView(view)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not get leader index after computing next epoch (%d): %w", nextCounter, err)
 	}
@@ -183,7 +183,7 @@ func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, erro
 	// for this to be linear in the number of epochs we have observed.
 	for _, epoch := range c.leaders {
 		if view >= epoch.selection.FirstView() && view <= epoch.selection.FinalView() {
-			index, err := epoch.selection.LeaderIndexForView(view)
+			index, err := epoch.selection.LeaderForView(view)
 			if err != nil {
 				return flow.ZeroID, fmt.Errorf("could not get leader index for view: %w", err)
 			}

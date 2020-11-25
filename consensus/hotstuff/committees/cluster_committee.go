@@ -88,7 +88,7 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 
 func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
 
-	index, err := c.selection.LeaderIndexForView(view)
+	index, err := c.selection.LeaderForView(view)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not get leader for view: %w", err)
 	}

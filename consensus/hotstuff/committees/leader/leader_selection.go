@@ -12,45 +12,55 @@ const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 min
 // LeaderSelection caches the pre-generated leader selections for a certain number of
 // views starting from the epoch start view.
 type LeaderSelection struct {
-	// leaderIndexesForView caches leader selections that were pre-generated for a
-	// certain number of views.
-	leaderIndexesForView []int
+
+	// the ordered list of node IDs for all members of the current consensus committee
+	memberIDs flow.IdentifierList
+
+	// leaderIndexes caches pre-generated leader indices for the range
+	// of views specified at construction, typically for an epoch
+	//
+	// The first value in this slice corresponds to the leader index at view
+	// firstView, and so on
+	leaderIndexes []int
+
 	// The leader selection randomness varies for each epoch.
 	// Leader selection only returns the correct leader selection for the corresponding epoch.
-	// epochStartView specifies the start view of the current epoch
-	epochStartView uint64
+	// firstView specifies the start view of the current epoch
+	firstView uint64
 }
 
 func (l LeaderSelection) FirstView() uint64 {
-	return l.epochStartView
+	return l.firstView
 }
 
 func (l LeaderSelection) FinalView() uint64 {
-	return l.epochStartView + uint64(len(l.leaderIndexesForView))
+	return l.firstView + uint64(len(l.leaderIndexes))
 }
 
-// LeaderIndexForView returns the leader index for given view.
-// If the view is smaller than the epochStartView, an error will be returned.
-func (l LeaderSelection) LeaderIndexForView(view uint64) (int, error) {
+// LeaderForView returns the node ID of the leader for a given view.
+// If the view is smaller than the firstView, an error will be returned.
+func (l LeaderSelection) LeaderForView(view uint64) (flow.Identifier, error) {
 	if view < l.FirstView() {
-		return -1, fmt.Errorf("view (%d) before first view of epoch (%d)", view, l.FirstView())
+		return flow.ZeroID, fmt.Errorf("view (%d) before first view of epoch (%d)", view, l.FirstView())
 	}
 	if view > l.FinalView() {
-		return -1, fmt.Errorf("view (%d) after last view of epoch (%d)", view, l.FirstView())
+		return flow.ZeroID, fmt.Errorf("view (%d) after last view of epoch (%d)", view, l.FirstView())
 	}
 
-	index := int(view - l.epochStartView)
-	return l.leaderIndexesForView[index], nil
+	viewIndex := int(view - l.firstView)      // index of leader index from view
+	leaderIndex := l.leaderIndexes[viewIndex] // index of leader node ID from leader index
+	leaderID := l.memberIDs[leaderIndex]      // leader node ID from leader index
+	return leaderID, nil
 }
 
 // ComputeLeaderSelectionFromSeed pre-generates a certain number of leader selections, and returns a
 // leader selection instance for querying the leader indexes for certain views.
-// epochStartView - the start view of the epoch, the generated leader selections start from this view.
+// firstView - the start view of the epoch, the generated leader selections start from this view.
 // seed - the random seed for leader selection
 // count - the number of leader selections to be pre-generated and cached.
 // identities - the identities that contain the stake info, which is used as weight for the chance of
 // 							the identity to be selected as leader.
-func ComputeLeaderSelectionFromSeed(epochStartView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
+func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
 		weights = append(weights, id.Stake)
@@ -62,8 +72,9 @@ func ComputeLeaderSelectionFromSeed(epochStartView uint64, seed []byte, count in
 	}
 
 	return &LeaderSelection{
-		leaderIndexesForView: leaders,
-		epochStartView:       epochStartView,
+		memberIDs:     identities.NodeIDs(),
+		leaderIndexes: leaders,
+		firstView:     firstView,
 	}, nil
 }
 
