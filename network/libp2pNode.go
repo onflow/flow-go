@@ -532,7 +532,7 @@ func (n *Node) IsConnected(address NodeAddress) (bool, error) {
 }
 
 // Host returns libp2p host part of the node.
-func (n Node) Host() host.Host {
+func (n *Node) Host() host.Host {
 	return n.libP2PHost
 }
 
