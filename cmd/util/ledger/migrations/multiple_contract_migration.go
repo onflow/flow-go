@@ -174,10 +174,9 @@ func migrateDeferredValueOfContractValue(
 	}, "")
 
 	newPayload := ledger.Payload{
-		Key: changeKey(payload.Key, newRegisterKey),
+		Key:   changeKey(payload.Key, newRegisterKey),
 		Value: payload.Value,
 	}
-
 
 	logKeyChange(address.Hex(), payload.Key, newPayload.Key)
 
@@ -230,7 +229,7 @@ func migrateContractValues(payloads []ledger.Payload) ([]ledger.Payload, map[str
 }
 
 type contractValueMapping struct {
-	address []byte
+	address      []byte
 	contractName string
 }
 
