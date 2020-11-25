@@ -3,11 +3,10 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 
@@ -119,16 +118,18 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	return nil
 }
 
-type Validator struct {
+type receiptValidator struct {
 	state    protocol.State
 	index    storage.Index
+	results  storage.ExecutionResults
 	verifier module.Verifier
 }
 
-func NewReceiptValidator(state protocol.State, index storage.Index) *Validator {
-	rv := &Validator{
+func NewReceiptValidator(state protocol.State, index storage.Index, results storage.ExecutionResults) protocol.ReceiptValidator {
+	rv := &receiptValidator{
 		state:    state,
 		index:    index,
+		results:  results,
 		verifier: signature.NewAggregationVerifier(encoding.ExecutionReceiptTag),
 	}
 
@@ -145,7 +146,7 @@ func NewReceiptValidator(state protocol.State, index storage.Index) *Validator {
 // Note: the method receives the block header as proof of its existence.
 // Therefore, we consider the case where the respective block is unknown to the
 // protocol state as a symptom of a fatal implementation bug.
-func (v *Validator) ensureStakedNodeWithRole(nodeID flow.Identifier, identity *flow.Identity, expectedRole flow.Role) error {
+func (v *receiptValidator) ensureStakedNodeWithRole(nodeID flow.Identifier, identity *flow.Identity, expectedRole flow.Role) error {
 
 	// check that the origin is a verification node
 	if identity.Role != expectedRole {
@@ -160,7 +161,7 @@ func (v *Validator) ensureStakedNodeWithRole(nodeID flow.Identifier, identity *f
 	return nil
 }
 
-func (v *Validator) identityForNode(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
+func (v *receiptValidator) identityForNode(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	// get the identity of the origin node
 	identity, err := v.state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {
@@ -174,7 +175,7 @@ func (v *Validator) identityForNode(blockID flow.Identifier, nodeID flow.Identif
 	return identity, nil
 }
 
-func (v *Validator) verifySignature(receipt *flow.ExecutionReceipt, nodeIdentity *flow.Identity) error {
+func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceipt, nodeIdentity *flow.Identity) error {
 	id := receipt.ID()
 	valid, err := v.verifier.Verify(id[:], receipt.ExecutorSignature, nodeIdentity.StakingPubKey)
 	if err != nil {
@@ -188,7 +189,7 @@ func (v *Validator) verifySignature(receipt *flow.ExecutionReceipt, nodeIdentity
 	return nil
 }
 
-func (v *Validator) verifyChunksFormat(result *flow.ExecutionResult) error {
+func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) error {
 	for index, chunk := range result.Chunks.Items() {
 		if uint(index) != chunk.CollectionIndex {
 			return fmt.Errorf("invalid CollectionIndex, expected %d got %d", index, chunk.CollectionIndex)
@@ -223,7 +224,22 @@ func (v *Validator) verifyChunksFormat(result *flow.ExecutionResult) error {
 	return nil
 }
 
-func (v *Validator) Validate(receipt *flow.ExecutionReceipt) error {
+func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) error {
+	_, err := v.results.ByID(result.PreviousResultID)
+	if err != nil {
+		return fmt.Errorf("no previous result ID")
+	}
+	return nil
+}
+
+// Validate performs checks for ExecutionReceipt being valid or no.
+// Checks performed:
+// 	- can find stake and stake is positive
+//	- signature is correct
+//	- chunks are in correct format
+// 	- execution result has a valid parent
+// Returns nil if all checks passed successfully
+func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	identity, err := v.identityForNode(receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 
 	err = v.ensureStakedNodeWithRole(receipt.ExecutorID, identity, flow.RoleExecution)
@@ -237,6 +253,11 @@ func (v *Validator) Validate(receipt *flow.ExecutionReceipt) error {
 	}
 
 	err = v.verifyChunksFormat(&receipt.ExecutionResult)
+	if err != nil {
+		return err
+	}
+
+	err = v.verifyExecutionResult(&receipt.ExecutionResult)
 	if err != nil {
 		return err
 	}

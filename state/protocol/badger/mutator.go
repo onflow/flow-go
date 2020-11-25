@@ -4,6 +4,7 @@ package badger
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -15,7 +16,8 @@ import (
 )
 
 type Mutator struct {
-	state *State
+	state     *State
+	validator protocol.ReceiptValidator
 }
 
 func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
@@ -601,12 +603,9 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 			return fmt.Errorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
 		}
 
-		valid, err := IsValidReceipt(receipt)
+		err = m.validator.Validate(receipt)
 		if err != nil {
-			return fmt.Errorf("could not check validity of Execution Receipt %v: %w", receipt.ID(), err)
-		}
-		if !valid {
-			return state.NewInvalidExtensionErrorf("payload includes invalid receipt (%x)", receipt.ID())
+			return fmt.Errorf("payload includes invalid receipt %v: %w", receipt.ID(), err)
 		}
 
 		// check receipts are sorted by block height
@@ -618,16 +617,6 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	}
 
 	return nil
-}
-
-// IsValidReceipt performs checks that are independent of where the receipt was
-// incorporated
-func IsValidReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
-	// TODO fill this out. ex:
-	// - Is the receipt from a valid execution node with non-zero weight (stake)?
-	// - Cryptography checks
-	// - Does it contain the expected number of chunks?
-	return true, nil
 }
 
 // finding the last sealed block on the chain of which the given block is extending

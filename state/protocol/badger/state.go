@@ -14,6 +14,29 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+type MutatorFactory interface {
+	Create(state *State) protocol.Mutator
+}
+
+type mutatorFactory struct {
+	results storage.ExecutionResults
+}
+
+func (m *mutatorFactory) Create(state *State) protocol.Mutator {
+	r := &Mutator{
+		state:     state,
+		validator: NewReceiptValidator(state, state.index, m.results),
+	}
+	return r
+}
+
+func NewMutatorFactory(results storage.ExecutionResults) MutatorFactory {
+	m := &mutatorFactory{
+		results: results,
+	}
+	return m
+}
+
 type State struct {
 	metrics  module.ComplianceMetrics
 	tracer   module.Tracer
@@ -28,8 +51,9 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
-	consumer protocol.Consumer
-	cfg      Config
+	consumer       protocol.Consumer
+	cfg            Config
+	mutatorFactory MutatorFactory
 }
 
 // NewState initializes a new state backed by a badger database, applying the
@@ -47,6 +71,7 @@ func NewState(
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
 	consumer protocol.Consumer,
+	mutatorFactory MutatorFactory,
 ) (*State, error) {
 
 	s := &State{
@@ -67,8 +92,9 @@ func NewState(
 			commits:  commits,
 			statuses: statuses,
 		},
-		consumer: consumer,
-		cfg:      DefaultConfig(),
+		consumer:       consumer,
+		cfg:            DefaultConfig(),
+		mutatorFactory: mutatorFactory,
 	}
 
 	return s, nil
@@ -113,8 +139,5 @@ func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 }
 
 func (s *State) Mutate() protocol.Mutator {
-	m := &Mutator{
-		state: s,
-	}
-	return m
+	return s.mutatorFactory.Create(s)
 }

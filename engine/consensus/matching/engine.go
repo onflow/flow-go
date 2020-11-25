@@ -5,6 +5,7 @@ package matching
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -53,6 +54,7 @@ type Engine struct {
 	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
 	maxResultsToRequest     int                             // max number of finalized blocks for which we request execution results
 	requireApprovals        bool                            // flag to disable verifying chunk approvals
+	receiptValidator        protocol.ReceiptValidator       // used to validate receipts
 }
 
 // New creates a new collection propagation engine.
@@ -101,6 +103,7 @@ func New(
 		maxResultsToRequest:     200,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
+		receiptValidator:        badger.NewReceiptValidator(state, indexDB, resultsDB),
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
@@ -260,7 +263,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
-	err = e.ensureStakedNodeWithRole(receipt.ExecutorID, head, flow.RoleExecution)
+	err = e.receiptValidator.Validate(receipt)
 	if err != nil {
 		return fmt.Errorf("failed to process execution receipt: %w", err)
 	}
