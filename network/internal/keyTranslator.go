@@ -1,4 +1,4 @@
-package network
+package internal
 
 import (
 	goecdsa "crypto/ecdsa"
