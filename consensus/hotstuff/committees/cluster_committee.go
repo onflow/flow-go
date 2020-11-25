@@ -77,14 +77,29 @@ func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilt
 
 func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 
-	identities, err := c.Identities(blockID, filter.HasNodeID(nodeID))
+	// first retrieve the cluster block payload
+	payload, err := c.payloads.ByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get identity (id=%s): %w", nodeID, err)
+		return nil, fmt.Errorf("could not get cluster payload: %w", err)
 	}
-	if len(identities) != 1 {
-		return nil, fmt.Errorf("found invalid number (%d) of identities for node id (%s)", len(identities), nodeID)
+
+	// if a reference block is specified, use that
+	if payload.ReferenceBlockID != flow.ZeroID {
+		identity, err := c.state.AtBlockID(payload.ReferenceBlockID).Identity(nodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, err)
+		}
+		if !c.clusterMemberFilter(identity) {
+			return nil, fmt.Errorf("node (id=%x) is not a valid cluster committee member", nodeID)
+		}
 	}
-	return identities[0], nil
+
+	// otherwise, this is a root block, in which case we use the initial cluster members
+	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
+	if !ok {
+		return nil, fmt.Errorf("node (id=%x) is not in initial cluster members", nodeID)
+	}
+	return identity, nil
 }
 
 func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
