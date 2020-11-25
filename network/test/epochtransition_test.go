@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
+	protocol2 "github.com/onflow/flow-go/network/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +33,7 @@ type MutableIdentityTableSuite struct {
 	suite.Suite
 	ConduitWrapper
 	nets         []*network.Network
-	mws          []*network.Middleware
+	mws          []*protocol2.Middleware
 	idRefreshers []*network.NodeIDRefresher
 	engines      []*MeshEngine
 	state        *protocol.ReadOnlyState
@@ -160,7 +161,7 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 
 // checkConnectivity checks that the middleware of a node is directly connected
 // to at least half of the other nodes.
-func checkConnectivity(t *testing.T, mw *network.Middleware, ids flow.IdentityList) {
+func checkConnectivity(t *testing.T, mw *protocol2.Middleware, ids flow.IdentityList) {
 	threshold := len(ids) / 2
 	assert.Eventually(t, func() bool {
 		connections := 0

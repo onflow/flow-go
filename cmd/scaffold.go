@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	protocol2 "github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/network/validators"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
@@ -118,7 +119,7 @@ type FlowNodeBuilder struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             *protocol.State
-	Middleware        *network.Middleware
+	Middleware        *protocol2.Middleware
 	Network           *network.Network
 	MsgValidators     []validators.MessageValidator
 	FvmOptions        []fvm.Option
@@ -167,8 +168,8 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
-		mw, err := network.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics.Network, network.DefaultMaxUnicastMsgSize, network.DefaultMaxPubSubMsgSize,
+		mw, err := protocol2.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
+			fnb.networkKey, fnb.Metrics.Network, protocol2.DefaultMaxUnicastMsgSize, protocol2.DefaultMaxPubSubMsgSize,
 			fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
 		if err != nil {

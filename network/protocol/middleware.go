@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package network
+package protocol
 
 import (
 	"bufio"
@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/middleware"
 	"github.com/onflow/flow-go/network/validators"
@@ -54,10 +55,10 @@ type Middleware struct {
 	ctx               context.Context
 	cancel            context.CancelFunc
 	log               zerolog.Logger
-	codec             Codec
+	codec             network.Codec
 	ov                middleware.Overlay
 	wg                *sync.WaitGroup
-	libP2PNode        *P2PNode
+	libP2PNode        *network.P2PNode
 	me                flow.Identifier
 	host              string
 	port              string
@@ -67,12 +68,12 @@ type Middleware struct {
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
 	rootBlockID       string
 	validators        []validators.MessageValidator
-	peerManager       *PeerManager
+	peerManager       *network.PeerManager
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
-func NewMiddleware(log zerolog.Logger, codec Codec, address string, flowID flow.Identifier,
+func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
 	key crypto.PrivateKey, metrics module.NetworkMetrics, maxUnicastMsgSize int, maxPubSubMsgSize int,
 	rootBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
@@ -80,7 +81,7 @@ func NewMiddleware(log zerolog.Logger, codec Codec, address string, flowID flow.
 		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
-	p2p := &P2PNode{}
+	p2p := &network.P2PNode{}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if len(validators) == 0 {
@@ -166,9 +167,9 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		pubsub.WithMaxMessageSize(m.maxPubSubMsgSize),
 	}
 
-	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
+	nodeAddress := network.NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 
-	libp2pKey, err := PrivKey(m.key)
+	libp2pKey, err := network.PrivKey(m.key)
 	if err != nil {
 		return fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
 	}
@@ -187,12 +188,12 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
 
-	libp2pConnector, err := NewLibp2pConnector(m.libP2PNode.libP2PHost)
+	libp2pConnector, err := network.NewLibp2pConnector(m.libP2PNode.libP2PHost)
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
 
-	m.peerManager = NewPeerManager(m.ctx, m.log, m.ov.Topology, libp2pConnector)
+	m.peerManager = network.NewPeerManager(m.ctx, m.log, m.ov.Topology, libp2pConnector)
 	select {
 	case <-m.peerManager.Ready():
 		m.log.Debug().Msg("peer manager successfully started")
@@ -337,27 +338,27 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 }
 
 // nodeAddressFromID returns the libp2p.NodeAddress for the given flow.id.
-func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) {
+func (m *Middleware) nodeAddressFromID(id flow.Identifier) (network.NodeAddress, error) {
 
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
 	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not get identities: %w", err)
+		return network.NodeAddress{}, fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// retrieve the flow.Identity for the give flow.ID
 	flowIdentity, found := idsMap[id]
 	if !found {
-		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
+		return network.NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
 	}
 
-	return nodeAddressFromIdentity(flowIdentity)
+	return network.nodeAddressFromIdentity(flowIdentity)
 }
 
-func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {
-	var nodeAddrs []NodeAddress
+func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]network.NodeAddress, error) {
+	var nodeAddrs []network.NodeAddress
 	for _, identity := range identityMap {
-		nodeAddress, err := nodeAddressFromIdentity(identity)
+		nodeAddress, err := network.nodeAddressFromIdentity(identity)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +381,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	log.Info().Msg("incoming connection established")
 
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
+	conn := network.newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
 
 	// kick off the receive loop to continuously receive messages
 	m.wg.Add(1)
@@ -398,7 +399,7 @@ func (m *Middleware) Subscribe(channelID string) error {
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
+	rs := network.newReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
@@ -511,7 +512,7 @@ func (m *Middleware) UpdateAllowList() error {
 
 // IsConnected returns true if this node is connected to the node with id nodeID
 func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
-	nodeAddress, err := nodeAddressFromIdentity(identity)
+	nodeAddress, err := network.nodeAddressFromIdentity(identity)
 	if err != nil {
 		return false, err
 	}

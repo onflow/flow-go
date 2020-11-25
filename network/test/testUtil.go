@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channel"
 	"github.com/onflow/flow-go/network/codec/json"
+	protocol2 "github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -72,19 +73,19 @@ func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identi
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*network.Middleware {
+func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*protocol2.Middleware {
 	metrics := metrics.NewNoopCollector()
-	mws := make([]*network.Middleware, len(identities))
+	mws := make([]*protocol2.Middleware, len(identities))
 	for i, id := range identities {
 		// creating middleware of nodes
-		mw, err := network.NewMiddleware(log,
+		mw, err := protocol2.NewMiddleware(log,
 			json.NewCodec(),
 			id.Address,
 			id.NodeID,
 			keys[i],
 			metrics,
-			network.DefaultMaxUnicastMsgSize,
-			network.DefaultMaxPubSubMsgSize,
+			protocol2.DefaultMaxUnicastMsgSize,
+			protocol2.DefaultMaxPubSubMsgSize,
 			rootBlockID)
 		require.NoError(t, err)
 		mws[i] = mw
@@ -96,7 +97,7 @@ func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.Ident
 func GenerateNetworks(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
-	mws []*network.Middleware,
+	mws []*protocol2.Middleware,
 	csize int,
 	tops []topology.Topology,
 	sms []channel.SubscriptionManager,
@@ -148,7 +149,7 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
 	log zerolog.Logger) (flow.IdentityList,
-	[]*network.Middleware) {
+	[]*protocol2.Middleware) {
 
 	ids, keys := GenerateIDs(t, n, dryRunMode)
 	mws := GenerateMiddlewares(t, log, ids, keys)
@@ -160,7 +161,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []topology.Topology,
-	dryRun bool) (flow.IdentityList, []*network.Middleware, []*network.Network) {
+	dryRun bool) (flow.IdentityList, []*protocol2.Middleware, []*network.Network) {
 	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
@@ -211,7 +212,7 @@ func GenerateTopologies(t *testing.T, state protocol.State, identities flow.Iden
 }
 
 // GenerateSubscriptionManagers creates and returns a ChannelSubscriptionManager for each middleware object.
-func GenerateSubscriptionManagers(t *testing.T, mws []*network.Middleware) []channel.SubscriptionManager {
+func GenerateSubscriptionManagers(t *testing.T, mws []*protocol2.Middleware) []channel.SubscriptionManager {
 	require.NotEmpty(t, mws)
 
 	sms := make([]channel.SubscriptionManager, len(mws))

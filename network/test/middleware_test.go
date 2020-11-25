@@ -21,14 +21,15 @@ import (
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/message"
 	mock2 "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/protocol"
 )
 
 const testChannel = "test-channel"
 
 type MiddlewareTestSuite struct {
 	suite.Suite
-	size    int                   // used to determine number of middlewares under test
-	mws     []*network.Middleware // used to keep track of middlewares under test
+	size    int                    // used to determine number of middlewares under test
+	mws     []*protocol.Middleware // used to keep track of middlewares under test
 	ov      []*mock2.Overlay
 	ids     []*flow.Identity
 	metrics *metrics.NoopCollector // no-op performance monitoring simulation
@@ -243,7 +244,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	// so the generated payload is 1000 bytes below the maximum unicast message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := network.NetworkPayloadFixture(m.T(), uint(network.DefaultMaxUnicastMsgSize)+1000)
+	payload := network.NetworkPayloadFixture(m.T(), uint(protocol.DefaultMaxUnicastMsgSize)+1000)
 	event := &message2.TestMessage{
 		Text: string(payload),
 	}
@@ -276,7 +277,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// so the generated payload is 1000 bytes below the maximum publish message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := network.NetworkPayloadFixture(m.T(), uint(network.DefaultMaxPubSubMsgSize)+1000)
+	payload := network.NetworkPayloadFixture(m.T(), uint(protocol.DefaultMaxPubSubMsgSize)+1000)
 	event := &message2.TestMessage{
 		Text: string(payload),
 	}

@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -328,7 +329,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 	}()
 
 	// setup the context to expire after the default timeout
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), protocol.DefaultUnicastTimeout)
 	defer cancel()
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
@@ -338,7 +339,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 		func() {
 			_, err = peers[0].CreateStream(ctx, silentNodeAddress)
 		},
-		DefaultUnicastTimeout+grace)
+		protocol.DefaultUnicastTimeout+grace)
 	assert.Error(suite.T(), err)
 }
 
@@ -347,7 +348,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 
 	// bump up the unicast timeout to a high value
-	unicastTimeout = time.Hour
+	protocol.unicastTimeout = time.Hour
 
 	// create two regular node
 	goodPeers, goodAddrs := suite.CreateNodes(2, nil, false)
