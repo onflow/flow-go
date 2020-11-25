@@ -225,10 +225,21 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 }
 
 func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) error {
-	_, err := v.results.ByID(result.PreviousResultID)
+	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
 		return fmt.Errorf("no previous result ID")
 	}
+
+	block, err := v.state.AtBlockID(result.BlockID).Head()
+
+	if err != nil {
+		return fmt.Errorf("no block found %s %w", result.BlockID, err)
+	}
+
+	if prevResult.BlockID != block.ParentID {
+		return fmt.Errorf("invalid block for previous result %s", prevResult.BlockID)
+	}
+
 	return nil
 }
 
