@@ -293,7 +293,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	if err != nil {
 		return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
 	}
-	if status.NextEpoch.CommitID == flow.ZeroID {
+	if phase == flow.EpochPhaseSetup {
 		return q.NewSetupEpoch(nextSetup)
 	}
 	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
