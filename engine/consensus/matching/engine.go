@@ -54,7 +54,7 @@ type Engine struct {
 	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
 	maxResultsToRequest     int                             // max number of finalized blocks for which we request execution results
 	requireApprovals        bool                            // flag to disable verifying chunk approvals
-	receiptValidator        protocol.ReceiptValidator       // used to validate receipts
+	receiptValidator        module.ReceiptValidator         // used to validate receipts
 }
 
 // New creates a new collection propagation engine.

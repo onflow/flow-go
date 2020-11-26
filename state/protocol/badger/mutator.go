@@ -3,9 +3,12 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -236,6 +239,10 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// check if the receipts in the payload are valid
 	err = m.receiptExtend(candidate)
 	if err != nil {
+		if state.IsInvalidExtensionError(err) {
+			return err
+		}
+
 		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
 	}
 
@@ -608,7 +615,16 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 
 		err = m.validator.Validate(receipt)
 		if err != nil {
-			return fmt.Errorf("payload includes invalid receipt %v: %w", receipt.ID(), err)
+			// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
+			if errors.Is(err, storage.ErrNotFound) {
+				return state.NewInvalidExtensionErrorf("payload validation not enough data %v: %w", receipt.ID(), err)
+			}
+
+			if engine.IsInvalidInputError(err) {
+				return state.NewInvalidExtensionErrorf("payload includes invalid receipt %v: %w", receipt.ID(), err)
+			}
+
+			return fmt.Errorf("payload validation unexpected error %w", err)
 		}
 
 		// check receipts are sorted by block height

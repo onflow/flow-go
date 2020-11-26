@@ -89,11 +89,11 @@ func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceipt, nodeI
 func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) error {
 	for index, chunk := range result.Chunks.Items() {
 		if uint(index) != chunk.CollectionIndex {
-			return fmt.Errorf("invalid CollectionIndex, expected %d got %d", index, chunk.CollectionIndex)
+			return engine.NewInvalidInputErrorf("invalid CollectionIndex, expected %d got %d", index, chunk.CollectionIndex)
 		}
 
 		if chunk.BlockID != result.BlockID {
-			return fmt.Errorf("invalid blockID, expected %s got %s", result.BlockID, chunk.BlockID)
+			return engine.NewInvalidInputErrorf("invalid blockID, expected %s got %s", result.BlockID, chunk.BlockID)
 		}
 	}
 
@@ -115,7 +115,8 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	}
 
 	if result.Chunks.Len() != requiredChunks {
-		return fmt.Errorf("invalid number of chunks, expected %d got %d", requiredChunks, result.Chunks.Len())
+		return engine.NewInvalidInputErrorf("invalid number of chunks, expected %d got %d",
+			requiredChunks, result.Chunks.Len())
 	}
 
 	return nil
@@ -124,16 +125,24 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) error {
 	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
-		return fmt.Errorf("no previous result ID")
+		if errors.Is(err, storage.ErrNotFound) {
+			return engine.NewInvalidInputErrorf("no previous result ID")
+		} else {
+			return err
+		}
 	}
 
 	block, err := v.state.AtBlockID(result.BlockID).Head()
 	if err != nil {
-		return fmt.Errorf("no block found %s %w", result.BlockID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return engine.NewInvalidInputErrorf("no block found %s %w", result.BlockID, err)
+		} else {
+			return err
+		}
 	}
 
 	if prevResult.BlockID != block.ParentID {
-		return fmt.Errorf("invalid block for previous result %s", prevResult.BlockID)
+		return engine.NewInvalidInputErrorf("invalid block for previous result %s", prevResult.BlockID)
 	}
 
 	return nil
