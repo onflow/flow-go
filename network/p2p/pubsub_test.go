@@ -35,8 +35,8 @@ func TestPubSubTestSuite(t *testing.T) {
 }
 
 // SetupTests initiates the test setups prior to each test
-func (p *PubSubTestSuite) SetupTest() {
-	p.ctx, p.cancel = context.WithCancel(context.Background())
+func (suite *PubSubTestSuite) SetupTest() {
+	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 }
 
 type mockDiscovery struct {
@@ -62,8 +62,8 @@ func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Op
 }
 
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message
-func (p *PubSubTestSuite) TestPubSub() {
-	defer p.cancel()
+func (suite *PubSubTestSuite) TestPubSub() {
+	defer suite.cancel()
 	topic := "testtopic/" + unittest.IdentifierFixture().String()
 	count := 4
 	golog.SetAllLoggers(golog.LevelError)
@@ -71,8 +71,8 @@ func (p *PubSubTestSuite) TestPubSub() {
 	// Step 1: Creates nodes
 	d := &mockDiscovery{}
 
-	nodes := p.CreateNodes(count, d)
-	defer p.StopNodes(nodes)
+	nodes := suite.CreateNodes(count, d)
+	defer suite.StopNodes(nodes)
 
 	// Step 2: Subscribe to a Flow topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
@@ -82,16 +82,16 @@ func (p *PubSubTestSuite) TestPubSub() {
 		m := n.name
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
-			msg, err := s.Next(p.ctx)
-			require.NoError(p.Suite.T(), err)
-			require.NotNil(p.Suite.T(), msg)
-			assert.Equal(p.Suite.T(), []byte("hello"), msg.Data)
+			msg, err := s.Next(suite.ctx)
+			require.NoError(suite.Suite.T(), err)
+			require.NotNil(suite.Suite.T(), msg)
+			assert.Equal(suite.Suite.T(), []byte("hello"), msg.Data)
 			ch <- m
 		}
 
 		// Subscribes to the test topic
-		s, err := n.Subscribe(p.ctx, topic)
-		require.NoError(p.Suite.T(), err)
+		s, err := n.Subscribe(suite.ctx, topic)
+		require.NoError(suite.Suite.T(), err)
 
 		// kick off the reader
 		go subReader(s)
@@ -112,7 +112,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 	time.Sleep(2 * time.Second)
 
 	// Step 4: publish a message to the topic
-	require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello")))
+	require.NoError(suite.Suite.T(), nodes[0].Publish(suite.ctx, topic, []byte("hello")))
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
@@ -128,28 +128,28 @@ func (p *PubSubTestSuite) TestPubSub() {
 					missing = append(missing, n.name)
 				}
 			}
-			assert.Fail(p.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
+			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
 			break
 		}
 	}
 
 	// Step 6: unsubscribes all nodes from the topic
 	for _, n := range nodes {
-		assert.NoError(p.Suite.T(), n.UnSubscribe(topic))
+		assert.NoError(suite.Suite.T(), n.UnSubscribe(topic))
 	}
 }
 
 // CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*Node) {
+func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*Node) {
 	// keeps track of errors on creating a node
 	var err error
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	defer func() {
 		if err != nil && nodes != nil {
 			// stops all nodes upon an error in starting even one single node
-			psts.StopNodes(nodes)
+			suite.StopNodes(nodes)
 		}
 	}()
 
@@ -160,9 +160,11 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 
 		name := fmt.Sprintf("node%d", i)
 		pkey, err := generateNetworkingKey(name)
-		require.NoError(psts.Suite.T(), err)
+		require.NoError(suite.Suite.T(), err)
 
-		n := &Node{}
+		n, err := NewLibP2PNode(logger, pkey)
+		require.NoError(suite.T(), err)
+
 		nodeID := NodeAddress{
 			Name:   name,
 			IP:     "0.0.0.0",        // localhost
@@ -172,9 +174,9 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 
 		psOption := pubsub.WithDiscovery(d)
 		noopMetrics := metrics.NewNoopCollector()
-		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootBlockID, false, nil, noopMetrics, psOption)
-		require.NoError(psts.Suite.T(), err)
-		require.Eventuallyf(psts.Suite.T(), func() bool {
+		err = n.Start(suite.ctx, nodeID, handlerFunc, rootBlockID, false, nil, noopMetrics, psOption)
+		require.NoError(suite.T(), err)
+		require.Eventuallyf(suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()
 			return err == nil && ip != "" && p != ""
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
@@ -184,10 +186,10 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 }
 
 // StopNodes stop all nodes in the input slice
-func (psts *PubSubTestSuite) StopNodes(nodes []*Node) {
+func (suite *PubSubTestSuite) StopNodes(nodes []*Node) {
 	for _, n := range nodes {
 		done, err := n.Stop()
-		assert.NoError(psts.Suite.T(), err)
+		assert.NoError(suite.Suite.T(), err)
 		<-done
 	}
 }

@@ -64,13 +64,20 @@ type Node struct {
 	conMgr               ConnManager                     // the connection manager passed in to libp2p
 	connGater            *connGater                      // the connection gator passed in to libp2p
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
+	key                  crypto.PrivKey
+}
+
+func NewLibP2PNode(logger zerolog.Logger, key crypto.PrivKey) (*Node, error) {
+	n := &Node{
+		logger: logger,
+		key:    key,
+	}
+	return n, nil
 }
 
 // Start starts a libp2p node on the given address.
 func (n *Node) Start(ctx context.Context,
 	nodeAddress NodeAddress,
-	logger zerolog.Logger,
-	key crypto.PrivKey,
 	handler network.StreamHandler,
 	rootBlockID string,
 	allowList bool,
@@ -81,14 +88,13 @@ func (n *Node) Start(ctx context.Context,
 	defer n.Unlock()
 
 	n.name = nodeAddress.Name
-	n.logger = logger
 	n.flowLibP2PProtocolID = generateProtocolID(rootBlockID)
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
 	if err != nil {
 		return err
 	}
 
-	n.conMgr = NewConnManager(logger, metrics)
+	n.conMgr = NewConnManager(n.logger, metrics)
 
 	// create a transport which disables port reuse and web socket.
 	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
@@ -105,7 +111,7 @@ func (n *Node) Start(ctx context.Context,
 	var options []config.Option
 	options = append(options,
 		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
-		libp2p.Identity(key),                // pass in the networking key
+		libp2p.Identity(n.key),              // pass in the networking key
 		libp2p.ConnectionManager(n.conMgr),  // set the connection manager
 		transport,                           // set the protocol
 		libp2p.Ping(true),                   // enable ping

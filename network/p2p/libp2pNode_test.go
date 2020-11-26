@@ -596,7 +596,9 @@ func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamH
 
 func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
 	handler network.StreamHandler, allowList bool) (*Node, NodeAddress) {
-	n := &Node{}
+	n, err := NewLibP2PNode(suite.logger, key)
+	require.NoError(suite.T(), err)
+
 	nodeID := NodeAddress{
 		Name:   name,
 		IP:     ip,
@@ -614,7 +616,7 @@ func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip
 	}
 
 	noopMetrics := metrics.NewNoopCollector()
-	err := n.Start(suite.ctx, nodeID, suite.logger, key, handlerFunc, rootID, allowList, nil, noopMetrics)
+	err = n.Start(suite.ctx, nodeID, handlerFunc, rootID, allowList, nil, noopMetrics)
 	require.NoError(suite.T(), err)
 	require.Eventuallyf(suite.T(), func() bool {
 		ip, p, err := n.GetIPPort()

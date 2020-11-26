@@ -81,7 +81,16 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
-	p2p := &Node{}
+	libp2pKey, err := internal.PrivKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
+	}
+
+	p2p, err := NewLibP2PNode(log, libp2pKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not create a libp2p node: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if len(validators) == 0 {
@@ -142,7 +151,6 @@ func (m *Middleware) PublicKey() crypto.PublicKey {
 
 // Start will start the middleware.
 func (m *Middleware) Start(ov network.Overlay) error {
-
 	m.ov = ov
 
 	// get the node identity map from the overlay
@@ -169,15 +177,9 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 
-	libp2pKey, err := internal.PrivKey(m.key)
-	if err != nil {
-		return fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
-	}
-
 	// start the libp2p node
 	err = m.libP2PNode.Start(m.ctx,
 		nodeAddress,
-		m.log, libp2pKey,
 		m.handleIncomingStream,
 		m.rootBlockID,
 		true,
