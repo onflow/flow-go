@@ -3,6 +3,7 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/module/validation"
 	"testing"
 	"time"
 
@@ -221,6 +222,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
+	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB)
+
 	requireApprovals := true
 
 	matchingEngine, err := matching.New(
@@ -241,6 +244,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		approvals,
 		seals,
 		assigner,
+		validator,
 		requireApprovals)
 	require.Nil(t, err)
 

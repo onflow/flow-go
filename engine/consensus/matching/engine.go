@@ -76,6 +76,7 @@ func New(
 	approvals mempool.Approvals,
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
+	validator module.ReceiptValidator,
 	requireApprovals bool,
 ) (*Engine, error) {
 
@@ -103,7 +104,7 @@ func New(
 		maxResultsToRequest:     200,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
-		receiptValidator:        badger.NewReceiptValidator(state, indexDB, resultsDB),
+		receiptValidator:        validator,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())

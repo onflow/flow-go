@@ -4,6 +4,7 @@ package badger
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/validation"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -25,7 +26,7 @@ type mutatorFactory struct {
 func (m *mutatorFactory) Create(state *State) protocol.Mutator {
 	r := &Mutator{
 		state:     state,
-		validator: NewReceiptValidator(state, state.index, m.results),
+		validator: validation.NewReceiptValidator(state, state.index, m.results),
 	}
 	return r
 }

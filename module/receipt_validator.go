@@ -1,4 +1,4 @@
-package protocol
+package module
 
 import "github.com/onflow/flow-go/model/flow"
 
