@@ -162,7 +162,8 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		pkey, err := generateNetworkingKey(name)
 		require.NoError(suite.Suite.T(), err)
 
-		n, err := NewLibP2PNode(logger, pkey)
+		noopMetrics := metrics.NewNoopCollector()
+		n, err := NewLibP2PNode(logger, pkey, noopMetrics)
 		require.NoError(suite.T(), err)
 
 		nodeID := NodeAddress{
@@ -173,8 +174,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		}
 
 		psOption := pubsub.WithDiscovery(d)
-		noopMetrics := metrics.NewNoopCollector()
-		err = n.Start(suite.ctx, nodeID, handlerFunc, rootBlockID, false, nil, noopMetrics, psOption)
+		err = n.Start(suite.ctx, nodeID, handlerFunc, rootBlockID, false, nil, psOption)
 		require.NoError(suite.T(), err)
 		require.Eventuallyf(suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()

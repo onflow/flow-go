@@ -65,12 +65,15 @@ type Node struct {
 	connGater            *connGater                      // the connection gator passed in to libp2p
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 	key                  crypto.PrivKey
+	metrics              module.NetworkMetrics
 }
 
-func NewLibP2PNode(logger zerolog.Logger, key crypto.PrivKey) (*Node, error) {
+func NewLibP2PNode(logger zerolog.Logger, key crypto.PrivKey, metrics module.NetworkMetrics) (*Node, error) {
 	n := &Node{
-		logger: logger,
-		key:    key,
+		logger:  logger,
+		key:     key,
+		metrics: metrics,
+		conMgr:  NewConnManager(logger, metrics),
 	}
 	return n, nil
 }
@@ -82,7 +85,6 @@ func (n *Node) Start(ctx context.Context,
 	rootBlockID string,
 	allowList bool,
 	allowListAddrs []NodeAddress,
-	metrics module.NetworkMetrics,
 	psOption ...pubsub.Option) error {
 	n.Lock()
 	defer n.Unlock()
@@ -93,8 +95,6 @@ func (n *Node) Start(ctx context.Context,
 	if err != nil {
 		return err
 	}
-
-	n.conMgr = NewConnManager(n.logger, metrics)
 
 	// create a transport which disables port reuse and web socket.
 	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
