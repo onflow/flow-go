@@ -6,10 +6,11 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 )
 
-var _ MessageValidator = &TargetValidator{}
+var _ network.MessageValidator = &TargetValidator{}
 
 // TargetValidator filters out messages by target ID
 type TargetValidator struct {
