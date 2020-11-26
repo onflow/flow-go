@@ -1,4 +1,4 @@
-package topology
+package network
 
 import "github.com/onflow/flow-go/model/flow"
 
