@@ -185,13 +185,13 @@ func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	n := a.curve.Params().N
 	nlen := bitsToBytes(n.BitLen())
 	if len(der) != nlen {
-		return nil, errors.New("raw private key size is not valid")
+		return nil, fmt.Errorf("input has incorrect %s key size", a.algo)
 	}
 	var d big.Int
 	d.SetBytes(der)
 
 	if d.Cmp(n) >= 0 {
-		return nil, errors.New("raw public key value is not valid")
+		return nil, fmt.Errorf("input is not a valid %s key", a.algo)
 	}
 
 	priv := goecdsa.PrivateKey{
@@ -214,7 +214,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	p := (a.curve.Params().P)
 	plen := bitsToBytes(p.BitLen())
 	if len(der) != 2*plen {
-		return nil, errors.New("raw public key size is not valid")
+		return nil, fmt.Errorf("input has incorrect %s key size", a.algo)
 	}
 	var x, y big.Int
 	x.SetBytes(der[:plen])
@@ -223,7 +223,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	// all the curves supported for now have a cofactor equal to 1,
 	// so that IsOnCurve guarantees the point is on the right subgroup.
 	if x.Cmp(p) >= 0 || y.Cmp(p) >= 0 || !a.curve.IsOnCurve(&x, &y) {
-		return nil, errors.New("raw public key value is not valid")
+		return nil, fmt.Errorf("input is not a valid %s key", a.algo)
 	}
 
 	pk := goecdsa.PublicKey{

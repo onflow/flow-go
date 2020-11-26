@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	mathRand "math/rand"
 	"sync"
 	"testing"
 	"time"
-
-	mathRand "math/rand"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -22,14 +21,14 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	state "github.com/onflow/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
-	mocklocal "github.com/onflow/flow-go/engine/testutil/mocklocal"
+	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/trace"
-	network "github.com/onflow/flow-go/network/mocks"
+	network "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
@@ -57,8 +56,8 @@ type testingContext struct {
 	blocks             *storage.MockBlocks
 	collections        *storage.MockCollections
 	state              *protocol.State
-	conduit            *network.MockConduit
-	collectionConduit  *network.MockConduit
+	conduit            *network.Conduit
+	collectionConduit  *network.Conduit
 	computationManager *computation.ComputationManager
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
@@ -74,9 +73,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
-	conduit := network.NewMockConduit(ctrl)
-	collectionConduit := network.NewMockConduit(ctrl)
-	syncConduit := network.NewMockConduit(ctrl)
+	conduit := &network.Conduit{}
+	collectionConduit := &network.Conduit{}
+	syncConduit := &network.Conduit{}
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -585,7 +584,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	ctrl := gomock.NewController(t)
 	net := module.NewMockNetwork(ctrl)
 	request := module.NewMockRequester(ctrl)
-	syncConduit := network.NewMockConduit(ctrl)
+	syncConduit := &network.Conduit{}
 	var engine *Engine
 	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
