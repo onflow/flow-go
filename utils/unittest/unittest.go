@@ -54,17 +54,6 @@ func AssertClosesBefore(t *testing.T, done <-chan struct{}, duration time.Durati
 	}
 }
 
-// RequireClosesBefore requires that the given channel closes before the
-// duration expires.
-func RequireClosesBefore(t *testing.T, done <-chan struct{}, duration time.Duration) {
-	select {
-	case <-time.After(duration):
-		require.Fail(t, "channel did not return in time")
-	case <-done:
-		return
-	}
-}
-
 // RequireReturnBefore requires that the given function returns before the
 // duration expires.
 func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, message string) {
@@ -75,10 +64,16 @@ func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, messag
 		close(done)
 	}()
 
+	RequireCloseBefore(t, done, duration, "could not close done channel on time")
+}
+
+// RequireCloseBefore requires that the given channel returns before the
+// duration expires.
+func RequireCloseBefore(t testing.TB, c <-chan struct{}, duration time.Duration, message string) {
 	select {
 	case <-time.After(duration):
-		require.Fail(t, "function did not return on time: "+message)
-	case <-done:
+		require.Fail(t, "function did not return in time: "+message)
+	case <-c:
 		return
 	}
 }

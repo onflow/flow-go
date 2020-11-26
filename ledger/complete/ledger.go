@@ -19,7 +19,7 @@ import (
 )
 
 const DefaultCacheSize = 1000
-const DefaultPathFinderVersion = 0
+const DefaultPathFinderVersion = 1
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -248,7 +248,11 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 }
 
 // ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
-func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migration, targetPathFinderVersion uint8, outputDir, outputFile string) (ledger.State, error) {
+func (l *Ledger) ExportCheckpointAt(state ledger.State,
+	migrations []ledger.Migration,
+	reporters []ledger.Reporter,
+	targetPathFinderVersion uint8,
+	outputDir, outputFile string) (ledger.State, error) {
 
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
@@ -268,6 +272,14 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 		}
 		if payloadSize != len(payloads) {
 			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
+		}
+	}
+
+	// run reporters
+	for i, reporter := range reporters {
+		err = reporter.Report(payloads)
+		if err != nil {
+			return nil, fmt.Errorf("error running reporter (%d): %w", i, err)
 		}
 	}
 

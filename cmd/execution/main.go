@@ -98,7 +98,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
-			vmCtx := fvm.NewContext(node.FvmOptions...)
+			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 
 			manager, err := computation.New(
 				node.Logger,
@@ -163,8 +163,8 @@ func main() {
 				// if execution database has been bootstrapped, then the root statecommit must equal to the one
 				// in the bootstrap folder
 				if !bytes.Equal(commit, node.RootSeal.FinalState) {
-					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %v, "+
-						"bootstap has statecommitment: %v",
+					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
+						"bootstap has statecommitment: %x",
 						commit, node.RootSeal.FinalState)
 				}
 			}

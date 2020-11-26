@@ -15,15 +15,21 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
 	"github.com/onflow/flow-go/network/gossip/libp2p/topology"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var rootBlockID string
+
+const DryRun = true
 
 var allocator *portAllocator
 
@@ -34,38 +40,39 @@ func init() {
 	rootBlockID = unittest.IdentifierFixture().String()
 }
 
-// generateIDs generate flow Identities with a valid port and networking key
-func generateIDs(t *testing.T, n int) (flow.IdentityList, []crypto.PrivateKey) {
-	identities := make([]*flow.Identity, n)
+// GenerateIDs generate flow Identities with a valid port and networking key
+func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identity)) (flow.IdentityList,
+	[]crypto.PrivateKey) {
 	privateKeys := make([]crypto.PrivateKey, n)
-	freePorts := allocator.getFreePorts(t, n)
+	var freePorts []int
 
-	for i := 0; i < n; i++ {
+	if !dryRunMode {
+		// get free ports
+		freePorts = allocator.getFreePorts(t, n)
+	}
 
-		identifier := unittest.IdentifierFixture()
+	identities := unittest.IdentityListFixture(n, opts...)
 
+	// generates keys and address for the node
+	for i, id := range identities {
 		// generate key
-		key, err := GenerateNetworkingKey(identifier)
+		key, err := GenerateNetworkingKey(id.NodeID)
 		require.NoError(t, err)
 		privateKeys[i] = key
+		port := 0
 
-		port := freePorts[i]
-
-		opt := []func(id *flow.Identity){
-			func(id *flow.Identity) {
-				id.NodeID = identifier
-				id.Address = fmt.Sprintf("0.0.0.0:%d", port)
-				id.NetworkPubKey = key.PublicKey()
-			},
+		if !dryRunMode {
+			port = freePorts[i]
 		}
 
-		identities[i] = unittest.IdentityFixture(opt...)
+		identities[i].Address = fmt.Sprintf("0.0.0.0:%d", port)
+		identities[i].NetworkPubKey = key.PublicKey()
 	}
 	return identities, privateKeys
 }
 
-// generateMiddlewares creates and initializes middleware instances for all the identities
-func generateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*libp2p.Middleware {
+// GenerateMiddlewares creates and initializes middleware instances for all the identities
+func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*libp2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*libp2p.Middleware, len(identities))
 	for i, id := range identities {
@@ -85,20 +92,32 @@ func generateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.Ident
 	return mws
 }
 
-// generateNetworks generates the network for the given middlewares
-func generateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, mws []*libp2p.Middleware, csize int, tops []topology.Topology, dryrun bool) []*libp2p.Network {
+// GenerateNetworks generates the network for the given middlewares
+func GenerateNetworks(t *testing.T,
+	log zerolog.Logger,
+	ids flow.IdentityList,
+	mws []*libp2p.Middleware,
+	csize int,
+	tops []topology.Topology,
+	sms []channel.SubscriptionManager,
+	dryRunMode bool) []*libp2p.Network {
 	count := len(ids)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
 
-	// if no topology is passed in, use the default topology for all networks
+	// checks if necessary to generate topology managers
 	if tops == nil {
-		tops = make([]topology.Topology, count)
-		for i, id := range ids {
-			rpt, err := topology.NewRandPermTopology(id.Role, id.NodeID)
-			require.NoError(t, err)
-			tops[i] = rpt
-		}
+		// nil topology managers means generating default ones
+
+		// creates default topology
+		//
+		// mocks state for collector nodes topology
+		// considers only a single cluster as higher cluster numbers are tested
+		// in collectionTopology_test
+		state, _ := topology.CreateMockStateForCollectionNodes(t,
+			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
+		// creates topology instances for the nodes based on their roles
+		tops = GenerateTopologies(t, state, ids, sms, log)
 	}
 
 	for i := 0; i < count; i++ {
@@ -110,14 +129,14 @@ func generateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, m
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], metrics)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
 	}
 
 	// if dryrun then don't actually start the network
-	if !dryrun {
+	if !dryRunMode {
 		for _, net := range nets {
 			<-net.Ready()
 		}
@@ -125,20 +144,31 @@ func generateNetworks(t *testing.T, log zerolog.Logger, ids flow.IdentityList, m
 	return nets
 }
 
-func generateIDsAndMiddlewares(t *testing.T, n int, log zerolog.Logger) (flow.IdentityList, []*libp2p.Middleware) {
-	ids, keys := generateIDs(t, n)
-	mws := generateMiddlewares(t, log, ids, keys)
+func GenerateIDsAndMiddlewares(t *testing.T,
+	n int,
+	dryRunMode bool,
+	log zerolog.Logger) (flow.IdentityList,
+	[]*libp2p.Middleware) {
+
+	ids, keys := GenerateIDs(t, n, dryRunMode)
+	mws := GenerateMiddlewares(t, log, ids, keys)
 	return ids, mws
 }
 
-func generateIDsMiddlewaresNetworks(t *testing.T, n int, log zerolog.Logger, csize int, tops []topology.Topology, dryrun bool) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
-	ids, mws := generateIDsAndMiddlewares(t, n, log)
-	networks := generateNetworks(t, log, ids, mws, csize, tops, dryrun)
+func GenerateIDsMiddlewaresNetworks(t *testing.T,
+	n int,
+	log zerolog.Logger,
+	csize int,
+	tops []topology.Topology,
+	dryRun bool) (flow.IdentityList, []*libp2p.Middleware, []*libp2p.Network) {
+	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log)
+	sms := GenerateSubscriptionManagers(t, mws)
+	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
 	return ids, mws, networks
 }
 
-// generateEngines generates MeshEngines for the given networks
-func generateEngines(t *testing.T, nets []*libp2p.Network) []*MeshEngine {
+// GenerateEngines generates MeshEngines for the given networks
+func GenerateEngines(t *testing.T, nets []*libp2p.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
@@ -161,4 +191,45 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
+}
+
+// CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
+// and returns the slice of topologies.
+func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList,
+	subMngrs []channel.SubscriptionManager, logger zerolog.Logger) []topology.Topology {
+	tops := make([]topology.Topology, 0)
+	for i, id := range identities {
+		var top topology.Topology
+		var err error
+
+		top, err = topology.NewTopicBasedTopology(id.NodeID, logger, state, subMngrs[i])
+		require.NoError(t, err)
+
+		tops = append(tops, top)
+	}
+	return tops
+}
+
+// GenerateSubscriptionManagers creates and returns a ChannelSubscriptionManager for each middleware object.
+func GenerateSubscriptionManagers(t *testing.T, mws []*libp2p.Middleware) []channel.SubscriptionManager {
+	require.NotEmpty(t, mws)
+
+	sms := make([]channel.SubscriptionManager, len(mws))
+	for i, mw := range mws {
+		sms[i] = libp2p.NewChannelSubscriptionManager(mw)
+	}
+	return sms
+}
+
+// stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
+// duration.
+func stopNetworks(t *testing.T, nets []*libp2p.Network, duration time.Duration) {
+	// casts nets instances into ReadyDoneAware components
+	comps := make([]module.ReadyDoneAware, 0, len(nets))
+	for _, net := range nets {
+		comps = append(comps, net)
+	}
+
+	unittest.RequireCloseBefore(t, lifecycle.AllDone(comps...), duration,
+		"could not stop the networks")
 }

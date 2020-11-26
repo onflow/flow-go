@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -170,7 +171,8 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 		}
 
 		psOption := pubsub.WithDiscovery(d)
-		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootBlockID, false, nil, psOption)
+		noopMetrics := metrics.NewNoopCollector()
+		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootBlockID, false, nil, noopMetrics, psOption)
 		require.NoError(psts.Suite.T(), err)
 		require.Eventuallyf(psts.Suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()
