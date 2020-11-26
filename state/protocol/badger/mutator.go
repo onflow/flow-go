@@ -596,13 +596,13 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 		// if the receipt was already included before, error
 		_, duplicated := lookup[receipt.ID()]
 		if duplicated {
-			return fmt.Errorf("payload includes duplicate receipt (%x)", receipt.ID())
+			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
 		}
 
 		// if the receipt is not for a block on this fork, error
 		header, ok := forkBlocks[receipt.ExecutionResult.BlockID]
 		if !ok {
-			return fmt.Errorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
+			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
 		}
 
 		valid, err := IsValidReceipt(receipt)
@@ -615,7 +615,7 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 
 		// check receipts are sorted by block height
 		if header.Height < prevReceiptHeight {
-			return fmt.Errorf("payload receipts should be sorted by block height")
+			return state.NewInvalidExtensionError("payload receipts should be sorted by block height")
 		}
 
 		prevReceiptHeight = header.Height
