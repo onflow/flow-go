@@ -6,16 +6,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
-	mock2 "github.com/onflow/flow-go/network/mock"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/state/protocol"
-	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,10 +23,10 @@ import (
 // clustering collection nodes into `clusterNum` clusters.
 func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList,
 	clusterNum uint) (protocol.State, flow.ClusterList) {
-	state := new(protocolmock.State)
-	snapshot := new(protocolmock.Snapshot)
-	epochQuery := new(protocolmock.EpochQuery)
-	epoch := new(protocolmock.Epoch)
+	state := new(mockprotocol.State)
+	snapshot := new(mockprotocol.Snapshot)
+	epochQuery := new(mockprotocol.EpochQuery)
+	epoch := new(mockprotocol.Epoch)
 	assignments := unittest.ClusterAssignment(clusterNum, collectorIds)
 	clusters, err := flow.NewClusterList(assignments, collectorIds)
 	require.NoError(t, err)
@@ -79,11 +79,11 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.Subs
 
 	sms := make([]network.SubscriptionManager, len(ids))
 	for i, id := range ids {
-		sm := &mock2.SubscriptionManager{}
+		sm := &mocknetwork.SubscriptionManager{}
 		err := fmt.Errorf("this method should not be called on mock subscription manager")
-		sm.On("Register", testifymock.Anything, testifymock.Anything).Return(err)
-		sm.On("Unregister", testifymock.Anything).Return(err)
-		sm.On("GetEngine", testifymock.Anything).Return(err)
+		sm.On("Register", mock.Anything, mock.Anything).Return(err)
+		sm.On("Unregister", mock.Anything).Return(err)
+		sm.On("GetEngine", mock.Anything).Return(err)
 		sm.On("GetChannelIDs").Return(engine.ChannelIDsByRole(id.Role))
 		sms[i] = sm
 	}
