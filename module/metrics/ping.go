@@ -18,15 +18,19 @@ func NewPingCollector() *PingCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
-		}, []string{LabelNodeID, LabelNodeRole}),
+		}, []string{LabelNodeID, LabelNodeRole, LabelNodeInfo}),
 	}
 	return pc
 }
 
-func (pc *PingCollector) NodeReachable(node *flow.Identity, reachable bool) {
+func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, reachable bool) {
 	var val float64
 	if reachable {
 		val = 1
 	}
-	pc.reachable.With(prometheus.Labels{LabelNodeID: node.String(), LabelNodeRole: node.Role.String()}).Set(val)
+	pc.reachable.With(prometheus.Labels{
+		LabelNodeID:   node.String(),
+		LabelNodeRole: node.Role.String(),
+		LabelNodeInfo: nodeInfo}).
+		Set(val)
 }
