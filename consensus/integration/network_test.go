@@ -48,7 +48,7 @@ func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 	return net
 }
 
-// TODO replace this type with `network/stub/overlay.go`
+// TODO replace this type with `network/stub/network.go`
 // Network is a mocked Network layer made for testing engine's behavior.
 // It represents the Network layer of a single node. A node can attach several engines of
 // itself to the Network, and hence enabling them send and receive message.
