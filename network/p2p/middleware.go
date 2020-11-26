@@ -67,7 +67,7 @@ type Middleware struct {
 	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
 	rootBlockID       string
-	validators        []validator.MessageValidator
+	validators        []network.MessageValidator
 	peerManager       *PeerManager
 }
 
@@ -75,7 +75,7 @@ type Middleware struct {
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
 	key crypto.PrivateKey, metrics module.NetworkMetrics, maxUnicastMsgSize int, maxPubSubMsgSize int,
-	rootBlockID string, validators ...validator.MessageValidator) (*Middleware, error) {
+	rootBlockID string, validators ...network.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create middleware: %w", err)
@@ -119,8 +119,8 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	return m, err
 }
 
-func defaultValidators(log zerolog.Logger, flowID flow.Identifier) []validator.MessageValidator {
-	return []validator.MessageValidator{
+func defaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
+	return []network.MessageValidator{
 		validator.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
 		validator.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
 	}

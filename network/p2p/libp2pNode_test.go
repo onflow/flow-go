@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
+	"github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
@@ -50,7 +50,7 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 // SetupTests initiates the test setups prior to each test
 func (suite *LibP2PNodeTestSuite) SetupTest() {
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-	golog.SetAllLoggers(golog.LevelError)
+	log.SetAllLoggers(log.LevelError)
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 }
 

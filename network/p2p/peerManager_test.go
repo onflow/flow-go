@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
+	"github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -32,7 +32,7 @@ func TestPeerManagerTestSuite(t *testing.T) {
 
 func (suite *PeerManagerTestSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-	golog.SetAllLoggers(golog.LevelError)
+	log.SetAllLoggers(log.LevelError)
 	suite.ctx = context.Background()
 }
 
@@ -53,14 +53,14 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 
 	// create the connector mock to check ids requested for connect and disconnect
 	connector := new(mocknetwork.Connector)
-	connector.On("ConnectPeers", suite.ctx, testifymock.AnythingOfType("flow.IdentityList")).
-		Run(func(args testifymock.Arguments) {
+	connector.On("ConnectPeers", suite.ctx, mock.AnythingOfType("flow.IdentityList")).
+		Run(func(args mock.Arguments) {
 			idArg := args[1].(flow.IdentityList)
 			assertListsEqual(suite.T(), currentIDs, idArg)
 		}).
 		Return(nil)
-	connector.On("DisconnectPeers", suite.ctx, testifymock.AnythingOfType("flow.IdentityList")).
-		Run(func(args testifymock.Arguments) {
+	connector.On("DisconnectPeers", suite.ctx, mock.AnythingOfType("flow.IdentityList")).
+		Run(func(args mock.Arguments) {
 			idArg := args[1].(flow.IdentityList)
 			assertListsEqual(suite.T(), extraIDs, idArg)
 			// assert that ids passed to disconnect have no id in common with those passed to connect
@@ -134,7 +134,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	count := 0
 	times := 2 // we expect it to be called twice at least
 	wg.Add(times)
-	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
+	connector.On("ConnectPeers", suite.ctx, mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -143,7 +143,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 			wg.Done()
 		}
 	}).Return(nil)
-	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
+	connector.On("DisconnectPeers", suite.ctx, mock.Anything).Return(nil)
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
 	PeerUpdateInterval = 5 * time.Millisecond
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
@@ -170,7 +170,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	wg.Add(1)  // this accounts for one invocation, the other invocation is subsequent
 	connector := new(mocknetwork.Connector)
 	// captures the first periodic update initiated after start to complete
-	connector.On("ConnectPeers", suite.ctx, testifymock.Anything).Run(func(args testifymock.Arguments) {
+	connector.On("ConnectPeers", suite.ctx, mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -179,7 +179,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 			wg.Done()
 		}
 	}).Return(nil)
-	connector.On("DisconnectPeers", suite.ctx, testifymock.Anything).Return(nil)
+	connector.On("DisconnectPeers", suite.ctx, mock.Anything).Return(nil)
 
 	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
@@ -211,9 +211,9 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	connectPeerGate := make(chan time.Time)
 	defer close(connectPeerGate)
 
-	connector.On("ConnectPeers", ctx, testifymock.Anything).Return(nil).
+	connector.On("ConnectPeers", ctx, mock.Anything).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
-	connector.On("DisconnectPeers", ctx, testifymock.Anything).Return(nil)
+	connector.On("DisconnectPeers", ctx, mock.Anything).Return(nil)
 	pm := NewPeerManager(ctx, suite.log, idProvider, connector)
 
 	// set the periodic interval to a high value so that periodic runs don't interfere with this test

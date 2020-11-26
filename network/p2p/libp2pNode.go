@@ -13,7 +13,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -49,7 +49,7 @@ type NodeAddress struct {
 	Name   string
 	IP     string
 	Port   string
-	PubKey lcrypto.PubKey
+	PubKey crypto.PubKey
 }
 
 // Node is a wrapper around LibP2P host.
@@ -70,7 +70,7 @@ type Node struct {
 func (n *Node) Start(ctx context.Context,
 	nodeAddress NodeAddress,
 	logger zerolog.Logger,
-	key lcrypto.PrivKey,
+	key crypto.PrivKey,
 	handler network.StreamHandler,
 	rootBlockID string,
 	allowList bool,

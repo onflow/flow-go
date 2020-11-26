@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/network/internal"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
-	"github.com/onflow/flow-go/network/topology"
 )
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
@@ -30,10 +29,10 @@ type Network struct {
 	ids     flow.IdentityList
 	me      module.Local
 	mw      network.Middleware
-	top     topology.Topology // used to determine fanout connections
+	top     network.Topology // used to determine fanout connections
 	metrics module.NetworkMetrics
 	rcache  *internal.RcvCache // used to deduplicate incoming messages
-	queue   queue.MessageQueue
+	queue   network.MessageQueue
 	ctx     context.Context
 	cancel  context.CancelFunc
 	subMngr network.SubscriptionManager // used to keep track of subscribed channels
@@ -51,7 +50,7 @@ func NewNetwork(
 	me module.Local,
 	mw network.Middleware,
 	csize int,
-	top topology.Topology,
+	top network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
