@@ -119,13 +119,13 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 }
 
 type receiptValidator struct {
-	state    protocol.State
+	state    protocol.ReadOnlyState
 	index    storage.Index
 	results  storage.ExecutionResults
 	verifier module.Verifier
 }
 
-func NewReceiptValidator(state protocol.State, index storage.Index, results storage.ExecutionResults) protocol.ReceiptValidator {
+func NewReceiptValidator(state protocol.ReadOnlyState, index storage.Index, results storage.ExecutionResults) protocol.ReceiptValidator {
 	rv := &receiptValidator{
 		state:    state,
 		index:    index,
@@ -146,11 +146,11 @@ func NewReceiptValidator(state protocol.State, index storage.Index, results stor
 // Note: the method receives the block header as proof of its existence.
 // Therefore, we consider the case where the respective block is unknown to the
 // protocol state as a symptom of a fatal implementation bug.
-func (v *receiptValidator) ensureStakedNodeWithRole(nodeID flow.Identifier, identity *flow.Identity, expectedRole flow.Role) error {
+func (v *receiptValidator) ensureStakedNodeWithRole(identity *flow.Identity, expectedRole flow.Role) error {
 
 	// check that the origin is a verification node
 	if identity.Role != expectedRole {
-		return engine.NewInvalidInputErrorf("expected node %x to have identity %s but got %s", nodeID, expectedRole, identity.Role)
+		return engine.NewInvalidInputErrorf("expected node %x to have identity %s but got %s", identity.NodeID, expectedRole, identity.Role)
 	}
 
 	// check if the identity has a stake
@@ -158,9 +158,15 @@ func (v *receiptValidator) ensureStakedNodeWithRole(nodeID flow.Identifier, iden
 		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
 	}
 
+	// TODO: check if node was ejected
 	return nil
 }
 
+// identityForNode ensures that `nodeID` is an authorized member of the network
+// at the given block and returns the corresponding node's full identity. 
+// Error returns:
+//   * sentinel engine.InvalidInputError is nodeID is NOT an authorized member of the network
+//   * generic error indicating a fatal internal problem
 func (v *receiptValidator) identityForNode(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	// get the identity of the origin node
 	identity, err := v.state.AtBlockID(blockID).Identity(nodeID)
@@ -231,7 +237,6 @@ func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) e
 	}
 
 	block, err := v.state.AtBlockID(result.BlockID).Head()
-
 	if err != nil {
 		return fmt.Errorf("no block found %s %w", result.BlockID, err)
 	}
