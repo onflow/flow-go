@@ -37,7 +37,7 @@ func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 
 	bytes := EncodeUpdate(update)
 
-	err := w.wal.Log(bytes)
+	_, err := w.wal.Log(bytes)
 
 	if err != nil {
 		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
@@ -48,7 +48,7 @@ func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 func (w *LedgerWAL) RecordDelete(rootHash ledger.RootHash) error {
 	bytes := EncodeDelete(rootHash)
 
-	err := w.wal.Log(bytes)
+	_, err := w.wal.Log(bytes)
 
 	if err != nil {
 		return fmt.Errorf("error while recording delete in LedgerWAL: %w", err)
