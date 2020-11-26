@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
+	"github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,7 +41,7 @@ func TestStubEngineTestSuite(t *testing.T) {
 func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-	golog.SetAllLoggers(golog.LevelError)
+	log.SetAllLoggers(log.LevelError)
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun)
 }

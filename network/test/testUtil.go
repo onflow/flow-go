@@ -99,7 +99,7 @@ func GenerateNetworks(t *testing.T,
 	ids flow.IdentityList,
 	mws []*p2p.Middleware,
 	csize int,
-	tops []topology.Topology,
+	tops []network.Topology,
 	sms []network.SubscriptionManager,
 	dryRunMode bool) []*p2p.Network {
 	count := len(ids)
@@ -160,7 +160,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	n int,
 	log zerolog.Logger,
 	csize int,
-	tops []topology.Topology,
+	tops []network.Topology,
 	dryRun bool) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network) {
 	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log)
 	sms := GenerateSubscriptionManagers(t, mws)
@@ -197,10 +197,10 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 // CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
 // and returns the slice of topologies.
 func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList,
-	subMngrs []network.SubscriptionManager, logger zerolog.Logger) []topology.Topology {
-	tops := make([]topology.Topology, 0)
+	subMngrs []network.SubscriptionManager, logger zerolog.Logger) []network.Topology {
+	tops := make([]network.Topology, 0)
 	for i, id := range identities {
-		var top topology.Topology
+		var top network.Topology
 		var err error
 
 		top, err = topology.NewTopicBasedTopology(id.NodeID, logger, state, subMngrs[i])

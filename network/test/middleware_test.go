@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
+	"github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	message2 "github.com/onflow/flow-go/model/libp2p/message"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/message"
-	mock2 "github.com/onflow/flow-go/network/mock"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
@@ -29,7 +29,7 @@ type MiddlewareTestSuite struct {
 	suite.Suite
 	size    int               // used to determine number of middlewares under test
 	mws     []*p2p.Middleware // used to keep track of middlewares under test
-	ov      []*mock2.Overlay
+	ov      []*mocknetwork.Overlay
 	ids     []*flow.Identity
 	metrics *metrics.NoopCollector // no-op performance monitoring simulation
 }
@@ -42,7 +42,7 @@ func TestMiddlewareTestSuit(t *testing.T) {
 // SetupTest initiates the test setups prior to each test
 func (m *MiddlewareTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-	golog.SetAllLoggers(golog.LevelError)
+	log.SetAllLoggers(log.LevelError)
 
 	m.size = 2 // operates on two middlewares
 	m.metrics = metrics.NewNoopCollector()
@@ -54,7 +54,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	// create the mock overlays
 	for i := 0; i < m.size; i++ {
-		overlay := &mock2.Overlay{}
+		overlay := &mocknetwork.Overlay{}
 		m.ov = append(m.ov, overlay)
 
 		identifierToID := make(map[flow.Identifier]flow.Identity)
@@ -244,7 +244,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
 	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxUnicastMsgSize)+1000)
-	event := &message2.TestMessage{
+	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
 
@@ -277,7 +277,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
 	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxPubSubMsgSize)+1000)
-	event := &message2.TestMessage{
+	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
 

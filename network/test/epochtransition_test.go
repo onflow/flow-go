@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
+	"github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -49,7 +49,7 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-	golog.SetAllLoggers(golog.LevelError)
+	log.SetAllLoggers(log.LevelError)
 
 	// create ids
 	ids, mws := GenerateIDsAndMiddlewares(suite.T(), nodeCount, !DryRun, suite.logger)
@@ -62,7 +62,7 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 	suite.snapshot = new(mockprotocol.Snapshot)
 	suite.snapshot.On("Head").Return(&final, nil)
 	suite.snapshot.On("Phase").Return(flow.EpochPhaseCommitted, nil)
-	suite.snapshot.On("Identities", testifymock.Anything).Return(
+	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(flow.IdentityFilter) flow.IdentityList { return suite.ids },
 		func(flow.IdentityFilter) error { return nil })
 	suite.state.On("Final").Return(suite.snapshot, nil)
