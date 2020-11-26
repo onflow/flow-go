@@ -308,25 +308,56 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 		// figure out the expected first views of the epochs
 		epoch1FirstView := root.Header.View
-		epoch2FirstHeader, err := state.AtHeight(4).Head()
-		require.Nil(t, err)
-		epoch2FirstView := epoch2FirstHeader.View
+		epoch2FirstView := seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView + 1
 
-		// check first view for snapshots within epoch 1
-		heights := []uint64{0, 1, 2, 3}
-		for _, height := range heights {
-			actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
-			require.Nil(t, err)
-			assert.Equal(t, epoch1FirstView, actualFirstView)
-		}
+		epoch1Heights := []uint64{0, 1, 2, 3}
+		epoch2Heights := []uint64{4, 5, 6, 7}
 
-		// check first view for snapshots with epoch 2
-		heights = []uint64{4, 5, 6, 7}
-		for _, height := range heights {
-			actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
-			require.Nil(t, err)
-			assert.Equal(t, epoch2FirstView, actualFirstView)
-		}
+		// check first view for snapshots within epoch 1, with respect to a
+		// snapshot in either epoch 1 or epoch 2 (testing Current and Previous)
+		t.Run("epoch 1", func(t *testing.T) {
+
+			// test w.r.t. epoch 1 snapshot
+			t.Run("Current", func(t *testing.T) {
+				for _, height := range epoch1Heights {
+					actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
+					require.Nil(t, err)
+					assert.Equal(t, epoch1FirstView, actualFirstView)
+				}
+			})
+
+			// test w.r.t. epoch 2 snapshot
+			t.Run("Previous", func(t *testing.T) {
+				for _, height := range epoch2Heights {
+					actualFirstView, err := state.AtHeight(height).Epochs().Previous().FirstView()
+					require.Nil(t, err)
+					assert.Equal(t, epoch1FirstView, actualFirstView)
+				}
+			})
+		})
+
+		// check first view for snapshots within epoch 2, with respect to a
+		// snapshot in either epoch 1 or epoch 2 (testing Next and Current)
+		t.Run("epoch 2", func(t *testing.T) {
+
+			// test w.r.t. epoch 1 snapshot
+			t.Run("Next", func(t *testing.T) {
+				for _, height := range epoch1Heights[2:] {
+					actualFirstView, err := state.AtHeight(height).Epochs().Next().FirstView()
+					require.Nil(t, err)
+					assert.Equal(t, epoch2FirstView, actualFirstView)
+				}
+			})
+
+			// test w.r.t. epoch 2 snapshot
+			t.Run("Current", func(t *testing.T) {
+				for _, height := range epoch2Heights {
+					actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
+					require.Nil(t, err)
+					assert.Equal(t, epoch2FirstView, actualFirstView)
+				}
+			})
+		})
 	})
 }
 
