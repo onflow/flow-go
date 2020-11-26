@@ -47,6 +47,10 @@ type EpochSetup struct {
 	Participants IdentityList   // all participants of the epoch
 	Assignments  AssignmentList // cluster assignment for the epoch
 	RandomSource []byte         // source of randomness for epoch-specific setup tasks
+
+	// FirstView is the first view of the epoch. It is NOT included in the service
+	// event, but is cached here when stored to simplify epoch queries.
+	FirstView uint64
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {

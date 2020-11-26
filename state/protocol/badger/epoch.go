@@ -4,7 +4,6 @@ package badger
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -18,7 +17,7 @@ import (
 // Only the EpochSetup event for the epoch has been emitted as of the point
 // at which the epoch was queried.
 type SetupEpoch struct {
-	query      *EpochQuery
+	// EpochSetup service event
 	setupEvent *flow.EpochSetup
 }
 
@@ -27,15 +26,7 @@ func (es *SetupEpoch) Counter() (uint64, error) {
 }
 
 func (es *SetupEpoch) FirstView() (uint64, error) {
-	status, err := es.query.snap.state.epoch.statuses.ByBlockID(es.query.snap.blockID)
-	if err != nil {
-		return 0, fmt.Errorf("could not get epoch status: %w", err)
-	}
-	first, err := es.query.snap.state.headers.ByBlockID(status.FirstBlockID)
-	if err != nil {
-		return 0, fmt.Errorf("could not get epoch first block: %w", err)
-	}
-	return first.View, nil
+	return es.setupEvent.FirstView, nil
 }
 
 func (es *SetupEpoch) FinalView() (uint64, error) {
@@ -46,9 +37,7 @@ func (es *SetupEpoch) InitialIdentities() (flow.IdentityList, error) {
 
 	identities := es.setupEvent.Participants.Filter(filter.Any)
 	// apply a deterministic sort to the participants
-	sort.Slice(identities, func(i int, j int) bool {
-		return order.ByNodeIDAsc(identities[i], identities[j])
-	})
+	identities = identities.Order(order.ByNodeIDAsc)
 
 	return identities, nil
 }
@@ -75,9 +64,8 @@ func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
 	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
 }
 
-func (q *EpochQuery) NewSetupEpoch(setupEvent *flow.EpochSetup) *SetupEpoch {
+func NewSetupEpoch(setupEvent *flow.EpochSetup) *SetupEpoch {
 	return &SetupEpoch{
-		query:      q,
 		setupEvent: setupEvent,
 	}
 }
@@ -126,10 +114,9 @@ func (es *CommittedEpoch) DKG() (protocol.DKG, error) {
 	return &DKG{commitEvent: es.commitEvent}, nil
 }
 
-func (q *EpochQuery) NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
+func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
 	return &CommittedEpoch{
 		SetupEpoch: SetupEpoch{
-			query:      q,
 			setupEvent: setupEvent,
 		},
 		commitEvent: commitEvent,
