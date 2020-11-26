@@ -28,7 +28,7 @@ import (
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/network/validators"
+	"github.com/onflow/flow-go/network/validator"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -120,7 +120,7 @@ type FlowNodeBuilder struct {
 	State             *protocol.State
 	Middleware        *p2p.Middleware
 	Network           *p2p.Network
-	MsgValidators     []validators.MessageValidator
+	MsgValidators     []validator.MessageValidator
 	FvmOptions        []fvm.Option
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
