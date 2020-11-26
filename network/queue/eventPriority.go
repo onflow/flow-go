@@ -5,7 +5,7 @@ import (
 	"math"
 
 	"github.com/onflow/flow-go/model/flow"
-	testmessage "github.com/onflow/flow-go/model/libp2p/message"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
 )
 
@@ -15,8 +15,8 @@ const (
 	MiB
 )
 
-// QueueMessage is the message that is enqueued for each incoming message
-type QueueMessage struct {
+// QMessage is the message that is enqueued for each incoming message
+type QMessage struct {
 	Payload   interface{}     // the decoded message
 	Size      int             // the size of the message in bytes
 	ChannelID string          // the channel id to use to lookup the engine
@@ -26,7 +26,7 @@ type QueueMessage struct {
 // GetEventPriority returns the priority of the flow event message.
 // It is an average of the priority by message type and priority by message size
 func GetEventPriority(message interface{}) (Priority, error) {
-	qm, ok := message.(QueueMessage)
+	qm, ok := message.(QMessage)
 	if !ok {
 		return 0, fmt.Errorf("invalid message format: %T", message)
 	}
@@ -97,7 +97,7 @@ func getPriorityByType(message interface{}) Priority {
 		return LowPriority
 
 	// test message
-	case *testmessage.TestMessage:
+	case *libp2pmessage.TestMessage:
 		return LowPriority
 
 	// anything else

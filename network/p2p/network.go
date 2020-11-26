@@ -228,7 +228,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	}
 
 	// create queue message
-	qm := queue.QueueMessage{
+	qm := queue.QMessage{
 		Payload:   decodedMessage,
 		Size:      message.Size(),
 		ChannelID: message.ChannelID,
@@ -426,7 +426,7 @@ func (n *Network) sendOnChannel(channelID string, message interface{}, targetIDs
 // queueSubmitFunc submits the message to the engine synchronously. It is the callback for the queue worker
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
-	qm := message.(queue.QueueMessage)
+	qm := message.(queue.QMessage)
 	eng, err := n.subMngr.GetEngine(qm.ChannelID)
 	if err != nil {
 		n.logger.Error().
