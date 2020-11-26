@@ -4,10 +4,11 @@ import (
 	"bytes"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 )
 
-var _ MessageValidator = &SenderValidator{}
+var _ network.MessageValidator = &SenderValidator{}
 
 // SenderValidator validates messages by sender ID
 type SenderValidator struct {
