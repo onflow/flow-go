@@ -11,6 +11,7 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -61,7 +62,8 @@ type Middleware struct {
 	me                flow.Identifier
 	host              string
 	port              string
-	key               crypto.PrivateKey
+	flowKey           crypto.PrivateKey
+	libp2pKey         lcrypto.PrivKey
 	metrics           module.NetworkMetrics
 	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
@@ -116,7 +118,8 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		me:                flowID,
 		host:              ip,
 		port:              port,
-		key:               key,
+		flowKey:           key,
+		libp2pKey:         libp2pKey,
 		metrics:           metrics,
 		maxPubSubMsgSize:  maxPubSubMsgSize,
 		maxUnicastMsgSize: maxUnicastMsgSize,
@@ -145,7 +148,7 @@ func (m *Middleware) GetIPPort() (string, string, error) {
 }
 
 func (m *Middleware) PublicKey() crypto.PublicKey {
-	return m.key.PublicKey()
+	return m.flowKey.PublicKey()
 }
 
 // Start will start the middleware.
@@ -175,14 +178,13 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	}
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
+	libp2pHost, err := NewLibP2PHost(m.ctx, m.log, nodeAddress, NewConnManager(m.log, m.metrics), m.libp2pKey, true, nodeAddrsWhiteList)
+	if err != nil {
+		return fmt.Errorf("could not create libp2p host: %w", err)
+	}
 
 	// start the libp2p node
-	err = m.libP2PNode.Start(m.ctx,
-		nodeAddress,
-		m.handleIncomingStream,
-		true,
-		nodeAddrsWhiteList,
-		psOptions...)
+	err = m.libP2PNode.Start(libp2pHost, m.handleIncomingStream, psOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}

@@ -15,6 +15,7 @@ import (
 )
 
 type LibP2PHost struct {
+	ctx         context.Context
 	nodeAddress NodeAddress
 	connGater   *connGater
 	host        host.Host
@@ -30,6 +31,10 @@ func (l LibP2PHost) ConnenctionGater() *connGater {
 
 func (l LibP2PHost) Host() host.Host {
 	return l.host
+}
+
+func (l LibP2PHost) Context() context.Context {
+	return l.ctx
 }
 
 // Start starts a libp2p node on the given address.
@@ -94,5 +99,6 @@ func NewLibP2PHost(ctx context.Context,
 		nodeAddress: nodeAddress,
 		connGater:   connGater,
 		host:        libP2PHost,
+		ctx:         ctx,
 	}, nil
 }

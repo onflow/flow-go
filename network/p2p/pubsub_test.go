@@ -173,8 +173,12 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 			PubKey: pkey.GetPublic(), // the networking public key
 		}
 
+		libp2pHost, err := NewLibP2PHost(suite.ctx, logger, nodeID, NewConnManager(logger, noopMetrics),
+			pkey, false, nil)
+		require.NoError(suite.T(), err)
+
 		psOption := pubsub.WithDiscovery(d)
-		err = n.Start(suite.ctx, nodeID, handlerFunc, false, nil, psOption)
+		err = n.Start(libp2pHost, handlerFunc, psOption)
 		require.NoError(suite.T(), err)
 		require.Eventuallyf(suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()

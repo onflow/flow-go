@@ -77,12 +77,7 @@ func NewLibP2PNode(logger zerolog.Logger, key crypto.PrivKey, rootBlockID string
 }
 
 // Start starts a libp2p node on the given address.
-func (n *Node) Start(ctx context.Context,
-	nodeAddress NodeAddress,
-	handler network.StreamHandler,
-	allowList bool,
-	allowListAddrs []NodeAddress,
-	psOption ...pubsub.Option) error {
+func (n *Node) Start(libp2pHost *LibP2PHost, handler network.StreamHandler, psOption ...pubsub.Option) error {
 	n.Lock()
 	defer n.Unlock()
 
@@ -134,10 +129,10 @@ func (n *Node) Start(ctx context.Context,
 	//	return fmt.Errorf("could not create libp2p host: %w", err)
 	//}
 
-	libp2pHost, err := NewLibP2PHost(ctx, n.logger, nodeAddress, n.conMgr, n.key, allowList, allowListAddrs)
-	if err != nil {
-		return fmt.Errorf("could not create libp2p host: %w", err)
-	}
+	//libp2pHost, err := NewLibP2PHost(ctx, n.logger, nodeAddress, n.conMgr, n.key, allowList, allowListAddrs)
+	//if err != nil {
+	//	return fmt.Errorf("could not create libp2p host: %w", err)
+	//}
 	n.connGater = libp2pHost.ConnenctionGater()
 	n.libP2PHost = libp2pHost.Host()
 	n.name = libp2pHost.Name()
@@ -145,11 +140,12 @@ func (n *Node) Start(ctx context.Context,
 	n.libP2PHost.SetStreamHandler(n.flowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
-	n.ps, err = pubsub.NewGossipSub(ctx, n.libP2PHost, psOption...)
+	ps, err := pubsub.NewGossipSub(libp2pHost.Context(), n.libP2PHost, psOption...)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p pubsub: %w", err)
 	}
 
+	n.ps = ps
 	n.topics = make(map[string]*pubsub.Topic)
 	n.subs = make(map[string]*pubsub.Subscription)
 
