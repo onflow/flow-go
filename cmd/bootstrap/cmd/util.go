@@ -37,7 +37,7 @@ func readJSON(path string, target interface{}) {
 	}
 	err = json.Unmarshal(dat, target)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot unmarshal json in file")
+		log.Fatal().Err(err).Msgf("cannot unmarshal json in file %s", path)
 	}
 }
 
@@ -71,8 +71,17 @@ func pubKeyToString(key crypto.PublicKey) string {
 }
 
 func filesInDir(dir string) ([]string, error) {
+	exists, err := pathExists(dir)
+	if err != nil {
+		return nil, fmt.Errorf("could not check if dir exists: %w", err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("dir %v does not exist", dir)
+	}
+
 	var files []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
 			files = append(files, path)
 		}

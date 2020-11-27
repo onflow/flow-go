@@ -196,7 +196,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
 
-	results := stdmap.NewIncorporatedResults(1000)
+	results, err := stdmap.NewIncorporatedResults(1000)
+	require.NoError(t, err)
 
 	receipts, err := stdmap.NewReceipts(1000)
 	require.NoError(t, err)
@@ -306,6 +307,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	vm := fvm.New(rt)
 
 	vmCtx := fvm.NewContext(
+		node.Log,
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(node.Blocks),
 	)
@@ -617,6 +619,7 @@ func VerificationNode(t testing.TB,
 		vm := fvm.New(rt)
 
 		vmCtx := fvm.NewContext(
+			node.Log,
 			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(node.Blocks),
 		)

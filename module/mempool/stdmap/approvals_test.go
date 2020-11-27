@@ -6,7 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module/mempool/model"
+
 	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,10 +32,11 @@ func TestApprovals(t *testing.T) {
 	})
 
 	// insert another approval for the same chunk
-	approval2 := unittest.ResultApprovalFixture(func(approval *flow.ResultApproval) {
-		approval.Body.ExecutionResultID = approval1.Body.ExecutionResultID
-		approval.Body.ChunkIndex = approval1.Body.ChunkIndex
-	})
+	approval2 := unittest.ResultApprovalFixture(
+		unittest.WithExecutionResultID(approval1.Body.ExecutionResultID),
+		unittest.WithBlockID(approval1.Body.BlockID),
+		unittest.WithChunk(approval1.Body.ChunkIndex),
+	)
 	t.Run("adding second approval in same chunk", func(t *testing.T) {
 		ok, err := approvalPL.Add(approval2)
 		require.True(t, ok)
@@ -97,13 +101,76 @@ func TestApprovals(t *testing.T) {
 
 // Test that size gets decremented when items are automatically ejected
 func TestApprovalsEjectSize(t *testing.T) {
-	approvalPL, _ := NewApprovals(10)
 
-	// insert 20 items (10 above limit)
-	for i := 0; i < 20; i++ {
-		_, _ = approvalPL.Add(unittest.ResultApprovalFixture())
+	t.Run("check ejection of chunk with only a single approval", func(t *testing.T) {
+		approvalPL, _ := NewApprovals(10)
+
+		// insert 20 items (10 above limit)
+		for i := 0; i < 20; i++ {
+			_, _ = approvalPL.Add(unittest.ResultApprovalFixture())
+		}
+
+		// 10 items should have been evicted, so size 10
+		require.Equal(t, uint(10), approvalPL.Size())
+	})
+
+	t.Run("check ejection of chunk with multiple approvals", func(t *testing.T) {
+		// custom ejector which deterministically ejects all Approvals for chunk with index 0
+		ejector := func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+			for id, entity := range entities {
+				chunkIndex := entity.(*model.ApprovalMapEntity).ChunkIndex
+				if chunkIndex == uint64(0) {
+					return id, entity
+				}
+			}
+			panic("missing target ID")
+		}
+
+		// init mempool
+		approvalPL, err := NewApprovals(10, WithEject(ejector))
+		require.NoError(t, err)
+
+		// consider an execution result for an arbitrary block
+		blockID := unittest.IdentifierFixture()
+		executionResultID := unittest.IdentifierFixture()
+		// Without loss of generality, we assume that there are at least 11 chunks in the result.
+		// We add Approvals for the result: 3 approvals per chunk
+		for chunkIndex := uint64(0); chunkIndex < 10; chunkIndex++ {
+			addApprovals(t, approvalPL, blockID, executionResultID, chunkIndex, 3)
+
+			// Internally, the mempool works with the pair (resultID, chunkIndex). All approvals
+			// for the same pair (resultID, chunkIndex) are one data structure. Therefore, all
+			// approvals for same pair (resultID, chunkIndex) together consume only capacity 1.
+			require.Equal(t, uint(3*(chunkIndex+1)), approvalPL.Size())
+		}
+		// mempool should now be at capacity limit: storing approvals for 10 different pairs (resultID, chunkIndex)
+		require.Equal(t, uint(30), approvalPL.Size())
+
+		// Adding an approval for a previously unknown chunk (index 10) should overflow the mempool;
+		addApprovals(t, approvalPL, blockID, executionResultID, 10, 1)
+
+		// The mempool stores all approvals for the same chunk internally in one data structure.
+		// Hence, eviction should lead to _all_ approvals for a single chunk being dropped.
+		// For this specific test, we always evict the approvals for chunk with index 2.
+		// Hence, we expect:
+		//   * 0 Approvals for chunk 0, as it was evicted
+		//   * 3 Approvals for each of the chunks 1, 2, ..., 9
+		//   * plus one result for chunk 10
+		require.Equal(t, uint(9*3+1), approvalPL.Size())
+	})
+}
+
+// addIncorporatedResults generates 3 different IncorporatedResults structures
+// for the baseResult and adds those to the mempool
+func addApprovals(t *testing.T, mempool *Approvals, blockID flow.Identifier, executionResultID flow.Identifier, chunkIndex uint64, num uint) {
+	for ; num > 0; num-- {
+		a := unittest.ResultApprovalFixture(
+			unittest.WithBlockID(blockID),
+			unittest.WithExecutionResultID(executionResultID),
+			unittest.WithChunk(chunkIndex),
+		)
+		added, err := mempool.Add(a)
+		require.True(t, added)
+		require.NoError(t, err)
 	}
-
-	// 10 items should have been evicted, so size 10
-	require.Equal(t, uint(10), approvalPL.Size())
 }
