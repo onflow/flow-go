@@ -3,7 +3,7 @@ package committees
 import (
 	"errors"
 	"fmt"
-	"math"
+	"sort"
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -11,13 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
-)
-
-// a filter that returns all members of the consensus committee allowed to vote
-var consensusMemberFilter = filter.And(
-	filter.HasStake(true),              // must have non-zero weight
-	filter.HasRole(flow.RoleConsensus), // must be a consensus node
-	filter.Not(filter.Ejected),         // must not be ejected
 )
 
 var errSelectionNotComputed = fmt.Errorf("leader selection for epoch not yet computed")
@@ -44,7 +37,7 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 
 	// pre-compute leader selection for current epoch
 	current := final.Epochs().Current()
-	err := com.prepareLeaderSelection(current)
+	_, err := com.prepareLeaderSelection(current)
 	if err != nil {
 		return nil, fmt.Errorf("could not add leader for current epoch: %w", err)
 	}
@@ -65,7 +58,7 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 		return nil, fmt.Errorf("could not get previous epoch: %w", err)
 	}
 
-	err = com.prepareLeaderSelection(previous)
+	_, err = com.prepareLeaderSelection(previous)
 	if err != nil {
 		return nil, fmt.Errorf("could not add leader for previous epoch: %w", err)
 	}
@@ -75,7 +68,7 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 
 func (c *Consensus) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return c.state.AtBlockID(blockID).Identities(filter.And(
-		consensusMemberFilter,
+		filter.IsVotingConsensusCommitteeMember,
 		selector,
 	))
 }
@@ -85,7 +78,7 @@ func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*
 	if err != nil {
 		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
-	if !consensusMemberFilter(identity) {
+	if !filter.IsVotingConsensusCommitteeMember(identity) {
 		return nil, fmt.Errorf("node with ID %x is not a valid consensus committee member at block %x", nodeID, blockID)
 	}
 	return identity, nil
@@ -133,21 +126,12 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// block in every epoch, which is anyway a requirement for valid epochs.
 	//
 	next := c.state.Final().Epochs().Next()
-	err = c.prepareLeaderSelection(next)
+	selection, err := c.prepareLeaderSelection(next)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not compute leader selection for next epoch: %w", err)
 	}
-	nextCounter, err := next.Counter()
-	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not get next epoch counter: %w", err)
-	}
 
-	// if we get to this point, we are guaranteed to have inserted the leader
-	// selection for the next epoch
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	nextEpochSelection := c.leaders[nextCounter]
-	return nextEpochSelection.LeaderForView(view)
+	return selection.LeaderForView(view)
 }
 
 func (c *Consensus) Self() flow.Identifier {
@@ -191,42 +175,50 @@ func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, erro
 // prepareLeaderSelection pre-computes and stores the leader selection for the
 // given epoch. Computing leader selection for the same epoch multiple times
 // is a no-op.
-func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) error {
+//
+// Returns the leader selection for the given epoch.
+func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) (*leader.LeaderSelection, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	counter, err := epoch.Counter()
 	if err != nil {
-		return fmt.Errorf("could not get counter for current epoch: %w", err)
+		return nil, fmt.Errorf("could not get counter for current epoch: %w", err)
 	}
 	// this is a no-op if we have already computed leaders for this epoch
-	_, exists := c.leaders[counter]
+	selection, exists := c.leaders[counter]
 	if exists {
-		return nil
+		return selection, nil
 	}
 
-	selection, err := leader.SelectionForConsensus(epoch)
+	selection, err = leader.SelectionForConsensus(epoch)
 	if err != nil {
-		return fmt.Errorf("could not get leader selection for current epoch: %w", err)
+		return nil, fmt.Errorf("could not get leader selection for current epoch: %w", err)
 	}
 
 	c.leaders[counter] = selection
 
 	// prune leader selection for old epochs when we have more than 2 stored
 	if len(c.leaders) <= 2 {
-		return nil
+		return selection, nil
 	}
 
-	// Since we only add leader selections in this method, and we only add one
-	// at a time, whenever we have >2 epochs stored we will have exactly 3.
-	// Therefore we remove exactly one epoch, whichever has the lowest counter.
-	minCounter := uint64(math.MaxUint64)
+	// create a list of counters for all the epochs we have stored
+	counters := make([]uint64, 0, len(c.leaders))
 	for counter := range c.leaders {
-		if counter < minCounter {
-			minCounter = counter
-		}
+		counters = append(counters, counter)
 	}
-	delete(c.leaders, minCounter)
 
-	return nil
+	// sort counters in ascending order
+	sort.Slice(counters, func(i, j int) bool {
+		return counters[i] < counters[j]
+	})
+
+	// delete leader selection for the lowest counter until we have 2 epochs left
+	for len(c.leaders) > 2 {
+		delete(c.leaders, counters[0])
+		counters = counters[1:]
+	}
+
+	return selection, nil
 }

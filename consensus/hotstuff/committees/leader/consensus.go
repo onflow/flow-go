@@ -3,7 +3,6 @@ package leader
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
@@ -36,7 +35,7 @@ func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 		firstView,
 		seed,
 		int(finalView-firstView+1), // add 1 because both first/final view are inclusive
-		identities.Filter(filter.HasRole(flow.RoleConsensus)),
+		identities.Filter(filter.IsVotingConsensusCommitteeMember),
 	)
 	return leaders, err
 }
