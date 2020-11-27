@@ -167,8 +167,15 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
-		mw, err := p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics.Network, p2p.DefaultMaxUnicastMsgSize, p2p.DefaultMaxPubSubMsgSize,
+		mw, err := p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
+			p2p.DefaultLibP2PHostGenerator,
+			codec,
+			myAddr,
+			fnb.Me.NodeID(),
+			fnb.networkKey,
+			fnb.Metrics.Network,
+			p2p.DefaultMaxUnicastMsgSize,
+			p2p.DefaultMaxPubSubMsgSize,
 			fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
 		if err != nil {

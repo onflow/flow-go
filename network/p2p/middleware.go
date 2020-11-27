@@ -48,6 +48,14 @@ const (
 
 var unicastTimeout = DefaultUnicastTimeout
 
+type LibP2PHostGenFuc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Option) (*LibP2PHost, error)
+
+var DefaultLibP2PHostGenerator = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*LibP2PHost, error) {
+	return NewLibP2PHost(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics),
+		mv.libp2pKey, true, allowList, mv.rootBlockID, mv.handleIncomingStream,
+		psOption...)
+}
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -59,6 +67,7 @@ type Middleware struct {
 	ov                network.Overlay
 	wg                *sync.WaitGroup
 	libP2PNode        *Node
+	libP2PHostGenFuc  LibP2PHostGenFuc
 	me                flow.Identifier
 	host              string
 	port              string
@@ -74,9 +83,17 @@ type Middleware struct {
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
-func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, metrics module.NetworkMetrics, maxUnicastMsgSize int, maxPubSubMsgSize int,
-	rootBlockID string, validators ...network.MessageValidator) (*Middleware, error) {
+func NewMiddleware(log zerolog.Logger,
+	libP2PHostGenFunc LibP2PHostGenFuc,
+	codec network.Codec,
+	address string,
+	flowID flow.Identifier,
+	key crypto.PrivateKey,
+	metrics module.NetworkMetrics,
+	maxUnicastMsgSize int,
+	maxPubSubMsgSize int,
+	rootBlockID string,
+	validators ...network.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create middleware: %w", err)
@@ -113,6 +130,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		host:              ip,
 		port:              port,
 		flowKey:           key,
+		libP2PHostGenFuc:  libP2PHostGenFunc,
 		libp2pKey:         libp2pKey,
 		metrics:           metrics,
 		maxPubSubMsgSize:  maxPubSubMsgSize,
@@ -173,8 +191,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	// creates libp2p host and node
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
-	libp2pHost, err := NewLibP2PHost(m.ctx, m.log, nodeAddress, NewConnManager(m.log, m.metrics), m.libp2pKey, true, nodeAddrsWhiteList,
-		m.rootBlockID, m.handleIncomingStream, psOptions...)
+	libp2pHost, err := m.libP2PHostGenFuc(m, nodeAddress, nodeAddrsWhiteList, psOptions...)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}

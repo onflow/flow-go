@@ -80,6 +80,7 @@ func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.Ident
 	for i, id := range identities {
 		// creating middleware of nodes
 		mw, err := p2p.NewMiddleware(log,
+			p2p.DefaultLibP2PHostGenerator,
 			json.NewCodec(),
 			id.Address,
 			id.NodeID,
