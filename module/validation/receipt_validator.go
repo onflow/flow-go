@@ -126,7 +126,7 @@ func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) e
 	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return engine.NewInvalidInputErrorf("no previous result ID")
+			return engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown")
 		} else {
 			return err
 		}
