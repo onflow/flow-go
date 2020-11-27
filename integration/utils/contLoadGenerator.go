@@ -123,7 +123,12 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
-	lg.SetupFavContract()
+	err := lg.SetupFavContract()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("failed to setup fav contract")
+		return err
+	}
+
 	return nil
 }
 
@@ -143,10 +148,6 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 
 	lg.log.Trace().Msgf("creating fav contract deployment script")
 	deployScript := DeployingMyFavContractScript()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error creating fav contract deployment script")
-		return err
-	}
 
 	lg.log.Trace().Msgf("creating fav contract deployment transaction")
 	deploymentTx := flowsdk.NewTransaction().
@@ -157,7 +158,7 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	acc.signTx(deploymentTx, 0)
+	err = acc.signTx(deploymentTx, 0)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return err
@@ -373,7 +374,11 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 		SetScript(addKeysScript).
 		AddAuthorizer(*acc.address).
 		SetReferenceBlockID(blockRef).
-		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
+		SetProposalKey(
+			*lg.serviceAccount.address,
+			lg.serviceAccount.accountKey.Index,
+			lg.serviceAccount.accountKey.SequenceNumber,
+		).
 		SetPayer(*lg.serviceAccount.address)
 
 	err = addKeysTx.AddArgument(cadenceKeysArray)
@@ -390,7 +395,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	acc.signTx(addKeysTx, 0)
+	err = acc.signTx(addKeysTx, 0)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return
@@ -434,7 +439,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	acc.signTx(transferTx, 0)
+	err = acc.signTx(transferTx, 0)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return
@@ -476,7 +481,7 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	acc.signTx(tx, 0)
+	err = acc.signTx(tx, 0)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return

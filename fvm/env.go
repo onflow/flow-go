@@ -160,7 +160,7 @@ func (e *hostEnv) ResolveLocation(
 	// then fetch all identifiers at this address
 
 	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.ToAddress())
+		address := flow.Address(addressLocation.Address)
 		contractNames, err := e.accounts.GetContractNames(address)
 		if err != nil {
 			panic(err)
@@ -189,9 +189,9 @@ func (e *hostEnv) ResolveLocation(
 	for i := range resolvedLocations {
 		identifier := identifiers[i]
 		resolvedLocations[i] = runtime.ResolvedLocation{
-			Location: runtime.AddressContractLocation{
-				AddressLocation: addressLocation,
-				Name:            identifier.Identifier,
+			Location: runtime.AddressLocation{
+				Address: addressLocation.Address,
+				Name:    identifier.Identifier,
 			},
 			Identifiers: []runtime.Identifier{identifier},
 		}
@@ -201,12 +201,12 @@ func (e *hostEnv) ResolveLocation(
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
-	contractLocation, ok := location.(runtime.AddressContractLocation)
+	contractLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
-		return nil, fmt.Errorf("can only get code for an account contract (an AddressContractLocation)")
+		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
 
-	address := flow.Address(contractLocation.AddressLocation.ToAddress())
+	address := flow.BytesToAddress(contractLocation.Address.Bytes())
 
 	code, err := e.accounts.GetContract(contractLocation.Name, address)
 	if err != nil {
@@ -225,8 +225,8 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 	if program != nil {
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(runtime.AddressContractLocation); ok {
-			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.AddressLocation))
+		if addressLocation, ok := location.(runtime.AddressLocation); ok {
+			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
 		}
 	}
 
@@ -247,8 +247,9 @@ func (e *hostEnv) Log(message string) {
 	e.logs = append(e.logs, message)
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) {
+func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	e.events = append(e.events, event)
+	return nil
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
@@ -409,9 +410,9 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
-	return e.GetCode(runtime.AddressContractLocation{
-		AddressLocation: address.Bytes(),
-		Name:            name,
+	return e.GetCode(runtime.AddressLocation{
+		Address: address,
+		Name:    name,
 	})
 }
 

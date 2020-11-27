@@ -21,7 +21,7 @@ jobs:
     - name: Build relic
       run: make crypto/relic/build
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v1.2.1
+      uses: golangci/golangci-lint-action@v2.3.0
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.29
@@ -36,7 +36,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: '1.14'
+        go-version: '1.13'
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run tests
@@ -51,11 +51,11 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: '1.14'
+        go-version: '1.13'
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Install SSH agent
-      uses: webfactory/ssh-agent@v0.4.0
+      uses: webfactory/ssh-agent@v0.4.1
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
     - name: Build relic

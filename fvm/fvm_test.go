@@ -11,6 +11,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,7 @@ func vmTest(
 
 		opts = append(baseOpts, opts...)
 
-		ctx := fvm.NewContext(opts...)
+		ctx := fvm.NewContext(zerolog.Nop(), opts...)
 
 		mapLedger := state.NewMapLedger()
 		ledger := delta.NewView(mapLedger.Get)
@@ -73,7 +74,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	t.Run("Success", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -194,7 +195,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
@@ -295,7 +296,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
@@ -401,7 +402,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	var tests = []struct {
 		label    string
@@ -524,7 +525,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	t.Run("script success", func(t *testing.T) {
 		code := []byte(`
@@ -594,7 +595,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	blocks := new(fvmmock.Blocks)
 
@@ -725,7 +726,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	sequenceNumber := uint64(0)
 
@@ -821,7 +822,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	header := flow.Header{Height: 42}
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithBlockHeader(&header))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithBlockHeader(&header))
 
 	t.Run("works as transaction", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -865,7 +866,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
@@ -1153,10 +1154,11 @@ func TestWithServiceAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	ctxA := fvm.NewContext(
+		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithASTCache(cache),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(),
+			fvm.NewTransactionInvocator(zerolog.Nop()),
 		),
 	)
 
