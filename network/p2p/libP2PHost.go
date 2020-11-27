@@ -14,6 +14,24 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type LibP2PHost struct {
+	nodeAddress NodeAddress
+	connGater   *connGater
+	host        host.Host
+}
+
+func (l LibP2PHost) Name() string {
+	return l.nodeAddress.Name
+}
+
+func (l LibP2PHost) ConnenctionGater() *connGater {
+	return l.connGater
+}
+
+func (l LibP2PHost) Host() host.Host {
+	return l.host
+}
+
 // Start starts a libp2p node on the given address.
 func NewLibP2PHost(ctx context.Context,
 	logger zerolog.Logger,
@@ -21,12 +39,12 @@ func NewLibP2PHost(ctx context.Context,
 	conMgr ConnManager,
 	key crypto.PrivKey,
 	allowList bool,
-	allowListAddrs []NodeAddress) (host.Host, *connGater, error) {
+	allowListAddrs []NodeAddress) (*LibP2PHost, error) {
 
 	var connGater *connGater
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate multi-address for host: %w", err)
+		return nil, fmt.Errorf("could not generate multi-address for host: %w", err)
 	}
 
 	// create a transport which disables port reuse and web socket.
@@ -56,7 +74,7 @@ func NewLibP2PHost(ctx context.Context,
 		// convert each of the allowList address to libp2p peer infos
 		allowListPInfos, err := GetPeerInfos(allowListAddrs...)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create approved list of peers: %w", err)
+			return nil, fmt.Errorf("failed to create approved list of peers: %w", err)
 		}
 
 		// create a connection gater
@@ -69,8 +87,12 @@ func NewLibP2PHost(ctx context.Context,
 	// create the libp2p host
 	libP2PHost, err := libp2p.New(ctx, options...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create libp2p host: %w", err)
+		return nil, fmt.Errorf("could not create libp2p host: %w", err)
 	}
 
-	return libP2PHost, connGater, nil
+	return &LibP2PHost{
+		nodeAddress: nodeAddress,
+		connGater:   connGater,
+		host:        libP2PHost,
+	}, nil
 }
