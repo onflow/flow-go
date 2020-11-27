@@ -15,7 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
+	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -28,7 +28,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
-	flownetwork "github.com/onflow/flow-go/network"
+	flownet "github.com/onflow/flow-go/network"
 )
 
 const (
@@ -71,7 +71,7 @@ func (n *Node) Start(ctx context.Context,
 	nodeAddress NodeAddress,
 	logger zerolog.Logger,
 	key crypto.PrivKey,
-	handler network.StreamHandler,
+	handler libp2pnet.StreamHandler,
 	rootBlockID string,
 	allowList bool,
 	allowListAddrs []NodeAddress,
@@ -239,7 +239,7 @@ func (n *Node) RemovePeer(ctx context.Context, peer NodeAddress) error {
 }
 
 // CreateStream returns an existing stream connected to n if it exists or adds node n as a peer and creates a new stream with it
-func (n *Node) CreateStream(ctx context.Context, nodeAddress NodeAddress) (network.Stream, error) {
+func (n *Node) CreateStream(ctx context.Context, nodeAddress NodeAddress) (libp2pnet.Stream, error) {
 
 	// Get the PeerID
 	peerID, err := peer.IDFromPublicKey(nodeAddress.PubKey)
@@ -250,7 +250,7 @@ func (n *Node) CreateStream(ctx context.Context, nodeAddress NodeAddress) (netwo
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := n.tryCreateNewStream(ctx, nodeAddress, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, flownetwork.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", nodeAddress.Name, nodeAddress.IP,
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", nodeAddress.Name, nodeAddress.IP,
 			nodeAddress.Port,
 			err))
 	}
@@ -260,9 +260,9 @@ func (n *Node) CreateStream(ctx context.Context, nodeAddress NodeAddress) (netwo
 // tryCreateNewStream makes at most maxAttempts to create a stream with the target peer
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
-func (n *Node) tryCreateNewStream(ctx context.Context, nodeAddress NodeAddress, targetID peer.ID, maxAttempts int) (network.Stream, error) {
+func (n *Node) tryCreateNewStream(ctx context.Context, nodeAddress NodeAddress, targetID peer.ID, maxAttempts int) (libp2pnet.Stream, error) {
 	var errs, err error
-	var s network.Stream
+	var s libp2pnet.Stream
 	var retries = 0
 	for ; retries < maxAttempts; retries++ {
 		select {
@@ -528,7 +528,7 @@ func (n *Node) IsConnected(address NodeAddress) (bool, error) {
 		return false, err
 	}
 	// query libp2p for connectedness status of this peer
-	isConnected := n.libP2PHost.Network().Connectedness(pInfo.ID) == network.Connected
+	isConnected := n.libP2PHost.Network().Connectedness(pInfo.ID) == libp2pnet.Connected
 	return isConnected, nil
 }
 
