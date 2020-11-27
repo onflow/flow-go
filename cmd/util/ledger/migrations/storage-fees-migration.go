@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"fmt"
 	"github.com/onflow/flow-go/engine/execution/state"
 	fvm "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -16,10 +15,10 @@ const (
 // Migration assumes that payload containd all existing registers.
 // iterates through registers keeping a map of register sizes
 // after it has reached the end it add storage used and storage capacity for each address
-func Migration(payload []ledger.Payload) ([]ledger.Payload, error) {
-	storageUsed := make(map[string]uint64, 0)
+func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
+	storageUsed := make(map[string]uint64)
 	newPayload := make([]ledger.Payload, len(payload))
-	
+
 	for i, p := range payload {
 		err := process(p, storageUsed)
 		if err != nil {
@@ -59,17 +58,6 @@ func makeKey(owner string, key string) ledger.Key {
 		Value: []byte(key),
 	}
 	return newKey
-}
-
-func keyToRegisterId(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 3 ||
-		key.KeyParts[0].Type != state.KeyPartOwner ||
-		key.KeyParts[1].Type != state.KeyPartController ||
-		key.KeyParts[2].Type != state.KeyPartKey {
-		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
-	}
-
-	return flow.NewRegisterID(string(key.KeyParts[0].Value), string(key.KeyParts[1].Value), string(key.KeyParts[2].Value)), nil
 }
 
 func process(p ledger.Payload, used map[string]uint64) error {

@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
@@ -64,8 +63,9 @@ func (r *BaseReporter) Report(payloads []ledger.Payload) error {
 
 		if string(p.Key.KeyParts[2].Value) == "storageflowTokenVault" {
 			ownerAddress := common.BytesToAddress(owner)
+			data, version := interpreter.StripMagic(p.Value)
 			// TODO handle error
-			decoded, err := interpreter.DecodeValue(p.Value, &ownerAddress, nil)
+			decoded, err := interpreter.DecodeValue(data, &ownerAddress, nil, version)
 			fmt.Println(">>>", string(p.Key.KeyParts[2].Value), p.Key.String(), decoded, err)
 		}
 	}

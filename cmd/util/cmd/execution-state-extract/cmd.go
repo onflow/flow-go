@@ -18,7 +18,6 @@ var (
 	flagBlockHash         string
 	flagStateCommitment   string
 	flagDatadir           string
-	flagChainID           string
 )
 
 var Cmd = &cobra.Command{
@@ -38,23 +37,21 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")
-	// _ = Cmd.MarkFlagRequired("block-hash")
 
 	Cmd.Flags().StringVar(&flagBlockHash, "block-hash", "",
 		"Block hash (hex-encoded, 64 characters)")
-	// _ = Cmd.MarkFlagRequired("block-hash")
 
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")
-	// _ = Cmd.MarkFlagRequired("datadir")
-
-	Cmd.Flags().StringVar(&flagChainID, "chainID", "main",
-		"chainID (main or test")
-	_ = Cmd.MarkFlagRequired("chainID")
 }
 
 func run(*cobra.Command, []string) {
 	var stateCommitment []byte
+
+	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
+		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
+		return
+	}
 
 	if len(flagBlockHash) > 0 {
 		blockID, err := flow.HexStringToIdentifier(flagBlockHash)
@@ -84,20 +81,8 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment))
 
-	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, parseChainID(flagChainID))
+	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("error extracting the execution state: %w", err)
-	}
-}
-
-func parseChainID(chainID string) flow.ChainID {
-	switch chainID {
-	case "main":
-		return flow.Mainnet
-	case "test":
-		return flow.Testnet
-	default:
-		log.Fatal().Str("chain_id", chainID).Msg("invalid chain ID")
-		return ""
+		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}
 }

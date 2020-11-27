@@ -5,8 +5,10 @@ go 1.13
 require (
 	cloud.google.com/go/storage v1.10.0
 	github.com/HdrHistogram/hdrhistogram-go v0.9.0 // indirect
+	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
@@ -33,7 +35,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	// pinned to https://github.com/onflow/cadence/commit/3ab62fe974547aba6fa4e8e102d16c3f0f4ecdf3
 	// replace with tag before merging feature branch to master
-	github.com/onflow/cadence v0.11.1-0.20201112191337-3ab62fe97454
+	github.com/onflow/cadence v0.11.1-0.20201125180111-7255767ff5cf
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20201002123512-35d751ebea1d
 	// pinned to https://github.com/onflow/flow-go-sdk/tree/janez/storage-fees
 	// replace with tag before merging feature branch to master
@@ -71,5 +73,3 @@ replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 replace github.com/onflow/flow-go => ./
 
 replace github.com/onflow/flow-go/crypto => ./crypto
-
-replace github.com/onflow/flow-go/integration => ./integration

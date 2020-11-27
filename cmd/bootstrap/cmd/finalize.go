@@ -210,9 +210,9 @@ func assemblePartnerNodes() []model.NodeInfo {
 	return nodes
 }
 
-// readParnterNodes reads the partner node information from the flag --partner-dir
-func readPartnerNodes() []model.PartnerNodeInfoPub {
-	var partners []model.PartnerNodeInfoPub
+// readParnterNodes reads the partner node information
+func readPartnerNodes() []model.NodeInfoPub {
+	var partners []model.NodeInfoPub
 	files, err := filesInDir(flagPartnerNodeInfoDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read partner node infos")
@@ -224,7 +224,7 @@ func readPartnerNodes() []model.PartnerNodeInfoPub {
 		}
 
 		// read file and append to partners
-		var p model.PartnerNodeInfoPub
+		var p model.NodeInfoPub
 		readJSON(f, &p)
 		partners = append(partners, p)
 	}

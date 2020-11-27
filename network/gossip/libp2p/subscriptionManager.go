@@ -8,23 +8,23 @@ import (
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 )
 
-// subscriptionManager manages the engine to channelID subscription
-type subscriptionManager struct {
-	sync.RWMutex
+// ChannelSubscriptionManager manages the engine to channelID subscription
+type ChannelSubscriptionManager struct {
+	mu      sync.RWMutex
 	engines map[string]network.Engine
 	mw      middleware.Middleware
 }
 
-func newSubscriptionManager(mw middleware.Middleware) *subscriptionManager {
-	return &subscriptionManager{
+func NewChannelSubscriptionManager(mw middleware.Middleware) *ChannelSubscriptionManager {
+	return &ChannelSubscriptionManager{
 		engines: make(map[string]network.Engine),
 		mw:      mw,
 	}
 }
 
-func (sm *subscriptionManager) register(channelID string, engine network.Engine) error {
-	sm.Lock()
-	defer sm.Unlock()
+func (sm *ChannelSubscriptionManager) Register(channelID string, engine network.Engine) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
 
 	// check if the engine engineID is already taken
 	_, ok := sm.engines[channelID]
@@ -44,9 +44,9 @@ func (sm *subscriptionManager) register(channelID string, engine network.Engine)
 	return nil
 }
 
-func (sm *subscriptionManager) unregister(channelID string) error {
-	sm.Lock()
-	defer sm.Unlock()
+func (sm *ChannelSubscriptionManager) Unregister(channelID string) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
 
 	// check if there is a registered engine for the given channelID
 	_, ok := sm.engines[channelID]
@@ -65,12 +65,26 @@ func (sm *subscriptionManager) unregister(channelID string) error {
 	return nil
 }
 
-func (sm *subscriptionManager) getEngine(channelID string) (network.Engine, error) {
-	sm.RLock()
-	defer sm.RUnlock()
+func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engine, error) {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
 	eng, found := sm.engines[channelID]
 	if !found {
 		return nil, fmt.Errorf("subscriptionManager: engine for channelID %s not found", channelID)
 	}
 	return eng, nil
+}
+
+// GetChannelIDs returns list of topics this subscription manager has an engine registered for.
+func (sm *ChannelSubscriptionManager) GetChannelIDs() []string {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	topics := make([]string, 0)
+	for topic := range sm.engines {
+		topics = append(topics, topic)
+	}
+
+	return topics
 }

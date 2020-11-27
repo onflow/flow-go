@@ -162,6 +162,30 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
 	})
 
+	suite.Run("invalid signature format", func() {
+		suite.Run("invalid format of an enveloppe signature", func() {
+			invalidSig := unittest.InvalidFormatSignature()
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.EnvelopeSignatures[0] = invalidSig
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
+		})
+
+		suite.Run("invalid format of a payload signature", func() {
+			invalidSig := unittest.InvalidFormatSignature()
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.PayloadSignatures[0] = invalidSig
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
+		})
+	})
+
 	suite.Run("invalid signature", func() {
 		// TODO cannot check signatures in MVP
 		suite.T().Skip()
@@ -184,7 +208,7 @@ func (suite *Suite) TestInvalidTransaction() {
 			suite.Require().Nil(err)
 			tx := unittest.TransactionBodyFixture()
 			tx.ReferenceBlockID = suite.root.ID()
-			tx.Payer = invalid
+			tx.Authorizers[0] = invalid
 
 			err = suite.engine.ProcessLocal(&tx)
 			suite.Assert().Error(err)

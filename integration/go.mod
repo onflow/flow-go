@@ -11,7 +11,7 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	// pinned to https://github.com/onflow/cadence/commit/3ab62fe974547aba6fa4e8e102d16c3f0f4ecdf3
 	// replace with tag before merging feature branch to master
-	github.com/onflow/cadence v0.11.1-0.20201112191337-3ab62fe97454
+	github.com/onflow/cadence v0.11.1-0.20201125180111-7255767ff5cf
 	github.com/onflow/flow-go v0.4.1-0.20200715183900-b337e998d486
 	// pinned to https://github.com/onflow/flow-go-sdk/tree/janez/storage-fees
 	// replace with tag before merging feature branch to master

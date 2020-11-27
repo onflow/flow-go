@@ -45,13 +45,10 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	golog.SetAllLoggers(golog.LevelError)
 
 	m.size = 2 // operates on two middlewares
-
 	m.metrics = metrics.NewNoopCollector()
-
 	// create and start the middlewares
-	var err error
-	m.ids, m.mws = generateIDsAndMiddlewares(m.T(), m.size, logger)
-	require.NoError(m.T(), err)
+	m.ids, m.mws = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
 
