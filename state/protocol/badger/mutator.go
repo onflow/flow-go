@@ -617,7 +617,7 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 		if err != nil {
 			// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
 			if errors.Is(err, storage.ErrNotFound) {
-				return state.NewInvalidExtensionErrorf("payload validation not enough data %v: %w", receipt.ID(), err)
+				return state.NewInvalidExtensionErrorf("some entities referenced by receipt %v are missing: %w", receipt.ID(), err)
 			}
 
 			if engine.IsInvalidInputError(err) {
