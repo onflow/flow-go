@@ -61,6 +61,8 @@ require (
 	gotest.tools v2.2.0+incompatible
 )
 
+replace github.com/onflow/flow-go/crypto => ./crypto
+
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 // temp fix for MacOS build. See comment https://github.com/ory/dockertest/issues/208#issuecomment-686820414
