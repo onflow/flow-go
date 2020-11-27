@@ -8,10 +8,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/prometheus/tsdb/fileutil"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -47,28 +46,50 @@ func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Check
 	}
 }
 
-// LatestCheckpoint returns number of latest checkpoint or -1 if there are no checkpoints
-func (c *Checkpointer) LatestCheckpoint() (int, error) {
+func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 
-	files, err := fileutil.ReadDir(c.dir)
+	list := make([]int, 0)
+
+	files, err := ioutil.ReadDir(c.dir)
 	if err != nil {
-		return -1, err
+		return nil, -1, err
 	}
 	last := -1
 	for _, fn := range files {
-		if !strings.HasPrefix(fn, checkpointFilenamePrefix) {
+		if !strings.HasPrefix(fn.Name(), checkpointFilenamePrefix) {
 			continue
 		}
-		justNumber := fn[len(checkpointFilenamePrefix):]
+		justNumber := fn.Name()[len(checkpointFilenamePrefix):]
 		k, err := strconv.Atoi(justNumber)
 		if err != nil {
 			continue
 		}
 
-		last = k
+		list = append(list, k)
+
+		if k > last {
+			last = k
+		}
 	}
 
-	return last, nil
+	return list, last, nil
+}
+
+func (c *Checkpointer) ListCheckpoints() ([]int, error) {
+	list, _, err := c.listCheckpoints()
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Ints(list)
+
+	return list, nil
+}
+
+// LatestCheckpoint returns number of latest checkpoint or -1 if there are no checkpoints
+func (c *Checkpointer) LatestCheckpoint() (int, error) {
+	_, last, err := c.listCheckpoints()
+	return last, err
 }
 
 // NotCheckpointedSegments - returns numbers of segments which are not checkpointed yet,
@@ -279,6 +300,10 @@ func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
+	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
 func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {

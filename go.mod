@@ -16,6 +16,7 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.2
+	github.com/golangci/golangci-lint v1.33.0 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/go-multierror v1.1.0
@@ -31,7 +32,7 @@ require (
 	github.com/libp2p/go-libp2p-swarm v0.2.8
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
-	github.com/m4ksio/wal v0.7.1
+	github.com/m4ksio/wal v0.0.0-20201126224043-78f56296d8b9
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.10.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.3.1-0.20201122012505-4061d358b8db
@@ -44,12 +45,13 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/tsdb v0.10.0
 	github.com/rs/zerolog v1.19.0
-	github.com/spf13/cobra v0.0.6
+	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.4.0
+	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.6.1
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
+	github.com/ugorji/go v1.1.4 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.6.0
@@ -72,5 +74,3 @@ replace github.com/onflow/flow-go => ./
 replace github.com/onflow/flow-go/crypto => ./crypto
 
 replace github.com/onflow/flow-go/integration => ./integration
-
-replace github.com/m4ksio/wal => ../wal

@@ -62,6 +62,14 @@ func Test_loneCheckpoint(t *testing.T) {
 	})
 }
 
+func Test_lastCheckpointIsFoundByNumericValue(t *testing.T) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000004", "checkpoint.00000006", "checkpoint.00000002", "checkpoint.00000001", func(t *testing.T, wal *realWAL.LedgerWAL, checkpointer *realWAL.Checkpointer) {
+		latestCheckpoint, err := checkpointer.LatestCheckpoint()
+		require.NoError(t, err)
+		require.Equal(t, 6, latestCheckpoint)
+	})
+}
+
 func Test_checkpointWithoutPrecedingSegments(t *testing.T) {
 	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "00000006", "00000007", func(t *testing.T, wal *realWAL.LedgerWAL, checkpointer *realWAL.Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
@@ -85,6 +93,15 @@ func Test_checkpointWithSameSegment(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 6, from)
 		require.Equal(t, 8, to) //extra one because WAL now creates empty file on start
+	})
+}
+
+func Test_listingCheckpoints(t *testing.T) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000002", "00000003", "checkpoint.00000000", func(t *testing.T, wal *realWAL.LedgerWAL, checkpointer *realWAL.Checkpointer) {
+		listCheckpoints, err := checkpointer.ListCheckpoints()
+		require.NoError(t, err)
+		require.Len(t, listCheckpoints, 3)
+		require.Equal(t, []int{0, 2, 5}, listCheckpoints)
 	})
 }
 
