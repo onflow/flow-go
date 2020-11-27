@@ -28,7 +28,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
-	network2 "github.com/onflow/flow-go/network"
+	flownetwork "github.com/onflow/flow-go/network"
 )
 
 const (
@@ -250,7 +250,7 @@ func (n *Node) CreateStream(ctx context.Context, nodeAddress NodeAddress) (netwo
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := n.tryCreateNewStream(ctx, nodeAddress, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, network2.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", nodeAddress.Name, nodeAddress.IP,
+		return nil, flownetwork.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", nodeAddress.Name, nodeAddress.IP,
 			nodeAddress.Port,
 			err))
 	}
