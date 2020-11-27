@@ -35,7 +35,7 @@ func (s State) Set(owner, controller, key string, value flow.RegisterValue) erro
 	}
 	err := s.ledger.Set(owner, controller, key, value)
 	if err != nil {
-		// Return fatal erro
+		return &LedgerFailure{err}
 	}
 	return nil
 }
@@ -47,7 +47,7 @@ func (s State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 
 	value, err := s.ledger.Get(owner, controller, key)
 	if err != nil {
-		// Return fatal error
+		return nil, &LedgerFailure{err}
 	}
 	return value, nil
 }
@@ -58,7 +58,7 @@ func (s State) Touch(owner, controller, key string) error {
 	}
 	err := s.ledger.Touch(owner, controller, key)
 	if err != nil {
-		// Return fatal error
+		return &LedgerFailure{err}
 	}
 	return nil
 }

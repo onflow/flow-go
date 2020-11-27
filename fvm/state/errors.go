@@ -39,3 +39,11 @@ type StateInteractionLimitExceededError struct {
 func (e *StateInteractionLimitExceededError) Error() string {
 	return fmt.Sprintf("max interaction with storage has exceeded the limit (used: %d, limit %d)", e.Used, e.Limit)
 }
+
+type LedgerFailure struct {
+	err error
+}
+
+func (e *LedgerFailure) Error() string {
+	return fmt.Sprintf("ledger returns unsuccessful: %w", e.err)
+}
