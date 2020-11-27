@@ -16,7 +16,7 @@ import (
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -103,7 +103,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	// create collection node that can respond collections to execution node
 	// check collection node received the collection request from execution node
-	providerEngine := new(network.Engine)
+	providerEngine := new(mocknetwork.Engine)
 	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
 	providerEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -139,7 +139,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	// create verification engine that can create approvals and send to consensus nodes
 	// check the verification engine received the ER from execution node
-	verificationEngine := new(network.Engine)
+	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -152,7 +152,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	// create consensus engine that accepts the result
 	// check the consensus engine has received the result from execution node
-	consensusEngine := new(network.Engine)
+	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -323,7 +323,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	receiptsReceived := 0
 
-	consensusEngine := new(network.Engine)
+	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -383,8 +383,8 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	consensusEngine.AssertExpectations(t)
 }
 
-func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testmock.GenericNode, cols []*flow.Collection) *network.Engine {
-	collectionEngine := new(network.Engine)
+func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testmock.GenericNode, cols []*flow.Collection) *mocknetwork.Engine {
+	collectionEngine := new(mocknetwork.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
 
 	// make lookup
@@ -447,7 +447,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	var receipt *flow.ExecutionReceipt
 
-	verificationEngine := new(network.Engine)
+	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verification1Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	_, _ = verification2Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).

@@ -21,7 +21,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	netint "github.com/onflow/flow-go/network"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -57,9 +57,9 @@ type ComplianceSuite struct {
 	state    *protocol.State
 	snapshot *protocol.Snapshot
 	mutator  *protocol.Mutator
-	con      *network.Conduit
+	con      *mocknetwork.Conduit
 	net      *module.Network
-	prov     *network.Engine
+	prov     *mocknetwork.Engine
 	pending  *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
 	sync     *module.BlockRequester
@@ -183,7 +183,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.mutator.On("Extend", mock.Anything).Return(nil)
 
 	// set up network conduit mock
-	cs.con = &network.Conduit{}
+	cs.con = &mocknetwork.Conduit{}
 	cs.con.On("Publish", mock.Anything, mock.Anything).Return(nil)
 	cs.con.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	cs.con.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -199,7 +199,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	)
 
 	// set up the provider engine
-	cs.prov = &network.Engine{}
+	cs.prov = &mocknetwork.Engine{}
 	cs.prov.On("SubmitLocal", mock.Anything).Return()
 
 	// set up pending module mock
