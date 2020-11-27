@@ -33,7 +33,7 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.10.2
+	github.com/onflow/cadence v0.11.1-0.20201020035252-6e8bc39e62cb
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.3.1-0.20201122012505-4061d358b8db
 	github.com/onflow/flow-go-sdk v0.12.2
 	github.com/onflow/flow-go/crypto v0.9.4
@@ -43,7 +43,10 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/tsdb v0.7.1
+	github.com/raviqqe/hamt v0.0.0-20200926195927-a161b94127cc // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/zerolog v1.19.0
+	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
@@ -56,6 +59,7 @@ require (
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/text v0.3.4 // indirect
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
 	gotest.tools v2.2.0+incompatible
@@ -71,3 +75,5 @@ replace github.com/fxamacker/cbor/v2 => github.com/turbolent/cbor/v2 v2.2.1-0.20
 replace github.com/onflow/flow-go => ./
 
 replace github.com/onflow/flow-go/crypto => ./crypto
+
+replace github.com/onflow/flow-go/integration => ./integration
