@@ -10,7 +10,7 @@ require (
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
-	github.com/fxamacker/cbor/v2 v2.2.0
+	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
 	github.com/go-kit/kit v0.9.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.4
@@ -31,9 +31,13 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.10.1
+	// pinned to https://github.com/onflow/cadence/commit/3ab62fe974547aba6fa4e8e102d16c3f0f4ecdf3
+	// replace with tag before merging feature branch to master
+	github.com/onflow/cadence v0.11.1-0.20201112191337-3ab62fe97454
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20201002123512-35d751ebea1d
-	github.com/onflow/flow-go-sdk v0.12.1
+	// pinned to https://github.com/onflow/flow-go-sdk/tree/janez/storage-fees
+	// replace with tag before merging feature branch to master
+	github.com/onflow/flow-go-sdk v0.12.2-0.20201113180830-d355071fc3ab
 	github.com/onflow/flow-go/crypto v0.9.4
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/opentracing/opentracing-go v1.2.0
@@ -63,8 +67,6 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 // temp fix for MacOS build. See comment https://github.com/ory/dockertest/issues/208#issuecomment-686820414
 replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
-
-replace github.com/fxamacker/cbor/v2 => github.com/turbolent/cbor/v2 v2.2.1-0.20200911003300-cac23af49154
 
 replace github.com/onflow/flow-go => ./
 
