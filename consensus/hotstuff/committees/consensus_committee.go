@@ -3,6 +3,7 @@ package committees
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -28,7 +29,6 @@ type Consensus struct {
 	state protocol.ReadOnlyState // the protocol state
 	me    flow.Identifier        // the node ID of this node
 	// TODO use uint16 in leader selection impl to halve memory usage
-	// TODO delete old entries, this uses ~200kb memory/day with above optimization
 	leaders map[uint64]*leader.LeaderSelection // pre-computed leader selection for each epoch
 }
 
@@ -211,5 +211,22 @@ func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) error {
 	}
 
 	c.leaders[counter] = selection
+
+	// prune leader selection for old epochs when we have more than 2 stored
+	if len(c.leaders) <= 2 {
+		return nil
+	}
+
+	// Since we only add leader selections in this method, and we only add one
+	// at a time, whenever we have >2 epochs stored we will have exactly 3.
+	// Therefore we remove exactly one epoch, whichever has the lowest counter.
+	minCounter := uint64(math.MaxUint64)
+	for counter := range c.leaders {
+		if counter < minCounter {
+			minCounter = counter
+		}
+	}
+	delete(c.leaders, minCounter)
+
 	return nil
 }
