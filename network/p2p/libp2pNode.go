@@ -58,7 +58,6 @@ type Node struct {
 	ps                   *pubsub.PubSub                  // the reference to the pubsub instance
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
-	conMgr               ConnManager                     // the connection manager passed in to libp2p
 	connGater            *connGater                      // the connection gator passed in to libp2p
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 	key                  crypto.PrivKey
@@ -70,7 +69,6 @@ func NewLibP2PNode(logger zerolog.Logger, key crypto.PrivKey, rootBlockID string
 		logger:               logger,
 		key:                  key,
 		metrics:              metrics,
-		conMgr:               NewConnManager(logger, metrics),
 		flowLibP2PProtocolID: generateProtocolID(rootBlockID),
 	}
 	return n, nil

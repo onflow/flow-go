@@ -616,7 +616,7 @@ func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip
 		handlerFunc = func(network.Stream) {}
 	}
 
-	libp2pHost, err := NewLibP2PHost(suite.ctx, n.logger, nodeID, n.conMgr, n.key, allowList, nil)
+	libp2pHost, err := NewLibP2PHost(suite.ctx, n.logger, nodeID, NewConnManager(n.logger, n.metrics), n.key, allowList, nil)
 	require.NoError(suite.T(), err)
 
 	err = n.Start(libp2pHost, handlerFunc)
