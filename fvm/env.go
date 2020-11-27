@@ -23,10 +23,11 @@ var _ runtime.Interface = &hostEnv{}
 var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
-	ctx           Context
-	ledger        state.Ledger
-	accounts      *state.Accounts
-	uuidGenerator *UUIDGenerator
+	ctx              Context
+	ledger           state.Ledger
+	accounts         *state.Accounts
+	addressGenerator flow.AddressGenerator
+	uuidGenerator    *UUIDGenerator
 
 	runtime.Metrics
 
@@ -45,18 +46,23 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
 	return hasher.ComputeHash(data)
 }
 
-func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
-	accounts := state.NewAccounts(ledger, ctx.Chain)
+func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
+	accounts := state.NewAccounts(ledger)
+	generator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+	if err != nil {
+		return nil, err
+	}
 
 	uuids := state.NewUUIDs(ledger)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{
-		ctx:           ctx,
-		ledger:        ledger,
-		Metrics:       &noopMetricsCollector{},
-		accounts:      accounts,
-		uuidGenerator: uuidGenerator,
+		ctx:              ctx,
+		ledger:           ledger,
+		Metrics:          &noopMetricsCollector{},
+		accounts:         accounts,
+		addressGenerator: generator,
+		uuidGenerator:    uuidGenerator,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -67,7 +73,7 @@ func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
 		env.Metrics = &metricsCollector{ctx.Metrics}
 	}
 
-	return env
+	return env, nil
 }
 
 func (e *hostEnv) seedRNG(header *flow.Header) {
@@ -84,6 +90,7 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
 		e.ctx,
 		e.ledger,
 		e.accounts,
+		e.addressGenerator,
 		tx,
 	)
 }
@@ -149,7 +156,7 @@ func (e *hostEnv) ResolveLocation(
 	// then fetch all identifiers at this address
 
 	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.ToAddress())
+		address := flow.Address(addressLocation.Address)
 		contractNames, err := e.accounts.GetContractNames(address)
 		if err != nil {
 			panic(err)
@@ -178,9 +185,9 @@ func (e *hostEnv) ResolveLocation(
 	for i := range resolvedLocations {
 		identifier := identifiers[i]
 		resolvedLocations[i] = runtime.ResolvedLocation{
-			Location: runtime.AddressContractLocation{
-				AddressLocation: addressLocation,
-				Name:            identifier.Identifier,
+			Location: runtime.AddressLocation{
+				Address: addressLocation.Address,
+				Name:    identifier.Identifier,
 			},
 			Identifiers: []runtime.Identifier{identifier},
 		}
@@ -190,12 +197,12 @@ func (e *hostEnv) ResolveLocation(
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
-	contractLocation, ok := location.(runtime.AddressContractLocation)
+	contractLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
-		return nil, fmt.Errorf("can only get code for an account contract (an AddressContractLocation)")
+		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
 
-	address := flow.Address(contractLocation.AddressLocation.ToAddress())
+	address := flow.BytesToAddress(contractLocation.Address.Bytes())
 
 	code, err := e.accounts.GetContract(contractLocation.Name, address)
 	if err != nil {
@@ -214,8 +221,8 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 	if program != nil {
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(runtime.AddressContractLocation); ok {
-			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.AddressLocation))
+		if addressLocation, ok := location.(runtime.AddressLocation); ok {
+			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
 		}
 	}
 
@@ -398,9 +405,9 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
-	return e.GetCode(runtime.AddressContractLocation{
-		AddressLocation: address.Bytes(),
-		Name:            name,
+	return e.GetCode(runtime.AddressLocation{
+		Address: address,
+		Name:    name,
 	})
 }
 
@@ -448,10 +455,11 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 // Transaction Environment
 
 type transactionEnv struct {
-	vm       *VirtualMachine
-	ctx      Context
-	ledger   state.Ledger
-	accounts *state.Accounts
+	vm               *VirtualMachine
+	ctx              Context
+	ledger           state.Ledger
+	accounts         *state.Accounts
+	addressGenerator flow.AddressGenerator
 
 	tx          *flow.TransactionBody
 	authorizers []runtime.Address
@@ -462,14 +470,16 @@ func newTransactionEnv(
 	ctx Context,
 	ledger state.Ledger,
 	accounts *state.Accounts,
+	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
 ) *transactionEnv {
 	return &transactionEnv{
-		vm:       vm,
-		ctx:      ctx,
-		ledger:   ledger,
-		accounts: accounts,
-		tx:       tx,
+		vm:               vm,
+		ctx:              ctx,
+		ledger:           ledger,
+		accounts:         accounts,
+		addressGenerator: addressGenerator,
+		tx:               tx,
 	}
 }
 
@@ -506,9 +516,12 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		}
 	}
 
-	var flowAddress flow.Address
+	flowAddress, err := e.addressGenerator.NextAddress()
+	if err != nil {
+		return address, err
+	}
 
-	flowAddress, err = e.accounts.Create(nil)
+	err = e.accounts.Create(nil, flowAddress)
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return address, err

@@ -57,7 +57,7 @@ func NewBlockComputer(
 		fvm.WithASTCache(systemChunkASTCache),
 		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
 	)
 
 	return &blockComputer{
@@ -104,7 +104,7 @@ func (e *blockComputer) executeBlock(
 
 	var gasUsed uint64
 
-	interactions := make([]*delta.Snapshot, len(collections)+1)
+	interactions := make([]*delta.SpockSnapshot, len(collections)+1)
 
 	events := make([]flow.Event, 0)
 	serviceEvents := make([]flow.Event, 0)

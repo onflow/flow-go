@@ -74,6 +74,7 @@ func main() {
 		syncByBlocks          bool
 		syncFast              bool
 		syncThreshold         int
+		extensiveLog          bool
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -84,19 +85,20 @@ func main() {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
-			flags.UintVar(&checkpointDistance, "checkpoint-distance", 1, "number of WAL segments between checkpoints")
+			flags.UintVar(&checkpointDistance, "checkpoint-distance", 10, "number of WAL segments between checkpoints")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
 			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
+			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
-			vmCtx := fvm.NewContext(node.FvmOptions...)
+			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 
 			manager, err := computation.New(
 				node.Logger,
@@ -161,13 +163,13 @@ func main() {
 				// if execution database has been bootstrapped, then the root statecommit must equal to the one
 				// in the bootstrap folder
 				if !bytes.Equal(commit, node.RootSeal.FinalState) {
-					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %v, "+
-						"bootstap has statecommitment: %v",
+					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
+						"bootstap has statecommitment: %x",
 						commit, node.RootSeal.FinalState)
 				}
 			}
 
-			ledgerStorage, err = ledger.NewLedger(triedir, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), node.MetricsRegisterer)
+			ledgerStorage, err = ledger.NewLedger(triedir, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), node.MetricsRegisterer, ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -246,7 +248,7 @@ func main() {
 				executionState,
 				collector,
 				node.Tracer,
-				true,
+				extensiveLog,
 				preferredExeFilter,
 				deltas,
 				syncThreshold,

@@ -2,15 +2,20 @@ package fvm
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const TopShotContractAddress = "0b2a3299cc857e29"
 
 func Transaction(tx *flow.TransactionBody) *TransactionProcedure {
 	return &TransactionProcedure{
@@ -77,10 +82,14 @@ func (proc *TransactionProcedure) ConvertEvents(txIndex uint32, chain flow.Chain
 	return flowEvents, serviceEvents, nil
 }
 
-type TransactionInvocator struct{}
+type TransactionInvocator struct {
+	logger zerolog.Logger
+}
 
-func NewTransactionInvocator() *TransactionInvocator {
-	return &TransactionInvocator{}
+func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
+	return &TransactionInvocator{
+		logger: logger,
+	}
 }
 
 func (i *TransactionInvocator) Process(
@@ -89,13 +98,18 @@ func (i *TransactionInvocator) Process(
 	proc *TransactionProcedure,
 	ledger state.Ledger,
 ) error {
-	env := newEnvironment(ctx, ledger)
+	env, err := newEnvironment(ctx, ledger)
+	if err != nil {
+		return err
+	}
 	env.setTransaction(vm, proc.Transaction)
 
 	location := runtime.TransactionLocation(proc.ID[:])
 
-	err := vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+
 	if err != nil {
+		i.topshotSafetyErrorCheck(err)
 		return err
 	}
 
@@ -103,4 +117,32 @@ func (i *TransactionInvocator) Process(
 	proc.Logs = env.getLogs()
 
 	return nil
+}
+
+// topshotSafetyErrorCheck is additional check introduced to help chase erroneous execution results
+// which caused unexpected network fork. TopShot is first full-fledged game running on Flow, and
+// checking failures in this contract indicate the unexpected computation happening.
+// This is a temporary measure.
+func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
+	fmt.Println("ERROR", err)
+	e := err.Error()
+	if strings.Contains(e, TopShotContractAddress) && strings.Contains(e, "checking") {
+		re, isRuntime := err.(runtime.Error)
+		if !isRuntime {
+			i.logger.Err(err).Msg("found checking error for TopShot contract but exception is not RuntimeError")
+			return
+		}
+		ee, is := re.Err.(*runtime.ParsingCheckingError)
+		if !is {
+			i.logger.Err(err).Msg("found checking error for TopShot contract but exception is not ExtendedParsingCheckingError")
+			return
+		}
+
+		// serializing such large and complex objects to JSON
+		// causes stack overflow, spew works fine
+		spew.Config.DisableMethods = true
+		dump := spew.Sdump(ee)
+
+		i.logger.Error().Str("extended_error", dump).Msg("TopShot contract checking failed")
+	}
 }

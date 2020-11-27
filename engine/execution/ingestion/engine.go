@@ -3,11 +3,14 @@ package ingestion
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
@@ -135,6 +138,11 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
+	err := e.reloadUnexecutedBlocks()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
+	}
+
 	return e.unit.Ready()
 }
 
@@ -183,6 +191,201 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+	// get finalized height
+	final, err := finalized.Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized block: %w", err)
+	}
+
+	// find the first unexecuted and finalized block
+	// We iterate from the last finalized, check if it has been executed,
+	// if not, keep going to the lower height, until we find an executed
+	// block, and then the next height is the first unexecuted.
+	// If there is only one finalized, and it's executed (i.e. root block),
+	// then the firstUnexecuted is a unfinalized block, which is ok,
+	// because the next loop will ensure it only iterates through finalized
+	// blocks.
+	lastExecuted := final.Height
+
+	rootBlock, err := e.state.Params().Root()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
+	}
+
+	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
+		header, err := e.state.AtHeight(lastExecuted).Head()
+		if err != nil {
+			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
+		}
+
+		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ID())
+		if err != nil {
+			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
+		}
+
+		if executed {
+			break
+		}
+	}
+
+	firstUnexecuted := lastExecuted + 1
+
+	e.log.Info().Msgf("last finalized and executed height: %v", lastExecuted)
+
+	unexecuted := make([]flow.Identifier, 0)
+
+	// starting from the first unexecuted block, go through each unexecuted and finalized block
+	// reload its block to execution queues
+	for height := firstUnexecuted; height <= final.Height; height++ {
+		header, err := e.state.AtHeight(height).Head()
+		if err != nil {
+			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
+		}
+
+		unexecuted = append(unexecuted, header.ID())
+	}
+
+	return unexecuted, nil
+}
+
+func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+	pendings, err := finalized.Pending()
+	if err != nil {
+		return nil, fmt.Errorf("could not get pending blocks: %w", err)
+	}
+
+	unexecuted := make([]flow.Identifier, 0)
+
+	for _, pending := range pendings {
+		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, pending)
+		if err != nil {
+			return nil, fmt.Errorf("could not check block executed or not: %w", err)
+		}
+
+		if !executed {
+			unexecuted = append(unexecuted, pending)
+		}
+	}
+
+	return unexecuted, nil
+}
+
+func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
+	// pin the snapshot so that finalizedUnexecutedBlocks and pendingUnexecutedBlocks are based
+	// on the same snapshot.
+	snapshot := e.state.Final()
+
+	finalized, err = e.finalizedUnexecutedBlocks(snapshot)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
+	}
+
+	pending, err = e.pendingUnexecutedBlocks(snapshot)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
+	}
+
+	return finalized, pending, nil
+}
+
+// on nodes startup, we need to load all the unexecuted blocks to the execution queues.
+// blocks have to be loaded in the way that the parent has been loaded before loading its children
+func (e *Engine) reloadUnexecutedBlocks() error {
+	// it's possible the BlockProcessable is called during the reloading, as the follower engine
+	// will receive blocks before ingestion engine is ready.
+	// The problem with that is, since the reloading hasn't finished yet, enqueuing the new block from
+	// the BlockProcessable callback will fail, because its parent block might have not been reloaded
+	// to the queues yet.
+	// So one solution here is to lock the execution queues during reloading, so that if BlockProcessable
+	// is called before reloading is finished, it will be blocked, which will avoid that edge case.
+	return e.mempool.Run(func(
+		blockByCollection *stdmap.BlockByCollectionBackdata,
+		executionQueues *stdmap.QueuesBackdata) error {
+
+		// saving an executed block is currently not transactional, so it's possible
+		// the block is marked as executed but the receipt might not be saved during a crash.
+		// in order to mitigate this problem, we always re-execute the last executed and finalized
+		// block.
+		// there is an exception, if the last executed block is a root block, then don't execute it,
+		// because the root has already been executed during bootstrapping phase. And re-executing
+		// a root block will fail, because the root block doesn't have a parent block, and could not
+		// get the result of it.
+		// TODO: remove this, when saving a executed block is transactional
+		lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
+		if err != nil {
+			return fmt.Errorf("could not get last executed: %w", err)
+		}
+
+		last, err := e.state.AtBlockID(lastExecutedID).Head()
+		if err != nil {
+			return fmt.Errorf("could not get last executed final by ID: %w", err)
+		}
+
+		// don't reload root block
+		rootBlock, err := e.state.Params().Root()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve root block: %w", err)
+		}
+
+		isRoot := rootBlock.ID() == last.ID()
+		if !isRoot {
+			err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
+			if err != nil {
+				return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
+			}
+		}
+
+		finalized, pending, err := e.unexecutedBlocks()
+		if err != nil {
+			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
+		}
+
+		unexecuted := append(finalized, pending...)
+
+		log := e.log.With().
+			Int("total", len(unexecuted)).
+			Int("finalized", len(finalized)).
+			Int("pending", len(pending)).
+			Uint64("last_executed", lastExecutedHeight).
+			Hex("last_executed_id", lastExecutedID[:]).
+			Logger()
+
+		log.Info().Msg("reloading unexecuted blocks")
+
+		for _, blockID := range unexecuted {
+			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
+			if err != nil {
+				return fmt.Errorf("could not reload block: %v, %w", blockID, err)
+			}
+
+			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
+		}
+
+		log.Info().Msg("all unexecuted have been successfully reloaded")
+
+		return nil
+	})
+}
+
+func (e *Engine) reloadBlock(
+	blockByCollection *stdmap.BlockByCollectionBackdata,
+	executionQueues *stdmap.QueuesBackdata,
+	blockID flow.Identifier) error {
+	block, err := e.blocks.ByID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get block by ID: %v %w", blockID, err)
+	}
+
+	err = e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
+
+	if err != nil {
+		return fmt.Errorf("could not enqueue block on reloading: %w", err)
+	}
+
+	return nil
+}
+
 // BlockProcessable handles the new verified blocks (blocks that
 // have passed consensus validation) received from the consensus nodes
 // Note: BlockProcessable might be called multiple times for the same block.
@@ -193,7 +396,9 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", blockID, err)
 	}
 
-	e.log.Debug().Hex("block_id", blockID[:]).Msg("handling new block")
+	e.log.Info().Hex("block_id", blockID[:]).
+		Uint64("height", b.Height).
+		Msg("handling new block")
 
 	err = e.handleBlock(e.unit.Ctx(), newBlock)
 	if err != nil {
@@ -209,80 +414,114 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
-	_, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err == nil {
-		// a statecommitment being stored indicates the block
-		// has been executed
-		log.Debug().Msg("block has been executed already")
-		return nil
+	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	if err != nil {
+		return fmt.Errorf("could not check whether block is executed: %w", err)
 	}
 
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not query state commitment for block: %w", err)
+	if executed {
+		log.Debug().Msg("block has been executed already")
+		return nil
 	}
 
 	// unexecuted block
 	e.metrics.StartBlockReceivedToExecuted(blockID)
 
+	// acquiring the lock so that there is only one process modifying the queue
+	err = e.mempool.Run(func(
+		blockByCollection *stdmap.BlockByCollectionBackdata,
+		executionQueues *stdmap.QueuesBackdata,
+	) error {
+		return e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, true)
+	})
+
+	if err != nil {
+		return fmt.Errorf("could not enqueue block: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) enqueueBlockAndCheckExecutable(
+	blockByCollection *stdmap.BlockByCollectionBackdata,
+	executionQueues *stdmap.QueuesBackdata,
+	block *flow.Block,
+	checkStateSync bool) error {
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
 
-	// acquiring the lock so that there is only one process modifying the queue
-	return e.mempool.Run(
-		func(
-			blockByCollection *stdmap.BlockByCollectionBackdata,
-			executionQueues *stdmap.QueuesBackdata,
-		) error {
-			// adding the block to the queue,
-			queue, added := enqueue(executableBlock, executionQueues)
+	blockID := executableBlock.ID()
 
-			// if it's not added, it means the block is not a new block, it already
-			// exists in the queue, then bail
-			if !added {
-				log.Debug().Msg("block already exists in the execution queue")
-				return nil
-			}
+	lg := e.log.With().
+		Hex("block_id", blockID[:]).
+		Uint64("block_height", executableBlock.Block.Header.Height).
+		Logger()
 
-			// whenever the queue grows, we need to check whether the state sync should be
-			// triggered.
-			firstUnexecutedHeight := queue.Head.Item.Height()
-			e.unit.Launch(func() {
-				e.checkStateSyncStart(firstUnexecutedHeight)
-			})
+	// adding the block to the queue,
+	queue, added := enqueue(executableBlock, executionQueues)
 
-			// check if a block is executable.
-			// a block is executable if the following conditions are all true
-			// 1) the parent state commitment is ready
-			// 2) the collections for the block payload are ready
-			// 3) the child block is ready for querying the randomness
+	// if it's not added, it means the block is not a new block, it already
+	// exists in the queue, then bail
+	if !added {
+		log.Debug().Msg("block already exists in the execution queue")
+		return nil
+	}
 
-			// check if the block's parent has been executed. (we can't execute the block if the parent has
-			// not been executed yet)
-			// check if there is a statecommitment for the parent block
-			parentCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
+	firstUnexecutedHeight := queue.Head.Item.Height()
+	if checkStateSync {
+		// whenever the queue grows, we need to check whether the state sync should be
+		// triggered.
+		e.unit.Launch(func() {
+			e.checkStateSyncStart(firstUnexecutedHeight)
+		})
+	}
 
-			// if we found the statecommitment for the parent block, then add it to the executable block.
-			if err == nil {
-				executableBlock.StartState = parentCommitment
-			} else if !errors.Is(err, storage.ErrNotFound) {
-				// if there is exception, then crash
-				log.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
-			}
+	// check if a block is executable.
+	// a block is executable if the following conditions are all true
+	// 1) the parent state commitment is ready
+	// 2) the collections for the block payload are ready
+	// 3) the child block is ready for querying the randomness
 
-			// check if we have all the collections for the block, and request them if there is missing.
-			err = e.matchOrRequestCollections(executableBlock, blockByCollection)
-			if err != nil {
-				return fmt.Errorf("cannot send collection requests: %w", err)
-			}
+	// check if the block's parent has been executed. (we can't execute the block if the parent has
+	// not been executed yet)
+	// check if there is a statecommitment for the parent block
+	parentCommitment, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), block.Header.ParentID)
 
-			// execute the block if the block is ready to be executed
-			e.executeBlockIfComplete(executableBlock)
+	// if we found the statecommitment for the parent block, then add it to the executable block.
+	if err == nil {
+		executableBlock.StartState = parentCommitment
+	} else if errors.Is(err, storage.ErrNotFound) {
+		// the parent block is an unexecuted block.
+		// if the queue only has one block, and its parent doesn't
+		// exist in the queue, then we need to load the block from the storage.
+		_, ok := queue.Nodes[blockID]
+		if !ok {
+			lg.Error().Msgf("an unexecuted parent block is missing in the queue")
+		}
+	} else {
+		// if there is exception, then crash
+		lg.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
+	}
 
-			return nil
-		},
-	)
+	// check if we have all the collections for the block, and request them if there is missing.
+	err = e.matchOrRequestCollections(executableBlock, blockByCollection)
+	if err != nil {
+		return fmt.Errorf("cannot send collection requests: %w", err)
+	}
+
+	// execute the block if the block is ready to be executed
+	completed := e.executeBlockIfComplete(executableBlock)
+
+	lg.Info().
+		// if the execution is halt, but the queue keeps growing, we could check which block
+		// hasn't been executed.
+		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
+		Bool("completed", completed).
+		Msg("block is enqueued")
+
+	return nil
 }
 
 // executeBlock will execute the block.
@@ -310,7 +549,11 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionGasUsedPerBlock(computationResult.GasUsed)
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
-	finalState, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
+	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
+	if errors.Is(err, storage.ErrDataMismatch) {
+		e.log.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
+	}
+
 	if err != nil {
 		e.log.Err(err).
 			Hex("block_id", logging.Entity(executableBlock)).
@@ -318,15 +561,16 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
-
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
+		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
 		Uint64("block_height", executableBlock.Block.Header.Height).
+		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
+		Hex("start_state", executableBlock.StartState).
 		Hex("final_state", finalState).
+		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Msg("block executed")
-
-	e.metrics.ExecutionLastExecutedBlockHeight(executableBlock.Block.Header.Height)
 
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
@@ -352,6 +596,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState flow.StateCommitment) error {
 
+	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
+	e.metrics.ExecutionLastExecutedBlockHeight(executed.Block.Header.Height)
+
 	e.checkStateSyncStop(executed.Block.Header.Height)
 
 	err := e.mempool.Run(
@@ -362,7 +609,10 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executed.ID())
 			if !exists {
-				return fmt.Errorf("fatal error - executed block not present in execution queue")
+				// when the block no longer exists in the queue, it means there was a race condition that
+				// two onBlockExecuted was called for the same block, and one process has already removed the
+				// block from the queue, so we will print an error here
+				return fmt.Errorf("block has been executed already, no longer exists in the queue")
 			}
 
 			// dismount the executed block and all its children
@@ -373,6 +623,9 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			for _, queue := range newQueues {
 				added := executionQueues.Add(queue)
 				if !added {
+					// blocks should be unique in execution queues, if we dismount all the children blocks, then
+					// add it back to the queues, then it should always be able to add.
+					// If not, then there is a bug that the queues have duplicated blocks
 					return fmt.Errorf("fatal error - child block already in execution queue")
 				}
 
@@ -487,13 +740,17 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 // is.
 func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
 
+	collID := collection.ID()
+
+	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
+
+	lg.Info().Hex("sender", originID[:]).Msg("handle collection")
+
 	// TODO: bail if have seen this collection before.
 	err := e.collections.Store(collection)
 	if err != nil {
 		return fmt.Errorf("cannot store collection: %w", err)
 	}
-
-	collID := collection.ID()
 
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
@@ -504,15 +761,17 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// or it was ejected from the mempool when it was full.
 			// either way, we will return
 			if !exists {
-				e.log.Debug().Hex("collection_id", collID[:]).
-					Msg("could not find block for collection")
+				lg.Debug().Msg("could not find block for collection")
 				return nil
 			}
 
 			for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
+				blockID := executableBlock.ID()
+
 				completeCollection, ok := executableBlock.CompleteCollections[collID]
 				if !ok {
-					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
+					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection",
+						blockID)
 				}
 
 				if completeCollection.IsCompleted() {
@@ -530,6 +789,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			}
 
 			// since we've received this collection, remove it from the index
+			// this also prevents from executing the same block twice, because the second
+			// time when the collection arrives, it will not be found in the blockByCollectionID
+			// index.
 			backdata.Rem(collID)
 
 			return nil
@@ -668,6 +930,7 @@ func (e *Engine) matchOrRequestCollections(
 
 	e.log.Debug().
 		Hex("block", logging.Entity(executableBlock)).
+		Uint64("height", executableBlock.Block.Header.Height).
 		Int("num_col", len(executableBlock.Block.Payload.Guarantees)).
 		Int("actual_req", actualRequested).
 		Msg("requested all collections")
@@ -689,6 +952,19 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 
 	blockView := e.execState.NewView(stateCommit)
 
+	if e.extensiveLogging {
+		args := make([]string, 0)
+		for _, a := range arguments {
+			args = append(args, hex.EncodeToString(a))
+		}
+		e.log.Debug().
+			Hex("block_id", logging.ID(blockID)).
+			Uint64("block_height", block.Height).
+			Hex("state_commitment", stateCommit).
+			Hex("script_hex", script).
+			Str("args", strings.Join(args[:], ",")).
+			Msg("extensive log: executed script content")
+	}
 	return e.computationManager.ExecuteScript(script, arguments, block, blockView)
 }
 
@@ -712,7 +988,7 @@ func (e *Engine) handleComputationResult(
 	ctx context.Context,
 	result *execution.ComputationResult,
 	startState flow.StateCommitment,
-) (flow.StateCommitment, error) {
+) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
@@ -721,23 +997,46 @@ func (e *Engine) handleComputationResult(
 	// There is one result per transaction
 	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
 
-	receipt, err := e.saveExecutionResults(
+	snapshots := make([]*delta.Snapshot, len(result.StateSnapshots))
+	for i, stateSnapshot := range result.StateSnapshots {
+		snapshots[i] = &stateSnapshot.Snapshot
+	}
+
+	executionResult, err := e.saveExecutionResults(
 		ctx,
 		result.ExecutableBlock,
-		result.StateSnapshots,
+		snapshots,
 		result.Events,
 		result.ServiceEvents,
 		result.TransactionResult,
 		startState,
 	)
-
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("could not save execution results: %w", err)
+	}
+
+	receipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not generate execution receipt: %w", err)
+	}
+
+	err = func() error {
+		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionReceipt)
+		defer span.Finish()
+
+		err = e.execState.PersistExecutionReceipt(ctx, receipt)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not persist execution receipt: %w", err)
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 	if err != nil {
-		return nil, fmt.Errorf("could not send broadcast order: %w", err)
+		return nil, nil, fmt.Errorf("could not send broadcast order: %w", err)
 	}
 
 	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
@@ -745,7 +1044,7 @@ func (e *Engine) handleComputationResult(
 		finalState = startState
 	}
 
-	return finalState, nil
+	return finalState, receipt, nil
 }
 
 // save the execution result of a block
@@ -757,7 +1056,7 @@ func (e *Engine) saveExecutionResults(
 	serviceEvents []flow.Event,
 	txResults []flow.TransactionResult,
 	startState flow.StateCommitment,
-) (*flow.ExecutionReceipt, error) {
+) (*flow.ExecutionResult, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
@@ -829,9 +1128,9 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
 
-	receipt, err := e.generateExecutionReceipt(childCtx, executionResult, stateInteractions)
+	err = e.execState.PersistExecutionResult(childCtx, executionResult)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
+		return nil, fmt.Errorf("could not persist execution result: %w", err)
 	}
 
 	// not update the highest executed until the result and receipts are saved.
@@ -880,7 +1179,7 @@ func (e *Engine) saveExecutionResults(
 		Hex("final_state", endState).
 		Msg("saved computation results")
 
-	return receipt, nil
+	return executionResult, nil
 }
 
 // logExecutableBlock logs all data about an executable block
@@ -931,7 +1230,7 @@ func generateChunk(colIndex int,
 			// TODO: record number of txs
 			NumberOfTransactions: 0,
 		},
-		Index:    0,
+		Index:    uint64(colIndex),
 		EndState: endState,
 	}
 }
@@ -967,7 +1266,7 @@ func (e *Engine) generateExecutionResultForBlock(
 func (e *Engine) generateExecutionReceipt(
 	ctx context.Context,
 	result *flow.ExecutionResult,
-	stateInteractions []*delta.Snapshot,
+	stateInteractions []*delta.SpockSnapshot,
 ) (*flow.ExecutionReceipt, error) {
 
 	spocks := make([]crypto.Signature, len(stateInteractions))
@@ -996,11 +1295,6 @@ func (e *Engine) generateExecutionReceipt(
 	}
 
 	receipt.ExecutorSignature = sig
-
-	err = e.execState.PersistExecutionReceipt(ctx, receipt)
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return nil, fmt.Errorf("could not persist execution result: %w", err)
-	}
 
 	return receipt, nil
 }
@@ -1236,25 +1530,26 @@ func (e *Engine) deltaRange(ctx context.Context, fromHeight uint64, toHeight uin
 		}
 
 		blockID := header.ID()
-		_, err = e.execState.StateCommitmentByBlockID(ctx, blockID)
 
-		if err == nil {
-			// this block has been executed, we will send the delta
-			delta, err := e.execState.RetrieveStateDelta(ctx, blockID)
-			if err != nil {
-				return fmt.Errorf("could not retrieve state delta for block %v, %w", blockID, err)
-			}
-
-			onDelta(delta)
-
-		} else if errors.Is(err, storage.ErrNotFound) {
-			// this block has not been executed,
-			// it parent block hasn't been executed, the higher block won't be
-			// executed either, so we stop iterating through the heights
-			break
-		} else {
-			return fmt.Errorf("could not query statecommitment for height %v: %w", height, err)
+		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+		if err != nil {
+			return fmt.Errorf("could not check whether block is executed: %w", err)
 		}
+
+		if !executed {
+			// this block has not been executed,
+			// we could stop iterating through the heights, because
+			// if a parent block is not executed, its children won't be executed
+			break
+		}
+
+		// this block has been executed, we will send the delta
+		delta, err := e.execState.RetrieveStateDelta(ctx, blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve state delta for block %v, %w", blockID, err)
+		}
+
+		onDelta(delta)
 	}
 
 	return nil
@@ -1282,17 +1577,15 @@ func (e *Engine) handleStateDeltaResponse(executionNodeID flow.Identifier, delta
 	// check if the block has been executed already
 	// delta ID is block ID
 	blockID := delta.ID()
-	_, err = e.execState.StateCommitmentByBlockID(e.unit.Ctx(), blockID)
-
-	if err == nil {
-		// the block has been executed, ignore
-		e.log.Info().Hex("block", logging.Entity(delta)).Msg("ignore executed state delta")
-		return nil
+	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	if err != nil {
+		return fmt.Errorf("could not check whether block is executed: %w", err)
 	}
 
-	// exception
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not get know block was executed or not: %w", err)
+	if executed {
+		// if the block has been executed, we don't need the delta, exit here
+		e.log.Info().Hex("block", logging.Entity(delta)).Msg("ignore executed state delta")
+		return nil
 	}
 
 	// block not executed yet, check if the block has been sealed
@@ -1394,7 +1687,7 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 
 	// TODO - validate state delta, reject invalid messages
 
-	executionReceipt, err := e.saveExecutionResults(
+	executionResult, err := e.saveExecutionResults(
 		e.unit.Ctx(),
 		&delta.ExecutableBlock,
 		delta.StateInteractions,
@@ -1408,7 +1701,7 @@ func (e *Engine) applyStateDelta(delta *messages.ExecutionStateDelta) {
 		log.Fatal().Err(err).Msg("fatal error while processing sync message")
 	}
 
-	finalState, ok := executionReceipt.ExecutionResult.FinalStateCommitment()
+	finalState, ok := executionResult.FinalStateCommitment()
 	if !ok {
 		// set to start state next line will fail anyways
 		finalState = delta.StartState

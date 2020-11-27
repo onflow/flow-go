@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -116,8 +117,14 @@ func NewUpdate(sc State, keys []Key, values []Value) (*Update, error) {
 // State captures an state of the ledger
 type State []byte
 
+// String returns the hex encoding of the state
 func (sc State) String() string {
 	return hex.EncodeToString(sc)
+}
+
+// Base64 return the base64 encoding of the state
+func (sc State) Base64() string {
+	return base64.StdEncoding.EncodeToString(sc)
 }
 
 // Equals compares the state to another state
@@ -163,15 +170,19 @@ func (k *Key) Size() int {
 	return size
 }
 
-func (k *Key) String() string {
+// CanonicalForm returns a byte slice describing the key
+// Warning, Changing this has an impact on how leaf hashes are computed
+// don't use this to reconstruct the key later
+func (k *Key) CanonicalForm() []byte {
 	ret := ""
 	for _, kp := range k.KeyParts {
-		ret += "/"
-		ret += string(kp.Type)
-		ret += "/"
-		ret += string(kp.Value)
+		ret += fmt.Sprintf("/%d/%v", kp.Type, string(kp.Value))
 	}
-	return ret
+	return []byte(ret)
+}
+
+func (k *Key) String() string {
+	return string(k.CanonicalForm())
 }
 
 // DeepCopy returns a deep copy of the key
@@ -267,4 +278,12 @@ func (v Value) Equals(other Value) bool {
 
 func (v Value) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hex.EncodeToString(v))
+}
+
+// Migration defines how to convert the given slice of input payloads into an slice of output payloads
+type Migration func(payloads []Payload) ([]Payload, error)
+
+// Reporter accepts slice ledger payloads and reports the state of the ledger
+type Reporter interface {
+	Report(payloads []Payload) error
 }

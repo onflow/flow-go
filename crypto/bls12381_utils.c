@@ -24,7 +24,7 @@ prec_st* bls_prec = NULL;
 
 #if (hashToPoint == OPSWU)
 extern const uint64_t p_3div4_data[Fp_DIGITS];
-extern const uint64_t p_1div2_data[Fp_DIGITS];
+extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
 extern const uint64_t a1_data[Fp_DIGITS];
 extern const uint64_t b1_data[Fp_DIGITS];
 extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
@@ -38,6 +38,12 @@ extern const uint64_t beta_data[Fp_DIGITS];
 extern const uint64_t z2_1_by3_data[2];
 #endif
 
+const uint64_t p_1div2_data[Fp_DIGITS] = {
+   0xdcff7fffffffd555, 0x0f55ffff58a9ffff, 0xb39869507b587b12, 
+   0xb23ba5c279c2895f, 0x258dd3db21a5d66b, 0x0d0088f51cbff34d,
+};
+
+
 // sets the global variable to input
 void precomputed_data_set(prec_st* p) {
     bls_prec = p;
@@ -50,13 +56,14 @@ void precomputed_data_set(prec_st* p) {
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
+
     #if (hashToPoint == OPSWU)
     fp_read_raw(bls_prec->a1, a1_data);
     fp_read_raw(bls_prec->b1, b1_data);
     // (p-3)/4
     bn_read_raw(&bls_prec->p_3div4, p_3div4_data, Fp_DIGITS);
     // (p-1)/2
-    fp_read_raw(bls_prec->p_1div2, p_1div2_data);
+    fp_read_raw(bls_prec->fp_p_1div2, fp_p_1div2_data);
     for (int i=0; i<ELLP_Dx_LEN; i++)  
         fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i]);
     for (int i=0; i<ELLP_Nx_LEN; i++)  
@@ -66,10 +73,13 @@ prec_st* init_precomputed_data_BLS12_381() {
     for (int i=0; i<ELLP_Ny_LEN; i++)  
         fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i]);
     #endif
+
     #if (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_read_raw(&bls_prec->beta, beta_data, Fp_DIGITS);
     bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
+
+    bn_read_raw(&bls_prec->p_1div2, p_1div2_data, Fp_DIGITS);
     return bls_prec;
 }
 
@@ -108,12 +118,8 @@ void seed_relic(byte* seed, int len) {
 
 // Exponentiation of a generic point p in G1
 void ep_mult(ep_t res, const ep_t p, const bn_t expo) {
-    // Using window NAF of size 2
-    #if (EP_MUL	== LWNAF)
-        g1_mul(res, p, expo);
-    #else 
-        ep_mul_lwnaf(res, p, expo);
-    #endif
+    // Using window NAF of size 2 
+    ep_mul_lwnaf(res, p, expo);
 }
 
 // Exponentiation of generator g1 in G1
@@ -126,18 +132,14 @@ void ep_mult_gen(ep_t res, const bn_t expo) {
     ep_mult(res, &core_get()->ep_g, expo);
 #elif FIXED_MULT
     // Using precomputed table of size 4
-    g1_mul_gen(res, expo);
+    ep_mul_gen(res, (bn_st *)expo);
 #endif
 }
 
 // Exponentiation of a generic point p in G2
 void ep2_mult(ep2_t res, ep2_t p, bn_t expo) {
     // Using window NAF of size 2
-    #if (EP_MUL	== LWNAF)
-        g2_mul(res, p, expo);
-    #else 
-        ep2_mul_lwnaf(res, p, expo);
-    #endif
+    ep2_mul_lwnaf(res, p, expo);
 }
 
 // Exponentiation of fixed g2 in G2
@@ -181,6 +183,7 @@ void ep2_print_(char* s, ep2_st* p) {
 
 // generates a random number less than the order r
 void bn_randZr_star(bn_t x) {
+    // reduce the modular reduction bias
     int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
     byte* seed = (byte*) malloc(seed_len);
     rand_bytes(seed, seed_len);
@@ -192,7 +195,7 @@ void bn_randZr(bn_t x) {
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
-
+    // reduce the modular reduction bias
     bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
     bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
     bn_mod(x, x, r);
@@ -217,124 +220,49 @@ void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
     bn_free(tmp);
 }
 
-
-// reads a bit in a prime field element at a given index
-// whether the field element is in Montgomery domain or not
-static int fp_get_bit_generic(const fp_t a, int bit) {
-#if (FP_RDC == MONTY)
-    bn_t tmp;
-    bn_new(tmp);
-    fp_prime_back(tmp, a);
-    int res = bn_get_bit(tmp, bit);
-    bn_free(tmp);
-    return res;
-#else
-    return fp_get_bit(a, bit);
-#endif
+// returns the sign of y.
+// 1 if y > (p - 1)/2 and 0 otherwise.
+static int fp_get_sign(fp_t y) {
+    bn_t bn_y;
+    bn_new(bn_y);
+    fp_prime_back(bn_y, y);
+    return bn_cmp(bn_y, &bls_prec->p_1div2) == RLC_GT;		
 }
-
-// uncompress a G1 point p into r taken into account the coordinate x
-// and the LS bit of the y coordinate. 
-//
-// (taken and modifed from Relic ep_upk function)
-// Change: the square root (y) is chosen regardless of the modular multiplication used.
-// If montgomery multiplication is used, the square root is reduced to check the LS bit.
-//
-// Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
-// https://github.com/relic-toolkit/relic
-//
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
-//    You may obtain a copy of the License at
-
-//        http://www.apache.org/licenses/LICENSE-2.0
-
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS,
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//    See the License for the specific language governing permissions and
-//    limitations under the License.
-static int ep_upk_generic(ep_t r, const ep_t p) {
-    fp_t t;
-    int result = 0;
-    fp_null(t);
-    TRY {
-        fp_new(t);
-        ep_rhs(t, p);
-        /* t0 = sqrt(x1^3 + a * x1 + b). */
-        result = fp_srt(t, t);
-        if (result) {
-            /* Verify if least significant bit of the result matches the
-            * compressed y-coordinate. */
-            #if (FP_RDC == MONTY)
-            bn_t tmp;
-            bn_new(tmp);
-            fp_prime_back(tmp, t);
-            if (bn_get_bit(tmp, 0) != fp_get_bit(p->y, 0)) {
-                fp_neg(t, t);
-            }
-            bn_free(tmp);
-            #else
-            if (fp_get_bit(t, 0) != fp_get_bit(p->y, 0)) {
-                fp_neg(t, t);
-            }
-            #endif
-            fp_copy(r->x, p->x);
-            fp_copy(r->y, t);
-            fp_set_dig(r->z, 1);
-            r->norm = 1;
-        }
-    }
-    CATCH_ANY {
-        THROW(ERR_CAUGHT);
-    }
-    FINALLY {
-        fp_free(t);
-    }
-    return result;
-}
-
 
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
-// len is the allocated size of the buffer bin for sanity check
-// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) 
-// with a small change to accomodate Relic lib 
-//
-// The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
-// Otherwise, the point is in uncompressed form.
-// The second-most significant bit, when set, indicates that the point is at infinity. 
-// If this bit is set, the remaining bits of the group element's encoding should be set to zero.
-// The third-most significant bit is set if (and only if) this point is in compressed form and it is not 
-// the point at infinity and its y-coordinate is odd.
+// len is the allocated size of the buffer bin.
+// The serialization is following:
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
+// The code is a modified version of Relic ep_write_bin
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
     ep_null(t);
-    const int G1size = (G1_BYTES/(SERIALIZATION+1));
+    const int G1_size = (G1_BYTES/(SERIALIZATION+1));
 
-    if (len!=G1size) {
-        THROW(ERR_NO_BUFFER);
+    if (len!=G1_size) {
+        RLC_THROW(ERR_NO_BUFFER);
         return;
     }
  
     if (ep_is_infty(a)) {
             // set the infinity bit
             bin[0] = (SERIALIZATION << 7) | 0x40;
-            memset(bin+1, 0, G1size-1);
+            memset(bin+1, 0, G1_size-1);
             return;
     }
 
-    TRY {
-        ep_new(t);
+    RLC_TRY {
+        ep_new(t); 
         ep_norm(t, a);
         fp_write_bin(bin, Fp_BYTES, t->x);
 
         if (SERIALIZATION == COMPRESSED) {
-            bin[0] |= (fp_get_bit_generic(t->y, 0) << 5);
+            bin[0] |= (fp_get_sign(t->y) << 5);
         } else {
             fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
         }
-    } CATCH_ANY {
-        THROW(ERR_CAUGHT);
+    } RLC_CATCH_ANY {
+        RLC_THROW(ERR_CAUGHT);
     }
 
     bin[0] |= (SERIALIZATION << 7);
@@ -343,13 +271,13 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 
 
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// len is the size of the input buffer
-// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
-// look at the comments of ep_write_bin_compact for a detailed description
+// len is the size of the input buffer.
+// The serialization is following:
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_read_bin
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
-    const int G1size = (G1_BYTES/(SERIALIZATION+1));
-    if (len!=G1size) {
+    const int G1_size = (G1_BYTES/(SERIALIZATION+1));
+    if (len!=G1_size) {
         return RLC_ERR;
     }
     // check if the point is infinity
@@ -358,7 +286,7 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
         if (bin[0] & 0x3F) {
             return RLC_ERR;
         }
-        for (int i=1; i<G1size-1; i++) {
+        for (int i=1; i<G1_size-1; i++) {
             if (bin[i]) {
                 return RLC_ERR;
             } 
@@ -368,17 +296,17 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 	} 
 
     int compressed = bin[0] >> 7;
-    int y_is_odd = (bin[0] >> 5) & 1;
+    int y_sign = (bin[0] >> 5) & 1;
 
-    if (y_is_odd && (!compressed)) {
+    if (y_sign && (!compressed)) {
         return RLC_ERR;
     } 
 
-	a->norm = 1;
+	a->coord = BASIC;
 	fp_set_dig(a->z, 1);
     byte* temp = (byte*)malloc(Fp_BYTES);
     if (!temp) {
-        THROW(ERR_NO_MEMORY);
+        RLC_THROW(ERR_NO_MEMORY);
         return RLC_ERR;
     }
     memcpy(temp, bin, Fp_BYTES);
@@ -391,98 +319,56 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
         return RLC_OK;
     }
     fp_zero(a->y);
-    fp_set_bit(a->y, 0, y_is_odd);
-    if (ep_upk_generic(a, a) == 1) {
+    fp_set_bit(a->y, 0, y_sign);
+    if (ep_upk(a, a) == 1) {
         return RLC_OK;
     }
     return RLC_ERR;
 }
 
-// uncompress a G2 point p into r taking into account the coordinate x
-// and the LS bit of the y lower coordinate.
-//
-// (taken and modifed from Relic ep2_upk function)
-// Change: the square root (y) is chosen regardless of the modular multiplication used.
-// If montgomery multiplication is used, the square root is reduced to check the LS bit.
-//
-// Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
-// https://github.com/relic-toolkit/relic
-static  int ep2_upk_generic(ep2_t r, ep2_t p) {
-    fp2_t t;
-    int result = 0;
-    fp2_null(t);
-    TRY {
-        fp2_new(t);
-        ep2_rhs(t, p);
-        /* t0 = sqrt(x1^3 + a * x1 + b). */
-        result = fp2_srt(t, t);
-        if (result) {
-            /* Verify if least significant bit of the result matches the
-             * compressed y-coordinate. */
-            #if (FP_RDC == MONTY)
-            bn_t tmp;
-            bn_new(tmp);
-            fp_prime_back(tmp, t[0]);
-            if (bn_get_bit(tmp, 0) != fp_get_bit(p->y[0], 0)) {
-                fp2_neg(t, t);
-            }
-            bn_free(tmp);
-            #else
-            if (fp_get_bit(t[0], 0) != fp_get_bit(p->y[0], 0)) {
-                fp2_neg(t, t);
-            }
-            #endif
-            fp2_copy(r->x, p->x);
-            fp2_copy(r->y, t);
-            fp_set_dig(r->z[0], 1);
-            fp_zero(r->z[1]);
-            r->norm = 1;
-        }
+// returns the sign of y.
+// sign(y_0) if y_1 = 0, else sign(y_1)
+static int fp2_get_sign(fp2_t y) {
+    if (fp_is_zero(y[1])) { // no need to convert back as the montgomery form of 0 is 0
+        return fp_get_sign(y[0]);
     }
-    CATCH_ANY {
-        THROW(ERR_CAUGHT);
-    }
-    FINALLY {
-        fp2_free(t);
-    }
-    return result;
+    return fp_get_sign(y[1]);
 }
 
 // ep2_write_bin_compact exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
-// The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
-// Otherwise, the point is in uncompressed form.
-// The second-most significant bit indicates that the point is at infinity. 
-// If this bit is set, the remaining bits of the group element's encoding should be set to zero.
-// The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
+// len is the allocated size of the buffer bin.
+// The serialization is following:
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
+// The code is a modified version of Relic ep2_write_bin 
 void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     ep2_t t;
     ep2_null(t);
-    const int G2size = (G2_BYTES/(SERIALIZATION+1));
+    const int G2_size = (G2_BYTES/(SERIALIZATION+1));
 
-    if (len!=G2size) {
-        THROW(ERR_NO_BUFFER);
+    if (len!=G2_size) {
+        RLC_THROW(ERR_NO_BUFFER);
         return;
     }
  
     if (ep2_is_infty((ep2_st *)a)) {
             // set the infinity bit
             bin[0] = (SERIALIZATION << 7) | 0x40;
-            memset(bin+1, 0, G2size-1);
+            memset(bin+1, 0, G2_size-1);
             return;
     }
 
-    TRY {
+    RLC_TRY {
         ep2_new(t);
         ep2_norm(t, (ep2_st *)a);
         fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
 
         if (SERIALIZATION == COMPRESSED) {
-            bin[0] |= (fp_get_bit_generic(t->y[0], 0) << 5);
+            bin[0] |= (fp2_get_sign(t->y) << 5);
         } else {
             fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
         }
-    } CATCH_ANY {
-        THROW(ERR_CAUGHT);
+    } RLC_CATCH_ANY {
+        RLC_THROW(ERR_CAUGHT);
     }
 
     bin[0] |= (SERIALIZATION << 7);
@@ -490,7 +376,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// The code is a modified version of Relic ep_read_bin
+// The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
@@ -512,16 +398,16 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 		return RLC_OK;
 	} 
     byte compressed = bin[0] >> 7;
-    byte y_is_odd = (bin[0] >> 5) & 1;
-    if (y_is_odd && (!compressed)) {
+    byte y_sign = (bin[0] >> 5) & 1;
+    if (y_sign && (!compressed)) {
         return RLC_ERR;
     } 
-	a->norm = 1;
+	a->coord = BASIC;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
     byte* temp = (byte*)malloc(2*Fp_BYTES);
     if (!temp) {
-        THROW(ERR_NO_MEMORY);
+        RLC_THROW(ERR_NO_MEMORY);
         return RLC_ERR;
     }
     memcpy(temp, bin, 2*Fp_BYTES);
@@ -536,9 +422,9 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     }
     
     fp2_zero(a->y);
-    fp_set_bit(a->y[0], 0, y_is_odd);
+    fp_set_bit(a->y[0], 0, y_sign);
     fp_zero(a->y[1]);
-    if (ep2_upk_generic(a, a) == 1) {
+    if (ep2_upk(a, a) == 1) {
         return RLC_OK;
     }
     return RLC_ERR;
@@ -566,6 +452,76 @@ void ep2_sum_vector(ep2_t jointy, ep2_st* y, const int len){
     for (int i=0; i<len; i++){
         ep2_add_projc(jointy, jointy, &y[i]);
     }
+    ep2_norm(jointy, jointy); // not necessary but left here to optimize the 
+                            // multiple pairing computations with the same 
+                            // public key
+}
+
+// Verifies the validity of 2 SPoCK proofs and 2 public keys.
+// Membership check in G1 of both proofs is verified in this function.
+// Membership check in G2 of both keys is not verified in this function.
+// the membership check in G2 is separated to allow optimizing multiple verifications 
+// using the same public keys.
+int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const byte* sig2) {  
+    ep_t elemsG1[2];
+    ep2_t elemsG2[2];
+
+    // elemsG1[0] = s1
+    ep_new(elemsG1[0]);
+    if (ep_read_bin_compact(elemsG1[0], sig1, SIGNATURE_LEN) != RLC_OK) 
+        return INVALID;
+
+    // check s1 is on curve and in G1
+    if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+        return INVALID;
+
+    // elemsG1[1] = s2
+    ep_new(elemsG1[1]);
+    if (ep_read_bin_compact(elemsG1[1], sig2, SIGNATURE_LEN) != RLC_OK) 
+        return INVALID;
+
+    // check s2 is on curve and in G1
+    if (check_membership_G1(elemsG1[1]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+        return INVALID; 
+
+    // elemsG2[1] = pk1
+    ep2_new(elemsG2[1]);
+    ep2_copy(elemsG2[1], (ep2_st*)pk1);
+
+    // elemsG2[0] = pk2
+    ep2_new(elemsG2[0]);
+    ep2_copy(elemsG2[0], (ep2_st*)pk2);
+
+#if DOUBLE_PAIRING  
+    // elemsG2[0] = -pk2
+    ep2_neg(elemsG2[0], elemsG2[0]);
+
+    fp12_t pair;
+    fp12_new(&pair);
+    // double pairing with Optimal Ate 
+    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), 2);
+
+    // compare the result to 1
+    int res = fp12_cmp_dig(pair, 1);
+
+#elif SINGLE_PAIRING   
+    fp12_t pair1, pair2;
+    fp12_new(&pair1); fp12_new(&pair2);
+    pp_map_oatep_k12(pair1, elemsG1[0], elemsG2[0]);
+    pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
+
+    int res = fp12_cmp(pair1, pair2);
+#endif
+    fp12_free(&one);
+    ep_free(elemsG1[0]);
+    ep_free(elemsG1[1]);
+    ep2_free(elemsG2[0]);
+    ep2_free(elemsG2[1]);
+    
+    if (res == RLC_EQ && core_get()->code == RLC_OK) 
+        return VALID;
+    else 
+        return INVALID;
 }
 
 // Subtracts the sum of a G2 array elements y from an element x and writes the 
@@ -580,7 +536,7 @@ void ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len){
 void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
     ep_set_infty(jointx);
     for (int i=0; i<len; i++){
-        ep_add_projc(jointx, jointx, &x[i]);
+        ep_add_jacob(jointx, jointx, &x[i]);
     }
 }
 
@@ -711,7 +667,7 @@ void ep_rand_G1(ep_t p) {
 // generates a random point in E1\G1 and stores it in p
 void ep_rand_G1complement(ep_t p) {
     // generate a random point in E1
-    p->norm = 1;
+    p->coord = BASIC;
     fp_set_dig(p->z, 1);
     do {
         fp_rand(p->x); // set x to a random field element
@@ -720,7 +676,7 @@ void ep_rand_G1complement(ep_t p) {
         fp_zero(p->y);
         fp_set_bit(p->y, 0, r&1); // set y randomly to 0 or 1
     }
-    while (ep_upk_generic(p, p) == 0); // make sure p is in E1
+    while (ep_upk(p, p) == 0); // make sure p is in E1
 
     // map the point to E1\G1 by clearing G1 order
     bn_t order;
@@ -735,7 +691,7 @@ int subgroup_check_G1_test(int inG1, int method) {
 	if (inG1) ep_rand_G1(p); // p in G1
 	else ep_rand_G1complement(p); // p in E1\G1
 
-    if (!ep_is_valid(p)) { // sanity check to make sure p is in E1
+    if (!ep_on_curve(p)) { // sanity check to make sure p is in E1
         return UNDEFINED; // this should not happen
     }
         

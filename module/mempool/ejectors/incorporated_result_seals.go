@@ -28,9 +28,10 @@ func (ls *LatestIncorporatedResultSeal) Eject(entities map[flow.Identifier]flow.
 		irSeal := entity.(*flow.IncorporatedResultSeal)
 		block, err := ls.headers.ByBlockID(irSeal.Seal.BlockID)
 		if err != nil {
-			continue
+			// eject seals first, whose block is not even known (which are presumably newer than any other entity)
+			return id, entity
 		}
-		if block.Height > maxHeight {
+		if block.Height >= maxHeight {
 			maxHeight = block.Height
 			maxID = id
 		}

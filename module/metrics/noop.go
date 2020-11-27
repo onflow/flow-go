@@ -23,6 +23,8 @@ func (nc *NoopCollector) QueueDuration(duration time.Duration, priority int)    
 func (nc *NoopCollector) MessageSent(engine string, message string)                              {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)                          {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}
+func (nc *NoopCollector) OutboundConnections(_ uint)                                             {}
+func (nc *NoopCollector) InboundConnections(_ uint)                                              {}
 func (nc *NoopCollector) RanGC(duration time.Duration)                                           {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                                          {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                                         {}
@@ -63,6 +65,7 @@ func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)               {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                               {}
 func (nc *NoopCollector) FinishBlockToSeal(blockID flow.Identifier)                              {}
+func (nc *NoopCollector) CheckSealingDuration(duration time.Duration)                            {}
 func (nc *NoopCollector) OnExecutionReceiptReceived()                                            {}
 func (nc *NoopCollector) OnExecutionResultSent()                                                 {}
 func (nc *NoopCollector) OnExecutionResultReceived()                                             {}

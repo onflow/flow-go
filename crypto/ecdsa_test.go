@@ -18,9 +18,23 @@ func TestECDSA(t *testing.T) {
 		ECDSAP256,
 		ECDSASecp256k1,
 	}
+
+	minSeed := map[SigningAlgorithm]int{
+		ECDSAP256:      KeyGenSeedMinLenECDSAP256,
+		ECDSASecp256k1: KeyGenSeedMinLenECDSASecp256k1,
+	}
+
+	maxSeed := map[SigningAlgorithm]int{
+		ECDSAP256:      KeyGenSeedMaxLenECDSA,
+		ECDSASecp256k1: KeyGenSeedMaxLenECDSA,
+	}
+
 	for _, curve := range ecdsaCurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 		halg := hash.NewSHA3_256()
+		// test key generation seed limits
+		testKeyGenSeed(t, curve, minSeed[curve], maxSeed[curve])
+		// test consistency
 		testGenSignVerify(t, curve, halg)
 	}
 }
@@ -156,31 +170,36 @@ func TestScalarMult(t *testing.T) {
 		},
 	}
 
-	for _, test := range genericMultTests {
-		Px, _ := new(big.Int).SetString(test.Px, 16)
-		Py, _ := new(big.Int).SetString(test.Py, 16)
-		k, _ := new(big.Int).SetString(test.k, 16)
-		Qx, _ := new(big.Int).SetString(test.Qx, 16)
-		Qy, _ := new(big.Int).SetString(test.Qy, 16)
-		Rx, Ry := test.curve.ScalarMult(Px, Py, k.Bytes())
-		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0)
-	}
-	for _, test := range baseMultTests {
-		k, _ := new(big.Int).SetString(test.k, 16)
-		Qx, _ := new(big.Int).SetString(test.Qx, 16)
-		Qy, _ := new(big.Int).SetString(test.Qy, 16)
-		// base mult
-		Rx, Ry := test.curve.ScalarBaseMult(k.Bytes())
-		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0)
-		// generic mult with base point
-		Px := new(big.Int).Set(test.curve.Params().Gx)
-		Py := new(big.Int).Set(test.curve.Params().Gy)
-		Rx, Ry = test.curve.ScalarMult(Px, Py, k.Bytes())
-		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0)
-	}
+	t.Run("scalar mult check", func(t *testing.T) {
+		for _, test := range genericMultTests {
+			Px, _ := new(big.Int).SetString(test.Px, 16)
+			Py, _ := new(big.Int).SetString(test.Py, 16)
+			k, _ := new(big.Int).SetString(test.k, 16)
+			Qx, _ := new(big.Int).SetString(test.Qx, 16)
+			Qy, _ := new(big.Int).SetString(test.Qy, 16)
+			Rx, Ry := test.curve.ScalarMult(Px, Py, k.Bytes())
+			assert.Equal(t, Rx.Cmp(Qx), 0)
+			assert.Equal(t, Ry.Cmp(Qy), 0)
+		}
+	})
+
+	t.Run("base scalar mult check", func(t *testing.T) {
+		for _, test := range baseMultTests {
+			k, _ := new(big.Int).SetString(test.k, 16)
+			Qx, _ := new(big.Int).SetString(test.Qx, 16)
+			Qy, _ := new(big.Int).SetString(test.Qy, 16)
+			// base mult
+			Rx, Ry := test.curve.ScalarBaseMult(k.Bytes())
+			assert.Equal(t, Rx.Cmp(Qx), 0)
+			assert.Equal(t, Ry.Cmp(Qy), 0)
+			// generic mult with base point
+			Px := new(big.Int).Set(test.curve.Params().Gx)
+			Py := new(big.Int).Set(test.curve.Params().Gy)
+			Rx, Ry = test.curve.ScalarMult(Px, Py, k.Bytes())
+			assert.Equal(t, Rx.Cmp(Qx), 0)
+			assert.Equal(t, Ry.Cmp(Qy), 0)
+		}
+	})
 }
 
 // ECDSA Proof of Possession test
@@ -193,5 +212,88 @@ func TestECDSAPOP(t *testing.T) {
 		t.Logf("Testing ECDSA for curve %s", curve)
 		halg := hash.NewSHA3_256()
 		testPOP(t, curve, halg)
+	}
+}
+
+func TestSignatureFormatCheck(t *testing.T) {
+	curves := []SigningAlgorithm{
+		ECDSAP256,
+		ECDSASecp256k1,
+	}
+
+	sigLen := make(map[SigningAlgorithm]int)
+	sigLen[ECDSAP256] = SignatureLenECDSAP256
+	sigLen[ECDSASecp256k1] = SignatureLenECDSASecp256k1
+
+	for _, curve := range curves {
+		t.Run("valid signature", func(t *testing.T) {
+			len := sigLen[curve]
+			sig := Signature(make([]byte, len))
+			rand.Read(sig)
+			sig[len/2] = 0    // force s to be less than the curve order
+			sig[len-1] |= 1   // force s to be non zero
+			sig[0] = 0        // force r to be less than the curve order
+			sig[len/2-1] |= 1 // force r to be non zero
+			valid, err := SignatureFormatCheck(curve, sig)
+			assert.Nil(t, err)
+			assert.True(t, valid)
+		})
+
+		t.Run("invalid length", func(t *testing.T) {
+			len := sigLen[curve]
+			shortSig := Signature(make([]byte, len/2))
+			valid, err := SignatureFormatCheck(curve, shortSig)
+			assert.Nil(t, err)
+			assert.False(t, valid)
+
+			longSig := Signature(make([]byte, len*2))
+			valid, err = SignatureFormatCheck(curve, longSig)
+			assert.Nil(t, err)
+			assert.False(t, valid)
+		})
+
+		t.Run("zero values", func(t *testing.T) {
+			// signature with a zero s
+			len := sigLen[curve]
+			sig0s := Signature(make([]byte, len))
+			rand.Read(sig0s[:len/2])
+
+			valid, err := SignatureFormatCheck(curve, sig0s)
+			assert.Nil(t, err)
+			assert.False(t, valid)
+
+			// signature with a zero r
+			sig0r := Signature(make([]byte, len))
+			rand.Read(sig0r[len/2:])
+
+			valid, err = SignatureFormatCheck(curve, sig0r)
+			assert.Nil(t, err)
+			assert.False(t, valid)
+		})
+
+		t.Run("large values", func(t *testing.T) {
+			len := sigLen[curve]
+			sigLargeS := Signature(make([]byte, len))
+			rand.Read(sigLargeS[:len/2])
+			// make sure s is larger than the curve order
+			for i := len / 2; i < len; i++ {
+				sigLargeS[i] = 0xFF
+			}
+
+			valid, err := SignatureFormatCheck(curve, sigLargeS)
+			assert.Nil(t, err)
+			assert.False(t, valid)
+
+			sigLargeR := Signature(make([]byte, len))
+			rand.Read(sigLargeR[len/2:])
+			// make sure s is larger than the curve order
+			for i := 0; i < len/2; i++ {
+				sigLargeR[i] = 0xFF
+			}
+
+			valid, err = SignatureFormatCheck(curve, sigLargeR)
+			assert.Nil(t, err)
+			assert.False(t, valid)
+		})
 	}
 }

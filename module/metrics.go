@@ -28,6 +28,12 @@ type NetworkMetrics interface {
 
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
 	QueueDuration(duration time.Duration, priority int)
+
+	// OutboundConnections updates the metric tracking the number of outbound connections of this node
+	OutboundConnections(connectionCount uint)
+
+	// InboundConnections updates the metric tracking the number of inbound connections of this node
+	InboundConnections(connectionCount uint)
 }
 
 type EngineMetrics interface {
@@ -128,6 +134,9 @@ type ConsensusMetrics interface {
 
 	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	FinishBlockToSeal(blockID flow.Identifier)
+
+	// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
+	CheckSealingDuration(duration time.Duration)
 }
 
 type VerificationMetrics interface {

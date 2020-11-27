@@ -12,12 +12,14 @@ import (
 	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module"
 )
 
 const DefaultCacheSize = 1000
+const DefaultPathFinderVersion = 1
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -37,6 +39,7 @@ type Ledger struct {
 	logger  zerolog.Logger
 	// disk size reading can be time consuming, so limit how often its read
 	diskUpdateLimiter *time.Ticker
+	pathFinderVersion uint8
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
@@ -44,7 +47,8 @@ func NewLedger(dbDir string,
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
-	reg prometheus.Registerer) (*Ledger, error) {
+	reg prometheus.Registerer,
+	pathFinderVer uint8) (*Ledger, error) {
 
 	w, err := wal.NewWAL(nil, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
@@ -66,6 +70,7 @@ func NewLedger(dbDir string,
 		metrics:           metrics,
 		logger:            logger,
 		diskUpdateLimiter: time.NewTicker(5 * time.Second),
+		pathFinderVersion: pathFinderVer,
 	}
 
 	err = w.ReplayOnForest(forest)
@@ -105,7 +110,7 @@ func (l *Ledger) InitialState() ledger.State {
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	start := time.Now()
-	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +147,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +197,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 // Prove provides proofs for a ledger query and errors (if any)
 func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 
-	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -240,4 +245,94 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
 	}
 	return checkpointer, nil
+}
+
+// ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
+func (l *Ledger) ExportCheckpointAt(state ledger.State,
+	migrations []ledger.Migration,
+	reporters []ledger.Reporter,
+	targetPathFinderVersion uint8,
+	outputFilePath string) (ledger.State, error) {
+
+	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
+
+	// get trie
+	t, err := l.forest.GetTrie(ledger.RootHash(state))
+	if err != nil {
+		return nil, fmt.Errorf("cannot get try at the given state commitment: %w", err)
+	}
+
+	// TODO enable validity check of trie
+	// only check validity of the trie we are interested in
+	// l.logger.Info().Msg("Checking validity of the trie at the given state...")
+	// if !t.IsAValidTrie() {
+	//	 return nil, fmt.Errorf("trie is not valid: %w", err)
+	// }
+	// l.logger.Info().Msg("Trie is valid.")
+
+	// get all payloads
+	payloads := t.AllPayloads()
+	payloadSize := len(payloads)
+
+	// migrate payloads
+	for i, migrate := range migrations {
+		l.logger.Info().Msgf("migration %d is underway", i)
+
+		payloads, err = migrate(payloads)
+		if err != nil {
+			return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
+		}
+		if payloadSize != len(payloads) {
+			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
+		}
+		l.logger.Info().Msgf("migration %d is done", i)
+	}
+
+	// run reporters
+	for i, reporter := range reporters {
+		err = reporter.Report(payloads)
+		if err != nil {
+			return nil, fmt.Errorf("error running reporter (%d): %w", i, err)
+		}
+	}
+
+	l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
+
+	// get paths
+	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
+	if err != nil {
+		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+	}
+
+	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
+	if err != nil {
+		return nil, fmt.Errorf("constructing empty trie failed: %w", err)
+	}
+
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	if err != nil {
+		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
+	}
+
+	l.logger.Info().Msg("creating a checkpoint for the new trie")
+
+	writer, err := wal.CreateCheckpointWriterForFile(outputFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a checkpoint writer: %w", err)
+	}
+
+	flatTrie, err := flattener.FlattenTrie(newTrie)
+	if err != nil {
+		return nil, fmt.Errorf("failed to flatten the trie: %w", err)
+	}
+
+	l.logger.Info().Msg("storing the checkpoint to the file")
+
+	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store the checkpoint: %w", err)
+	}
+	writer.Close()
+
+	return newTrie.RootHash(), nil
 }

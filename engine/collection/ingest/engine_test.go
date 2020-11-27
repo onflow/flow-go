@@ -117,7 +117,8 @@ func (suite *Suite) SetupTest() {
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), 1, epoch)
 
 	suite.conf = DefaultConfig()
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, suite.pools, suite.conf)
+	chain := flow.Testnet.Chain()
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
 	suite.Require().Nil(err)
 }
 
@@ -161,9 +162,58 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
 	})
 
+	suite.Run("invalid signature format", func() {
+		suite.Run("invalid format of an enveloppe signature", func() {
+			invalidSig := unittest.InvalidFormatSignature()
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.EnvelopeSignatures[0] = invalidSig
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
+		})
+
+		suite.Run("invalid format of a payload signature", func() {
+			invalidSig := unittest.InvalidFormatSignature()
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.PayloadSignatures[0] = invalidSig
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
+		})
+	})
+
 	suite.Run("invalid signature", func() {
 		// TODO cannot check signatures in MVP
 		suite.T().Skip()
+	})
+
+	suite.Run("invalid address", func() {
+		suite.Run("objective check", func() {
+			invalid := unittest.InvalidAddressFixture()
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = invalid
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
+		})
+
+		suite.Run("subjective check with max index", func() {
+			invalid, err := flow.Testnet.Chain().AddressAtIndex(suite.conf.MaxAddressIndex + 1)
+			suite.Require().Nil(err)
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Authorizers[0] = invalid
+
+			err = suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
+		})
 	})
 
 	suite.Run("expired reference block ID", func() {

@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,8 +48,7 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 func AssertClosesBefore(t *testing.T, done <-chan struct{}, duration time.Duration) {
 	select {
 	case <-time.After(duration):
-		t.Log("channel did not return in time")
-		t.Fail()
+		assert.Fail(t, "channel did not return in time")
 	case <-done:
 		return
 	}
@@ -64,11 +64,68 @@ func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, messag
 		close(done)
 	}()
 
+	RequireCloseBefore(t, done, duration, "could not close done channel on time")
+}
+
+// RequireCloseBefore requires that the given channel returns before the
+// duration expires.
+func RequireCloseBefore(t testing.TB, c <-chan struct{}, duration time.Duration, message string) {
 	select {
 	case <-time.After(duration):
 		require.Fail(t, "function did not return in time: "+message)
-	case <-done:
+	case <-c:
 		return
+	}
+}
+
+// RequireConcurrentCallsReturnBefore is a test helper that runs function `f` count-many times concurrently,
+// and requires all invocations to return within duration.
+func RequireConcurrentCallsReturnBefore(t *testing.T, f func(), count int, duration time.Duration, message string) {
+	wg := &sync.WaitGroup{}
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func() {
+			f()
+			wg.Done()
+		}()
+	}
+
+	RequireReturnsBefore(t, wg.Wait, duration, message)
+}
+
+// RequireNeverReturnBefore is a test helper that tries invoking function `f` and fails the test if either:
+// - function `f` is not invoked within 1 second.
+// - function `f` returns before specified `duration`.
+//
+// It also returns a channel that is closed once the function `f` returns and hence its openness can evaluate
+// return status of function `f` for intervals longer than duration.
+func RequireNeverReturnBefore(t *testing.T, f func(), duration time.Duration, message string) <-chan struct{} {
+	ch := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		wg.Done()
+		f()
+		close(ch)
+	}()
+
+	// requires function invoked within next 1 second
+	RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not invoke the function: "+message)
+
+	// requires function never returns within duration
+	RequireNeverClosedWithin(t, ch, duration, "unexpected return: "+message)
+
+	return ch
+}
+
+// RequireNeverClosedWithin is a test helper function that fails the test if channel `ch` is closed before the
+// determined duration.
+func RequireNeverClosedWithin(t *testing.T, ch <-chan struct{}, duration time.Duration, message string) {
+	select {
+	case <-time.After(duration):
+	case <-ch:
+		require.Fail(t, "channel closed before timeout: "+message)
 	}
 }
 

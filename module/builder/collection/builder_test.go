@@ -111,6 +111,7 @@ func (suite *BuilderSuite) Bootstrap() {
 		transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
 			tx.ReferenceBlockID = root.ID()
 			tx.ProposalKey.SequenceNumber = uint64(i)
+			tx.GasLimit = uint64(9999)
 		})
 		added := suite.pool.Add(&transaction)
 		suite.Assert().True(added)
@@ -457,6 +458,42 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 
 	// should be only 1 transaction in the collection
 	suite.Assert().Equal(builtCollection.Len(), 1)
+}
+
+func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
+	// set the max collection byte size to 600 (each tx is about 273 bytes)
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(600))
+
+	// build a block
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// retrieve the built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	// should be only 2 transactions in the collection, since each tx is ~273 bytes and the limit is 600 bytes
+	suite.Assert().Equal(builtCollection.Len(), 2)
+}
+
+func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
+	// set the max gas to 20,000
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(20000))
+
+	// build a block
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// retrieve the built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	// should be only 2 transactions in collection, since each transaction has gas limit of 9,999 and collection limit is set to 20,000
+	suite.Assert().Equal(builtCollection.Len(), 2)
 }
 
 func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {

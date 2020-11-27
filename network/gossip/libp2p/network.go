@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/gossip/libp2p/cache"
+	"github.com/onflow/flow-go/network/gossip/libp2p/channel"
 	"github.com/onflow/flow-go/network/gossip/libp2p/message"
 	"github.com/onflow/flow-go/network/gossip/libp2p/middleware"
 	"github.com/onflow/flow-go/network/gossip/libp2p/queue"
@@ -23,18 +26,20 @@ type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
-	logger          zerolog.Logger
-	codec           network.Codec
-	ids             flow.IdentityList
-	me              module.Local
-	mw              middleware.Middleware
-	top             topology.Topology
-	metrics         module.NetworkMetrics
-	rcache          *cache.RcvCache // used to deduplicate incoming messages
-	queue           queue.MessageQueue
-	ctx             context.Context
-	cancel          context.CancelFunc
-	subscriptionMgr *subscriptionManager
+	sync.RWMutex
+	logger  zerolog.Logger
+	codec   network.Codec
+	ids     flow.IdentityList
+	me      module.Local
+	mw      middleware.Middleware
+	top     topology.Topology // used to determine fanout connections
+	metrics module.NetworkMetrics
+	rcache  *cache.RcvCache // used to deduplicate incoming messages
+	queue   queue.MessageQueue
+	ctx     context.Context
+	cancel  context.CancelFunc
+	subMngr channel.SubscriptionManager // used to keep track of subscribed channels
+
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -49,6 +54,7 @@ func NewNetwork(
 	mw middleware.Middleware,
 	csize int,
 	top topology.Topology,
+	sm channel.SubscriptionManager,
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
 
@@ -58,28 +64,24 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:          log,
-		codec:           codec,
-		me:              me,
-		mw:              mw,
-		rcache:          rcache,
-		top:             top,
-		metrics:         metrics,
-		subscriptionMgr: newSubscriptionManager(mw),
+		logger:  log,
+		codec:   codec,
+		me:      me,
+		mw:      mw,
+		rcache:  rcache,
+		top:     top,
+		metrics: metrics,
+		subMngr: sm,
 	}
-
-	o.SetIDs(ids)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	o.cancel = cancel
-	o.ctx = ctx
+	o.ctx, o.cancel = context.WithCancel(context.Background())
+	o.ids = ids
 
 	// setup the message queue
 	// create priority queue
-	o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
+	o.queue = queue.NewMessageQueue(o.ctx, queue.GetEventPriority, metrics)
 
 	// create workers to read from the queue and call queueSubmitFunc
-	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+	queue.CreateQueueWorkers(o.ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
 
 	return o, nil
 }
@@ -112,11 +114,18 @@ func (n *Network) Done() <-chan struct{} {
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
+	if _, ok := channels.RolesByChannelID(channelID); !ok {
+		return nil, fmt.Errorf("unknown channel id: %s, should be registered in topic map", channelID)
+	}
 
-	err := n.subscriptionMgr.register(channelID, engine)
+	err := n.subMngr.Register(channelID, engine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channelID, err)
 	}
+
+	n.logger.Info().
+		Str("channel_id", channelID).
+		Msg("channel successfully registered")
 
 	// create a cancellable child context
 	ctx, cancel := context.WithCancel(n.ctx)
@@ -139,7 +148,7 @@ func (n *Network) Register(channelID string, engine network.Engine) (network.Con
 // unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
 // receive messages from that channelID
 func (n *Network) unregister(channelID string) error {
-	err := n.subscriptionMgr.unregister(channelID)
+	err := n.subMngr.Unregister(channelID)
 	if err != nil {
 		return fmt.Errorf("failed to unregister engine for channelID %s: %w", channelID, err)
 	}
@@ -148,6 +157,8 @@ func (n *Network) unregister(channelID string) error {
 
 // Identity returns a map of all flow.Identifier to flow identity by querying the flow state
 func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
+	n.RLock()
+	defer n.RUnlock()
 	identifierToID := make(map[flow.Identifier]flow.Identity)
 	for _, id := range n.ids {
 		identifierToID[id.NodeID] = *id
@@ -155,41 +166,43 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 	return identifierToID, nil
 }
 
-// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
-func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	subset, err := n.top.Subset(n.ids, n.fanout())
+// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
+// Independent invocations of Topology on different nodes collectively constructs a connected network graph.
+func (n *Network) Topology() (flow.IdentityList, error) {
+	n.Lock()
+	defer n.Unlock()
+	top, err := n.top.GenerateFanout(n.ids)
 	if err != nil {
-		return nil, fmt.Errorf("failed to derive list of peer nodes to connect to: %w", err)
+		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
-
-	// creates a map of all the selected ids
-	topMap := make(map[flow.Identifier]flow.Identity)
-	for _, id := range subset {
-		topMap[id.NodeID] = *id
-	}
-	return topMap, nil
+	return top, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
-
 	err := n.processNetworkMessage(nodeID, msg)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
-
 	return nil
 }
 
-func (n *Network) SetIDs(ids flow.IdentityList) {
-	// remove this node id from the list of fanout target ids to avoid self-dial
-	idsMinusMe := ids.Filter(n.me.NotMeFilter())
-	n.ids = idsMinusMe
-}
+// SetIDs updates the identity list cached by the network layer
+func (n *Network) SetIDs(ids flow.IdentityList) error {
 
-// fanout returns the node fanout derived from the identity list
-func (n *Network) fanout() uint {
-	// fanout is currently set to half of the system size for connectivity assurance
-	return uint(len(n.ids)+1) / 2
+	// remove self from id
+	ids = ids.Filter(n.me.NotMeFilter())
+
+	n.Lock()
+	n.ids = ids
+	n.Unlock()
+
+	// update the allow list
+	err := n.mw.UpdateAllowList()
+	if err != nil {
+		return fmt.Errorf("failed to update middleware allow list: %w", err)
+	}
+
+	return nil
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
@@ -416,7 +429,7 @@ func (n *Network) sendOnChannel(channelID string, message interface{}, targetIDs
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QueueMessage)
-	eng, err := n.subscriptionMgr.getEngine(qm.ChannelID)
+	eng, err := n.subMngr.GetEngine(qm.ChannelID)
 	if err != nil {
 		n.logger.Error().
 			Err(err).

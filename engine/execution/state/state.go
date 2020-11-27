@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -50,6 +51,24 @@ type ReadOnlyExecutionState interface {
 	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
 }
 
+// IsBlockExecuted returns whether the block has been executed.
+// it checks whether the state commitment exists in execution state.
+func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
+	_, err := state.StateCommitmentByBlockID(ctx, block)
+
+	// statecommitment exists means the block has been executed
+	if err == nil {
+		return true, nil
+	}
+
+	// statecommitment not exists means the block hasn't been executed yet
+	if errors.Is(err, storage.ErrNotFound) {
+		return false, nil
+	}
+
+	return false, err
+}
+
 // TODO Many operations here are should be transactional, so we need to refactor this
 // to store a reference to DB and compose operations and procedures rather then
 // just being amalgamate of proxies for single transactions operation
@@ -66,6 +85,8 @@ type ExecutionState interface {
 
 	// PersistChunkDataPack stores a chunk data pack by chunk ID.
 	PersistChunkDataPack(context.Context, *flow.ChunkDataPack) error
+
+	PersistExecutionResult(ctx context.Context, result *flow.ExecutionResult) error
 
 	PersistExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
 
@@ -90,6 +111,20 @@ type state struct {
 	results        storage.ExecutionResults
 	receipts       storage.ExecutionReceipts
 	db             *badger.DB
+}
+
+func (s *state) PersistExecutionResult(ctx context.Context, executionResult *flow.ExecutionResult) error {
+
+	err := s.results.Store(executionResult)
+	if err != nil {
+		return fmt.Errorf("could not store result: %w", err)
+	}
+
+	err = s.results.Index(executionResult.BlockID, executionResult.ID())
+	if err != nil {
+		return fmt.Errorf("could not index execution result: %w", err)
+	}
+	return nil
 }
 
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
@@ -331,10 +366,6 @@ func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.Execu
 	err = s.receipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
 	if err != nil {
 		return fmt.Errorf("could not index execution receipt: %w", err)
-	}
-	err = s.results.Index(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution result: %w", err)
 	}
 	return nil
 }
