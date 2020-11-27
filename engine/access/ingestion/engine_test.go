@@ -17,11 +17,12 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	network "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -41,7 +42,7 @@ type Suite struct {
 
 	me           *module.Local
 	request      *module.Requester
-	provider     *network.Engine
+	provider     *mocknetwork.Engine
 	blocks       *storage.Blocks
 	headers      *storage.Headers
 	collections  *storage.Collections
@@ -77,7 +78,7 @@ func (suite *Suite) SetupTest() {
 		Once()
 	suite.request = new(module.Requester)
 
-	suite.provider = new(network.Engine)
+	suite.provider = new(mocknetwork.Engine)
 	suite.blocks = new(storage.Blocks)
 	suite.headers = new(storage.Headers)
 	suite.collections = new(storage.Collections)
