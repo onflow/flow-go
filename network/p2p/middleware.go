@@ -178,13 +178,14 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	}
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
-	libp2pHost, err := NewLibP2PHost(m.ctx, m.log, nodeAddress, NewConnManager(m.log, m.metrics), m.libp2pKey, true, nodeAddrsWhiteList)
+	libp2pHost, err := NewLibP2PHost(m.ctx, m.log, nodeAddress, NewConnManager(m.log, m.metrics), m.libp2pKey, true, nodeAddrsWhiteList,
+		m.rootBlockID, m.handleIncomingStream, psOptions...)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
 
 	// start the libp2p node
-	err = m.libP2PNode.Start(libp2pHost, m.handleIncomingStream, psOptions...)
+	err = m.libP2PNode.Start(libp2pHost)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}

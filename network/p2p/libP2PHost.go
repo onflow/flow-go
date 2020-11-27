@@ -7,6 +7,9 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
@@ -15,10 +18,11 @@ import (
 )
 
 type LibP2PHost struct {
-	ctx         context.Context
-	nodeAddress NodeAddress
-	connGater   *connGater
-	host        host.Host
+	nodeAddress          NodeAddress
+	connGater            *connGater
+	host                 host.Host
+	pubSub               *pubsub.PubSub
+	flowLibP2PProtocolID protocol.ID // the unique protocol ID
 }
 
 func (l LibP2PHost) Name() string {
@@ -33,8 +37,12 @@ func (l LibP2PHost) Host() host.Host {
 	return l.host
 }
 
-func (l LibP2PHost) Context() context.Context {
-	return l.ctx
+func (l LibP2PHost) FlowLibP2PProtocolID() protocol.ID {
+	return l.flowLibP2PProtocolID
+}
+
+func (l LibP2PHost) PubSub() *pubsub.PubSub {
+	return l.pubSub
 }
 
 // Start starts a libp2p node on the given address.
@@ -44,7 +52,10 @@ func NewLibP2PHost(ctx context.Context,
 	conMgr ConnManager,
 	key crypto.PrivKey,
 	allowList bool,
-	allowListAddrs []NodeAddress) (*LibP2PHost, error) {
+	allowListAddrs []NodeAddress,
+	rootBlockID string,
+	handler network.StreamHandler,
+	psOption ...pubsub.Option) (*LibP2PHost, error) {
 
 	var connGater *connGater
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
@@ -94,11 +105,20 @@ func NewLibP2PHost(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("could not create libp2p host: %w", err)
 	}
+	flowLibP2PProtocolID := generateProtocolID(rootBlockID)
+	libP2PHost.SetStreamHandler(flowLibP2PProtocolID, handler)
+
+	// Creating a new PubSub instance of the type GossipSub with psOption
+	ps, err := pubsub.NewGossipSub(ctx, libP2PHost, psOption...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p pubsub: %w", err)
+	}
 
 	return &LibP2PHost{
-		nodeAddress: nodeAddress,
-		connGater:   connGater,
-		host:        libP2PHost,
-		ctx:         ctx,
+		nodeAddress:          nodeAddress,
+		connGater:            connGater,
+		host:                 libP2PHost,
+		flowLibP2PProtocolID: flowLibP2PProtocolID,
+		pubSub:               ps,
 	}, nil
 }
