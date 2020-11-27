@@ -1,15 +1,18 @@
 
 #!/bin/bash
 
+# relic version or tag
+relic_version="7a9bba7f"
+
 rm -rf relic
 
 # clone a specif version of Relic without history if it's tagged.
-#git clone --branch <tag> --single-branch --depth 1 git@github.com:relic-toolkit/relic.git
+#git clone --branch $(relic_version) --single-branch --depth 1 git@github.com:relic-toolkit/relic.git
 
 # clone all the history if the verison is only defined by a commit hash.
 git clone --branch master --single-branch git@github.com:relic-toolkit/relic.git
 cd relic
-git checkout 7a9bba7
+git checkout $relic_version
 cd ..
 
 # build relic
