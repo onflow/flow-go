@@ -47,13 +47,14 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
 }
 
 func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
-	accounts := state.NewAccounts(ledger)
-	generator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
+	accounts := state.NewAccounts(st)
+	generator, err := state.NewLedgerBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
 
-	uuids := state.NewUUIDs(ledger)
+	uuids := state.NewUUIDs(st)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{

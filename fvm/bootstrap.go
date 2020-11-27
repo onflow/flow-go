@@ -45,8 +45,9 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 	b.ledger = ledger
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(ledger)
-	addressGenerator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
+	b.accounts = state.NewAccounts(st)
+	addressGenerator, err := state.NewLedgerBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create address generator: %s", err.Error()))
 	}

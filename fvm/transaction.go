@@ -23,6 +23,10 @@ func Transaction(tx *flow.TransactionBody) *TransactionProcedure {
 	}
 }
 
+type TransactionProcessor interface {
+	Process(*VirtualMachine, Context, *TransactionProcedure, state.Ledger) error
+}
+
 type TransactionProcedure struct {
 	ID          flow.Identifier
 	Transaction *flow.TransactionBody
@@ -31,10 +35,6 @@ type TransactionProcedure struct {
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
-}
-
-type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, state.Ledger) error
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {

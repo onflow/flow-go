@@ -6,12 +6,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Rename this to Storage
 // A Ledger is the storage interface used by the virtual machine to read and write register values.
 type Ledger interface {
-	Set(owner, controller, key string, value flow.RegisterValue)
+	Set(owner, controller, key string, value flow.RegisterValue) error
 	Get(owner, controller, key string) (flow.RegisterValue, error)
-	Touch(owner, controller, key string)
-	Delete(owner, controller, key string)
+	Touch(owner, controller, key string) error
 }
 
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
@@ -41,12 +41,9 @@ func (m MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error
 	return m.Registers[k], nil
 }
 
-func (m MapLedger) Touch(owner, controller, key string) {
+func (m MapLedger) Touch(owner, controller, key string) error {
 	m.RegisterTouches[fullKey(owner, controller, key)] = true
-}
-
-func (m MapLedger) Delete(owner, controller, key string) {
-	delete(m.Registers, fullKey(owner, controller, key))
+	return nil
 }
 
 func fullKey(owner, controller, key string) string {

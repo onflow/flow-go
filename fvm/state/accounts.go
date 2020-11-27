@@ -28,13 +28,14 @@ func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
 
+// TODO RAMTIN change this to storage
 type Accounts struct {
-	ledger Ledger
+	state *State
 }
 
-func NewAccounts(ledger Ledger) *Accounts {
+func NewAccounts(state *State) *Accounts {
 	return &Accounts{
-		ledger: ledger,
+		state: state,
 	}
 }
 
@@ -78,7 +79,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 }
 
 func (a *Accounts) Exists(address flow.Address) (bool, error) {
-	exists, err := a.ledger.Get(string(address.Bytes()), "", keyExists)
+	exists, err := a.state.Get(string(address.Bytes()), "", keyExists)
 	if err != nil {
 		return false, newLedgerGetError(keyExists, address, err)
 	}
@@ -101,13 +102,13 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 	}
 
 	// mark that this account exists
-	a.ledger.Set(string(newAddress.Bytes()), "", keyExists, []byte{1})
+	a.state.Set(string(newAddress.Bytes()), "", keyExists, []byte{1})
 
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
-	publicKey, err := a.ledger.Get(
+	publicKey, err := a.state.Get(
 		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
 	)
 	if err != nil {
@@ -127,7 +128,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 }
 
 func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
-	countBytes, err := a.ledger.Get(
+	countBytes, err := a.state.Get(
 		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
 	)
 	if err != nil {
@@ -152,7 +153,7 @@ func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 func (a *Accounts) SetPublicKeyCount(address flow.Address, count uint64) {
 	newCount := new(big.Int).SetUint64(count)
 
-	a.ledger.Set(
+	a.state.Set(
 		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
 		newCount.Bytes(),
 	)
@@ -160,7 +161,7 @@ func (a *Accounts) SetPublicKeyCount(address flow.Address, count uint64) {
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
 	var countBytes []byte
-	countBytes, err = a.ledger.Get(
+	countBytes, err = a.state.Get(
 		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
 	)
 	if err != nil {
@@ -211,7 +212,7 @@ func (a *Accounts) SetPublicKey(
 		return nil, fmt.Errorf("failed to encode public key: %w", err)
 	}
 
-	a.ledger.Set(
+	a.state.Set(
 		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
 		encodedPublicKey,
 	)
@@ -256,7 +257,7 @@ func contractKey(contractName string) string {
 }
 
 func (a *Accounts) getContract(contractName string, address flow.Address) ([]byte, error) {
-	contract, err := a.ledger.Get(string(address.Bytes()),
+	contract, err := a.state.Get(string(address.Bytes()),
 		string(address.Bytes()),
 		contractKey(contractName))
 	if err != nil {
@@ -277,7 +278,7 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	}
 
 	var prevContract []byte
-	prevContract, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), contractKey(contractName))
+	prevContract, err = a.state.Get(string(address.Bytes()), string(address.Bytes()), contractKey(contractName))
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous contract: %w", err)
 	}
@@ -287,7 +288,7 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 		return nil
 	}
 
-	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), contractKey(contractName), contract)
+	a.state.Set(string(address.Bytes()), string(address.Bytes()), contractKey(contractName), contract)
 
 	return nil
 }
@@ -314,7 +315,7 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 	newContractNames := buf.Bytes()
 
 	var prevContractNames []byte
-	prevContractNames, err = a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContractNames)
+	prevContractNames, err = a.state.Get(string(address.Bytes()), string(address.Bytes()), keyContractNames)
 	if err != nil {
 		return fmt.Errorf("cannot retrieve current contract names: %w", err)
 	}
@@ -324,7 +325,7 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 		return nil
 	}
 
-	a.ledger.Set(string(address.Bytes()), string(address.Bytes()), keyContractNames, newContractNames)
+	a.state.Set(string(address.Bytes()), string(address.Bytes()), keyContractNames, newContractNames)
 
 	return nil
 }
@@ -335,7 +336,7 @@ func (a *Accounts) TouchContract(contractName string, address flow.Address) {
 		panic(err)
 	}
 	if contractNames.Has(contractName) {
-		a.ledger.Touch(string(address.Bytes()),
+		a.state.Touch(string(address.Bytes()),
 			string(address.Bytes()),
 			contractKey(contractName))
 	}
@@ -347,7 +348,7 @@ func (a *Accounts) GetContractNames(address flow.Address) ([]string, error) {
 }
 
 func (a *Accounts) getContractNames(address flow.Address) (contractNames, error) {
-	encContractNames, err := a.ledger.Get(string(address.Bytes()), string(address.Bytes()), keyContractNames)
+	encContractNames, err := a.state.Get(string(address.Bytes()), string(address.Bytes()), keyContractNames)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
 	}

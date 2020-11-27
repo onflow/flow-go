@@ -11,18 +11,18 @@ const keyAddressState = "account_address_state"
 // The only change is that when next address is called the state is updated as well.
 type LedgerBoundAddressGenerator struct {
 	generator flow.AddressGenerator
-	ledger    Ledger
+	state     *State
 }
 
-func NewLedgerBoundAddressGenerator(ledger Ledger, chain flow.Chain) (*LedgerBoundAddressGenerator, error) {
-	stateBytes, err := ledger.Get("", "", keyAddressState)
+func NewLedgerBoundAddressGenerator(state *State, chain flow.Chain) (*LedgerBoundAddressGenerator, error) {
+	stateBytes, err := state.Get("", "", keyAddressState)
 	if err != nil {
 		return nil, err
 	}
 
 	addressGenerator := chain.BytesToAddressGenerator(stateBytes)
 	return &LedgerBoundAddressGenerator{
-		ledger:    ledger,
+		state:     state,
 		generator: addressGenerator,
 	}, nil
 }
@@ -35,7 +35,7 @@ func (g *LedgerBoundAddressGenerator) NextAddress() (flow.Address, error) {
 
 	// update the ledger state
 	stateBytes := g.generator.Bytes()
-	g.ledger.Set("", "", keyAddressState, stateBytes)
+	g.state.Set("", "", keyAddressState, stateBytes)
 
 	return address, nil
 }
