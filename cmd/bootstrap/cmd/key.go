@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 var (
@@ -117,13 +117,13 @@ func validateAddressFormat(address string) {
 	_, err = strconv.Atoi(port)
 	checkErr(err)
 
-	nodeAddrs := libp2p.NodeAddress{
+	nodeAddrs := p2p.NodeAddress{
 		IP:   ip,
 		Port: port,
 	}
 
 	// create a libp2p address from the ip and port
-	lp2pAddr := libp2p.MultiaddressStr(nodeAddrs)
+	lp2pAddr := p2p.MultiaddressStr(nodeAddrs)
 	_, err = multiaddr.NewMultiaddr(lp2pAddr)
 	checkErr(err)
 }

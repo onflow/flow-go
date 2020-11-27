@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
-	networkmock "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -209,7 +209,7 @@ func createNode(
 	// initialize the persister
 	persist := persister.New(db, rootHeader.ChainID)
 
-	prov := &networkmock.Engine{}
+	prov := &mocknetwork.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig())
