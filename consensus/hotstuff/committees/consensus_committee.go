@@ -172,9 +172,18 @@ func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, erro
 	// epoch here 99.99% of the time. Since epochs are long-lived, it is fine
 	// for this to be linear in the number of epochs we have observed.
 	for _, selection := range c.leaders {
-		if view >= selection.FirstView() && view <= selection.FinalView() {
-			return selection.LeaderForView(view)
+
+		// try retrieving the leader
+		leaderID, err := selection.LeaderForView(view)
+		// if the view is out of range, try the next epoch
+		if errors.As(err, &leader.InvalidViewError{}) {
+			continue
 		}
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not get leader: %w", err)
+		}
+
+		return leaderID, nil
 	}
 	return flow.ZeroID, errSelectionNotComputed
 }

@@ -9,6 +9,20 @@ import (
 
 const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months
 
+// InvalidViewError is returned when a requested view is outside the pre-computed range.
+type InvalidViewError struct {
+	requestedView uint64 // the requested view
+	firstView     uint64 // the first view we have pre-computed
+	finalView     uint64 // the final view we have pre-computed
+}
+
+func (err InvalidViewError) Error() string {
+	return fmt.Sprintf(
+		"requested view (%d) outside of valid range [%d-%d]",
+		err.requestedView, err.firstView, err.finalView,
+	)
+}
+
 // LeaderSelection caches the pre-generated leader selections for a certain number of
 // views starting from the epoch start view.
 type LeaderSelection struct {
@@ -38,19 +52,27 @@ func (l LeaderSelection) FinalView() uint64 {
 }
 
 // LeaderForView returns the node ID of the leader for a given view.
-// If the view is smaller than the firstView, an error will be returned.
+// Returns InvalidViewError if the view is outside the pre-computed range.
 func (l LeaderSelection) LeaderForView(view uint64) (flow.Identifier, error) {
 	if view < l.FirstView() {
-		return flow.ZeroID, fmt.Errorf("view (%d) before first view of epoch (%d)", view, l.FirstView())
+		return flow.ZeroID, l.newInvalidViewError(view)
 	}
 	if view > l.FinalView() {
-		return flow.ZeroID, fmt.Errorf("view (%d) after last view of epoch (%d)", view, l.FirstView())
+		return flow.ZeroID, l.newInvalidViewError(view)
 	}
 
 	viewIndex := int(view - l.firstView)      // index of leader index from view
 	leaderIndex := l.leaderIndexes[viewIndex] // index of leader node ID from leader index
 	leaderID := l.memberIDs[leaderIndex]      // leader node ID from leader index
 	return leaderID, nil
+}
+
+func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
+	return InvalidViewError{
+		requestedView: view,
+		firstView:     l.FirstView(),
+		finalView:     l.FinalView(),
+	}
 }
 
 // ComputeLeaderSelectionFromSeed pre-generates a certain number of leader selections, and returns a
