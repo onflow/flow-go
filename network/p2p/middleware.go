@@ -80,7 +80,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
-	libp2pKey, err := internal.PrivKey(key)
+	libp2pKey, err := privKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
 	}
