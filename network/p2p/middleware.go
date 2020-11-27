@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/internal"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/validator"
 )
@@ -169,7 +168,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 
-	libp2pKey, err := internal.PrivKey(m.key)
+	libp2pKey, err := privKey(m.key)
 	if err != nil {
 		return fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
 	}

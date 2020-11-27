@@ -1,4 +1,4 @@
-package internal
+package p2p
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ func TestRcvCacheTestSuite(t *testing.T) {
 func (r *RcvCacheTestSuite) SetupTest() {
 	const size = 10
 
-	c, err := NewRcvCache(size)
+	c, err := newRcvCache(size)
 	require.NoError(r.Suite.T(), err)
 
 	r.c = c
@@ -35,16 +35,16 @@ func (r *RcvCacheTestSuite) SetupTest() {
 func (r *RcvCacheTestSuite) TestSingleElementAdd() {
 	eventID := []byte("event-1")
 	channelID := "0"
-	assert.False(r.Suite.T(), r.c.Add(eventID, channelID))
+	assert.False(r.Suite.T(), r.c.add(eventID, channelID))
 
-	assert.True(r.Suite.T(), r.c.Add(eventID, channelID))
+	assert.True(r.Suite.T(), r.c.add(eventID, channelID))
 }
 
 // TestNoneExistence evaluates the correctness of cache operation against non-existing element
 func (r *RcvCacheTestSuite) TestNoneExistence() {
 	eventID := []byte("non-existing event")
 	channelID := "1"
-	assert.False(r.Suite.T(), r.c.Add(eventID, channelID))
+	assert.False(r.Suite.T(), r.c.add(eventID, channelID))
 }
 
 // TestMultipleElementAdd adds several eventIDs to th cache and evaluates their xistence
@@ -58,11 +58,11 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 
 	// adds all events to the cache
 	for i := range events {
-		assert.False(r.Suite.T(), r.c.Add(events[i], strconv.Itoa(i)))
+		assert.False(r.Suite.T(), r.c.add(events[i], strconv.Itoa(i)))
 	}
 
 	// checks for the existence of the added events
 	for i := range events {
-		assert.True(r.Suite.T(), r.c.Add(events[i], strconv.Itoa(i)))
+		assert.True(r.Suite.T(), r.c.add(events[i], strconv.Itoa(i)))
 	}
 }

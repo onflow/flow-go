@@ -1,4 +1,4 @@
-package internal
+package p2p
 
 import (
 	"fmt"
@@ -17,8 +17,8 @@ type RcvCacheEntry struct {
 	channelID string
 }
 
-// NewRcvCache creates and returns a new RcvCache
-func NewRcvCache(size int) (*RcvCache, error) {
+// newRcvCache creates and returns a new RcvCache
+func newRcvCache(size int) (*RcvCache, error) {
 	c, err := lru.New(size)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize cache %w", err)
@@ -33,7 +33,7 @@ func NewRcvCache(size int) (*RcvCache, error) {
 
 // Add adds a new message to the cache if not already present. Returns true if the message was already in the cache and false
 // otherwise
-func (r *RcvCache) Add(eventID []byte, channelID string) bool {
+func (r *RcvCache) add(eventID []byte, channelID string) bool {
 	entry := RcvCacheEntry{
 		eventID:   string(eventID),
 		channelID: channelID,

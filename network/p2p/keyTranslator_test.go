@@ -1,4 +1,4 @@
-package internal
+package p2p
 
 import (
 	"crypto/rand"
@@ -45,7 +45,7 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 			require.NoError(k.T(), err)
 
 			// convert it to a LibP2P private key
-			lpk, err := PrivKey(fpk)
+			lpk, err := privKey(fpk)
 			require.NoError(k.T(), err)
 
 			// get the raw bytes of both the keys
@@ -91,7 +91,7 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 			fpublic := fpk.PublicKey()
 
 			// convert the Flow public key to a Libp2p public key
-			lpublic, err := PublicKey(fpublic)
+			lpublic, err := publicKey(fpublic)
 			require.NoError(k.T(), err)
 
 			// compare raw bytes of the public keys
@@ -123,7 +123,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 	fpublic := fpk.PublicKey()
 
 	// convert it to the Libp2p Public key
-	lconverted, err := PublicKey(fpublic)
+	lconverted, err := publicKey(fpublic)
 	require.NoError(k.T(), err)
 
 	// check that the LibP2P Id generation is deterministic
