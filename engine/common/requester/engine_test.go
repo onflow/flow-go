@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -111,7 +111,7 @@ func TestDispatchRequestVarious(t *testing.T) {
 
 	var nonce uint64
 
-	con := &network.Conduit{}
+	con := &mocknetwork.Conduit{}
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			request := args.Get(0).(*messages.EntityRequest)
@@ -185,7 +185,7 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 		items[item.EntityID] = item
 	}
 
-	con := &network.Conduit{}
+	con := &mocknetwork.Conduit{}
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			request := args.Get(0).(*messages.EntityRequest)
