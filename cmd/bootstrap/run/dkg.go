@@ -120,8 +120,8 @@ func (proc *localDKGProcessor) Broadcast(data []byte) {
 	}
 }
 
-// Blacklist a node
-func (proc *localDKGProcessor) Blacklist(node int, log string) {
+// Disqualify a node
+func (proc *localDKGProcessor) Disqualify(node int, log string) {
 }
 
 // FlagMisbehavior flags a node for misbehaviour

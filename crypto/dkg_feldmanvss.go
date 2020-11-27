@@ -168,11 +168,11 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	return nil
 }
 
-// Disqualify forces a node to get disqualified
+// ForceDisqualify forces a node to get disqualified
 // for a reason outside of the DKG protocol
 // The caller should make sure all honest nodes call this function,
 // otherwise, the protocol can be broken
-func (s *feldmanVSSstate) Disqualify(node int) error {
+func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}

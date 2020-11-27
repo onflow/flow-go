@@ -160,7 +160,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 			for complainer, c := range s.fvss[i].complaints {
 				if c.received && !c.answerReceived {
 					s.fvss[i].disqualified = true
-					s.processor.Blacklist(i,
+					s.processor.Disqualify(i,
 						fmt.Sprintf("complaint from %d was not answered", complainer))
 					disqualifiedTotal++
 					break
@@ -219,16 +219,16 @@ func (s *JointFeldmanState) Running() bool {
 	return s.jointRunning
 }
 
-// Disqualify forces a node to get disqualified
+// ForceDisqualify forces a node to get disqualified
 // for a reason outside of the DKG protocol
 // The caller should make sure all honest nodes call this function,
 // otherwise, the protocol can be broken
-func (s *JointFeldmanState) Disqualify(node int) error {
+func (s *JointFeldmanState) ForceDisqualify(node int) error {
 	if !s.jointRunning {
 		return errors.New("dkg is not running")
 	}
 	for i := 0; i < s.size; i++ {
-		err := s.fvss[i].Disqualify(node)
+		err := s.fvss[i].ForceDisqualify(node)
 		if err != nil {
 			return fmt.Errorf("disqualif has failed: %w", err)
 		}

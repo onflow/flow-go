@@ -252,8 +252,8 @@ func (proc *testDKGProcessor) Broadcast(data []byte) {
 	}
 }
 
-func (proc *testDKGProcessor) Blacklist(node int, logInfo string) {
-	log.Infof("%d wants to blacklist %d: %s", proc.current, node, logInfo)
+func (proc *testDKGProcessor) Disqualify(node int, logInfo string) {
+	log.Infof("%d wants to Disqualify %d: %s", proc.current, node, logInfo)
 }
 func (proc *testDKGProcessor) FlagMisbehavior(node int, logInfo string) {
 	log.Infof("%d flags a misbehavior from %d: %s", proc.current, node, logInfo)

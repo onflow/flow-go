@@ -44,11 +44,11 @@ type DKGState interface {
 	NextTimeout() error
 	// Running returns the running state of the DKG protocol
 	Running() bool
-	// Disqualify forces a node to get disqualified
+	// ForceDisqualify forces a node to get disqualified
 	// for a reason outside of the DKG protocol.
 	// The caller should make sure all honest nodes call this function,
 	// otherwise, the protocol can be broken.
-	Disqualify(node int) error
+	ForceDisqualify(node int) error
 }
 
 // index is the node index type used as participants ID
@@ -142,17 +142,17 @@ type DKGProcessor interface {
 	// protocol instance. This can be achieved by prepending all
 	// messages by a unique instance ID.
 	Broadcast(data []byte)
-	// Blacklist flags that a node is misbehaving and that it got
+	// Disqualify flags that a node is misbehaving and that it got
 	// disqualified from the protocol. Such behavior deserves
 	// disqualifying as it is flagged to all honest nodes in
 	// the protocol.
-	// log describes the blacklisting reason.
-	Blacklist(node int, log string)
+	// log describes the disqualification reason.
+	Disqualify(node int, log string)
 	// FlagMisbehavior warns that a node is misbehaving.
 	// Such behavior is not necessarily flagged to all nodes and therefore
 	// the node is not disqualified from the protocol. Other mechanisms
 	// outside DKG could be implemented to synchronize slashing the misbehaving
-	// node by all participating nodes, using the api `Disqualify`. Failing to
+	// node by all participating nodes, using the api `ForceDisqualify`. Failing to
 	// do so, the protocol can be broken.
 	// log describes the misbehavior.
 	FlagMisbehavior(node int, log string)
