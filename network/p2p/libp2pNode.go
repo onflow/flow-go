@@ -65,12 +65,13 @@ type Node struct {
 	metrics              module.NetworkMetrics
 }
 
-func NewLibP2PNode(logger zerolog.Logger, key crypto.PrivKey, metrics module.NetworkMetrics) (*Node, error) {
+func NewLibP2PNode(logger zerolog.Logger, key crypto.PrivKey, rootBlockID string, metrics module.NetworkMetrics) (*Node, error) {
 	n := &Node{
-		logger:  logger,
-		key:     key,
-		metrics: metrics,
-		conMgr:  NewConnManager(logger, metrics),
+		logger:               logger,
+		key:                  key,
+		metrics:              metrics,
+		conMgr:               NewConnManager(logger, metrics),
+		flowLibP2PProtocolID: generateProtocolID(rootBlockID),
 	}
 	return n, nil
 }
@@ -79,15 +80,12 @@ func NewLibP2PNode(logger zerolog.Logger, key crypto.PrivKey, metrics module.Net
 func (n *Node) Start(ctx context.Context,
 	nodeAddress NodeAddress,
 	handler network.StreamHandler,
-	rootBlockID string,
 	allowList bool,
 	allowListAddrs []NodeAddress,
 	psOption ...pubsub.Option) error {
 	n.Lock()
 	defer n.Unlock()
 
-	n.name = nodeAddress.Name
-	n.flowLibP2PProtocolID = generateProtocolID(rootBlockID)
 	//sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
 	//if err != nil {
 	//	return err
@@ -136,14 +134,15 @@ func (n *Node) Start(ctx context.Context,
 	//	return fmt.Errorf("could not create libp2p host: %w", err)
 	//}
 
-	host, connGater, err := NewLibP2PHost(ctx, n.logger, nodeAddress, n.conMgr, n.key, allowList, allowListAddrs)
+	libp2pHost, err := NewLibP2PHost(ctx, n.logger, nodeAddress, n.conMgr, n.key, allowList, allowListAddrs)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
-	n.connGater = connGater
-	n.libP2PHost = host
+	n.connGater = libp2pHost.ConnenctionGater()
+	n.libP2PHost = libp2pHost.Host()
+	n.name = libp2pHost.Name()
 
-	host.SetStreamHandler(n.flowLibP2PProtocolID, handler)
+	n.libP2PHost.SetStreamHandler(n.flowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	n.ps, err = pubsub.NewGossipSub(ctx, n.libP2PHost, psOption...)

@@ -85,7 +85,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		return nil, fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
 	}
 
-	p2p, err := NewLibP2PNode(log, libp2pKey, metrics)
+	p2p, err := NewLibP2PNode(log, libp2pKey, rootBlockID, metrics)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a libp2p node: %w", err)
 	}
@@ -180,7 +180,6 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	err = m.libP2PNode.Start(m.ctx,
 		nodeAddress,
 		m.handleIncomingStream,
-		m.rootBlockID,
 		true,
 		nodeAddrsWhiteList,
 		psOptions...)
