@@ -12,13 +12,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// a filter that returns all members of the consensus committee allowed to vote
-var consensusMemberFilter = filter.And(
-	filter.HasStake(true),              // must have non-zero weight
-	filter.HasRole(flow.RoleConsensus), // must be a consensus node
-	filter.Not(filter.Ejected),         // must not be ejected
-)
-
 var errSelectionNotComputed = fmt.Errorf("leader selection for epoch not yet computed")
 
 // Consensus represents the main committee for consensus nodes. The consensus
@@ -75,7 +68,7 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 
 func (c *Consensus) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return c.state.AtBlockID(blockID).Identities(filter.And(
-		consensusMemberFilter,
+		filter.IsVotingConsensusCommitteeMember,
 		selector,
 	))
 }
@@ -85,7 +78,7 @@ func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*
 	if err != nil {
 		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
-	if !consensusMemberFilter(identity) {
+	if !filter.IsVotingConsensusCommitteeMember(identity) {
 		return nil, fmt.Errorf("node with ID %x is not a valid consensus committee member at block %x", nodeID, blockID)
 	}
 	return identity, nil
