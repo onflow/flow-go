@@ -403,13 +403,10 @@ func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
 	return nil
 }
 
-// The compliance of the seal payload.
-// we need them to create a valid chain of seals on our branch of the chain,
-// starting at the block directly after the last sealed block all the way to
-// at most the parent.
-// We use deterministic lookup by height for the finalized part of the chain and
-// then make a list of unfinalized blocks for the remainder, if any seals
-// remain.
+// sealExtend checks the compliance of the payload seals and returns the last
+// valid seal on the fork. Payload seals should form a valid chain on top of the
+// last seal, and should only correspond to blocks and execution results
+// incorporated on the current fork.
 func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 
 	blockID := candidate.ID()
@@ -419,7 +416,8 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
 
-	// get the parent's block seal, which constitutes the beginning of the
+	// Get the latest seal in the fork that ends with block `ParentID`.
+	// This last sealed block in the fork constitutes the beginning of the
 	// sealing chain; if no seals are part of the payload, it will also be used
 	// for the candidate block, which remains at the same sealed state
 	last, err := m.state.seals.ByBlockID(header.ParentID)
@@ -427,8 +425,8 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
 
-	// if there is no seal in the block payload, use the last sealed block of the parent
-	// block as the last sealed block of the given block.
+	// if there is no seal in the block payload, use the last sealed block of
+	// the parent block as the last sealed block of the given block.
 	if len(payload.Seals) == 0 {
 		return last, nil
 	}
@@ -444,137 +442,81 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		return nil, state.NewInvalidExtensionErrorf("multiple seals for the same block")
 	}
 
-	// get the last sealed block; we use its height to iterate forwards through
-	// the finalized blocks which still need sealing
-	sealed, err := m.state.headers.ByBlockID(last.BlockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
-	}
-
-	var finalizedHeight uint64
-	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
-	}
-	var finalID flow.Identifier
-	err = m.state.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
-	if err != nil {
-		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
-	}
-
 	// incorporatedResults collects the _first_ appearance of unsealed execution
 	// results on the fork, along with the ID of the block in which they are
 	// incorporated.
 	incorporatedResults := make(map[flow.Identifier]*flow.IncorporatedResult)
 
-	// we now go from last sealed height plus one to finalized height and check
-	// if we have the seal for each of them step by step; often we will not even
-	// enter this loop, because last sealed height is higher than finalized
-	for height := sealed.Height + 1; height <= finalizedHeight; height++ {
-		// as we are iterating the finalized blocks, if there is all the seals
-		// have been used to seal the finalized blocks, and there is no more seal left,
-		// we could exit earlier with the last seal
+	// collect IDs of blocks on the fork (from parent to last sealed)
+	var blockIDs []flow.Identifier
+
+	// loop through the fork backwards up to last sealed block and collect
+	// IncorporatedResults as well as the IDs of blocks visited
+	sealedID := last.BlockID
+	ancestorID := header.ParentID
+	for ancestorID != sealedID {
+
+		ancestor, err := m.state.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
+		}
+
+		// keep track of blocks on the fork
+		blockIDs = append(blockIDs, ancestorID)
+
+		payload, err := m.state.payloads.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block payload %x: %w", ancestorID, err)
+		}
+
+		// Collect execution results from receipts.
+		for _, receipt := range payload.Receipts {
+			resultID := receipt.ExecutionResult.ID()
+			// incorporatedResults should contain the _first_ appearance of the
+			// ExecutionResult. We are traversing the fork backwards, so we can
+			// overwrite any previously recorded result.
+
+			// ATTENTION:
+			// Here, IncorporatedBlockID (the first argument) should be set
+			// to ancestorID, because that is the block that contains the
+			// ExecutionResult. However, in phase 2 of the sealing roadmap,
+			// we are still using a temporary sealing logic where the
+			// IncorporatedBlockID is expected to be the result's block ID.
+			incorporatedResults[resultID] = flow.NewIncorporatedResult(
+				receipt.ExecutionResult.BlockID,
+				&receipt.ExecutionResult,
+			)
+
+		}
+
+		ancestorID = ancestor.ParentID
+	}
+
+	// Loop forward across the fork and try to create a valid chain of seals.
+	// blockIDs, as populated by the previous loop, is in reverse order.
+	for i := len(blockIDs) - 1; i >= 0; i-- {
+		// if there are no more seals left, we can exit earlier
 		if len(byBlock) == 0 {
 			return last, nil
 		}
 
-		header, err := m.state.headers.ByHeight(height)
-		if err != nil {
-			return nil, fmt.Errorf("could not get block for sealed height (%d): %w", height, err)
-		}
-
-		blockID := header.ID()
-		next, found := byBlock[blockID]
+		// return an error if there are still seals to consider, but they break
+		// the chain
+		blockID := blockIDs[i]
+		seal, found := byBlock[blockID]
 		if !found {
-			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
+			return nil, state.NewInvalidExtensionErrorf("chain of seals broken (missing: %x)", blockID)
 		}
 
 		delete(byBlock, blockID)
 
-		block, err := m.state.blocks.ByID(blockID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get block %x: %w", blockID, err)
-		}
-
-		// Collect execution results from receipts. We are visiting the blocks
-		// in ascending order, so if the lookup table already contains an entry
-		// for an execution result, we don't need top updated it.
-		for _, receipt := range block.Payload.Receipts {
-			resultID := receipt.ExecutionResult.ID()
-			if _, ok := incorporatedResults[resultID]; !ok {
-				incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, &receipt.ExecutionResult)
-			}
-		}
-
-		last = next
-	}
-	// In case no seals are left, we skip the remaining part:
-	if len(byBlock) == 0 {
-		return last, nil
-	}
-	// Once we have filled in seals for all finalized blocks we need to check
-	// the non-finalized blocks backwards; collect all of them, from direct
-	// parent to just before finalized, and see if we can use up the rest of the
-	// seals. We need to stop collecting ancestors either when reaching the
-	// finalized state, or when reaching the last sealed block.
-	ancestorID := header.ParentID
-	var pendingIDs []flow.Identifier
-	for ancestorID != finalID && ancestorID != last.BlockID {
-		pendingIDs = append(pendingIDs, ancestorID)
-		ancestor, err := m.state.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
-		}
-		ancestorID = ancestor.ParentID
-	}
-
-	for i := len(pendingIDs) - 1; i >= 0; i-- {
-		// as we are iterating the pendings blocks, if there is no more seal left,
-		// we exit earlier with the last seal
-		if len(byBlock) == 0 {
-			return last, nil
-		}
-
-		pendingID := pendingIDs[i]
-		next, found := byBlock[pendingID]
-		if !found {
-			return nil, state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
-		}
-
-		delete(byBlock, pendingID)
-
-		block, err := m.state.blocks.ByID(pendingID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get block %x: %w", pendingID, err)
-		}
-
-		for _, receipt := range block.Payload.Receipts {
-			resultID := receipt.ExecutionResult.ID()
-			if _, ok := incorporatedResults[resultID]; !ok {
-				incorporatedResults[resultID] = flow.NewIncorporatedResult(pendingID, &receipt.ExecutionResult)
-			}
-		}
-
-		last = next
-	}
-
-	// This is just a sanity check; at this point, no seals should be left.
-	if len(byBlock) > 0 {
-		return nil, state.NewInvalidExtensionErrorf("not all seals connected to state (left: %d)", len(byBlock))
-	}
-
-	// If we have made it this far, all the seals in the payload form a valid
-	// chain on top of the last seal. Now we need to check that each seal
-	// corresponds to an ExecutionResult that was incorporated in a block on
-	// this fork, and check the integrity of the seal against the first
-	// appearance of this ExecutionResult.
-
-	for _, seal := range payload.Seals {
+		// check if we have an incorporatedResult for this seal
 		incorporatedResult, ok := incorporatedResults[seal.ResultID]
 		if !ok {
 			return nil, state.NewInvalidExtensionErrorf("seal %x does not correspond to a result on this fork", seal.ID())
 		}
 
+		// check the integrity of the seal
 		valid, err := IsValidSeal(seal, incorporatedResult)
 		if err != nil {
 			return nil, fmt.Errorf("could not check validity of Seal %v: %w", seal.ID(), err)
@@ -582,6 +524,13 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 		if !valid {
 			return nil, state.NewInvalidExtensionErrorf("payload includes invalid seal (%x)", seal.ID())
 		}
+
+		last = seal
+	}
+
+	// at this point no seals should be left
+	if len(byBlock) > 0 {
+		return nil, state.NewInvalidExtensionErrorf("not all seals connected to state (left: %d)", len(byBlock))
 	}
 
 	return last, nil
