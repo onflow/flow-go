@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
@@ -167,6 +167,10 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing root execution result and block seal")
 	constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
+	log.Info().Msg("")
+
+	log.Info().Msg("copying internal private keys to output folder")
+	copyDir(flagInternalNodePrivInfoDir, filepath.Join(flagOutdir, model.DirPrivateRoot))
 	log.Info().Msg("")
 
 	// print count of all nodes
