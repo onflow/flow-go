@@ -4,6 +4,8 @@ package badger
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/validation"
 
 	"github.com/dgraph-io/badger/v2"
@@ -20,20 +22,22 @@ type MutatorFactory interface {
 }
 
 type mutatorFactory struct {
-	results storage.ExecutionResults
+	results           storage.ExecutionResults
+	signatureVerifier module.AggregatingVerifier
 }
 
 func (m *mutatorFactory) Create(state *State) protocol.Mutator {
 	r := &Mutator{
 		state:     state,
-		validator: validation.NewReceiptValidator(state, state.index, m.results),
+		validator: validation.NewReceiptValidator(state, state.index, m.results, m.signatureVerifier),
 	}
 	return r
 }
 
 func NewMutatorFactory(results storage.ExecutionResults) MutatorFactory {
 	m := &mutatorFactory{
-		results: results,
+		results:           results,
+		signatureVerifier: signature.NewAggregationVerifier(encoding.ExecutionReceiptTag),
 	}
 	return m
 }

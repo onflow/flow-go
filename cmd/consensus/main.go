@@ -170,7 +170,8 @@ func main() {
 				return nil, fmt.Errorf("could not create public assignment: %w", err)
 			}
 
-			validator := validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results)
+			signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
+			validator := validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results, signatureVerifier)
 
 			match, err := matching.New(
 				node.Logger,

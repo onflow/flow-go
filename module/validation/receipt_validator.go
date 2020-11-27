@@ -4,10 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -19,12 +17,12 @@ type receiptValidator struct {
 	verifier module.Verifier
 }
 
-func NewReceiptValidator(state protocol.ReadOnlyState, index storage.Index, results storage.ExecutionResults) module.ReceiptValidator {
+func NewReceiptValidator(state protocol.ReadOnlyState, index storage.Index, results storage.ExecutionResults, verifier module.Verifier) *receiptValidator {
 	rv := &receiptValidator{
 		state:    state,
 		index:    index,
 		results:  results,
-		verifier: signature.NewAggregationVerifier(encoding.ExecutionReceiptTag),
+		verifier: verifier,
 	}
 
 	return rv
@@ -41,7 +39,7 @@ func NewReceiptValidator(state protocol.ReadOnlyState, index storage.Index, resu
 func (v *receiptValidator) ensureStakedNodeWithRole(identity *flow.Identity, expectedRole flow.Role) error {
 	// check that the origin is an expected node
 	if identity.Role != expectedRole {
-		return engine.NewInvalidInputErrorf("expected node %x to have identity %s but got %s", identity.NodeID, expectedRole, identity.Role)
+		return engine.NewInvalidInputErrorf("expected node %x to have identity %v but got %v", identity.NodeID, expectedRole, identity.Role)
 	}
 
 	// check if the identity has a stake
@@ -93,7 +91,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 		}
 
 		if chunk.BlockID != result.BlockID {
-			return engine.NewInvalidInputErrorf("invalid blockID, expected %s got %s", result.BlockID, chunk.BlockID)
+			return engine.NewInvalidInputErrorf("invalid blockID, expected %v got %v", result.BlockID, chunk.BlockID)
 		}
 	}
 
@@ -126,7 +124,7 @@ func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) e
 	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown")
+			return engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown", result.PreviousResultID)
 		} else {
 			return err
 		}
@@ -135,14 +133,14 @@ func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) e
 	block, err := v.state.AtBlockID(result.BlockID).Head()
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return engine.NewInvalidInputErrorf("no block found %s %w", result.BlockID, err)
+			return engine.NewInvalidInputErrorf("no block found %v %w", result.BlockID, err)
 		} else {
 			return err
 		}
 	}
 
 	if prevResult.BlockID != block.ParentID {
-		return engine.NewInvalidInputErrorf("invalid block for previous result %s", prevResult.BlockID)
+		return engine.NewInvalidInputErrorf("invalid block for previous result %v", prevResult.BlockID)
 	}
 
 	return nil

@@ -239,10 +239,6 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// check if the receipts in the payload are valid
 	err = m.receiptExtend(candidate)
 	if err != nil {
-		if state.IsInvalidExtensionError(err) {
-			return err
-		}
-
 		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
 	}
 

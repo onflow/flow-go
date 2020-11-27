@@ -5,7 +5,6 @@ package matching
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/badger"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
