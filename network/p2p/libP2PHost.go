@@ -5,27 +5,28 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog"
 )
 
 // Start starts a libp2p node on the given address.
 func NewLibP2PHost(ctx context.Context,
+	logger zerolog.Logger,
 	nodeAddress NodeAddress,
-	handler network.StreamHandler,
-	rootBlockID string,
+	conMgr ConnManager,
+	key crypto.PrivKey,
 	allowList bool,
-	allowListAddrs []NodeAddress,
-	psOption ...pubsub.Option) (host.Host, error) {
+	allowListAddrs []NodeAddress) (host.Host, *connGater, error) {
 
+	var connGater *connGater
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
 	if err != nil {
-		return nil, fmt.Errorf("could not generate multi-address for host: %w", err)
+		return nil, nil, fmt.Errorf("could not generate multi-address for host: %w", err)
 	}
 
 	// create a transport which disables port reuse and web socket.
@@ -43,8 +44,8 @@ func NewLibP2PHost(ctx context.Context,
 	var options []config.Option
 	options = append(options,
 		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
-		libp2p.Identity(n.key),              // pass in the networking key
-		libp2p.ConnectionManager(n.conMgr),  // set the connection manager
+		libp2p.Identity(key),                // pass in the networking key
+		libp2p.ConnectionManager(conMgr),    // set the connection manager
 		transport,                           // set the protocol
 		libp2p.Ping(true),                   // enable ping
 	)
@@ -55,43 +56,21 @@ func NewLibP2PHost(ctx context.Context,
 		// convert each of the allowList address to libp2p peer infos
 		allowListPInfos, err := GetPeerInfos(allowListAddrs...)
 		if err != nil {
-			return fmt.Errorf("failed to create approved list of peers: %w", err)
+			return nil, nil, fmt.Errorf("failed to create approved list of peers: %w", err)
 		}
 
 		// create a connection gater
-		n.connGater = newConnGater(allowListPInfos, n.logger)
+		connGater = newConnGater(allowListPInfos, logger)
 
 		// provide the connection gater as an option to libp2p
-		options = append(options, libp2p.ConnectionGater(n.connGater))
+		options = append(options, libp2p.ConnectionGater(connGater))
 	}
 
 	// create the libp2p host
-	host, err := libp2p.New(ctx, options...)
+	libP2PHost, err := libp2p.New(ctx, options...)
 	if err != nil {
-		return fmt.Errorf("could not create libp2p host: %w", err)
+		return nil, nil, fmt.Errorf("could not create libp2p host: %w", err)
 	}
 
-	n.libP2PHost = host.
-		host.SetStreamHandler(n.flowLibP2PProtocolID, handler)
-
-	// Creating a new PubSub instance of the type GossipSub with psOption
-	n.ps, err = pubsub.NewGossipSub(ctx, n.libP2PHost, psOption...)
-	if err != nil {
-		return fmt.Errorf("could not create libp2p pubsub: %w", err)
-	}
-
-	n.topics = make(map[string]*pubsub.Topic)
-	n.subs = make(map[string]*pubsub.Subscription)
-
-	ip, port, err := n.GetIPPort()
-	if err != nil {
-		return fmt.Errorf("failed to find IP and port on which the node was started: %w", err)
-	}
-
-	n.logger.Debug().
-		Str("name", n.name).
-		Str("address", fmt.Sprintf("%s:%s", ip, port)).
-		Msg("libp2p node started successfully")
-
-	return nil
+	return libP2PHost, connGater, nil
 }
