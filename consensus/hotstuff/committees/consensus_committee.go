@@ -44,7 +44,7 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 
 	// pre-compute leader selection for current epoch
 	current := final.Epochs().Current()
-	err := com.prepareLeaderSelection(current)
+	_, err := com.prepareLeaderSelection(current)
 	if err != nil {
 		return nil, fmt.Errorf("could not add leader for current epoch: %w", err)
 	}
@@ -65,7 +65,7 @@ func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*C
 		return nil, fmt.Errorf("could not get previous epoch: %w", err)
 	}
 
-	err = com.prepareLeaderSelection(previous)
+	_, err = com.prepareLeaderSelection(previous)
 	if err != nil {
 		return nil, fmt.Errorf("could not add leader for previous epoch: %w", err)
 	}
@@ -133,21 +133,12 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// block in every epoch, which is anyway a requirement for valid epochs.
 	//
 	next := c.state.Final().Epochs().Next()
-	err = c.prepareLeaderSelection(next)
+	selection, err := c.prepareLeaderSelection(next)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not compute leader selection for next epoch: %w", err)
 	}
-	nextCounter, err := next.Counter()
-	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not get next epoch counter: %w", err)
-	}
 
-	// if we get to this point, we are guaranteed to have inserted the leader
-	// selection for the next epoch
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	nextEpochSelection := c.leaders[nextCounter]
-	return nextEpochSelection.LeaderForView(view)
+	return selection.LeaderForView(view)
 }
 
 func (c *Consensus) Self() flow.Identifier {
@@ -191,25 +182,27 @@ func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, erro
 // prepareLeaderSelection pre-computes and stores the leader selection for the
 // given epoch. Computing leader selection for the same epoch multiple times
 // is a no-op.
-func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) error {
+//
+// Returns the leader selection for the given epoch.
+func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) (*leader.LeaderSelection, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	counter, err := epoch.Counter()
 	if err != nil {
-		return fmt.Errorf("could not get counter for current epoch: %w", err)
+		return nil, fmt.Errorf("could not get counter for current epoch: %w", err)
 	}
 	// this is a no-op if we have already computed leaders for this epoch
-	_, exists := c.leaders[counter]
+	selection, exists := c.leaders[counter]
 	if exists {
-		return nil
+		return selection, nil
 	}
 
-	selection, err := leader.SelectionForConsensus(epoch)
+	selection, err = leader.SelectionForConsensus(epoch)
 	if err != nil {
-		return fmt.Errorf("could not get leader selection for current epoch: %w", err)
+		return nil, fmt.Errorf("could not get leader selection for current epoch: %w", err)
 	}
 
 	c.leaders[counter] = selection
-	return nil
+	return selection, nil
 }
