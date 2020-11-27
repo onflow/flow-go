@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/internal"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
 )
@@ -31,7 +30,7 @@ type Network struct {
 	mw      network.Middleware
 	top     network.Topology // used to determine fanout connections
 	metrics module.NetworkMetrics
-	rcache  *internal.RcvCache // used to deduplicate incoming messages
+	rcache  *RcvCache // used to deduplicate incoming messages
 	queue   network.MessageQueue
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -55,7 +54,7 @@ func NewNetwork(
 	metrics module.NetworkMetrics,
 ) (*Network, error) {
 
-	rcache, err := internal.NewRcvCache(csize)
+	rcache, err := newRcvCache(csize)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
@@ -204,7 +203,7 @@ func (n *Network) SetIDs(ids flow.IdentityList) error {
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if n.rcache.Add(message.EventID, message.ChannelID) {
+	if n.rcache.add(message.EventID, message.ChannelID) {
 		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).

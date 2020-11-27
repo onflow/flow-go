@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/trace"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
@@ -56,8 +56,8 @@ type testingContext struct {
 	blocks             *storage.MockBlocks
 	collections        *storage.MockCollections
 	state              *protocol.State
-	conduit            *network.Conduit
-	collectionConduit  *network.Conduit
+	conduit            *mocknetwork.Conduit
+	collectionConduit  *mocknetwork.Conduit
 	computationManager *computation.ComputationManager
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
@@ -73,9 +73,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
-	conduit := &network.Conduit{}
-	collectionConduit := &network.Conduit{}
-	syncConduit := &network.Conduit{}
+	conduit := &mocknetwork.Conduit{}
+	collectionConduit := &mocknetwork.Conduit{}
+	syncConduit := &mocknetwork.Conduit{}
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -584,7 +584,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	ctrl := gomock.NewController(t)
 	net := module.NewMockNetwork(ctrl)
 	request := module.NewMockRequester(ctrl)
-	syncConduit := &network.Conduit{}
+	syncConduit := &mocknetwork.Conduit{}
 	var engine *Engine
 	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 

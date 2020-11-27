@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/internal"
 )
 
 // EchoEngine is a simple engine that is used for testing the correctness of
@@ -116,7 +115,7 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 	// we allow one dial failure on echo due to connection tear down
 	// specially when the test is for a single message and not echo
 	// the sender side may close the connection as it does not expect any echo
-	if err != nil && !internal.IsDialFailureError(err) {
+	if err != nil && !strings.Contains(err.Error(), "failed to dial") {
 		require.Fail(te.t, fmt.Sprintf("could not submit echo back to network: %s", err))
 	}
 	return nil

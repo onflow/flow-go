@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +53,7 @@ func idsAndPeerInfos(t *testing.T) (flow.IdentityList, []peer.AddrInfo) {
 		ids[i] = id
 
 		// create a libp2p PeerAddressInfo
-		libp2pKey, err := internal.PublicKey(id.NetworkPubKey)
+		libp2pKey, err := publicKey(id.NetworkPubKey)
 		assert.NoError(t, err)
 		peerID, err := peer.IDFromPublicKey(libp2pKey)
 		assert.NoError(t, err)
