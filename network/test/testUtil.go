@@ -49,6 +49,7 @@ func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identi
 
 	if !dryRunMode {
 		// get free ports
+		// todo generate libp2p host
 		freePorts = allocator.getFreePorts(t, n)
 	}
 

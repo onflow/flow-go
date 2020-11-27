@@ -87,11 +87,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		return nil, fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
 	}
 
-	p2p, err := NewLibP2PNode(log, libp2pKey, rootBlockID, metrics)
-	if err != nil {
-		return nil, fmt.Errorf("could not create a libp2p node: %w", err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if len(validators) == 0 {
@@ -113,7 +108,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		cancel:            cancel,
 		log:               log,
 		codec:             codec,
-		libP2PNode:        p2p,
 		wg:                &sync.WaitGroup{},
 		me:                flowID,
 		host:              ip,
@@ -177,6 +171,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		pubsub.WithMaxMessageSize(m.maxPubSubMsgSize),
 	}
 
+	// creates libp2p host and node
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 	libp2pHost, err := NewLibP2PHost(m.ctx, m.log, nodeAddress, NewConnManager(m.log, m.metrics), m.libp2pKey, true, nodeAddrsWhiteList,
 		m.rootBlockID, m.handleIncomingStream, psOptions...)
@@ -184,13 +179,13 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
 
-	// start the libp2p node
-	err = m.libP2PNode.Start(libp2pHost)
+	p2p, err := NewLibP2PNode(m.log, libp2pHost)
 	if err != nil {
-		return fmt.Errorf("failed to start libp2p node: %w", err)
+		return fmt.Errorf("could not create a libp2p node: %w", err)
 	}
+	m.libP2PNode = p2p
 
-	libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host())
+	libp2pConnector, err := newLibp2pConnector(libp2pHost.Host())
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}

@@ -79,7 +79,7 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan string, count)
 	for _, n := range nodes {
-		m := n.name
+		m := n.libP2PHost.Name()
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(suite.ctx)
@@ -101,8 +101,8 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	// Step 3: Now setup discovery to allow nodes to find each other
 	var pInfos []peer.AddrInfo
 	for _, n := range nodes {
-		id := n.libP2PHost.ID()
-		addrs := n.libP2PHost.Addrs()
+		id := n.libP2PHost.Host().ID()
+		addrs := n.libP2PHost.Host().Addrs()
 		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
 	}
 	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
@@ -124,8 +124,8 @@ func (suite *PubSubTestSuite) TestPubSub() {
 		case <-time.After(3 * time.Second):
 			missing := make([]string, 0)
 			for _, n := range nodes {
-				if _, found := recv[n.name]; !found {
-					missing = append(missing, n.name)
+				if _, found := recv[n.libP2PHost.Name()]; !found {
+					missing = append(missing, n.libP2PHost.Name())
 				}
 			}
 			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
@@ -163,9 +163,6 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		require.NoError(suite.Suite.T(), err)
 
 		noopMetrics := metrics.NewNoopCollector()
-		n, err := NewLibP2PNode(logger, pkey, rootBlockID, noopMetrics)
-		require.NoError(suite.T(), err)
-
 		nodeID := NodeAddress{
 			Name:   name,
 			IP:     "0.0.0.0",        // localhost
@@ -177,7 +174,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		libp2pHost, err := NewLibP2PHost(suite.ctx, logger, nodeID, NewConnManager(logger, noopMetrics), pkey, false, nil, rootBlockID, handlerFunc, psOption)
 		require.NoError(suite.T(), err)
 
-		err = n.Start(libp2pHost)
+		n, err := NewLibP2PNode(logger, libp2pHost)
 		require.NoError(suite.T(), err)
 		require.Eventuallyf(suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()
