@@ -2,6 +2,8 @@ package crypto
 
 //revive:disable:var-naming
 
+//go:generate bash ./build_dependency.sh
+
 // SigningAlgorithm is an identifier for a signing algorithm
 // (and parameters if applicable)
 type SigningAlgorithm int
