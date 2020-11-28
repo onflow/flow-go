@@ -48,7 +48,7 @@ func (l LeaderSelection) FirstView() uint64 {
 }
 
 func (l LeaderSelection) FinalView() uint64 {
-	return l.firstView + uint64(len(l.leaderIndexes))
+	return l.firstView + uint64(len(l.leaderIndexes)) - 1
 }
 
 // LeaderForView returns the node ID of the leader for a given view.

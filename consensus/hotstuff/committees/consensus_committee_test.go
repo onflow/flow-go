@@ -114,6 +114,85 @@ func TestConsensus_LeaderForView(t *testing.T) {
 	})
 }
 
+func TestRemoveOldEpochs(t *testing.T) {
+
+	identities := unittest.IdentityListFixture(10)
+	me := identities[0].NodeID
+
+	// counter for the current epoch
+	epochCounter := uint64(1)
+
+	// create mocks
+	state := new(protocolmock.ReadOnlyState)
+	snapshot := new(protocolmock.Snapshot)
+
+	epoch1 := newMockEpoch(
+		epochCounter,
+		identities,
+		1,
+		100,
+		unittest.SeedFixture(32),
+	)
+	epoch2 := newMockEpoch(
+		epochCounter+1,
+		identities,
+		101,
+		200,
+		unittest.SeedFixture(32),
+	)
+	epoch3 := newMockEpoch(
+		epochCounter+2,
+		identities,
+		201,
+		300,
+		unittest.SeedFixture(32),
+	)
+
+	state.On("Final").Return(snapshot)
+	epochs := mocks.NewEpochQuery(t, epochCounter, epoch1, epoch2, epoch3)
+	snapshot.On("Epochs").Return(epochs)
+
+	committee, err := NewConsensusCommittee(state, me)
+	require.Nil(t, err)
+
+	// we should start with only current epoch (epoch 1) pre-computed
+	// since there is no previous epoch
+	assert.Equal(t, 1, len(committee.leaders))
+
+	// when we first request a view within epoch 2, we should not remove
+	// any old epochs since we have 2 (1 & 2)
+	t.Run("first transition", func(t *testing.T) {
+		_, err = committee.LeaderForView(101)
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(committee.leaders))
+	})
+
+	// when we request a view within epoch 3, we should remove epoch 1 so
+	// we have only 2 epochs (2 & 3)
+	t.Run("second transition", func(t *testing.T) {
+
+		// request 101 first so this test doesn't depend on previous
+		_, err = committee.LeaderForView(101)
+		assert.Nil(t, err)
+		// transition so epoch 2 is current
+		epochs.Transition()
+
+		_, err = committee.LeaderForView(201)
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(committee.leaders))
+
+		// should have removed leader selection for epoch 1
+		_, has1 := committee.leaders[epochCounter]
+		assert.False(t, has1)
+
+		// should still have leader selection for epochs 2-3
+		_, has2 := committee.leaders[epochCounter+1]
+		_, has3 := committee.leaders[epochCounter+2]
+		assert.True(t, has2)
+		assert.True(t, has3)
+	})
+}
+
 func newMockEpoch(
 	counter uint64,
 	identities flow.IdentityList,

@@ -169,6 +169,7 @@ func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, erro
 
 		return leaderID, nil
 	}
+
 	return flow.ZeroID, errSelectionNotComputed
 }
 
