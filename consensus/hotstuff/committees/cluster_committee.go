@@ -62,17 +62,20 @@ func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilt
 		return nil, fmt.Errorf("could not get cluster payload: %w", err)
 	}
 
-	// if a reference block is specified, use that
-	if payload.ReferenceBlockID != flow.ZeroID {
-		identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(filter.And(
-			selector,
-			c.clusterMemberFilter,
-		))
-		return identities, err
+	// an empty reference block ID indicates a root block
+	isRootBlock := payload.ReferenceBlockID == flow.ZeroID
+
+	// use the initial cluster members for root block
+	if isRootBlock {
+		return c.initialClusterMembers.Filter(selector), nil
 	}
 
-	// otherwise, this is a root block, in which case we use the initial cluster members
-	return c.initialClusterMembers.Filter(selector), nil
+	// otherwise use the snapshot given by the reference block
+	identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(filter.And(
+		selector,
+		c.clusterMemberFilter,
+	))
+	return identities, err
 }
 
 func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
@@ -83,21 +86,25 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 		return nil, fmt.Errorf("could not get cluster payload: %w", err)
 	}
 
-	// if a reference block is specified, use that
-	if payload.ReferenceBlockID != flow.ZeroID {
-		identity, err := c.state.AtBlockID(payload.ReferenceBlockID).Identity(nodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, err)
+	// an empty reference block ID indicates a root block
+	isRootBlock := payload.ReferenceBlockID == flow.ZeroID
+
+	// use the initial cluster members for root block
+	if isRootBlock {
+		identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
+		if !ok {
+			return nil, fmt.Errorf("node (id=%x) is not in initial cluster members", nodeID)
 		}
-		if !c.clusterMemberFilter(identity) {
-			return nil, fmt.Errorf("node (id=%x) is not a valid cluster committee member", nodeID)
-		}
+		return identity, nil
 	}
 
-	// otherwise, this is a root block, in which case we use the initial cluster members
-	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
-	if !ok {
-		return nil, fmt.Errorf("node (id=%x) is not in initial cluster members", nodeID)
+	// otherwise use the snapshot given by the reference block
+	identity, err := c.state.AtBlockID(payload.ReferenceBlockID).Identity(nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, err)
+	}
+	if !c.clusterMemberFilter(identity) {
+		return nil, fmt.Errorf("node (id=%x) is not a valid cluster committee member", nodeID)
 	}
 	return identity, nil
 }
