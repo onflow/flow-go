@@ -12,7 +12,7 @@ require (
 	github.com/onflow/cadence v0.10.2
 	github.com/onflow/flow-go v0.4.1-0.20200715183900-b337e998d486
 	github.com/onflow/flow-go-sdk v0.12.2
-	github.com/onflow/flow-go/crypto v0.9.4
+	github.com/onflow/flow-go/crypto v0.11.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.19.0
@@ -29,5 +29,3 @@ replace github.com/fxamacker/cbor/v2 => github.com/turbolent/cbor/v2 v2.2.1-0.20
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/crypto => ../crypto
-
-replace github.com/onflow/flow-go/integration => ../integration
