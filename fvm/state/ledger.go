@@ -7,6 +7,7 @@ import (
 )
 
 // Rename this to Storage
+// remove reference to flow.RegisterValue and use byte[]
 // A Ledger is the storage interface used by the virtual machine to read and write register values.
 type Ledger interface {
 	Set(owner, controller, key string, value flow.RegisterValue) error
