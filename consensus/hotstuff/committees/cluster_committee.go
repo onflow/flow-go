@@ -92,6 +92,7 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 		if !c.clusterMemberFilter(identity) {
 			return nil, fmt.Errorf("node (id=%x) is not a valid cluster committee member", nodeID)
 		}
+		return identity, nil
 	}
 
 	// otherwise, this is a root block, in which case we use the initial cluster members
