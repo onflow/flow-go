@@ -114,18 +114,6 @@ func (s State) InteractionUsed() uint64 {
 	return s.interactionUsed
 }
 
-func (s State) MaxKeySizeAllowed() uint64 {
-	return s.maxKeySizeAllowed
-}
-
-func (s State) MaxInteractionAllowed() uint64 {
-	return s.maxInteractionAllowed
-}
-
-func (s State) MaxValueSizeAllowed() uint64 {
-	return s.maxValueSizeAllowed
-}
-
 type payload struct {
 	owner      string
 	controller string
