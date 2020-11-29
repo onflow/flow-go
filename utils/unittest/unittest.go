@@ -1,8 +1,8 @@
 package unittest
 
 import (
-	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -154,8 +154,7 @@ func TempDir(t testing.TB) string {
 
 func RunWithTempDir(t testing.TB, f func(string)) {
 	dbDir := TempDir(t)
-	fmt.Printf("watch -n1 ls -la %s\n", dbDir)
-	//defer os.RemoveAll(dbDir)
+	defer os.RemoveAll(dbDir)
 	f(dbDir)
 }
 
