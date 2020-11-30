@@ -20,7 +20,7 @@ func TestHandler(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
-func TestReadJson(t *testing.T) {
+func TestUnmarshalNodeInfoFromJSONData(t *testing.T) {
 	totalNodes := 10
 	ids := unittest.IdentifierListFixture(totalNodes)
 	testJson := make(map[flow.Identifier]string, totalNodes)
