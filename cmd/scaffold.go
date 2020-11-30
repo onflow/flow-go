@@ -173,7 +173,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		mw, err := p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
 			ctx,
 			cancel,
-			p2p.DefaultLibP2PNodeGeneratr,
+			p2p.DefaultLibP2PNodeGenerator,
 			codec,
 			myAddr,
 			fnb.Me.NodeID(),

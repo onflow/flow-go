@@ -50,7 +50,7 @@ var unicastTimeout = DefaultUnicastTimeout
 
 type LibP2PHostGenFuc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Option) (*Node, error)
 
-var DefaultLibP2PNodeGeneratr = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
+var DefaultLibP2PNodeGenerator = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
 	return NewLibP2PNode(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics),
 		mv.libp2pKey, true, allowList, mv.rootBlockID, mv.handleIncomingStream,
 		psOption...)
