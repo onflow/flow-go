@@ -23,6 +23,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
+	fcrypto "github.com/onflow/flow-go/crypto"
 	flownet "github.com/onflow/flow-go/network"
 )
 
@@ -62,18 +63,23 @@ func NewLibP2PNode(ctx context.Context,
 	logger zerolog.Logger,
 	nodeAddress NodeAddress,
 	conMgr ConnManager,
-	key crypto.PrivKey,
+	key fcrypto.PrivateKey,
 	allowList bool,
 	allowListAddrs []NodeAddress,
 	rootBlockID string,
 	psOption ...pubsub.Option) (*Node, error) {
+
+	libp2pKey, err := privKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
+	}
 
 	flowLibP2PProtocolID := generateProtocolID(rootBlockID)
 	libp2pHostWrapper, err := bootstrapLibP2PHost(ctx,
 		logger,
 		nodeAddress,
 		conMgr,
-		key,
+		libp2pKey,
 		allowList,
 		allowListAddrs,
 		psOption...)

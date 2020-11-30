@@ -11,7 +11,6 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -52,7 +51,7 @@ type LibP2PHostGenFuc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Op
 
 var DefaultLibP2PNodeGenerator = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
 	return NewLibP2PNode(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics),
-		mv.libp2pKey, true, allowList, mv.rootBlockID,
+		mv.flowKey, true, allowList, mv.rootBlockID,
 		psOption...)
 }
 
@@ -72,7 +71,6 @@ type Middleware struct {
 	host              string
 	port              string
 	flowKey           crypto.PrivateKey
-	libp2pKey         lcrypto.PrivKey
 	metrics           module.NetworkMetrics
 	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
@@ -101,11 +99,6 @@ func NewMiddleware(log zerolog.Logger,
 		return nil, fmt.Errorf("failed to create middleware: %w", err)
 	}
 
-	libp2pKey, err := privKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
-	}
-
 	if len(validators) == 0 {
 		// add default validators to filter out unwanted messages received by this node
 		validators = defaultValidators(log, flowID)
@@ -131,7 +124,6 @@ func NewMiddleware(log zerolog.Logger,
 		port:              port,
 		flowKey:           key,
 		libP2PHostGenFuc:  libP2PHostGenFunc,
-		libp2pKey:         libp2pKey,
 		metrics:           metrics,
 		maxPubSubMsgSize:  maxPubSubMsgSize,
 		maxUnicastMsgSize: maxUnicastMsgSize,

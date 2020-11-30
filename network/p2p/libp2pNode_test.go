@@ -26,7 +26,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -583,25 +585,28 @@ func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamH
 	for i := 0; i < count; i++ {
 
 		name := fmt.Sprintf("node%d", i+1)
-		pkey, err := generateNetworkingKey(name)
+		key, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
 		require.NoError(suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := suite.CreateNode(name, pkey, "0.0.0.0", "0", rootBlockID, handler, allowList)
+		n, nodeID := suite.CreateNode(name, key, "0.0.0.0", "0", rootBlockID, handler, allowList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
 	return nodes, nodeAddrs
 }
 
-func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
+func (suite *LibP2PNodeTestSuite) CreateNode(name string, key fcrypto.PrivateKey, ip string, port string, rootID string,
 	handler network.StreamHandler, allowList bool) (*Node, NodeAddress) {
+
+	libP2PKey, err := privKey(key)
+	require.NoError(suite.T(), err)
 
 	nodeID := NodeAddress{
 		Name:   name,
 		IP:     ip,
 		Port:   port,
-		PubKey: key.GetPublic(),
+		PubKey: libP2PKey.GetPublic(),
 	}
 
 	var handlerFunc network.StreamHandler
