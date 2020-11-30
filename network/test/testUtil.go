@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -47,13 +48,13 @@ func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identi
 	privateKeys := make([]crypto.PrivateKey, n)
 	var freePorts []int
 
+	identities := unittest.IdentityListFixture(n, opts...)
+
 	if !dryRunMode {
 		// get free ports
 		// todo generate libp2p host
 		freePorts = allocator.getFreePorts(t, n)
 	}
-
-	identities := unittest.IdentityListFixture(n, opts...)
 
 	// generates keys and address for the node
 	for i, id := range identities {
@@ -74,12 +75,15 @@ func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identi
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*p2p.Middleware {
+func GenerateMiddlewares(t *testing.T, ctx context.Context, cancel context.CancelFunc, log zerolog.Logger, identities flow.IdentityList,
+	keys []crypto.PrivateKey) []*p2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*p2p.Middleware, len(identities))
 	for i, id := range identities {
 		// creating middleware of nodes
 		mw, err := p2p.NewMiddleware(log,
+			ctx,
+			cancel,
 			p2p.DefaultLibP2PHostGenerator,
 			json.NewCodec(),
 			id.Address,
@@ -152,9 +156,9 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	dryRunMode bool,
 	log zerolog.Logger) (flow.IdentityList,
 	[]*p2p.Middleware) {
-
+	ctx, cancel := context.WithCancel(context.Background())
 	ids, keys := GenerateIDs(t, n, dryRunMode)
-	mws := GenerateMiddlewares(t, log, ids, keys)
+	mws := GenerateMiddlewares(t, ctx, cancel, log, ids, keys)
 	return ids, mws
 }
 
@@ -180,6 +184,20 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 	}
 	return engs
 }
+
+//func generateLibP2PHosts(t *testing.T, ids flow.IdentityList, logger zerolog.Logger) ([]*p2p.LibP2PHost, context.Context, context.CancelFunc) {
+//	ctx, cancel := context.WithCancel(context.Background())
+//
+//	for _, id := range ids {
+//		// creates libp2p host and node
+//		nodeAddress := p2p.NodeAddress{Name: id.NodeID.String(), IP: "0.0.0.0", Port: "0"}
+//		noopMetrics := metrics.NewNoopCollector()
+//		key, err := GenerateNetworkingKey(id.NodeID)
+//		require.NoError(t, err)
+//
+//		libP2PHost, err := p2p.NewLibP2PHost(ctx, logger, nodeAddress, p2p.NewConnManager(logger, noopMetrics), key, false, nil)
+//	}
+//}
 
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
 func optionalSleep(send ConduitSendWrapperFunc) {
