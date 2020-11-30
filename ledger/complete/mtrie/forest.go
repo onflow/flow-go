@@ -78,7 +78,7 @@ func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metr
 	}
 
 	// add empty roothash
-	emptyTrie, err := trie.NewEmptyMTrie(pathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(pathByteSize, nil)
 	if err != nil {
 		return nil, fmt.Errorf("constructing empty trie for forest failed: %w", err)
 	}

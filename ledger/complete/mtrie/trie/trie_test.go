@@ -21,7 +21,7 @@ const (
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, nil)
 	require.NoError(t, err)
 
 	expectedRootHashHex := "6e24e2397f130d9d17bef32b19a77b8f5bcf03fb7e9e75fd89b8a455675d574a"
@@ -33,7 +33,7 @@ func Test_EmptyTrie(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithLeftRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, nil)
 	require.NoError(t, err)
 
 	path := utils.TwoBytesPath(0)
@@ -49,7 +49,7 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithRightRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, nil)
 	require.NoError(t, err)
 
 	path := utils.TwoBytesPath(65535)
@@ -65,7 +65,7 @@ func Test_TrieWithRightRegister(t *testing.T) {
 // // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, nil)
 	require.NoError(t, err)
 
 	path := utils.TwoBytesPath(56809)
@@ -81,7 +81,7 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithManyRegisters(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, nil)
 	require.NoError(t, err)
 
 	// allocate single random register
@@ -98,7 +98,7 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, nil)
 	require.NoError(t, err)
 
 	// allocate single random register
@@ -145,7 +145,7 @@ func Test_UpdateTrie(t *testing.T) {
 	}
 
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, nil)
 	require.NoError(t, err)
 
 	// allocate single random register
@@ -171,7 +171,7 @@ func Test_UpdateTrie(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_UnallocateRegisters(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, nil)
 	require.NoError(t, err)
 
 	// we first draw 99 random key-value pairs that will be first allocated and later unallocated:

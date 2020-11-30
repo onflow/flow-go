@@ -53,3 +53,8 @@ func (b *ExecutionStateDelta) Height() uint64 {
 func (b *ExecutionStateDelta) ParentID() flow.Identifier {
 	return b.Block.Header.ParentID
 }
+
+// ExecutionReceiptRequest is used to request an ExecutionReceipt
+type ExecutionReceiptRequest struct {
+	ReceiptID flow.Identifier
+}

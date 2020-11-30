@@ -66,7 +66,8 @@ func RebuildTrie(flatTrie *FlattenedTrie) (*trie.MTrie, error) {
 	}
 
 	//restore tries
-	mtrie, err := trie.NewMTrie(nodes[flatTrie.Trie.RootIndex])
+	// TODO - indices here
+	mtrie, err := trie.NewMTrie(nodes[flatTrie.Trie.RootIndex], nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("restoring trie failed: %w", err)
 	}

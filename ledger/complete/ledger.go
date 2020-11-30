@@ -304,7 +304,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
 
-	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize, nil)
 	if err != nil {
 		return nil, fmt.Errorf("constructing empty trie failed: %w", err)
 	}

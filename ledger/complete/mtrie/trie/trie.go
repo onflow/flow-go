@@ -40,23 +40,32 @@ type MTrie struct {
 	root         *node.Node
 	height       int
 	pathByteSize int
+	indices      map[string][]*ledger.Payload
+	indexedKeys  []ledger.Key
 }
 
 // NewEmptyMTrie returns an empty Mtrie (root is an empty node)
-func NewEmptyMTrie(pathByteSize int) (*MTrie, error) {
+func NewEmptyMTrie(pathByteSize int, indexedKeys []ledger.Key) (*MTrie, error) {
 	if pathByteSize < 1 {
 		return nil, errors.New("trie's path size [in bytes] must be positive")
 	}
 	height := pathByteSize * 8
+	indices := make(map[string][]*ledger.Payload, len(indexedKeys))
+	for _, key := range indexedKeys {
+		indices[string(key.CanonicalForm())] = make([]*ledger.Payload, 0)
+	}
+
 	return &MTrie{
 		root:         node.NewEmptyTreeRoot(height),
 		pathByteSize: pathByteSize,
 		height:       height,
+		indices:      indices,
+		indexedKeys:  indexedKeys,
 	}, nil
 }
 
 // NewMTrie returns a Mtrie given the root
-func NewMTrie(root *node.Node) (*MTrie, error) {
+func NewMTrie(root *node.Node, indices map[string][]*ledger.Payload, indexedKeys []ledger.Key) (*MTrie, error) {
 	if root.Height()%8 != 0 {
 		return nil, errors.New("height of root node must be integer-multiple of 8")
 	}
@@ -65,6 +74,8 @@ func NewMTrie(root *node.Node) (*MTrie, error) {
 		root:         root,
 		pathByteSize: pathByteSize,
 		height:       root.Height(),
+		indices:      indices,
+		indexedKeys:  indexedKeys,
 	}, nil
 }
 
@@ -92,6 +103,14 @@ func (mt *MTrie) MaxDepth() uint16 { return mt.root.MaxDepth() }
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) RootNode() *node.Node {
 	return mt.root
+}
+
+func (mt *MTrie) GetIndexed(key ledger.Key) ([]*ledger.Payload, error) {
+	payload, has := mt.indices[string(key.CanonicalForm())]
+	if !has {
+		return nil, fmt.Errorf("key %s not indexed", string(key.CanonicalForm()))
+	}
+	return payload, nil
 }
 
 // StringRootHash returns the trie's string representation.
@@ -169,7 +188,8 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
-	updatedTrie, err := NewMTrie(updatedRoot)
+	newIndices := index(parentTrie.indices, parentTrie.indexedKeys, updatedPayloads)
+	updatedTrie, err := NewMTrie(updatedRoot, newIndices, parentTrie.indexedKeys)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -241,6 +261,23 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 	}
 
 	return node.NewInterimNode(nodeHeight, lChild, rChild), nil
+}
+
+func index(indices map[string][]*ledger.Payload, indexedKeys []ledger.Key, payloads []ledger.Payload) map[string][]*ledger.Payload {
+	newIndices := make(map[string][]*ledger.Payload, len(indices)+len(payloads))
+	for s, i := range indices {
+		newIndices[s] = i
+	}
+	for _, pl := range payloads {
+		payload := pl //closure to avoid side-effects
+		for _, indexedKey := range indexedKeys {
+			if payload.Key.StartsWith(indexedKey) {
+				newIndices[indexedKey.String()] = append(newIndices[indexedKey.String()], &payload)
+			}
+		}
+	}
+
+	return newIndices
 }
 
 // constructSubtrie returns the head of a newly-constructed sub-trie for the specified key-value pairs.

@@ -210,6 +210,18 @@ func (k *Key) Equals(other *Key) bool {
 	return true
 }
 
+func (k *Key) StartsWith(key Key) bool {
+	for i, part := range key.KeyParts {
+		if i >= len(k.KeyParts) {
+			return false
+		}
+		if !part.Equals(&k.KeyParts[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // KeyPart is a typed part of a key
 type KeyPart struct {
 	Type  uint16

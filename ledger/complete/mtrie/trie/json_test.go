@@ -19,7 +19,7 @@ import (
 
 func Test_DumpJSON_Empty(t *testing.T) {
 
-	trie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
+	trie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize, nil)
 	require.NoError(t, err)
 
 	var buffer bytes.Buffer

@@ -122,7 +122,8 @@ func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
 
 	//restore tries
 	for _, storableTrie := range flatForest.Tries {
-		mtrie, err := trie.NewMTrie(nodes[storableTrie.RootIndex])
+		//TODO add new indices here
+		mtrie, err := trie.NewMTrie(nodes[storableTrie.RootIndex], nil, nil)
 		if err != nil {
 			return nil, fmt.Errorf("restoring trie failed: %w", err)
 		}
