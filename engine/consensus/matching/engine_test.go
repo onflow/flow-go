@@ -103,8 +103,9 @@ type MatchingSuite struct {
 	receiptsPL *mempool.Receipts
 
 	// misc SERVICE COMPONENTS which are injected into Matching Engine
-	requester *module.Requester
-	assigner  *module.ChunkAssigner
+	requester        *module.Requester
+	assigner         *module.ChunkAssigner
+	receiptValidator *module.ReceiptValidator
 
 	// MATCHING ENGINE
 	matching *Engine
@@ -322,6 +323,8 @@ func (ms *MatchingSuite) SetupTest() {
 
 	ms.assigner = &module.ChunkAssigner{}
 
+	ms.receiptValidator = &module.ReceiptValidator{}
+
 	ms.matching = &Engine{
 		unit:                    unit,
 		log:                     log,
@@ -342,6 +345,7 @@ func (ms *MatchingSuite) SetupTest() {
 		maxResultsToRequest:     200,
 		assigner:                ms.assigner,
 		requireApprovals:        true,
+		receiptValidator:        ms.receiptValidator,
 	}
 }
 
@@ -385,6 +389,9 @@ func (ms *MatchingSuite) TestOnReceiptInvalidRole() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.unfinalizedBlock))),
 	)
 
+	ms.receiptValidator.On("Validate", mock.Anything).
+		Return(engine.NewInvalidInputError("")).Once()
+
 	// the receipt should be rejected with an error
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().Error(err, "should reject receipt from wrong node role")
@@ -401,6 +408,9 @@ func (ms *MatchingSuite) TestOnReceiptUnstakedExecutor() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.unfinalizedBlock))),
 	)
+
+	ms.receiptValidator.On("Validate", mock.Anything).Return(engine.NewInvalidInputError("")).Once()
+
 	// assign 0 stake to this executor node
 	ms.identities[ms.exeID].Stake = 0
 
@@ -436,6 +446,8 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.unfinalizedBlock))),
 	)
 
+	ms.receiptValidator.On("Validate", mock.Anything).Return(nil)
+
 	// setup the receipts mempool to check if we attempted to add the receipt to
 	// the mempool, and return false as if it was already in the mempool
 	ms.receiptsPL.On("Add", mock.Anything).Run(
@@ -461,6 +473,8 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.unfinalizedBlock))),
 	)
+
+	ms.receiptValidator.On("Validate", mock.Anything).Return(nil)
 
 	// setup the receipts mempool to check if we attempted to add the receipt to
 	// the mempool
@@ -501,6 +515,8 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.unfinalizedBlock))),
 	)
+
+	ms.receiptValidator.On("Validate", mock.Anything).Return(nil)
 
 	// setup the receipts mempool to check if we attempted to add the receipt to
 	// the mempool

@@ -26,6 +26,10 @@ type mutatorFactory struct {
 	signatureVerifier module.AggregatingVerifier
 }
 
+type mutatorFactoryWithValidator struct {
+	validator module.ReceiptValidator
+}
+
 func (m *mutatorFactory) Create(state *State) protocol.Mutator {
 	r := &Mutator{
 		state:     state,
@@ -34,12 +38,28 @@ func (m *mutatorFactory) Create(state *State) protocol.Mutator {
 	return r
 }
 
-func NewMutatorFactory(results storage.ExecutionResults) MutatorFactory {
+func NewMutatorFactory(results storage.ExecutionResults) *mutatorFactory {
 	m := &mutatorFactory{
 		results:           results,
 		signatureVerifier: signature.NewAggregationVerifier(encoding.ExecutionReceiptTag),
 	}
 	return m
+}
+
+func NewMutatorFactoryWithValidator(validator module.ReceiptValidator) *mutatorFactoryWithValidator {
+	m := &mutatorFactoryWithValidator{
+		validator: validator,
+	}
+
+	return m
+}
+
+func (m *mutatorFactoryWithValidator) Create(state *State) protocol.Mutator {
+	r := &Mutator{
+		state:     state,
+		validator: m.validator,
+	}
+	return r
 }
 
 type State struct {

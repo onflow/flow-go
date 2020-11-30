@@ -4,6 +4,8 @@ package badger_test
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/engine"
+	mock2 "github.com/onflow/flow-go/module/mock"
 	"math/rand"
 	"testing"
 	"time"
@@ -346,14 +348,16 @@ func TestExtendValid(t *testing.T) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
 		consumer := new(mockprotocol.Consumer)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		mutatorFactory := protocol.NewMutatorFactory(results)
+		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits,
+			statuses, distributor, mutatorFactory)
 		require.Nil(t, err)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
@@ -672,13 +676,17 @@ func TestExtendHighestSeal(t *testing.T) {
 }
 
 func TestExtendReceiptsDuplicate(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	validator := &mock2.ReceiptValidator{}
+	mockFactory := protocol.NewMutatorFactoryWithValidator(validator)
+	util.RunWithProtocolStateAndMutatorFactory(t, mockFactory, func(db *badger.DB, state *protocol.State) {
 		// bootstrap the root block
 		block1, result, seal := unittest.BootstrapFixture(participants)
 		block1.Payload.Guarantees = nil
 		block1.Header.PayloadHash = block1.Payload.Hash()
 		err := state.Mutate().Bootstrap(block1, result, seal)
 		require.NoError(t, err)
+
+		validator.On("Validate", mock.Anything).Return(nil).Twice()
 
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -695,6 +703,8 @@ func TestExtendReceiptsDuplicate(t *testing.T) {
 		block3.Header.PayloadHash = block3.Payload.Hash()
 		err = state.Mutate().Extend(&block3)
 		require.Nil(t, err)
+
+		validator.On("Validate", mock.Anything).Return(engine.NewInvalidInputError("")).Once()
 
 		// insert a duplicate receipt
 		block4 := unittest.BlockWithParentFixture(block3.Header)
@@ -818,13 +828,17 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 }
 
 func TestExtendReceiptsValid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	validator := &mock2.ReceiptValidator{}
+	mockFactory := protocol.NewMutatorFactoryWithValidator(validator)
+	util.RunWithProtocolStateAndMutatorFactory(t, mockFactory, func(db *badger.DB, state *protocol.State) {
 		// bootstrap the root block
 		block1, result, seal := unittest.BootstrapFixture(participants)
 		block1.Payload.Guarantees = nil
 		block1.Header.PayloadHash = block1.Payload.Hash()
 		err := state.Mutate().Bootstrap(block1, result, seal)
 		require.NoError(t, err)
+
+		validator.On("Validate", mock.Anything).Return(nil)
 
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -866,7 +880,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -874,7 +888,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("BlockFinalized", mock.Anything)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+		mutatorFactory := protocol.NewMutatorFactory(results)
+		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits,
+			statuses, distributor, mutatorFactory)
 		require.Nil(t, err)
 
 		// first bootstrap with the initial epoch

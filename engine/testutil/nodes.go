@@ -3,6 +3,8 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/validation"
 	"testing"
 	"time"
@@ -222,7 +224,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB)
+	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
+	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signatureVerifier)
 
 	requireApprovals := true
 

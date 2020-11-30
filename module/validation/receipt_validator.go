@@ -155,6 +155,9 @@ func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) e
 // Returns nil if all checks passed successfully
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	identity, err := v.identityForNode(receipt.ExecutionResult.BlockID, receipt.ExecutorID)
+	if err != nil {
+		return err
+	}
 
 	err = v.ensureStakedNodeWithRole(identity, flow.RoleExecution)
 	if err != nil {
