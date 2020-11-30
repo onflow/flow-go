@@ -84,6 +84,8 @@ type Middleware struct {
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger,
+	ctx context.Context,
+	cancel context.CancelFunc,
 	libP2PHostGenFunc LibP2PHostGenFuc,
 	codec network.Codec,
 	address string,
@@ -103,8 +105,6 @@ func NewMiddleware(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	if len(validators) == 0 {
 		// add default validators to filter out unwanted messages received by this node
