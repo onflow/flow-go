@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
@@ -49,18 +50,47 @@ type NodeAddress struct {
 // Node is a wrapper around LibP2P host.
 type Node struct {
 	sync.Mutex
-	libP2PHost *LibP2PHost                     // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	logger     zerolog.Logger                  // for logging
-	topics     map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs       map[string]*pubsub.Subscription // map of a topic string to an actual subscription
+	libP2PHost           *hostWrapper                    // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	logger               zerolog.Logger                  // for logging
+	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
+	nodeAddress          NodeAddress
+	flowLibP2PProtocolID protocol.ID // the unique protocol ID
 }
 
-func NewLibP2PNode(logger zerolog.Logger, libp2pHost *LibP2PHost) (*Node, error) {
+func NewLibP2PNode(ctx context.Context,
+	logger zerolog.Logger,
+	nodeAddress NodeAddress,
+	conMgr ConnManager,
+	key crypto.PrivKey,
+	allowList bool,
+	allowListAddrs []NodeAddress,
+	rootBlockID string,
+	handler libp2pnet.StreamHandler,
+	psOption ...pubsub.Option) (*Node, error) {
+
+	flowLibP2PProtocolID := generateProtocolID(rootBlockID)
+	libp2pHostWrapper, err := bootstrapLibP2PHost(ctx,
+		logger,
+		nodeAddress,
+		conMgr,
+		key,
+		allowList,
+		allowListAddrs,
+		flowLibP2PProtocolID,
+		handler,
+		psOption...)
+	if err != nil {
+		return nil, fmt.Errorf("could not bootstrap libp2p host: %w", err)
+	}
+
 	n := &Node{
-		logger:     logger,
-		topics:     make(map[string]*pubsub.Topic),
-		subs:       make(map[string]*pubsub.Subscription),
-		libP2PHost: libp2pHost,
+		logger:               logger,
+		flowLibP2PProtocolID: flowLibP2PProtocolID,
+		nodeAddress:          nodeAddress,
+		topics:               make(map[string]*pubsub.Topic),
+		subs:                 make(map[string]*pubsub.Subscription),
+		libP2PHost:           libp2pHostWrapper,
 	}
 
 	ip, port, err := n.GetIPPort()
@@ -69,7 +99,7 @@ func NewLibP2PNode(logger zerolog.Logger, libp2pHost *LibP2PHost) (*Node, error)
 	}
 
 	n.logger.Debug().
-		Str("name", n.libP2PHost.Name()).
+		Str("name", nodeAddress.Name).
 		Str("address", fmt.Sprintf("%s:%s", ip, port)).
 		Msg("libp2p node started successfully")
 
@@ -80,22 +110,22 @@ func NewLibP2PNode(logger zerolog.Logger, libp2pHost *LibP2PHost) (*Node, error)
 func (n *Node) Stop() (chan struct{}, error) {
 	var result error
 	done := make(chan struct{})
-	n.logger.Debug().Str("name", n.libP2PHost.Name()).Msg("unsubscribing from all topics")
+	n.logger.Debug().Str("name", n.nodeAddress.Name).Msg("unsubscribing from all topics")
 	for t := range n.topics {
 		if err := n.UnSubscribe(t); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
-	n.logger.Debug().Str("name", n.libP2PHost.Name()).Msg("stopping libp2p node")
+	n.logger.Debug().Str("name", n.nodeAddress.Name).Msg("stopping libp2p node")
 	if err := n.libP2PHost.Host().Close(); err != nil {
 		result = multierror.Append(result, err)
 	}
 
-	n.logger.Debug().Str("name", n.libP2PHost.Name()).Msg("closing peer store")
+	n.logger.Debug().Str("name", n.nodeAddress.Name).Msg("closing peer store")
 	// to prevent peerstore routine leak (https://github.com/libp2p/go-libp2p/issues/718)
 	if err := n.libP2PHost.Host().Peerstore().Close(); err != nil {
-		n.logger.Debug().Str("name", n.libP2PHost.Name()).Err(err).Msg("closing peer store")
+		n.logger.Debug().Str("name", n.nodeAddress.Name).Err(err).Msg("closing peer store")
 		result = multierror.Append(result, err)
 	}
 
@@ -120,7 +150,7 @@ func (n *Node) Stop() (chan struct{}, error) {
 				addrs = len(n.libP2PHost.Host().Network().ListenAddresses())
 			}
 		}
-		n.logger.Debug().Str("name", n.libP2PHost.Name()).Msg("libp2p node stopped successfully")
+		n.logger.Debug().Str("name", n.nodeAddress.Name).Msg("libp2p node stopped successfully")
 	}(done)
 
 	return done, nil
@@ -222,7 +252,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, nodeAddress NodeAddress, 
 			continue
 		}
 
-		s, err = n.libP2PHost.Host().NewStream(ctx, targetID, n.libP2PHost.FlowLibP2PProtocolID())
+		s, err = n.libP2PHost.Host().NewStream(ctx, targetID, n.flowLibP2PProtocolID)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 			continue
@@ -296,7 +326,7 @@ func (n *Node) Subscribe(ctx context.Context, topic string) (*pubsub.Subscriptio
 	// Add the subscription to the cache
 	n.subs[topic] = s
 
-	n.logger.Debug().Str("topic", topic).Str("name", n.libP2PHost.Name()).Msg("subscribed to topic")
+	n.logger.Debug().Str("topic", topic).Str("name", n.nodeAddress.Name).Msg("subscribed to topic")
 	return s, err
 }
 
@@ -326,7 +356,7 @@ func (n *Node) UnSubscribe(topic string) error {
 	n.topics[topic] = nil
 	delete(n.topics, topic)
 
-	n.logger.Debug().Str("topic", topic).Str("name", n.libP2PHost.Name()).Msg("unsubscribed from topic")
+	n.logger.Debug().Str("topic", topic).Str("name", n.nodeAddress.Name).Msg("unsubscribed from topic")
 	return err
 }
 
@@ -436,6 +466,11 @@ func (n *Node) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
 	}
 	n.libP2PHost.ConnenctionGater().update(whilelistPInfos)
 	return nil
+}
+
+// Host returns pointer to host object of node.
+func (n *Node) Host() host.Host {
+	return n.libP2PHost.Host()
 }
 
 // IsConnected returns true is address is a direct peer of this node else false

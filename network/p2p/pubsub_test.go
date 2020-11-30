@@ -79,7 +79,7 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan string, count)
 	for _, n := range nodes {
-		m := n.libP2PHost.Name()
+		m := n.nodeAddress.Name
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(suite.ctx)
@@ -124,8 +124,8 @@ func (suite *PubSubTestSuite) TestPubSub() {
 		case <-time.After(3 * time.Second):
 			missing := make([]string, 0)
 			for _, n := range nodes {
-				if _, found := recv[n.libP2PHost.Name()]; !found {
-					missing = append(missing, n.libP2PHost.Name())
+				if _, found := recv[n.nodeAddress.Name]; !found {
+					missing = append(missing, n.nodeAddress.Name)
 				}
 			}
 			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
@@ -171,11 +171,9 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		}
 
 		psOption := pubsub.WithDiscovery(d)
-		libp2pHost, err := NewLibP2PHost(suite.ctx, logger, nodeID, NewConnManager(logger, noopMetrics), pkey, false, nil, rootBlockID, handlerFunc, psOption)
+		n, err := NewLibP2PNode(suite.ctx, logger, nodeID, NewConnManager(logger, noopMetrics), pkey, false, nil, rootBlockID, handlerFunc, psOption)
 		require.NoError(suite.T(), err)
 
-		n, err := NewLibP2PNode(logger, libp2pHost)
-		require.NoError(suite.T(), err)
 		require.Eventuallyf(suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()
 			return err == nil && ip != "" && p != ""

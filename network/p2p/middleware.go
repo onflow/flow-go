@@ -48,10 +48,10 @@ const (
 
 var unicastTimeout = DefaultUnicastTimeout
 
-type LibP2PHostGenFuc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Option) (*LibP2PHost, error)
+type LibP2PHostGenFuc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Option) (*Node, error)
 
-var DefaultLibP2PHostGenerator = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*LibP2PHost, error) {
-	return NewLibP2PHost(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics),
+var DefaultLibP2PNodeGeneratr = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
+	return NewLibP2PNode(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics),
 		mv.libp2pKey, true, allowList, mv.rootBlockID, mv.handleIncomingStream,
 		psOption...)
 }
@@ -191,18 +191,13 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	// creates libp2p host and node
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
-	libp2pHost, err := m.libP2PHostGenFuc(m, nodeAddress, nodeAddrsWhiteList, psOptions...)
+	libP2PNode, err := m.libP2PHostGenFuc(m, nodeAddress, nodeAddrsWhiteList, psOptions...)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
+	m.libP2PNode = libP2PNode
 
-	p2p, err := NewLibP2PNode(m.log, libp2pHost)
-	if err != nil {
-		return fmt.Errorf("could not create a libp2p node: %w", err)
-	}
-	m.libP2PNode = p2p
-
-	libp2pConnector, err := newLibp2pConnector(libp2pHost.Host())
+	libp2pConnector, err := newLibp2pConnector(libP2PNode.Host())
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}

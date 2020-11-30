@@ -84,7 +84,7 @@ func GenerateMiddlewares(t *testing.T, ctx context.Context, cancel context.Cance
 		mw, err := p2p.NewMiddleware(log,
 			ctx,
 			cancel,
-			p2p.DefaultLibP2PHostGenerator,
+			p2p.DefaultLibP2PNodeGeneratr,
 			json.NewCodec(),
 			id.Address,
 			id.NodeID,

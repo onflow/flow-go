@@ -42,8 +42,8 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	require.NoError(h.T(), err)
 	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootBlockID, nil, false)
 	defer h.StopNode(node1)
-	h.T().Logf(" %s node started on %s:%s", node1.libP2PHost.Name(), address1.IP, address1.Port)
-	h.T().Logf("libp2p ID for %s: %s", node1.libP2PHost.Name(), node1.libP2PHost.Host().ID())
+	h.T().Logf(" %s node started on %s:%s", node1.nodeAddress.Name, address1.IP, address1.Port)
+	h.T().Logf("libp2p ID for %s: %s", node1.nodeAddress.Name, node1.libP2PHost.Host().ID())
 
 	// create and start node 2 on localhost and random port
 	node2key, err := generateNetworkingKey("def")
@@ -64,7 +64,7 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	assert.False(h.T(), node2key.Equals(node2keyNew))
 
 	// start node2 with the same name, ip and port but with the new key
-	node2, address2New := h.CreateNode(node2.libP2PHost.Name(), node2keyNew, address2.IP, address2.Port, rootBlockID, nil, false)
+	node2, address2New := h.CreateNode(node2.nodeAddress.Name, node2keyNew, address2.IP, address2.Port, rootBlockID, nil, false)
 	defer h.StopNode(node2)
 
 	// make sure the node2 indeed came up on the old ip and port
@@ -107,7 +107,7 @@ func (h *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	rootID2 := unittest.BlockFixture().ID().String()
 
 	// start node2 with the same name, ip and port but with the new key
-	node2, address2New := h.CreateNode(node2.libP2PHost.Name(), node2key, address2.IP, address2.Port, rootID2, nil, false)
+	node2, address2New := h.CreateNode(node2.nodeAddress.Name, node2key, address2.IP, address2.Port, rootID2, nil, false)
 	defer h.StopNode(node2)
 
 	// make sure the node2 indeed came up on the old ip and port

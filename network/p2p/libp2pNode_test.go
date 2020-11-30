@@ -614,11 +614,8 @@ func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip
 	}
 
 	noopMetrics := metrics.NewNoopCollector()
-	libp2pHost, err := NewLibP2PHost(suite.ctx, suite.logger, nodeID, NewConnManager(suite.logger, noopMetrics), key, allowList, nil, rootID,
+	n, err := NewLibP2PNode(suite.ctx, suite.logger, nodeID, NewConnManager(suite.logger, noopMetrics), key, allowList, nil, rootID,
 		handlerFunc)
-	require.NoError(suite.T(), err)
-
-	n, err := NewLibP2PNode(suite.logger, libp2pHost)
 	require.NoError(suite.T(), err)
 
 	require.Eventuallyf(suite.T(), func() bool {

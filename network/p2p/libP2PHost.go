@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
+	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
@@ -17,45 +17,35 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type LibP2PHost struct {
-	nodeAddress          NodeAddress
-	connGater            *connGater
-	host                 host.Host
-	pubSub               *pubsub.PubSub
-	flowLibP2PProtocolID protocol.ID // the unique protocol ID
+type hostWrapper struct {
+	connGater *connGater
+	host      host.Host
+	pubSub    *pubsub.PubSub
 }
 
-func (l LibP2PHost) Name() string {
-	return l.nodeAddress.Name
+func (h hostWrapper) ConnenctionGater() *connGater {
+	return h.connGater
 }
 
-func (l LibP2PHost) ConnenctionGater() *connGater {
-	return l.connGater
+func (h hostWrapper) Host() host.Host {
+	return h.host
 }
 
-func (l LibP2PHost) Host() host.Host {
-	return l.host
+func (h hostWrapper) PubSub() *pubsub.PubSub {
+	return h.pubSub
 }
 
-func (l LibP2PHost) FlowLibP2PProtocolID() protocol.ID {
-	return l.flowLibP2PProtocolID
-}
-
-func (l LibP2PHost) PubSub() *pubsub.PubSub {
-	return l.pubSub
-}
-
-// Start starts a libp2p node on the given address.
-func NewLibP2PHost(ctx context.Context,
+// bootstrapLibP2PHost creates a libp2p host
+func bootstrapLibP2PHost(ctx context.Context,
 	logger zerolog.Logger,
 	nodeAddress NodeAddress,
 	conMgr ConnManager,
 	key crypto.PrivKey,
 	allowList bool,
 	allowListAddrs []NodeAddress,
-	rootBlockID string,
-	handler network.StreamHandler,
-	psOption ...pubsub.Option) (*LibP2PHost, error) {
+	flowLibP2PProtocolID protocol.ID,
+	handler libp2pnet.StreamHandler,
+	psOption ...pubsub.Option) (*hostWrapper, error) {
 
 	var connGater *connGater
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
@@ -105,7 +95,7 @@ func NewLibP2PHost(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("could not create libp2p host: %w", err)
 	}
-	flowLibP2PProtocolID := generateProtocolID(rootBlockID)
+
 	libP2PHost.SetStreamHandler(flowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
@@ -114,11 +104,9 @@ func NewLibP2PHost(ctx context.Context,
 		return nil, fmt.Errorf("could not create libp2p pubsub: %w", err)
 	}
 
-	return &LibP2PHost{
-		nodeAddress:          nodeAddress,
-		connGater:            connGater,
-		host:                 libP2PHost,
-		flowLibP2PProtocolID: flowLibP2PProtocolID,
-		pubSub:               ps,
+	return &hostWrapper{
+		connGater: connGater,
+		host:      libP2PHost,
+		pubSub:    ps,
 	}, nil
 }
