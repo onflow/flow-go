@@ -50,7 +50,3 @@ type Mutator interface {
 	// It modifies the persistent immutable protocol state accordingly.
 	MarkValid(blockID flow.Identifier) error
 }
-
-type MutatorFactory interface {
-	Create(state *State) Mutator
-}

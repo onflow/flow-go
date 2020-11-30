@@ -17,6 +17,8 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+// MutatorFactory is an interface that is used to build Mutator instance
+// it is used to inject different implementations for badger.State.
 type MutatorFactory interface {
 	Create(state *State) protocol.Mutator
 }
