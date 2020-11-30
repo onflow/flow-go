@@ -29,7 +29,7 @@ func TestReadJson(t *testing.T) {
 	}
 	jsonAsBytes, err := json.Marshal(testJson)
 	require.NoError(t, err)
-	content, err := unmarshalJson(jsonAsBytes)
+	content, err := unmarshalNodeInfoFromJSONData(jsonAsBytes)
 	require.NoError(t, err)
 	require.Len(t, content, totalNodes)
 	for k, v := range testJson {

@@ -49,7 +49,7 @@ func New(
 
 	// if a node info file is provided, it is read and the additional node information is reported as part of the ping metric
 	if nodeInfoFile != "" {
-		nodeInfo, err := readJson(nodeInfoFile)
+		nodeInfo, err := readExtraNodeInfoJSON(nodeInfoFile)
 		if err != nil {
 			log.Error().Err(err).Str("node_info_file", nodeInfoFile).Msg("failed to read node info file")
 		} else {
@@ -57,6 +57,8 @@ func New(
 			log.Debug().Str("node_info_file", nodeInfoFile).Msg("using node info file")
 		}
 	} else {
+		// initialize nodeInfo with an empty map
+		eng.nodeInfo = make(map[flow.Identifier]string)
 		// the node info file is not mandatory and should not stop the Ping engine from running
 		log.Trace().Msg("no node info file specified")
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func readJson(jsonFileName string) (map[flow.Identifier]string, error) {
+func readExtraNodeInfoJSON(jsonFileName string) (map[flow.Identifier]string, error) {
 
 	// read the file
 	byteValue, err := openAndReadFile(jsonFileName)
@@ -18,7 +18,7 @@ func readJson(jsonFileName string) (map[flow.Identifier]string, error) {
 	}
 
 	// unmarshal json data
-	result, err := unmarshalJson(byteValue)
+	result, err := unmarshalNodeInfoFromJSONData(byteValue)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %s: %w", jsonFileName, err)
 	}
@@ -41,7 +41,7 @@ func openAndReadFile(fileName string) ([]byte, error) {
 	return byteValue, nil
 }
 
-func unmarshalJson(jsonData []byte) (map[flow.Identifier]string, error) {
+func unmarshalNodeInfoFromJSONData(jsonData []byte) (map[flow.Identifier]string, error) {
 	var result map[flow.Identifier]string
 	err := json.Unmarshal(jsonData, &result)
 	if err != nil {
