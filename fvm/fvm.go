@@ -45,7 +45,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, ledger state.Ledger) error {
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, ledger *state.Ledger) error {
 	ctx = NewContextFromParent(
 		ctx,
 		WithTransactionProcessors(

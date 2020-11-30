@@ -46,8 +46,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
 	return hasher.ComputeHash(data)
 }
 
-func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
-	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
+func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
 	accounts := state.NewAccounts(st)
 	generator, err := state.NewLedgerBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
@@ -104,6 +103,7 @@ func (e *hostEnv) getLogs() []string {
 	return e.logs
 }
 
+// TODO RAMTIN - replace these with state
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	v, _ := e.ledger.Get(
 

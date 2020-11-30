@@ -17,9 +17,8 @@ func (c *TransactionSequenceNumberChecker) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
-	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
 	accounts := state.NewAccounts(st)
 
 	return c.checkAndIncrementSequenceNumber(proc.Transaction, accounts)
@@ -29,6 +28,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tx *flow.TransactionBody,
 	accounts *state.Accounts,
 ) error {
+	// TODO RAMTIN commit changes on state
 	proposalKey := tx.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)

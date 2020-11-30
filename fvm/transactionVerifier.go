@@ -23,9 +23,8 @@ func (v *TransactionSignatureVerifier) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
-	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
 	accounts := state.NewAccounts(st)
 
 	return v.verifyTransactionSignatures(proc.Transaction, accounts)
@@ -38,6 +37,8 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
+
+	// TODO RAMTIN commit state
 
 	var payloadWeights map[flow.Address]int
 	var proposalKeyVerifiedInPayload bool

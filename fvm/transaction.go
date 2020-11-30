@@ -24,7 +24,7 @@ func Transaction(tx *flow.TransactionBody) *TransactionProcedure {
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, state.Ledger) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State) error
 }
 
 type TransactionProcedure struct {
@@ -38,8 +38,11 @@ type TransactionProcedure struct {
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
+	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, ledger)
+		// TODO RAMTIN change ledger with state
+		// TODO RAMTIN (process should be called with the state, so they all share the same state)
+		err := p.Process(vm, ctx, proc, st)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -89,9 +92,9 @@ func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, ledger)
+	env, err := newEnvironment(ctx, st)
 	if err != nil {
 		return err
 	}
@@ -105,6 +108,9 @@ func (i *TransactionInvocator) Process(
 		i.topshotSafetyErrorCheck(err)
 		return err
 	}
+
+	// commit changes
+	st.Commit()
 
 	proc.Events = env.getEvents()
 	proc.Logs = env.getLogs()
