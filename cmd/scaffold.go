@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -167,7 +168,11 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
+
 		mw, err := p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
+			ctx,
+			cancel,
 			p2p.DefaultLibP2PHostGenerator,
 			codec,
 			myAddr,
