@@ -52,7 +52,7 @@ type LibP2PHostGenFuc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Op
 
 var DefaultLibP2PNodeGenerator = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
 	return NewLibP2PNode(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics),
-		mv.libp2pKey, true, allowList, mv.rootBlockID, mv.handleIncomingStream,
+		mv.libp2pKey, true, allowList, mv.rootBlockID,
 		psOption...)
 }
 
@@ -196,6 +196,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
 	m.libP2PNode = libP2PNode
+	m.libP2PNode.SetStreamHandler(m.handleIncomingStream)
 
 	libp2pConnector, err := newLibp2pConnector(libP2PNode.Host())
 	if err != nil {

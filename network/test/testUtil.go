@@ -78,8 +78,15 @@ func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identi
 func GenerateMiddlewares(t *testing.T, ctx context.Context, cancel context.CancelFunc, log zerolog.Logger, identities flow.IdentityList,
 	keys []crypto.PrivateKey) []*p2p.Middleware {
 	metrics := metrics.NewNoopCollector()
+
 	mws := make([]*p2p.Middleware, len(identities))
+	// libP2PNodes := generateLibP2PHosts(t)
+
 	for i, id := range identities {
+		//generator := func(*p2p.Middleware, p2p.NodeAddress, []p2p.NodeAddress, ...pubsub.Option)(*p2p.Node, error){
+		//	return libP2PNodes[i], nil
+		//}
+
 		// creating middleware of nodes
 		mw, err := p2p.NewMiddleware(log,
 			ctx,
@@ -185,9 +192,8 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 	return engs
 }
 
-//func generateLibP2PHosts(t *testing.T, ids flow.IdentityList, logger zerolog.Logger) ([]*p2p.LibP2PHost, context.Context, context.CancelFunc) {
-//	ctx, cancel := context.WithCancel(context.Background())
-//
+//func generateLibP2PHosts(t *testing.T, ctx context.Context, cancel context.CancelFunc,
+//	ids flow.IdentityList, logger zerolog.Logger) []*p2p.Node {
 //	for _, id := range ids {
 //		// creates libp2p host and node
 //		nodeAddress := p2p.NodeAddress{Name: id.NodeID.String(), IP: "0.0.0.0", Port: "0"}
@@ -195,7 +201,14 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 //		key, err := GenerateNetworkingKey(id.NodeID)
 //		require.NoError(t, err)
 //
-//		libP2PHost, err := p2p.NewLibP2PHost(ctx, logger, nodeAddress, p2p.NewConnManager(logger, noopMetrics), key, false, nil)
+//		libP2PHost, err := p2p.NewLibP2PNode(ctx,
+//			logger,
+//			nodeAddress,
+//			p2p.NewConnManager(logger, noopMetrics),
+//			key,
+//			false,
+//			nil,
+//			rootBlockID)
 //	}
 //}
 

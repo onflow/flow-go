@@ -66,7 +66,6 @@ func NewLibP2PNode(ctx context.Context,
 	allowList bool,
 	allowListAddrs []NodeAddress,
 	rootBlockID string,
-	handler libp2pnet.StreamHandler,
 	psOption ...pubsub.Option) (*Node, error) {
 
 	flowLibP2PProtocolID := generateProtocolID(rootBlockID)
@@ -77,8 +76,6 @@ func NewLibP2PNode(ctx context.Context,
 		key,
 		allowList,
 		allowListAddrs,
-		flowLibP2PProtocolID,
-		handler,
 		psOption...)
 	if err != nil {
 		return nil, fmt.Errorf("could not bootstrap libp2p host: %w", err)
@@ -471,6 +468,11 @@ func (n *Node) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
 // Host returns pointer to host object of node.
 func (n *Node) Host() host.Host {
 	return n.libP2PHost.Host()
+}
+
+// SetStreamHandler sets the stream handler of libp2p host of the node.
+func (n *Node) SetStreamHandler(handler libp2pnet.StreamHandler) {
+	n.libP2PHost.SetStreamHandler(n.flowLibP2PProtocolID, handler)
 }
 
 // IsConnected returns true is address is a direct peer of this node else false

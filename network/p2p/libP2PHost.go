@@ -35,6 +35,10 @@ func (h hostWrapper) PubSub() *pubsub.PubSub {
 	return h.pubSub
 }
 
+func (h *hostWrapper) SetStreamHandler(flowLibP2PProtocolID protocol.ID, handler libp2pnet.StreamHandler) {
+	h.host.SetStreamHandler(flowLibP2PProtocolID, handler)
+}
+
 // bootstrapLibP2PHost creates a libp2p host
 func bootstrapLibP2PHost(ctx context.Context,
 	logger zerolog.Logger,
@@ -43,8 +47,6 @@ func bootstrapLibP2PHost(ctx context.Context,
 	key crypto.PrivKey,
 	allowList bool,
 	allowListAddrs []NodeAddress,
-	flowLibP2PProtocolID protocol.ID,
-	handler libp2pnet.StreamHandler,
 	psOption ...pubsub.Option) (*hostWrapper, error) {
 
 	var connGater *connGater
@@ -95,8 +97,6 @@ func bootstrapLibP2PHost(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("could not create libp2p host: %w", err)
 	}
-
-	libP2PHost.SetStreamHandler(flowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	ps, err := pubsub.NewGossipSub(ctx, libP2PHost, psOption...)
