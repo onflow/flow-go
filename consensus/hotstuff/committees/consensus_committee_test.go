@@ -2,6 +2,7 @@ package committees
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -119,45 +120,20 @@ func TestRemoveOldEpochs(t *testing.T) {
 	identities := unittest.IdentityListFixture(10)
 	me := identities[0].NodeID
 
-	// counter for the current epoch
-	epochCounter := uint64(1)
+	// keep track of epoch counter and views
+	firstEpochCounter := uint64(1)
+	currentEpochCounter := firstEpochCounter
+	epochFinalView := uint64(100)
+
+	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(32))
 
 	// create mocks
 	state := new(protocolmock.ReadOnlyState)
 	snapshot := new(protocolmock.Snapshot)
 
-	epoch1 := newMockEpoch(
-		epochCounter,
-		identities,
-		1,
-		100,
-		unittest.SeedFixture(32),
-	)
-	epoch2 := newMockEpoch(
-		epochCounter+1,
-		identities,
-		101,
-		200,
-		unittest.SeedFixture(32),
-	)
-	epoch3 := newMockEpoch(
-		epochCounter+2,
-		identities,
-		201,
-		300,
-		unittest.SeedFixture(32),
-	)
-	epoch4 := newMockEpoch(
-		epochCounter+3,
-		identities,
-		301,
-		400,
-		unittest.SeedFixture(32),
-	)
-
 	state.On("Final").Return(snapshot)
-	epochs := mocks.NewEpochQuery(t, epochCounter, epoch1, epoch2, epoch3, epoch4)
-	snapshot.On("Epochs").Return(epochs)
+	epochQuery := mocks.NewEpochQuery(t, currentEpochCounter, epoch1)
+	snapshot.On("Epochs").Return(epochQuery)
 
 	committee, err := NewConsensusCommittee(state, me)
 	require.Nil(t, err)
@@ -166,57 +142,40 @@ func TestRemoveOldEpochs(t *testing.T) {
 	// since there is no previous epoch
 	assert.Equal(t, 1, len(committee.leaders))
 
-	// when we first request a view within epoch 2, we should not remove
-	// any old epochs since we have 2 (1 & 2)
-	_, err = committee.LeaderForView(101)
-	t.Run("first transition", func(t *testing.T) {
-		assert.Nil(t, err)
-		assert.Equal(t, 2, len(committee.leaders))
-	})
+	// test for 10 epochs
+	for currentEpochCounter < 10 {
 
-	// transition so epoch 2 is current
-	epochs.Transition()
-	// request a view in epoch 3
-	_, err = committee.LeaderForView(201)
-	assert.Nil(t, err)
+		// add another epoch
+		firstView := epochFinalView + 1
+		epochFinalView = epochFinalView + 100
+		currentEpochCounter++
+		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(32))
+		epochQuery.Add(nextEpoch)
 
-	// when we request a view within epoch 3, we should also not remove
-	// any old epochs since we have 3 (the maximum)
-	t.Run("second transition", func(t *testing.T) {
+		// query a view from the new epoch
+		_, err = committee.LeaderForView(firstView)
+		// transition to the next epoch
+		epochQuery.Transition()
 
-		// should have 3 epochs stored
-		assert.Equal(t, 3, len(committee.leaders))
+		t.Run(fmt.Sprintf("epoch %d", currentEpochCounter), func(t *testing.T) {
+			// check we have the right number of epochs stored
+			if currentEpochCounter <= 3 {
+				assert.Equal(t, int(currentEpochCounter), len(committee.leaders))
+			} else {
+				assert.Equal(t, 3, len(committee.leaders))
+			}
 
-		// should have leader selection for epochs 1-3
-		_, has1 := committee.leaders[epochCounter]
-		_, has2 := committee.leaders[epochCounter+1]
-		_, has3 := committee.leaders[epochCounter+2]
-		assert.True(t, has1)
-		assert.True(t, has2)
-		assert.True(t, has3)
-	})
-
-	// transition so epoch 3 is current
-	epochs.Transition()
-	// request a view in epoch 4
-	_, err = committee.LeaderForView(301)
-	assert.Nil(t, err)
-
-	t.Run("third transition", func(t *testing.T) {
-
-		// should have 3 epochs stored (1 has been deleted)
-		assert.Equal(t, 3, len(committee.leaders))
-
-		// should have leader selection for epochs 2-4 (no 1)
-		_, has1 := committee.leaders[epochCounter]
-		_, has2 := committee.leaders[epochCounter+1]
-		_, has3 := committee.leaders[epochCounter+2]
-		_, has4 := committee.leaders[epochCounter+3]
-		assert.False(t, has1)
-		assert.True(t, has2)
-		assert.True(t, has3)
-		assert.True(t, has4)
-	})
+			// check we have the right epochs stored
+			for i := uint64(0); i < 3; i++ {
+				counter := currentEpochCounter - i
+				if counter < firstEpochCounter {
+					break
+				}
+				_, exists := committee.leaders[counter]
+				assert.True(t, exists, "missing epoch with counter %d max counter is %d", counter, currentEpochCounter)
+			}
+		})
+	}
 }
 
 func newMockEpoch(
