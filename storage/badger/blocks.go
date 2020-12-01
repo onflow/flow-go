@@ -5,6 +5,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
