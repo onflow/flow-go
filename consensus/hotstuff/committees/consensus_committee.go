@@ -79,7 +79,7 @@ func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*
 		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
 	if !filter.IsVotingConsensusCommitteeMember(identity) {
-		return nil, fmt.Errorf("node with ID %x is not a valid consensus committee member at block %x", nodeID, blockID)
+		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return identity, nil
 }
