@@ -168,8 +168,11 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
+		// creates a context for middleware
+		// context is used to stop middleware and libp2p
 		ctx, cancel := context.WithCancel(context.Background())
 
+		// initializes middleware
 		mw, err := p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
 			ctx,
 			cancel,
