@@ -161,22 +161,22 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 
 	err = v.ensureStakedNodeWithRole(identity, flow.RoleExecution)
 	if err != nil {
-		return err
+		return fmt.Errorf("staked node invalid: %w", err)
 	}
 
 	err = v.verifySignature(receipt, identity)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid receipt signature: %w", err)
 	}
 
 	err = v.verifyChunksFormat(&receipt.ExecutionResult)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid chunks format: %w", err)
 	}
 
 	err = v.verifyExecutionResult(&receipt.ExecutionResult)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid execution result: %w", err)
 	}
 
 	return nil

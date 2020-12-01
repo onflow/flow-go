@@ -63,7 +63,6 @@ type MatchingSuite struct {
 
 func (ms *MatchingSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SUITE ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-
 	ms.SetupChain()
 
 	unit := engine.NewUnit()

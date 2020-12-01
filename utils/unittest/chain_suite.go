@@ -137,9 +137,9 @@ func (bc *BaseChainSuite) SetupChain() {
 		func(blockID flow.Identifier) realproto.Snapshot {
 			block, found := bc.Blocks[blockID]
 			if !found {
-				return stateSnapshotForUnknownBlock()
+				return StateSnapshotForUnknownBlock()
 			}
-			return stateSnapshotForKnownBlock(block.Header, bc.Identities)
+			return StateSnapshotForKnownBlock(block.Header, bc.Identities)
 		},
 	)
 
@@ -269,7 +269,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.Assigner = &module.ChunkAssigner{}
 }
 
-func stateSnapshotForUnknownBlock() *protocol.Snapshot {
+func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	snapshot := &protocol.Snapshot{}
 	snapshot.On("Identity", mock.Anything).Return(
 		nil, storerr.ErrNotFound,
@@ -280,7 +280,7 @@ func stateSnapshotForUnknownBlock() *protocol.Snapshot {
 	return snapshot
 }
 
-func stateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifier]*flow.Identity) *protocol.Snapshot {
+func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifier]*flow.Identity) *protocol.Snapshot {
 	snapshot := &protocol.Snapshot{}
 	snapshot.On("Identity", mock.Anything).Return(
 		func(nodeID flow.Identifier) *flow.Identity {
