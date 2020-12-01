@@ -114,7 +114,7 @@ func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("node%d", i)
-		key, _ := generateLibP2PKey(suite.T())
+		key, _ := generateNetworkingAndLibP2PKeys(suite.T())
 
 		// creates node-i address
 		address := NodeAddress{
@@ -655,9 +655,9 @@ func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
 	return key
 }
 
-// generateLibP2PKey is a test helper that generates a ECDSA flow key pairs, and translate it to
+// generateNetworkingAndLibP2PKeys is a test helper that generates a ECDSA flow key pairs, and translate it to
 // libp2p key pairs. It returns both generated pairs of keys.
-func generateLibP2PKey(t *testing.T) (crypto.PrivKey, fcrypto.PrivateKey) {
+func generateNetworkingAndLibP2PKeys(t *testing.T) (crypto.PrivKey, fcrypto.PrivateKey) {
 	// generates flow key
 	key := generateNetworkingKey(t)
 
@@ -672,7 +672,7 @@ func generateLibP2PKey(t *testing.T) (crypto.PrivKey, fcrypto.PrivateKey) {
 func newSilentNode(t *testing.T) (net.Listener, NodeAddress) {
 
 	name := "silent"
-	key, _ := generateLibP2PKey(t)
+	key, _ := generateNetworkingAndLibP2PKeys(t)
 
 	lst, err := net.Listen("tcp4", ":0")
 	if err != nil {

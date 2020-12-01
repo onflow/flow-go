@@ -159,7 +159,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 	for i := 1; i <= count; i++ {
 
 		name := fmt.Sprintf("node%d", i)
-		libp2pkey, key := generateLibP2PKey(suite.T())
+		libp2pkey, key := generateNetworkingAndLibP2PKeys(suite.T())
 
 		noopMetrics := metrics.NewNoopCollector()
 		nodeID := NodeAddress{
