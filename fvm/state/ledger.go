@@ -30,10 +30,11 @@ func NewMapLedger() *MapLedger {
 	}
 }
 
-func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) {
+func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) error {
 	k := fullKey(owner, controller, key)
 	m.RegisterTouches[k] = true
 	m.Registers[k] = value
+	return nil
 }
 
 func (m MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error) {

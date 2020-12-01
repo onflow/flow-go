@@ -9,23 +9,30 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	MaxStateKeySize         = 1000
+	MaxStateValueSize       = 10000
+	MaxStateInteractionSize = 10000
+)
+
 func TestAccounts_Create(t *testing.T) {
 	t.Run("Sets registers", func(t *testing.T) {
 		ledger := state.NewMapLedger()
+		st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		accounts := state.NewAccounts(st)
 
-		accounts := state.NewAccounts(ledger)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
-
+		st.Commit()
 		require.Equal(t, len(ledger.RegisterTouches), 2) // exists  + key count
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -39,8 +46,8 @@ func TestAccounts_Create(t *testing.T) {
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
 	ledger := state.NewMapLedger()
-
-	accounts := state.NewAccounts(ledger)
+	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	accounts := state.NewAccounts(st)
 	address := flow.HexToAddress("01")
 
 	err := accounts.Create(nil, address)
@@ -76,7 +83,7 @@ type TestLedger struct {
 	contracts []byte
 }
 
-func (l *TestLedger) Set(_, _, key string, value flow.RegisterValue) {
+func (l *TestLedger) Set(_, _, key string, value flow.RegisterValue) error {
 	if key == "contract_names" {
 		l.contracts = value
 	}
@@ -90,8 +97,8 @@ func (l *TestLedger) Get(_, _, key string) (flow.RegisterValue, error) {
 	}
 	return nil, nil
 }
-func (l *TestLedger) Touch(_, _, _ string)  {}
-func (l *TestLedger) Delete(_, _, _ string) {}
+func (l *TestLedger) Touch(_, _, _ string) error  {}
+func (l *TestLedger) Delete(_, _, _ string) error {}
 
 func TestAccounts_SetContracts(t *testing.T) {
 	address := flow.HexToAddress("0x01")
