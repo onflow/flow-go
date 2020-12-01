@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -28,7 +27,6 @@ import (
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -116,8 +114,7 @@ func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("node%d", i)
-		key, err := generateNetworkingKey(name)
-		require.NoError(suite.T(), err)
+		key, _ := generateLibP2PKey(suite.T())
 
 		// creates node-i address
 		address := NodeAddress{
@@ -585,7 +582,7 @@ func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamH
 	for i := 0; i < count; i++ {
 
 		name := fmt.Sprintf("node%d", i+1)
-		key, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
+		key := generateNetworkingKey(suite.T())
 		require.NoError(suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
@@ -649,20 +646,28 @@ func (suite *LibP2PNodeTestSuite) StopNode(node *Node) {
 }
 
 // generateNetworkingKey generates a ECDSA key pair using the given seed
-func generateNetworkingKey(seed string) (crypto.PrivKey, error) {
-	seedB := make([]byte, 100)
-	copy(seedB, seed)
-	var r io.Reader = bytes.NewReader(seedB)
-	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.ECDSA, 0, r)
-	return prvKey, err
+func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
+	seed := make([]byte, fcrypto.KeyGenSeedMinLenECDSASecp256k1)
+	s := unittest.IdentifierFixture()
+	copy(seed, s[:])
+	key, err := fcrypto.GeneratePrivateKey(fcrypto.ECDSASecp256k1, seed)
+	require.NoError(t, err)
+	return key
+}
+
+func generateLibP2PKey(t *testing.T) (crypto.PrivKey, fcrypto.PrivateKey) {
+	key := generateNetworkingKey(t)
+	libP2Pkey, err := privKey(key)
+	require.NoError(t, err)
+
+	return libP2Pkey, key
 }
 
 // newSilentNode returns a TCP listener and a node which never replies
 func newSilentNode(t *testing.T) (net.Listener, NodeAddress) {
 
 	name := "silent"
-	key, err := generateNetworkingKey(name)
-	require.NoError(t, err)
+	key, _ := generateLibP2PKey(t)
 
 	lst, err := net.Listen("tcp4", ":0")
 	if err != nil {
@@ -686,6 +691,7 @@ func newSilentNode(t *testing.T) (net.Listener, NodeAddress) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	nodeAddress := NodeAddress{
 		Name:   name,
 		IP:     ip,
