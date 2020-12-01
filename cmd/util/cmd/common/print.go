@@ -15,7 +15,7 @@ func PrettyPrintEntity(entity flow.Entity) {
 	PrettyPrint(entity)
 }
 
-// PrettyPrint an interfaec
+// PrettyPrint an interface
 func PrettyPrint(entity interface{}) {
 	bytes, err := json.MarshalIndent(entity, "", "  ")
 	if err != nil {
