@@ -159,19 +159,18 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 	for i := 1; i <= count; i++ {
 
 		name := fmt.Sprintf("node%d", i)
-		pkey, err := generateNetworkingKey(name)
-		require.NoError(suite.Suite.T(), err)
+		libp2pkey, key := generateLibP2PKey(suite.T())
 
 		noopMetrics := metrics.NewNoopCollector()
 		nodeID := NodeAddress{
 			Name:   name,
-			IP:     "0.0.0.0",        // localhost
-			Port:   "0",              // random Port number
-			PubKey: pkey.GetPublic(), // the networking public key
+			IP:     "0.0.0.0",             // localhost
+			Port:   "0",                   // random Port number
+			PubKey: libp2pkey.GetPublic(), // the networking public key
 		}
 
 		psOption := pubsub.WithDiscovery(d)
-		n, err := NewLibP2PNode(suite.ctx, logger, nodeID, NewConnManager(logger, noopMetrics), pkey, false, nil, rootBlockID, psOption)
+		n, err := NewLibP2PNode(suite.ctx, logger, nodeID, NewConnManager(logger, noopMetrics), key, false, nil, rootBlockID, psOption)
 		require.NoError(suite.T(), err)
 		n.SetStreamHandler(handlerFunc)
 

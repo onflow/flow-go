@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -39,16 +38,14 @@ func TestSporkingTestSuite(t *testing.T) {
 func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 
 	// create and start node 1 on localhost and random port
-	node1key, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(h.T(), err)
+	node1key := generateNetworkingKey(h.T())
 	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootBlockID, nil, false)
 	defer h.StopNode(node1)
 	h.T().Logf(" %s node started on %s:%s", node1.nodeAddress.Name, address1.IP, address1.Port)
 	h.T().Logf("libp2p ID for %s: %s", node1.nodeAddress.Name, node1.libP2PHost.Host().ID())
 
 	// create and start node 2 on localhost and random port
-	node2key, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(h.T(), err)
+	node2key := generateNetworkingKey(h.T())
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootBlockID, nil, false)
 
 	// create stream from node 1 to node 2
@@ -60,8 +57,7 @@ func (h *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	h.StopNode(node2)
 
 	// generate a new key
-	node2keyNew, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(h.T(), err)
+	node2keyNew := generateNetworkingKey(h.T())
 	assert.False(h.T(), node2key.Equals(node2keyNew))
 
 	// start node2 with the same name, ip and port but with the new key
@@ -86,14 +82,12 @@ func (h *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	rootID1 := unittest.BlockFixture().ID().String()
 
 	// create and start node 1 on localhost and random port
-	node1key, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(h.T(), err)
+	node1key := generateNetworkingKey(h.T())
 	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootID1, nil, false)
 	defer h.StopNode(node1)
 
 	// create and start node 2 on localhost and random port
-	node2key, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(h.T(), err)
+	node2key := generateNetworkingKey(h.T())
 	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootID1, nil, false)
 
 	// create stream from node 2 to node 1
@@ -128,14 +122,12 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	rootIDBeforeSpork := unittest.BlockFixture().ID().String()
 
 	// create and start node 1 on localhost and random port
-	node1key, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(h.T(), err)
+	node1key := generateNetworkingKey(h.T())
 	node1, _ := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
 	defer h.StopNode(node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
-	node2key, err := test.GenerateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(h.T(), err)
+	node2key := generateNetworkingKey(h.T())
 	node2, addr2 := h.CreateNode("node1", node2key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
 	defer h.StopNode(node2)
 
@@ -146,7 +138,7 @@ func (h *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	topicBeforeSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDBeforeSpork)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
-	_, err = node1.Subscribe(ctx, topicBeforeSpork)
+	_, err := node1.Subscribe(ctx, topicBeforeSpork)
 	require.NoError(h.T(), err)
 	sub2, err := node2.Subscribe(ctx, topicBeforeSpork)
 	require.NoError(h.T(), err)
