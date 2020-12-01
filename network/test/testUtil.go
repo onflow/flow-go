@@ -34,12 +34,9 @@ var rootBlockID string
 
 const DryRun = true
 
-var allocator *portAllocator
-
 // init is a built-in golang function getting called first time this
 // initialize the allocated ports map and the root block ID
 func init() {
-	allocator = newPortAllocator()
 	rootBlockID = unittest.IdentifierFixture().String()
 }
 
@@ -55,7 +52,7 @@ func GenerateIDs(t *testing.T, ctx context.Context, logger zerolog.Logger, n int
 	// generates keys and address for the node
 	for i, id := range identities {
 		// generate key
-		key, err := GenerateNetworkingKey(id.NodeID)
+		key, err := generateNetworkingKey(id.NodeID)
 		require.NoError(t, err)
 		privateKeys[i] = key
 		port := "0"
@@ -79,8 +76,11 @@ func GenerateMiddlewares(t *testing.T, ctx context.Context, cancel context.Cance
 	mws := make([]*p2p.Middleware, len(identities))
 
 	for i, id := range identities {
+		// casts libP2PNode instance to a local variable to avoid closure
+		node := libP2PNodes[i]
+
 		generator := func(*p2p.Middleware, p2p.NodeAddress, []p2p.NodeAddress, ...pubsub.Option) (*p2p.Node, error) {
-			return libP2PNodes[i], nil
+			return node, nil
 		}
 
 		// creating middleware of nodes
@@ -149,6 +149,8 @@ func GenerateNetworks(t *testing.T,
 	if !dryRunMode {
 		for _, net := range nets {
 			<-net.Ready()
+			err := net.SetIDs(ids)
+			require.NoError(t, err)
 		}
 	}
 	return nets
@@ -198,14 +200,25 @@ func generateLibP2PNode(t *testing.T,
 	nodeAddress := p2p.NodeAddress{Name: id.NodeID.String(), IP: "0.0.0.0", Port: "0"}
 	noopMetrics := metrics.NewNoopCollector()
 
+	// create PubSub options for libp2p to use
+	psOptions := []pubsub.Option{
+		// skip message signing
+		pubsub.WithMessageSigning(false),
+		// skip message signature
+		pubsub.WithStrictSignatureVerification(false),
+		// set max message size limit for 1-k PubSub messaging
+		pubsub.WithMaxMessageSize(p2p.DefaultMaxPubSubMsgSize),
+	}
+
 	libP2PNode, err := p2p.NewLibP2PNode(ctx,
 		logger,
 		nodeAddress,
 		p2p.NewConnManager(logger, noopMetrics),
 		key,
-		false,
+		true,
 		nil,
-		rootBlockID)
+		rootBlockID,
+		psOptions...)
 
 	require.NoError(t, err)
 
@@ -220,8 +233,8 @@ func optionalSleep(send ConduitSendWrapperFunc) {
 	}
 }
 
-// GenerateNetworkingKey generates a Flow ECDSA key using the given seed
-func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
+// generateNetworkingKey generates a Flow ECDSA key using the given seed
+func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
