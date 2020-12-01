@@ -79,8 +79,7 @@ func bootstrapLibP2PHost(ctx context.Context,
 	})
 
 	// gather all the options for the libp2p node
-	var options []config.Option
-	options = append(options,
+	options := []config.Option{
 		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
 		libp2p.Identity(key),                // pass in the networking key
 		libp2p.ConnectionManager(conMgr),    // set the connection manager
