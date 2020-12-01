@@ -1,6 +1,7 @@
 package access
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -58,9 +59,10 @@ type TransactionValidationOptions struct {
 }
 
 type TransactionValidator struct {
-	blocks  Blocks     // for looking up blocks to check transaction expiry
-	chain   flow.Chain // for checking validity of addresses
-	options TransactionValidationOptions
+	blocks                Blocks     // for looking up blocks to check transaction expiry
+	chain                 flow.Chain // for checking validity of addresses
+	options               TransactionValidationOptions
+	serviceAccountAddress flow.Address
 }
 
 func NewTransactionValidator(
@@ -69,9 +71,10 @@ func NewTransactionValidator(
 	options TransactionValidationOptions,
 ) *TransactionValidator {
 	return &TransactionValidator{
-		blocks:  blocks,
-		chain:   chain,
-		options: options,
+		blocks:                blocks,
+		chain:                 chain,
+		options:               options,
+		serviceAccountAddress: chain.ServiceAddress(),
 	}
 }
 
@@ -141,6 +144,12 @@ func (v *TransactionValidator) checkMissingFields(tx *flow.TransactionBody) erro
 }
 
 func (v *TransactionValidator) checkGasLimit(tx *flow.TransactionBody) error {
+	// if service account is the payer of the transaction accepts any gas limit
+	// note that even though we don't consider any limit here, exec node
+	// enforce a higher max limit for these transactions at execution time
+	if bytes.Equal(tx.Payer[:], v.serviceAccountAddress[:]) {
+		return nil
+	}
 	if tx.GasLimit > v.options.MaxGasLimit {
 		return InvalidGasLimitError{
 			Actual:  tx.GasLimit,
