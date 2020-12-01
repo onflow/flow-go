@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto/random"
@@ -94,6 +95,25 @@ func TestDeterministic(t *testing.T) {
 
 		require.Equal(t, l1, l2)
 	}
+}
+
+func TestInputValidation(t *testing.T) {
+
+	// should return an error if we request to compute leader selection for <1 views
+	t.Run("epoch containing no views", func(t *testing.T) {
+		count := 0
+		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, unittest.IdentityListFixture(4))
+		assert.Error(t, err)
+		count = -1
+		_, err = ComputeLeaderSelectionFromSeed(0, someSeed, count, unittest.IdentityListFixture(4))
+		assert.Error(t, err)
+	})
+
+	t.Run("epoch without participants", func(t *testing.T) {
+		identities := unittest.IdentityListFixture(0)
+		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 100, identities)
+		assert.Error(t, err)
+	})
 }
 
 func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {

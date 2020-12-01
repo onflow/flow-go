@@ -89,6 +89,11 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 // identities - the identities that contain the stake info, which is used as weight for the chance of
 // 							the identity to be selected as leader.
 func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
+
+	if count < 1 {
+		return nil, fmt.Errorf("number of views must be positive (got %d)", count)
+	}
+
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
 		weights = append(weights, id.Stake)
