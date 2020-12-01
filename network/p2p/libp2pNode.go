@@ -51,7 +51,7 @@ type NodeAddress struct {
 // Node is a wrapper around LibP2P host.
 type Node struct {
 	sync.Mutex
-	libP2PHost           *hostWrapper                    // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	libP2PHost           *libP2PHostWrapper              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	logger               zerolog.Logger                  // for logging
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
@@ -467,7 +467,7 @@ func (n *Node) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
 	if err != nil {
 		return fmt.Errorf("failed to create approved list of peers: %w", err)
 	}
-	n.libP2PHost.ConnenctionGater().update(whilelistPInfos)
+	n.libP2PHost.ConnectionGater().update(whilelistPInfos)
 	return nil
 }
 

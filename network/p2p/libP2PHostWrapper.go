@@ -17,29 +17,40 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type hostWrapper struct {
+// libP2PHostWrapper is an internal data structure to this package that encapsulates
+// all components that p2p package affiliates with a libp2p host.
+// Purpose of encapsulation is to ease passing the entire libp2p host affiliated components
+// around.
+type libP2PHostWrapper struct {
 	connGater *connGater
 	host      host.Host
 	pubSub    *pubsub.PubSub
 }
 
-func (h hostWrapper) ConnenctionGater() *connGater {
+// ConnectionGater returns `connGater` component of the libP2PHostWrapper.
+func (h libP2PHostWrapper) ConnectionGater() *connGater {
 	return h.connGater
 }
 
-func (h hostWrapper) Host() host.Host {
+// Host returns `host` component of the libP2PHostWrapper.
+func (h libP2PHostWrapper) Host() host.Host {
 	return h.host
 }
 
-func (h hostWrapper) PubSub() *pubsub.PubSub {
+// PubSub returns `pubsub` component of the libP2PHostWrapper.
+func (h libP2PHostWrapper) PubSub() *pubsub.PubSub {
 	return h.pubSub
 }
 
-func (h *hostWrapper) SetStreamHandler(flowLibP2PProtocolID protocol.ID, handler libp2pnet.StreamHandler) {
+// SetStreamHandler sets the stream handler of the host component in the libP2PHostWrapper.
+func (h *libP2PHostWrapper) SetStreamHandler(flowLibP2PProtocolID protocol.ID, handler libp2pnet.StreamHandler) {
 	h.host.SetStreamHandler(flowLibP2PProtocolID, handler)
 }
 
-// bootstrapLibP2PHost creates a libp2p host
+// bootstrapLibP2PHost creates and starts a libp2p host as well as a pubsub component for it, and returns all in a
+// libP2PHostWrapper.
+// In case `allowList` is true, it also creates and embeds a connection gater in the returned libP2PHostWrapper, which
+// whitelists the `allowListAddres` nodes.
 func bootstrapLibP2PHost(ctx context.Context,
 	logger zerolog.Logger,
 	nodeAddress NodeAddress,
@@ -47,9 +58,10 @@ func bootstrapLibP2PHost(ctx context.Context,
 	key crypto.PrivKey,
 	allowList bool,
 	allowListAddrs []NodeAddress,
-	psOption ...pubsub.Option) (*hostWrapper, error) {
+	psOption ...pubsub.Option) (*libP2PHostWrapper, error) {
 
 	var connGater *connGater
+
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
 	if err != nil {
 		return nil, fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
@@ -104,7 +116,7 @@ func bootstrapLibP2PHost(ctx context.Context,
 		return nil, fmt.Errorf("could not create libp2p pubsub: %w", err)
 	}
 
-	return &hostWrapper{
+	return &libP2PHostWrapper{
 		connGater: connGater,
 		host:      libP2PHost,
 		pubSub:    ps,
