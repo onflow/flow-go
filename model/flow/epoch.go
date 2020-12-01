@@ -50,7 +50,26 @@ type EpochSetup struct {
 
 	// FirstView is the first view of the epoch. It is NOT included in the service
 	// event, but is cached here when stored to simplify epoch queries.
+	// TODO separate this more explicitly from canonical service event
 	FirstView uint64
+}
+
+// Body returns the canonical body of the EpochSetup event (notably omitting
+// the FirstView which is a computed property).
+func (setup *EpochSetup) Body() interface{} {
+	return struct {
+		Counter      uint64
+		FinalView    uint64
+		Participants IdentityList
+		Assignments  AssignmentList
+		RandomSource []byte
+	}{
+		Counter:      setup.Counter,
+		FinalView:    setup.FinalView,
+		Participants: setup.Participants,
+		Assignments:  setup.Assignments,
+		RandomSource: setup.RandomSource,
+	}
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -62,7 +81,7 @@ func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 
 // ID returns the hash of the event contents.
 func (setup *EpochSetup) ID() Identifier {
-	return MakeID(setup)
+	return MakeID(setup.Body())
 }
 
 // EpochCommit is a service event emitted when epoch setup has been completed.

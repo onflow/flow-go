@@ -77,7 +77,7 @@ func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*
 		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
 	if !filter.IsVotingConsensusCommitteeMember(identity) {
-		return nil, fmt.Errorf("node with ID %x is not a valid consensus committee member at block %x", nodeID, blockID)
+		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return identity, nil
 }
@@ -85,6 +85,7 @@ func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*
 // LeaderForView returns the node ID of the leader for the given view. Returns
 // the following errors:
 //  * epoch containing the requested view has not been set up (protocol.ErrNextEpochNotSetup)
+//  * epoch is too far in the past (leader.InvalidViewError)
 //  * any other error indicates an unexpected internal error
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
@@ -158,7 +159,7 @@ func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, erro
 		// try retrieving the leader
 		leaderID, err := selection.LeaderForView(view)
 		// if the view is out of range, try the next epoch
-		if errors.As(err, &leader.InvalidViewError{}) {
+		if leader.IsInvalidViewError(err) {
 			continue
 		}
 		if err != nil {
