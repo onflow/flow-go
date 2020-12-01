@@ -2,8 +2,10 @@ package leader
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto/random"
@@ -94,6 +96,71 @@ func TestDeterministic(t *testing.T) {
 
 		require.Equal(t, l1, l2)
 	}
+}
+
+func TestInputValidation(t *testing.T) {
+
+	// should return an error if we request to compute leader selection for <1 views
+	t.Run("epoch containing no views", func(t *testing.T) {
+		count := 0
+		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, unittest.IdentityListFixture(4))
+		assert.Error(t, err)
+		count = -1
+		_, err = ComputeLeaderSelectionFromSeed(0, someSeed, count, unittest.IdentityListFixture(4))
+		assert.Error(t, err)
+	})
+
+	// epoch with no possible leaders should return an error
+	t.Run("epoch without participants", func(t *testing.T) {
+		identities := unittest.IdentityListFixture(0)
+		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 100, identities)
+		assert.Error(t, err)
+	})
+}
+
+// test that requesting a view outside the given range returns an error
+func TestViewOutOfRange(t *testing.T) {
+
+	firstView := uint64(100)
+	finalView := uint64(200)
+
+	identities := unittest.IdentityListFixture(4)
+	leaders, err := ComputeLeaderSelectionFromSeed(firstView, someSeed, int(finalView-firstView+1), identities)
+	require.Nil(t, err)
+
+	// confirm the selection has first/final view we expect
+	assert.Equal(t, firstView, leaders.FirstView())
+	assert.Equal(t, finalView, leaders.FinalView())
+
+	// boundary views should not return error
+	t.Run("boundary views", func(t *testing.T) {
+		_, err = leaders.LeaderForView(firstView)
+		assert.Nil(t, err)
+		_, err = leaders.LeaderForView(finalView)
+		assert.Nil(t, err)
+	})
+
+	// views before first view should return error
+	t.Run("before first view", func(t *testing.T) {
+		before := firstView - 1 // 1 before first view
+		_, err = leaders.LeaderForView(before)
+		assert.Error(t, err)
+
+		before = rand.Uint64() % firstView // random view before first view
+		_, err = leaders.LeaderForView(before)
+		assert.Error(t, err)
+	})
+
+	// views after final view should return error
+	t.Run("after final view", func(t *testing.T) {
+		after := finalView + 1 // 1 after final view
+		_, err = leaders.LeaderForView(after)
+		assert.Error(t, err)
+
+		after = finalView + uint64(rand.Uint32()) + 1 // random view after final view
+		_, err = leaders.LeaderForView(after)
+		assert.Error(t, err)
+	})
 }
 
 func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
