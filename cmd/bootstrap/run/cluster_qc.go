@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -77,7 +77,7 @@ func createClusterValidators(participants []bootstrap.NodeInfo) ([]hotstuff.Vali
 			return nil, nil, err
 		}
 
-		committee, err := committee.NewStaticCommittee(identities, me.NodeID(), nil, nil)
+		committee, err := committees.NewStaticCommittee(identities, me.NodeID(), nil, nil)
 		if err != nil {
 			return nil, nil, err
 		}
