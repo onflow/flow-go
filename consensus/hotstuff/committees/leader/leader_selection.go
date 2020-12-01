@@ -1,6 +1,7 @@
 package leader
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/random"
@@ -21,6 +22,11 @@ func (err InvalidViewError) Error() string {
 		"requested view (%d) outside of valid range [%d-%d]",
 		err.requestedView, err.firstView, err.finalView,
 	)
+}
+
+// IsInvalidViwError returns whether or not the input error is an invalid view error.
+func IsInvalidViewError(err error) bool {
+	return errors.As(err, &InvalidViewError{})
 }
 
 // LeaderSelection caches the pre-generated leader selections for a certain number of

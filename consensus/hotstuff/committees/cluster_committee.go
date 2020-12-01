@@ -93,7 +93,7 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 	if isRootBlock {
 		identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
 		if !ok {
-			return nil, fmt.Errorf("node (id=%x) is not in initial cluster members", nodeID)
+			return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 		}
 		return identity, nil
 	}
@@ -104,7 +104,7 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 		return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, err)
 	}
 	if !c.clusterMemberFilter(identity) {
-		return nil, fmt.Errorf("node (id=%x) is not a valid cluster committee member", nodeID)
+		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return identity, nil
 }
