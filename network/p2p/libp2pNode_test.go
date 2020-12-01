@@ -645,7 +645,7 @@ func (suite *LibP2PNodeTestSuite) StopNode(node *Node) {
 	<-done
 }
 
-// generateNetworkingKey generates a ECDSA key pair using the given seed
+// generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
 func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
 	seed := make([]byte, fcrypto.KeyGenSeedMinLenECDSASecp256k1)
 	s := unittest.IdentifierFixture()
@@ -655,8 +655,13 @@ func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
 	return key
 }
 
+// generateLibP2PKey is a test helper that generates a ECDSA flow key pairs, and translate it to
+// libp2p key pairs. It returns both generated pairs of keys.
 func generateLibP2PKey(t *testing.T) (crypto.PrivKey, fcrypto.PrivateKey) {
+	// generates flow key
 	key := generateNetworkingKey(t)
+
+	// translates flow key into libp2p key
 	libP2Pkey, err := privKey(key)
 	require.NoError(t, err)
 
