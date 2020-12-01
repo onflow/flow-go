@@ -40,7 +40,9 @@ func init() {
 	rootBlockID = unittest.IdentifierFixture().String()
 }
 
-// GenerateIDs generate flow Identities with a valid port and networking key
+// GenerateIDs is a test helper that generate flow identities with a valid port, networking keys, and libp2p nodes.
+// If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
+// to get used.
 func GenerateIDs(t *testing.T, ctx context.Context, logger zerolog.Logger, n int, dryRunMode bool,
 	opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node,
 	[]crypto.PrivateKey) {
