@@ -67,7 +67,7 @@ type Middleware struct {
 	ov                network.Overlay
 	wg                *sync.WaitGroup
 	libP2PNode        *Node
-	libP2PHostGenFuc  LibP2PFactoryFunc
+	libP2PNodeFactory LibP2PFactoryFunc
 	me                flow.Identifier
 	host              string
 	port              string
@@ -124,7 +124,7 @@ func NewMiddleware(log zerolog.Logger,
 		host:              ip,
 		port:              port,
 		flowKey:           key,
-		libP2PHostGenFuc:  libP2PHostGenFunc,
+		libP2PNodeFactory: libP2PHostGenFunc,
 		metrics:           metrics,
 		maxPubSubMsgSize:  maxPubSubMsgSize,
 		maxUnicastMsgSize: maxUnicastMsgSize,
@@ -184,7 +184,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	// creates libp2p host and node
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
-	libP2PNode, err := m.libP2PHostGenFuc(m, nodeAddress, nodeAddrsWhiteList, psOptions...)
+	libP2PNode, err := m.libP2PNodeFactory(m, nodeAddress, nodeAddrsWhiteList, psOptions...)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
