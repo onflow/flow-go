@@ -81,7 +81,8 @@ func GenerateMiddlewares(t *testing.T, ctx context.Context, cancel context.Cance
 		// casts libP2PNode instance to a local variable to avoid closure
 		node := libP2PNodes[i]
 
-		generator := func(*p2p.Middleware, p2p.NodeAddress, []p2p.NodeAddress, ...pubsub.Option) (*p2p.Node, error) {
+		// libp2p node factory for this instance of middleware
+		factory := func(*p2p.Middleware, p2p.NodeAddress, []p2p.NodeAddress, ...pubsub.Option) (*p2p.Node, error) {
 			return node, nil
 		}
 
@@ -89,7 +90,7 @@ func GenerateMiddlewares(t *testing.T, ctx context.Context, cancel context.Cance
 		mw, err := p2p.NewMiddleware(logger,
 			ctx,
 			cancel,
-			generator,
+			factory,
 			json.NewCodec(),
 			id.Address,
 			id.NodeID,
