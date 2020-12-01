@@ -165,7 +165,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 				assert.Equal(t, 3, len(committee.leaders))
 			}
 
-			// check we have the right epochs stored
+			// check we have the correct epochs stored
 			for i := uint64(0); i < 3; i++ {
 				counter := currentEpochCounter - i
 				if counter < firstEpochCounter {
