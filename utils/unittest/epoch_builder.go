@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -163,7 +164,8 @@ func (builder *EpochBuilder) CompleteEpoch() {
 
 	// A is the first block of the next epoch (see diagram in BuildEpoch)
 	A := BlockWithParentFixture(final)
-	A.Header.View = finalView + 1
+	// first view is not necessarily exactly final view of previous epoch
+	A.Header.View = finalView + (rand.Uint64() % 4) + 1
 	A.SetPayload(flow.EmptyPayload())
 	err = builder.state.Mutate().Extend(&A)
 	require.Nil(builder.t, err)

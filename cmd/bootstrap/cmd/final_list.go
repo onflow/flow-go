@@ -188,7 +188,8 @@ func checkMisMatchingNodes(collectedNodes []model.NodeInfo, stakedNodes []model.
 	invalidCollectedNodes := make([]model.NodeInfo, 0)
 	for _, node := range collectedNodes {
 		if _, ok := stakedNodesByID[node.NodeID]; !ok {
-			log.Warn().Str("collected-node-id", node.NodeID.String()).Msg("matching staked node not found for collected node")
+			log.Warn().Str("collected-node-id", node.NodeID.String()).Str("role", node.Role.String()).Str("address", node.Address).
+				Msg("matching staked node not found for collected node")
 			invalidCollectedNodes = append(invalidCollectedNodes, node)
 		}
 	}
@@ -196,7 +197,8 @@ func checkMisMatchingNodes(collectedNodes []model.NodeInfo, stakedNodes []model.
 	invalidStakedNodes := make([]model.NodeInfo, 0)
 	for _, node := range stakedNodes {
 		if _, ok := collectedNodesByID[node.NodeID]; !ok {
-			log.Warn().Str("staked-node-id", node.NodeID.String()).Msg("matching collected node not found for staked node")
+			log.Warn().Str("staked-node-id", node.NodeID.String()).Str("role", node.Role.String()).Str("address", node.Address).
+				Msg("matching collected node not found for staked node")
 			invalidStakedNodes = append(invalidStakedNodes, node)
 		}
 	}
