@@ -142,14 +142,22 @@ func TestViewOutOfRange(t *testing.T) {
 
 	// views before first view should return error
 	t.Run("before first view", func(t *testing.T) {
-		before := rand.Uint64() % firstView
+		before := firstView - 1 // 1 before first view
+		_, err = leaders.LeaderForView(before)
+		assert.Error(t, err)
+
+		before = rand.Uint64() % firstView // random view before first view
 		_, err = leaders.LeaderForView(before)
 		assert.Error(t, err)
 	})
 
 	// views after final view should return error
 	t.Run("after final view", func(t *testing.T) {
-		after := finalView + uint64(rand.Uint32()) + 1
+		after := finalView + 1 // 1 after final view
+		_, err = leaders.LeaderForView(after)
+		assert.Error(t, err)
+
+		after = finalView + uint64(rand.Uint32()) + 1 // random view after final view
 		_, err = leaders.LeaderForView(after)
 		assert.Error(t, err)
 	})
