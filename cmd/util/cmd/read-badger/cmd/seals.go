@@ -23,6 +23,11 @@ var sealsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
+		if flagSealID != "" && flagBlockID != "" {
+			log.Fatal().Msg("provide one of the flags --id or --block-id")
+			return
+		}
+
 		if flagSealID != "" {
 			log.Info().Msgf("got flag seal id: %s", flagSealID)
 			sealID, err := flow.HexStringToIdentifier(flagSealID)

@@ -23,7 +23,7 @@ func init() {
 
 var eventsCmd = &cobra.Command{
 	Use:   "events",
-	Short: "",
+	Short: "Read events from badger",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
@@ -58,15 +58,15 @@ var eventsCmd = &cobra.Command{
 		}
 
 		if flagEventType != "" {
-			validEvents := map[string]flow.EventType{
-				"flow.AccountCreated": flow.EventAccountCreated,
-				"flow.AccountUpdated": flow.EventAccountUpdated,
-				"flow.EpochCommit":    flow.EventEpochCommit,
-				"flow.EpochSetup":     flow.EventEpochSetup,
+			validEvents := map[string]bool{
+				"flow.AccountCreated": true,
+				"flow.AccountUpdated": true,
+				"flow.EpochCommit":    true,
+				"flow.EpochSetup":     true,
 			}
-			if event, ok := validEvents[flagEventType]; ok {
+			if _, ok := validEvents[flagEventType]; ok {
 				log.Info().Msgf("getting events for block id: %v, event type: %s", blockID, flagEventType)
-				events, err := storages.Events.ByBlockIDEventType(blockID, event)
+				events, err := storages.Events.ByBlockIDEventType(blockID, flow.EventType(flagEventType))
 				if err != nil {
 					log.Fatal().Err(err).Msgf("could not get events for block id: %v, event type: %s", blockID, flagEventType)
 				}
