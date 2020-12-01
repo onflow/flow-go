@@ -37,8 +37,7 @@ type TransactionProcedure struct {
 	Err     Error
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
-	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
 	for _, p := range ctx.TransactionProcessors {
 		// TODO RAMTIN change ledger with state
 		// TODO RAMTIN (process should be called with the state, so they all share the same state)

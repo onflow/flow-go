@@ -11,11 +11,10 @@ import (
 func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
-	ledger state.Ledger,
+	st *state.State,
 	chain flow.Chain,
 	address flow.Address,
 ) (*flow.Account, error) {
-	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
 	accounts := state.NewAccounts(st)
 
 	account, err := accounts.Get(address)
@@ -33,7 +32,7 @@ func getAccount(
 		err = vm.Run(
 			ctx,
 			script,
-			ledger,
+			st.Ledger(),
 		)
 		if err != nil {
 			return nil, err

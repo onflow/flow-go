@@ -82,6 +82,10 @@ func (s *State) Rollback() error {
 	return nil
 }
 
+func (s *State) Ledger() Ledger {
+	return s.ledger
+}
+
 func (s State) updateInteraction(keySize, oldValueSize, newValueSize uint64) error {
 	s.interactionUsed += keySize + oldValueSize + newValueSize
 	if s.interactionUsed > s.maxInteractionAllowed {

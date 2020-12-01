@@ -30,6 +30,6 @@ func (d *TransactionFeeDeductor) deductFees(
 	return vm.invokeMetaTransaction(
 		ctx,
 		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress()),
-		ledger,
+		st,
 	)
 }
