@@ -17,10 +17,9 @@ var errSelectionNotComputed = fmt.Errorf("leader selection for epoch not yet com
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee persists across epochs.
 type Consensus struct {
-	mu    sync.RWMutex
-	state protocol.ReadOnlyState // the protocol state
-	me    flow.Identifier        // the node ID of this node
-	// TODO use uint16 in leader selection impl to halve memory usage
+	mu      sync.RWMutex
+	state   protocol.ReadOnlyState             // the protocol state
+	me      flow.Identifier                    // the node ID of this node
 	leaders map[uint64]*leader.LeaderSelection // pre-computed leader selection for each epoch
 }
 

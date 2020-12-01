@@ -3,6 +3,7 @@ package leader
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,7 +42,7 @@ type LeaderSelection struct {
 	//
 	// The first value in this slice corresponds to the leader index at view
 	// firstView, and so on
-	leaderIndexes []int
+	leaderIndexes []uint16
 
 	// The leader selection randomness varies for each epoch.
 	// Leader selection only returns the correct leader selection for the corresponding epoch.
@@ -116,7 +117,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 // If an identity has 0 stake (weight is 0), it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
-func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, error) {
+func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16, error) {
 	// create random number generator from the seed
 	rng, err := random.NewRand(seed)
 	if err != nil {
@@ -125,6 +126,10 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 
 	if len(weights) == 0 {
 		return nil, fmt.Errorf("weights is empty")
+	}
+
+	if len(weights) >= math.MaxUint16 {
+		return nil, fmt.Errorf("number of possible leaders (%d) exceeds maximum (2^16-1)", len(weights))
 	}
 
 	// create an array of weight ranges for each identity.
@@ -144,15 +149,15 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 		return nil, fmt.Errorf("total weight must be greater than 0")
 	}
 
-	leaders := make([]int, 0, count)
+	leaders := make([]uint16, 0, count)
 	for i := 0; i < count; i++ {
 		// pick a random number from 0 (inclusive) to cumsum (exclusive). Or [0, cumsum)
 		randomness := rng.UintN(cumsum)
 
 		// binary search to find the leader index by the random number
-		leader := binarySearch(uint64(randomness), weightSums)
+		leader := binarySearch(randomness, weightSums)
 
-		leaders = append(leaders, leader)
+		leaders = append(leaders, uint16(leader))
 	}
 	return leaders, nil
 }
