@@ -21,7 +21,7 @@ func init() {
 	_ = clusterBlocksCmd.MarkFlagRequired("chain")
 
 	clusterBlocksCmd.Flags().StringVarP(&flagClusterBlockID, "id", "i", "", "the id of the cluster block")
-	clusterBlocksCmd.Flags().Uint64VarP(&flagHeight, "height", "h", 0, "the height of the cluste rblock")
+	clusterBlocksCmd.Flags().Uint64VarP(&flagHeight, "height", "h", 0, "the height of the cluster block")
 }
 
 var clusterBlocksCmd = &cobra.Command{
