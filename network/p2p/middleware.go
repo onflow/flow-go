@@ -47,12 +47,13 @@ const (
 
 var unicastTimeout = DefaultUnicastTimeout
 
-type LibP2PHostGenFuc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Option) (*Node, error)
+// LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
+type LibP2PFactoryFunc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Option) (*Node, error)
 
-var DefaultLibP2PNodeGenerator = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
-	return NewLibP2PNode(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics),
-		mv.flowKey, true, allowList, mv.rootBlockID,
-		psOption...)
+// DefaultLibP2PNodeFactory is a factory function that receives a middleware instance and generates a libp2p Node by invoking its factory with
+// proper parameters.
+var DefaultLibP2PNodeFactory = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
+	return NewLibP2PNode(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics), mv.flowKey, true, allowList, mv.rootBlockID, psOption...)
 }
 
 // Middleware handles the input & output on the direct connections we have to
@@ -66,7 +67,7 @@ type Middleware struct {
 	ov                network.Overlay
 	wg                *sync.WaitGroup
 	libP2PNode        *Node
-	libP2PHostGenFuc  LibP2PHostGenFuc
+	libP2PHostGenFuc  LibP2PFactoryFunc
 	me                flow.Identifier
 	host              string
 	port              string
@@ -84,7 +85,7 @@ type Middleware struct {
 func NewMiddleware(log zerolog.Logger,
 	ctx context.Context,
 	cancel context.CancelFunc,
-	libP2PHostGenFunc LibP2PHostGenFuc,
+	libP2PHostGenFunc LibP2PFactoryFunc,
 	codec network.Codec,
 	address string,
 	flowID flow.Identifier,
