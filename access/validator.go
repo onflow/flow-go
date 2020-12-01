@@ -1,7 +1,6 @@
 package access
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -147,7 +146,7 @@ func (v *TransactionValidator) checkGasLimit(tx *flow.TransactionBody) error {
 	// if service account is the payer of the transaction accepts any gas limit
 	// note that even though we don't consider any limit here, exec node
 	// enforce a higher max limit for these transactions at execution time
-	if bytes.Equal(tx.Payer[:], v.serviceAccountAddress[:]) {
+	if tx.Payer == v.serviceAccountAddress {
 		return nil
 	}
 	if tx.GasLimit > v.options.MaxGasLimit {
