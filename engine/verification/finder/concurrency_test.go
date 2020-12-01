@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -251,8 +251,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 // - that a set of execution results are delivered to it.
 // - that each execution result is delivered only once.
 // SetupMockMatchEng returns the mock engine and a wait group that unblocks when all results are received.
-func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionResult) (*network.Engine, *sync.WaitGroup) {
-	eng := new(network.Engine)
+func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionResult) (*mocknetwork.Engine, *sync.WaitGroup) {
+	eng := new(mocknetwork.Engine)
 
 	// keeps track of which execution results it has received
 	receivedResults := make(map[flow.Identifier]struct{})
