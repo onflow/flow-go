@@ -273,14 +273,10 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	return nil
 }
 
-func (e *hostEnv) GenerateUUID() uint64 {
+func (e *hostEnv) GenerateUUID() (uint64, error) {
+	// TODO add not supported
 	uuid, err := e.uuidGenerator.GenerateUUID()
-	if err != nil {
-		// TODO - Return error once Cadence interface accommodates it
-		panic(fmt.Errorf("cannot get UUID: %w", err))
-	}
-
-	return uuid
+	return uuid, err
 }
 
 func (e *hostEnv) GetComputationLimit() uint64 {
@@ -340,12 +336,11 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 // Block Environment Functions
 
 // GetCurrentBlockHeight returns the current block height.
-func (e *hostEnv) GetCurrentBlockHeight() uint64 {
+func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	if e.ctx.BlockHeader == nil {
-		panic("GetCurrentBlockHeight is not supported by this environment")
+		return 0, errors.New("GetCurrentBlockHeight is not supported by this environment")
 	}
-
-	return e.ctx.BlockHeader.Height
+	return e.ctx.BlockHeader.Height, nil
 }
 
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
@@ -470,12 +465,12 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 	return e.accounts.DeleteContract(name, accountAddress)
 }
 
-func (e *hostEnv) GetSigningAccounts() []runtime.Address {
+func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	if e.transactionEnv == nil {
-		panic("GetSigningAccounts is not supported by this environment")
+		return nil, errors.New("GetSigningAccounts is not supported by this environment")
 	}
 
-	return e.transactionEnv.GetSigningAccounts()
+	return e.transactionEnv.GetSigningAccounts(), nil
 }
 
 // Transaction Environment
