@@ -2,6 +2,7 @@ package leader
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -109,9 +110,47 @@ func TestInputValidation(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	// epoch with no possible leaders should return an error
 	t.Run("epoch without participants", func(t *testing.T) {
 		identities := unittest.IdentityListFixture(0)
 		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 100, identities)
+		assert.Error(t, err)
+	})
+}
+
+// test that requesting a view outside the given range returns an error
+func TestViewOutOfRange(t *testing.T) {
+
+	firstView := uint64(100)
+	finalView := uint64(200)
+
+	identities := unittest.IdentityListFixture(4)
+	leaders, err := ComputeLeaderSelectionFromSeed(firstView, someSeed, int(finalView-firstView+1), identities)
+	require.Nil(t, err)
+
+	// confirm the selection has first/final view we expect
+	assert.Equal(t, firstView, leaders.FirstView())
+	assert.Equal(t, finalView, leaders.FinalView())
+
+	// boundary views should not return error
+	t.Run("boundary views", func(t *testing.T) {
+		_, err = leaders.LeaderForView(firstView)
+		assert.Nil(t, err)
+		_, err = leaders.LeaderForView(finalView)
+		assert.Nil(t, err)
+	})
+
+	// views before first view should return error
+	t.Run("before first view", func(t *testing.T) {
+		before := rand.Uint64() % firstView
+		_, err = leaders.LeaderForView(before)
+		assert.Error(t, err)
+	})
+
+	// views after final view should return error
+	t.Run("after final view", func(t *testing.T) {
+		after := finalView + uint64(rand.Uint32()) + 1
+		_, err = leaders.LeaderForView(after)
 		assert.Error(t, err)
 	})
 }
