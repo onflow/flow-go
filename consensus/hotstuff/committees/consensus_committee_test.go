@@ -147,9 +147,16 @@ func TestRemoveOldEpochs(t *testing.T) {
 		300,
 		unittest.SeedFixture(32),
 	)
+	epoch4 := newMockEpoch(
+		epochCounter+3,
+		identities,
+		301,
+		400,
+		unittest.SeedFixture(32),
+	)
 
 	state.On("Final").Return(snapshot)
-	epochs := mocks.NewEpochQuery(t, epochCounter, epoch1, epoch2, epoch3)
+	epochs := mocks.NewEpochQuery(t, epochCounter, epoch1, epoch2, epoch3, epoch4)
 	snapshot.On("Epochs").Return(epochs)
 
 	committee, err := NewConsensusCommittee(state, me)
@@ -161,35 +168,54 @@ func TestRemoveOldEpochs(t *testing.T) {
 
 	// when we first request a view within epoch 2, we should not remove
 	// any old epochs since we have 2 (1 & 2)
+	_, err = committee.LeaderForView(101)
 	t.Run("first transition", func(t *testing.T) {
-		_, err = committee.LeaderForView(101)
 		assert.Nil(t, err)
 		assert.Equal(t, 2, len(committee.leaders))
 	})
 
-	// when we request a view within epoch 3, we should remove epoch 1 so
-	// we have only 2 epochs (2 & 3)
+	// transition so epoch 2 is current
+	epochs.Transition()
+	// request a view in epoch 3
+	_, err = committee.LeaderForView(201)
+	assert.Nil(t, err)
+
+	// when we request a view within epoch 3, we should also not remove
+	// any old epochs since we have 3 (the maximum)
 	t.Run("second transition", func(t *testing.T) {
 
-		// request 101 first so this test doesn't depend on previous
-		_, err = committee.LeaderForView(101)
-		assert.Nil(t, err)
-		// transition so epoch 2 is current
-		epochs.Transition()
+		// should have 3 epochs stored
+		assert.Equal(t, 3, len(committee.leaders))
 
-		_, err = committee.LeaderForView(201)
-		assert.Nil(t, err)
-		assert.Equal(t, 2, len(committee.leaders))
-
-		// should have removed leader selection for epoch 1
+		// should have leader selection for epochs 1-3
 		_, has1 := committee.leaders[epochCounter]
-		assert.False(t, has1)
-
-		// should still have leader selection for epochs 2-3
 		_, has2 := committee.leaders[epochCounter+1]
 		_, has3 := committee.leaders[epochCounter+2]
+		assert.True(t, has1)
 		assert.True(t, has2)
 		assert.True(t, has3)
+	})
+
+	// transition so epoch 3 is current
+	epochs.Transition()
+	// request a view in epoch 4
+	_, err = committee.LeaderForView(301)
+	assert.Nil(t, err)
+
+	t.Run("third transition", func(t *testing.T) {
+
+		// should have 3 epochs stored (1 has been deleted)
+		assert.Equal(t, 3, len(committee.leaders))
+
+		// should have leader selection for epochs 2-4 (no 1)
+		_, has1 := committee.leaders[epochCounter]
+		_, has2 := committee.leaders[epochCounter+1]
+		_, has3 := committee.leaders[epochCounter+2]
+		_, has4 := committee.leaders[epochCounter+3]
+		assert.False(t, has1)
+		assert.True(t, has2)
+		assert.True(t, has3)
+		assert.True(t, has4)
 	})
 }
 

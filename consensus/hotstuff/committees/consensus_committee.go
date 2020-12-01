@@ -3,7 +3,6 @@ package committees
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -197,29 +196,24 @@ func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) (*leader.Leader
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection for current epoch: %w", err)
 	}
-
 	c.leaders[counter] = selection
 
-	// prune leader selection for old epochs when we have more than 2 stored
-	if len(c.leaders) <= 2 {
-		return selection, nil
-	}
+	// now prune any old epochs, if we have exceeded our maximum of 3
+	// if we have fewer than 3 epochs, this is a no-op
 
-	// create a list of counters for all the epochs we have stored
-	counters := make([]uint64, 0, len(c.leaders))
+	// find the maximum counter, including the epoch we just computed
+	max := uint64(0)
 	for counter := range c.leaders {
-		counters = append(counters, counter)
+		if counter > max {
+			max = counter
+		}
 	}
 
-	// sort counters in ascending order
-	sort.Slice(counters, func(i, j int) bool {
-		return counters[i] < counters[j]
-	})
-
-	// delete leader selection for the lowest counter until we have 2 epochs left
-	for len(c.leaders) > 2 {
-		delete(c.leaders, counters[0])
-		counters = counters[1:]
+	// remove any epochs which aren't within the most recent 3
+	for counter := range c.leaders {
+		if counter+3 <= max {
+			delete(c.leaders, counter)
+		}
 	}
 
 	return selection, nil
