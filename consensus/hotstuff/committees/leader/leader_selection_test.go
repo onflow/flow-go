@@ -1,12 +1,15 @@
-package committee
+package leader
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
@@ -66,27 +69,27 @@ func bruteSearch(value uint64, arr []uint64) (int, error) {
 }
 
 // Test given the same seed, the leader selection will produce the same selection
-func TestDeterminstic(t *testing.T) {
-	identities := []*flow.Identity{
-		{Stake: 1},
-		{Stake: 2},
-		{Stake: 3},
-		{Stake: 4},
+func TestDeterministic(t *testing.T) {
+
+	const N_VIEWS = 100
+	const N_NODES = 4
+
+	identities := unittest.IdentityListFixture(N_NODES)
+	for i, identity := range identities {
+		identity.Stake = uint64(i + 1)
 	}
 
-	count := 100
-
-	leaders1, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+	leaders1, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	leaders2, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+	leaders2, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	for i := 0; i < count; i++ {
-		l1, err := leaders1.LeaderIndexForView(uint64(i))
+	for i := 0; i < N_VIEWS; i++ {
+		l1, err := leaders1.LeaderForView(uint64(i))
 		require.NoError(t, err)
 
-		l2, err := leaders2.LeaderIndexForView(uint64(i))
+		l2, err := leaders2.LeaderForView(uint64(i))
 		require.NoError(t, err)
 
 		require.Equal(t, l1, l2)
@@ -94,14 +97,14 @@ func TestDeterminstic(t *testing.T) {
 }
 
 func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
-	identities := []*flow.Identity{
-		{Stake: 1},
-		{Stake: 2},
-		{Stake: 3},
-		{Stake: 4},
-	}
 
-	count := 100
+	const N_VIEWS = 100
+	const N_NODES = 4
+
+	identities := unittest.IdentityListFixture(N_NODES)
+	for i, identity := range identities {
+		identity.Stake = uint64(i)
+	}
 
 	seed1 := make([]byte, 16)
 	seed1[0] = 34
@@ -109,18 +112,18 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 	seed2 := make([]byte, 16)
 	seed2[0] = 8
 
-	leaders1, err := ComputeLeaderSelectionFromSeed(0, seed1, count, identities)
+	leaders1, err := ComputeLeaderSelectionFromSeed(0, seed1, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	leaders2, err := ComputeLeaderSelectionFromSeed(0, seed2, count, identities)
+	leaders2, err := ComputeLeaderSelectionFromSeed(0, seed2, N_VIEWS, identities)
 	require.NoError(t, err)
 
 	diff := 0
-	for view := 0; view < count; view++ {
-		l1, err := leaders1.LeaderIndexForView(uint64(view))
+	for view := 0; view < N_VIEWS; view++ {
+		l1, err := leaders1.LeaderForView(uint64(view))
 		require.NoError(t, err)
 
-		l2, err := leaders2.LeaderIndexForView(uint64(view))
+		l2, err := leaders2.LeaderForView(uint64(view))
 		require.NoError(t, err)
 
 		if l1 != l2 {
@@ -135,28 +138,31 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 // The number of time being selected as leader might not exactly match their weight, but also
 // won't go too far from that.
 func TestLeaderSelectionAreWeighted(t *testing.T) {
-	count := 100000
-	identities := []*flow.Identity{
-		{Stake: 1},
-		{Stake: 2},
-		{Stake: 3},
-		{Stake: 4},
+
+	const N_VIEWS = 100000
+	const N_NODES = 4
+
+	identities := unittest.IdentityListFixture(N_NODES)
+	for i, identity := range identities {
+		identity.Stake = uint64(i + 1)
 	}
 
-	leaders, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+	leaders, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	selected := make([]uint64, 4)
-	for view := 0; view < count; view++ {
-		index, err := leaders.LeaderIndexForView(uint64(view))
+	selected := make(map[flow.Identifier]uint64)
+	for view := 0; view < N_VIEWS; view++ {
+		nodeID, err := leaders.LeaderForView(uint64(view))
 		require.NoError(t, err)
 
-		selected[index]++
+		selected[nodeID]++
 	}
 
 	fmt.Printf("selected for weights [1,2,3,4]: %v\n", selected)
-	for i, selectedCount := range selected {
-		target := uint64(count) * identities[i].Stake / 10
+	for nodeID, selectedCount := range selected {
+		identity, ok := identities.ByNodeID(nodeID)
+		require.True(t, ok)
+		target := uint64(N_VIEWS) * identity.Stake / 10
 
 		var diff uint64
 		if selectedCount > target {
@@ -166,35 +172,30 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 		}
 
 		// difference should be less than 2%
-		stdDiff := count / 10 * 2 / 100
+		stdDiff := N_VIEWS / 10 * 2 / 100
 		require.Less(t, diff, uint64(stdDiff))
 	}
 }
 
 func BenchmarkLeaderSelection(b *testing.B) {
-	nodes := 20
-	identities := make([]*flow.Identity, 0, nodes)
 
-	for i := 0; i < nodes; i++ {
-		identities = append(identities, &flow.Identity{
-			Stake: uint64(i),
-		})
+	const N_VIEWS = 15000000
+	const N_NODES = 20
+
+	identities := make([]*flow.Identity, 0, N_NODES)
+	for i := 0; i < N_NODES; i++ {
+		identities = append(identities, unittest.IdentityFixture(unittest.WithStake(uint64(i))))
 	}
 
 	for n := 0; n < b.N; n++ {
-		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 15000000, identities)
+		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 
 		require.NoError(b, err)
 	}
 }
 
 func TestInvalidTotalWeight(t *testing.T) {
-	identities := []*flow.Identity{
-		{Stake: 0},
-		{Stake: 0},
-		{Stake: 0},
-		{Stake: 0},
-	}
+	identities := unittest.IdentityListFixture(4, unittest.WithStake(0))
 	_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 10, identities)
 	require.Error(t, err)
 }
@@ -204,48 +205,31 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 	// check that if there is some zero staked node, the selections for each view should be the same as
 	// with no zero staked nodes.
 	t.Run("small dataset", func(t *testing.T) {
-		identities := []*flow.Identity{
-			{Stake: 0},
-			{Stake: 0},
-			{Stake: 1},
-			{Stake: 0},
-			{Stake: 0},
-			{Stake: 2},
-			{Stake: 3},
-			{Stake: 4},
-			{Stake: 0},
-			{Stake: 0},
+		const N_VIEWS = 100
+
+		stakeless := unittest.IdentityListFixture(5, unittest.WithStake(0))
+		stakeful := unittest.IdentityListFixture(5)
+		for i, identity := range stakeful {
+			identity.Stake = uint64(i + 1)
 		}
 
-		// different identity with the same stake are different
-		require.NotSame(t, identities[0], identities[1])
+		identities := append(stakeless, stakeful...)
 
-		withoutZeros := make([]*flow.Identity, 0)
-		for _, id := range identities {
-			if id.Stake > 0 {
-				withoutZeros = append(withoutZeros, id)
-			}
-		}
-
-		// same identities are the same
-		require.Same(t, identities[2], withoutZeros[0])
-
-		count := 100
-		selections, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+		selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 		require.NoError(t, err)
 
-		selectionsWithNoZeros, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, withoutZeros)
+		selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, stakeful)
 		require.NoError(t, err)
 
-		for i := 0; i < count; i++ {
-			index, err := selections.LeaderIndexForView(uint64(i))
+		for i := 0; i < N_VIEWS; i++ {
+			nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
-			indexWithout, err := selectionsWithNoZeros.LeaderIndexForView(uint64(i))
+			nodeIDFromStakeful, err := selectionFromStakeful.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
 			// the selection should be the same
-			require.Same(t, withoutZeros[indexWithout], identities[index])
+			require.Equal(t, nodeIDFromAll, nodeIDFromStakeful)
 		}
 	})
 
@@ -255,10 +239,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			// create 1002 nodes with all 0 stake
-			identities := make([]*flow.Identity, 0, 1002)
-			for i := 0; i < 1002; i++ {
-				identities = append(identities, &flow.Identity{Stake: 0})
-			}
+			identities := unittest.IdentityListFixture(1002, unittest.WithStake(0))
 
 			// create 2 nodes with 1 stake, and place them in between
 			// index 233-777
@@ -268,52 +249,46 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 			identities[m].Stake = 1
 
 			// the following code check the zero staker should not be selected
-			withoutZeros := make([]*flow.Identity, 0)
-			for _, id := range identities {
-				if id.Stake > 0 {
-					withoutZeros = append(withoutZeros, id)
-				}
-			}
+			stakeful := identities.Filter(filter.HasStake(true))
 
 			count := 1000
-			selections, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+			selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
 			require.NoError(t, err)
 
-			selectionsWithNoZeros, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, withoutZeros)
+			selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, stakeful)
 			require.NoError(t, err)
 
 			for i := 0; i < count; i++ {
-				index, err := selections.LeaderIndexForView(uint64(i))
+				nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 				require.NoError(t, err)
 
-				indexWithout, err := selectionsWithNoZeros.LeaderIndexForView(uint64(i))
+				nodeIDFromStakeful, err := selectionFromStakeful.LeaderForView(uint64(i))
 				require.NoError(t, err)
 
 				// the selection should be the same
-				require.Same(t, withoutZeros[indexWithout], identities[index])
+				require.Equal(t, nodeIDFromStakeful, nodeIDFromAll)
 			}
 		}
 
 		t.Run("if there is only 1 node has stake, then it will be always be the leader and the only leader", func(t *testing.T) {
 			rng, err := random.NewRand(someSeed)
 			require.NoError(t, err)
+
 			for i := 0; i < 100; i++ {
-				identities := make([]*flow.Identity, 0, 1000)
-				for i := 0; i < 1000; i++ {
-					identities = append(identities, &flow.Identity{Stake: 0})
-				}
+				identities := unittest.IdentityListFixture(1000, unittest.WithStake(0))
 
 				n := rng.UintN(1000)
 				stake := n + 1
 				identities[n].Stake = stake
+				onlyStaked := identities[n]
 
 				selections, err := ComputeLeaderSelectionFromSeed(0, someSeed, 1000, identities)
 				require.NoError(t, err)
 
 				for i := 0; i < 1000; i++ {
-					index, err := selections.LeaderIndexForView(uint64(i))
+					nodeID, err := selections.LeaderForView(uint64(i))
 					require.NoError(t, err)
-					require.Equal(t, stake, identities[index].Stake)
+					require.Equal(t, onlyStaked.NodeID, nodeID)
 				}
 			}
 		})

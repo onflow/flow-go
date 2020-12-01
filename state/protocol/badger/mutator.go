@@ -153,6 +153,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 
 		// 5) initialize values related to the epoch logic
+		setup.FirstView = root.Header.View // cache the first view of the epoch
 		err = m.state.epoch.setups.StoreTx(setup)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert EpochSetup event: %w", err)
@@ -864,6 +865,9 @@ func (m *Mutator) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) er
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("invalid epoch setup: %s", err)
 				}
+
+				// cache the first view to simplify epoch queries later on
+				ev.FirstView = activeSetup.FinalView + 1
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
 				epochStatus.NextEpoch.SetupID = ev.ID()
