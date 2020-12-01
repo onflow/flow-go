@@ -64,7 +64,7 @@ func bootstrapLibP2PHost(ctx context.Context,
 
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
 	if err != nil {
-		return nil, fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
+		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}
 
 	// create a transport which disables port reuse and web socket.
