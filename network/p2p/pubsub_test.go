@@ -79,7 +79,7 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan string, count)
 	for _, n := range nodes {
-		m := n.nodeAddress.Name
+		m := n.name
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(suite.ctx)
@@ -124,8 +124,8 @@ func (suite *PubSubTestSuite) TestPubSub() {
 		case <-time.After(3 * time.Second):
 			missing := make([]string, 0)
 			for _, n := range nodes {
-				if _, found := recv[n.nodeAddress.Name]; !found {
-					missing = append(missing, n.nodeAddress.Name)
+				if _, found := recv[n.name]; !found {
+					missing = append(missing, n.name)
 				}
 			}
 			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
