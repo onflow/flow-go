@@ -269,7 +269,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
