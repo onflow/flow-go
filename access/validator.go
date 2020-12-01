@@ -144,8 +144,8 @@ func (v *TransactionValidator) checkMissingFields(tx *flow.TransactionBody) erro
 
 func (v *TransactionValidator) checkGasLimit(tx *flow.TransactionBody) error {
 	// if service account is the payer of the transaction accepts any gas limit
-	// note that even though we don't consider any limit here, exec node
-	// enforce a higher max limit for these transactions at execution time
+	// note that even though we don't enforce any limit here, exec node later
+	// enforce a max value for any transaction
 	if tx.Payer == v.serviceAccountAddress {
 		return nil
 	}
