@@ -186,12 +186,12 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 	libP2PNode, err := m.libP2PNodeFactory(m, nodeAddress, nodeAddrsWhiteList, psOptions...)
 	if err != nil {
-		return fmt.Errorf("could not create libp2p host: %w", err)
+		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetStreamHandler(m.handleIncomingStream)
 
-	libp2pConnector, err := newLibp2pConnector(libP2PNode.Host())
+	libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host())
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
