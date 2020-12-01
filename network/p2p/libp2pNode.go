@@ -51,12 +51,12 @@ type NodeAddress struct {
 // Node is a wrapper around LibP2P host.
 type Node struct {
 	sync.Mutex
-	libP2PHost           *libP2PHostWrapper              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	logger               zerolog.Logger                  // for logging
+	libP2PHost           *libP2PHostWrapper              // used to provide unicast and pubsub services
+	logger               zerolog.Logger                  // used to provide logging
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
-	nodeAddress          NodeAddress
-	flowLibP2PProtocolID protocol.ID // the unique protocol ID
+	nodeAddress          NodeAddress                     // used to encapsulate identity of node at network layer
+	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 }
 
 func NewLibP2PNode(ctx context.Context,

@@ -22,9 +22,9 @@ import (
 // Purpose of encapsulation is to ease passing the entire libp2p host affiliated components
 // around.
 type libP2PHostWrapper struct {
-	connGater *connGater
-	host      host.Host
-	pubSub    *pubsub.PubSub
+	connGater *connGater     // used to provide white listing
+	host      host.Host      // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	pubSub    *pubsub.PubSub // reference to the libp2p PubSub component
 }
 
 // ConnectionGater returns `connGater` component of the libP2PHostWrapper.

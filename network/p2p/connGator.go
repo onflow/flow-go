@@ -13,7 +13,7 @@ import (
 
 var _ connmgr.ConnectionGater = (*connGater)(nil)
 
-// connGater is the implementatiion of the libp2p connmgr.ConnectionGater interface
+// connGater is the implementation of the libp2p connmgr.ConnectionGater interface
 // It provides node allowlisting by libp2p peer.ID which is derived from the node public networking key
 type connGater struct {
 	sync.RWMutex
