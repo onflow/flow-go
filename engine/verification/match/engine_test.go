@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -42,7 +42,7 @@ type MatchEngineTestSuite struct {
 	myID    flow.Identifier
 	head    *flow.Header
 
-	con *network.Conduit
+	con *mocknetwork.Conduit
 
 	headers          *storage.Headers
 	headerDB         map[flow.Identifier]*flow.Header
@@ -50,7 +50,7 @@ type MatchEngineTestSuite struct {
 	snapshot         *protocol.Snapshot
 	results          *stdmap.ResultDataPacks
 	chunkIDsByResult *mempool.IdentifierMap
-	verifier         *network.Engine
+	verifier         *mocknetwork.Engine
 	chunks           *match.Chunks
 	assigner         *module.ChunkAssigner
 }
@@ -105,7 +105,7 @@ func (suite *MatchEngineTestSuite) SetupTest() {
 
 	// setup other dependencies
 	suite.results = stdmap.NewResultDataPacks(10)
-	suite.verifier = &network.Engine{}
+	suite.verifier = &mocknetwork.Engine{}
 	suite.assigner = &module.ChunkAssigner{}
 	suite.metrics = &module.VerificationMetrics{}
 	suite.chunkIDsByResult = &mempool.IdentifierMap{}

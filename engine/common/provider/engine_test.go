@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -58,7 +58,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final, nil)
 
-	con := &network.Conduit{}
+	con := &mocknetwork.Conduit{}
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
@@ -131,7 +131,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final, nil)
 
-	con := &network.Conduit{}
+	con := &mocknetwork.Conduit{}
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
@@ -204,7 +204,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final, nil)
 
-	con := &network.Conduit{}
+	con := &mocknetwork.Conduit{}
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			response := args.Get(0).(*messages.EntityResponse)
@@ -271,7 +271,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final, nil)
 
-	con := &network.Conduit{}
+	con := &mocknetwork.Conduit{}
 
 	provide := Engine{
 		metrics:  metrics.NewNoopCollector(),

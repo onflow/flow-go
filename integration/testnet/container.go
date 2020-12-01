@@ -3,6 +3,7 @@ package testnet
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -17,9 +18,18 @@ import (
 )
 
 var (
+	defaultRegistry = "gcr.io/dl-flow"
+
 	checkContainerTimeout = time.Second * 10
 	checkContainerPeriod  = time.Millisecond * 50
 )
+
+func init() {
+	registry := os.Getenv("CONTAINER_REGISTRY")
+	if len(registry) > 0 {
+		defaultRegistry = registry
+	}
+}
 
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
@@ -33,9 +43,9 @@ type ContainerConfig struct {
 // ImageName returns the Docker image name for the given config.
 func (c *ContainerConfig) ImageName() string {
 	if c.Ghost {
-		return "gcr.io/dl-flow/ghost:latest"
+		return defaultRegistry + "/ghost:latest"
 	}
-	return fmt.Sprintf("gcr.io/dl-flow/%s:latest", c.Role.String())
+	return fmt.Sprintf("%s/%s:latest", defaultRegistry, c.Role.String())
 }
 
 // Container represents a test Docker container for a generic Flow node.

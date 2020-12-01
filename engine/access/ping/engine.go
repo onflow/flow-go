@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network/gossip/libp2p"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -22,7 +22,7 @@ type Engine struct {
 
 	pingEnabled  bool
 	pingInterval time.Duration
-	middleware   *libp2p.Middleware
+	middleware   *p2p.Middleware
 }
 
 func New(
@@ -31,7 +31,7 @@ func New(
 	me module.Local,
 	metrics module.PingMetrics,
 	pingEnabled bool,
-	mw *libp2p.Middleware,
+	mw *p2p.Middleware,
 ) (*Engine, error) {
 	eng := &Engine{
 		unit:         engine.NewUnit(),

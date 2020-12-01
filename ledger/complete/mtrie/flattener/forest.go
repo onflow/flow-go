@@ -126,9 +126,6 @@ func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
 		if err != nil {
 			return nil, fmt.Errorf("restoring trie failed: %w", err)
 		}
-		if !mtrie.IsAValidTrie() {
-			return nil, fmt.Errorf("restoring trie failed: the constructed trie is not a valid trie")
-		}
 		if !bytes.Equal(storableTrie.RootHash, mtrie.RootHash()) {
 			return nil, fmt.Errorf("restoring trie failed: roothash doesn't match")
 		}
