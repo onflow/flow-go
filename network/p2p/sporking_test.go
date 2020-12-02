@@ -42,7 +42,7 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	node1, address1 := suite.CreateNode("node1", node1key, "0.0.0.0", "0", rootBlockID, nil, false)
 	defer suite.StopNode(node1)
 	suite.T().Logf(" %s node started on %s:%s", node1.name, address1.IP, address1.Port)
-	suite.T().Logf("libp2p ID for %s: %s", node1.name, node1.libP2PHost.Host().ID())
+	suite.T().Logf("libp2p ID for %s: %s", node1.name, node1.host.ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())

@@ -152,16 +152,16 @@ func (suite *LibP2PNodeTestSuite) TestAddPeers() {
 	}
 
 	// Checks if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].libP2PHost.Host().Peerstore().Peers(), count)
+	assert.Len(suite.T(), nodes[0].host.Peerstore().Peers(), count)
 
 	// Checks whether the first node is connected to the rest
-	for _, peer := range nodes[0].libP2PHost.Host().Peerstore().Peers() {
+	for _, peer := range nodes[0].host.Peerstore().Peers() {
 		// A node is also a peer to itself but not marked as connected, hence skip checking that.
-		if nodes[0].libP2PHost.Host().ID().String() == peer.String() {
+		if nodes[0].host.ID().String() == peer.String() {
 			continue
 		}
 		assert.Eventuallyf(suite.T(), func() bool {
-			return network.Connected == nodes[0].libP2PHost.Host().Network().Connectedness(peer)
+			return network.Connected == nodes[0].host.Network().Connectedness(peer)
 		}, 2*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
 	}
 }
@@ -181,16 +181,16 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 	}
 
 	// check if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].libP2PHost.Host().Peerstore().Peers(), count)
+	assert.Len(suite.T(), nodes[0].host.Peerstore().Peers(), count)
 
 	// check whether the first node is connected to the rest
-	for _, peer := range nodes[0].libP2PHost.Host().Peerstore().Peers() {
+	for _, peer := range nodes[0].host.Peerstore().Peers() {
 		// A node is also a peer to itself but not marked as connected, hence skip checking that.
-		if nodes[0].libP2PHost.Host().ID().String() == peer.String() {
+		if nodes[0].host.ID().String() == peer.String() {
 			continue
 		}
 		assert.Eventually(suite.T(), func() bool {
-			return network.Connected == nodes[0].libP2PHost.Host().Network().Connectedness(peer)
+			return network.Connected == nodes[0].host.Network().Connectedness(peer)
 		}, 2*time.Second, tickForAssertEventually)
 	}
 
@@ -199,7 +199,7 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, p))
 		pInfo, err := GetPeerInfo(p)
 		assert.NoError(suite.T(), err)
-		assert.Equal(suite.T(), network.NotConnected, nodes[0].libP2PHost.Host().Network().Connectedness(pInfo.ID))
+		assert.Equal(suite.T(), network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
 }
 
@@ -216,7 +216,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 
 	flowProtocolID := generateProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(suite.T(), 0, CountStream(nodes[0].libP2PHost.Host(), nodes[1].libP2PHost.Host().ID(), flowProtocolID, network.DirOutbound))
+	require.Equal(suite.T(), 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
@@ -226,9 +226,9 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 		require.NoError(suite.T(), err)
 		require.NotNil(suite.T(), anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(suite.T(), i+1, CountStream(nodes[0].libP2PHost.Host(), nodes[1].libP2PHost.Host().ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(suite.T(), i+1, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 		// assert that the same connection is reused
-		require.Len(suite.T(), nodes[0].libP2PHost.Host().Network().Conns(), 1)
+		require.Len(suite.T(), nodes[0].host.Network().Conns(), 1)
 		streams = append(streams, anotherStream)
 	}
 
@@ -243,7 +243,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 		}()
 		wg.Wait()
 		// assert that the stream count within libp2p decremented
-		require.Equal(suite.T(), i, CountStream(nodes[0].libP2PHost.Host(), nodes[1].libP2PHost.Host().ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(suite.T(), i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 	}
 }
 

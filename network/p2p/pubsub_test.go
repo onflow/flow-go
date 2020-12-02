@@ -101,8 +101,8 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	// Step 3: Now setup discovery to allow nodes to find each other
 	var pInfos []peer.AddrInfo
 	for _, n := range nodes {
-		id := n.libP2PHost.Host().ID()
-		addrs := n.libP2PHost.Host().Addrs()
+		id := n.host.ID()
+		addrs := n.host.Addrs()
 		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
 	}
 	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
