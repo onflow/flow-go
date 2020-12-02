@@ -63,7 +63,8 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	ledger := state.NewMapLedger()
 
-	accounts := state.NewAccounts(ledger)
+	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	accounts := state.NewAccounts(st)
 	address := flow.HexToAddress("01")
 
 	err := accounts.Create(nil, address)
@@ -87,7 +88,9 @@ func (l *TestLedger) Set(_, _, key string, value flow.RegisterValue) error {
 	if key == "contract_names" {
 		l.contracts = value
 	}
+	return nil
 }
+
 func (l *TestLedger) Get(_, _, key string) (flow.RegisterValue, error) {
 	if key == "exists" {
 		return []byte("1"), nil
@@ -97,15 +100,22 @@ func (l *TestLedger) Get(_, _, key string) (flow.RegisterValue, error) {
 	}
 	return nil, nil
 }
-func (l *TestLedger) Touch(_, _, _ string) error  {}
-func (l *TestLedger) Delete(_, _, _ string) error {}
+func (l *TestLedger) Touch(_, _, _ string) error {
+	return nil
+}
+func (l *TestLedger) Delete(_, _, _ string) error {
+	return nil
+}
 
 func TestAccounts_SetContracts(t *testing.T) {
 	address := flow.HexToAddress("0x01")
 
 	t.Run("Setting a contract puts it in Contracts", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger)
+
+		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+
+		a := state.NewAccounts(st)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
 		require.NoError(t, err)
@@ -118,7 +128,9 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting a contract again, does not add it to contracts", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger)
+		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+
+		a := state.NewAccounts(st)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
 		require.NoError(t, err)
@@ -134,7 +146,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting more contracts always keeps them sorted", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger)
+		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		a := state.NewAccounts(st)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
 		require.NoError(t, err)
@@ -155,14 +168,16 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Removing a contract does not fail if there is none", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger)
+		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		a := state.NewAccounts(st)
 
 		err := a.DeleteContract("Dummy", address)
 		require.NoError(t, err)
 	})
 	t.Run("Removing a contract removes it", func(t *testing.T) {
 		ledger := TestLedger{}
-		a := state.NewAccounts(&ledger)
+		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		a := state.NewAccounts(st)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
 		require.NoError(t, err)

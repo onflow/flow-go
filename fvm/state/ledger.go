@@ -48,6 +48,10 @@ func (m MapLedger) Touch(owner, controller, key string) error {
 	return nil
 }
 
+func (m MapLedger) Delete(owner, controller, key string) {
+	delete(m.RegisterTouches, fullKey(owner, controller, key))
+}
+
 func fullKey(owner, controller, key string) string {
 	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
 	return strings.Join([]string{owner, controller, key}, "\x1F")

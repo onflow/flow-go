@@ -54,7 +54,9 @@ func prepare(executeTxResult error) (error, *bytes.Buffer) {
 
 	context := NewContext(log)
 
-	err := txInvocator.Process(vm, context, proc, ledger)
+	st := state.NewState(ledger, context.MaxStateKeySize, context.MaxStateValueSize, context.MaxStateInteractionSize)
+
+	err := txInvocator.Process(vm, context, proc, st)
 
 	return err, buffer
 }
@@ -196,7 +198,9 @@ func TestTopShotSafety(t *testing.T) {
 
 		context := NewContext(log)
 
-		err = txInvocator.Process(vm, context, proc, ledger)
+		st := state.NewState(ledger, context.MaxStateKeySize, context.MaxStateValueSize, context.MaxStateInteractionSize)
+
+		err = txInvocator.Process(vm, context, proc, st)
 		require.Error(t, err)
 
 		expected := addressToSpewBytesString(topShotContractAddress)

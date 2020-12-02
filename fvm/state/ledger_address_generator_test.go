@@ -12,19 +12,22 @@ import (
 func Test_NewLedgerBoundAddressGenerator_NoError(t *testing.T) {
 	ledger := state.NewMapLedger()
 	chain := flow.MonotonicEmulator.Chain()
-	_, err := state.NewLedgerBoundAddressGenerator(ledger, chain)
+	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	_, err := state.NewLedgerBoundAddressGenerator(st, chain)
 	require.NoError(t, err)
 }
 
 func Test_NewLedgerBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	ledger := state.NewMapLedger()
 	chain := flow.MonotonicEmulator.Chain()
-	generator, err := state.NewLedgerBoundAddressGenerator(ledger, chain)
+	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	generator, err := state.NewLedgerBoundAddressGenerator(st, chain)
 	require.NoError(t, err)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
+	st.Commit()
 	stateBytes, err := ledger.Get("", "", "account_address_state")
 	require.NoError(t, err)
 
@@ -35,12 +38,14 @@ func Test_NewLedgerBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	ledger := state.NewMapLedger()
 	ledger.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
 	chain := flow.MonotonicEmulator.Chain()
-	generator, err := state.NewLedgerBoundAddressGenerator(ledger, chain)
+	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	generator, err := state.NewLedgerBoundAddressGenerator(st, chain)
 	require.NoError(t, err)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
+	st.Commit()
 	stateBytes, err := ledger.Get("", "", "account_address_state")
 	require.NoError(t, err)
 

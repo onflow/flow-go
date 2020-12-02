@@ -9,9 +9,16 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
+const (
+	MaxStateKeySize         = 1000
+	MaxStateValueSize       = 10000
+	MaxStateInteractionSize = 10000
+)
+
 func Test_GenerateUUID(t *testing.T) {
 	ledger := state.NewMapLedger()
-	uuidsA := state.NewUUIDs(ledger)
+	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	uuidsA := state.NewUUIDs(st)
 	genA := fvm.NewUUIDGenerator(uuidsA)
 
 	uuidA, err := genA.GenerateUUID()
@@ -26,7 +33,7 @@ func Test_GenerateUUID(t *testing.T) {
 	require.Equal(t, uint64(2), uuidC)
 
 	// Create new generator instance from same ledger
-	uuidsB := state.NewUUIDs(ledger)
+	uuidsB := state.NewUUIDs(st)
 	genB := fvm.NewUUIDGenerator(uuidsB)
 
 	uuidD, err := genB.GenerateUUID()
