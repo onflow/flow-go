@@ -29,7 +29,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID = unittest.IdentifierFixture().String
+var rootBlockID = unittest.IdentifierFixture().String()
 
 const DryRun = true
 
