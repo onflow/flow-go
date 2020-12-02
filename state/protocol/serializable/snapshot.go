@@ -19,7 +19,7 @@ type snapshot struct {
 	commit     flow.StateCommitment
 	qc         *flow.QuorumCertificate
 	phase      flow.EpochPhase
-	epochs     epochQuery
+	epochs     *epochQuery
 }
 
 func (s *snapshot) Head() (*flow.Header, error) {
@@ -37,7 +37,7 @@ func (s *snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 func (s *snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, ok := s.identities.ByNodeID(nodeID)
 	if !ok {
-		return nil, protocol.IdentityNotFoundErr{NodeID: nodeID}
+		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return identity, nil
 }

@@ -14,7 +14,7 @@ type epoch struct {
 	initialIdentities flow.IdentityList
 	clustering        flow.ClusterList
 	clusters          []cluster
-	dkg               dkg
+	dkg               *dkg
 }
 
 type epochQuery struct {
@@ -25,6 +25,10 @@ type epochQuery struct {
 
 func (e *epoch) Counter() (uint64, error) {
 	return e.counter, nil
+}
+
+func (e *epoch) FirstView() (uint64, error) {
+	return e.firstView, nil
 }
 
 func (e *epoch) FinalView() (uint64, error) {
@@ -48,7 +52,7 @@ func (e *epoch) Cluster(i uint) (protocol.Cluster, error) {
 }
 
 func (e *epoch) DKG() (protocol.DKG, error) {
-	return e.dkg
+	return e.dkg, nil
 }
 
 func (eq *epochQuery) Previous() protocol.Epoch {
