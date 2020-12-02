@@ -10,16 +10,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const (
-	maxKeySize         = 10_000_000
-	maxValueSize       = 10_000_000
-	maxInteractionSize = 100_000_000
-)
-
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	l := newLed(payloads)
-
-	st := state.NewState(l, maxKeySize, maxValueSize, maxInteractionSize)
+	st := state.NewState(l)
 	a := state.NewAccounts(st)
 
 	coreContractEncodedKey := "f847b8402b0bf247520770a4bad19e07f6d6b1e8f0542da564154087e2681b175b4432ec2c7b09a52d34dabe0a887ea0f96b067e52c6a0792dcff730fe78a6c5fbbf0a9c02038203e8"
