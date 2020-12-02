@@ -68,7 +68,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	log := unittest.Logger().With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
 
 	dbDir := unittest.TempDir(t)
-	db := unittest.BadgerDB(t, dbDir)
+	db := unittest.BadgerDB(t, dbDir, true)
 
 	metrics := metrics.NewNoopCollector()
 	tracer, err := trace.NewTracer(log, "test")

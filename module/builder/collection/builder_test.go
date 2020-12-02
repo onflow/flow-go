@@ -2,7 +2,6 @@ package collection_test
 
 import (
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -31,8 +30,7 @@ var noopSetter = func(*flow.Header) error { return nil }
 
 type BuilderSuite struct {
 	suite.Suite
-	db    *badger.DB
-	dbdir string
+	db *badger.DB
 
 	genesis *model.Block
 	chainID flow.ChainID
@@ -63,8 +61,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	suite.pool = stdmap.NewTransactions(1000)
 
-	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.db = unittest.BadgerDB(suite.T(), "", true)
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -87,8 +84,6 @@ func (suite *BuilderSuite) SetupTest() {
 // runs after each test finishes
 func (suite *BuilderSuite) TearDownTest() {
 	err := suite.db.Close()
-	suite.Assert().Nil(err)
-	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().Nil(err)
 }
 
@@ -824,12 +819,9 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		suite.pool = stdmap.NewTransactions(1000)
 
-		suite.dbdir = unittest.TempDir(b)
-		suite.db = unittest.BadgerDB(b, suite.dbdir)
+		suite.db = unittest.BadgerDB(b, "", true)
 		defer func() {
 			err = suite.db.Close()
-			assert.Nil(b, err)
-			err = os.RemoveAll(suite.dbdir)
 			assert.Nil(b, err)
 		}()
 

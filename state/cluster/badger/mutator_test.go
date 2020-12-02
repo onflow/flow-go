@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -28,8 +27,7 @@ import (
 
 type MutatorSuite struct {
 	suite.Suite
-	db    *badger.DB
-	dbdir string
+	db *badger.DB
 
 	genesis *model.Block
 	chainID flow.ChainID
@@ -52,8 +50,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
-	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.db = unittest.BadgerDB(suite.T(), "", true)
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -72,8 +69,6 @@ func (suite *MutatorSuite) SetupTest() {
 // runs after each test finishes
 func (suite *MutatorSuite) TearDownTest() {
 	err := suite.db.Close()
-	suite.Assert().Nil(err)
-	err = os.RemoveAll(suite.dbdir)
 	suite.Assert().Nil(err)
 }
 
