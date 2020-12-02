@@ -225,15 +225,28 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("header does not compliance the chain state: %w", err)
 	}
 
+	// Get the latest seal in the fork that ends with the candidate's parent.
+	// The protocol state saves this information for each block that has been
+	// successfully added to the chain tree (even when the added block does not
+	// itself contain a seal). We just called `headerExtend` to check that the
+	// candidate block's header is a valid extension of the chain, which implies
+	// that the parent must already be part of the chain tree. Therefore, _not_
+	// finding the latest sealed block in the fork up to the parent constitutes
+	// a fatal internal error.
+	lastSealUpToParent, err := m.state.seals.ByBlockID(candidate.Header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve parent seal (%x): %w", candidate.Header.ParentID, err)
+	}
+
 	// check if the guarantees in the payload is a valid extension of the finalized state
 	err = m.guaranteeExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
 	}
 
-	// check if the seals in the payload is a valid extension of the finalized state
-	// return the last seal at the parent block
-	last, err := m.sealExtend(candidate)
+	// check if the seals in the payload is a valid extension of the finalized
+	// state, return the last seal at the candidate block
+	last, err := m.sealExtend(candidate, lastSealUpToParent)
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
@@ -408,7 +421,16 @@ func (m *Mutator) guaranteeExtend(candidate *flow.Block) error {
 // form a valid chain on top of the last seal as of the parent of `candidate`,
 // and should only correspond to blocks and execution results incorporated on
 // the current fork.
-func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
+//
+// Note that we don't explicitly check that sealed results satisfy the sub-graph
+// check. Nevertheless, correctness in this regard is guaranteed because:
+//  * We only allow seals that correspond to ExecutionReceipts that were
+//    incorporated in this fork.
+//  * We only include ExecutionReceipts whose results pass the sub-graph check
+//    (as part of ReceiptValidator).
+// => Therefore, only seals whose results pass the sub-graph check will be
+//    allowed.
+func (m *Mutator) sealExtend(candidate *flow.Block, lastSealUpToParent *flow.Seal) (*flow.Seal, error) {
 
 	blockID := candidate.ID()
 	m.state.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
@@ -417,19 +439,7 @@ func (m *Mutator) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
 
-	// Get the latest seal in the fork that ends with block `ParentID`.  The
-	// protocol state saves this information for each block that has been
-	// successfully added to the chain tree (even when the added block does not
-	// itself contain a seal). Prior to entering this method, we check in
-	// `headerExtend` that the candidate block's header is a valid extension of
-	// the chain. Reaching this payload check here implies that `headerExtend`
-	// passed successfully, i.e. the parent must already be part of the chain
-	// tree. Therefore, _not_ finding the latest sealed block in the fork up to
-	// the parent constitutes a fatal internal error.
-	last, err := m.state.seals.ByBlockID(header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
-	}
+	last := lastSealUpToParent
 
 	// if there is no seal in the block payload, use the last sealed block of
 	// the parent block as the last sealed block of the given block.
