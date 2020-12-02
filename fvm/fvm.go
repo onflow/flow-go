@@ -27,13 +27,20 @@ func New(rt runtime.Runtime) *VirtualMachine {
 
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger) error {
-	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
+
+	st := state.NewState(ledger, state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
+		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
+		state.WithMaxInteractionAllowed(ctx.MaxStateInteractionSize))
+
 	return proc.Run(vm, ctx, st)
 }
 
 // GetAccount returns an account by address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger state.Ledger) (*flow.Account, error) {
-	st := state.NewState(ledger, ctx.MaxStateKeySize, ctx.MaxStateValueSize, ctx.MaxStateInteractionSize)
+	st := state.NewState(ledger, state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
+		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
+		state.WithMaxInteractionAllowed(ctx.MaxStateInteractionSize))
+
 	account, err := getAccount(vm, ctx, st, ctx.Chain, address)
 	if err != nil {
 		// TODO: wrap error

@@ -8,9 +8,9 @@ const (
 	defaultMaxKeySize         = 16_000     // ~16KB
 	defaultMaxValueSize       = 32_000_000 // ~32MB
 	defaultMaxInteractionSize = 64_000_000 // ~64MB
-	defaultGasLimit           = 100_000    // 100K
 )
 
+type StateOption func(st *State) *State
 type State struct {
 	ledger                Ledger
 	draft                 map[string]payload
@@ -20,14 +20,47 @@ type State struct {
 	maxInteractionAllowed uint64
 }
 
-func NewState(ledger Ledger, maxKeySizeAllowed, maxValueSizeAllowed, maxInteractionAllowed uint64) *State {
+func defaultState(ledger Ledger) *State {
 	return &State{
 		ledger:                ledger,
 		interactionUsed:       uint64(0),
 		draft:                 make(map[string]payload, 0),
-		maxKeySizeAllowed:     maxKeySizeAllowed,
-		maxValueSizeAllowed:   maxValueSizeAllowed,
-		maxInteractionAllowed: maxInteractionAllowed,
+		maxKeySizeAllowed:     defaultMaxKeySize,
+		maxValueSizeAllowed:   defaultMaxValueSize,
+		maxInteractionAllowed: defaultMaxInteractionSize,
+	}
+}
+
+// NewState constucts a new state
+func NewState(ledger Ledger, opts ...StateOption) *State {
+	ctx := defaultState(ledger)
+	for _, applyOption := range opts {
+		ctx = applyOption(ctx)
+	}
+	return ctx
+}
+
+// WithMaxKeySizeAllowed sets limit on max key size
+func WithMaxKeySizeAllowed(limit uint64) func(st *State) *State {
+	return func(st *State) *State {
+		st.maxKeySizeAllowed = limit
+		return st
+	}
+}
+
+// WithMaxValueSizeAllowed sets limit on max value size
+func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
+	return func(st *State) *State {
+		st.maxValueSizeAllowed = limit
+		return st
+	}
+}
+
+// WithMaxInteractionAllowed sets limit on total byte interaction with ledger
+func WithMaxInteractionAllowed(limit uint64) func(st *State) *State {
+	return func(st *State) *State {
+		st.maxInteractionAllowed = limit
+		return st
 	}
 }
 

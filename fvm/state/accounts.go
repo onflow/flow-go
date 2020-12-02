@@ -102,8 +102,10 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 	}
 
 	// mark that this account exists
-	a.state.Update(string(newAddress.Bytes()), "", keyExists, []byte{1})
-
+	err = a.state.Update(string(newAddress.Bytes()), "", keyExists, []byte{1})
+	if err != nil {
+		return fmt.Errorf("failed to update the ledger: %w", err)
+	}
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
@@ -153,10 +155,14 @@ func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 func (a *Accounts) SetPublicKeyCount(address flow.Address, count uint64) {
 	newCount := new(big.Int).SetUint64(count)
 
-	a.state.Update(
+	err := a.state.Update(
 		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
 		newCount.Bytes(),
 	)
+	if err != nil {
+		// TODO return the error instead of panic
+		panic(fmt.Errorf("failed to update the ledger: %w", err))
+	}
 }
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
@@ -212,10 +218,14 @@ func (a *Accounts) SetPublicKey(
 		return nil, fmt.Errorf("failed to encode public key: %w", err)
 	}
 
-	a.state.Update(
+	err = a.state.Update(
 		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
 		encodedPublicKey,
 	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to update ledger: %w", err)
+	}
 
 	return encodedPublicKey, nil
 }
@@ -288,8 +298,10 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 		return nil
 	}
 
-	a.state.Update(string(address.Bytes()), string(address.Bytes()), contractKey(contractName), contract)
-
+	err = a.state.Update(string(address.Bytes()), string(address.Bytes()), contractKey(contractName), contract)
+	if err != nil {
+		return fmt.Errorf("failed to update the ledger: %w", err)
+	}
 	return nil
 }
 
@@ -325,8 +337,10 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 		return nil
 	}
 
-	a.state.Update(string(address.Bytes()), string(address.Bytes()), keyContractNames, newContractNames)
-
+	err = a.state.Update(string(address.Bytes()), string(address.Bytes()), keyContractNames, newContractNames)
+	if err != nil {
+		return fmt.Errorf("failed to update the ledger: %w", err)
+	}
 	return nil
 }
 
@@ -336,9 +350,14 @@ func (a *Accounts) TouchContract(contractName string, address flow.Address) {
 		panic(err)
 	}
 	if contractNames.Has(contractName) {
-		a.state.Read(string(address.Bytes()),
+		// TODO change me to touch
+		_, err = a.state.Read(string(address.Bytes()),
 			string(address.Bytes()),
 			contractKey(contractName))
+		if err != nil {
+			// TODO return error
+			panic(fmt.Errorf("failed to read the ledger: %w", err))
+		}
 	}
 }
 

@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -35,8 +37,10 @@ func (g *LedgerBoundAddressGenerator) NextAddress() (flow.Address, error) {
 
 	// update the ledger state
 	stateBytes := g.generator.Bytes()
-	g.state.Update("", "", keyAddressState, stateBytes)
-
+	err = g.state.Update("", "", keyAddressState, stateBytes)
+	if err != nil {
+		return address, fmt.Errorf("failed to update the ledger: %w", err)
+	}
 	return address, nil
 }
 

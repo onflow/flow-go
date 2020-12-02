@@ -10,7 +10,7 @@ import (
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	ledger := state.NewMapLedger()
-	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	st := state.NewState(ledger)
 
 	uuidsA := state.NewUUIDs(st)
 

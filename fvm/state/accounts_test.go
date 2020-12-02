@@ -9,16 +9,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const (
-	MaxStateKeySize         = 1000
-	MaxStateValueSize       = 10000
-	MaxStateInteractionSize = 10000
-)
-
 func TestAccounts_Create(t *testing.T) {
 	t.Run("Sets registers", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-		st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		st := state.NewState(ledger)
 		accounts := state.NewAccounts(st)
 
 		address := flow.HexToAddress("01")
@@ -31,7 +25,7 @@ func TestAccounts_Create(t *testing.T) {
 
 	t.Run("Fails if account exists", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-		st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		st := state.NewState(ledger)
 		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
@@ -46,7 +40,7 @@ func TestAccounts_Create(t *testing.T) {
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
 	ledger := state.NewMapLedger()
-	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	st := state.NewState(ledger)
 	accounts := state.NewAccounts(st)
 	address := flow.HexToAddress("01")
 
@@ -63,7 +57,7 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	ledger := state.NewMapLedger()
 
-	st := state.NewState(ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+	st := state.NewState(ledger)
 	accounts := state.NewAccounts(st)
 	address := flow.HexToAddress("01")
 
@@ -113,7 +107,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 	t.Run("Setting a contract puts it in Contracts", func(t *testing.T) {
 		ledger := TestLedger{}
 
-		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		st := state.NewState(&ledger)
 
 		a := state.NewAccounts(st)
 
@@ -128,7 +122,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting a contract again, does not add it to contracts", func(t *testing.T) {
 		ledger := TestLedger{}
-		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		st := state.NewState(&ledger)
 
 		a := state.NewAccounts(st)
 
@@ -146,7 +140,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting more contracts always keeps them sorted", func(t *testing.T) {
 		ledger := TestLedger{}
-		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		st := state.NewState(&ledger)
 		a := state.NewAccounts(st)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
@@ -168,7 +162,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Removing a contract does not fail if there is none", func(t *testing.T) {
 		ledger := TestLedger{}
-		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		st := state.NewState(&ledger)
 		a := state.NewAccounts(st)
 
 		err := a.DeleteContract("Dummy", address)
@@ -176,7 +170,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Removing a contract removes it", func(t *testing.T) {
 		ledger := TestLedger{}
-		st := state.NewState(&ledger, MaxStateKeySize, MaxStateValueSize, MaxStateInteractionSize)
+		st := state.NewState(&ledger)
 		a := state.NewAccounts(st)
 
 		err := a.SetContract("Dummy", address, []byte("non empty string"))
