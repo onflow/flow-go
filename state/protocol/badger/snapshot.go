@@ -41,6 +41,88 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return head, err
 }
 
+// QuorumCertificate returns a valid quorum certificate for the block at the
+// head of this snapshot, if one exists.
+//
+// For root block snapshots, returns the root quorum certificate. For all other
+// blocks, generates a quorum certificate from a valid child, if one exists.
+func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
+
+	// CASE 1: for the root block, return the root QC
+	root, err := s.state.Params().Root()
+	if err != nil {
+		return nil, fmt.Errorf("could not get root: %w", err)
+	}
+
+	head, err := s.Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get head: %w", err)
+	}
+	if head.Height == root.Height {
+		// TODO store root QC and return here
+		return nil, fmt.Errorf("root qc not stored")
+	}
+
+	// CASE 2: for any other block, generate the root QC from a valid child
+	child, err := s.validChild()
+	if err != nil {
+		return nil, fmt.Errorf("could not get child: %w", err)
+	}
+
+	qc := &flow.QuorumCertificate{
+		View:      head.View,
+		BlockID:   child.ParentID,
+		SignerIDs: child.ParentVoterIDs,
+		SigData:   child.ParentVoterSig,
+	}
+
+	return qc, nil
+}
+
+// validChild returns a child of the snapshot head that has been validated
+// by HotStuff, if such a child exists. Otherwise returns an error. Any valid
+// child may be returned. Subsequent calls are not guaranteed to return the
+// same child.
+func (s *Snapshot) validChild() (*flow.Header, error) {
+
+	var childIDs []flow.Identifier
+	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childIDs))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up children: %w", err)
+	}
+
+	// check we have at least one child
+	if len(childIDs) == 0 {
+		return nil, state.NewNoValidChildBlockError("block doesn't have children yet")
+	}
+
+	// find the first child that has been validated
+	var validChildID flow.Identifier
+	for _, childID := range childIDs {
+		var valid bool
+		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
+		// skip blocks whose validity hasn't been checked yet
+		if errors.Is(err, storage.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get child validity: %w", err)
+		}
+		if valid {
+			validChildID = childID
+			break
+		}
+	}
+
+	if validChildID == flow.ZeroID {
+		return nil, state.NewNoValidChildBlockError("block has no valid children")
+	}
+
+	// get the header of the first child
+	child, err := s.state.headers.ByBlockID(validChildID)
+	return child, err
+}
+
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
 	if err != nil {
@@ -197,47 +279,12 @@ func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 // Seed returns the random seed at the given indices for the current block snapshot.
 func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
-	// get the current state snapshot head
-	var childrenIDs []flow.Identifier
-	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childrenIDs))
+	child, err := s.validChild()
 	if err != nil {
-		return nil, fmt.Errorf("could not look up children: %w", err)
+		return nil, fmt.Errorf("could not get child: %w", err)
 	}
 
-	// check we have at least one child
-	if len(childrenIDs) == 0 {
-		return nil, state.NewNoValidChildBlockError("block doesn't have children yet")
-	}
-
-	// find the first child that has been validated
-	var validChildID flow.Identifier
-	for _, childID := range childrenIDs {
-		var valid bool
-		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
-		// skip blocks whose validity hasn't been checked yet
-		if errors.Is(err, storage.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("could not get child validity: %w", err)
-		}
-		if valid {
-			validChildID = childID
-			break
-		}
-	}
-
-	if validChildID == flow.ZeroID {
-		return nil, state.NewNoValidChildBlockError("block has no valid children")
-	}
-
-	// get the header of the first child (they all have the same threshold sig)
-	head, err := s.state.headers.ByBlockID(validChildID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get head: %w", err)
-	}
-
-	seed, err := seed.FromParentSignature(indices, head.ParentVoterSig)
+	seed, err := seed.FromParentSignature(indices, child.ParentVoterSig)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}
@@ -343,6 +390,10 @@ func NewInvalidSnapshot(err error) *InvalidSnapshot {
 }
 
 func (u *InvalidSnapshot) Head() (*flow.Header, error) {
+	return nil, u.err
+}
+
+func (u *InvalidSnapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	return nil, u.err
 }
 
