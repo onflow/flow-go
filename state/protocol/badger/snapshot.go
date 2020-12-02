@@ -157,7 +157,7 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// check if node ID is part of identities
 	if len(identities) == 0 {
-		return nil, protocol.IdentityNotFoundErr{NodeID: nodeID}
+		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return identities[0], nil
 }
@@ -251,13 +251,14 @@ func (s *Snapshot) Epochs() protocol.EpochQuery {
 	}
 }
 
-// EpochQuery simplifies querying epochs w.r.t. a snapshot.
+// EpochQuery encapsulates querying epochs w.r.t. a snapshot.
 type EpochQuery struct {
 	snap *Snapshot
 }
 
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
+
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return NewInvalidEpoch(err)
@@ -270,70 +271,75 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
+
 	return NewCommittedEpoch(setup, commit)
 }
 
-// Next returns the next epoch.
+// Next returns the next epoch, if it is available.
 func (q *EpochQuery) Next() protocol.Epoch {
+
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
+	phase, err := status.Phase()
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	return q.ByCounter(setup.Counter + 1)
+	// if we are in the staking phase, the next epoch is not setup yet
+	if phase == flow.EpochPhaseStaking {
+		return NewInvalidEpoch(protocol.ErrNextEpochNotSetup)
+	}
+
+	// if we are in setup phase, return a SetupEpoch
+	nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
+	if err != nil {
+		return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
+	}
+	if phase == flow.EpochPhaseSetup {
+		return NewSetupEpoch(nextSetup)
+	}
+
+	// if we are in committed phase, return a CommittedEpoch
+	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
+	if err != nil {
+		return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
+	}
+	return NewCommittedEpoch(nextSetup, nextCommit)
 }
 
-// ByCounter returns the epoch with the given counter.
-func (q *EpochQuery) ByCounter(counter uint64) protocol.Epoch {
+// Previous returns the previous epoch. During the first epoch after the root
+// block, this returns a sentinel error (since there is no previous epoch).
+// For all other epochs, returns the previous epoch.
+func (q *EpochQuery) Previous() protocol.Epoch {
 
-	// get the current setup/commit events
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	currentSetup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
-	if err != nil {
-		return NewInvalidEpoch(err)
-	}
-	currentCommit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
+	first, err := q.snap.state.headers.ByBlockID(status.FirstBlockID)
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
 
-	switch {
-	case counter < currentSetup.Counter:
-		// we currently only support snapshots of the current and next Epoch
-		return NewInvalidEpoch(fmt.Errorf("past epoch"))
-	case counter == currentSetup.Counter:
-		return NewCommittedEpoch(currentSetup, currentCommit)
-	case counter == currentSetup.Counter+1:
-		if status.NextEpoch.SetupID == flow.ZeroID {
-			return NewInvalidEpoch(fmt.Errorf("epoch still undefined"))
-		}
-		nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
-		if err != nil {
-			return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
-		}
-
-		if status.NextEpoch.CommitID == flow.ZeroID {
-			return NewSetupEpoch(nextSetup)
-		}
-		nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
-		if err != nil {
-			return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
-		}
-		return NewCommittedEpoch(nextSetup, nextCommit)
-	default:
-		// we currently only support snapshots of the current and next Epoch
-		return NewInvalidEpoch(fmt.Errorf("epoch too far in future"))
+	// CASE 1: we are in the first epoch after the root block, in which case
+	// we return a sentinel error
+	root, err := q.snap.state.Params().Root()
+	if err != nil {
+		return NewInvalidEpoch(err)
 	}
+	if first.Height == root.Height {
+		return NewInvalidEpoch(protocol.ErrNoPreviousEpoch)
+	}
+
+	// CASE 2: we are in any other epoch, return the current epoch w.r.t. the
+	// parent block of the first block in this epoch, which must be in the
+	// previous epoch
+	return q.snap.state.AtBlockID(first.ParentID).Epochs().Current()
 }
 
-// ****************************************
-
+// InvalidSnapshot represents a snapshot referencing an invalid block, or for
+// which an error occurred while resolving the reference block.
 type InvalidSnapshot struct {
 	err error
 }
@@ -370,6 +376,7 @@ func (u *InvalidSnapshot) Seed(_ ...uint32) ([]byte, error) {
 	return nil, u.err
 }
 
+// InvalidEpochQuery is an epoch query for an invalid snapshot.
 type InvalidEpochQuery struct {
 	err error
 }
@@ -386,6 +393,6 @@ func (u *InvalidEpochQuery) Next() protocol.Epoch {
 	return NewInvalidEpoch(u.err)
 }
 
-func (u *InvalidEpochQuery) ByCounter(_ uint64) protocol.Epoch {
+func (u *InvalidEpochQuery) Previous() protocol.Epoch {
 	return NewInvalidEpoch(u.err)
 }
