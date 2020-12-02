@@ -149,21 +149,8 @@ func (m *Middleware) PublicKey() crypto.PublicKey {
 // Start will start the middleware.
 func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
-
-	// get the node identity map from the overlay
-	idsMap, err := m.ov.Identity()
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-
-	// derive all node addresses from flow identities. Those node address will serve as the network whitelist
-	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
-	if err != nil {
-		return fmt.Errorf("could not derive list of approved peer list: %w", err)
-	}
-
 	libP2PNode, err := m.libP2PNodeFactory()
-	libP2PNode.UpdateAllowlist(nodeAddresWhiteList)
+
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}

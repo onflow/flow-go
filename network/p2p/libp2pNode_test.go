@@ -616,7 +616,7 @@ func (suite *LibP2PNodeTestSuite) CreateNode(name string, key fcrypto.PrivateKey
 	}
 
 	noopMetrics := metrics.NewNoopCollector()
-	n, err := NewLibP2PNode(suite.logger, nodeID, NewConnManager(suite.logger, noopMetrics), key, allowList, nil, rootID)
+	n, err := NewLibP2PNode(suite.logger, nodeID, NewConnManager(suite.logger, noopMetrics), key, allowList, rootID)
 	require.NoError(suite.T(), err)
 	n.SetStreamHandler(handlerFunc)
 

@@ -70,8 +70,8 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 	// creates libp2p host and node
 	nodeAddress := NodeAddress{Name: me.String(), IP: ip, Port: port}
 
-	return func(allowList []NodeAddress) (*Node, error) {
-		return NewLibP2PNode(log, nodeAddress, NewConnManager(log, metrics), flowKey, true, allowList, rootBlockID, psOptions...)
+	return func() (*Node, error) {
+		return NewLibP2PNode(log, nodeAddress, NewConnManager(log, metrics), flowKey, true, rootBlockID, psOptions...)
 	}, nil
 }
 
@@ -103,7 +103,6 @@ func NewLibP2PNode(logger zerolog.Logger,
 	conMgr ConnManager,
 	key fcrypto.PrivateKey,
 	allowList bool,
-	allowListAddrs []NodeAddress,
 	rootBlockID string,
 	psOption ...pubsub.Option) (*Node, error) {
 
@@ -122,7 +121,6 @@ func NewLibP2PNode(logger zerolog.Logger,
 		conMgr,
 		libp2pKey,
 		allowList,
-		allowListAddrs,
 		psOption...)
 
 	if err != nil {
@@ -553,7 +551,6 @@ func bootstrapLibP2PHost(ctx context.Context,
 	conMgr ConnManager,
 	key crypto.PrivKey,
 	allowList bool,
-	allowListAddrs []NodeAddress,
 	psOption ...pubsub.Option) (host.Host, *connGater, *pubsub.PubSub, error) {
 
 	var connGater *connGater
@@ -585,15 +582,8 @@ func bootstrapLibP2PHost(ctx context.Context,
 
 	// if allowlisting is enabled, create a connection gator with allowListAddrs
 	if allowList {
-
-		// convert each of the allowList address to libp2p peer infos
-		allowListPInfos, err := GetPeerInfos(allowListAddrs...)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to create approved list of peers: %w", err)
-		}
-
 		// create a connection gater
-		connGater = newConnGater(allowListPInfos, logger)
+		connGater = newConnGater(logger)
 
 		// provide the connection gater as an option to libp2p
 		options = append(options, libp2p.ConnectionGater(connGater))

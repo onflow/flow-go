@@ -21,11 +21,10 @@ type connGater struct {
 	log             zerolog.Logger
 }
 
-func newConnGater(peerInfos []peer.AddrInfo, log zerolog.Logger) *connGater {
+func newConnGater(log zerolog.Logger) *connGater {
 	cg := &connGater{
 		log: log,
 	}
-	cg.update(peerInfos)
 	return cg
 }
 
