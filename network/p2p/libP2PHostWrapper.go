@@ -85,7 +85,7 @@ func bootstrapLibP2PHost(ctx context.Context,
 		libp2p.ConnectionManager(conMgr),    // set the connection manager
 		transport,                           // set the protocol
 		libp2p.Ping(true),                   // enable ping
-	)
+	}
 
 	// if allowlisting is enabled, create a connection gator with allowListAddrs
 	if allowList {
