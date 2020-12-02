@@ -180,9 +180,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		fnb.Middleware = p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
 			libP2PNodeFactory,
-			codec,
 			fnb.Me.NodeID(),
-			fnb.networkKey,
 			fnb.Metrics.Network,
 			p2p.DefaultMaxUnicastMsgSize,
 			p2p.DefaultMaxPubSubMsgSize,

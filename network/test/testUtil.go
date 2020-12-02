@@ -33,13 +33,10 @@ var rootBlockID = unittest.IdentifierFixture().String()
 
 const DryRun = true
 
-// GenerateIDs is a test helper that generate flow identities with a valid port, networking keys, and libp2p nodes.
+// GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
 // If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
 // to get used.
-func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool,
-	opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node,
-	[]crypto.PrivateKey) {
-	privateKeys := make([]crypto.PrivateKey, n)
+func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node) {
 	libP2PNodes := make([]*p2p.Node, n)
 
 	identities := unittest.IdentityListFixture(n, opts...)
@@ -49,7 +46,6 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool,
 		// generate key
 		key, err := generateNetworkingKey(id.NodeID)
 		require.NoError(t, err)
-		privateKeys[i] = key
 		port := "0"
 
 		if !dryRunMode {
@@ -61,12 +57,11 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool,
 		identities[i].Address = fmt.Sprintf("0.0.0.0:%s", port)
 		identities[i].NetworkPubKey = key.PublicKey()
 	}
-	return identities, libP2PNodes, privateKeys
+	return identities, libP2PNodes
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList,
-	libP2PNodes []*p2p.Node, keys []crypto.PrivateKey) []*p2p.Middleware {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node) []*p2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*p2p.Middleware, len(identities))
 
@@ -82,9 +77,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
 			factory,
-			json.NewCodec(),
 			id.NodeID,
-			keys[i],
 			metrics,
 			p2p.DefaultMaxUnicastMsgSize,
 			p2p.DefaultMaxPubSubMsgSize,
@@ -153,8 +146,8 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	logger zerolog.Logger) (flow.IdentityList,
 	[]*p2p.Middleware) {
 
-	ids, libP2PNodes, keys := GenerateIDs(t, logger, n, dryRunMode)
-	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes, keys)
+	ids, libP2PNodes := GenerateIDs(t, logger, n, dryRunMode)
+	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes)
 	return ids, mws
 }
 

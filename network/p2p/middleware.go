@@ -14,7 +14,6 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -52,13 +51,11 @@ type Middleware struct {
 	ctx               context.Context
 	cancel            context.CancelFunc
 	log               zerolog.Logger
-	codec             network.Codec
 	ov                network.Overlay
 	wg                *sync.WaitGroup
 	libP2PNode        *Node
 	libP2PNodeFactory LibP2PFactoryFunc
 	me                flow.Identifier
-	flowKey           crypto.PrivateKey
 	metrics           module.NetworkMetrics
 	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
 	maxUnicastMsgSize int // used to define maximum message size in unicast mode
@@ -71,9 +68,7 @@ type Middleware struct {
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger,
 	libP2PNodeFactory LibP2PFactoryFunc,
-	codec network.Codec,
 	flowID flow.Identifier,
-	key crypto.PrivateKey,
 	metrics module.NetworkMetrics,
 	maxUnicastMsgSize int,
 	maxPubSubMsgSize int,
@@ -100,10 +95,8 @@ func NewMiddleware(log zerolog.Logger,
 		ctx:               ctx,
 		cancel:            cancel,
 		log:               log,
-		codec:             codec,
 		wg:                &sync.WaitGroup{},
 		me:                flowID,
-		flowKey:           key,
 		libP2PNodeFactory: libP2PNodeFactory,
 		metrics:           metrics,
 		maxPubSubMsgSize:  maxPubSubMsgSize,
@@ -128,10 +121,6 @@ func (m *Middleware) Me() flow.Identifier {
 // GetIPPort returns the ip address and port number associated with the middleware
 func (m *Middleware) GetIPPort() (string, string, error) {
 	return m.libP2PNode.GetIPPort()
-}
-
-func (m *Middleware) PublicKey() crypto.PublicKey {
-	return m.flowKey.PublicKey()
 }
 
 // Start will start the middleware.
