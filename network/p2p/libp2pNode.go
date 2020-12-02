@@ -137,6 +137,7 @@ func (n *Node) Stop() (chan struct{}, error) {
 		n.logger.Debug().Str("name", n.name).Err(err).Msg("closing peer store")
 		result = multierror.Append(result, err)
 	}
+	n.cancel()
 
 	if result != nil {
 		close(done)
@@ -162,7 +163,6 @@ func (n *Node) Stop() (chan struct{}, error) {
 		n.logger.Debug().Str("name", n.name).Msg("libp2p node stopped successfully")
 	}(done)
 
-	n.cancel()
 	return done, nil
 }
 
