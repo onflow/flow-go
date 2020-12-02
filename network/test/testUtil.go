@@ -80,18 +80,15 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		}
 
 		// creating middleware of nodes
-		mw, err := p2p.NewMiddleware(logger,
+		mws[i] = p2p.NewMiddleware(logger,
 			factory,
 			json.NewCodec(),
-			id.Address,
 			id.NodeID,
 			keys[i],
 			metrics,
 			p2p.DefaultMaxUnicastMsgSize,
 			p2p.DefaultMaxPubSubMsgSize,
 			rootBlockID)
-		require.NoError(t, err)
-		mws[i] = mw
 	}
 	return mws
 }

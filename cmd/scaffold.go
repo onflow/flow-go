@@ -178,10 +178,9 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
-		mw, err := p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
+		fnb.Middleware = p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
 			libP2PNodeFactory,
 			codec,
-			myAddr,
 			fnb.Me.NodeID(),
 			fnb.networkKey,
 			fnb.Metrics.Network,
@@ -189,10 +188,6 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize middleware: %w", err)
-		}
-		fnb.Middleware = mw
 
 		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)
 		if err != nil {

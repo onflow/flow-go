@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
@@ -59,8 +58,6 @@ type Middleware struct {
 	libP2PNode        *Node
 	libP2PNodeFactory LibP2PFactoryFunc
 	me                flow.Identifier
-	host              string
-	port              string
 	flowKey           crypto.PrivateKey
 	metrics           module.NetworkMetrics
 	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
@@ -75,18 +72,13 @@ type Middleware struct {
 func NewMiddleware(log zerolog.Logger,
 	libP2PNodeFactory LibP2PFactoryFunc,
 	codec network.Codec,
-	address string,
 	flowID flow.Identifier,
 	key crypto.PrivateKey,
 	metrics module.NetworkMetrics,
 	maxUnicastMsgSize int,
 	maxPubSubMsgSize int,
 	rootBlockID string,
-	validators ...network.MessageValidator) (*Middleware, error) {
-	ip, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create middleware: %w", err)
-	}
+	validators ...network.MessageValidator) *Middleware {
 
 	if len(validators) == 0 {
 		// add default validators to filter out unwanted messages received by this node
@@ -104,15 +96,13 @@ func NewMiddleware(log zerolog.Logger,
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// create the node entity and inject dependencies & config
-	m := &Middleware{
+	return &Middleware{
 		ctx:               ctx,
 		cancel:            cancel,
 		log:               log,
 		codec:             codec,
 		wg:                &sync.WaitGroup{},
 		me:                flowID,
-		host:              ip,
-		port:              port,
 		flowKey:           key,
 		libP2PNodeFactory: libP2PNodeFactory,
 		metrics:           metrics,
@@ -121,8 +111,6 @@ func NewMiddleware(log zerolog.Logger,
 		rootBlockID:       rootBlockID,
 		validators:        validators,
 	}
-
-	return m, err
 }
 
 func defaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
@@ -168,12 +156,6 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		m.log.Debug().Msg("peer manager successfully started")
 	case <-time.After(30 * time.Second):
 		return fmt.Errorf("could not start peer manager")
-	}
-
-	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
-	m.host, m.port, err = m.libP2PNode.GetIPPort()
-	if err != nil {
-		return fmt.Errorf("failed to find IP and port of the libp2p node: %w", err)
 	}
 
 	return nil
