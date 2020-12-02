@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	actormock "github.com/onflow/flow-go/module/mempool/consensus/mock"
 	poolmock "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -27,7 +28,7 @@ func Test_ImplementsInterfaces(t *testing.T) {
 
 // Test_Construction verifies correctness of the initial size and limit values
 func Test_Construction(t *testing.T) {
-	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 		wrappedMempool.On("Size").Return(uint(0)).Once()
 		require.Equal(t, uint(0), wrapper.Size())
 		wrappedMempool.On("Limit").Return(uint(0)).Once()
@@ -38,7 +39,7 @@ func Test_Construction(t *testing.T) {
 
 // Test_Size checks that ExecForkSuppressor is reporting the size of the wrapped mempool
 func Test_Size(t *testing.T) {
-	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 		wrappedMempool.On("Size").Return(uint(139)).Once()
 		require.Equal(t, uint(139), wrapper.Size())
 		wrappedMempool.AssertExpectations(t)
@@ -47,7 +48,7 @@ func Test_Size(t *testing.T) {
 
 // Test_Limit checks that ExecForkSuppressor is reporting the capacity limit of the wrapped mempool
 func Test_Limit(t *testing.T) {
-	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 		wrappedMempool.On("Limit").Return(uint(227)).Once()
 		require.Equal(t, uint(227), wrapper.Limit())
 		wrappedMempool.AssertExpectations(t)
@@ -58,7 +59,7 @@ func Test_Limit(t *testing.T) {
 //   * the wrapper also clears the wrapped mempool;
 //   * the reported mempool size, _after_ clearing should be zero
 func Test_Clear(t *testing.T) {
-	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 		wrappedMempool.On("Clear").Return().Once()
 
 		wrapper.Clear()
@@ -70,7 +71,7 @@ func Test_Clear(t *testing.T) {
 
 // Test_All checks that ExecForkSuppressor.All() is returning the elements of the wrapped mempool
 func Test_All(t *testing.T) {
-	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 		expectedSeals := unittest.IncorporatedResultSeal.Fixtures(7)
 		wrappedMempool.On("All").Return(expectedSeals)
 		retrievedSeals := wrapper.All()
@@ -93,7 +94,7 @@ func Test_All(t *testing.T) {
 //        same result as (1) and incorporated in same block B1;
 //        should be automatically de-duplicated (irrespective of approvals on the seal).
 func Test_Add(t *testing.T) {
-	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 		for _, block := range unittest.BlockFixtures(2) {
 			result := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
@@ -137,7 +138,7 @@ func Test_Add(t *testing.T) {
 // Test_Rem checks that ExecForkSuppressor.Rem()
 //   * delegates the call to the underlying mempool
 func Test_Rem(t *testing.T) {
-	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 		// element is in wrapped mempool: Rem should be called
 		seal := unittest.IncorporatedResultSeal.Fixture()
 		wrappedMempool.On("Add", seal).Return(true, nil).Once()
@@ -168,7 +169,7 @@ func Test_Rem(t *testing.T) {
 //  * there are no chunks in the result (invalid result, as system chunk is missing)
 func Test_RejectInvalidSeals(t *testing.T) {
 	t.Run("reject seal for result with missing end state", func(t *testing.T) {
-		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 			irSeal := unittest.IncorporatedResultSeal.Fixture()
 			chunks := irSeal.IncorporatedResult.Result.Chunks
 			emptyState := make([]byte, 0)
@@ -183,7 +184,7 @@ func Test_RejectInvalidSeals(t *testing.T) {
 	})
 
 	t.Run("reject seal without chunks", func(t *testing.T) {
-		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 			irSeal := unittest.IncorporatedResultSeal.Fixture()
 			irSeal.IncorporatedResult.Result.Chunks = make(flow.ChunkList, 0)
 			irSeal.Seal.FinalState = make([]byte, 0)
@@ -201,7 +202,7 @@ func Test_RejectInvalidSeals(t *testing.T) {
 //  * clear the wrapped mempool
 //  * reject addition of all further entities (even valid seals)
 func Test_ConflictingResults(t *testing.T) {
-	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 		// add 3 random irSeals
 		irSeals := unittest.IncorporatedResultSeal.Fixtures(3)
 		for _, s := range irSeals {
@@ -221,6 +222,7 @@ func Test_ConflictingResults(t *testing.T) {
 		conflictingSeal := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(result))
 
 		wrappedMempool.On("Clear").Return().Once()
+		execForkActor.On("OnExecFork", []*flow.IncorporatedResultSeal{conflictingSeal, irSeals[1]}).Return().Once()
 		added, err := wrapper.Add(conflictingSeal)
 		assert.NoError(t, err)
 		assert.False(t, added)
@@ -236,11 +238,12 @@ func Test_ConflictingResults(t *testing.T) {
 		assert.False(t, added)
 		assert.Equal(t, uint(0), wrapper.Size())
 		wrappedMempool.AssertExpectations(t)
+		execForkActor.AssertExpectations(t)
 	})
 }
 
 // Test_ForkDetectionPersisted verifies that, when ExecForkSuppressor detects a fork, this information is
-// persited in the data base
+// persisted in the data base
 func Test_ForkDetectionPersisted(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		db := unittest.BadgerDB(t, dir)
@@ -249,38 +252,52 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 		// initialize ExecForkSuppressor
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
 		wrappedMempool.On("RegisterEjectionCallbacks", mock.Anything).Return()
-		wrapper, _ := NewExecStateForkSuppressor(wrappedMempool, db, zerolog.New(os.Stderr))
+		execForkActor := &actormock.ExecForkActorMock{}
+		wrapper, _ := NewExecStateForkSuppressor(execForkActor.OnExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
 
 		// add seal
 		block := unittest.BlockFixture()
-		seal1 := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
-		wrappedMempool.On("Add", seal1).Return(true, nil).Once()
-		wrappedMempool.On("ByID", seal1.ID()).Return(seal1, true)
-		_, _ = wrapper.Add(seal1)
+		sealA := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		wrappedMempool.On("Add", sealA).Return(true, nil).Once()
+		wrappedMempool.On("ByID", sealA.ID()).Return(sealA, true)
+		_, _ = wrapper.Add(sealA)
 
 		// add conflicting seal
+		sealB := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
+		execForkActor.On("OnExecFork", []*flow.IncorporatedResultSeal{sealB, sealA}).Return().Once()
 		wrappedMempool.On("Clear").Return().Once()
-		seal2 := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))))
-		added, _ := wrapper.Add(seal2) // should be rejected because it is conflicting with seal1
+		added, _ := wrapper.Add(sealB) // should be rejected because it is conflicting with sealA
 		assert.False(t, added)
 		wrappedMempool.AssertExpectations(t)
+		execForkActor.AssertExpectations(t)
 
 		// crash => re-initialization
 		db.Close()
 		db2 := unittest.BadgerDB(t, dir)
 		wrappedMempool2 := &poolmock.IncorporatedResultSeals{}
 		wrappedMempool2.On("RegisterEjectionCallbacks", mock.Anything).Return()
-		wrapper2, _ := NewExecStateForkSuppressor(wrappedMempool2, db2, zerolog.New(os.Stderr))
+		execForkActor2 := &actormock.ExecForkActorMock{}
+		execForkActor2.On("OnExecFork", mock.Anything).
+			Run(func(args mock.Arguments) {
+				conflictingSeals := args[0].([]*flow.IncorporatedResultSeal)
+				assert.Equal(t, 2, len(conflictingSeals))
+				assert.Equal(t, sealB.ID(), conflictingSeals[0].ID())
+				assert.Equal(t, sealA.ID(), conflictingSeals[1].ID())
+			}).Return().Once()
+		wrapper2, _ := NewExecStateForkSuppressor(execForkActor2.OnExecFork, wrappedMempool2, db2, zerolog.New(os.Stderr))
 
 		// add another (non-conflicting) seal to ExecForkSuppressor
 		// fail test if seal is added to wrapped mempool
 		wrappedMempool2.On("Add", mock.Anything).
 			Run(func(args mock.Arguments) { assert.Fail(t, "seal was added to wrapped mempool") }).
-			Return(true, nil)
+			Return(true, nil).Maybe()
 		added, _ = wrapper2.Add(unittest.IncorporatedResultSeal.Fixture())
 		assert.False(t, added)
 		wrappedMempool2.On("Size").Return(uint(0)) // we asserted that Clear was called on wrappedMempool
 		assert.Equal(t, uint(0), wrapper2.Size())
+
+		wrappedMempool2.AssertExpectations(t)
+		execForkActor2.AssertExpectations(t)
 	})
 }
 
@@ -294,7 +311,8 @@ func Test_EjectorRemovesNewSeal(t *testing.T) {
 		wrappedMempool.On("RegisterEjectionCallbacks", mock.Anything).
 			Run(func(args mock.Arguments) { ejectionCallback = args[0].(mempool.OnEjection) }).
 			Return()
-		wrapper, _ := NewExecStateForkSuppressor(wrappedMempool, db, zerolog.New(os.Stderr))
+		execForkActor := &actormock.ExecForkActorMock{}
+		wrapper, _ := NewExecStateForkSuppressor(execForkActor.OnExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
 
 		// as soon as a seal is added, the underlying mempool ejects it right away again
 		seal := unittest.IncorporatedResultSeal.Fixture()
@@ -314,9 +332,12 @@ func Test_EjectorRemovesNewSeal(t *testing.T) {
 // which is wrapped in an ExecForkSuppressor.
 // We add and remove lots of different seals.
 func Test_AddRem_SmokeTest(t *testing.T) {
+	onExecFork := func([]*flow.IncorporatedResultSeal) {
+		assert.Fail(t, "no call to onExecFork expected ")
+	}
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		wrappedMempool := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(3))
-		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, db, zerolog.New(os.Stderr))
+		wrapper, err := NewExecStateForkSuppressor(onExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)
 
@@ -373,14 +394,15 @@ func Test_AddRem_SmokeTest(t *testing.T) {
 //  2. wraps `wrappedMempool` in a ExecForkSuppressor
 //  3. ensures that initializing the wrapper did not error
 //  4. executes the `testLogic`
-func WithExecStateForkSuppressor(t testing.TB, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals)) {
+func WithExecStateForkSuppressor(t testing.TB, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
 		wrappedMempool.On("RegisterEjectionCallbacks", mock.Anything).Return()
 
-		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, db, zerolog.New(os.Stderr))
+		execForkActor := &actormock.ExecForkActorMock{}
+		wrapper, err := NewExecStateForkSuppressor(execForkActor.OnExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)
-		testLogic(wrapper, wrappedMempool)
+		testLogic(wrapper, wrappedMempool, execForkActor)
 	})
 }

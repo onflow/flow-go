@@ -30,14 +30,14 @@ func LookupBlockSeal(blockID flow.Identifier, sealID *flow.Identifier) func(*bad
 	return retrieve(makePrefix(codeBlockToSeal, blockID), &sealID)
 }
 
-func InsertExecutionForkDetected(flag bool) func(*badger.Txn) error {
-	return insert(makePrefix(codeExecutionForkDetected), flag)
+func InsertExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal) func(*badger.Txn) error {
+	return insert(makePrefix(codeExecutionFork), conflictingSeals)
 }
 
-func UpdateExecutionForkDetected(flag bool) func(*badger.Txn) error {
-	return update(makePrefix(codeExecutionForkDetected), flag)
+func RemoveExecutionForkEvidence() func(*badger.Txn) error {
+	return remove(makePrefix(codeExecutionFork))
 }
 
-func RetrieveExecutionForkDetected(flag *bool) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeExecutionForkDetected), flag)
+func RetrieveExecutionForkEvidence(conflictingSeals *[]*flow.IncorporatedResultSeal) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeExecutionFork), conflictingSeals)
 }

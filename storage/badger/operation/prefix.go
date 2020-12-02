@@ -66,8 +66,8 @@ const (
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
 
-	// Flags indicating internal failures that should be preserved accross restarts
-	codeExecutionForkDetected = 254
+	// internal failure information that should be preserved across restarts
+	codeExecutionFork = 254
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

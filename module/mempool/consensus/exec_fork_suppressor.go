@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,13 +39,14 @@ var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel
 //     ExecForkSuppressor sets an internal flag and thereafter
 //     reports the mempool as empty, which will lead to the respective
 //     consensus node not including any more seals.
-//   * The flag is stored in a database for persistence across restarts.
+//   * Evidence for an execution fork stored in a database (persisted across restarts).
 // Implementation is concurrency safe.
 type ExecForkSuppressor struct {
 	mutex            sync.RWMutex
 	seals            mempool.IncorporatedResultSeals
 	sealsForBlock    map[flow.Identifier]sealSet // map BlockID -> set of IncorporatedResultSeal
 	execForkDetected bool
+	onExecFork       ExecForkActor
 	db               *badger.DB
 	log              zerolog.Logger
 }
@@ -52,17 +54,22 @@ type ExecForkSuppressor struct {
 // sealSet is a set of seals; internally represented as a map from sealID -> to seal
 type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 
-func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, db *badger.DB, log zerolog.Logger) (*ExecForkSuppressor, error) {
-	flag, err := readExecutionForkDetectedFlag(db, false)
+func NewExecStateForkSuppressor(onExecFork ExecForkActor, seals mempool.IncorporatedResultSeals, db *badger.DB, log zerolog.Logger) (*ExecForkSuppressor, error) {
+	conflictingSeals, err := checkExecutionForkEvidence(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to interface with storage: %w", err)
+	}
+	execForkDetectedFlag := len(conflictingSeals) != 0
+	if execForkDetectedFlag {
+		onExecFork(conflictingSeals)
 	}
 
 	wrapper := ExecForkSuppressor{
 		mutex:            sync.RWMutex{},
 		seals:            seals,
 		sealsForBlock:    make(map[flow.Identifier]sealSet),
-		execForkDetected: flag,
+		execForkDetected: execForkDetectedFlag,
+		onExecFork:       onExecFork,
 		db:               db,
 		log:              log.With().Str("mempool", "ExecForkSuppressor").Logger(),
 	}
@@ -128,6 +135,7 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 		otherSeal := getArbitraryElement(otherSeals) // cannot be nil, as otherSeals is guaranteed to always contain at least one element
 		err := s.enforceConsistentStateTransitions(newSeal, otherSeal)
 		if errors.Is(err, ExecutionForkErr) {
+			s.onExecFork([]*flow.IncorporatedResultSeal{newSeal, otherSeal})
 			return false, nil
 		}
 		if err != nil {
@@ -234,28 +242,6 @@ func (s *ExecForkSuppressor) RegisterEjectionCallbacks(callbacks ...mempool.OnEj
 	s.seals.RegisterEjectionCallbacks(callbacks...)
 }
 
-// readExecutionForkDetectedFlag attempts to read the flag ExecutionForkDetected from the database.
-// In case no value is persisted, the default value is written to the database.
-func readExecutionForkDetectedFlag(db *badger.DB, defaultValue bool) (bool, error) {
-	var flag bool
-	err := operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
-		err := operation.RetrieveExecutionForkDetected(&flag)(tx)
-		if errors.Is(err, storage.ErrNotFound) { // that no value was previously stored, which is expected on fist initialization
-			err := operation.InsertExecutionForkDetected(defaultValue)(tx)
-			if err != nil {
-				return fmt.Errorf("error setting default value for execution-fork-detected flag: %w", err)
-			}
-			// happy case: flag was not stored and we have now successfully initialized it with the default value
-			flag = defaultValue
-			return nil
-		} else if err != nil {
-			return fmt.Errorf("error loading value for execution-fork-detected flag: %w", err)
-		}
-		return nil // happy case: flag was previously stored and we have successfully retrieved it
-	})
-	return flag, err
-}
-
 // enforceValidStates checks that seal has valid, non-empty, initial and final state.
 // In case a seal fails the check, a detailed error message is logged and an
 // engine.InvalidInputError (sentinel error) is returned.
@@ -311,19 +297,6 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 	// the results for the seals have different IDs (!)
 	// => check whether initial and final state match in both seals
 
-	sc1json, err := json.Marshal(irSeal)
-	if err != nil {
-		return fmt.Errorf("failed to marshal candidate seal to json: %w", err)
-	}
-	sc2json, err := json.Marshal(irSeal2)
-	if err != nil {
-		return fmt.Errorf("failed to marshal candidate seal to json: %w", err)
-	}
-	log := s.log.With().
-		Str("seal_1", string(sc1json)).
-		Str("seal_2", string(sc2json)).
-		Logger()
-
 	// unsafe: we assume validity of states has been checked before
 	irSeal1InitialState, _ := irSeal.IncorporatedResult.Result.InitialStateCommit()
 	irSeal1FinalState, _ := irSeal.IncorporatedResult.Result.FinalStateCommitment()
@@ -334,7 +307,7 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 		log.Error().Msg("inconsistent seals for the same block")
 		s.seals.Clear()
 		s.execForkDetected = true
-		err := operation.RetryOnConflict(s.db.Update, operation.UpdateExecutionForkDetected(true))
+		err := storeExecutionForkEvidence([]*flow.IncorporatedResultSeal{irSeal, irSeal2}, s.db)
 		if err != nil {
 			return fmt.Errorf("failed to update execution-fork-detected flag: %w", err)
 		}
@@ -342,4 +315,39 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 	}
 	log.Warn().Msg("seals with different ID but consistent state transition")
 	return nil
+}
+
+// checkExecutionForkDetected checks the database whether evidence
+// about an execution fork is stored. Returns the stored evidence.
+func checkExecutionForkEvidence(db *badger.DB) ([]*flow.IncorporatedResultSeal, error) {
+	var conflictingSeals []*flow.IncorporatedResultSeal
+	err := db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveExecutionForkEvidence(&conflictingSeals)(tx)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil // no evidence in data base; conflictingSeals is still nil slice
+		}
+		if err != nil {
+			return fmt.Errorf("failed to load evidence whether or not an execution fork occured: %w", err)
+		}
+		return nil
+	})
+	return conflictingSeals, err
+}
+
+// storeExecutionForkEvidence stores the provided seals in the database
+// as evidence for an execution fork.
+func storeExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal, db *badger.DB) error {
+	err := operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
+		err := operation.InsertExecutionForkEvidence(conflictingSeals)(tx)
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			// some evidence about execution fork already stored;
+			// we only keep the first evidence => noting more to do
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("failed to store evidence about execution fork: %w", err)
+		}
+		return nil
+	})
+	return err
 }
