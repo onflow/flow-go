@@ -169,7 +169,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
-			fnb.Me.Address(),
+			myAddr,
 			fnb.networkKey,
 			fnb.RootBlock.ID().String(),
 			p2p.DefaultMaxPubSubMsgSize,
