@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/module/validation"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -169,6 +170,9 @@ func main() {
 				return nil, fmt.Errorf("could not create public assignment: %w", err)
 			}
 
+			signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
+			validator := validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results, signatureVerifier)
+
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -187,6 +191,7 @@ func main() {
 				approvals,
 				seals,
 				assigner,
+				validator,
 				requireOneApproval,
 			)
 			requesterEng.WithHandle(match.HandleReceipt)

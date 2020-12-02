@@ -398,6 +398,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 func (fnb *FlowNodeBuilder) initState() {
 
 	distributor := events.NewDistributor()
+	mutatorFactory := protocol.NewMutatorFactory(fnb.Storage.Results)
 	state, err := protocol.NewState(
 		fnb.Metrics.Compliance,
 		fnb.Tracer,
@@ -411,6 +412,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Commits,
 		fnb.Storage.Statuses,
 		distributor,
+		mutatorFactory,
 	)
 
 	fnb.MustNot(err).Msg("could not initialize flow state")

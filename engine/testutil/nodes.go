@@ -3,6 +3,9 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/validation"
 	"testing"
 	"time"
 
@@ -86,8 +89,9 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	commits := storage.NewEpochCommits(metrics, db)
 	distributor := events.NewDistributor()
 	statuses := storage.NewEpochStatuses(metrics, db)
+	mutatorFactory := protocol.NewMutatorFactory(resultsDB)
 
-	state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+	state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor, mutatorFactory)
 	require.NoError(t, err)
 
 	root, result, seal := unittest.BootstrapFixture(participants)
@@ -220,6 +224,9 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
+	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
+	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signatureVerifier)
+
 	requireApprovals := true
 
 	matchingEngine, err := matching.New(
@@ -240,6 +247,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		approvals,
 		seals,
 		assigner,
+		validator,
 		requireApprovals)
 	require.Nil(t, err)
 

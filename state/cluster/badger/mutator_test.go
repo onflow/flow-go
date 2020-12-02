@@ -57,7 +57,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = NewState(suite.db, tracer, suite.chainID, headers, colPayloads)
@@ -65,7 +65,9 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.mutator = suite.state.Mutate()
 	consumer := events.NewNoop()
 
-	suite.protoState, err = protocol.NewState(metrics, tracer, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
+	mutatorFactory := protocol.NewMutatorFactory(results)
+	suite.protoState, err = protocol.NewState(metrics, tracer, suite.db, headers, seals, index, conPayloads, blocks,
+		setups, commits, statuses, consumer, mutatorFactory)
 	require.NoError(suite.T(), err)
 }
 

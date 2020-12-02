@@ -55,7 +55,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = NewState(suite.db, tracer, suite.chainID, headers, colPayloads)
@@ -63,8 +63,10 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.mutator = suite.state.Mutate()
 	consumer := events.NewNoop()
 
+	mutatorFactory := protocol.NewMutatorFactory(results)
 	// just bootstrap with a genesis block, we'll use this as reference
-	suite.protoState, err = protocol.NewState(metrics, tracer, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
+	suite.protoState, err = protocol.NewState(metrics, tracer, suite.db, headers, seals, index, conPayloads, blocks,
+		setups, commits, statuses, consumer, mutatorFactory)
 	suite.Assert().Nil(err)
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	genesis, result, seal := unittest.BootstrapFixture(participants)
