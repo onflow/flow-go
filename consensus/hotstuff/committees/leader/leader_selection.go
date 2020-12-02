@@ -55,7 +55,7 @@ func (l LeaderSelection) FirstView() uint64 {
 }
 
 func (l LeaderSelection) FinalView() uint64 {
-	return l.firstView + uint64(len(l.leaderIndexes))
+	return l.firstView + uint64(len(l.leaderIndexes)) - 1
 }
 
 // LeaderForView returns the node ID of the leader for a given view.
@@ -90,6 +90,11 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 // identities - the identities that contain the stake info, which is used as weight for the chance of
 // 							the identity to be selected as leader.
 func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
+
+	if count < 1 {
+		return nil, fmt.Errorf("number of views must be positive (got %d)", count)
+	}
+
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
 		weights = append(weights, id.Stake)
