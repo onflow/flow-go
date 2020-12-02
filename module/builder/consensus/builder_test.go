@@ -518,9 +518,8 @@ func (bs *BuilderSuite) TestPayloadSealAllValid() {
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
-// TestPayloadSealOnlyFork verifies that builder only includes seals whose
-//
-// if an IncorporatedResultSeal is included in mempool, whose final state does not match the execution result
+// TestPayloadSealOnlyFork verifies that builder only includes seals for blocks in the respective fork
+// (and _not_ seals for sealable blocks on other forks)
 func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 	// in the test setup, we already created a single fork
 	//  [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
