@@ -158,11 +158,11 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 	f(dbDir)
 }
 
-func BadgerDB(t testing.TB, dir string) *badger.DB {
+func BadgerDB(t testing.TB, dir string, inmemory bool) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
-		WithInMemory(false).
+		WithInMemory(inmemory).
 		WithLogger(nil)
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
@@ -170,15 +170,13 @@ func BadgerDB(t testing.TB, dir string) *badger.DB {
 }
 
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
-	RunWithTempDir(t, func(dir string) {
-		db := BadgerDB(t, dir)
-		defer db.Close()
-		f(db)
-	})
+	db := BadgerDB(t, "", true)
+	defer db.Close()
+	f(db)
 }
 
 func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 	dir := TempDir(t)
-	db := BadgerDB(t, dir)
+	db := BadgerDB(t, dir, false)
 	return db, dir
 }
