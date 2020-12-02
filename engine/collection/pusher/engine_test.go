@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	metrics "github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,7 +26,7 @@ type Suite struct {
 	identities   flow.IdentityList
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
-	conduit      *network.Conduit
+	conduit      *mocknetwork.Conduit
 	me           *module.Local
 	collections  *storage.Collections
 	transactions *storage.Transactions
@@ -53,7 +53,7 @@ func (suite *Suite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	net := new(module.Network)
-	suite.conduit = new(network.Conduit)
+	suite.conduit = new(mocknetwork.Conduit)
 	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
 
 	suite.me = new(module.Local)

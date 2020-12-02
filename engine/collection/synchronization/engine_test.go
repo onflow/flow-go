@@ -22,7 +22,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	netint "github.com/onflow/flow-go/network"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	clusterint "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -42,13 +42,13 @@ type SyncSuite struct {
 	heights      map[uint64]*model.Block
 	blockIDs     map[flow.Identifier]*model.Block
 	net          *module.Network
-	conduit      *network.Conduit
+	conduit      *mocknetwork.Conduit
 	me           *module.Local
 	state        *cluster.State
 	snapshot     *cluster.Snapshot
 	params       *cluster.Params
 	blocks       *storage.ClusterBlocks
-	comp         *network.Engine
+	comp         *mocknetwork.Engine
 	core         *module.SyncCore
 	e            *Engine
 }
@@ -80,7 +80,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up the network conduit mock
-	ss.conduit = &network.Conduit{}
+	ss.conduit = &mocknetwork.Conduit{}
 	ss.conduit.On("Close").Return(nil).Maybe()
 
 	// set up the local module mock
@@ -150,7 +150,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up compliance engine mock
-	ss.comp = &network.Engine{}
+	ss.comp = &mocknetwork.Engine{}
 	ss.comp.On("SubmitLocal", mock.Anything).Return()
 
 	// set up sync core
