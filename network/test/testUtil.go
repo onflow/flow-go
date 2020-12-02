@@ -184,7 +184,7 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 	return engs
 }
 
-// generateLibP2PNode is a test helper that generates a libp2p node for the specified overlay.
+// generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	id flow.Identity,
