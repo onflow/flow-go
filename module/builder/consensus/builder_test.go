@@ -515,44 +515,11 @@ func (bs *BuilderSuite) TestPayloadSealAllValid() {
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
-// TestPayloadSealSomeValidOnFork verifies that builder only includes seals whose
-//
-// if an IncorporatedResultSeal is included in mempool, whose final state does not match the execution result
-func (bs *BuilderSuite) TestPayloadSealSomeValidOnFork_old() {
-	// skipping this test:
-	//  * currently, the builder relies on the IncorporatedResultSeal to be constructed
-	//    correctly by the matching engine
-	//  * with the implementation of this test, the matching engine
-	bs.T().Skip()
-
-	bs.pendingSeals = bs.irsMap
-
-	// add some invalid seals to the mempool
-	for i := 0; i < 8; i++ {
-		invalid := &flow.IncorporatedResultSeal{
-			IncorporatedResult: unittest.IncorporatedResult.Fixture(),
-			Seal:               unittest.Seal.Fixture(),
-		}
-		bs.pendingSeals[invalid.ID()] = invalid
-	}
-
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
-	bs.Require().NoError(err)
-	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
-}
-
-// TestPayloadSealSomeValidOnFork verifies that builder only includes seals whose
+// TestPayloadSealOnlyFork verifies that builder only includes seals whose
 //
 // if an IncorporatedResultSeal is included in mempool, whose final state does not match the execution result
 func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
-	// skipping this test:
-	//  * currently, the builder relies on the IncorporatedResultSeal to be constructed
-	//    correctly by the matching engine
-	//  * with the implementation of this test, the matching engine
-	//bs.T().Skip()
-
-	// in the test setup, we already create a single fork
+	// in the test setup, we already created a single fork
 	//  [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
 	// Where block
 	//   * [first] is sealed and finalized
@@ -573,21 +540,12 @@ func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 	bs.Require().NoError(err)
 
 	// expected seals: [F0] <- ... <- [F3] <- [B0] <- ... <- [B7]
-	bs.Assert().Equal(12, len(bs.assembled.Seals), "should have included only valid chain of seals")
+	// Note: bs.chain contains seals for blocks  F0 ... F3 then A0 ... A3 and then B0 ... B7
+	bs.Assert().Equal(12, len(bs.assembled.Seals), "unexpected number of seals")
 	bs.Assert().ElementsMatch(bs.chain[:4], bs.assembled.Seals[:4], "should have included only valid chain of seals")
-	bs.Assert().Equal(bs.chain[len(bs.chain)-1], bs.assembled.Seals[len(bs.assembled.Seals)-1], "should have included only valid chain of seals")
-	bs.Assert().Equal(bs.chain[len(bs.chain)-2], bs.assembled.Seals[len(bs.assembled.Seals)-2], "should have included only valid chain of seals")
-	bs.Assert().Equal(bs.chain[len(bs.chain)-3], bs.assembled.Seals[len(bs.assembled.Seals)-3], "should have included only valid chain of seals")
-	bs.Assert().Equal(bs.chain[len(bs.chain)-4], bs.assembled.Seals[len(bs.assembled.Seals)-4], "should have included only valid chain of seals")
-	bs.Assert().Equal(bs.chain[len(bs.chain)-5], bs.assembled.Seals[len(bs.assembled.Seals)-5], "should have included only valid chain of seals")
-	bs.Assert().Equal(bs.chain[len(bs.chain)-6], bs.assembled.Seals[len(bs.assembled.Seals)-6], "should have included only valid chain of seals")
-	bs.Assert().Equal(bs.chain[len(bs.chain)-7], bs.assembled.Seals[len(bs.assembled.Seals)-7], "should have included only valid chain of seals")
-	bs.Assert().Equal(bs.chain[len(bs.chain)-8], bs.assembled.Seals[len(bs.assembled.Seals)-8], "should have included only valid chain of seals")
-	//bs.Assert().ElementsMatch(bs.chain[len(bs.chain)-8:], bs.assembled.Seals[4:], "should have included only valid chain of seals")
+	bs.Assert().ElementsMatch(bs.chain[len(bs.chain)-8:], bs.assembled.Seals[4:], "should have included only valid chain of seals")
 
-	//bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-
 }
 
 func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
