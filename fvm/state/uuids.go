@@ -28,9 +28,12 @@ func (u *UUIDs) GetUUID() (uint64, error) {
 	return binary.BigEndian.Uint64(bytes), nil
 }
 
-// TODO return error
 func (u *UUIDs) SetUUID(uuid uint64) {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	u.state.Update("", "", keyUUID, bytes)
+	err := u.state.Update("", "", keyUUID, bytes)
+	// TODO return the error instead
+	if err != nil {
+		panic(err)
+	}
 }
