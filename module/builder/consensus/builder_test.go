@@ -112,8 +112,11 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 
 		incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(previousResult),
-			//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 			unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
+			// For sealing phase 2, the value for IncorporatedBlockID is the block the result pertains to (here parentBlock).
+			// In later development phases, we will change the logic such that IncorporatedBlockID references the
+			// block which actually incorporates the result:
+			//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 		)
 		result := unittest.ExecutionResultFixture(
 			unittest.WithBlock(&block),
