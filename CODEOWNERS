@@ -26,8 +26,10 @@
 /ledger/** @ramtinms @m4ksio @AlexHentschel
 
 # Networking Stream
-/network/** @yhassanzadeh13 @vishalchangraniaxiom
+/network/** @yhassanzadeh13 @vishalchangrani
 
 # Cryptography Stream
 /crypto/** @tarakby
 
+# Bootstrap and transit scripts
+/cmd/bootstrap/** @vishalchangrani @ljk662
