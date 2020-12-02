@@ -206,13 +206,18 @@ func TestQuorumCertificate(t *testing.T) {
 
 			// add a valid child to block1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(flow.EmptyPayload())
 			err = state.Mutate().Extend(&block2)
+			require.Nil(t, err)
+			err = state.Mutate().MarkValid(block1.ID())
 			require.Nil(t, err)
 			err = state.Mutate().MarkValid(block2.ID())
 			require.Nil(t, err)
 
-			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
-			assert.Error(t, err)
+			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
+			assert.Nil(t, err)
+			assert.Equal(t, block2.Header.ParentVoterIDs, qc.SignerIDs)
+			assert.Equal(t, block2.Header.ParentVoterSig.Bytes(), qc.SigData)
 
 			_, err = state.AtBlockID(block1.ID()).Seed(1, 2, 3, 4)
 			require.Nil(t, err)
