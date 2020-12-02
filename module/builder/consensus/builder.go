@@ -188,13 +188,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// 3) If it was already included on the pending part of the chain, skip, but
 	// keep in memory pool for now.
 	// 4) Otherwise, this guarantee can be included in the payload.
-	var guaranteeCount uint
 	var guarantees []*flow.CollectionGuarantee
 	for _, guarantee := range b.guarPool.All() {
 		// add at most <maxGuaranteeCount> number of collection guarantees in a new block proposal
 		// in order to prevent the block payload from being too big or computationally heavy for the
 		// execution nodes
-		if guaranteeCount >= b.cfg.maxGuaranteeCount {
+		if uint(len(guarantees)) >= b.cfg.maxGuaranteeCount {
 			break
 		}
 
@@ -221,7 +220,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			continue
 		}
 		guarantees = append(guarantees, guarantee)
-		guaranteeCount++
 	}
 
 	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
