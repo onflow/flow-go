@@ -215,18 +215,6 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	fmt.Println("Flow Address:", flowTokenAddress)
 }
 
-const createAccountTemplate = `
-transaction(publicKeys: [[UInt8]], code: [UInt8]) {
-  prepare(signer: AuthAccount) {
-	let acct = AuthAccount(payer: signer)
-	for key in publicKeys {
-		acct.addPublicKey(key)
-	}
-	acct.setCode(code)
-  }
-}
-`
-
 // CreateAccountAndTransfer will create an account and transfer 1000 tokens to it
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()

@@ -20,7 +20,7 @@ import (
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +32,7 @@ type FinderEngineTestSuite struct {
 	me  *module.Local
 
 	// mock conduit for receiving receipts
-	receiptsConduit *network.Conduit
+	receiptsConduit *mocknetwork.Conduit
 	metrics         *module.VerificationMetrics
 	tracer          realModule.Tracer
 
@@ -66,7 +66,7 @@ type FinderEngineTestSuite struct {
 	// other engine
 	// mock Match engine, should be called when Finder engine completely
 	// processes a receipt
-	matchEng *network.Engine
+	matchEng *mocknetwork.Engine
 }
 
 // TestFinderEngine executes all FinderEngineTestSuite tests.
@@ -76,7 +76,7 @@ func TestFinderEngine(t *testing.T) {
 
 // SetupTest initiates the test setups prior to each test.
 func (suite *FinderEngineTestSuite) SetupTest() {
-	suite.receiptsConduit = &network.Conduit{}
+	suite.receiptsConduit = &mocknetwork.Conduit{}
 	suite.net = &module.Network{}
 	suite.me = &module.Local{}
 	suite.metrics = &module.VerificationMetrics{}
@@ -89,7 +89,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.blockIDsCache = &mempool.Identifiers{}
 	suite.receiptIDsByBlock = &mempool.IdentifierMap{}
 	suite.receiptIDsByResult = &mempool.IdentifierMap{}
-	suite.matchEng = &network.Engine{}
+	suite.matchEng = &mocknetwork.Engine{}
 
 	// generates an execution result with a single collection, chunk, and transaction.
 	completeER := utils.LightExecutionResultFixture(1)

@@ -37,7 +37,7 @@ func readJSON(path string, target interface{}) {
 	}
 	err = json.Unmarshal(dat, target)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot unmarshal json in file")
+		log.Fatal().Err(err).Msgf("cannot unmarshal json in file %s", path)
 	}
 }
 
