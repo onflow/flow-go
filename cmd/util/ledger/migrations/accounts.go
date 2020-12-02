@@ -10,9 +10,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	maxKeySize         = 10_000_000
+	maxValueSize       = 10_000_000
+	maxInteractionSize = 100_000_000
+)
+
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	l := newLed(payloads)
-	a := state.NewAccounts(l)
+
+	st := state.NewState(l, maxKeySize, maxValueSize, maxInteractionSize)
+	a := state.NewAccounts(st)
 
 	coreContractEncodedKey := "f847b8402b0bf247520770a4bad19e07f6d6b1e8f0542da564154087e2681b175b4432ec2c7b09a52d34dabe0a887ea0f96b067e52c6a0792dcff730fe78a6c5fbbf0a9c02038203e8"
 
@@ -88,12 +96,13 @@ type led struct {
 	payloads map[string]ledger.Payload
 }
 
-func (l *led) Set(owner, controller, key string, value flow.RegisterValue) {
+func (l *led) Set(owner, controller, key string, value flow.RegisterValue) error {
 	keyparts := []ledger.KeyPart{ledger.NewKeyPart(0, []byte(owner)),
 		ledger.NewKeyPart(1, []byte(controller)),
 		ledger.NewKeyPart(2, []byte(key))}
 	fk := fullKey(owner, controller, key)
 	l.payloads[fk] = ledger.Payload{Key: ledger.NewKey(keyparts), Value: ledger.Value(value)}
+	return nil
 }
 
 func (l *led) Get(owner, controller, key string) (flow.RegisterValue, error) {
@@ -106,7 +115,9 @@ func (l *led) Delete(owner, controller, key string) {
 	delete(l.payloads, fk)
 }
 
-func (l *led) Touch(owner, controller, key string) {}
+func (l *led) Touch(owner, controller, key string) error {
+	return nil
+}
 
 func (l *led) Payloads() []ledger.Payload {
 	ret := make([]ledger.Payload, 0, len(l.payloads))

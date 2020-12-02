@@ -25,6 +25,12 @@ var cmd = &cobra.Command{
 	Run:   run,
 }
 
+const (
+	maxKeySize         = 10_000_000
+	maxValueSize       = 10_000_000
+	maxInteractionSize = 100_000_000
+)
+
 var stateLoader func() *mtrie.Forest = nil
 var flagStateCommitment string
 var flagChain string
@@ -96,8 +102,9 @@ func run(*cobra.Command, []string) {
 		return payload[0].Value, nil
 	})
 
-	accounts := state.NewAccounts(ldg)
-	finalGenerator, err := state.NewLedgerBoundAddressGenerator(ldg, chain)
+	st := state.NewState(ldg, maxKeySize, maxValueSize, maxInteractionSize)
+	accounts := state.NewAccounts(st)
+	finalGenerator, err := state.NewLedgerBoundAddressGenerator(st, chain)
 
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot get current address state")
