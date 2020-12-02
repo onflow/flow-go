@@ -4,11 +4,12 @@ package badger_test
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/engine"
-	mock2 "github.com/onflow/flow-go/module/mock"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine"
+	mock2 "github.com/onflow/flow-go/module/mock"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +38,16 @@ func init() {
 }
 
 var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
+
+// mockMutatorFactory returns a MutatorFactory that generates state mutators
+// with a ReceiptValidator that accepts all receipts without performing any
+// integrity checks.
+func mockMutatorFactory() protocol.MutatorFactory {
+	validator := &mock2.ReceiptValidator{}
+	validator.On("Validate", mock.Anything).Return(nil)
+	mockFactory := protocol.NewMutatorFactoryWithValidator(validator)
+	return mockFactory
+}
 
 func TestBootstrapValid(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
@@ -383,7 +394,8 @@ func TestExtendValid(t *testing.T) {
 }
 
 func TestExtendSealedBoundary(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 
 		root, result, rootSeal := unittest.BootstrapFixture(participants)
 		t.Logf("root: %x\n", root.ID())
@@ -560,10 +572,46 @@ func TestExtendBlockNotConnected(t *testing.T) {
 	})
 }
 
+func TestExtendWrongIdentity(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		block, result, seal := unittest.BootstrapFixture(participants)
+		err := state.Mutate().Bootstrap(block, result, seal)
+		require.NoError(t, err)
+
+		extend := unittest.BlockFixture()
+		extend.Header.Height = 1
+		extend.Header.View = 1
+		extend.Header.ParentID = block.ID()
+		extend.Header.PayloadHash = extend.Payload.Hash()
+		extend.Payload.Guarantees = nil
+
+		err = state.Mutate().Extend(&extend)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
+func TestExtendInvalidChainID(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		root := unittest.GenesisFixture(participants)
+		block := unittest.BlockWithParentFixture(root.Header)
+		block.SetPayload(flow.Payload{})
+		// use an invalid chain ID
+		block.Header.ChainID = root.Header.ChainID + "-invalid"
+
+		err := state.Mutate().Extend(&block)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
 // Test that seals are rejected if they correspond to ExecutionResults that are
 // not incorporated in blocks on this fork
 func TestExtendSealNoIncorporatedResult(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 
 		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
@@ -669,7 +717,8 @@ func TestExtendSealNoIncorporatedResult(t *testing.T) {
 // Test that proposed seals are rejected if they do not form a valid chain on
 // top of the last known seal on the branch.
 func TestExtendSealNotConnected(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 
 		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
@@ -720,7 +769,8 @@ func TestExtendSealNotConnected(t *testing.T) {
 
 // Test that payloads containing duplicate seals are rejected.
 func TestExtendSealDuplicate(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 
 		block, result, seal := unittest.BootstrapFixture(participants)
 		err := state.Mutate().Bootstrap(block, result, seal)
@@ -781,45 +831,11 @@ func TestExtendSealDuplicate(t *testing.T) {
 	})
 }
 
-func TestExtendWrongIdentity(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Mutate().Bootstrap(block, result, seal)
-		require.NoError(t, err)
-
-		extend := unittest.BlockFixture()
-		extend.Header.Height = 1
-		extend.Header.View = 1
-		extend.Header.ParentID = block.ID()
-		extend.Header.PayloadHash = extend.Payload.Hash()
-		extend.Payload.Guarantees = nil
-
-		err = state.Mutate().Extend(&extend)
-		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
-	})
-}
-
-func TestExtendInvalidChainID(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		root := unittest.GenesisFixture(participants)
-		block := unittest.BlockWithParentFixture(root.Header)
-		block.SetPayload(flow.Payload{})
-		// use an invalid chain ID
-		block.Header.ChainID = root.Header.ChainID + "-invalid"
-
-		err := state.Mutate().Extend(&block)
-		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
-	})
-}
-
 // Test that Extend will pick the seal corresponding to the highest block when
 // the payload contains multiple seals that are not ordered.
 func TestExtendHighestSeal(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 		// bootstrap the root block
 		block1, result, seal := unittest.BootstrapFixture(participants)
 		block1.Payload.Guarantees = nil
@@ -873,17 +889,14 @@ func TestExtendHighestSeal(t *testing.T) {
 }
 
 func TestExtendReceiptsDuplicate(t *testing.T) {
-	validator := &mock2.ReceiptValidator{}
-	mockFactory := protocol.NewMutatorFactoryWithValidator(validator)
-	util.RunWithProtocolStateAndMutatorFactory(t, mockFactory, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 		// bootstrap the root block
 		block1, result, seal := unittest.BootstrapFixture(participants)
 		block1.Payload.Guarantees = nil
 		block1.Header.PayloadHash = block1.Payload.Hash()
 		err := state.Mutate().Bootstrap(block1, result, seal)
 		require.NoError(t, err)
-
-		validator.On("Validate", mock.Anything).Return(nil).Twice()
 
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -901,8 +914,6 @@ func TestExtendReceiptsDuplicate(t *testing.T) {
 		err = state.Mutate().Extend(&block3)
 		require.Nil(t, err)
 
-		validator.On("Validate", mock.Anything).Return(engine.NewInvalidInputError("")).Once()
-
 		// insert a duplicate receipt
 		block4 := unittest.BlockWithParentFixture(block3.Header)
 		block4.Payload.Guarantees = nil
@@ -915,7 +926,8 @@ func TestExtendReceiptsDuplicate(t *testing.T) {
 }
 
 func TestExtendReceiptsLatestSealed(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 		// bootstrap the root block
 		block1, result, seal := unittest.BootstrapFixture(participants)
 		block1.Payload.Guarantees = nil
@@ -953,7 +965,6 @@ func TestExtendReceiptsLatestSealed(t *testing.T) {
 		// insert another receipt for block 2, which is now the highest sealed
 		// block
 		receipt := unittest.ReceiptForBlockFixture(&block2)
-
 		// test that the receipt is rejected
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(flow.Payload{
@@ -1030,9 +1041,10 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 	})
 }
 
-func TestExtendReceiptsValid(t *testing.T) {
+func TestExtendReceiptInvalid(t *testing.T) {
 	validator := &mock2.ReceiptValidator{}
 	mockFactory := protocol.NewMutatorFactoryWithValidator(validator)
+
 	util.RunWithProtocolStateAndMutatorFactory(t, mockFactory, func(db *badger.DB, state *protocol.State) {
 		// bootstrap the root block
 		block1, result, seal := unittest.BootstrapFixture(participants)
@@ -1041,7 +1053,38 @@ func TestExtendReceiptsValid(t *testing.T) {
 		err := state.Mutate().Bootstrap(block1, result, seal)
 		require.NoError(t, err)
 
-		validator.On("Validate", mock.Anything).Return(nil)
+		// create block2 and block3
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Payload.Guarantees = nil
+		block2.Header.PayloadHash = block2.Payload.Hash()
+		err = state.Mutate().Extend(&block2)
+		require.Nil(t, err)
+
+		// Add a receipt for block 2
+		receipt := unittest.ExecutionReceiptFixture()
+
+		// force the receipt validator to refuse this receipt
+		validator.On("Validate", mock.Anything).Return(engine.NewInvalidInputError(""))
+
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.Payload.Guarantees = nil
+		block3.Payload.Receipts = append(block3.Payload.Receipts, receipt)
+		block3.Header.PayloadHash = block3.Payload.Hash()
+		err = state.Mutate().Extend(&block3)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
+func TestExtendReceiptsValid(t *testing.T) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
+		// bootstrap the root block
+		block1, result, seal := unittest.BootstrapFixture(participants)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+		err := state.Mutate().Bootstrap(block1, result, seal)
+		require.NoError(t, err)
 
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -1079,11 +1122,12 @@ func TestExtendReceiptsValid(t *testing.T) {
 // event, then a commit event, then finalizing the first block of the next epoch.
 // Also tests that appropriate epoch transition events are fired.
 func TestExtendEpochTransitionValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -1091,7 +1135,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("BlockFinalized", mock.Anything)
 		distributor.AddConsumer(consumer)
 
-		mutatorFactory := protocol.NewMutatorFactory(results)
+		// setup the receipt validator to always accept receipts
+		validator := &mock2.ReceiptValidator{}
+		validator.On("Validate", mock.Anything).Return(nil)
+		mutatorFactory := protocol.NewMutatorFactoryWithValidator(validator)
+
 		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits,
 			statuses, distributor, mutatorFactory)
 		require.Nil(t, err)
@@ -1293,7 +1341,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //        \-->BLOCK2-->BLOCK4-->BLOCK6
 //
 func TestExtendConflictingEpochEvents(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 
 		// first bootstrap with the initial epoch
 		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
@@ -1465,7 +1514,8 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 // extending protocol state with an invalid epoch commit service event should cause an error
 func TestExtendEpochCommitInvalid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 
 		// first bootstrap with the initial epoch
 		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
@@ -1611,7 +1661,8 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 // if we reach the first block of the next epoch before both setup and commit
 // service events are finalized, the chain should halt
 func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 
 		// first bootstrap with the initial epoch
 		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)

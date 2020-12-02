@@ -197,7 +197,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	// epoch 3 has no overlap with epoch 2
 	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 
-	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *bprotocol.State) {
 		root, result, seal := unittest.BootstrapFixture(epoch1Identities)
 		err := state.Mutate().Bootstrap(root, result, seal)
 		require.Nil(t, err)
