@@ -46,7 +46,7 @@ const (
 const maxConnectAttempt = 3
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func(allowList []NodeAddress) (*Node, error)
+type LibP2PFactoryFunc func() (*Node, error)
 
 // DefaultLibP2PNodeFactory is a factory function that receives a middleware instance and generates a libp2p Node by invoking its factory with
 // proper parameters.
