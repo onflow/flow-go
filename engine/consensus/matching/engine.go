@@ -53,6 +53,7 @@ type Engine struct {
 	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
 	maxResultsToRequest     int                             // max number of finalized blocks for which we request execution results
 	requireApprovals        bool                            // flag to disable verifying chunk approvals
+	receiptValidator        module.ReceiptValidator         // used to validate receipts
 }
 
 // New creates a new collection propagation engine.
@@ -74,6 +75,7 @@ func New(
 	approvals mempool.Approvals,
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
+	validator module.ReceiptValidator,
 	requireApprovals bool,
 ) (*Engine, error) {
 
@@ -101,6 +103,7 @@ func New(
 		maxResultsToRequest:     200,
 		assigner:                assigner,
 		requireApprovals:        requireApprovals,
+		receiptValidator:        validator,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
@@ -260,7 +263,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
-	err = e.ensureStakedNodeWithRole(receipt.ExecutorID, head, flow.RoleExecution)
+	err = e.receiptValidator.Validate(receipt)
 	if err != nil {
 		return fmt.Errorf("failed to process execution receipt: %w", err)
 	}

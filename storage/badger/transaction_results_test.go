@@ -1,6 +1,7 @@
 package badger_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -22,7 +23,7 @@ func TestStoringTransactionResults(t *testing.T) {
 			txID := unittest.IdentifierFixture()
 			expected := &flow.TransactionResult{
 				TransactionID: txID,
-				ErrorMessage:  "a runtime error " + string(i),
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
 			}
 			txResults = append(txResults, expected)
 		}
@@ -48,7 +49,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
 				TransactionID: txID,
-				ErrorMessage:  "a runtime error " + string(i),
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
 			}
 			txResults = append(txResults, expected)
 		}

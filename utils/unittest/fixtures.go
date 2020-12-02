@@ -469,6 +469,7 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
+	var previousResultID flow.Identifier
 	if block.Payload != nil {
 		chunks += len(block.Payload.Guarantees)
 	}
@@ -479,6 +480,7 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 		result.BlockID = blockID
 		result.Chunks = ChunksFixture(uint(chunks), block.ID())
 		result.Chunks[0].StartState = startState // set start state to value before update
+		result.PreviousResultID = previousResultID
 	}
 }
 
@@ -746,10 +748,10 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return identities
 }
 
-func ChunkFixture(blockID flow.Identifier) *flow.Chunk {
+func ChunkFixture(blockID flow.Identifier, collectionIndex uint) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex:      42,
+			CollectionIndex:      collectionIndex,
 			StartState:           StateCommitmentFixture(),
 			EventCollection:      IdentifierFixture(),
 			TotalComputationUsed: 4200,
@@ -764,7 +766,7 @@ func ChunkFixture(blockID flow.Identifier) *flow.Chunk {
 func ChunksFixture(n uint, blockID flow.Identifier) []*flow.Chunk {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID)
+		chunk := ChunkFixture(blockID, uint(i))
 		chunk.Index = i
 		chunks = append(chunks, chunk)
 	}

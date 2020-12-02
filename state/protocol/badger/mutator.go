@@ -3,9 +3,12 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -15,7 +18,8 @@ import (
 )
 
 type Mutator struct {
-	state *State
+	state     *State
+	validator module.ReceiptValidator
 }
 
 func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
@@ -605,12 +609,18 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
 		}
 
-		valid, err := IsValidReceipt(receipt)
+		err = m.validator.Validate(receipt)
 		if err != nil {
-			return fmt.Errorf("could not check validity of Execution Receipt %v: %w", receipt.ID(), err)
-		}
-		if !valid {
-			return state.NewInvalidExtensionErrorf("payload includes invalid receipt (%x)", receipt.ID())
+			// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
+			if errors.Is(err, storage.ErrNotFound) {
+				return state.NewInvalidExtensionErrorf("some entities referenced by receipt %v are missing: %w", receipt.ID(), err)
+			}
+
+			if engine.IsInvalidInputError(err) {
+				return state.NewInvalidExtensionErrorf("payload includes invalid receipt %v: %w", receipt.ID(), err)
+			}
+
+			return fmt.Errorf("payload validation unexpected error %w", err)
 		}
 
 		// check receipts are sorted by block height
@@ -622,16 +632,6 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	}
 
 	return nil
-}
-
-// IsValidReceipt performs checks that are independent of where the receipt was
-// incorporated
-func IsValidReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
-	// TODO fill this out. ex:
-	// - Is the receipt from a valid execution node with non-zero weight (stake)?
-	// - Cryptography checks
-	// - Does it contain the expected number of chunks?
-	return true, nil
 }
 
 // finding the last sealed block on the chain of which the given block is extending

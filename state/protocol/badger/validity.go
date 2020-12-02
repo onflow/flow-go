@@ -2,9 +2,7 @@ package badger
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )

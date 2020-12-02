@@ -17,6 +17,7 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 	metrics := &metrics.NoopCollector{}
 	tracer := trace.NewNoopTracer()
 	distributor := events.NewDistributor()
+	mutatorFactory := protocolbadger.NewMutatorFactory(storages.Results)
 
 	protocolState, err := protocolbadger.NewState(
 		metrics,
@@ -31,6 +32,7 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 		storages.EpochCommits,
 		storages.Statuses,
 		distributor,
+		mutatorFactory,
 	)
 
 	if err != nil {

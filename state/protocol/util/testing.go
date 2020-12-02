@@ -34,14 +34,17 @@ type createState func(
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
 	consumer protocol.Consumer,
+	mutatorFactory pbadger.MutatorFactory,
 ) (*pbadger.State, error)
 
 func WithProtocolState(t testing.TB, db *badger.DB, create createState) *pbadger.State {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	consumer := events.NewNoop()
-	headers, _, seals, index, payloads, blocks, setups, commits, statuses := util.StorageLayer(t, db)
-	proto, err := create(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
+	headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
+	mutatorFactory := pbadger.NewMutatorFactory(results)
+	proto, err := create(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses,
+		consumer, mutatorFactory)
 	require.NoError(t, err)
 	return proto
 }
@@ -49,6 +52,19 @@ func WithProtocolState(t testing.TB, db *badger.DB, create createState) *pbadger
 func RunWithProtocolState(t testing.TB, f func(*badger.DB, *pbadger.State)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		proto := ProtocolState(t, db)
+		f(db, proto)
+	})
+}
+
+func RunWithProtocolStateAndMutatorFactory(t testing.TB, mutatorFactory pbadger.MutatorFactory, f func(*badger.DB, *pbadger.State)) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		consumer := events.NewNoop()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
+		proto, err := pbadger.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses,
+			consumer, mutatorFactory)
+		require.NoError(t, err)
 		f(db, proto)
 	})
 }
@@ -75,8 +91,9 @@ func RunWithProtocolStateAndConsumer(t testing.TB, consumer protocol.Consumer, f
 		commits storage.EpochCommits,
 		statuses storage.EpochStatuses,
 		c protocol.Consumer,
+		factory pbadger.MutatorFactory,
 	) (*pbadger.State, error) {
-		proto, err := pbadger.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
+		proto, err := pbadger.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer, factory)
 		require.NoError(t, err)
 		return proto, nil
 	}, f)
