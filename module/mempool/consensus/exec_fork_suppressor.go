@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
-var ExecutionForkErr = fmt.Errorf("forked execution state detected") // sentinel error
+var executionForkErr = fmt.Errorf("forked execution state detected") // sentinel error
 
 // ExecForkSuppressor is a wrapper around a conventional mempool.IncorporatedResultSeals
 // mempool. It implements the following mitigation strategy for execution forks:
@@ -134,7 +134,7 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 		// already other seal for this block in mempool => compare consistency of results' state transitions
 		otherSeal := getArbitraryElement(otherSeals) // cannot be nil, as otherSeals is guaranteed to always contain at least one element
 		err := s.enforceConsistentStateTransitions(newSeal, otherSeal)
-		if errors.Is(err, ExecutionForkErr) {
+		if errors.Is(err, executionForkErr) {
 			s.onExecFork([]*flow.IncorporatedResultSeal{newSeal, otherSeal})
 			return false, nil
 		}
@@ -288,7 +288,7 @@ func getArbitraryElement(set sealSet) *flow.IncorporatedResultSeal {
 //   * wrapped mempool is cleared
 //   * internal execForkDetected flag is ste to true
 //   * the new value of execForkDetected is persisted to data base
-// and ExecutionForkErr (sentinel error) is returned
+// and executionForkErr (sentinel error) is returned
 func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal) error {
 	if irSeal.IncorporatedResult.Result.ID() == irSeal2.IncorporatedResult.Result.ID() {
 		// happy case: candidate seals are for the same result
@@ -311,7 +311,7 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 		if err != nil {
 			return fmt.Errorf("failed to update execution-fork-detected flag: %w", err)
 		}
-		return ExecutionForkErr
+		return executionForkErr
 	}
 	log.Warn().Msg("seals with different ID but consistent state transition")
 	return nil
