@@ -18,7 +18,6 @@ import (
 // the reconstructed threshold signature.
 type CombinedVerifier struct {
 	committee hotstuff.Committee
-	dkg       hotstuff.DKG
 	staking   module.AggregatingVerifier
 	beacon    module.ThresholdVerifier
 	merger    module.Merger
