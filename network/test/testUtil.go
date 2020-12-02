@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -43,7 +42,7 @@ func init() {
 // GenerateIDs is a test helper that generate flow identities with a valid port, networking keys, and libp2p nodes.
 // If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
 // to get used.
-func GenerateIDs(t *testing.T, ctx context.Context, logger zerolog.Logger, n int, dryRunMode bool,
+func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool,
 	opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node,
 	[]crypto.PrivateKey) {
 	privateKeys := make([]crypto.PrivateKey, n)
@@ -60,7 +59,7 @@ func GenerateIDs(t *testing.T, ctx context.Context, logger zerolog.Logger, n int
 		port := "0"
 
 		if !dryRunMode {
-			libP2PNodes[i] = generateLibP2PNode(t, logger, ctx, *id, key)
+			libP2PNodes[i] = generateLibP2PNode(t, logger, *id, key)
 			_, port, err = libP2PNodes[i].GetIPPort()
 			require.NoError(t, err)
 		}
@@ -72,7 +71,7 @@ func GenerateIDs(t *testing.T, ctx context.Context, logger zerolog.Logger, n int
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, ctx context.Context, cancel context.CancelFunc, logger zerolog.Logger, identities flow.IdentityList,
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList,
 	libP2PNodes []*p2p.Node, keys []crypto.PrivateKey) []*p2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*p2p.Middleware, len(identities))
@@ -88,8 +87,6 @@ func GenerateMiddlewares(t *testing.T, ctx context.Context, cancel context.Cance
 
 		// creating middleware of nodes
 		mw, err := p2p.NewMiddleware(logger,
-			ctx,
-			cancel,
 			factory,
 			json.NewCodec(),
 			id.Address,
@@ -164,9 +161,9 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	dryRunMode bool,
 	logger zerolog.Logger) (flow.IdentityList,
 	[]*p2p.Middleware) {
-	ctx, cancel := context.WithCancel(context.Background())
-	ids, libP2PNodes, keys := GenerateIDs(t, ctx, logger, n, dryRunMode)
-	mws := GenerateMiddlewares(t, ctx, cancel, logger, ids, libP2PNodes, keys)
+
+	ids, libP2PNodes, keys := GenerateIDs(t, logger, n, dryRunMode)
+	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes, keys)
 	return ids, mws
 }
 
@@ -196,7 +193,6 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 // generateLibP2PNode is a test helper that generates a libp2p node for the specified overlay.
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
-	ctx context.Context,
 	id flow.Identity,
 	key crypto.PrivateKey) *p2p.Node {
 
@@ -214,8 +210,7 @@ func generateLibP2PNode(t *testing.T,
 		pubsub.WithMaxMessageSize(p2p.DefaultMaxPubSubMsgSize),
 	}
 
-	libP2PNode, err := p2p.NewLibP2PNode(ctx,
-		logger,
+	libP2PNode, err := p2p.NewLibP2PNode(logger,
 		nodeAddress,
 		p2p.NewConnManager(logger, noopMetrics),
 		key,

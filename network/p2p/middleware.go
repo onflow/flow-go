@@ -53,7 +53,7 @@ type LibP2PFactoryFunc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.O
 // DefaultLibP2PNodeFactory is a factory function that receives a middleware instance and generates a libp2p Node by invoking its factory with
 // proper parameters.
 var DefaultLibP2PNodeFactory = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
-	return NewLibP2PNode(mv.ctx, mv.log, me, NewConnManager(mv.log, mv.metrics), mv.flowKey, true, allowList, mv.rootBlockID, psOption...)
+	return NewLibP2PNode(mv.log, me, NewConnManager(mv.log, mv.metrics), mv.flowKey, true, allowList, mv.rootBlockID, psOption...)
 }
 
 // Middleware handles the input & output on the direct connections we have to
@@ -83,8 +83,6 @@ type Middleware struct {
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger,
-	ctx context.Context,
-	cancel context.CancelFunc,
 	libP2PHostGenFunc LibP2PFactoryFunc,
 	codec network.Codec,
 	address string,
@@ -112,6 +110,8 @@ func NewMiddleware(log zerolog.Logger,
 	if maxUnicastMsgSize <= 0 {
 		maxUnicastMsgSize = DefaultMaxUnicastMsgSize
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// create the node entity and inject dependencies & config
 	m := &Middleware{

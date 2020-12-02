@@ -52,6 +52,7 @@ type NodeAddress struct {
 type Node struct {
 	sync.Mutex
 	libP2PHost           *libP2PHostWrapper              // used to provide unicast and pubsub services
+	cancel               context.CancelFunc              // used to cancel context of host
 	logger               zerolog.Logger                  // used to provide logging
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
@@ -59,8 +60,7 @@ type Node struct {
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 }
 
-func NewLibP2PNode(ctx context.Context,
-	logger zerolog.Logger,
+func NewLibP2PNode(logger zerolog.Logger,
 	nodeAddress NodeAddress,
 	conMgr ConnManager,
 	key fcrypto.PrivateKey,
@@ -75,6 +75,9 @@ func NewLibP2PNode(ctx context.Context,
 	}
 
 	flowLibP2PProtocolID := generateProtocolID(rootBlockID)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
 	libp2pHostWrapper, err := bootstrapLibP2PHost(ctx,
 		logger,
 		nodeAddress,
@@ -83,7 +86,9 @@ func NewLibP2PNode(ctx context.Context,
 		allowList,
 		allowListAddrs,
 		psOption...)
+
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("could not bootstrap libp2p host: %w", err)
 	}
 
@@ -94,6 +99,7 @@ func NewLibP2PNode(ctx context.Context,
 		topics:               make(map[string]*pubsub.Topic),
 		subs:                 make(map[string]*pubsub.Subscription),
 		libP2PHost:           libp2pHostWrapper,
+		cancel:               cancel,
 	}
 
 	ip, port, err := n.GetIPPort()
@@ -156,6 +162,7 @@ func (n *Node) Stop() (chan struct{}, error) {
 		n.logger.Debug().Str("name", n.name).Msg("libp2p node stopped successfully")
 	}(done)
 
+	n.cancel()
 	return done, nil
 }
 

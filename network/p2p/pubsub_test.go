@@ -170,7 +170,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		}
 
 		psOption := pubsub.WithDiscovery(d)
-		n, err := NewLibP2PNode(suite.ctx, logger, nodeID, NewConnManager(logger, noopMetrics), key, false, nil, rootBlockID, psOption)
+		n, err := NewLibP2PNode(logger, nodeID, NewConnManager(logger, noopMetrics), key, false, nil, rootBlockID, psOption)
 		require.NoError(suite.T(), err)
 		n.SetStreamHandler(handlerFunc)
 
