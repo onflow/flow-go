@@ -162,6 +162,7 @@ func BadgerDB(t testing.TB, dir string) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
+		WithInMemory(false).
 		WithLogger(nil)
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
