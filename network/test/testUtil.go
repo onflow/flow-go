@@ -29,15 +29,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID string
+var rootBlockID = unittest.IdentifierFixture().String
 
 const DryRun = true
-
-// init is a built-in golang function getting called first time this
-// initialize the allocated ports map and the root block ID
-func init() {
-	rootBlockID = unittest.IdentifierFixture().String()
-}
 
 // GenerateIDs is a test helper that generate flow identities with a valid port, networking keys, and libp2p nodes.
 // If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
