@@ -167,8 +167,19 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
+		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Me.NodeID(),
+			fnb.Me.Address(),
+			fnb.networkKey,
+			fnb.RootBlock.ID().String(),
+			p2p.DefaultMaxPubSubMsgSize,
+			fnb.Metrics.Network)
+		if err != nil {
+			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
+		}
+
 		mw, err := p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
-			p2p.DefaultLibP2PNodeFactory,
+			libP2PNodeFactory,
 			codec,
 			myAddr,
 			fnb.Me.NodeID(),

@@ -13,7 +13,6 @@ import (
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
@@ -47,15 +46,6 @@ const (
 
 var unicastTimeout = DefaultUnicastTimeout
 
-// LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func(*Middleware, NodeAddress, []NodeAddress, ...pubsub.Option) (*Node, error)
-
-// DefaultLibP2PNodeFactory is a factory function that receives a middleware instance and generates a libp2p Node by invoking its factory with
-// proper parameters.
-var DefaultLibP2PNodeFactory = func(mv *Middleware, me NodeAddress, allowList []NodeAddress, psOption ...pubsub.Option) (*Node, error) {
-	return NewLibP2PNode(mv.log, me, NewConnManager(mv.log, mv.metrics), mv.flowKey, true, allowList, mv.rootBlockID, psOption...)
-}
-
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -83,7 +73,7 @@ type Middleware struct {
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger,
-	libP2PHostGenFunc LibP2PFactoryFunc,
+	libP2PNodeFactory LibP2PFactoryFunc,
 	codec network.Codec,
 	address string,
 	flowID flow.Identifier,
@@ -124,7 +114,7 @@ func NewMiddleware(log zerolog.Logger,
 		host:              ip,
 		port:              port,
 		flowKey:           key,
-		libP2PNodeFactory: libP2PHostGenFunc,
+		libP2PNodeFactory: libP2PNodeFactory,
 		metrics:           metrics,
 		maxPubSubMsgSize:  maxPubSubMsgSize,
 		maxUnicastMsgSize: maxUnicastMsgSize,
@@ -172,19 +162,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not derive list of approved peer list: %w", err)
 	}
 
-	// create PubSub options for libp2p to use
-	psOptions := []pubsub.Option{
-		// skip message signing
-		pubsub.WithMessageSigning(false),
-		// skip message signature
-		pubsub.WithStrictSignatureVerification(false),
-		// set max message size limit for 1-k PubSub messaging
-		pubsub.WithMaxMessageSize(m.maxPubSubMsgSize),
-	}
-
-	// creates libp2p host and node
-	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
-	libP2PNode, err := m.libP2PNodeFactory(m, nodeAddress, nodeAddrsWhiteList, psOptions...)
+	libP2PNode, err := m.libP2PNodeFactory(nodeAddrsWhiteList)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}

@@ -75,7 +75,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		node := libP2PNodes[i]
 
 		// libp2p node factory for this instance of middleware
-		factory := func(*p2p.Middleware, p2p.NodeAddress, []p2p.NodeAddress, ...pubsub.Option) (*p2p.Node, error) {
+		factory := func(allowList []p2p.NodeAddress) (*p2p.Node, error) {
 			return node, nil
 		}
 

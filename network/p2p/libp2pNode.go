@@ -24,6 +24,8 @@ import (
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
 )
 
@@ -38,6 +40,36 @@ const (
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 const maxConnectAttempt = 3
+
+// LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
+type LibP2PFactoryFunc func(allowList []NodeAddress) (*Node, error)
+
+// DefaultLibP2PNodeFactory is a factory function that receives a middleware instance and generates a libp2p Node by invoking its factory with
+// proper parameters.
+func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
+	maxPubSubMsgSize int, metrics module.NetworkMetrics) (LibP2PFactoryFunc, error) {
+	// create PubSub options for libp2p to use
+	psOptions := []pubsub.Option{
+		// skip message signing
+		pubsub.WithMessageSigning(false),
+		// skip message signature
+		pubsub.WithStrictSignatureVerification(false),
+		// set max message size limit for 1-k PubSub messaging
+		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
+	}
+
+	ip, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create middleware: %w", err)
+	}
+
+	// creates libp2p host and node
+	nodeAddress := NodeAddress{Name: me.String(), IP: ip, Port: port}
+
+	return func(allowList []NodeAddress) (*Node, error) {
+		return NewLibP2PNode(log, nodeAddress, NewConnManager(log, metrics), flowKey, true, allowList, rootBlockID, psOptions...)
+	}, nil
+}
 
 // NodeAddress is used to define a libp2p node
 type NodeAddress struct {
