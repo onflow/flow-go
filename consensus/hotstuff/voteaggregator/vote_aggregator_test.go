@@ -8,19 +8,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/indices"
+	"github.com/onflow/flow-go/state/protocol"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state"
 	protomock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -68,33 +69,35 @@ func (as *AggregatorSuite) SetupTest() {
 	as.protocol = &protomock.State{}
 	as.protocol.On("Final").Return(as.snapshot)
 
+	// mock out epoch, used for leader selection
+	epochs := &protomock.EpochQuery{}
+	epoch := &protomock.Epoch{}
+	as.snapshot.On("Epochs").Return(epochs)
+	epochs.On("Current").Return(epoch)
+	epoch.On("Counter").Return(uint64(1), nil)
+	epoch.On("InitialIdentities").Return(as.participants, nil)
+	var params []interface{}
+	for _, param := range indices.ProtocolConsensusLeaderSelection {
+		params = append(params, param)
+	}
+	seed := unittest.SeedFixture(32)
+	epoch.On("Seed", params...).Return(seed, nil)
+	epoch.On("FirstView").Return(uint64(0), nil)
+	epoch.On("FinalView").Return(uint64(1000), nil)
+	// there is no previous epoch
+	previousEpoch := &protomock.Epoch{}
+	epochs.On("Previous").Return(previousEpoch)
+	previousEpoch.On("Counter").Return(uint64(0), protocol.ErrNoPreviousEpoch)
+
 	// create a mocked forks
 	as.forks = &mocks.Forks{}
 
 	rootHeader := &flow.Header{}
-
-	sig1 := make([]byte, 32)
-	rand.Read(sig1[:])
-	sig2 := make([]byte, 32)
-	rand.Read(sig2[:])
-	c := &signature.Combiner{}
-	combined, err := c.Join(sig1, sig2)
-	require.NoError(as.T(), err)
-
-	rootQC := &flow.QuorumCertificate{
-		View:      rootHeader.View,
-		BlockID:   rootHeader.ID(),
-		SignerIDs: nil,
-		SigData:   combined,
-	}
-
 	as.MockProtocolByBlockID(rootHeader.ID())
 
-	// initialize and pre-generate leader selections from the seed
-	selection, err := leader.NewSelectionForConsensus(10000, rootHeader, rootQC, as.protocol)
-	require.NoError(as.T(), err)
 	// create hotstuff.Committee
-	as.committee, err = committee.NewMainConsensusCommitteeState(as.protocol, as.participants[0].NodeID, selection)
+	var err error
+	as.committee, err = committees.NewConsensusCommittee(as.protocol, as.participants[0].NodeID)
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals

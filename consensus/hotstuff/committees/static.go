@@ -1,4 +1,4 @@
-package committee
+package committees
 
 import (
 	"fmt"
