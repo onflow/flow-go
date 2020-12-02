@@ -79,10 +79,13 @@ func (s State) Read(owner, controller, key string) (flow.RegisterValue, error) {
 	}
 
 	value, err := s.ledger.Get(owner, controller, key)
+	if err != nil {
+		return nil, &LedgerFailure{err}
+	}
 	// update interaction
 	keySize := uint64(len(owner) + len(controller) + len(key))
 	valueSize := uint64(len(value))
-	s.updateInteraction(keySize, valueSize, 0)
+	err = s.updateInteraction(keySize, valueSize, 0)
 	if err != nil {
 		return nil, &LedgerFailure{err}
 	}
