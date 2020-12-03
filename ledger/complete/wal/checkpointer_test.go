@@ -5,6 +5,7 @@ import (
 	"io"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -74,6 +75,7 @@ func Test_WAL(t *testing.T) {
 
 		// WAL segments are 32kB, so here we generate 2 keys 16kB each, times `size`
 		// so we should get at least `size` segments
+
 		for i := 0; i < size; i++ {
 
 			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
@@ -156,7 +158,7 @@ func Test_Checkpointing(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
 				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 				update, err := ledger.NewUpdate(rootHash, keys, values)
 				require.NoError(t, err)
@@ -179,6 +181,8 @@ func Test_Checkpointing(t *testing.T) {
 
 				savedData[string(rootHash)] = data
 			}
+			// some buffer time of the checkpointer to run
+			time.Sleep(1 * time.Second)
 			err = wal.Close()
 			require.NoError(t, err)
 
