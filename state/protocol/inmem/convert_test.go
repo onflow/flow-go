@@ -125,6 +125,7 @@ func testEncodeDecode(t *testing.T, snap *Snapshot) {
 
 // checks that 2 snapshots are equivalent by converting to a serializable
 // representation and comparing the serializations
+// TODO check equality manually
 func snapshotsEqual(t *testing.T, snap1, snap2 protocol.Snapshot) bool {
 	enc1, err := FromSnapshot(snap1)
 	require.Nil(t, err)

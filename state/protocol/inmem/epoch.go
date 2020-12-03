@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
@@ -58,7 +58,7 @@ func (eq Epochs) Previous() protocol.Epoch {
 	if eq.enc.Previous != nil {
 		return Epoch{*eq.enc.Previous}
 	}
-	return bprotocol.NewInvalidEpoch(protocol.ErrNoPreviousEpoch)
+	return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 }
 func (eq Epochs) Current() protocol.Epoch {
 	return Epoch{*eq.enc.Current}
@@ -67,5 +67,5 @@ func (eq Epochs) Next() protocol.Epoch {
 	if eq.enc.Next != nil {
 		return Epoch{*eq.enc.Next}
 	}
-	return bprotocol.NewInvalidEpoch(protocol.ErrNextEpochNotSetup)
+	return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 }

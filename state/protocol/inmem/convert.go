@@ -176,3 +176,13 @@ func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
 
 	return &DKG{dkg}, nil
 }
+
+// DKGFromEncodable returns a DKG backed by the given encodable representation.
+func DKGFromEncodable(enc EncodableDKG) (*DKG, error) {
+	return &DKG{enc}, nil
+}
+
+// ClusterFromEncodable returns a Cluster backed by the given encodable representation.
+func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
+	return &Cluster{enc}, nil
+}
