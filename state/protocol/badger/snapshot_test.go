@@ -197,29 +197,32 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	// epoch 3 has no overlap with epoch 2
 	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 
-	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *bprotocol.State) {
 		root, result, seal := unittest.BootstrapFixture(epoch1Identities)
 		err := state.Mutate().Bootstrap(root, result, seal)
 		require.Nil(t, err)
 
-		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
+		// Prepare an epoch builder, which builds epochs with 6 blocks, A,B,C,D,E,F
 		// See EpochBuilder documentation for details of these blocks.
-		//
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 		// build blocks WITHIN epoch 1 - PREPARING epoch 2
-		// A - height 0 (root block)
+		// A - height 0 - (root block)
 		// B - height 1 - staking phase
-		// C - height 2 - setup phase
-		// D - height 3 - committed phase
+		// C - height 2
+		// D - height 3 - setup phase
+		// E - height 4
+		// F - height 5 - committed phase
 		epochBuilder.
 			UsingSetupOpts(unittest.WithParticipants(epoch2Identities)).
 			BuildEpoch().
 			CompleteEpoch()
 		// build blocks WITHIN epoch 2 - PREPARING epoch 3
-		// A - height 4
-		// B - height 5 - staking phase
-		// C - height 6 - setup phase
-		// D - height 7 - committed phase
+		// A - height 6  - first block of epoch 2
+		// B - height 7  - staking phase
+		// C - height 8
+		// D - height 9  - setup phase
+		// E - height 10
+		// F - height 11 - committed phase
 		epochBuilder.
 			UsingSetupOpts(unittest.WithParticipants(epoch3Identities)).
 			BuildEpoch().
@@ -239,7 +242,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		t.Run("should include next epoch after staking phase", func(t *testing.T) {
 
 			// get a snapshot from setup phase and commit phase of epoch 1
-			snapshots := []protocol.Snapshot{state.AtHeight(2), state.AtHeight(3)}
+			snapshots := []protocol.Snapshot{state.AtHeight(3), state.AtHeight(5)}
 
 			for _, snapshot := range snapshots {
 				phase, err := snapshot.Phase()
@@ -266,7 +269,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		t.Run("should include previous epoch in staking phase", func(t *testing.T) {
 
 			// get a snapshot from staking phase of epoch 2
-			snapshot := state.AtHeight(5)
+			snapshot := state.AtHeight(7)
 			identities, err := snapshot.Identities(filter.Any)
 			require.Nil(t, err)
 
@@ -285,7 +288,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		t.Run("should not include previous epoch after staking phase", func(t *testing.T) {
 
 			// get a snapshot from setup phase and commit phase of epoch 2
-			snapshots := []protocol.Snapshot{state.AtHeight(6), state.AtHeight(7)}
+			snapshots := []protocol.Snapshot{state.AtHeight(9), state.AtHeight(11)}
 
 			for _, snapshot := range snapshots {
 				phase, err := snapshot.Phase()

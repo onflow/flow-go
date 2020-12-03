@@ -4,6 +4,7 @@ package badger
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/validation"
@@ -40,7 +41,7 @@ func (m *mutatorFactory) Create(state *State) protocol.Mutator {
 	return r
 }
 
-func NewMutatorFactory(results storage.ExecutionResults) *mutatorFactory {
+func NewMutatorFactory(results storage.ExecutionResults) MutatorFactory {
 	m := &mutatorFactory{
 		results:           results,
 		signatureVerifier: signature.NewAggregationVerifier(encoding.ExecutionReceiptTag),
@@ -48,7 +49,7 @@ func NewMutatorFactory(results storage.ExecutionResults) *mutatorFactory {
 	return m
 }
 
-func NewMutatorFactoryWithValidator(validator module.ReceiptValidator) *mutatorFactoryWithValidator {
+func NewMutatorFactoryWithValidator(validator module.ReceiptValidator) MutatorFactory {
 	m := &mutatorFactoryWithValidator{
 		validator: validator,
 	}
