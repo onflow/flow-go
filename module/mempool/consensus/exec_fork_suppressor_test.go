@@ -85,7 +85,7 @@ func Test_All(t *testing.T) {
 // Test_Add adds IncorporatedResultSeals for
 //   * 2 different blocks
 //   * for each block, we generate one specific result,
-//     for which we add 4 IncorporatedResultSeals
+//     for which we add 3 IncorporatedResultSeals
 //      o IncorporatedResultSeal (1):
 //        incorporated in block B1
 //      o IncorporatedResultSeal (2):

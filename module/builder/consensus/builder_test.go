@@ -518,8 +518,8 @@ func (bs *BuilderSuite) TestPayloadSealAllValid() {
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
-// TestPayloadSealOnlyFork verifies that builder only includes seals for blocks in the respective fork
-// (and _not_ seals for sealable blocks on other forks)
+// TestPayloadSealOnlyFork checks that the builder only includes seals corresponding
+// to blocks on the current fork (and _not_ seals for sealable blocks on other forks)
 func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 	// in the test setup, we already created a single fork
 	//  [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
@@ -529,12 +529,10 @@ func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 	//   * [A0] ... [A3] are _not_ finalized and _not_ sealed
 	// We now create an additional fork:  [F3] <- [B0] <- [B1] <- ... <- [B7]
 	var forkHead *flow.Block
-	for f := 0; f < 100; f++ {
-		forkHead = bs.blocks[bs.finalID]
-		for i := 0; i < 8; i++ {
-			forkHead = bs.createAndRecordBlock(forkHead)
-			// Method createAndRecordBlock adds a seal for every block into the mempool.
-		}
+	forkHead = bs.blocks[bs.finalID]
+	for i := 0; i < 8; i++ {
+		forkHead = bs.createAndRecordBlock(forkHead)
+		// Method createAndRecordBlock adds a seal for every block into the mempool.
 	}
 
 	bs.pendingSeals = bs.irsMap
