@@ -199,10 +199,10 @@ func (n *Node) Stop() (chan struct{}, error) {
 }
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
-func (n *Node) AddPeer(ctx context.Context, peer NodeAddress) error {
-	pInfo, err := GetPeerInfo(peer)
+func (n *Node) AddPeer(ctx context.Context, address NodeAddress) error {
+	pInfo, err := GetPeerInfo(address)
 	if err != nil {
-		return fmt.Errorf("failed to add peer %s: %w", peer.Name, err)
+		return fmt.Errorf("failed to add peer %s: %w", address.Name, err)
 	}
 
 	err = n.host.Connect(ctx, pInfo)
@@ -227,21 +227,13 @@ func (n *Node) RemovePeer(ctx context.Context, peer NodeAddress) error {
 	return nil
 }
 
-// CreateStream returns an existing stream connected to n if it exists or adds node n as a peer and creates a new stream with it
-func (n *Node) CreateStream(ctx context.Context, nodeAddress NodeAddress) (libp2pnet.Stream, error) {
-
-	// Get the PeerID
-	peerID, err := peer.IDFromPublicKey(nodeAddress.PubKey)
-	if err != nil {
-		return nil, fmt.Errorf("could not get peer ID: %w", err)
-	}
-
+// CreateStream returns an existing stream connected to identity, if it exists or adds one to identity as a peer and creates a new stream with it.
+func (n *Node) CreateStream(ctx context.Context, identity flow.Identity) (libp2pnet.Stream, error) {
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
-	stream, err := n.tryCreateNewStream(ctx, nodeAddress, peerID, maxConnectAttempt)
+	stream, err := n.tryCreateNewStream(ctx, identity, maxConnectAttempt)
 	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", nodeAddress.Name, nodeAddress.IP,
-			nodeAddress.Port,
-			err))
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s): %w", identity.NodeID.String(),
+			identity.Address, err))
 	}
 	return stream, nil
 }
@@ -249,8 +241,18 @@ func (n *Node) CreateStream(ctx context.Context, nodeAddress NodeAddress) (libp2
 // tryCreateNewStream makes at most maxAttempts to create a stream with the target peer
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
-func (n *Node) tryCreateNewStream(ctx context.Context, nodeAddress NodeAddress, targetID peer.ID, maxAttempts int) (libp2pnet.Stream, error) {
-	var errs, err error
+func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, maxAttempts int) (libp2pnet.Stream, error) {
+	_, _, key, err := networkingInfo(identity)
+	if err != nil {
+		return nil, fmt.Errorf("could not get translate identity to networking info %s: %w", identity.NodeID.String(), err)
+	}
+
+	peerID, err := peer.IDFromPublicKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not get peer ID: %w", err)
+	}
+
+	var errs error
 	var s libp2pnet.Stream
 	var retries = 0
 	for ; retries < maxAttempts; retries++ {
@@ -261,12 +263,12 @@ func (n *Node) tryCreateNewStream(ctx context.Context, nodeAddress NodeAddress, 
 		}
 
 		// remove the peer from the peer store if present
-		n.host.Peerstore().ClearAddrs(targetID)
+		n.host.Peerstore().ClearAddrs(peerID)
 
 		// cancel the dial back off (if any), since we want to connect immediately
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
-			swm.Backoff().Clear(targetID)
+			swm.Backoff().Clear(peerID)
 		}
 
 		// if this is a retry attempt, wait for some time before retrying
@@ -277,7 +279,11 @@ func (n *Node) tryCreateNewStream(ctx context.Context, nodeAddress NodeAddress, 
 		}
 
 		// add node address as a peer
-		err = n.AddPeer(ctx, nodeAddress)
+		targetAddress, err := NodeAddressFromIdentity(identity)
+		if err != nil {
+			return nil, err
+		}
+		err = n.AddPeer(ctx, targetAddress)
 		if err != nil {
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
@@ -294,7 +300,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, nodeAddress NodeAddress, 
 			continue
 		}
 
-		s, err = n.host.NewStream(ctx, targetID, n.flowLibP2PProtocolID)
+		s, err = n.host.NewStream(ctx, peerID, n.flowLibP2PProtocolID)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 			continue
@@ -318,6 +324,27 @@ func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
 	id, err := peer.IDFromPublicKey(p.PubKey)
 	if err != nil {
 		return peer.AddrInfo{}, err
+	}
+	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
+	return pInfo, err
+}
+
+// PeerAddressInfo generates the libp2p peer.AddrInfo for an identity given its node address
+func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
+	ip, port, key, err := networkingInfo(identity)
+	if err != nil {
+		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to network address and key: %w", identity.NodeID.String(), err)
+	}
+
+	addr := Multiaddress(ip, port)
+	maddr, err := multiaddr.NewMultiaddr(addr)
+	if err != nil {
+		return peer.AddrInfo{}, err
+	}
+
+	id, err := peer.IDFromPublicKey(key)
+	if err != nil {
+		return peer.AddrInfo{}, fmt.Errorf("could not extract libp2p id from key:%w", err)
 	}
 	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
 	return pInfo, err
