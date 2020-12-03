@@ -1,7 +1,11 @@
 package complete
 
 import (
+	"bufio"
+	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -335,4 +339,26 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	writer.Close()
 
 	return newTrie.RootHash(), nil
+}
+
+// DumpTrieAsJSON export trie at specific state as a jsonl file, each line is json encode of a payload
+func (l *Ledger) DumpTrieAsJSON(state ledger.State, outputFilePath string) error {
+	fmt.Println(ledger.RootHash(state))
+	trie, err := l.forest.GetTrie(ledger.RootHash(state))
+	if err != nil {
+		return fmt.Errorf("cannot find the target trie: %w", err)
+	}
+
+	path := filepath.Join(outputFilePath, hex.EncodeToString(ledger.RootHash(state))+".trie.jsonl")
+
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	return trie.DumpAsJSON(writer)
 }
