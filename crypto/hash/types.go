@@ -31,8 +31,6 @@ const (
 	HashLenSha3_384 = 48
 
 	// KMAC
-	// the parameter maximum bytes-length as defined in NIST SP 800-185
-	KmacMaxParamsLen = 2040 / 8
 	// the minimum key length in bytes
 	KmacMinKeyLen = securityBits / 8
 )
