@@ -43,7 +43,7 @@ func DefaultConfig() Config {
 		MaxPayerTransactionRate: 0,                               // no rate limiting
 		UnlimitedPayers:         make(map[flow.Address]struct{}), // no unlimited payers
 		MaxCollectionByteSize:   uint64(1750000),                 // ~1.75MB. This is slightly higher than the limit on single tx size, which is 1.5MB
-		MaxCollectionTotalGas:   uint64(1000000),                 // 1M
+		MaxCollectionTotalGas:   uint64(10000000),                // 10M
 	}
 }
 

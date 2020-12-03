@@ -100,7 +100,7 @@ func main() {
 				"maximum number of transactions in proposed collections")
 			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", 1000000,
 				"maximum byte size of the proposed collection")
-			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", 1000000,
+			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", 10000000,
 				"maximum total amount of maxgas of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
 				"the initial timeout for the hotstuff pacemaker")
