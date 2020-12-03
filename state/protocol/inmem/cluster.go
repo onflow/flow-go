@@ -1,4 +1,4 @@
-package serializable
+package inmem
 
 import (
 	clustermodel "github.com/onflow/flow-go/model/cluster"

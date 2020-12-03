@@ -1,4 +1,4 @@
-package serializable
+package inmem
 
 import (
 	"github.com/onflow/flow-go/model/encodable"
