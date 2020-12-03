@@ -190,7 +190,7 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 }
 
 // decodePublicKey decodes a slice of bytes into a public key.
-// This function includes a membership check in G2
+// This function includes a membership check in G2 and rejects the infinity point.
 func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
 	if len(publicKeyBytes) != pubKeyLengthBLSBLS12381 {
 		return nil, fmt.Errorf("the input length has to be %d", pubKeyLengthBLSBLS12381)
@@ -199,8 +199,8 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	if readPointG2(&pk.point, publicKeyBytes) != nil {
 		return nil, errors.New("the input does not encode a BLS12-381 point")
 	}
-	if !pk.point.checkMembershipG2() {
-		return nil, errors.New("the input does not encode a BLS12-381 point in the valid group")
+	if !pk.point.checkValidPublicKeyPoint() {
+		return nil, errors.New("the input is infinity or does not encode a BLS12-381 point in the valid group")
 	}
 	return &pk, nil
 }
@@ -334,16 +334,25 @@ func (a *blsBLS12381Algo) reInit() {
 	a.context.setContext()
 }
 
-// membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.
-// Returns true if the public key is on the correct subgroup of the curve
-// and false otherwise
+// checkValidPublicKeyPoint checks whether the input point is a valid public key for BLS
+// on the BLS12-381 curve, considering public keys are in G2.
+// It returns true if the public key is non-infinity and on the correct subgroup of the curve
+// and false otherwise.
+//
 // It is necessary to run this test once for every public key before
 // it is used to verify BLS signatures. The library calls this function whenever
 // it imports a key through the function DecodePublicKey.
-// The membership check is separated from the signature verification to optimize
-// multiple verification calls using the same public key
-func (pk *pointG2) checkMembershipG2() bool {
-	verif := C.check_membership_G2((*C.ep2_st)(pk))
+// The validity check is separated from the signature verification to optimize
+// multiple verification calls using the same public key.
+func (pk *pointG2) checkValidPublicKeyPoint() bool {
+	// check point is non-infinity
+	verif := C.ep2_is_infty((*C.ep2_st)(pk))
+	if verif != valid {
+		return false
+	}
+
+	// membership check in G2
+	verif = C.check_membership_G2((*C.ep2_st)(pk))
 	return verif == valid
 }
 
