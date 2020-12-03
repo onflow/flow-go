@@ -167,14 +167,25 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
-		mw, err := p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics.Network, p2p.DefaultMaxUnicastMsgSize, p2p.DefaultMaxPubSubMsgSize,
+		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Me.NodeID(),
+			myAddr,
+			fnb.networkKey,
+			fnb.RootBlock.ID().String(),
+			p2p.DefaultMaxPubSubMsgSize,
+			fnb.Metrics.Network)
+		if err != nil {
+			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
+		}
+
+		fnb.Middleware = p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
+			libP2PNodeFactory,
+			fnb.Me.NodeID(),
+			fnb.Metrics.Network,
+			p2p.DefaultMaxUnicastMsgSize,
+			p2p.DefaultMaxPubSubMsgSize,
 			fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize middleware: %w", err)
-		}
-		fnb.Middleware = mw
 
 		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)
 		if err != nil {
@@ -543,9 +554,10 @@ func (fnb *FlowNodeBuilder) initState() {
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
+	blockFinder := fvm.NewBlockFinder(fnb.Storage.Headers)
 	vmOpts := []fvm.Option{
 		fvm.WithChain(fnb.RootChainID.Chain()),
-		fvm.WithBlocks(fnb.Storage.Blocks),
+		fvm.WithBlocks(blockFinder),
 	}
 	if fnb.RootChainID == flow.Testnet {
 		vmOpts = append(vmOpts,
