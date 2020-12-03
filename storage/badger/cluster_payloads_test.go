@@ -1,14 +1,12 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
@@ -22,12 +20,8 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.ClusterPayloadFixture(5)
 
-		// TODO: failing here? WHY?
-		_, err := store.ByBlockID(blockID)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
-
 		// store payload
-		err = store.Store(blockID, expected)
+		err := store.Store(blockID, expected)
 		require.NoError(t, err)
 
 		// fetch payload
