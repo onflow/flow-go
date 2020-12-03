@@ -53,11 +53,11 @@ func (es *SetupEpoch) Clustering() (flow.ClusterList, error) {
 }
 
 func (es *SetupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
-	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
+	return nil, protocol.ErrEpochNotCommitted
 }
 
 func (es *SetupEpoch) DKG() (protocol.DKG, error) {
-	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
+	return nil, protocol.ErrEpochNotCommitted
 }
 
 func (es *SetupEpoch) RandomSource() ([]byte, error) {
