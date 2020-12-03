@@ -1,7 +1,6 @@
 package inmem
 
 import (
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/seed"
@@ -18,23 +17,23 @@ var (
 // data is stored in the embedded encodable snapshot model, which defines the
 // canonical structure of an encoded snapshot for the purposes of serialization.
 type Snapshot struct {
-	encodable.Snapshot
+	enc EncodableSnapshot
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
-	return s.Snapshot.Head, nil
+	return s.enc.Head, nil
 }
 
 func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
-	return s.Snapshot.QuorumCertificate, nil
+	return s.enc.QuorumCertificate, nil
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.Snapshot.Identities.Filter(selector), nil
+	return s.enc.Identities.Filter(selector), nil
 }
 
 func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
-	identity, ok := s.Snapshot.Identities.ByNodeID(nodeID)
+	identity, ok := s.enc.Identities.ByNodeID(nodeID)
 	if !ok {
 		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
@@ -42,7 +41,7 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 }
 
 func (s *Snapshot) Commit() (flow.StateCommitment, error) {
-	return s.Snapshot.Commit, nil
+	return s.enc.Commit, nil
 }
 
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
@@ -51,13 +50,13 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
-	return s.Snapshot.Phase, nil
+	return s.enc.Phase, nil
 }
 
 func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
-	return seed.FromParentSignature(indices, s.Snapshot.QuorumCertificate.SigData)
+	return seed.FromParentSignature(indices, s.enc.QuorumCertificate.SigData)
 }
 
 func (s *Snapshot) Epochs() protocol.EpochQuery {
-	return Epochs{s.Snapshot.Epochs}
+	return Epochs{s.enc.Epochs}
 }

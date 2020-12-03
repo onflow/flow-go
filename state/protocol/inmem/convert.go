@@ -1,6 +1,8 @@
 package inmem
 
 import (
+	"errors"
+
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -13,7 +15,7 @@ import (
 func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 
 	var (
-		snap encodable.Snapshot
+		snap EncodableSnapshot
 		err  error
 	)
 
@@ -41,20 +43,30 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 
 	// convert epochs
 	previous, err := FromEpoch(from.Epochs().Previous())
-	if err != nil {
+	// it is possible for valid snapshots to have no previous epoch
+	if errors.Is(err, protocol.ErrNoPreviousEpoch) {
+		snap.Epochs.Previous = nil
+	} else if err != nil {
 		return nil, err
+	} else {
+		snap.Epochs.Previous = &previous.enc
 	}
-	snap.Epochs.Previous = previous.Epoch
+
 	current, err := FromEpoch(from.Epochs().Current())
 	if err != nil {
 		return nil, err
 	}
-	snap.Epochs.Current = current.Epoch
+	snap.Epochs.Current = &current.enc
+
 	next, err := FromEpoch(from.Epochs().Next())
-	if err != nil {
+	// it is possible for valid snapshots to have no next epoch
+	if errors.Is(err, protocol.ErrNextEpochNotSetup) {
+		snap.Epochs.Next = nil
+	} else if err != nil {
 		return nil, err
+	} else {
+		snap.Epochs.Next = &next.enc
 	}
-	snap.Epochs.Next = next.Epoch
 
 	return &Snapshot{snap}, nil
 }
@@ -63,7 +75,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 
 	var (
-		epoch encodable.Epoch
+		epoch EncodableEpoch
 		err   error
 	)
 
@@ -98,7 +110,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	if err != nil {
 		return nil, err
 	}
-	epoch.DKG = convertedDKG.DKG
+	epoch.DKG = convertedDKG.enc
 
 	// convert clusters
 	clustering, err := from.Clustering()
@@ -114,7 +126,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 		if err != nil {
 			return nil, err
 		}
-		epoch.Clusters = append(epoch.Clusters, convertedCluster.Cluster)
+		epoch.Clusters = append(epoch.Clusters, convertedCluster.enc)
 	}
 
 	return &Epoch{epoch}, nil
@@ -122,7 +134,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 
 // FromCluster converts any protocol.Cluster to a memory-backed Cluster
 func FromCluster(from protocol.Cluster) (*Cluster, error) {
-	cluster := encodable.Cluster{
+	cluster := EncodableCluster{
 		Counter:   from.EpochCounter(),
 		Index:     from.Index(),
 		Members:   from.Members(),
@@ -137,7 +149,7 @@ func FromCluster(from protocol.Cluster) (*Cluster, error) {
 // The given participant list must exactly match the DKG members.
 func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
 
-	var dkg encodable.DKG
+	var dkg EncodableDKG
 	dkg.Size = from.Size()
 	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}
 

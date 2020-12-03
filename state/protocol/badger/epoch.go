@@ -164,6 +164,10 @@ func (u *InvalidEpoch) DKG() (protocol.DKG, error) {
 	return nil, u.err
 }
 
+func (u *InvalidEpoch) RandomSource() ([]byte, error) {
+	return nil, u.err
+}
+
 func (u *InvalidEpoch) Seed(...uint32) ([]byte, error) {
 	return nil, u.err
 }
