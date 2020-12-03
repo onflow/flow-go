@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -93,7 +93,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		}
 
 		// create consensus committee's state
-		committee, err := committee.NewStaticCommittee(identities, local.NodeID(), participantData.Lookup, participantData.GroupKey)
+		committee, err := committees.NewStaticCommittee(identities, local.NodeID(), participantData.Lookup, participantData.GroupKey)
 		if err != nil {
 			return nil, nil, err
 		}
