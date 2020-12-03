@@ -7,6 +7,7 @@ import (
 	"net"
 
 	core "github.com/libp2p/go-libp2p-core"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -114,7 +115,6 @@ func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
 
 // NodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
 func NodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
-
 	// split the node address into ip and port
 	ip, port, err := net.SplitHostPort(flowIdentity.Address)
 	if err != nil {
@@ -131,4 +131,21 @@ func NodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
 	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
 
 	return nodeAddress, nil
+}
+
+// networkingInfo returns ip, port, libp2p public key of the identity.
+func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
+	// split the node address into ip and port
+	ip, port, err := net.SplitHostPort(identity.Address)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("could not parse address %s: %w", identity.Address, err)
+	}
+
+	// convert the Flow key to a LibP2P key
+	lkey, err := publicKey(identity.NetworkPubKey)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
+	}
+
+	return ip, port, lkey, nil
 }
