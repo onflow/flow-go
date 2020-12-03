@@ -94,8 +94,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	B.SetPayload(flow.Payload{Seals: seals})
 	err = builder.state.Mutate().Extend(&B)
 	require.Nil(builder.t, err)
-	// finalize block B
+	// finalize and validate block B
 	err = builder.state.Mutate().Finalize(B.ID())
+	require.Nil(builder.t, err)
+	err = builder.state.Mutate().MarkValid(B.ID())
 	require.Nil(builder.t, err)
 
 	// defaults for the EpochSetup event
@@ -118,8 +120,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	})
 	err = builder.state.Mutate().Extend(&C)
 	require.Nil(builder.t, err)
-	// finalize block C
+	// finalize and validate block C
 	err = builder.state.Mutate().Finalize(C.ID())
+	require.Nil(builder.t, err)
+	err = builder.state.Mutate().MarkValid(C.ID())
 	require.Nil(builder.t, err)
 
 	// defaults for the EpochCommit event
@@ -141,8 +145,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	})
 	err = builder.state.Mutate().Extend(&D)
 	require.Nil(builder.t, err)
-	// finalize block D
+	// finalize and validate block D
 	err = builder.state.Mutate().Finalize(D.ID())
+	require.Nil(builder.t, err)
+	err = builder.state.Mutate().MarkValid(D.ID())
 	require.Nil(builder.t, err)
 
 	return builder
@@ -170,5 +176,7 @@ func (builder *EpochBuilder) CompleteEpoch() {
 	err = builder.state.Mutate().Extend(&A)
 	require.Nil(builder.t, err)
 	err = builder.state.Mutate().Finalize(A.ID())
+	require.Nil(builder.t, err)
+	err = builder.state.Mutate().MarkValid(A.ID())
 	require.Nil(builder.t, err)
 }
