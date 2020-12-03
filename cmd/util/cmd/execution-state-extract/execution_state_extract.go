@@ -5,7 +5,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -20,13 +19,13 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	led, err := complete.NewLedger(dir, complete.DefaultCacheSize, &metrics.NoopCollector{}, log, nil, 0)
+	led, err := complete.NewLedger(dir, complete.DefaultCacheSize, &metrics.NoopCollector{}, log, nil, complete.DefaultPathFinderVersion)
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
 	newState, err := led.ExportCheckpointAt(targetHash,
-		[]ledger.Migration{migrations.MultipleContractMigration, migrations.AddMissingKeysMigration},
+		[]ledger.Migration{},
 		[]ledger.Reporter{},
 		complete.DefaultPathFinderVersion,
 		outputDir, wal.RootCheckpointFilename)
