@@ -133,7 +133,7 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 }
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	return e.accounts.GetStorageCapacity(flow.BytesToAddress(address.Bytes()))
+	return e.ctx.StorageCapacityResolver(e.ledger, flow.BytesToAddress(address.Bytes()))
 }
 
 func (e *hostEnv) ResolveLocation(

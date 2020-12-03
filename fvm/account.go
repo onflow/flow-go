@@ -85,7 +85,7 @@ func initAccountTransaction(payerAddress, accountAddress, serviceAddress flow.Ad
 	arg, err := jsoncdc.Encode(cadence.NewBool(restrictedAccountCreationEnabled))
 	if err != nil {
 		// this should not fail! It simply encodes a boolean
-		panic("Cannot json encode cadence boolean argument")
+		panic(fmt.Errorf("cannot json encode cadence boolean argument: %w", err))
 	}
 
 	return Transaction(

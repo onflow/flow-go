@@ -21,6 +21,8 @@ func (d *TransactionStorageLimiter) Process(
 		return nil
 	}
 
+	storageCapacityResolver := ctx.StorageCapacityResolver
+
 	accounts := state.NewAccounts(ledger)
 
 	registerIds, _ := ledger.RegisterUpdates()
@@ -50,7 +52,7 @@ func (d *TransactionStorageLimiter) Process(
 			continue
 		}
 
-		capacity, err := accounts.GetStorageCapacity(address)
+		capacity, err := storageCapacityResolver(ledger, address)
 		if err != nil {
 			return err
 		}
