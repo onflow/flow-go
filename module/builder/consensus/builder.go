@@ -57,10 +57,11 @@ func NewBuilder(
 
 	// initialize default config
 	cfg := Config{
-		minInterval:  500 * time.Millisecond,
-		maxInterval:  10 * time.Second,
-		maxSealCount: 100,
-		expiry:       flow.DefaultTransactionExpiry,
+		minInterval:       500 * time.Millisecond,
+		maxInterval:       10 * time.Second,
+		maxSealCount:      100,
+		maxGuaranteeCount: 100,
+		expiry:            flow.DefaultTransactionExpiry,
 	}
 
 	// apply option parameters
@@ -256,9 +257,15 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier,
 	// 3) If it was already included on the pending part of the chain, skip, but
 	// keep in memory pool for now.
 	// 4) Otherwise, this guarantee can be included in the payload.
-
 	var guarantees []*flow.CollectionGuarantee
 	for _, guarantee := range b.guarPool.All() {
+		// add at most <maxGuaranteeCount> number of collection guarantees in a new block proposal
+		// in order to prevent the block payload from being too big or computationally heavy for the
+		// execution nodes
+		if uint(len(guarantees)) >= b.cfg.maxGuaranteeCount {
+			break
+		}
+
 		collID := guarantee.ID()
 		_, duplicated := finalLookup[collID]
 		if duplicated {

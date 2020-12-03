@@ -13,8 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -31,7 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
-	networkmock "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -219,12 +218,8 @@ func createNode(
 
 	rootHeader := root.Header
 
-	// initialize and pre-generate leader selections from the seed
-	selection, err := leader.NewSelectionForConsensus(10000, rootHeader, rootQC, state)
-	require.NoError(t, err)
-
 	// selector := filter.HasRole(flow.RoleConsensus)
-	com, err := committee.NewMainConsensusCommitteeState(state, localID, selection)
+	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
 
 	// initialize the block finalizer
@@ -233,7 +228,7 @@ func createNode(
 	// initialize the persister
 	persist := persister.New(db, rootHeader.ChainID)
 
-	prov := &networkmock.Engine{}
+	prov := &mocknetwork.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig())
@@ -250,7 +245,7 @@ func createNode(
 	pending := []*flow.Header{}
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		com, build, final, persist, signer, comp, rootHeader,
+		committee, build, final, persist, signer, comp, rootHeader,
 		rootQC, rootHeader, pending, consensus.WithInitialTimeout(hotstuffTimeout), consensus.WithMinTimeout(hotstuffTimeout))
 
 	require.NoError(t, err)

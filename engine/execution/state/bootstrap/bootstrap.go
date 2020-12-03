@@ -39,7 +39,7 @@ func (b *Bootstrapper) BootstrapLedger(
 
 	vm := fvm.New(runtime.NewInterpreterRuntime())
 
-	ctx := fvm.NewContext(fvm.WithChain(chain))
+	ctx := fvm.NewContext(b.logger, fvm.WithChain(chain))
 
 	err := vm.Run(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
 	if err != nil {

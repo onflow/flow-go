@@ -4,7 +4,6 @@ package badger
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -18,11 +17,16 @@ import (
 // Only the EpochSetup event for the epoch has been emitted as of the point
 // at which the epoch was queried.
 type SetupEpoch struct {
+	// EpochSetup service event
 	setupEvent *flow.EpochSetup
 }
 
 func (es *SetupEpoch) Counter() (uint64, error) {
 	return es.setupEvent.Counter, nil
+}
+
+func (es *SetupEpoch) FirstView() (uint64, error) {
+	return es.setupEvent.FirstView, nil
 }
 
 func (es *SetupEpoch) FinalView() (uint64, error) {
@@ -33,9 +37,7 @@ func (es *SetupEpoch) InitialIdentities() (flow.IdentityList, error) {
 
 	identities := es.setupEvent.Participants.Filter(filter.Any)
 	// apply a deterministic sort to the participants
-	sort.Slice(identities, func(i int, j int) bool {
-		return order.ByNodeIDAsc(identities[i], identities[j])
-	})
+	identities = identities.Order(order.ByNodeIDAsc)
 
 	return identities, nil
 }
@@ -50,7 +52,7 @@ func (es *SetupEpoch) Clustering() (flow.ClusterList, error) {
 	return clustering, nil
 }
 
-func (es *SetupEpoch) Cluster(index uint) (protocol.Cluster, error) {
+func (es *SetupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
 	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
 }
 
@@ -131,6 +133,10 @@ type InvalidEpoch struct {
 }
 
 func (u *InvalidEpoch) Counter() (uint64, error) {
+	return 0, u.err
+}
+
+func (u *InvalidEpoch) FirstView() (uint64, error) {
 	return 0, u.err
 }
 

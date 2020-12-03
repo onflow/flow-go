@@ -289,7 +289,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 		func(nodeID flow.Identifier) error {
 			_, found := identities[nodeID]
 			if !found {
-				return realproto.IdentityNotFoundErr{NodeID: nodeID}
+				return realproto.IdentityNotFoundError{NodeID: nodeID}
 			}
 			return nil
 		},
