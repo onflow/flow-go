@@ -168,6 +168,7 @@ func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, erro
 
 		return leaderID, nil
 	}
+
 	return flow.ZeroID, errSelectionNotComputed
 }
 
@@ -194,7 +195,25 @@ func (c *Consensus) prepareLeaderSelection(epoch protocol.Epoch) (*leader.Leader
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection for current epoch: %w", err)
 	}
-
 	c.leaders[counter] = selection
+
+	// now prune any old epochs, if we have exceeded our maximum of 3
+	// if we have fewer than 3 epochs, this is a no-op
+
+	// find the maximum counter, including the epoch we just computed
+	max := uint64(0)
+	for counter := range c.leaders {
+		if counter > max {
+			max = counter
+		}
+	}
+
+	// remove any epochs which aren't within the most recent 3
+	for counter := range c.leaders {
+		if counter+3 <= max {
+			delete(c.leaders, counter)
+		}
+	}
+
 	return selection, nil
 }
