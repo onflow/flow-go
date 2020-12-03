@@ -8,8 +8,9 @@ import (
 )
 
 type Blocks interface {
-	// ByHeight returns the block at the given height in chain engine at header,
-	// or finalized if header is nil
+	// ByHeight returns the block at the given height in the chain ending in `header` (or finalized
+	// if `header` is nil). This enables querying un-finalized blocks by height with respect to the
+	// chain defined by the block we are executing.
 	ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error)
 }
 
@@ -45,7 +46,7 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 		// recent block should be in cache so this is supposed to be fast
 		parent, err := b.storage.ByBlockID(id)
 		if err != nil {
-			return nil, fmt.Errorf("cannot retireve block parent: %w", err)
+			return nil, fmt.Errorf("cannot retrieve block parent: %w", err)
 		}
 		if parent.Height == height {
 			return parent, nil
@@ -59,7 +60,7 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 		}
 		// any other error bubbles up
 		if err != nil {
-			return nil, fmt.Errorf("cannot retireve block parent: %w", err)
+			return nil, fmt.Errorf("cannot retrieve block parent: %w", err)
 		}
 		//if parent is finalized block, we can just use finalized chain
 		// to get desired height

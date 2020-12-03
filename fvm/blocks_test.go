@@ -47,15 +47,10 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		header0 := unittest.BlockHeaderFixture()
 		header0.Height = 0
 		header1 := unittest.BlockHeaderWithParentFixture(&header0)
-		header1.Height = 1
 		header2 := unittest.BlockHeaderWithParentFixture(&header1)
-		header2.Height = 2
 		header3 := unittest.BlockHeaderWithParentFixture(&header2)
-		header3.Height = 3
 		header4 := unittest.BlockHeaderWithParentFixture(&header3)
-		header4.Height = 4
 		header5 := unittest.BlockHeaderWithParentFixture(&header4)
-		header5.Height = 5
 
 		headers.On("ByBlockID", header4.ID()).Return(&header4, nil)
 		headers.On("ByHeight", uint64(4)).Return(nil, storage.ErrNotFound)
