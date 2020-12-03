@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -616,7 +617,7 @@ func (suite *LibP2PNodeTestSuite) CreateNode(name string, key fcrypto.PrivateKey
 	}
 
 	noopMetrics := metrics.NewNoopCollector()
-	n, err := NewLibP2PNode(suite.logger, nodeID, NewConnManager(suite.logger, noopMetrics), key, allowList, rootID)
+	n, err := NewLibP2PNode(suite.logger, flow.Identifier{}, ip+":"+port, NewConnManager(suite.logger, noopMetrics), key, allowList, rootID)
 	require.NoError(suite.T(), err)
 	n.SetStreamHandler(handlerFunc)
 

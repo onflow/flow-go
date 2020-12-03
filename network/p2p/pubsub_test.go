@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -157,20 +158,12 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 
 	// creating nodes
 	for i := 1; i <= count; i++ {
-
-		name := fmt.Sprintf("node%d", i)
-		libp2pkey, key := generateNetworkingAndLibP2PKeys(suite.T())
+		_, key := generateNetworkingAndLibP2PKeys(suite.T())
 
 		noopMetrics := metrics.NewNoopCollector()
-		nodeID := NodeAddress{
-			Name:   name,
-			IP:     "0.0.0.0",             // localhost
-			Port:   "0",                   // random Port number
-			PubKey: libp2pkey.GetPublic(), // the networking public key
-		}
 
 		psOption := pubsub.WithDiscovery(d)
-		n, err := NewLibP2PNode(logger, nodeID, NewConnManager(logger, noopMetrics), key, false, rootBlockID, psOption)
+		n, err := NewLibP2PNode(logger, flow.Identifier{}, "0.0.0.0:0", NewConnManager(logger, noopMetrics), key, false, rootBlockID, psOption)
 		require.NoError(suite.T(), err)
 		n.SetStreamHandler(handlerFunc)
 

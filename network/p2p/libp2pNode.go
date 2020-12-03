@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -62,16 +63,8 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
 	}
 
-	ip, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create middleware: %w", err)
-	}
-
-	// creates libp2p host and node
-	nodeAddress := NodeAddress{Name: me.String(), IP: ip, Port: port}
-
 	return func() (*Node, error) {
-		return NewLibP2PNode(log, nodeAddress, NewConnManager(log, metrics), flowKey, true, rootBlockID, psOptions...)
+		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, psOptions...)
 	}, nil
 }
 
@@ -99,7 +92,8 @@ type Node struct {
 }
 
 func NewLibP2PNode(logger zerolog.Logger,
-	nodeAddress NodeAddress,
+	id flow.Identifier,
+	address string,
 	conMgr ConnManager,
 	key fcrypto.PrivateKey,
 	allowList bool,
@@ -117,7 +111,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 
 	libP2PHost, connGater, pubSub, err := bootstrapLibP2PHost(ctx,
 		logger,
-		nodeAddress,
+		address,
 		conMgr,
 		libp2pKey,
 		allowList,
@@ -136,7 +130,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		logger:               logger,
 		topics:               make(map[string]*pubsub.Topic),
 		subs:                 make(map[string]*pubsub.Subscription),
-		name:                 nodeAddress.Name,
+		name:                 id.String(),
 		flowLibP2PProtocolID: flowLibP2PProtocolID,
 	}
 
@@ -146,7 +140,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 	}
 
 	n.logger.Debug().
-		Str("name", nodeAddress.Name).
+		Hex("node_id", logging.ID(id)).
 		Str("address", fmt.Sprintf("%s:%s", ip, port)).
 		Msg("libp2p node started successfully")
 
@@ -475,6 +469,22 @@ func MultiaddressStr(address NodeAddress) string {
 	return fmt.Sprintf("/dns4/%s/tcp/%s", address.IP, address.Port)
 }
 
+// Multiaddress receives a node ip and port and returns
+// its corresponding Libp2p Multiaddress in string format
+// in current implementation IP part of the node address is
+// either an IP or a dns4
+// https://docs.libp2p.io/concepts/addressing/
+func Multiaddress(ip, port string) string {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP != nil {
+		// returns parsed ip version of the multi-address
+		return fmt.Sprintf("/ip4/%s/tcp/%s", ip, port)
+	}
+	// could not parse it as an IP address and returns the dns version of the
+	// multi-address
+	return fmt.Sprintf("/dns4/%s/tcp/%s", ip, port)
+}
+
 // IPPortFromMultiAddress returns the IP/hostname and the port for the given multi-addresses
 // associated with a libp2p host
 func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error) {
@@ -547,7 +557,7 @@ func generateProtocolID(rootBlockID string) protocol.ID {
 // whitelists the `allowListAddres` nodes.
 func bootstrapLibP2PHost(ctx context.Context,
 	logger zerolog.Logger,
-	nodeAddress NodeAddress,
+	address string,
 	conMgr ConnManager,
 	key crypto.PrivKey,
 	allowList bool,
@@ -555,7 +565,12 @@ func bootstrapLibP2PHost(ctx context.Context,
 
 	var connGater *connGater
 
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiaddressStr(nodeAddress))
+	ip, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not split node address %s:%w", address, err)
+	}
+
+	sourceMultiAddr, err := multiaddr.NewMultiaddr(Multiaddress(ip, port))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}
