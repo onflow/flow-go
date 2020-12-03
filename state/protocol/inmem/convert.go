@@ -56,7 +56,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	snap.Epochs.Current = &current.enc
+	snap.Epochs.Current = current.enc
 
 	next, err := FromEpoch(from.Epochs().Next())
 	// it is possible for valid snapshots to have no next epoch

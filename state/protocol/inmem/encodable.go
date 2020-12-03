@@ -19,7 +19,7 @@ type EncodableSnapshot struct {
 // EncodableEpochs is the encoding format for protocol.EpochQuery
 type EncodableEpochs struct {
 	Previous *EncodableEpoch
-	Current  *EncodableEpoch
+	Current  EncodableEpoch // cannot be nil
 	Next     *EncodableEpoch
 }
 

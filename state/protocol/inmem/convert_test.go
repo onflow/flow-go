@@ -1,4 +1,4 @@
-package inmem
+package inmem_test
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -51,7 +52,7 @@ func TestFromSnapshot(t *testing.T) {
 			t.SkipNow()
 
 			expected := state.AtHeight(0)
-			actual, err := FromSnapshot(expected)
+			actual, err := inmem.FromSnapshot(expected)
 			require.Nil(t, err)
 			assertSnapshotsEqual(t, expected, actual)
 			testEncodeDecode(t, actual)
@@ -61,21 +62,21 @@ func TestFromSnapshot(t *testing.T) {
 		t.Run("epoch 1", func(t *testing.T) {
 			t.Run("staking phase", func(t *testing.T) {
 				expected := state.AtHeight(1)
-				actual, err := FromSnapshot(expected)
+				actual, err := inmem.FromSnapshot(expected)
 				require.Nil(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("setup phase", func(t *testing.T) {
 				expected := state.AtHeight(2)
-				actual, err := FromSnapshot(expected)
+				actual, err := inmem.FromSnapshot(expected)
 				require.Nil(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("committed phase", func(t *testing.T) {
 				expected := state.AtHeight(3)
-				actual, err := FromSnapshot(expected)
+				actual, err := inmem.FromSnapshot(expected)
 				require.Nil(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
@@ -86,21 +87,21 @@ func TestFromSnapshot(t *testing.T) {
 		t.Run("epoch 2", func(t *testing.T) {
 			t.Run("staking phase", func(t *testing.T) {
 				expected := state.AtHeight(5)
-				actual, err := FromSnapshot(expected)
+				actual, err := inmem.FromSnapshot(expected)
 				require.Nil(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("setup phase", func(t *testing.T) {
 				expected := state.AtHeight(6)
-				actual, err := FromSnapshot(expected)
+				actual, err := inmem.FromSnapshot(expected)
 				require.Nil(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("committed phase", func(t *testing.T) {
 				expected := state.AtHeight(7)
-				actual, err := FromSnapshot(expected)
+				actual, err := inmem.FromSnapshot(expected)
 				require.Nil(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
@@ -110,16 +111,16 @@ func TestFromSnapshot(t *testing.T) {
 }
 
 // checks that a snapshot is equivalent after encoding and decoding
-func testEncodeDecode(t *testing.T, snap *Snapshot) {
+func testEncodeDecode(t *testing.T, snap *inmem.Snapshot) {
 
 	bz, err := json.Marshal(snap.Encodable())
 	require.Nil(t, err)
 
-	var encoded EncodableSnapshot
+	var encoded inmem.EncodableSnapshot
 	err = json.Unmarshal(bz, &encoded)
 	require.Nil(t, err)
 
-	fromEncoded := SnapshotFromEncodable(encoded)
+	fromEncoded := inmem.SnapshotFromEncodable(encoded)
 	assertSnapshotsEqual(t, snap, fromEncoded)
 }
 
@@ -127,9 +128,9 @@ func testEncodeDecode(t *testing.T, snap *Snapshot) {
 // representation and comparing the serializations
 // TODO check equality manually
 func snapshotsEqual(t *testing.T, snap1, snap2 protocol.Snapshot) bool {
-	enc1, err := FromSnapshot(snap1)
+	enc1, err := inmem.FromSnapshot(snap1)
 	require.Nil(t, err)
-	enc2, err := FromSnapshot(snap2)
+	enc2, err := inmem.FromSnapshot(snap2)
 	require.Nil(t, err)
 
 	bz1, err := json.Marshal(enc1.Encodable())

@@ -61,7 +61,7 @@ func (eq Epochs) Previous() protocol.Epoch {
 	return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 }
 func (eq Epochs) Current() protocol.Epoch {
-	return Epoch{*eq.enc.Current}
+	return Epoch{eq.enc.Current}
 }
 func (eq Epochs) Next() protocol.Epoch {
 	if eq.enc.Next != nil {
