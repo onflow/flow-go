@@ -3,9 +3,10 @@ package jsonexporter
 import (
 	"encoding/hex"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var (
