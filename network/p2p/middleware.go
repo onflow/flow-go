@@ -244,9 +244,15 @@ func (m *Middleware) chooseMode(_ string, _ *message.Message, targetIDs ...flow.
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-	targetAddress, err := m.nodeAddressFromID(targetID)
+	// translates target identifier to identity
+	idMap, err := m.ov.Identity()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not extract network identity map: %w", err)
+	}
+
+	targetIdentity, ok := idMap[targetID]
+	if !ok {
+		return fmt.Errorf("could not lookup identitifer in identity map of middleware: %x", targetID)
 	}
 
 	if msg.Size() > m.maxUnicastMsgSize {
@@ -264,9 +270,9 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the the receiver
-	stream, err := m.libP2PNode.CreateStream(ctx, targetAddress)
+	stream, err := m.libP2PNode.CreateStream(ctx, targetIdentity)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s :%w", targetAddress.Name, err)
+		return fmt.Errorf("failed to create stream for %x :%w", targetID, err)
 	}
 
 	// create a gogo protobuf writer
