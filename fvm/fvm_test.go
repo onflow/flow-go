@@ -462,6 +462,8 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 	t.Run("Storing too much data fails", vmTest(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
+			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+
 			// Create an account private key.
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 			require.NoError(t, err)
@@ -768,8 +770,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	}
 
 	addressGen := chain.NewAddressGenerator()
-	// skip the addresses of 4 reserved accounts
-	for i := 0; i < 4; i++ {
+	// skip the addresses of 5 reserved accounts
+	for i := 0; i < 5; i++ {
 		_, err := addressGen.NextAddress()
 		require.NoError(t, err)
 	}
@@ -886,7 +888,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	require.Len(t, tx.Events, 1)
 	require.Equal(t, string(flow.EventAccountCreated), tx.Events[0].EventType.TypeID)
-	assert.Equal(t, flow.HexToAddress("05"), flow.Address(tx.Events[0].Fields[0].(cadence.Address)))
+	assert.Equal(t, flow.HexToAddress("06"), flow.Address(tx.Events[0].Fields[0].(cadence.Address)))
 }
 
 func TestSignatureVerification(t *testing.T) {

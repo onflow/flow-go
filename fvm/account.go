@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -53,12 +56,16 @@ func getAccount(
 	return account, nil
 }
 
-const initFlowTokenTransactionTemplate = `
+const initAccountTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 
-transaction {
-  prepare(account: AuthAccount) {
-    FlowServiceAccount.initDefaultToken(account)
+transaction(restrictedAccountCreationEnabled: Bool) {
+  prepare(newAccount: AuthAccount, payerAccount: AuthAccount) {
+    if restrictedAccountCreationEnabled && !FlowServiceAccount.isAccountCreator(payerAccount.address) {
+	  panic("Account not authorized to create accounts")
+    }
+
+    FlowServiceAccount.setupNewAccount(newAccount: newAccount, payer: payerAccount)
   }
 }
 `
@@ -72,11 +79,21 @@ pub fun main(): UFix64 {
 }
 `
 
-func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) *TransactionProcedure {
+func initAccountTransaction(payerAddress, accountAddress, serviceAddress flow.Address,
+	restrictedAccountCreationEnabled bool,
+) *TransactionProcedure {
+	arg, err := jsoncdc.Encode(cadence.NewBool(restrictedAccountCreationEnabled))
+	if err != nil {
+		// this should not fail! It simply encodes a boolean
+		panic("Cannot json encode cadence boolean argument")
+	}
+
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, serviceAddress))).
-			AddAuthorizer(accountAddress),
+			SetScript([]byte(fmt.Sprintf(initAccountTransactionTemplate, serviceAddress))).
+			AddAuthorizer(accountAddress).
+			AddAuthorizer(payerAddress).
+			AddArgument(arg),
 	)
 }
 

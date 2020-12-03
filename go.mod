@@ -36,7 +36,7 @@ require (
 	// pinned to https://github.com/onflow/cadence/commit/3ab62fe974547aba6fa4e8e102d16c3f0f4ecdf3
 	// replace with tag before merging feature branch to master
 	github.com/onflow/cadence v0.11.1-0.20201125180111-7255767ff5cf
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20201002123512-35d751ebea1d
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.4.1-0.20201203141023-6e11dbb55ea9
 	// pinned to https://github.com/onflow/flow-go-sdk/tree/janez/storage-fees
 	// replace with tag before merging feature branch to master
 	github.com/onflow/flow-go-sdk v0.12.2-0.20201113180830-d355071fc3ab
@@ -71,5 +71,7 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
 replace github.com/onflow/flow-go => ./
+
+replace github.com/onflow/flow-core-contracts/lib/go/contracts => ../flow-core-contracts/lib/go/contracts
 
 replace github.com/onflow/flow-go/crypto => ./crypto

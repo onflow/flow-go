@@ -13,10 +13,14 @@ func NewTransactionStorageLimiter() *TransactionStorageLimiter {
 
 func (d *TransactionStorageLimiter) Process(
 	_ *VirtualMachine,
-	_ Context,
+	ctx Context,
 	_ *TransactionProcedure,
 	ledger state.Ledger,
 ) error {
+	if !ctx.LimitAccountStorage {
+		return nil
+	}
+
 	accounts := state.NewAccounts(ledger)
 
 	registerIds, _ := ledger.RegisterUpdates()

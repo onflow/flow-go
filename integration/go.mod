@@ -32,4 +32,6 @@ replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/crypto => ../crypto
 
+replace github.com/onflow/flow-core-contracts/lib/go/contracts => ../../flow-core-contracts/lib/go/contracts
+
 replace github.com/onflow/flow-go/integration => ../integration

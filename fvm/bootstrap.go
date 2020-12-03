@@ -57,12 +57,13 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken)
+	storageFees := b.deployStorageFees(service, flowToken)
 
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
 	}
 
-	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
+	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract, storageFees)
 
 	return nil
 }
@@ -147,11 +148,31 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	return flowFees
 }
 
-func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
+func (b *BootstrapProcedure) deployStorageFees(service, flowToken flow.Address) flow.Address {
+	storageFees := b.createAccount()
+
+	contract := contracts.StorageFees(
+		flowToken.HexWithPrefix(),
+	)
+
+	err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployStorageFeesTransaction(storageFees, service, contract),
+		b.ledger,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", err.Error()))
+	}
+
+	return storageFees
+}
+
+func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract, storageFees flow.Address) {
 	contract := contracts.FlowServiceAccount(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
 		feeContract.HexWithPrefix(),
+		storageFees.HexWithPrefix(),
 	)
 
 	err := b.vm.invokeMetaTransaction(
@@ -200,6 +221,15 @@ transaction {
   prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
     let adminAccount = serviceAccount
     flowFeesAccount.contracts.add(name: "FlowFees", code: "%s".decodeHex(), adminAccount: adminAccount)
+  }
+}
+`
+
+const deployStorageFeesTransactionTemplate = `
+transaction {
+  prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
+    let adminAccount = serviceAccount
+    flowFeesAccount.contracts.add(name: "StorageFees", code: "%s".decodeHex(), adminAccount: adminAccount)
   }
 }
 `
@@ -256,6 +286,15 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployFlowFeesTransactionTemplate, hex.EncodeToString(contract)))).
+			AddAuthorizer(flowFees).
+			AddAuthorizer(service),
+	)
+}
+
+func deployStorageFeesTransaction(flowFees, service flow.Address, contract []byte) *TransactionProcedure {
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(deployStorageFeesTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(flowFees).
 			AddAuthorizer(service),
 	)

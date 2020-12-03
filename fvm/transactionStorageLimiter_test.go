@@ -22,7 +22,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
-		err := d.Process(nil, fvm.Context{}, nil, ledger)
+		err := d.Process(nil, fvm.Context{
+			LimitAccountStorage: true,
+		}, nil, ledger)
 
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
@@ -37,7 +39,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
-		err := d.Process(nil, fvm.Context{}, nil, ledger)
+		err := d.Process(nil, fvm.Context{
+			LimitAccountStorage: true,
+		}, nil, ledger)
 
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
@@ -52,7 +56,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
-		err := d.Process(nil, fvm.Context{}, nil, ledger)
+		err := d.Process(nil, fvm.Context{
+			LimitAccountStorage: true,
+		}, nil, ledger)
 
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
@@ -67,7 +73,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
-		err := d.Process(nil, fvm.Context{}, nil, ledger)
+		err := d.Process(nil, fvm.Context{
+			LimitAccountStorage: true,
+		}, nil, ledger)
 
 		require.NoError(t, err)
 		// three touches per account: get exists, get capacity, get used
@@ -88,7 +96,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
-		err := d.Process(nil, fvm.Context{}, nil, ledger)
+		err := d.Process(nil, fvm.Context{
+			LimitAccountStorage: true,
+		}, nil, ledger)
 
 		require.NoError(t, err)
 		// three touches per account: get exists, get capacity, get used
@@ -106,7 +116,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
-		err := d.Process(nil, fvm.Context{}, nil, ledger)
+		err := d.Process(nil, fvm.Context{
+			LimitAccountStorage: true,
+		}, nil, ledger)
 
 		require.NoError(t, err)
 	})
@@ -120,7 +132,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
-		err := d.Process(nil, fvm.Context{}, nil, ledger)
+		err := d.Process(nil, fvm.Context{
+			LimitAccountStorage: true,
+		}, nil, ledger)
 
 		require.NoError(t, err)
 	})

@@ -505,22 +505,6 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	if e.ctx.ServiceAccountEnabled {
-		err = e.vm.invokeMetaTransaction(
-			e.ctx,
-			deductAccountCreationFeeTransaction(
-				flow.Address(payer),
-				e.ctx.Chain.ServiceAddress(),
-				e.ctx.RestrictedAccountCreationEnabled,
-			),
-			e.ledger,
-		)
-		if err != nil {
-			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-			return address, err
-		}
-	}
-
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
 		return address, err
@@ -535,7 +519,11 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	if e.ctx.ServiceAccountEnabled {
 		err = e.vm.invokeMetaTransaction(
 			e.ctx,
-			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
+			initAccountTransaction(
+				flow.Address(payer),
+				flowAddress,
+				e.ctx.Chain.ServiceAddress(),
+				e.ctx.RestrictedAccountCreationEnabled),
 			e.ledger,
 		)
 		if err != nil {
