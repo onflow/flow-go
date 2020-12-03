@@ -306,10 +306,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	vm := fvm.New(rt)
 
+	blockFinder := fvm.NewBlockFinder(node.Headers)
+
 	vmCtx := fvm.NewContext(
 		node.Log,
 		fvm.WithChain(node.ChainID.Chain()),
-		fvm.WithBlocks(node.Blocks),
+		fvm.WithBlocks(blockFinder),
 	)
 
 	computationEngine, err := computation.New(
@@ -618,10 +620,12 @@ func VerificationNode(t testing.TB,
 
 		vm := fvm.New(rt)
 
+		blockFinder := fvm.NewBlockFinder(node.Headers)
+
 		vmCtx := fvm.NewContext(
 			node.Log,
 			fvm.WithChain(node.ChainID.Chain()),
-			fvm.WithBlocks(node.Blocks),
+			fvm.WithBlocks(blockFinder),
 		)
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
