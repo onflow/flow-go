@@ -744,19 +744,19 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Equal(t, flow.EpochPhaseSetup, phase)
 
 		// we should NOT be able to query epoch 2 wrt block 1
-		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block1.ID()).Epochs().Next().InitialIdentities()
 		require.Error(t, err)
-		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block1.ID()).Epochs().Next().Clustering()
 		require.Error(t, err)
 
 		// we should be able to query epoch 2 wrt block 2
-		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block2.ID()).Epochs().Next().InitialIdentities()
 		assert.Nil(t, err)
-		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block2.ID()).Epochs().Next().Clustering()
 		assert.Nil(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
-		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block2.ID()).Epochs().Next().DKG()
 		require.Error(t, err)
 
 		// ensure an epoch phase transition when we finalize the event
@@ -785,15 +785,15 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Nil(t, err)
 
 		// we should NOT be able to query epoch 2 commit info wrt block 2
-		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block2.ID()).Epochs().Next().DKG()
 		require.Error(t, err)
 
 		// now epoch 2 is fully ready, we can query anything we want about it wrt block 3 (or later)
-		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().InitialIdentities()
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().Clustering()
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().DKG()
 		assert.Nil(t, err)
 
 		// how that the commit event has been emitted, we should be in the committed phase

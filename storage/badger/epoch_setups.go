@@ -57,11 +57,6 @@ func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) 
 	}
 }
 
-// TODO: can we remove this method? Its not contained in the interface.
-func (es *EpochSetups) Store(setup *flow.EpochSetup) error {
-	return operation.RetryOnConflict(es.db.Update, es.StoreTx(setup))
-}
-
 func (es *EpochSetups) ByID(setupID flow.Identifier) (*flow.EpochSetup, error) {
 	tx := es.db.NewTransaction(false)
 	defer tx.Discard()
