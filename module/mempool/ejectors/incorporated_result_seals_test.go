@@ -21,7 +21,7 @@ func TestLatestSealEjector(t *testing.T) {
 		headers := storage.NewHeaders(metrics.NewNoopCollector(), db)
 		ejector := NewLatestIncorporatedResultSeal(headers)
 
-		pool := stdmap.NewIncorporatedResultSeals(N, stdmap.WithEject(ejector.Eject))
+		pool := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(N), stdmap.WithEject(ejector.Eject))
 
 		var (
 			maxHeader flow.Header
@@ -34,7 +34,7 @@ func TestLatestSealEjector(t *testing.T) {
 			err := headers.Store(&header)
 			require.Nil(t, err)
 
-			seal := unittest.SealFixture()
+			seal := unittest.Seal.Fixture()
 			seal.BlockID = header.ID()
 
 			er := unittest.ExecutionResultFixture()
@@ -46,7 +46,8 @@ func TestLatestSealEjector(t *testing.T) {
 				},
 				Seal: seal,
 			}
-			ok := pool.Add(ir)
+			ok, err := pool.Add(ir)
+			require.NoError(t, err)
 			assert.True(t, ok)
 
 			if header.Height >= maxHeader.Height {
