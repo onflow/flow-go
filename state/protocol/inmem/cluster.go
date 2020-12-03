@@ -14,4 +14,4 @@ func (c Cluster) ChainID() flow.ChainID           { return c.enc.RootBlock.Heade
 func (c Cluster) EpochCounter() uint64            { return c.enc.Counter }
 func (c Cluster) Members() flow.IdentityList      { return c.enc.Members }
 func (c Cluster) RootBlock() *clustermodel.Block  { return c.enc.RootBlock }
-func (c Cluster) RootQC() *flow.QuorumCertificate { return c.RootQC() }
+func (c Cluster) RootQC() *flow.QuorumCertificate { return c.enc.RootQC }

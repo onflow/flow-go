@@ -60,3 +60,13 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 func (s *Snapshot) Epochs() protocol.EpochQuery {
 	return Epochs{s.enc.Epochs}
 }
+
+func (s *Snapshot) Encodable() EncodableSnapshot {
+	return s.enc
+}
+
+func SnapshotFromEncodable(enc EncodableSnapshot) *Snapshot {
+	return &Snapshot{
+		enc: enc,
+	}
+}

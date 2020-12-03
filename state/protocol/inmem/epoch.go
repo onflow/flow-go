@@ -19,7 +19,6 @@ func (e Epoch) FinalView() (uint64, error) { return e.enc.FinalView, nil }
 func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 	return e.enc.InitialIdentities, nil
 }
-func (e Epoch) DKG() (protocol.DKG, error)    { return DKG{e.enc.DKG}, nil }
 func (e Epoch) RandomSource() ([]byte, error) { return e.enc.RandomSource, nil }
 
 func (e Epoch) Seed(indices ...uint32) ([]byte, error) {
@@ -34,11 +33,21 @@ func (e Epoch) Clustering() (flow.ClusterList, error) {
 	return clusters, nil
 }
 
-func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
-	if i >= uint(len(e.enc.Clusters)) {
-		return nil, fmt.Errorf("no cluster with index %d", i)
+func (e Epoch) DKG() (protocol.DKG, error) {
+	if e.enc.DKG != nil {
+		return DKG{*e.enc.DKG}, nil
 	}
-	return Cluster{e.enc.Clusters[i]}, nil
+	return nil, protocol.ErrEpochNotCommitted
+}
+
+func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
+	if e.enc.Clusters != nil {
+		if i >= uint(len(e.enc.Clusters)) {
+			return nil, fmt.Errorf("no cluster with index %d", i)
+		}
+		return Cluster{e.enc.Clusters[i]}, nil
+	}
+	return nil, protocol.ErrEpochNotCommitted
 }
 
 type Epochs struct {

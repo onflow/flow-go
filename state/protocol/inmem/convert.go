@@ -103,6 +103,10 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 
 	// convert dkg
 	dkg, err := from.DKG()
+	// if this epoch hasn't been committed yet, return the epoch as-is
+	if errors.Is(err, protocol.ErrEpochNotCommitted) {
+		return &Epoch{epoch}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +114,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	if err != nil {
 		return nil, err
 	}
-	epoch.DKG = convertedDKG.enc
+	epoch.DKG = &convertedDKG.enc
 
 	// convert clusters
 	clustering, err := from.Clustering()

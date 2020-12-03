@@ -31,7 +31,7 @@ type EncodableEpoch struct {
 	RandomSource      []byte
 	InitialIdentities flow.IdentityList
 	Clusters          []EncodableCluster
-	DKG               EncodableDKG
+	DKG               *EncodableDKG
 }
 
 // DKG is the encoding format for protocol.DKG
