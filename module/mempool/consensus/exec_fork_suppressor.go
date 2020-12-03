@@ -248,8 +248,7 @@ func (s *ExecForkSuppressor) RegisterEjectionCallbacks(callbacks ...mempool.OnEj
 func (s *ExecForkSuppressor) enforceValidStates(irSeal *flow.IncorporatedResultSeal) error {
 	result := irSeal.IncorporatedResult.Result
 
-	initialState, ok := result.InitialStateCommit()
-	if !ok || len(initialState) < 1 {
+	if _, ok := result.InitialStateCommit(); !ok {
 		scjson, err := json.Marshal(irSeal)
 		if err != nil {
 			return err
@@ -260,8 +259,7 @@ func (s *ExecForkSuppressor) enforceValidStates(irSeal *flow.IncorporatedResultS
 		return engine.NewInvalidInputErrorf("seal's execution result has no InitialStateCommit: %x", result.ID())
 	}
 
-	finalState, ok := result.FinalStateCommitment()
-	if !ok || len(finalState) < 1 {
+	if _, ok := result.FinalStateCommitment(); !ok {
 		scjson, err := json.Marshal(irSeal)
 		if err != nil {
 			return err

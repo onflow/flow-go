@@ -217,7 +217,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	log = log.With().Hex("final_state", resultFinalState).Logger()
 
 	resultInitialState, ok := receipt.ExecutionResult.InitialStateCommit()
-	if !ok || len(resultInitialState) < 1 { // discard receipt
+	if !ok { // discard receipt
 		log.Error().Msg("execution receipt without InitialStateCommit received")
 		return engine.NewInvalidInputErrorf("execution receipt without InitialStateCommit: %x", receipt.ID())
 	}
