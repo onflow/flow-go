@@ -874,3 +874,40 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			pending)
 	})
 }
+
+func TestChunkifyEvents(t *testing.T) {
+	// generate events
+	var events []flow.Event
+	for j := 0; j < 10; j++ {
+		events = append(events, unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture()))
+	}
+
+	// chunk size be 0
+	ret := ChunkifyEvents(events, 0)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
+
+	// chunk size be 1
+	ret = ChunkifyEvents(events, 1)
+	assert.Equal(t, len(ret), 10)
+	for i := 0; i < len(events); i++ {
+		assert.Equal(t, ret[i], events[i:i+1])
+	}
+
+	// chunk size smaller than events
+	ret = ChunkifyEvents(events, 2)
+	assert.Equal(t, len(ret), 5)
+	for i := 0; i < len(ret); i++ {
+		assert.Equal(t, ret[i], events[i*2:i*2+2])
+	}
+
+	// chunk size equal to the size of events
+	ret = ChunkifyEvents(events, 10)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
+
+	// chunk bigger than the slice
+	ret = ChunkifyEvents(events, 12)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
+}
