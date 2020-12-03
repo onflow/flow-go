@@ -45,7 +45,7 @@ var v1Forest = &flattener.FlattenedForest{
 
 func Test_LoadingV1Checkpoint(t *testing.T) {
 
-	forest, err := LoadCheckpoint("checkpoint.v1")
+	forest, err := LoadCheckpoint("test_data/checkpoint.v1")
 	require.NoError(t, err)
 
 	require.Equal(t, v1Forest, forest)
@@ -55,7 +55,7 @@ func Test_CreateCheckpoint(t *testing.T) {
 
 	t.Skip("Used only to generate previous checkpoint version while upgrading")
 
-	writer, err := CreateCheckpointWriterForFile("", "checkpoint.v1")
+	writer, err := CreateCheckpointWriterForFile("./test_data", "checkpoint.v1")
 	require.NoError(t, err)
 
 	err = StoreCheckpoint(v1Forest, writer)

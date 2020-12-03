@@ -28,7 +28,8 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		[]ledger.Migration{},
 		[]ledger.Reporter{},
 		complete.DefaultPathFinderVersion,
-		outputDir, wal.RootCheckpointFilename)
+		outputDir,
+		wal.RootCheckpointFilename)
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
 	}
