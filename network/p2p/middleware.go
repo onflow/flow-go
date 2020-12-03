@@ -134,6 +134,22 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetStreamHandler(m.handleIncomingStream)
 
+	// get the node identity map from the overlay
+	idsMap, err := m.ov.Identity()
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// derive all node addresses from flow identities. Those node address will serve as the network whitelist
+	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
+	if err != nil {
+		return fmt.Errorf("could not derive list of approved peer list: %w", err)
+	}
+	err = m.libP2PNode.UpdateAllowlist(nodeAddrsWhiteList...)
+	if err != nil {
+		return fmt.Errorf("could not update approved peer list: %w", err)
+	}
+
 	libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host())
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
