@@ -5,11 +5,13 @@ package badger
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
@@ -103,19 +105,22 @@ func (es *CommittedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 	epochCounter := es.setupEvent.Counter
 
-	inf := Cluster{
-		index:     index,
-		counter:   epochCounter,
-		members:   members,
-		rootBlock: cluster.CanonicalRootBlock(epochCounter, members),
-		rootQC:    rootQC,
-	}
-
-	return &inf, nil
+	cluster, err := inmem.ClusterFromEncodable(inmem.EncodableCluster{
+		Index:     index,
+		Counter:   epochCounter,
+		Members:   members,
+		RootBlock: cluster.CanonicalRootBlock(epochCounter, members),
+		RootQC:    rootQC,
+	})
+	return cluster, err
 }
 
 func (es *CommittedEpoch) DKG() (protocol.DKG, error) {
-	return &DKG{commitEvent: es.commitEvent}, nil
+	dkg, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
+		GroupKey:     encodable.RandomBeaconPubKey{es.commitEvent.DKGGroupKey},
+		Participants: es.commitEvent.DKGParticipants,
+	})
+	return dkg, err
 }
 
 func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
