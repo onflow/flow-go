@@ -5,6 +5,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
@@ -20,12 +21,6 @@ import (
 type Mutator struct {
 	state     *State
 	validator module.ReceiptValidator
-}
-
-func NewMutator(state *State) *Mutator {
-	return &Mutator{
-		state: state,
-	}
 }
 
 func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
