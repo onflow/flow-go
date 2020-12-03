@@ -217,8 +217,11 @@ func TestQuorumCertificate(t *testing.T) {
 
 			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Nil(t, err)
+			// should have signatures from valid child (block 2)
 			assert.Equal(t, block2.Header.ParentVoterIDs, qc.SignerIDs)
 			assert.Equal(t, block2.Header.ParentVoterSig.Bytes(), qc.SigData)
+			// should have view matching block1 view
+			assert.Equal(t, block1.Header.View, qc.View)
 
 			_, err = state.AtBlockID(block1.ID()).Seed(1, 2, 3, 4)
 			require.Nil(t, err)
