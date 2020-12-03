@@ -42,7 +42,6 @@ type Crc32Reader struct {
 }
 
 func NewCRC32Reader(reader io.Reader) *Crc32Reader {
-	fmt.Println("New hasher!")
 	return &Crc32Reader{
 		hash:   crc32.New(crc32Table),
 		reader: reader,
