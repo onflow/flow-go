@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -36,17 +37,14 @@ func TestSporkingTestSuite(t *testing.T) {
 // TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
 // if it's network key is updated while the libp2p protocol ID remains the same
 func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
-
 	// create and start node 1 on localhost and random port
-	node1key := generateNetworkingKey(suite.T())
-	node1, address1 := suite.CreateNode("node1", node1key, "0.0.0.0", "0", rootBlockID, nil, false)
+	node1, address1 := suite.NodeFixture(rootBlockID, nil, false)
 	defer suite.StopNode(node1)
-	suite.T().Logf(" %s node started on %s:%s", node1.name, address1.IP, address1.Port)
+	suite.T().Logf(" %x node started on %s", address1.NodeID, address1.Address)
 	suite.T().Logf("libp2p ID for %s: %s", node1.name, node1.host.ID())
 
 	// create and start node 2 on localhost and random port
-	node2key := generateNetworkingKey(suite.T())
-	node2, address2 := suite.CreateNode("node2", node2key, "0.0.0.0", "0", rootBlockID, nil, false)
+	node2, address2 := suite.NodeFixture(rootBlockID, nil, false)
 
 	// create stream from node 1 to node 2
 	testOneToOneMessagingSucceeds(suite.T(), node1, address2)
@@ -56,17 +54,12 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// stop node 2 and start it again with a different networking key but on the same IP and port
 	suite.StopNode(node2)
 
-	// generate a new key
-	node2keyNew := generateNetworkingKey(suite.T())
-	assert.False(suite.T(), node2key.Equals(node2keyNew))
-
-	// start node2 with the same name, ip and port but with the new key
-	node2, address2New := suite.CreateNode(node2.name, node2keyNew, address2.IP, address2.Port, rootBlockID, nil, false)
+	// start node2 with the same name, ip a`nd port but with the new key
+	node2, address2New := suite.NodeFixture(rootBlockID, nil, false)
 	defer suite.StopNode(node2)
 
 	// make sure the node2 indeed came up on the old ip and port
-	assert.Equal(suite.T(), address2.IP, address2New.IP)
-	assert.Equal(suite.T(), address2.Port, address2New.Port)
+	assert.Equal(suite.T(), address2New.Address, address2.Address)
 
 	// attempt to create a stream from node 1 (old chain) to node 2 (new chain)
 	// this time it should fail since node 2 is using a different public key
@@ -82,13 +75,11 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	rootID1 := unittest.BlockFixture().ID().String()
 
 	// create and start node 1 on localhost and random port
-	node1key := generateNetworkingKey(suite.T())
-	node1, address1 := suite.CreateNode("node1", node1key, "0.0.0.0", "0", rootID1, nil, false)
+	node1, address1 := suite.NodeFixture(rootID1, nil, false)
 	defer suite.StopNode(node1)
 
 	// create and start node 2 on localhost and random port
-	node2key := generateNetworkingKey(suite.T())
-	node2, address2 := suite.CreateNode("node2", node2key, "0.0.0.0", "0", rootID1, nil, false)
+	node2, address2 := suite.NodeFixture(rootID1, nil, false)
 
 	// create stream from node 2 to node 1
 	testOneToOneMessagingSucceeds(suite.T(), node2, address1)
@@ -102,12 +93,11 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	rootID2 := unittest.BlockFixture().ID().String()
 
 	// start node2 with the same name, ip and port but with the new key
-	node2, address2New := suite.CreateNode(node2.name, node2key, address2.IP, address2.Port, rootID2, nil, false)
+	node2, address2New := suite.NodeFixture(rootID2, nil, false)
 	defer suite.StopNode(node2)
 
 	// make sure the node2 indeed came up on the old ip and port
-	assert.Equal(suite.T(), address2.IP, address2New.IP)
-	assert.Equal(suite.T(), address2.Port, address2New.Port)
+	assert.Equal(suite.T(), address2New.Address, address2.Address)
 
 	// attempt to create a stream from node 2 (new chain) to node 1 (old chain)
 	// this time it should fail since node 2 is listening on a different protocol
@@ -171,17 +161,17 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	testOneToKMessagingFails(ctx, suite.T(), node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, dstnAddress NodeAddress) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, targetId flow.Identity) {
 	// create stream from node 1 to node 2
-	s, err := sourceNode.CreateStream(context.Background(), dstnAddress)
+	s, err := sourceNode.CreateStream(context.Background(), targetId)
 	// assert that stream creation succeeded
 	require.NoError(t, err)
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, dstnAddress NodeAddress) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, targetId flow.Identity) {
 	// create stream from source node to destination address
-	_, err := sourceNode.CreateStream(context.Background(), dstnAddress)
+	_, err := sourceNode.CreateStream(context.Background(), targetId)
 	// assert that stream creation failed
 	assert.Error(t, err)
 	// assert that it failed with the expected error
