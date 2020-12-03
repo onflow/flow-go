@@ -14,6 +14,9 @@ var (
 	_ protocol.Cluster    = new(Cluster)
 )
 
+// Snapshot is a memory-backed implementation of protocol.Snapshot. The snapshot
+// data is stored in the embedded encodable snapshot model, which defines the
+// canonical structure of an encoded snapshot for the purposes of serialization.
 type Snapshot struct {
 	encodable.Snapshot
 }
