@@ -17,10 +17,11 @@ func (e Epoch) Counter() (uint64, error)                      { return e.Epoch.C
 func (e Epoch) FirstView() (uint64, error)                    { return e.Epoch.FirstView, nil }
 func (e Epoch) FinalView() (uint64, error)                    { return e.Epoch.FinalView, nil }
 func (e Epoch) InitialIdentities() (flow.IdentityList, error) { return e.Epoch.InitialIdentities, nil }
-func (e Epoch) DKG() (protocol.DKG, error)                    { return dkg{e.Epoch.DKG}, nil }
+func (e Epoch) DKG() (protocol.DKG, error)                    { return DKG{e.Epoch.DKG}, nil }
+func (e Epoch) RandomSource() ([]byte, error)                 { return e.Epoch.RandomSource, nil }
 
 func (e Epoch) Seed(indices ...uint32) ([]byte, error) {
-	return seed.FromRandomSource(indices, e.Epoch.Seed)
+	return seed.FromRandomSource(indices, e.Epoch.RandomSource)
 }
 
 func (e Epoch) Clustering() (flow.ClusterList, error) {
