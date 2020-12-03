@@ -150,9 +150,8 @@ func FromCluster(from protocol.Cluster) (*Cluster, error) {
 func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
 
 	var dkg EncodableDKG
-	dkg.Size = from.Size()
-	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}
 
+	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}
 	dkg.Participants = make(map[flow.Identifier]flow.DKGParticipant)
 	for _, identity := range participants {
 
