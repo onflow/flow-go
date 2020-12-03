@@ -1,68 +1,47 @@
 package serializable
 
 import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
-type epoch struct {
-	counter           uint64
-	firstView         uint64
-	finalView         uint64
-	seed              []byte
-	initialIdentities flow.IdentityList
-	clustering        flow.ClusterList
-	clusters          []cluster
-	dkg               *dkg
+type Epoch struct {
+	encodable.Epoch
 }
 
-type epochQuery struct {
-	prev *epoch
-	curr *epoch
-	next *epoch
+func (e Epoch) Counter() (uint64, error)                      { return e.Epoch.Counter, nil }
+func (e Epoch) FirstView() (uint64, error)                    { return e.Epoch.FirstView, nil }
+func (e Epoch) FinalView() (uint64, error)                    { return e.Epoch.FinalView, nil }
+func (e Epoch) InitialIdentities() (flow.IdentityList, error) { return e.Epoch.InitialIdentities, nil }
+func (e Epoch) DKG() (protocol.DKG, error)                    { return dkg{e.Epoch.DKG}, nil }
+
+func (e Epoch) Seed(indices ...uint32) ([]byte, error) {
+	return seed.FromRandomSource(indices, e.Epoch.Seed)
 }
 
-func (e *epoch) Counter() (uint64, error) {
-	return e.counter, nil
+func (e Epoch) Clustering() (flow.ClusterList, error) {
+	var clusters flow.ClusterList
+	for _, cluster := range e.Epoch.Clusters {
+		clusters = append(clusters, cluster.Members)
+	}
+	return clusters, nil
 }
 
-func (e *epoch) FirstView() (uint64, error) {
-	return e.firstView, nil
+func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
+	if i >= uint(len(e.Epoch.Clusters)) {
+		return nil, fmt.Errorf("no cluster with index %d", i)
+	}
+	return Cluster{e.Epoch.Clusters[i]}, nil
 }
 
-func (e *epoch) FinalView() (uint64, error) {
-	return e.finalView, nil
+type Epochs struct {
+	encodable.Epochs
 }
 
-func (e *epoch) Seed(indices ...uint32) ([]byte, error) {
-	return seed.FromRandomSource(indices, e.seed)
-}
-
-func (e *epoch) InitialIdentities() (flow.IdentityList, error) {
-	return e.initialIdentities, nil
-}
-
-func (e *epoch) Clustering() (flow.ClusterList, error) {
-	return e.clustering, nil
-}
-
-func (e *epoch) Cluster(i uint) (protocol.Cluster, error) {
-	return e.clusters[i], nil
-}
-
-func (e *epoch) DKG() (protocol.DKG, error) {
-	return e.dkg, nil
-}
-
-func (eq *epochQuery) Previous() protocol.Epoch {
-	return eq.prev
-}
-
-func (eq *epochQuery) Current() protocol.Epoch {
-	return eq.curr
-}
-
-func (eq *epochQuery) Next() protocol.Epoch {
-	return eq.next
-}
+func (eq Epochs) Previous() protocol.Epoch { return Epoch{eq.Epochs.Previous} }
+func (eq Epochs) Current() protocol.Epoch  { return Epoch{eq.Epochs.Current} }
+func (eq Epochs) Next() protocol.Epoch     { return Epoch{eq.Epochs.Next} }
