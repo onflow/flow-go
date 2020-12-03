@@ -60,6 +60,10 @@ func (es *SetupEpoch) DKG() (protocol.DKG, error) {
 	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
 }
 
+func (es *SetupEpoch) RandomSource() ([]byte, error) {
+	return es.setupEvent.RandomSource, nil
+}
+
 func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
 	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
 }
