@@ -14,28 +14,27 @@ var flagTransactionID string
 func init() {
 	rootCmd.AddCommand(collectionsCmd)
 
-	collectionsCmd.Flags().StringVar(&flagCollectionID, "collection-id", "", "the ID of the collection")
-	collectionsCmd.Flags().StringVar(&flagTransactionID, "transaction-id", "", "the ID of the transaction")
+	collectionsCmd.Flags().StringVarP(&flagCollectionID, "id", "i", "", "the id of the collection")
+	collectionsCmd.Flags().StringVarP(&flagTransactionID, "transaction-id", "t", "", "the id of the transaction")
 }
 
 var collectionsCmd = &cobra.Command{
 	Use:   "collections",
-	Short: "get collection by collection ID (--colleciton-id) or transaction ID (--transaction-id)",
+	Short: "get collection by collection or transaction ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages := InitStorages()
 
 		if flagCollectionID != "" {
-			log.Info().Msgf("flag collection id: %v", flagCollectionID)
+			log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed collection ID")
+				log.Fatal().Err(err).Msg("malformed collection id")
 			}
 
-			log.Info().Msgf("getting collections by collection id: %v", collectionID)
-
+			log.Info().Msgf("getting collection by id: %v", collectionID)
 			collection, err := storages.Collections.ByID(collectionID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get collection")
+				log.Fatal().Err(err).Msgf("could not get collection with id: %v", collectionID)
 			}
 
 			common.PrettyPrintEntity(collection)
@@ -43,16 +42,16 @@ var collectionsCmd = &cobra.Command{
 		}
 
 		if flagTransactionID != "" {
+			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed transaction ID")
+				log.Fatal().Err(err).Msg("malformed transaction id")
 			}
 
 			log.Info().Msgf("getting collections by transaction id: %v", transactionID)
-
 			collections, err := storages.Collections.LightByTransactionID(transactionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("could not get collections")
+				log.Fatal().Err(err).Msgf("could not get collections for transaction id: %v", transactionID)
 			}
 
 			common.PrettyPrintEntity(collections)

@@ -24,7 +24,7 @@ import (
 	realModule "github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -39,7 +39,7 @@ type VerifierEngineTestSuite struct {
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
 	chain   flow.Chain
-	con     *network.Conduit                // mocks con for submitting result approvals
+	con     *mocknetwork.Conduit            // mocks con for submitting result approvals
 	metrics *mockmodule.VerificationMetrics // mocks performance monitoring metrics
 }
 
@@ -53,7 +53,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = &protocol.Snapshot{}
-	suite.con = &network.Conduit{}
+	suite.con = &mocknetwork.Conduit{}
 	suite.metrics = &mockmodule.VerificationMetrics{}
 	suite.chain = flow.Testnet.Chain()
 
