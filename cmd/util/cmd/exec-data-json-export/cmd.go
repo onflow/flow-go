@@ -1,6 +1,8 @@
 package jsonexporter
 
 import (
+	"encoding/hex"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -12,6 +14,7 @@ var (
 	flagOutputDir         string
 	flagBlockHash         string
 	flagDatadir           string
+	flagStateCommitment   string
 )
 
 var Cmd = &cobra.Command{
@@ -36,6 +39,9 @@ func init() {
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
 		"directory that stores the protocol state")
 	_ = Cmd.MarkFlagRequired("datadir")
+
+	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
+		"state commitment (hex-encoded, 64 characters)")
 }
 
 func run(*cobra.Command, []string) {
@@ -46,7 +52,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	log.Info().Msg("start exporting blocks")
-	err = ExportBlocks(blockID, flagDatadir, flagOutputDir)
+	fallbackState, err := ExportBlocks(blockID, flagDatadir, flagOutputDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export blocks")
 	}
@@ -70,7 +76,13 @@ func run(*cobra.Command, []string) {
 	}
 
 	log.Info().Msg("start exporting ledger")
-	err = ExportLedger(blockID, flagDatadir, flagExecutionStateDir, flagOutputDir)
+	// if state commitment not provided do the fall back to the one connected to the block
+	if len(flagStateCommitment) == 0 {
+		flagStateCommitment = hex.EncodeToString(fallbackState)
+		log.Info().Msg("no state commitment is provided, falling back to the one attached to the block")
+	}
+
+	err = ExportLedger(flagExecutionStateDir, flagStateCommitment, flagOutputDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export ledger")
 	}

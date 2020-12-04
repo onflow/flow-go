@@ -187,7 +187,7 @@ func createNode(
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
 
-	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
+	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 
 	// initialize the block builder
 	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals, tracer)

@@ -36,6 +36,7 @@ const (
 	ResourceUndefined                = "undefined"
 	ResourceProposal                 = "proposal"
 	ResourceHeader                   = "header"
+	ResourceFinalizedHeight          = "finalized_height"
 	ResourceIndex                    = "index"
 	ResourceIdentity                 = "identity"
 	ResourceGuarantee                = "guarantee"
