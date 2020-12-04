@@ -310,27 +310,6 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 	return s, nil
 }
 
-// PeerAddressInfo generates the libp2p peer.AddrInfo for an identity given its node address.
-func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
-	ip, port, key, err := networkingInfo(identity)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("could not get translate identity to networking info %s: %w", identity.NodeID.String(), err)
-	}
-
-	addr := MultiAddressStr(ip, port)
-	maddr, err := multiaddr.NewMultiaddr(addr)
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-
-	id, err := peer.IDFromPublicKey(key)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("could not extract libp2p id from key:%w", err)
-	}
-	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
-	return pInfo, err
-}
-
 // GetIPPort returns the IP and Port the libp2p node is listening on.
 func (n *Node) GetIPPort() (string, string, error) {
 	return IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
@@ -455,53 +434,6 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (time.Duration,
 	}
 }
 
-// MultiAddressStr receives a node ip and port and returns
-// its corresponding Libp2p MultiAddressStr in string format
-// in current implementation IP part of the node address is
-// either an IP or a dns4.
-// https://docs.libp2p.io/concepts/addressing/
-func MultiAddressStr(ip, port string) string {
-	parsedIP := net.ParseIP(ip)
-	if parsedIP != nil {
-		// returns parsed ip version of the multi-address
-		return fmt.Sprintf("/ip4/%s/tcp/%s", ip, port)
-	}
-	// could not parse it as an IP address and returns the dns version of the
-	// multi-address
-	return fmt.Sprintf("/dns4/%s/tcp/%s", ip, port)
-}
-
-// IPPortFromMultiAddress returns the IP/hostname and the port for the given multi-addresses
-// associated with a libp2p host
-func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error) {
-
-	var ipOrHostname, port string
-	var err error
-
-	for _, a := range addrs {
-		// try and get the dns4 hostname
-		ipOrHostname, err = a.ValueForProtocol(multiaddr.P_DNS4)
-		if err != nil {
-			// if dns4 hostname is not found, try and get the IP address
-			ipOrHostname, err = a.ValueForProtocol(multiaddr.P_IP4)
-			if err != nil {
-				continue // this may not be a TCP IP multiaddress
-			}
-		}
-
-		// if either IP address or hostname is found, look for the port number
-		port, err = a.ValueForProtocol(multiaddr.P_TCP)
-		if err != nil {
-			// an IPv4 or DNS4 based multiaddress should have a port number
-			return "", "", err
-		}
-
-		//there should only be one valid IPv4 address
-		return ipOrHostname, port, nil
-	}
-	return "", "", fmt.Errorf("ip address or hostname not found")
-}
-
 // UpdateAllowList allows the peer allow list to be updated.
 func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	// generates peer address information for all identities
@@ -537,10 +469,6 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 	// query libp2p for connectedness status of this peer
 	isConnected := n.host.Network().Connectedness(pInfo.ID) == libp2pnet.Connected
 	return isConnected, nil
-}
-
-func generateProtocolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
 }
 
 // bootstrapLibP2PHost creates and starts a libp2p host as well as a pubsub component for it, and returns all in a
