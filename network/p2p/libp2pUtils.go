@@ -99,13 +99,7 @@ func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 //    |-- Address          --->   |-- []multiaddr.Multiaddr
 //    |-- NetworkPublicKey --->   |-- ID
 func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
-
-	nodeAddress, err := NodeAddressFromIdentity(id)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
-	}
-
-	addr, err := GetPeerInfo(nodeAddress)
+	addr, err := PeerAddressInfo(id)
 	if err != nil {
 		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
 	}

@@ -309,21 +309,6 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 	return s, nil
 }
 
-// GetPeerInfo generates the libp2p peer.AddrInfo for a Node/Peer given its node address
-func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
-	addr := MultiaddressStr(p)
-	maddr, err := multiaddr.NewMultiaddr(addr)
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-	id, err := peer.IDFromPublicKey(p.PubKey)
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
-	return pInfo, err
-}
-
 // PeerAddressInfo generates the libp2p peer.AddrInfo for an identity given its node address
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	ip, port, key, err := networkingInfo(identity)
