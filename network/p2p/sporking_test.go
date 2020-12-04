@@ -98,7 +98,7 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	// update the flow root id for node 2. node1 is still listening on the old protocol
 	rootID2 := unittest.BlockFixture().ID().String()
 
-	// start node2 with the same name, ip and port but with the new key
+	// start node2 with the same address and root key but different root block id
 	node2, address2New := suite.NodeFixture(node2key, rootID2, nil, false, WithAddress(address2.Address))
 	defer suite.StopNode(node2)
 
