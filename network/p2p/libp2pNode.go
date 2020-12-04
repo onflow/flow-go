@@ -460,22 +460,6 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (time.Duration,
 	}
 }
 
-// MultiaddressStr receives a node address and returns
-// its corresponding Libp2p Multiaddress in string format
-// in current implementation IP part of the node address is
-// either an IP or a dns4
-// https://docs.libp2p.io/concepts/addressing/
-func MultiaddressStr(address NodeAddress) string {
-	parsedIP := net.ParseIP(address.IP)
-	if parsedIP != nil {
-		// returns parsed ip version of the multi-address
-		return fmt.Sprintf("/ip4/%s/tcp/%s", address.IP, address.Port)
-	}
-	// could not parse it as an IP address and returns the dns version of the
-	// multi-address
-	return fmt.Sprintf("/dns4/%s/tcp/%s", address.IP, address.Port)
-}
-
 // Multiaddress receives a node ip and port and returns
 // its corresponding Libp2p Multiaddress in string format
 // in current implementation IP part of the node address is
