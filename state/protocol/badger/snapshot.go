@@ -42,8 +42,10 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return head, err
 }
 
-// QuorumCertificate returns a valid quorum certificate for the block at the
-// head of this snapshot, if one exists.
+// QuorumCertificate (QC) returns a valid quorum certificate pointing to the
+// header at this snapshot. With the exception of the root block, a valid child
+// block must be which contains the desired QC. The sentinel error
+// state.NoValidChildBlockError is returned if the the QC is unknown.
 //
 // For root block snapshots, returns the root quorum certificate. For all other
 // blocks, generates a quorum certificate from a valid child, if one exists.
@@ -55,11 +57,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
 
-	head, err := s.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get head: %w", err)
-	}
-	if head.Height == root.Height {
+	if s.blockID == root.ID() {
 		// TODO store root QC and return here
 		return nil, fmt.Errorf("root qc not stored")
 	}
@@ -70,9 +68,20 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not get child: %w", err)
 	}
 
+	// sanity check: ensure the child has the snapshot block as parent
+	if child.ParentID != s.blockID {
+		return nil, fmt.Errorf("child parent id (%x) does not match snapshot id (%x)", child.ParentID, s.blockID)
+	}
+
+	// retrieve the full header as we need the view for the quorum certificate
+	head, err := s.Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get head: %w", err)
+	}
+
 	qc := &flow.QuorumCertificate{
 		View:      head.View,
-		BlockID:   child.ParentID,
+		BlockID:   s.blockID,
 		SignerIDs: child.ParentVoterIDs,
 		SigData:   child.ParentVoterSig,
 	}
@@ -81,9 +90,10 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 }
 
 // validChild returns a child of the snapshot head that has been validated
-// by HotStuff, if such a child exists. Otherwise returns an error. Any valid
-// child may be returned. Subsequent calls are not guaranteed to return the
-// same child.
+// by HotStuff. Returns state.NoValidChildBlockError if no valid child exists.
+//
+// Any valid child may be returned. Subsequent calls are not guaranteed to
+// return the same child.
 func (s *Snapshot) validChild() (*flow.Header, error) {
 
 	var childIDs []flow.Identifier
@@ -92,13 +102,8 @@ func (s *Snapshot) validChild() (*flow.Header, error) {
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}
 
-	// check we have at least one child
-	if len(childIDs) == 0 {
-		return nil, state.NewNoValidChildBlockError("block doesn't have children yet")
-	}
-
 	// find the first child that has been validated
-	var validChildID flow.Identifier
+	validChildID := flow.ZeroID
 	for _, childID := range childIDs {
 		var valid bool
 		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
@@ -116,7 +121,7 @@ func (s *Snapshot) validChild() (*flow.Header, error) {
 	}
 
 	if validChildID == flow.ZeroID {
-		return nil, state.NewNoValidChildBlockError("block has no valid children")
+		return nil, state.NewNoValidChildBlockErrorf("block has no valid children (total children: %d)", len(childIDs))
 	}
 
 	// get the header of the first child
@@ -175,7 +180,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		if err != nil {
 			return nil, fmt.Errorf("could not get root block: %w", err)
 		}
-		if first.Height == root.Height {
+		if first.ID() == root.ID() {
 			break
 		}
 
@@ -376,7 +381,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpoch(err)
 	}
-	if first.Height == root.Height {
+	if first.ID() == root.ID() {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 
