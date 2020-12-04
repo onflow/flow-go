@@ -143,11 +143,12 @@ func (k *kmac128) Reset() {
 	_, _ = k.Write(k.initBlock)
 }
 
-// ComputeHash adds the input data to the a mac state copy
-// and returns the mac output
-// It does not change the underlying hash state.
+// ComputeHash computes the mac of the input data.
+// It does not update the underlying hash state.
 func (k *kmac128) ComputeHash(data []byte) Hash {
 	cshake := k.ShakeHash.Clone()
+	cshake.Reset()
+	cshake.Write(k.initBlock)
 	cshake.Write(data)
 	cshake.Write(rightEncode(uint64(k.outputSize * 8)))
 	// read the cshake output
@@ -156,9 +157,8 @@ func (k *kmac128) ComputeHash(data []byte) Hash {
 	return h
 }
 
-// SumHash finalizes the mac computations using a state copy,
-// and returns the hash output
-// It does not change the underlying hash state.
+// SumHash finalizes the mac computations and returns the output.
+// It does not reset the state to allow further writing.
 func (k *kmac128) SumHash() Hash {
 	cshake := k.ShakeHash.Clone()
 	cshake.Write(rightEncode(uint64(k.outputSize * 8)))
