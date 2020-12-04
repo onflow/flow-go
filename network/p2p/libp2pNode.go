@@ -314,7 +314,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	ip, port, key, err := networkingInfo(identity)
 	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to network address and key: %w", identity.NodeID.String(), err)
+		return peer.AddrInfo{}, fmt.Errorf("could not get translate identity to networking info %s: %w", identity.NodeID.String(), err)
 	}
 
 	addr := Multiaddress(ip, port)
