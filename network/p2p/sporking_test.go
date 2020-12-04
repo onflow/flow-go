@@ -119,12 +119,12 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
-	node1, _ := suite.CreateNode("node1", node1key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
+	node1, _ := suite.NodeFixture(node1key, rootIDBeforeSpork, nil, false)
 	defer suite.StopNode(node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2key := generateNetworkingKey(suite.T())
-	node2, addr2 := suite.CreateNode("node1", node2key, "0.0.0.0", "0", rootIDBeforeSpork, nil, false)
+	node2, addr2 := suite.NodeFixture(node2key, rootIDBeforeSpork, nil, false)
 	defer suite.StopNode(node2)
 
 	ctx, cancel := context.WithCancel(context.Background())
