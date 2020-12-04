@@ -41,8 +41,8 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	node1key := generateNetworkingKey(suite.T())
 	node1, id1 := suite.NodeFixture(node1key, rootBlockID, nil, false)
 	defer suite.StopNode(node1)
-	suite.T().Logf(" %x node started on %s", id1.NodeID, id1.Address)
-	suite.T().Logf("libp2p ID for %x: %s", node1.id, node1.host.ID())
+	suite.T().Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
+	suite.T().Logf("libp2p ID for %s: %s", node1.id.String(), node1.host.ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
@@ -52,13 +52,13 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	testOneToOneMessagingSucceeds(suite.T(), node1, id2)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
-	node2keyNew := generateNetworkingKey(suite.T())
-	assert.False(suite.T(), node2key.Equals(node2keyNew))
 
 	// stop node 2 and start it again with a different networking key but on the same IP and port
 	suite.StopNode(node2)
 
 	// start node2 with the same name, ip a`nd port but with the new key
+	node2keyNew := generateNetworkingKey(suite.T())
+	assert.False(suite.T(), node2key.Equals(node2keyNew))
 	node2, id2New := suite.NodeFixture(node2keyNew, rootBlockID, nil, false, WithAddress(id2.Address))
 	defer suite.StopNode(node2)
 
