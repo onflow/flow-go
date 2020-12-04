@@ -577,7 +577,7 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler network.Stream
 	return nodes, identities
 }
 
-// NodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
+// NodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
 func (suite *LibP2PNodeTestSuite) NodeFixture(key fcrypto.PrivateKey, rootID string, handler network.StreamHandler, allowList bool,
 	opts ...func(*flow.Identity)) (*Node, flow.Identity) {
@@ -607,7 +607,7 @@ func (suite *LibP2PNodeTestSuite) NodeFixture(key fcrypto.PrivateKey, rootID str
 	require.Eventuallyf(suite.T(), func() bool {
 		ip, p, err := n.GetIPPort()
 		return err == nil && ip != "" && p != ""
-	}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %x", identity.NodeID))
+	}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %s", identity.NodeID.String()))
 
 	// get the actual IP and port that have been assigned by the subsystem
 	ip, port, err := n.GetIPPort()
@@ -623,7 +623,7 @@ func WithAddress(address string) func(*flow.Identity) {
 	}
 }
 
-// IdentityFixture creates a node identity with default networking setup.
+// IdentityFixture creates a node identity with default networking setup, and the given key.
 func (suite *LibP2PNodeTestSuite) IdentityFixture(key fcrypto.PublicKey, opts ...func(*flow.Identity)) flow.Identity {
 	id := flow.Identifier{}
 	_, _ = crand.Read(id[:])
