@@ -41,8 +41,10 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return head, err
 }
 
-// QuorumCertificate returns a valid quorum certificate for the block at the
-// head of this snapshot, if one exists.
+// QuorumCertificate (QC) returns a valid quorum certificate pointing to the
+// header at this snapshot. With the exception of the root block, a valid child
+// block must be which contains the desired QC. The sentinel error
+// state.NoValidChildBlockError is returned if the the QC is unknown.
 //
 // For root block snapshots, returns the root quorum certificate. For all other
 // blocks, generates a quorum certificate from a valid child, if one exists.
