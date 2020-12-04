@@ -195,7 +195,7 @@ func createNode(
 	receipts, err := stdmap.NewReceipts(receiptLimit)
 	require.NoError(t, err)
 
-	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
+	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 
 	// initialize the block builder
 	build := builder.NewBuilder(

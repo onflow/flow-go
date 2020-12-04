@@ -211,7 +211,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)
 
-	seals := stdmap.NewIncorporatedResultSeals(1000)
+	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
@@ -334,10 +334,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	vm := fvm.New(rt)
 
+	blockFinder := fvm.NewBlockFinder(node.Headers)
+
 	vmCtx := fvm.NewContext(
 		node.Log,
 		fvm.WithChain(node.ChainID.Chain()),
-		fvm.WithBlocks(node.Blocks),
+		fvm.WithBlocks(blockFinder),
 	)
 
 	computationEngine, err := computation.New(
@@ -646,10 +648,12 @@ func VerificationNode(t testing.TB,
 
 		vm := fvm.New(rt)
 
+		blockFinder := fvm.NewBlockFinder(node.Headers)
+
 		vmCtx := fvm.NewContext(
 			node.Log,
 			fvm.WithChain(node.ChainID.Chain()),
-			fvm.WithBlocks(node.Blocks),
+			fvm.WithBlocks(blockFinder),
 		)
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)

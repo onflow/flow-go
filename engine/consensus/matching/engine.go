@@ -217,11 +217,18 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Logger()
 
 	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok { // return
+	if !ok || len(resultFinalState) < 1 { // discard receipt
 		log.Error().Msg("execution receipt without FinalStateCommit received")
 		return engine.NewInvalidInputErrorf("execution receipt without FinalStateCommit: %x", receipt.ID())
 	}
 	log = log.With().Hex("final_state", resultFinalState).Logger()
+
+	resultInitialState, ok := receipt.ExecutionResult.InitialStateCommit()
+	if !ok { // discard receipt
+		log.Error().Msg("execution receipt without InitialStateCommit received")
+		return engine.NewInvalidInputErrorf("execution receipt without InitialStateCommit: %x", receipt.ID())
+	}
+	log = log.With().Hex("initial_state", resultInitialState).Logger()
 
 	// CAUTION INCOMPLETE
 	// For many other messages, we check that the message's origin (as established by the
@@ -312,6 +319,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	)
 	if err != nil {
 		log.Err(err).Msg("error inserting incorporated result in mempool")
+		return fmt.Errorf("error inserting incorporated result in mempool: %w", err)
 	}
 	if !added {
 		log.Debug().Msg("skipping result already in mempool")
@@ -754,10 +762,13 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_ = e.seals.Add(&flow.IncorporatedResultSeal{
+	_, err = e.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	})
+	if err != nil {
+		return fmt.Errorf("failed to store IncorporatedResultSeal in mempool: %w", err)
+	}
 
 	return nil
 }

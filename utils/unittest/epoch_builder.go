@@ -110,7 +110,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 			receiptA,
 		}
 		sealsForPrev = []*flow.Seal{
-			SealFixture(SealFromResult(&aBlock.Payload.Receipts[0].ExecutionResult)),
+			Seal.Fixture(Seal.WithResult(&aBlock.Payload.Receipts[0].ExecutionResult)),
 		}
 	}
 
@@ -136,7 +136,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	var sealsForA []*flow.Seal
 	if receiptA != nil {
 		sealsForA = []*flow.Seal{
-			SealFixture(SealFromResult(&receiptA.ExecutionResult)),
+			Seal.Fixture(Seal.WithResult(&receiptA.ExecutionResult)),
 		}
 	}
 	C.SetPayload(flow.Payload{
@@ -165,9 +165,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// receipt for block C
 	setup := EpochSetupFixture(append(setupDefaults, builder.setupOpts...)...)
 	D := BlockWithParentFixture(C.Header)
-	sealForB := SealFixture(
-		SealFromResult(&receiptB.ExecutionResult),
-		WithServiceEvents(setup.ServiceEvent()),
+	sealForB := Seal.Fixture(
+		Seal.WithResult(&receiptB.ExecutionResult),
+		Seal.WithServiceEvents(setup.ServiceEvent()),
 	)
 	D.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receiptC},
@@ -186,8 +186,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// build block E
 	// E contains a seal for C and a receipt for D
 	E := BlockWithParentFixture(D.Header)
-	sealForC := SealFixture(
-		SealFromResult(&receiptC.ExecutionResult),
+	sealForC := Seal.Fixture(
+		Seal.WithResult(&receiptC.ExecutionResult),
 	)
 	E.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receiptD},
@@ -214,9 +214,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// receipt for block E
 	commit := EpochCommitFixture(append(commitDefaults, builder.commitOpts...)...)
 	F := BlockWithParentFixture(E.Header)
-	sealForD := SealFixture(
-		SealFromResult(&receiptD.ExecutionResult),
-		WithServiceEvents(commit.ServiceEvent()),
+	sealForD := Seal.Fixture(
+		Seal.WithResult(&receiptD.ExecutionResult),
+		Seal.WithServiceEvents(commit.ServiceEvent()),
 	)
 	F.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receiptE},
@@ -259,7 +259,9 @@ func (builder *EpochBuilder) CompleteEpoch() {
 			ReceiptForBlockFixture(finalBlock),
 		},
 		Seals: []*flow.Seal{
-			SealFixture(SealFromResult(&finalBlock.Payload.Receipts[0].ExecutionResult)),
+			Seal.Fixture(
+				Seal.WithResult(&finalBlock.Payload.Receipts[0].ExecutionResult),
+			),
 		},
 	})
 	err = builder.state.Mutate().Extend(&A)

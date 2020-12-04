@@ -232,7 +232,7 @@ func TestBootstrapWithSeal(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		block := unittest.GenesisFixture(participants)
-		block.Payload.Seals = []*flow.Seal{unittest.SealFixture()}
+		block.Payload.Seals = []*flow.Seal{unittest.Seal.Fixture()}
 		block.Header.PayloadHash = block.Payload.Hash()
 
 		result := unittest.ExecutionResultFixture()
@@ -241,7 +241,7 @@ func TestBootstrapWithSeal(t *testing.T) {
 		finalState, ok := result.FinalStateCommitment()
 		require.True(t, ok)
 
-		seal := unittest.SealFixture()
+		seal := unittest.Seal.Fixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
 		seal.FinalState = finalState
@@ -424,7 +424,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add a third block containing a seal for the first block
-		block1Seal := unittest.SealFixture(unittest.SealFromResult(&block1Receipt.ExecutionResult))
+		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{block1Seal},
@@ -628,8 +628,8 @@ func TestExtendSealNoIncorporatedResult(t *testing.T) {
 		// result (ER1) referenced by the proposed seal.
 		t.Run("no IncorporatedResult", func(t *testing.T) {
 			// create block 2 with a seal for block 1
-			block1Result := unittest.ResultForBlockFixture(&block1)
-			block1Seal := unittest.SealFixture(unittest.SealFromResult(block1Result))
+			block1Result := unittest.ExecutionResultFixture(unittest.WithBlock(&block1))
+			block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(block1Result))
 
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(flow.Payload{
@@ -660,8 +660,8 @@ func TestExtendSealNoIncorporatedResult(t *testing.T) {
 
 			// create block 3 with a seal for block 1, but DIFFERENT execution
 			// result than that which was included in block1
-			block1Result2 := unittest.ResultForBlockFixture(&block1)
-			block1Seal := unittest.SealFixture(unittest.SealFromResult(block1Result2))
+			block1Result2 := unittest.ExecutionResultFixture(unittest.WithBlock(&block1))
+			block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(block1Result2))
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
 			block3.SetPayload(flow.Payload{
@@ -699,7 +699,7 @@ func TestExtendSealNoIncorporatedResult(t *testing.T) {
 
 			// create block4 on top of block2 containing a seal for the result
 			// contained on the other fork
-			block1Seal := unittest.SealFixture(unittest.SealFromResult(&block1Receipt.ExecutionResult))
+			block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
 			block4 := unittest.BlockWithParentFixture(block2.Header)
 			block4.SetPayload(flow.Payload{
 				Seals: []*flow.Seal{block1Seal},
@@ -749,7 +749,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		// Insert block4 with a seal for block 2. Note that there is no seal
 		// for block1. The block should be rejected because it contains a seal
 		// that breaks the chain.
-		block2Seal := unittest.SealFixture(unittest.SealFromResult(&block2Receipt.ExecutionResult))
+		block2Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
 
 		block4 := unittest.BlockWithParentFixture(block3.Header)
 		block4.SetPayload(flow.Payload{
@@ -791,7 +791,7 @@ func TestExtendSealDuplicate(t *testing.T) {
 		require.NoError(t, err)
 
 		// create seal for block1
-		block1Seal := unittest.SealFixture(unittest.SealFromResult(&block1Receipt.ExecutionResult))
+		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
 
 		t.Run("Duplicate seal in separate block", func(t *testing.T) {
 			// insert block3 with a seal for block1
@@ -869,8 +869,8 @@ func TestExtendHighestSeal(t *testing.T) {
 		require.Nil(t, err)
 
 		// create seals for block2 and block3
-		seal2 := unittest.SealFixture(unittest.SealFromResult(&block2Receipt.ExecutionResult))
-		seal3 := unittest.SealFixture(unittest.SealFromResult(&block3Receipt.ExecutionResult))
+		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
+		seal3 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block3Receipt.ExecutionResult))
 
 		// include the seals in block5
 		block5 := unittest.BlockWithParentFixture(block4.Header)
@@ -952,7 +952,7 @@ func TestExtendReceiptsLatestSealed(t *testing.T) {
 		require.Nil(t, err)
 
 		// create a seals for block2
-		seal2 := unittest.SealFixture(unittest.SealFromResult(&block2Receipt.ExecutionResult))
+		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
 
 		// create block4 containing a seal for block2
 		block4 := unittest.BlockWithParentFixture(block3.Header)
@@ -1190,9 +1190,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		)
 
 		// create the seal referencing block1 and including the setup event
-		seal1 := unittest.SealFixture(
-			unittest.SealFromResult(&block1Receipt.ExecutionResult),
-			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
+		seal1 := unittest.Seal.Fixture(
+			unittest.Seal.WithResult(&block1Receipt.ExecutionResult),
+			unittest.Seal.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
 		// create a receipt for block2
@@ -1243,9 +1243,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		)
 
 		// create a seal for block 2 with epoch2 service event
-		seal2 := unittest.SealFixture(
-			unittest.SealFromResult(&block2Receipt.ExecutionResult),
-			unittest.WithServiceEvents(epoch2Commit.ServiceEvent()),
+		seal2 := unittest.Seal.Fixture(
+			unittest.Seal.WithResult(&block2Receipt.ExecutionResult),
+			unittest.Seal.WithServiceEvents(epoch2Commit.ServiceEvent()),
 		)
 
 		// create a receipt for block 3
@@ -1393,15 +1393,15 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		)
 
 		// create one seal containing the first setup event
-		seal1 := unittest.SealFixture(
-			unittest.SealFromResult(&block1Receipt.ExecutionResult),
-			unittest.WithServiceEvents(nextEpochSetup1.ServiceEvent()),
+		seal1 := unittest.Seal.Fixture(
+			unittest.Seal.WithResult(&block1Receipt.ExecutionResult),
+			unittest.Seal.WithServiceEvents(nextEpochSetup1.ServiceEvent()),
 		)
 
 		// create another seal containing the second setup event
-		seal2 := unittest.SealFixture(
-			unittest.SealFromResult(&block2Receipt.ExecutionResult),
-			unittest.WithServiceEvents(nextEpochSetup2.ServiceEvent()),
+		seal2 := unittest.Seal.Fixture(
+			unittest.Seal.WithResult(&block2Receipt.ExecutionResult),
+			unittest.Seal.WithServiceEvents(nextEpochSetup2.ServiceEvent()),
 		)
 
 		// block 5 builds on block 3, contains setup event 1
@@ -1462,9 +1462,9 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 			)
-			seal := unittest.SealFixture(
-				unittest.SealWithBlockID(block1.ID()),
-				unittest.WithServiceEvents(setup.ServiceEvent()),
+			seal := unittest.Seal.Fixture(
+				unittest.Seal.WithBlockID(block1.ID()),
+				unittest.Seal.WithServiceEvents(setup.ServiceEvent()),
 			)
 			return setup, seal
 		}
@@ -1556,9 +1556,9 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 			)
-			seal := unittest.SealFixture(
-				unittest.SealFromResult(sealedResult),
-				unittest.WithServiceEvents(setup.ServiceEvent()),
+			seal := unittest.Seal.Fixture(
+				unittest.Seal.WithResult(sealedResult),
+				unittest.Seal.WithServiceEvents(setup.ServiceEvent()),
 			)
 			return setup, seal
 		}
@@ -1568,9 +1568,9 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				unittest.CommitWithCounter(epoch1Setup.Counter+1),
 				unittest.WithDKGFromParticipants(epoch2Participants),
 			)
-			seal := unittest.SealFixture(
-				unittest.SealFromResult(sealedResult),
-				unittest.WithServiceEvents(commit.ServiceEvent()),
+			seal := unittest.Seal.Fixture(
+				unittest.Seal.WithResult(sealedResult),
+				unittest.Seal.WithServiceEvents(commit.ServiceEvent()),
 			)
 			return commit, seal
 		}
@@ -1703,9 +1703,9 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		)
 
 		// create the seal referencing block1 and including the setup event
-		seal1 := unittest.SealFixture(
-			unittest.SealFromResult(&block1Receipt.ExecutionResult),
-			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
+		seal1 := unittest.Seal.Fixture(
+			unittest.Seal.WithResult(&block1Receipt.ExecutionResult),
+			unittest.Seal.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
 		// block 3 contains the epoch setup service event
@@ -1891,11 +1891,11 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		require.Nil(t, err)
 
 		// create seals for block2 and block3
-		seal2 := unittest.SealFixture(
-			unittest.SealWithBlockID(block2.ID()),
+		seal2 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block2.ID()),
 		)
-		seal3 := unittest.SealFixture(
-			unittest.SealWithBlockID(block3.ID()),
+		seal3 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block3.ID()),
 		)
 
 		// include the seals in block4

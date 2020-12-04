@@ -16,8 +16,9 @@ import (
 
 // Headers implements a simple read-only header storage around a badger DB.
 type Headers struct {
-	db    *badger.DB
-	cache *Cache
+	db          *badger.DB
+	cache       *Cache
+	heightCache *Cache
 }
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
@@ -26,6 +27,12 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		blockID := key.(flow.Identifier)
 		header := val.(*flow.Header)
 		return operation.InsertHeader(blockID, header)
+	}
+
+	storeHeight := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		height := key.(uint64)
+		id := val.(flow.Identifier)
+		return operation.IndexBlockHeight(height, id)
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -37,6 +44,15 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		}
 	}
 
+	retrieveHeight := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		height := key.(uint64)
+		var id flow.Identifier
+		return func(tx *badger.Txn) (interface{}, error) {
+			err := db.View(operation.LookupBlockHeight(height, &id))
+			return id, err
+		}
+	}
+
 	h := &Headers{
 		db: db,
 		cache: newCache(collector,
@@ -44,6 +60,12 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 			withStore(store),
 			withRetrieve(retrieve),
 			withResource(metrics.ResourceHeader)),
+
+		heightCache: newCache(collector,
+			withLimit(4*flow.DefaultTransactionExpiry),
+			withStore(storeHeight),
+			withRetrieve(retrieveHeight),
+			withResource(metrics.ResourceFinalizedHeight)),
 	}
 
 	return h
@@ -74,12 +96,14 @@ func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 }
 
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
-	var blockID flow.Identifier
-	err := h.db.View(operation.LookupBlockHeight(height, &blockID))
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := h.heightCache.Get(height)(tx)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up block: %w", err)
+		return nil, fmt.Errorf("could not look up height: %w", err)
 	}
-	return h.ByBlockID(blockID)
+	return h.ByBlockID(blockID.(flow.Identifier))
 }
 
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
