@@ -78,7 +78,7 @@ type Node struct {
 	logger               zerolog.Logger                  // used to provide logging
 	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
-	name                 string                          // used as a mnemonic name to represent this node
+	id                   flow.Identifier                 // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
 }
 
@@ -121,7 +121,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		logger:               logger,
 		topics:               make(map[string]*pubsub.Topic),
 		subs:                 make(map[string]*pubsub.Subscription),
-		name:                 id.String(),
+		id:                   id,
 		flowLibP2PProtocolID: flowLibP2PProtocolID,
 	}
 
@@ -142,22 +142,30 @@ func NewLibP2PNode(logger zerolog.Logger,
 func (n *Node) Stop() (chan struct{}, error) {
 	var result error
 	done := make(chan struct{})
-	n.logger.Debug().Str("name", n.name).Msg("unsubscribing from all topics")
+	n.logger.Debug().
+		Hex("node_id", logging.ID(n.id)).
+		Msg("unsubscribing from all topics")
 	for t := range n.topics {
 		if err := n.UnSubscribe(t); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
-	n.logger.Debug().Str("name", n.name).Msg("stopping libp2p node")
+	n.logger.Debug().
+		Hex("node_id", logging.ID(n.id)).
+		Msg("stopping libp2p node")
 	if err := n.host.Close(); err != nil {
 		result = multierror.Append(result, err)
 	}
 
-	n.logger.Debug().Str("name", n.name).Msg("closing peer store")
+	n.logger.Debug().
+		Hex("node_id", logging.ID(n.id)).
+		Msg("closing peer store")
 	// to prevent peerstore routine leak (https://github.com/libp2p/go-libp2p/issues/718)
 	if err := n.host.Peerstore().Close(); err != nil {
-		n.logger.Debug().Str("name", n.name).Err(err).Msg("closing peer store")
+		n.logger.Debug().
+			Hex("node_id", logging.ID(n.id)).
+			Err(err).Msg("closing peer store")
 		result = multierror.Append(result, err)
 	}
 	n.cancel()
@@ -183,7 +191,9 @@ func (n *Node) Stop() (chan struct{}, error) {
 				addrs = len(n.host.Network().ListenAddresses())
 			}
 		}
-		n.logger.Debug().Str("name", n.name).Msg("libp2p node stopped successfully")
+		n.logger.Debug().
+			Hex("node_id", logging.ID(n.id)).
+			Msg("libp2p node stopped successfully")
 	}(done)
 
 	return done, nil
@@ -366,7 +376,10 @@ func (n *Node) Subscribe(ctx context.Context, topic string) (*pubsub.Subscriptio
 	// Add the subscription to the cache
 	n.subs[topic] = s
 
-	n.logger.Debug().Str("topic", topic).Str("name", n.name).Msg("subscribed to topic")
+	n.logger.Debug().
+		Hex("node_id", logging.ID(n.id)).
+		Str("topic", topic).
+		Msg("subscribed to topic")
 	return s, err
 }
 
@@ -396,7 +409,10 @@ func (n *Node) UnSubscribe(topic string) error {
 	n.topics[topic] = nil
 	delete(n.topics, topic)
 
-	n.logger.Debug().Str("topic", topic).Str("name", n.name).Msg("unsubscribed from topic")
+	n.logger.Debug().
+		Hex("node_id", logging.ID(n.id)).
+		Str("topic", topic).
+		Msg("unsubscribed from topic")
 	return err
 }
 

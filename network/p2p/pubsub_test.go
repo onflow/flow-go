@@ -78,9 +78,9 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	// Step 2: Subscribe to a Flow topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
-	ch := make(chan string, count)
+	ch := make(chan flow.Identifier, count)
 	for _, n := range nodes {
-		m := n.name
+		m := n.id
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(suite.ctx)
@@ -117,19 +117,19 @@ func (suite *PubSubTestSuite) TestPubSub() {
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
-	recv := make(map[string]bool, count)
+	recv := make(map[flow.Identifier]bool, count)
 	for i := 0; i < count; i++ {
 		select {
 		case res := <-ch:
 			recv[res] = true
 		case <-time.After(3 * time.Second):
-			missing := make([]string, 0)
+			missing := flow.IdentifierList{}
 			for _, n := range nodes {
-				if _, found := recv[n.name]; !found {
-					missing = append(missing, n.name)
+				if _, found := recv[n.id]; !found {
+					missing = append(missing, n.id)
 				}
 			}
-			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
+			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing.String(), ","))
 			break
 		}
 	}
