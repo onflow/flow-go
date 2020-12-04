@@ -305,12 +305,12 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() {
 
 	// creates a regular node
-	peers, addrs := suite.NodesFixture(1, nil, false)
-	defer suite.StopNodes(peers)
-	require.Len(suite.T(), addrs, 1)
+	nodes, identities := suite.NodesFixture(1, nil, false)
+	defer suite.StopNodes(nodes)
+	require.Len(suite.T(), identities, 1)
 
 	// create a silent node which never replies
-	listener, silentNodeAddress := suite.silentNodeFixture()
+	listener, silentNodeId := suite.silentNodeFixture()
 	defer func() {
 		require.NoError(suite.T(), listener.Close())
 	}()
@@ -324,7 +324,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 	var err error
 	unittest.AssertReturnsBefore(suite.T(),
 		func() {
-			_, err = peers[0].CreateStream(ctx, silentNodeAddress)
+			_, err = nodes[0].CreateStream(ctx, silentNodeId)
 		},
 		DefaultUnicastTimeout+grace)
 	assert.Error(suite.T(), err)
@@ -334,12 +334,12 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 // does not block another concurrent call.
 func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	// create two regular node
-	goodPeers, goodAddrs := suite.NodesFixture(2, nil, false)
-	defer suite.StopNodes(goodPeers)
-	require.Len(suite.T(), goodAddrs, 2)
+	goodNodes, goodNodeIds := suite.NodesFixture(2, nil, false)
+	defer suite.StopNodes(goodNodes)
+	require.Len(suite.T(), goodNodeIds, 2)
 
 	// create a silent node which never replies
-	listener, silentNodeAddress := suite.silentNodeFixture()
+	listener, silentNodeId := suite.silentNodeFixture()
 	defer func() {
 		require.NoError(suite.T(), listener.Close())
 	}()
@@ -347,7 +347,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
 	blockedCallCh := unittest.RequireNeverReturnBefore(suite.T(),
 		func() {
-			_, _ = goodPeers[0].CreateStream(suite.ctx, silentNodeAddress) // this call will block
+			_, _ = goodNodes[0].CreateStream(suite.ctx, silentNodeId) // this call will block
 		},
 		1*time.Second,
 		"CreateStream attempt to the unresponsive peer did not block")
@@ -355,7 +355,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	// requires same peer can still connect to the other regular peer without being blocked
 	unittest.RequireReturnsBefore(suite.T(),
 		func() {
-			_, err := goodPeers[0].CreateStream(suite.ctx, *goodAddrs[1])
+			_, err := goodNodes[0].CreateStream(suite.ctx, *goodNodeIds[1])
 			require.NoError(suite.T(), err)
 		},
 		1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
