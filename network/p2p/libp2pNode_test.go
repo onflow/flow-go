@@ -63,38 +63,31 @@ func (suite *LibP2PNodeTestSuite) TearDownTest() {
 // TestMultiAddress evaluates correct translations from
 // dns and ip4 to libp2p multi-address
 func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
+	key := generateNetworkingKey(suite.T())
+
 	tt := []struct {
-		address      NodeAddress
+		identity     flow.Identity
 		multiaddress string
 	}{
 		{ // ip4 test case
-			address: NodeAddress{
-				Name: "ip4-node",
-				IP:   "172.16.254.1",
-				Port: "72",
-			},
+			identity:     suite.IdentityFixture(key.PublicKey(), WithAddress("172.16.254.1:72")),
 			multiaddress: "/ip4/172.16.254.1/tcp/72",
 		},
 		{ // dns test case
-			address: NodeAddress{
-				Name: "dns-node-1",
-				IP:   "consensus",
-				Port: "2222",
-			},
+			identity:     suite.IdentityFixture(key.PublicKey(), WithAddress("consensus:2222")),
 			multiaddress: "/dns4/consensus/tcp/2222",
 		},
 		{ // dns test case
-			address: NodeAddress{
-				Name: "dns-node-2",
-				IP:   "flow.com",
-				Port: "3333",
-			},
+			identity:     suite.IdentityFixture(key.PublicKey(), WithAddress("flow.com:3333")),
 			multiaddress: "/dns4/flow.com/tcp/3333",
 		},
 	}
 
 	for _, tc := range tt {
-		actualAddress := MultiaddressStr(tc.address)
+		ip, port, _, err := networkingInfo(tc.identity)
+		require.NoError(suite.T(), err)
+
+		actualAddress := Multiaddress(ip, port)
 		assert.Equal(suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 
@@ -102,10 +95,11 @@ func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 
 func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 	// creates a single
-	nodes, _ := suite.CreateNodes(1, nil, false)
+	key := generateNetworkingKey(suite.T())
+	node, _ := suite.NodeFixture(key, rootBlockID, nil, false)
 
 	// stops the created node
-	done, err := nodes[0].Stop()
+	done, err := node.Stop()
 	assert.NoError(suite.T(), err)
 	<-done
 }
@@ -115,24 +109,18 @@ func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 // yields the same info or not.
 func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
-		name := fmt.Sprintf("node%d", i)
-		key, _ := generateNetworkingAndLibP2PKeys(suite.T())
+		key := generateNetworkingKey(suite.T())
 
-		// creates node-i address
-		address := NodeAddress{
-			Name:   name,
-			IP:     "1.1.1.1",
-			Port:   "0",
-			PubKey: key.GetPublic(),
-		}
+		// creates node-i identity
+		identity := suite.IdentityFixture(key.PublicKey(), WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
-		info, err := GetPeerInfo(address)
+		info, err := PeerAddressInfo(identity)
 		require.NoError(suite.T(), err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			rinfo, err := GetPeerInfo(address)
+			rinfo, err := PeerAddressInfo(identity)
 			require.NoError(suite.T(), err)
 			assert.True(suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
 		}
@@ -141,16 +129,15 @@ func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 
 // TestAddPeers checks if nodes can be added as peers to a given node
 func (suite *LibP2PNodeTestSuite) TestAddPeers() {
-
 	count := 3
 
 	// create nodes
-	nodes, addrs := suite.CreateNodes(count, nil, false)
+	nodes, identities := suite.NodesFixture(count, nil, false)
 	defer suite.StopNodes(nodes)
 
 	// add the remaining nodes to the first node as its set of peers
-	for _, p := range addrs[1:] {
-		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, p))
+	for _, identity := range identities[1:] {
+		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, *identity))
 	}
 
 	// Checks if all 3 nodes have been added as peers to the first node
@@ -174,12 +161,12 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 	count := 3
 
 	// create nodes
-	nodes, addrs := suite.CreateNodes(count, nil, false)
+	nodes, identities := suite.NodesFixture(count, nil, false)
 	defer suite.StopNodes(nodes)
 
 	// add nodes two and three to the first node as its peers
-	for _, p := range addrs[1:] {
-		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, p))
+	for _, identity := range identities[1:] {
+		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, *identity))
 	}
 
 	// check if all 3 nodes have been added as peers to the first node
@@ -197,9 +184,9 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 	}
 
 	// disconnect from each peer and assert that the connection no longer exists
-	for _, p := range addrs[1:] {
-		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, p))
-		pInfo, err := GetPeerInfo(p)
+	for _, identity := range identities[1:] {
+		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, *identity))
+		pInfo, err := PeerAddressInfo(*identity)
 		assert.NoError(suite.T(), err)
 		assert.Equal(suite.T(), network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
@@ -490,20 +477,20 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 func (suite *LibP2PNodeTestSuite) TestPing() {
 
 	// creates two nodes
-	nodes, nodeAddr := suite.CreateNodes(2, nil, false)
+	nodes, identities := suite.NodesFixture(2, nil, false)
 	defer suite.StopNodes(nodes)
 
 	node1 := nodes[0]
 	node2 := nodes[1]
-	node1Addr := nodeAddr[0]
-	node2Addr := nodeAddr[1]
+	node1Id := *identities[0]
+	node2Id := *identities[1]
 
 	// test node1 can ping node 2
-	_, err := node1.Ping(suite.ctx, node2Addr)
+	_, err := node1.Ping(suite.ctx, node2Id)
 	require.NoError(suite.T(), err)
 
 	// test node 2 can ping node 1
-	_, err = node2.Ping(suite.ctx, node1Addr)
+	_, err = node2.Ping(suite.ctx, node1Id)
 	require.NoError(suite.T(), err)
 }
 
@@ -562,76 +549,6 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 		_, err = node2.CreateStream(suite.ctx, *node1Addr)
 		require.NoError(suite.T(), err)
 	})
-}
-
-// CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
-// it also asserts the correctness of nodes creations
-// a single error in creating one node terminates the entire test
-func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamHandler, allowList bool) ([]*Node, []NodeAddress) {
-	// keeps track of errors on creating a node
-	var err error
-	var nodes []*Node
-
-	defer func() {
-		if err != nil && nodes != nil {
-			// stops all nodes upon an error in starting even one single node
-			suite.StopNodes(nodes)
-		}
-	}()
-
-	// creating nodes
-	var nodeAddrs []NodeAddress
-	for i := 0; i < count; i++ {
-
-		name := fmt.Sprintf("node%d", i+1)
-		key := generateNetworkingKey(suite.T())
-		require.NoError(suite.T(), err)
-
-		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := suite.CreateNode(name, key, "0.0.0.0", "0", rootBlockID, handler, allowList)
-		nodes = append(nodes, n)
-		nodeAddrs = append(nodeAddrs, nodeID)
-	}
-	return nodes, nodeAddrs
-}
-
-func (suite *LibP2PNodeTestSuite) CreateNode(name string, key fcrypto.PrivateKey, ip string, port string, rootID string,
-	handler network.StreamHandler, allowList bool) (*Node, NodeAddress) {
-
-	libP2PKey, err := privKey(key)
-	require.NoError(suite.T(), err)
-
-	nodeID := NodeAddress{
-		Name:   name,
-		IP:     ip,
-		Port:   port,
-		PubKey: libP2PKey.GetPublic(),
-	}
-
-	var handlerFunc network.StreamHandler
-	if handler != nil {
-		// use the callback that has been passed in
-		handlerFunc = handler
-	} else {
-		// use a default call back
-		handlerFunc = func(network.Stream) {}
-	}
-
-	noopMetrics := metrics.NewNoopCollector()
-	n, err := NewLibP2PNode(suite.logger, flow.Identifier{}, ip+":"+port, NewConnManager(suite.logger, noopMetrics), key, allowList, rootID)
-	require.NoError(suite.T(), err)
-	n.SetStreamHandler(handlerFunc)
-
-	require.Eventuallyf(suite.T(), func() bool {
-		ip, p, err := n.GetIPPort()
-		return err == nil && ip != "" && p != ""
-	}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %s", name))
-
-	// get the actual IP and port that have been assigned by the subsystem
-	nodeID.IP, nodeID.Port, err = n.GetIPPort()
-	require.NoError(suite.T(), err)
-
-	return n, nodeID
 }
 
 // NodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
