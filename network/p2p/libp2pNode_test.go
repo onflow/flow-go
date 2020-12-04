@@ -371,9 +371,9 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 
 	// create two nodes
-	peers, addrs := suite.NodesFixture(2, nil, false)
-	defer suite.StopNodes(peers)
-	require.Len(suite.T(), addrs, 2)
+	nodes, identities := suite.NodesFixture(2, nil, false)
+	defer suite.StopNodes(nodes)
+	require.Len(suite.T(), identities, 2)
 
 	wg := sync.WaitGroup{}
 
@@ -382,7 +382,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 
 	createStream := func() {
 		<-gate
-		_, err := peers[0].CreateStream(suite.ctx, *addrs[1])
+		_, err := nodes[0].CreateStream(suite.ctx, *identities[1])
 		assert.NoError(suite.T(), err) // assert that stream was successfully created
 		wg.Done()
 	}
@@ -434,13 +434,13 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 		}(s)
 	}
 
-	// Creates peers
-	peers, addrs := suite.NodesFixture(2, handler, false)
-	defer suite.StopNodes(peers)
+	// Creates nodes
+	nodes, identities := suite.NodesFixture(2, handler, false)
+	defer suite.StopNodes(nodes)
 
 	for i := 0; i < count; i++ {
 		// Create stream from node 1 to node 2 (reuse if one already exists)
-		s, err := peers[0].CreateStream(context.Background(), *addrs[1])
+		s, err := nodes[0].CreateStream(context.Background(), *identities[1])
 		assert.NoError(suite.T(), err)
 		w := bufio.NewWriter(s)
 
@@ -498,14 +498,14 @@ func (suite *LibP2PNodeTestSuite) TestPing() {
 func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 
 	// create 2 nodes
-	nodes, nodeAddrs := suite.NodesFixture(2, nil, true)
+	nodes, identities := suite.NodesFixture(2, nil, true)
 
 	node1 := nodes[0]
-	node1Addr := nodeAddrs[0]
+	node1Id := *identities[0]
 	defer suite.StopNode(node1)
 
 	node2 := nodes[1]
-	node2Addr := nodeAddrs[1]
+	node2Id := *identities[1]
 	defer suite.StopNode(node2)
 
 	requireError := func(err error) {
@@ -515,38 +515,38 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 
 	suite.Run("outbound connection to a not-allowed node is rejected", func() {
 		// node1 and node2 both have no allowListed peers
-		_, err := node1.CreateStream(suite.ctx, *node2Addr)
+		_, err := node1.CreateStream(suite.ctx, node2Id)
 		requireError(err)
-		_, err = node2.CreateStream(suite.ctx, *node1Addr)
+		_, err = node2.CreateStream(suite.ctx, node1Id)
 		requireError(err)
 	})
 
 	suite.Run("inbound connection from an allowed node is rejected", func() {
 
 		// node1 allowlists node2 but node2 does not allowlists node1
-		err := node1.UpdateAllowList(flow.IdentityList{node2Addr})
+		err := node1.UpdateAllowList(flow.IdentityList{&node2Id})
 		require.NoError(suite.T(), err)
 
 		// node1 attempts to connect to node2
 		// node2 should reject the inbound connection
-		_, err = node1.CreateStream(suite.ctx, *node2Addr)
+		_, err = node1.CreateStream(suite.ctx, node2Id)
 		require.Error(suite.T(), err)
 	})
 
 	suite.Run("outbound connection to an approved node is allowed", func() {
 
 		// node1 allowlists node2
-		err := node1.UpdateAllowList(flow.IdentityList{node2Addr})
+		err := node1.UpdateAllowList(flow.IdentityList{&node2Id})
 		require.NoError(suite.T(), err)
 		// node2 allowlists node1
-		err = node2.UpdateAllowList(flow.IdentityList{node1Addr})
+		err = node2.UpdateAllowList(flow.IdentityList{&node1Id})
 		require.NoError(suite.T(), err)
 
 		// node1 should be allowed to connect to node2
-		_, err = node1.CreateStream(suite.ctx, *node2Addr)
+		_, err = node1.CreateStream(suite.ctx, node2Id)
 		require.NoError(suite.T(), err)
 		// node2 should be allowed to connect to node1
-		_, err = node2.CreateStream(suite.ctx, *node1Addr)
+		_, err = node2.CreateStream(suite.ctx, node1Id)
 		require.NoError(suite.T(), err)
 	})
 }
