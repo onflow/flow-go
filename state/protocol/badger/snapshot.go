@@ -101,13 +101,8 @@ func (s *Snapshot) validChild() (*flow.Header, error) {
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}
 
-	// check we have at least one child
-	if len(childIDs) == 0 {
-		return nil, state.NewNoValidChildBlockError("block doesn't have children yet")
-	}
-
 	// find the first child that has been validated
-	var validChildID flow.Identifier
+	validChildID := flow.ZeroID
 	for _, childID := range childIDs {
 		var valid bool
 		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
@@ -125,7 +120,7 @@ func (s *Snapshot) validChild() (*flow.Header, error) {
 	}
 
 	if validChildID == flow.ZeroID {
-		return nil, state.NewNoValidChildBlockError("block has no valid children")
+		return nil, state.NewNoValidChildBlockErrorf("block has no valid children (total children: %d)", len(childIDs))
 	}
 
 	// get the header of the first child
