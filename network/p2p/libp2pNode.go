@@ -233,7 +233,7 @@ func (n *Node) CreateStream(ctx context.Context, identity flow.Identity) (libp2p
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := n.tryCreateNewStream(ctx, identity, maxConnectAttempt)
 	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s): %w", identity.NodeID.String(),
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (node_id: %s, address: %s): %w", identity.NodeID.String(),
 			identity.Address, err))
 	}
 	return stream, nil
