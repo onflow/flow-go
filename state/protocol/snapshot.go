@@ -19,6 +19,10 @@ type Snapshot interface {
 	// we should build the next block in the context of the selected state.
 	Head() (*flow.Header, error)
 
+	// QuorumCertificate returns a valid quorum certificate for the header at
+	// this snapshot, if one exists.
+	QuorumCertificate() (*flow.QuorumCertificate, error)
+
 	// Identities returns a list of identities at the selected point of the
 	// protocol state history. At the beginning of an epoch, this list includes
 	// identities from the previous epoch that are un-staking during the current

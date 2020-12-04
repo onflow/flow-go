@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	staterr "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -130,19 +131,28 @@ func TestClusters(t *testing.T) {
 	})
 }
 
-func TestSeed(t *testing.T) {
+// test retrieving quorum certificate and seed
+func TestQuorumCertificate(t *testing.T) {
 
-	// should not be able to get random beacon seed from a block with no children
+	// should not be able to get QC or random beacon seed from a block with no children
 	t.Run("no children", func(t *testing.T) {
 		util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 			root, result, seal := unittest.BootstrapFixture(identities)
-			err := state.Mutate().Bootstrap(root, result, seal)
-			require.NoError(t, err)
 
-			_, err = state.Final().(*bprotocol.Snapshot).Seed(1, 2, 3, 4)
-			t.Log(err)
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.Nil(t, err)
+			block1 := unittest.BlockWithParentFixture(root.Header)
+			block1.SetPayload(flow.EmptyPayload())
+			err = state.Mutate().Extend(&block1)
+			require.Nil(t, err)
+
+			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
+			assert.Error(t, err)
+			assert.True(t, staterr.IsNoValidChildBlockError(err))
+
+			_, err = state.AtBlockID(block1.ID()).Seed(1, 2, 3, 4)
 			assert.Error(t, err)
 		})
 	})
@@ -157,24 +167,69 @@ func TestSeed(t *testing.T) {
 
 			err := state.Mutate().Bootstrap(root, result, seal)
 			require.NoError(t, err)
+			block1 := unittest.BlockWithParentFixture(root.Header)
+			block1.SetPayload(flow.EmptyPayload())
+			err = state.Mutate().Extend(&block1)
+			require.Nil(t, err)
 
 			// add child
-			unvalidatedChild := unittest.BlockWithParentFixture(root.Header)
-			unvalidatedChild.Payload.Guarantees = nil
-			unvalidatedChild.Header.PayloadHash = unvalidatedChild.Payload.Hash()
+			unvalidatedChild := unittest.BlockWithParentFixture(block1.Header)
+			unvalidatedChild.SetPayload(flow.EmptyPayload())
 			err = state.Mutate().Extend(&unvalidatedChild)
 			assert.Nil(t, err)
 
-			_, err = state.Final().(*bprotocol.Snapshot).Seed(1, 2, 3, 4)
-			t.Log(err)
+			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Error(t, err)
+			assert.True(t, staterr.IsNoValidChildBlockError(err))
+
+			_, err = state.AtBlockID(block1.ID()).Seed(1, 2, 3, 4)
+			assert.Error(t, err)
+			assert.True(t, staterr.IsNoValidChildBlockError(err))
 		})
 	})
 
-	// should be able to get random beacon seed from a block with a valid child
-	t.Run("valid child", func(t *testing.T) {
-		t.Skip()
+	// should be able to get QC and random beacon seed from root block
+	t.Run("root block", func(t *testing.T) {
 		// TODO
+	})
+
+	// should be able to get QC and random beacon seed from a block with a valid child
+	t.Run("valid child", func(t *testing.T) {
+		util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
+
+			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+			root, result, seal := unittest.BootstrapFixture(identities)
+
+			err := state.Mutate().Bootstrap(root, result, seal)
+			require.NoError(t, err)
+
+			// add a block so we aren't testing against root
+			block1 := unittest.BlockWithParentFixture(root.Header)
+			block1.SetPayload(flow.EmptyPayload())
+			err = state.Mutate().Extend(&block1)
+			require.Nil(t, err)
+
+			// add a valid child to block1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(flow.EmptyPayload())
+			err = state.Mutate().Extend(&block2)
+			require.Nil(t, err)
+			err = state.Mutate().MarkValid(block1.ID())
+			require.Nil(t, err)
+			err = state.Mutate().MarkValid(block2.ID())
+			require.Nil(t, err)
+
+			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
+			assert.Nil(t, err)
+			// should have signatures from valid child (block 2)
+			assert.Equal(t, block2.Header.ParentVoterIDs, qc.SignerIDs)
+			assert.Equal(t, block2.Header.ParentVoterSig.Bytes(), qc.SigData)
+			// should have view matching block1 view
+			assert.Equal(t, block1.Header.View, qc.View)
+
+			_, err = state.AtBlockID(block1.ID()).Seed(1, 2, 3, 4)
+			require.Nil(t, err)
+		})
 	})
 }
 
