@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/module/signature"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
@@ -261,7 +262,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 		Timestamp:      time.Now().UTC(),
 		View:           view,
 		ParentVoterIDs: IdentifierListFixture(4),
-		ParentVoterSig: SignatureFixture(),
+		ParentVoterSig: CombinedSignatureFixture(2),
 		ProposerID:     IdentifierFixture(),
 		ProposerSig:    SignatureFixture(),
 	}
@@ -689,6 +690,16 @@ func ChunksFixture(n uint, blockID flow.Identifier) []*flow.Chunk {
 func SignatureFixture() crypto.Signature {
 	sig := make([]byte, 32)
 	_, _ = crand.Read(sig)
+	return sig
+}
+
+func CombinedSignatureFixture(n int) crypto.Signature {
+	sigs := SignaturesFixture(n)
+	combiner := signature.NewCombiner()
+	sig, err := combiner.Join(sigs...)
+	if err != nil {
+		panic(err)
+	}
 	return sig
 }
 

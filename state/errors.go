@@ -69,6 +69,10 @@ func NewNoValidChildBlockError(msg string) error {
 	}
 }
 
+func NewNoValidChildBlockErrorf(msg string, args ...interface{}) error {
+	return NewNoValidChildBlockError(fmt.Sprintf(msg, args...))
+}
+
 func (e NoValidChildBlockError) Error() string {
 	return e.msg
 }
