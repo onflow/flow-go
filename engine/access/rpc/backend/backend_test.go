@@ -661,7 +661,7 @@ func (suite *Suite) TestGetAccount() {
 
 	// setup the latest sealed block
 	header := unittest.BlockHeaderFixture() // create a mock header
-	seal := unittest.SealFixture()          // create a mock seal
+	seal := unittest.Seal.Fixture()         // create a mock seal
 	seal.BlockID = header.ID()              // make the seal point to the header
 
 	suite.snapshot.

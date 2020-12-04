@@ -76,11 +76,13 @@ func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster 
 	flow.IdentityList,
 	[]network.SubscriptionManager) {
 
-	collector, _ := test.GenerateIDs(suite.T(), col, test.DryRun, unittest.WithRole(flow.RoleCollection))
-	access, _ := test.GenerateIDs(suite.T(), acc, test.DryRun, unittest.WithRole(flow.RoleAccess))
-	consensus, _ := test.GenerateIDs(suite.T(), con, test.DryRun, unittest.WithRole(flow.RoleConsensus))
-	verification, _ := test.GenerateIDs(suite.T(), ver, test.DryRun, unittest.WithRole(flow.RoleVerification))
-	execution, _ := test.GenerateIDs(suite.T(), exe, test.DryRun, unittest.WithRole(flow.RoleExecution))
+	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+
+	collector, _ := test.GenerateIDs(suite.T(), logger, col, test.DryRun, unittest.WithRole(flow.RoleCollection))
+	access, _ := test.GenerateIDs(suite.T(), logger, acc, test.DryRun, unittest.WithRole(flow.RoleAccess))
+	consensus, _ := test.GenerateIDs(suite.T(), logger, con, test.DryRun, unittest.WithRole(flow.RoleConsensus))
+	verification, _ := test.GenerateIDs(suite.T(), logger, ver, test.DryRun, unittest.WithRole(flow.RoleVerification))
+	execution, _ := test.GenerateIDs(suite.T(), logger, exe, test.DryRun, unittest.WithRole(flow.RoleExecution))
 
 	ids := flow.IdentityList{}
 	ids = ids.Union(collector)

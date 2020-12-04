@@ -65,6 +65,9 @@ const (
 	codeIndexCollection              = 200
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
+
+	// internal failure information that should be preserved across restarts
+	codeExecutionFork = 254
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
