@@ -559,8 +559,8 @@ func (n *Node) SetStreamHandler(handler libp2pnet.StreamHandler) {
 }
 
 // IsConnected returns true is address is a direct peer of this node else false
-func (n *Node) IsConnected(address NodeAddress) (bool, error) {
-	pInfo, err := GetPeerInfo(address)
+func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
+	pInfo, err := PeerAddressInfo(identity)
 	if err != nil {
 		return false, err
 	}

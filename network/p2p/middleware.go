@@ -461,11 +461,7 @@ func (m *Middleware) UpdateAllowList() error {
 	return nil
 }
 
-// IsConnected returns true if this node is connected to the node with id nodeID
+// IsConnected returns true if this node is connected to the node with id nodeID.
 func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
-	nodeAddress, err := NodeAddressFromIdentity(identity)
-	if err != nil {
-		return false, err
-	}
-	return m.libP2PNode.IsConnected(nodeAddress)
+	return m.libP2PNode.IsConnected(identity)
 }
