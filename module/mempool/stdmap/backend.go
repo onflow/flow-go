@@ -3,11 +3,11 @@
 package stdmap
 
 import (
-	"fmt"
 	"math"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // Backdata implements a generic memory pool backed by a Go map.
@@ -101,18 +101,18 @@ func (b *Backdata) Hash() flow.Identifier {
 type Backend struct {
 	sync.RWMutex
 	Backdata
-	limit            uint
-	eject            EjectFunc
-	ejectionCallback OnEjection
+	limit             uint
+	eject             EjectFunc
+	ejectionCallbacks []mempool.OnEjection
 }
 
 // NewBackend creates a new memory pool backend.
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		Backdata:         NewBackdata(),
-		limit:            uint(math.MaxUint32),
-		eject:            EjectTrueRandom,
-		ejectionCallback: nil,
+		Backdata:          NewBackdata(),
+		limit:             uint(math.MaxUint32),
+		eject:             EjectTrueRandom,
+		ejectionCallbacks: nil,
 	}
 	for _, option := range options {
 		option(&b)
@@ -203,16 +203,11 @@ func (b *Backend) Hash() flow.Identifier {
 	return b.Backdata.Hash()
 }
 
-// RegisterEjectionCallback sets the provided OnEjection callback
-// errors if another callback was already registered
-func (b *Backend) RegisterEjectionCallback(callback OnEjection) error {
+// RegisterEjectionCallbacks adds the provided OnEjection callbacks
+func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 	b.Lock()
 	defer b.Unlock()
-	if b.ejectionCallback != nil {
-		return fmt.Errorf("OnEjection callback already set")
-	}
-	b.ejectionCallback = callback
-	return nil
+	b.ejectionCallbacks = append(b.ejectionCallbacks, callbacks...)
 }
 
 // reduce will reduce the size of the kept entities until we are within the
@@ -235,8 +230,8 @@ func (b *Backend) reduce() {
 		delete(b.entities, key)
 
 		// notify callback
-		if b.ejectionCallback != nil {
-			b.ejectionCallback(entity)
+		for _, callback := range b.ejectionCallbacks {
+			callback(entity)
 		}
 	}
 }

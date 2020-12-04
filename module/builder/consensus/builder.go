@@ -4,7 +4,6 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -241,43 +240,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// roadmap (https://github.com/dapperlabs/flow-go/issues/4872)
 
 	// create a mapping of block to seal for all seals in our pool
-	// We consider two seals as inconsistent, if they have different start or end states
-	encounteredInconsistentSealsForSameBlock := false
 	byBlock := make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 	for _, irSeal := range b.sealPool.All() {
-		if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
-			return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
-		}
-		if len(irSeal.Seal.FinalState) < 1 {
-			// respective Execution Result should have been rejected by matching engine
-			return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
-		}
-		if irSeal2, found := byBlock[irSeal.Seal.BlockID]; found {
-			sc1json, err := json.Marshal(irSeal)
-			if err != nil {
-				return nil, err
-			}
-			sc2json, err := json.Marshal(irSeal2)
-			if err != nil {
-				return nil, err
-			}
-
-			// check whether seals are inconsistent:
-			if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
-				!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
-				fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-				encounteredInconsistentSealsForSameBlock = true
-			} else {
-				fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-			}
-
-		} else {
-			byBlock[irSeal.Seal.BlockID] = irSeal
-		}
-	}
-	if encounteredInconsistentSealsForSameBlock {
-		// in case we find inconsistent seals, do not seal anything
-		byBlock = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+		byBlock[irSeal.Seal.BlockID] = irSeal
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the

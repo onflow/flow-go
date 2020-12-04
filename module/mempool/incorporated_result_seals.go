@@ -10,13 +10,16 @@ import (
 // incorporated result seals
 type IncorporatedResultSeals interface {
 	// Add adds an IncorporatedResultSeal to the mempool
-	Add(irSeal *flow.IncorporatedResultSeal) bool
+	Add(irSeal *flow.IncorporatedResultSeal) (bool, error)
 
 	// All returns all the IncorporatedResultSeals in the mempool
 	All() []*flow.IncorporatedResultSeal
 
 	// ByID returns an IncorporatedResultSeal by ID
 	ByID(flow.Identifier) (*flow.IncorporatedResultSeal, bool)
+
+	// RegisterEjectionCallbacks adds the provided OnEjection callbacks
+	RegisterEjectionCallbacks(callbacks ...OnEjection)
 
 	// Limit returns the size limit of the mempool
 	Limit() uint
@@ -26,4 +29,7 @@ type IncorporatedResultSeals interface {
 
 	// Size returns the number of items in the mempool
 	Size() uint
+
+	// Clear removes all entities from the pool.
+	Clear()
 }
