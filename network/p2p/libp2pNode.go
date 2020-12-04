@@ -63,26 +63,9 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
 	}
 
-	ip, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create middleware: %w", err)
-	}
-
-	// creates libp2p host and node
-	nodeAddress := NodeAddress{Name: me.String(), IP: ip, Port: port}
-
 	return func() (*Node, error) {
-		return NewLibP2PNode(log, nodeAddress, NewConnManager(log, metrics), flowKey, true, rootBlockID, psOptions...)
+		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, psOptions...)
 	}, nil
-}
-
-// NodeAddress is used to define a libp2p node
-type NodeAddress struct {
-	// Name is the friendly node Name e.g. "node1" (not to be confused with the libp2p node id)
-	Name   string
-	IP     string
-	Port   string
-	PubKey crypto.PubKey
 }
 
 // Node is a wrapper around LibP2P host.
