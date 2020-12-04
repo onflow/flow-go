@@ -68,15 +68,6 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 	}, nil
 }
 
-// NodeAddress is used to define a libp2p node
-type NodeAddress struct {
-	// Name is the friendly node Name e.g. "node1" (not to be confused with the libp2p node id)
-	Name   string
-	IP     string
-	Port   string
-	PubKey crypto.PubKey
-}
-
 // Node is a wrapper around LibP2P host.
 type Node struct {
 	sync.Mutex

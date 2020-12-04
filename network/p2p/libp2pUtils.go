@@ -107,26 +107,6 @@ func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
 	return addr, nil
 }
 
-// NodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
-func NodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
-	// split the node address into ip and port
-	ip, port, err := net.SplitHostPort(flowIdentity.Address)
-	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not parse address %s: %w", flowIdentity.Address, err)
-	}
-
-	// convert the Flow key to a LibP2P key
-	lkey, err := publicKey(flowIdentity.NetworkPubKey)
-	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
-	}
-
-	// create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
-
-	return nodeAddress, nil
-}
-
 // networkingInfo returns ip, port, libp2p public key of the identity.
 func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
 	// split the node address into ip and port
