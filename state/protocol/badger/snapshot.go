@@ -69,9 +69,14 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not get child: %w", err)
 	}
 
+	// sanity check: ensure the child has the snapshot block as parent
+	if child.ParentID != s.blockID {
+		return nil, fmt.Errorf("child parent id (%x) does not match snapshot id (%x)", child.ParentID, s.blockID)
+	}
+
 	qc := &flow.QuorumCertificate{
 		View:      head.View,
-		BlockID:   child.ParentID,
+		BlockID:   s.blockID,
 		SignerIDs: child.ParentVoterIDs,
 		SigData:   child.ParentVoterSig,
 	}
