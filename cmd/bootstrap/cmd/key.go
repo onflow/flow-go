@@ -117,13 +117,8 @@ func validateAddressFormat(address string) {
 	_, err = strconv.Atoi(port)
 	checkErr(err)
 
-	nodeAddrs := p2p.NodeAddress{
-		IP:   ip,
-		Port: port,
-	}
-
 	// create a libp2p address from the ip and port
-	lp2pAddr := p2p.MultiaddressStr(nodeAddrs)
+	lp2pAddr := p2p.Multiaddress(ip, port)
 	_, err = multiaddr.NewMultiaddr(lp2pAddr)
 	checkErr(err)
 }
