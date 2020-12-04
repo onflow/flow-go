@@ -39,17 +39,17 @@ func TestSporkingTestSuite(t *testing.T) {
 func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
-	node1, address1 := suite.NodeFixture(node1key, rootBlockID, nil, false)
+	node1, id1 := suite.NodeFixture(node1key, rootBlockID, nil, false)
 	defer suite.StopNode(node1)
-	suite.T().Logf(" %x node started on %s", address1.NodeID, address1.Address)
+	suite.T().Logf(" %x node started on %s", id1.NodeID, id1.Address)
 	suite.T().Logf("libp2p ID for %s: %s", node1.name, node1.host.ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
-	node2, address2 := suite.NodeFixture(node2key, rootBlockID, nil, false)
+	node2, id2 := suite.NodeFixture(node2key, rootBlockID, nil, false)
 
 	// create stream from node 1 to node 2
-	testOneToOneMessagingSucceeds(suite.T(), node1, address2)
+	testOneToOneMessagingSucceeds(suite.T(), node1, id2)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	node2keyNew := generateNetworkingKey(suite.T())
@@ -59,16 +59,16 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	suite.StopNode(node2)
 
 	// start node2 with the same name, ip a`nd port but with the new key
-	node2, address2New := suite.NodeFixture(node2keyNew, rootBlockID, nil, false, WithAddress(address2.Address))
+	node2, id2New := suite.NodeFixture(node2keyNew, rootBlockID, nil, false, WithAddress(id2.Address))
 	defer suite.StopNode(node2)
 
 	// make sure the node2 indeed came up on the old ip and port
-	assert.Equal(suite.T(), address2New.Address, address2.Address)
+	assert.Equal(suite.T(), id2New.Address, id2.Address)
 
 	// attempt to create a stream from node 1 (old chain) to node 2 (new chain)
 	// this time it should fail since node 2 is using a different public key
 	// (and therefore has a different libp2p node id)
-	testOneToOneMessagingFails(suite.T(), node1, address2)
+	testOneToOneMessagingFails(suite.T(), node1, id2)
 }
 
 // TestOneToOneCrosstalkPrevention tests that a node from the old chain cannot talk directly to a node in the new chain
@@ -80,15 +80,15 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
-	node1, address1 := suite.NodeFixture(node1key, rootID1, nil, false)
+	node1, id1 := suite.NodeFixture(node1key, rootID1, nil, false)
 	defer suite.StopNode(node1)
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
-	node2, address2 := suite.NodeFixture(node2key, rootID1, nil, false)
+	node2, id2 := suite.NodeFixture(node2key, rootID1, nil, false)
 
 	// create stream from node 2 to node 1
-	testOneToOneMessagingSucceeds(suite.T(), node2, address1)
+	testOneToOneMessagingSucceeds(suite.T(), node2, id1)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
@@ -99,15 +99,15 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	rootID2 := unittest.BlockFixture().ID().String()
 
 	// start node2 with the same address and root key but different root block id
-	node2, address2New := suite.NodeFixture(node2key, rootID2, nil, false, WithAddress(address2.Address))
+	node2, id2New := suite.NodeFixture(node2key, rootID2, nil, false, WithAddress(id2.Address))
 	defer suite.StopNode(node2)
 
 	// make sure the node2 indeed came up on the old ip and port
-	assert.Equal(suite.T(), address2New.Address, address2.Address)
+	assert.Equal(suite.T(), id2New.Address, id2.Address)
 
 	// attempt to create a stream from node 2 (new chain) to node 1 (old chain)
 	// this time it should fail since node 2 is listening on a different protocol
-	testOneToOneMessagingFails(suite.T(), node2, address1)
+	testOneToOneMessagingFails(suite.T(), node2, id1)
 }
 
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
@@ -124,7 +124,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2key := generateNetworkingKey(suite.T())
-	node2, addr2 := suite.NodeFixture(node2key, rootIDBeforeSpork, nil, false)
+	node2, id2 := suite.NodeFixture(node2key, rootIDBeforeSpork, nil, false)
 	defer suite.StopNode(node2)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -140,7 +140,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	require.NoError(suite.T(), err)
 
 	// add node 2 as a peer of node 1
-	err = node1.AddPeer(ctx, addr2)
+	err = node1.AddPeer(ctx, id2)
 	require.NoError(suite.T(), err)
 
 	// let the two nodes form the mesh
