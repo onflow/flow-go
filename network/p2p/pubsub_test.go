@@ -123,7 +123,7 @@ func (suite *PubSubTestSuite) TestPubSub() {
 		case res := <-ch:
 			recv[res] = true
 		case <-time.After(3 * time.Second):
-			missing := flow.IdentifierList{}
+			var missing flow.IdentifierList
 			for _, n := range nodes {
 				if _, found := recv[n.id]; !found {
 					missing = append(missing, n.id)

@@ -232,22 +232,17 @@ func (m *Middleware) chooseMode(_ string, _ *message.Message, targetIDs ...flow.
 	}
 }
 
-// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 // direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 // as the router.
 //
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-	// translates target identifier to identity
-	idMap, err := m.ov.Identity()
+	// translates identifier to identity
+	targetIdentity, err := m.identity(targetID)
 	if err != nil {
-		return fmt.Errorf("could not extract network identity map: %w", err)
-	}
-
-	targetIdentity, ok := idMap[targetID]
-	if !ok {
-		return fmt.Errorf("could not lookup identitifer in identity map of middleware: %x", targetID)
+		return fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
 	if msg.Size() > m.maxUnicastMsgSize {
@@ -267,7 +262,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// sent out the the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, targetIdentity)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %x :%w", targetID, err)
+		return fmt.Errorf("failed to create stream for %s :%w", targetID.String(), err)
 	}
 
 	// create a gogo protobuf writer
@@ -296,7 +291,6 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 
 // identity returns corresponding identity of an identifier based on overlay identity list.
 func (m *Middleware) identity(identifier flow.Identifier) (flow.Identity, error) {
-
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
 	if err != nil {
@@ -306,7 +300,7 @@ func (m *Middleware) identity(identifier flow.Identifier) (flow.Identity, error)
 	// retrieve the flow.Identity for the give flow.ID
 	flowIdentity, found := idsMap[identifier]
 	if !found {
-		return flow.Identity{}, fmt.Errorf("could not get node identity for %x: %w", identifier, err)
+		return flow.Identity{}, fmt.Errorf("could not get node identity for %s: %w", identifier.String(), err)
 	}
 
 	return flowIdentity, nil
