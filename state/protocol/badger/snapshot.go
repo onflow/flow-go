@@ -89,9 +89,10 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 }
 
 // validChild returns a child of the snapshot head that has been validated
-// by HotStuff, if such a child exists. Otherwise returns an error. Any valid
-// child may be returned. Subsequent calls are not guaranteed to return the
-// same child.
+// by HotStuff. Returns state.NoValidChildBlockError if no valid child exists.
+//
+// Any valid child may be returned. Subsequent calls are not guaranteed to
+// return the same child.
 func (s *Snapshot) validChild() (*flow.Header, error) {
 
 	var childIDs []flow.Identifier
