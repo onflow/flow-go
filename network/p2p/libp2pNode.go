@@ -239,7 +239,7 @@ func (n *Node) CreateStream(ctx context.Context, identity flow.Identity) (libp2p
 	return stream, nil
 }
 
-// tryCreateNewStream makes at most maxAttempts to create a stream with the target peer
+// tryCreateNewStream makes at most maxAttempts to create a stream with the identity.
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
 func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, maxAttempts int) (libp2pnet.Stream, error) {
@@ -310,7 +310,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 	return s, nil
 }
 
-// PeerAddressInfo generates the libp2p peer.AddrInfo for an identity given its node address
+// PeerAddressInfo generates the libp2p peer.AddrInfo for an identity given its node address.
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	ip, port, key, err := networkingInfo(identity)
 	if err != nil {
@@ -329,18 +329,6 @@ func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	}
 	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
 	return pInfo, err
-}
-
-func GetPeerInfos(identities flow.IdentityList) ([]peer.AddrInfo, error) {
-	peerInfos := make([]peer.AddrInfo, len(identities))
-	var err error
-	for i, identity := range identities {
-		peerInfos[i], err = PeerAddressInfo(*identity)
-		if err != nil {
-			return nil, fmt.Errorf("could not generate address info: %w", err)
-		}
-	}
-	return peerInfos, err
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
@@ -516,11 +504,17 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 
 // UpdateAllowList allows the peer allow list to be updated
 func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
-	whilelistPInfos, err := GetPeerInfos(identities)
-	if err != nil {
-		return fmt.Errorf("failed to create approved list of peers: %w", err)
+	// generates peer address information for all identities
+	whiteList := make([]peer.AddrInfo, len(identities))
+	var err error
+	for i, identity := range identities {
+		whiteList[i], err = PeerAddressInfo(*identity)
+		if err != nil {
+			return fmt.Errorf("could not generate address info: %w", err)
+		}
 	}
-	n.connGater.update(whilelistPInfos)
+
+	n.connGater.update(whiteList)
 	return nil
 }
 
