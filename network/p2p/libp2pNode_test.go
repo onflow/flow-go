@@ -3,7 +3,6 @@ package p2p
 import (
 	"bufio"
 	"context"
-	crand "crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -34,6 +33,7 @@ import (
 
 // Workaround for https://github.com/stretchr/testify/pull/808
 const tickForAssertEventually = 100 * time.Millisecond
+const defaultAddress = "0.0.0.0:0"
 
 var rootBlockID = unittest.IdentifierFixture().String()
 
@@ -66,25 +66,25 @@ func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 	key := generateNetworkingKey(suite.T())
 
 	tt := []struct {
-		identity     flow.Identity
+		identity     *flow.Identity
 		multiaddress string
 	}{
 		{ // ip4 test case
-			identity:     suite.IdentityFixture(key.PublicKey(), WithAddress("172.16.254.1:72")),
+			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("172.16.254.1:72")),
 			multiaddress: "/ip4/172.16.254.1/tcp/72",
 		},
 		{ // dns test case
-			identity:     suite.IdentityFixture(key.PublicKey(), WithAddress("consensus:2222")),
+			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("consensus:2222")),
 			multiaddress: "/dns4/consensus/tcp/2222",
 		},
 		{ // dns test case
-			identity:     suite.IdentityFixture(key.PublicKey(), WithAddress("flow.com:3333")),
+			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("flow.com:3333")),
 			multiaddress: "/dns4/flow.com/tcp/3333",
 		},
 	}
 
 	for _, tc := range tt {
-		ip, port, _, err := networkingInfo(tc.identity)
+		ip, port, _, err := networkingInfo(*tc.identity)
 		require.NoError(suite.T(), err)
 
 		actualAddress := MultiAddressStr(ip, port)
@@ -96,7 +96,7 @@ func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 	// creates a single
 	key := generateNetworkingKey(suite.T())
-	node, _ := suite.NodeFixture(key, rootBlockID, nil, false)
+	node, _ := suite.NodeFixture(key, rootBlockID, nil, false, defaultAddress)
 
 	// stops the created node
 	done, err := node.Stop()
@@ -112,15 +112,15 @@ func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 		key := generateNetworkingKey(suite.T())
 
 		// creates node-i identity
-		identity := suite.IdentityFixture(key.PublicKey(), WithAddress("1.1.1.1:0"))
+		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
-		info, err := PeerAddressInfo(identity)
+		info, err := PeerAddressInfo(*identity)
 		require.NoError(suite.T(), err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			rinfo, err := PeerAddressInfo(identity)
+			rinfo, err := PeerAddressInfo(*identity)
 			require.NoError(suite.T(), err)
 			assert.True(suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
 		}
@@ -570,7 +570,7 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler network.Stream
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
 		key := generateNetworkingKey(suite.T())
-		node, identity := suite.NodeFixture(key, rootBlockID, handler, allowList)
+		node, identity := suite.NodeFixture(key, rootBlockID, handler, allowList, defaultAddress)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
@@ -579,10 +579,9 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler network.Stream
 
 // NodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func (suite *LibP2PNodeTestSuite) NodeFixture(key fcrypto.PrivateKey, rootID string, handler network.StreamHandler, allowList bool,
-	opts ...func(*flow.Identity)) (*Node, flow.Identity) {
+func (suite *LibP2PNodeTestSuite) NodeFixture(key fcrypto.PrivateKey, rootID string, handler network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
 
-	identity := suite.IdentityFixture(key.PublicKey(), opts...)
+	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
 
 	var handlerFunc network.StreamHandler
 	if handler != nil {
@@ -614,35 +613,7 @@ func (suite *LibP2PNodeTestSuite) NodeFixture(key fcrypto.PrivateKey, rootID str
 	require.NoError(suite.T(), err)
 	identity.Address = ip + ":" + port
 
-	return n, identity
-}
-
-func WithAddress(address string) func(*flow.Identity) {
-	return func(identity *flow.Identity) {
-		identity.Address = address
-	}
-}
-
-// IdentityFixture creates a node identity with default networking setup, and the given key.
-func (suite *LibP2PNodeTestSuite) IdentityFixture(key fcrypto.PublicKey, opts ...func(*flow.Identity)) flow.Identity {
-	id := flow.Identifier{}
-	_, _ = crand.Read(id[:])
-
-	identity := &flow.Identity{
-		NodeID:        id,
-		Address:       "0.0.0.0:0",
-		Role:          0,
-		Stake:         0,
-		Ejected:       false,
-		StakingPubKey: nil,
-		NetworkPubKey: key,
-	}
-
-	for _, opt := range opts {
-		opt(identity)
-	}
-
-	return *identity
+	return n, *identity
 }
 
 // StopNodes stop all nodes in the input slice
@@ -698,8 +669,8 @@ func (suite *LibP2PNodeTestSuite) silentNodeFixture() (net.Listener, flow.Identi
 	ip, port, err := IPPortFromMultiAddress(addrs...)
 	require.NoError(suite.T(), err)
 
-	identity := suite.IdentityFixture(key.PublicKey(), WithAddress(ip+":"+port))
-	return lst, identity
+	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(ip+":"+port))
+	return lst, *identity
 }
 
 func (suite *LibP2PNodeTestSuite) acceptAndHang(l net.Listener) {
