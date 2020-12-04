@@ -294,22 +294,22 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	return nil
 }
 
-// nodeAddressFromID returns the libp2p.NodeAddress for the given flow.id.
-func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) {
+// identity returns corresponding identity of an identifier based on overlay identity list.
+func (m *Middleware) identity(identifier flow.Identifier) (flow.Identity, error) {
 
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
 	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not get identities: %w", err)
+		return flow.Identity{}, fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// retrieve the flow.Identity for the give flow.ID
-	flowIdentity, found := idsMap[id]
+	flowIdentity, found := idsMap[identifier]
 	if !found {
-		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
+		return flow.Identity{}, fmt.Errorf("could not get node identity for %x: %w", identifier, err)
 	}
 
-	return NodeAddressFromIdentity(flowIdentity)
+	return flowIdentity, nil
 }
 
 // identityList translates an identity map into an identity list.
@@ -432,12 +432,12 @@ func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 
 // Ping pings the target node and returns the ping RTT or an error
 func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
-	nodeAddress, err := m.nodeAddressFromID(targetID)
+	targetIdentity, err := m.identity(targetID)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
-	return m.libP2PNode.Ping(m.ctx, nodeAddress)
+	return m.libP2PNode.Ping(m.ctx, targetIdentity)
 }
 
 // UpdateAllowList fetches the most recent identity of the nodes from overlay
