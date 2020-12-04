@@ -350,13 +350,13 @@ func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	return pInfo, err
 }
 
-func GetPeerInfos(addrs ...NodeAddress) ([]peer.AddrInfo, error) {
-	peerInfos := make([]peer.AddrInfo, len(addrs))
+func GetPeerInfos(identities flow.IdentityList) ([]peer.AddrInfo, error) {
+	peerInfos := make([]peer.AddrInfo, len(identities))
 	var err error
-	for i, addr := range addrs {
-		peerInfos[i], err = GetPeerInfo(addr)
+	for i, identity := range identities {
+		peerInfos[i], err = PeerAddressInfo(*identity)
 		if err != nil {
-			return []peer.AddrInfo{}, err
+			return nil, fmt.Errorf("could not generate address info: %w", err)
 		}
 	}
 	return peerInfos, err
@@ -543,9 +543,9 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-// UpdateAllowlist allows the peer allowlist to be updated
-func (n *Node) UpdateAllowlist(allowListAddrs ...NodeAddress) error {
-	whilelistPInfos, err := GetPeerInfos(allowListAddrs...)
+// UpdateAllowList allows the peer allow list to be updated
+func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
+	whilelistPInfos, err := GetPeerInfos(identities)
 	if err != nil {
 		return fmt.Errorf("failed to create approved list of peers: %w", err)
 	}

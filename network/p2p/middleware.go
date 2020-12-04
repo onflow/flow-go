@@ -140,12 +140,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// derive all node addresses from flow identities. Those node address will serve as the network whitelist
-	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
-	if err != nil {
-		return fmt.Errorf("could not derive list of approved peer list: %w", err)
-	}
-	err = m.libP2PNode.UpdateAllowlist(nodeAddrsWhiteList...)
+	err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
 	if err != nil {
 		return fmt.Errorf("could not update approved peer list: %w", err)
 	}
@@ -317,17 +312,17 @@ func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) 
 	return NodeAddressFromIdentity(flowIdentity)
 }
 
-func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {
-	var nodeAddrs []NodeAddress
+// identityList translates an identity map into an identity list.
+func identityList(identityMap map[flow.Identifier]flow.Identity) flow.IdentityList {
+	var identities flow.IdentityList
 	for _, identity := range identityMap {
-		nodeAddress, err := NodeAddressFromIdentity(identity)
-		if err != nil {
-			return nil, err
-		}
+		// casts identity into a local variable to
+		// avoid shallow copy of the loop variable
+		id := identity
+		identities = append(identities, &id)
 
-		nodeAddrs = append(nodeAddrs, nodeAddress)
 	}
-	return nodeAddrs, nil
+	return identities
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -454,14 +449,8 @@ func (m *Middleware) UpdateAllowList() error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// derive all node addresses from flow identities
-	nodeAddrsAllowList, err := nodeAddresses(idsMap)
-	if err != nil {
-		return fmt.Errorf("could not derive list of approved peer list: %w", err)
-	}
-
 	// update libp2pNode's approve lists
-	err = m.libP2PNode.UpdateAllowlist(nodeAddrsAllowList...)
+	err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
 	}
