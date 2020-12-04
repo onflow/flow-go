@@ -198,10 +198,10 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 	count := 2
 
 	// Creates nodes
-	nodes, addrs := suite.NodesFixture(count, nil, false)
+	nodes, identities := suite.NodesFixture(count, nil, false)
 	defer suite.StopNodes(nodes)
 
-	address2 := addrs[1]
+	id2 := identities[1]
 
 	flowProtocolID := generateProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
@@ -210,7 +210,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
 	for i := 0; i < 100; i++ {
-		anotherStream, err := nodes[0].CreateStream(context.Background(), *address2)
+		anotherStream, err := nodes[0].CreateStream(context.Background(), *id2)
 		// Assert that a stream was returned without error
 		require.NoError(suite.T(), err)
 		require.NotNil(suite.T(), anotherStream)
@@ -250,16 +250,16 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 		ch <- str
 	}
 
-	// Creates peers
-	peers, addrs := suite.NodesFixture(count, handler, false)
-	defer suite.StopNodes(peers)
-	require.Len(suite.T(), addrs, count)
+	// Creates nodes
+	nodes, identities := suite.NodesFixture(count, handler, false)
+	defer suite.StopNodes(nodes)
+	require.Len(suite.T(), identities, count)
 
-	addr1 := addrs[0]
-	addr2 := addrs[1]
+	id1 := *identities[0]
+	id2 := *identities[1]
 
 	// Create stream from node 1 to node 2
-	s1, err := peers[0].CreateStream(context.Background(), *addr2)
+	s1, err := nodes[0].CreateStream(context.Background(), id2)
 	assert.NoError(suite.T(), err)
 	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
 
@@ -280,7 +280,7 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 
 	// Create stream from node 2 to node 1
-	s2, err := peers[1].CreateStream(context.Background(), *addr1)
+	s2, err := nodes[1].CreateStream(context.Background(), id1)
 	assert.NoError(suite.T(), err)
 	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
 
