@@ -3,9 +3,6 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/module/validation"
 	"testing"
 	"time"
 
@@ -37,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -48,8 +46,10 @@ import (
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"

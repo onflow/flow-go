@@ -1123,7 +1123,7 @@ func TestExtendReceiptsValid(t *testing.T) {
 // Also tests that appropriate epoch transition events are fired.
 func TestExtendEpochTransitionValid(t *testing.T) {
 
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	util.RunWithProtocolState(t, func(db *badger.DB, s *protocol.State) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()

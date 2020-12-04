@@ -1,13 +1,15 @@
 package validation
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	mock2 "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 func TestReceiptValidator(t *testing.T) {
