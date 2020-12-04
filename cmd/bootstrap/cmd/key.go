@@ -118,7 +118,7 @@ func validateAddressFormat(address string) {
 	checkErr(err)
 
 	// create a libp2p address from the ip and port
-	lp2pAddr := p2p.Multiaddress(ip, port)
+	lp2pAddr := p2p.MultiAddressStr(ip, port)
 	_, err = multiaddr.NewMultiaddr(lp2pAddr)
 	checkErr(err)
 }

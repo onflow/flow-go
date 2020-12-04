@@ -87,7 +87,7 @@ func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 		ip, port, _, err := networkingInfo(tc.identity)
 		require.NoError(suite.T(), err)
 
-		actualAddress := Multiaddress(ip, port)
+		actualAddress := MultiAddressStr(ip, port)
 		assert.Equal(suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 

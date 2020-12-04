@@ -317,7 +317,7 @@ func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 		return peer.AddrInfo{}, fmt.Errorf("could not get translate identity to networking info %s: %w", identity.NodeID.String(), err)
 	}
 
-	addr := Multiaddress(ip, port)
+	addr := MultiAddressStr(ip, port)
 	maddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return peer.AddrInfo{}, err
@@ -421,7 +421,7 @@ func (n *Node) Publish(ctx context.Context, topic string, data []byte) error {
 func (n *Node) Ping(ctx context.Context, identity flow.Identity) (time.Duration, error) {
 
 	pingError := func(err error) (time.Duration, error) {
-		return -1, fmt.Errorf("failed to ping %x (%s): %w", identity.NodeID, identity.Address, err)
+		return -1, fmt.Errorf("failed to ping %s (%s): %w", identity.NodeID.String(), identity.Address, err)
 	}
 
 	// convert the target node address to libp2p peer info
@@ -455,12 +455,12 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (time.Duration,
 	}
 }
 
-// Multiaddress receives a node ip and port and returns
-// its corresponding Libp2p Multiaddress in string format
+// MultiAddressStr receives a node ip and port and returns
+// its corresponding Libp2p MultiAddressStr in string format
 // in current implementation IP part of the node address is
-// either an IP or a dns4
+// either an IP or a dns4.
 // https://docs.libp2p.io/concepts/addressing/
-func Multiaddress(ip, port string) string {
+func MultiAddressStr(ip, port string) string {
 	parsedIP := net.ParseIP(ip)
 	if parsedIP != nil {
 		// returns parsed ip version of the multi-address
@@ -502,7 +502,7 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-// UpdateAllowList allows the peer allow list to be updated
+// UpdateAllowList allows the peer allow list to be updated.
 func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	// generates peer address information for all identities
 	whiteList := make([]peer.AddrInfo, len(identities))
@@ -562,7 +562,7 @@ func bootstrapLibP2PHost(ctx context.Context,
 		return nil, nil, nil, fmt.Errorf("could not split node address %s:%w", address, err)
 	}
 
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(Multiaddress(ip, port))
+	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiAddressStr(ip, port))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}
