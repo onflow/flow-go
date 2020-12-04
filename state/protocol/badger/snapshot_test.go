@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	staterr "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -149,6 +150,7 @@ func TestQuorumCertificate(t *testing.T) {
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Error(t, err)
+			assert.True(t, staterr.IsNoValidChildBlockError(err))
 
 			_, err = state.AtBlockID(block1.ID()).Seed(1, 2, 3, 4)
 			assert.Error(t, err)
@@ -178,9 +180,11 @@ func TestQuorumCertificate(t *testing.T) {
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Error(t, err)
+			assert.True(t, staterr.IsNoValidChildBlockError(err))
 
 			_, err = state.AtBlockID(block1.ID()).Seed(1, 2, 3, 4)
 			assert.Error(t, err)
+			assert.True(t, staterr.IsNoValidChildBlockError(err))
 		})
 	})
 
