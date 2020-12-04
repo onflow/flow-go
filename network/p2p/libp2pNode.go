@@ -199,10 +199,10 @@ func (n *Node) Stop() (chan struct{}, error) {
 }
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
-func (n *Node) AddPeer(ctx context.Context, address NodeAddress) error {
-	pInfo, err := GetPeerInfo(address)
+func (n *Node) AddPeer(ctx context.Context, identity flow.Identity) error {
+	pInfo, err := PeerAddressInfo(identity)
 	if err != nil {
-		return fmt.Errorf("failed to add peer %s: %w", address.Name, err)
+		return fmt.Errorf("failed to add peer %x: %w", identity.NodeID, err)
 	}
 
 	err = n.host.Connect(ctx, pInfo)
@@ -213,16 +213,16 @@ func (n *Node) AddPeer(ctx context.Context, address NodeAddress) error {
 	return nil
 }
 
-// RemovePeer closes the connection with the peer
-func (n *Node) RemovePeer(ctx context.Context, peer NodeAddress) error {
-	pInfo, err := GetPeerInfo(peer)
+// RemovePeer closes the connection with the identity.
+func (n *Node) RemovePeer(ctx context.Context, identity flow.Identity) error {
+	pInfo, err := PeerAddressInfo(identity)
 	if err != nil {
-		return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
+		return fmt.Errorf("failed to remove peer %x: %w", identity, err)
 	}
 
 	err = n.host.Network().ClosePeer(pInfo.ID)
 	if err != nil {
-		return fmt.Errorf("failed to remove peer %s: %w", peer.Name, err)
+		return fmt.Errorf("failed to remove peer %s: %w", identity, err)
 	}
 	return nil
 }
@@ -278,12 +278,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
-		// add node address as a peer
-		targetAddress, err := NodeAddressFromIdentity(identity)
-		if err != nil {
-			return nil, err
-		}
-		err = n.AddPeer(ctx, targetAddress)
+		err = n.AddPeer(ctx, identity)
 		if err != nil {
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
@@ -443,14 +438,14 @@ func (n *Node) Publish(ctx context.Context, topic string, data []byte) error {
 }
 
 // Ping pings a remote node and returns the time it took to ping the remote node if successful or the error
-func (n *Node) Ping(ctx context.Context, target NodeAddress) (time.Duration, error) {
+func (n *Node) Ping(ctx context.Context, identity flow.Identity) (time.Duration, error) {
 
 	pingError := func(err error) (time.Duration, error) {
-		return -1, fmt.Errorf("failed to ping %s (%s:%s): %w", target.Name, target.IP, target.Port, err)
+		return -1, fmt.Errorf("failed to ping %x (%s): %w", identity.NodeID, identity.Address, err)
 	}
 
 	// convert the target node address to libp2p peer info
-	targetInfo, err := GetPeerInfo(target)
+	targetInfo, err := PeerAddressInfo(identity)
 	if err != nil {
 		return pingError(err)
 	}
