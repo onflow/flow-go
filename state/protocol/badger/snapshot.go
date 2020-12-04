@@ -56,11 +56,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
 
-	head, err := s.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get head: %w", err)
-	}
-	if head.Height == root.Height {
+	if s.blockID == root.ID() {
 		// TODO store root QC and return here
 		return nil, fmt.Errorf("root qc not stored")
 	}
@@ -74,6 +70,12 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	// sanity check: ensure the child has the snapshot block as parent
 	if child.ParentID != s.blockID {
 		return nil, fmt.Errorf("child parent id (%x) does not match snapshot id (%x)", child.ParentID, s.blockID)
+	}
+
+	// retrieve the full header as we need the view for the quorum certificate
+	head, err := s.Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get head: %w", err)
 	}
 
 	qc := &flow.QuorumCertificate{
@@ -181,7 +183,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		if err != nil {
 			return nil, fmt.Errorf("could not get root block: %w", err)
 		}
-		if first.Height == root.Height {
+		if first.ID() == root.ID() {
 			break
 		}
 
@@ -382,7 +384,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	if err != nil {
 		return NewInvalidEpoch(err)
 	}
-	if first.Height == root.Height {
+	if first.ID() == root.ID() {
 		return NewInvalidEpoch(protocol.ErrNoPreviousEpoch)
 	}
 
