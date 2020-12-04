@@ -647,15 +647,18 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler network.Stream
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := suite.NodeFixture(rootBlockID, handler, allowList)
+		key := generateNetworkingKey(suite.T())
+		node, identity := suite.NodeFixture(key, rootBlockID, handler, allowList)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
 	return nodes, identities
 }
 
-func (suite *LibP2PNodeTestSuite) NodeFixture(rootID string, handler network.StreamHandler, allowList bool) (*Node, flow.Identity) {
-	identity, key := suite.IdentityFixture()
+func (suite *LibP2PNodeTestSuite) NodeFixture(key fcrypto.PrivateKey, rootID string, handler network.StreamHandler, allowList bool,
+	opts ...func(*flow.Identity)) (*Node, flow.Identity) {
+
+	identity := suite.IdentityFixture(key.PublicKey(), opts...)
 
 	var handlerFunc network.StreamHandler
 	if handler != nil {
@@ -690,21 +693,32 @@ func (suite *LibP2PNodeTestSuite) NodeFixture(rootID string, handler network.Str
 	return n, identity
 }
 
+func WithAddress(address string) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Address = address
+	}
+}
+
 // IdentityFixture creates a node identity with default networking setup.
-func (suite *LibP2PNodeTestSuite) IdentityFixture() (flow.Identity, fcrypto.PrivateKey) {
+func (suite *LibP2PNodeTestSuite) IdentityFixture(key fcrypto.PublicKey, opts ...func(*flow.Identity)) flow.Identity {
 	id := flow.Identifier{}
 	_, _ = crand.Read(id[:])
-	key := generateNetworkingKey(suite.T())
 
-	return flow.Identity{
+	identity := &flow.Identity{
 		NodeID:        id,
 		Address:       "0.0.0.0:0",
 		Role:          0,
 		Stake:         0,
 		Ejected:       false,
 		StakingPubKey: nil,
-		NetworkPubKey: key.PublicKey(),
-	}, key
+		NetworkPubKey: key,
+	}
+
+	for _, opt := range opts {
+		opt(identity)
+	}
+
+	return *identity
 }
 
 // StopNodes stop all nodes in the input slice
