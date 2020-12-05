@@ -37,7 +37,7 @@ func (il IdentifierList) Swap(i, j int) {
 	il[j], il[i] = il[i], il[j]
 }
 
-func (il IdentifierList) String() []string {
+func (il IdentifierList) Strings() []string {
 	var list []string
 	for _, id := range il {
 		list = append(list, id.String())

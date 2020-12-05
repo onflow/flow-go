@@ -129,7 +129,7 @@ func (suite *PubSubTestSuite) TestPubSub() {
 					missing = append(missing, n.id)
 				}
 			}
-			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing.String(), ","))
+			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing.Strings(), ","))
 			break
 		}
 	}
