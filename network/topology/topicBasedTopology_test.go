@@ -222,7 +222,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 
 	// check that each of the collection clusters forms a connected graph
 	for _, cluster := range suite.clusters {
-		suite.checkConnectednessByCluster(suite.T(), channelIDAdjMap, cluster)
+		checkConnectednessByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
 	}
 }
 
@@ -243,7 +243,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_UnconditionalSampling
 	require.Equal(suite.T(), len(sample), expectedFanout)
 
 	// checks sample does not include any duplicate
-	suite.uniquenessCheck(sample)
+	uniquenessCheck(suite.T(), sample)
 }
 
 // TestLinearFanout_ConditionalSampling evaluates that sampling a connected graph fanout with a shouldHave set
@@ -266,7 +266,7 @@ func (suite *TopicAwareTopologyTestSuite) TestLinearFanout_ConditionalSampling()
 	require.Equal(suite.T(), len(sample), expectedFanout)
 
 	// checks sample does not include any duplicate
-	suite.uniquenessCheck(sample)
+	uniquenessCheck(suite.T(), sample)
 
 	// checks inclusion of all shouldHave ones into sample
 	for _, id := range shouldHave {
@@ -425,41 +425,4 @@ func (suite *TopicAwareTopologyTestSuite) TestSubsetRoleConnectedness_Unconditio
 
 	// evaluates connectedness of consensus nodes graph.
 	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.HasRole(flow.RoleConsensus))
-}
-
-// uniquenessCheck is a test helper method that fails the test if all include any duplicate identity.
-func (suite *TopicAwareTopologyTestSuite) uniquenessCheck(ids flow.IdentityList) {
-	seen := make(map[flow.Identifier]struct{})
-	for _, id := range ids {
-		// checks if id is duplicate in ids list
-		_, ok := seen[id.NodeID]
-		require.False(suite.T(), ok)
-
-		// marks id as seen
-		seen[id.NodeID] = struct{}{}
-	}
-}
-
-// clusterChannelIDs is a test helper method that returns all cluster-based channel ids.
-func clusterChannelIDs(t *testing.T) []string {
-	ccids := make([]string, 0)
-	for _, channelID := range engine.ChannelIDs() {
-		if _, ok := engine.IsClusterChannelID(channelID); !ok {
-			continue
-		}
-		ccids = append(ccids, channelID)
-	}
-
-	require.NotEmpty(t, ccids)
-	return ccids
-}
-
-// checkConnectednessByCluster is a test helper that checks all nodes belong to a cluster are connected.
-func (suite *TopicAwareTopologyTestSuite) checkConnectednessByCluster(t *testing.T,
-	adjMap map[flow.Identifier]flow.IdentityList,
-	cluster flow.IdentityList) {
-	CheckGraphConnected(t,
-		adjMap,
-		suite.all,
-		filter.In(cluster))
 }

@@ -5,7 +5,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -68,7 +67,7 @@ func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityL
 	dfs(startID, adjMap, visited, f)
 
 	// assert that expected number of nodes were visited by DFS
-	assert.Equal(t, expectedCount, len(visited))
+	require.Equal(t, expectedCount, len(visited))
 }
 
 // MockSubscriptionManager returns a list of mocked subscription manages for the input
@@ -136,4 +135,42 @@ func dfs(currentID flow.Identifier,
 	for _, id := range adjMap[currentID].Filter(filter) {
 		dfs(id.NodeID, adjMap, visited, filter)
 	}
+}
+
+// uniquenessCheck is a test helper method that fails the test if all include any duplicate identity.
+func uniquenessCheck(t *testing.T, ids flow.IdentityList) {
+	seen := make(map[flow.Identity]struct{})
+	for _, id := range ids {
+		// checks if id is duplicate in ids list
+		_, ok := seen[*id]
+		require.False(t, ok)
+
+		// marks id as seen
+		seen[*id] = struct{}{}
+	}
+}
+
+// clusterChannelIDs is a test helper method that returns all cluster-based channel ids.
+func clusterChannelIDs(t *testing.T) []string {
+	ccids := make([]string, 0)
+	for _, channelID := range engine.ChannelIDs() {
+		if _, ok := engine.IsClusterChannelID(channelID); !ok {
+			continue
+		}
+		ccids = append(ccids, channelID)
+	}
+
+	require.NotEmpty(t, ccids)
+	return ccids
+}
+
+// checkConnectednessByCluster is a test helper that checks all nodes belong to a cluster are connected.
+func checkConnectednessByCluster(t *testing.T,
+	adjMap map[flow.Identifier]flow.IdentityList,
+	all flow.IdentityList,
+	cluster flow.IdentityList) {
+	CheckGraphConnected(t,
+		adjMap,
+		all,
+		filter.In(cluster))
 }
