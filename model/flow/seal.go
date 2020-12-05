@@ -14,13 +14,15 @@ type Seal struct {
 // encodable with RLP
 func (s Seal) Body() interface{} {
 	return struct {
-		BlockID    Identifier
-		ResultID   Identifier
-		FinalState StateCommitment
+		BlockID                Identifier
+		ResultID               Identifier
+		FinalState             StateCommitment
+		AggregatedApprovalSigs []AggregatedSignature
 	}{
-		BlockID:    s.BlockID,
-		ResultID:   s.ResultID,
-		FinalState: s.FinalState,
+		BlockID:                s.BlockID,
+		ResultID:               s.ResultID,
+		FinalState:             s.FinalState,
+		AggregatedApprovalSigs: s.AggregatedApprovalSigs,
 	}
 }
 
