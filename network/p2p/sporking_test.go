@@ -56,7 +56,7 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// stop node 2 and start it again with a different networking key but on the same IP and port
 	suite.StopNode(node2)
 
-	// start node2 with the same name, ip a`nd port but with the new key
+	// start node2 with the same name, ip and port but with the new key
 	node2keyNew := generateNetworkingKey(suite.T())
 	assert.False(suite.T(), node2key.Equals(node2keyNew))
 	node2, id2New := suite.NodeFixture(node2keyNew, rootBlockID, nil, false, id2.Address)
