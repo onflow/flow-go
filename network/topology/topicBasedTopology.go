@@ -27,7 +27,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier,
 	logger zerolog.Logger,
 	state protocol.ReadOnlyState,
 	subMngr network.SubscriptionManager) (*TopicBasedTopology, error) {
-	seed, err := seedFromID(nodeID)
+	seed, err := intSeedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)
 	}
