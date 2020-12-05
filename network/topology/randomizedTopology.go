@@ -42,14 +42,15 @@ func NewRandomizedTopology(nodeID flow.Identifier, edgeProb float64, state proto
 		return nil, fmt.Errorf("could not generate random number generator: %w", err)
 	}
 
-	return &RandomizedTopology{
+	t := &RandomizedTopology{
 		me:      nodeID,
 		state:   state,
 		subMngr: subMngr,
 		chance:  uint64(100 * edgeProb),
 		rng:     rng,
-	}, nil
+	}
 
+	return t, nil
 }
 
 // GenerateFanout receives IdentityList of entire network and constructs the fanout IdentityList
@@ -88,10 +89,13 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 // Returned identities should all subscribed to the specified `channel`.
 // Note: this method should not include identity of its executor.
 func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel string) (flow.IdentityList, error) {
+	// excludes node itself
+	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.me)))
+
 	if _, ok := engine.IsClusterChannelID(channel); ok {
-		return r.clusterChannelHandler(ids)
+		return r.clusterChannelHandler(sampleSpace)
 	} else {
-		return r.nonClusterChannelHandler(ids, channel)
+		return r.nonClusterChannelHandler(sampleSpace, channel)
 	}
 }
 
@@ -139,6 +143,9 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", r.me.String(), err)
 	}
 
+	// excludes node itself from cluster
+	clusterPeers = clusterPeers.Filter(filter.Not(filter.HasNodeID(r.me)))
+
 	// checks all cluster peers belong to the passed ids list
 	nonMembers := clusterPeers.Filter(filter.Not(filter.In(ids)))
 	if len(nonMembers) > 0 {
@@ -168,7 +175,8 @@ func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, chan
 
 // tossBiasedBit returns true with probability equal `r.chance/100`, and returns false otherwise.
 func (r *RandomizedTopology) tossBiasedBit() bool {
-	if r.rng.UintN(100) <= r.chance {
+	draw := r.rng.UintN(100)
+	if draw < r.chance {
 		return true
 	} else {
 		return false
