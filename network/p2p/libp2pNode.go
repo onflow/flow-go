@@ -203,7 +203,7 @@ func (n *Node) Stop() (chan struct{}, error) {
 func (n *Node) AddPeer(ctx context.Context, identity flow.Identity) error {
 	pInfo, err := PeerAddressInfo(identity)
 	if err != nil {
-		return fmt.Errorf("failed to add peer %x: %w", identity.NodeID, err)
+		return fmt.Errorf("failed to add peer %s: %w", identity.String(), err)
 	}
 
 	err = n.host.Connect(ctx, pInfo)
