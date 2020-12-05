@@ -95,20 +95,6 @@ func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 	return filteredStreams
 }
 
-// PeerInfoFromID converts the flow.Identity to peer.AddrInfo.
-// A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
-// flow.Identity           ---> peer.AddrInfo
-//    |-- Address          --->   |-- []multiaddr.Multiaddr
-//    |-- NetworkPublicKey --->   |-- ID
-func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
-	addr, err := PeerAddressInfo(id)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
-	}
-
-	return addr, nil
-}
-
 // networkingInfo returns ip, port, libp2p public key of the identity.
 func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
 	// split the node address into ip and port
@@ -178,6 +164,10 @@ func generateProtocolID(rootBlockID string) protocol.ID {
 }
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for an identity given its node address.
+// A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
+// flow.Identity           ---> peer.AddrInfo
+//    |-- Address          --->   |-- []multiaddr.Multiaddr
+//    |-- NetworkPublicKey --->   |-- ID
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	ip, port, key, err := networkingInfo(identity)
 	if err != nil {
