@@ -89,17 +89,17 @@ func main() {
 				"how many additional cluster members we propagate transactions to")
 			flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 1_000_000,
 				"the maximum address index allowed in transactions")
-			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 25,
+			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 				"expiry buffer for transactions in proposed collections")
-			flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", 0, // no rate limiting
+			flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
 				"rate limit for each payer (transactions/collection)")
 			flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
 				"set of payer addresses which are omitted from rate limiting")
-			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 200,
+			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", builder.DefaultMaxCollectionSize,
 				"maximum number of transactions in proposed collections")
-			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", 1750000,
+			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", builder.DefaultMaxCollectionByteSize,
 				"maximum byte size of the proposed collection")
-			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", 1000000,
+			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", builder.DefaultMaxCollectionTotalGas,
 				"maximum total amount of maxgas of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
 				"the initial timeout for the hotstuff pacemaker")
