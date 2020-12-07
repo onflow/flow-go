@@ -1,28 +1,26 @@
 package factories
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/cluster"
 	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	hotmetrics "github.com/onflow/flow-go/module/metrics/hotstuff"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
-	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -54,43 +52,38 @@ func NewHotStuffFactory(
 }
 
 func (f *HotStuffFactory) Create(
-	clusterID flow.ChainID,
-	cluster flow.IdentityList,
+	epoch protocol.Epoch,
+	cluster protocol.Cluster,
 	clusterState cluster.State,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
-	seed []byte,
 	builder module.Builder,
 	updater module.Finalizer,
 	communicator hotstuff.Communicator,
-	rootHeader *flow.Header,
-	rootQC *flow.QuorumCertificate,
 ) (*hotstuff.EventLoop, error) {
 
 	// setup metrics/logging with the new chain ID
-	metrics := metrics.NewHotstuffCollector(clusterID)
+	metrics := metrics.NewHotstuffCollector(cluster.ChainID())
 	notifier := pubsub.NewDistributor()
 	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
-	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, clusterID))
+	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
 	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
-	selector := filter.And(filter.In(cluster), filter.HasStake(true))
-	translator := clusterkv.NewTranslator(payloads, f.protoState)
-	selection, err := committee.ComputeLeaderSelectionFromSeed(rootHeader.View, seed, leader.EstimatedSixMonthOfViews, cluster)
+	var committee hotstuff.Committee
+	var err error
+	committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create cluster committee: %w", err)
 	}
-
-	clusterCommittee := committee.New(f.protoState, translator, f.me.NodeID(), selector, cluster.NodeIDs(), selection)
-	clusterCommittee = committee.NewMetricsWrapper(clusterCommittee, metrics) // wrapper for measuring time spent determining consensus committee relations
+	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
 	staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, f.me)
-	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(clusterCommittee, staking, f.me.NodeID())
+	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(committee, staking, f.me.NodeID())
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
-	persist := persister.New(f.db, clusterID)
+	persist := persister.New(f.db, cluster.ChainID())
 
 	finalized, pending, err := recovery.FindLatest(clusterState, headers)
 	if err != nil {
@@ -102,14 +95,14 @@ func (f *HotStuffFactory) Create(
 		notifier,
 		metrics,
 		headers,
-		clusterCommittee,
+		committee,
 		builder,
 		updater,
 		persist,
 		signer,
 		communicator,
-		rootHeader,
-		rootQC,
+		cluster.RootBlock().Header,
+		cluster.RootQC(),
 		finalized,
 		pending,
 		f.opts...,

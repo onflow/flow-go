@@ -12,12 +12,6 @@ type Payload struct {
 	// Collection is the collection being created.
 	Collection flow.Collection
 
-	// ReferenceEpoch is the epoch counter to use as reference. This is only
-	// valid for root blocks, since these are generated in advance of a reference
-	// block being available.
-	// TODO needs more thought: https://github.com/dapperlabs/flow-go/issues/4655
-	ReferenceEpoch uint64
-
 	// ReferenceBlockID is the ID of a reference block on the main chain. It
 	// is defined as the ID of the reference block with the lowest height
 	// from all transactions within the collection.
@@ -25,6 +19,11 @@ type Payload struct {
 	// This determines when the collection expires, using the same expiry rules
 	// as transactions. It is also used as the reference point for committee
 	// state (staking, etc.) when validating the containing block.
+	//
+	// The root block of a cluster chain has an empty reference block ID, as it
+	// is created in advance of its members (necessarily) being staked network
+	// members. It is invalid for any non-root block to have an empty reference
+	// block ID.
 	ReferenceBlockID flow.Identifier
 }
 

@@ -603,11 +603,11 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	block3 := unittest.BlockWithParentFixture(block2.Header)
 
-	blocks.On("ByHeight", block1.Header.Height).Return(&block1, nil)
-	blocks.On("ByHeight", block2.Header.Height).Return(&block2, nil)
+	blocks.On("ByHeightFrom", block1.Header.Height, block1.Header).Return(block1.Header, nil)
+	blocks.On("ByHeightFrom", block2.Header.Height, block1.Header).Return(block2.Header, nil)
 
 	type logPanic struct{}
-	blocks.On("ByHeight", block3.Header.Height).Run(func(args mock.Arguments) { panic(logPanic{}) })
+	blocks.On("ByHeightFrom", block3.Header.Height, block1.Header).Run(func(args mock.Arguments) { panic(logPanic{}) })
 
 	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.Header))
 

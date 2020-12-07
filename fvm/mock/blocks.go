@@ -13,22 +13,22 @@ type Blocks struct {
 	mock.Mock
 }
 
-// ByHeight provides a mock function with given fields: height
-func (_m *Blocks) ByHeight(height uint64) (*flow.Block, error) {
-	ret := _m.Called(height)
+// ByHeightFrom provides a mock function with given fields: height, header
+func (_m *Blocks) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
+	ret := _m.Called(height, header)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(uint64) *flow.Block); ok {
-		r0 = rf(height)
+	var r0 *flow.Header
+	if rf, ok := ret.Get(0).(func(uint64, *flow.Header) *flow.Header); ok {
+		r0 = rf(height, header)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(*flow.Header)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint64) error); ok {
-		r1 = rf(height)
+	if rf, ok := ret.Get(1).(func(uint64, *flow.Header) error); ok {
+		r1 = rf(height, header)
 	} else {
 		r1 = ret.Error(1)
 	}

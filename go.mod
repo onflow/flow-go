@@ -33,17 +33,12 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	// pinned to https://github.com/onflow/cadence/commit/3ab62fe974547aba6fa4e8e102d16c3f0f4ecdf3
-	// replace with tag before merging feature branch to master
 	github.com/onflow/cadence v0.10.3
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.1.1-0.20201002123512-35d751ebea1d
-	// pinned to https://github.com/onflow/flow-go-sdk/tree/janez/storage-fees
-	// replace with tag before merging feature branch to master
-	github.com/onflow/flow-go-sdk v0.12.1
-	github.com/onflow/flow-go/crypto v0.9.4
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.3.1-0.20201122012505-4061d358b8db
+	github.com/onflow/flow-go-sdk v0.12.2
+	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/tsdb v0.7.1

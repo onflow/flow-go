@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -21,7 +21,7 @@ type Suite struct {
 	suite.Suite
 
 	me      *module.Local
-	conduit *network.Conduit
+	conduit *mocknetwork.Conduit
 	state   *protocol.State
 	final   *protocol.Snapshot
 
@@ -37,7 +37,7 @@ func TestProviderEngine(t *testing.T) {
 func (suite *Suite) SetupTest() {
 
 	suite.me = new(module.Local)
-	suite.conduit = new(network.Conduit)
+	suite.conduit = new(mocknetwork.Conduit)
 	suite.state = new(protocol.State)
 	suite.final = new(protocol.Snapshot)
 

@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -81,7 +81,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
-		con := new(network.Conduit)
+		con := new(mocknetwork.Conduit)
 
 		execState := new(state.ExecutionState)
 
