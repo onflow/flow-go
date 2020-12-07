@@ -35,8 +35,7 @@ func TestSealStoreRetrieve(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := badgerstorage.NewSeals(metrics, db)
 
-		expected := unittest.SealFixture()
-
+		expected := unittest.Seal.Fixture()
 		// store seal
 		err := store.Store(expected)
 		require.NoError(t, err)
@@ -57,7 +56,7 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := badgerstorage.NewSeals(metrics, db)
 
-		expectedSeal := unittest.SealFixture()
+		expectedSeal := unittest.Seal.Fixture()
 		blockID := unittest.IdentifierFixture()
 
 		// store the seal first
