@@ -57,15 +57,15 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken)
-	storageFees := b.deployStorageFees(service, flowToken)
+	b.deployStorageFees(service, flowToken)
 
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
 	}
 
-	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract, storageFees)
+	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
-	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract, storageFees)
+	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 	return nil
 }
 
@@ -149,31 +149,27 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	return flowFees
 }
 
-func (b *BootstrapProcedure) deployStorageFees(service, flowToken flow.Address) flow.Address {
-	storageFees := b.createAccount()
-
+func (b *BootstrapProcedure) deployStorageFees(service, flowToken flow.Address) {
 	contract := contracts.StorageFees(
 		flowToken.HexWithPrefix(),
 	)
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployStorageFeesTransaction(storageFees, service, contract),
+		deployStorageFeesTransaction(service, contract), // deploy storage fees on the service account
 		b.ledger,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", err.Error()))
 	}
-
-	return storageFees
 }
 
-func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract, storageFees flow.Address) {
+func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
 	contract := contracts.FlowServiceAccount(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
 		feeContract.HexWithPrefix(),
-		storageFees.HexWithPrefix(),
+		service.HexWithPrefix(),
 	)
 
 	err := b.vm.invokeMetaTransaction(
@@ -201,11 +197,11 @@ func (b *BootstrapProcedure) mintInitialTokens(
 }
 
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
-	service, fungibleToken, flowToken, feeContract, storageFees flow.Address,
+	service, fungibleToken, flowToken, feeContract flow.Address,
 ) {
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract, storageFees),
+		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract),
 		b.ledger,
 	)
 	if err != nil {
@@ -241,9 +237,9 @@ transaction {
 
 const deployStorageFeesTransactionTemplate = `
 transaction {
-  prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
+  prepare(serviceAccount: AuthAccount) {
     let adminAccount = serviceAccount
-    flowFeesAccount.contracts.add(name: "StorageFees", code: "%s".decodeHex(), adminAccount: adminAccount)
+    serviceAccount.contracts.add(name: "StorageFees", code: "%s".decodeHex(), adminAccount: adminAccount)
   }
 }
 `
@@ -286,14 +282,14 @@ import FlowToken from 0x%s
 // This transaction sets up storage on any auth accounts that were created before the storage fees.
 // This is used during bootstrapping a local environment 
 transaction() {
-    prepare(service: AuthAccount, fungibleToken: AuthAccount, flowToken: AuthAccount, feeContract: AuthAccount, storageFees: AuthAccount) {
-        let authAccounts = [service, fungibleToken, flowToken, feeContract, storageFees]
+    prepare(service: AuthAccount, fungibleToken: AuthAccount, flowToken: AuthAccount, feeContract: AuthAccount) {
+        let authAccounts = [service, fungibleToken, flowToken, feeContract]
 
         // take all the funds from the service account
         let tokenVault = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) ?? panic("Unable to borrow reference to the default token vault")
         
         for a in authAccounts {
-            StorageFees.setupStorageForAccount(account: a, paymentVault: <- (tokenVault.withdraw(amount: StorageFees.flowPerAccountCreation) as! @FlowToken.Vault))
+            StorageFees.setupAccountStorage(account: a, storageReservation: <- (tokenVault.withdraw(amount: StorageFees.minimumStorageReservation) as! @FlowToken.Vault))
         }
     }
 }
@@ -325,11 +321,10 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 	)
 }
 
-func deployStorageFeesTransaction(flowFees, service flow.Address, contract []byte) *TransactionProcedure {
+func deployStorageFeesTransaction(service flow.Address, contract []byte) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployStorageFeesTransactionTemplate, hex.EncodeToString(contract)))).
-			AddAuthorizer(flowFees).
 			AddAuthorizer(service),
 	)
 }
@@ -352,16 +347,15 @@ func mintFlowTokenTransaction(
 }
 
 func setupStorageForServiceAccountsTransaction(
-	service, fungibleToken, flowToken, feeContract, storageFees flow.Address,
+	service, fungibleToken, flowToken, feeContract flow.Address,
 ) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(setupStorageForServiceAccountsTemplate, storageFees, flowToken))).
+			SetScript([]byte(fmt.Sprintf(setupStorageForServiceAccountsTemplate, service, flowToken))).
 			AddAuthorizer(service).
 			AddAuthorizer(fungibleToken).
 			AddAuthorizer(flowToken).
-			AddAuthorizer(feeContract).
-			AddAuthorizer(storageFees),
+			AddAuthorizer(feeContract),
 	)
 }
 

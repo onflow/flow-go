@@ -2,6 +2,7 @@ package fvm_test
 
 import (
 	"encoding/binary"
+	"github.com/onflow/flow-go/fvm/state"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,12 +18,14 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 99),
-				storageCapacity(owner, 100),
 				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
+			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
+				return 100, nil
+			},
 			LimitAccountStorage: true,
 		}, nil, ledger)
 
@@ -34,12 +37,14 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 100),
-				storageCapacity(owner, 100),
 				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
+			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
+				return 100, nil
+			},
 			LimitAccountStorage: true,
 		}, nil, ledger)
 
@@ -51,12 +56,14 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
-				storageCapacity(owner, 100),
 				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
+			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
+				return 100, nil
+			},
 			LimitAccountStorage: true,
 		}, nil, ledger)
 
@@ -68,12 +75,14 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			[]string{owner, owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 99),
-				storageCapacity(owner, 100),
 				accountExists(owner),
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
+			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
+				return 100, nil
+			},
 			LimitAccountStorage: true,
 		}, nil, ledger)
 
@@ -88,15 +97,16 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			[]string{owner1, owner1, owner2, owner2},
 			[]OwnerKeyValue{
 				storageUsed(owner1, 99),
-				storageCapacity(owner1, 100),
 				accountExists(owner2),
 				storageUsed(owner2, 999),
-				storageCapacity(owner2, 1000),
 				accountExists(owner2),
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
+			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
+				return 100, nil
+			},
 			LimitAccountStorage: true,
 		}, nil, ledger)
 
@@ -111,12 +121,14 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
-				storageCapacity(owner, 100),
 				accountExists(owner), // it has exists value, but it cannot be parsed as an address
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
+			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
+				return 100, nil
+			},
 			LimitAccountStorage: true,
 		}, nil, ledger)
 
@@ -128,11 +140,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
-				storageCapacity(owner, 100),
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
+			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
+				return 100, nil
+			},
 			LimitAccountStorage: true,
 		}, nil, ledger)
 
@@ -156,14 +170,6 @@ func storageUsed(owner string, value uint64) OwnerKeyValue {
 	return OwnerKeyValue{
 		Owner: owner,
 		Key:   "storage_used",
-		Value: value,
-	}
-}
-
-func storageCapacity(owner string, value uint64) OwnerKeyValue {
-	return OwnerKeyValue{
-		Owner: owner,
-		Key:   "storage_capacity",
 		Value: value,
 	}
 }
