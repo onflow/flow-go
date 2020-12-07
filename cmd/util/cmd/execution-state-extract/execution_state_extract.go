@@ -27,7 +27,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	filePath := path.Join(outputDir, "root.checkpoint")
 
 	newState, err := led.ExportCheckpointAt(targetHash,
-		[]ledger.Migration{migrations.MultipleContractMigration, migrations.AddMissingKeysMigration},
+		[]ledger.Migration{migrations.MultipleContractMigration, migrations.AddMissingKeysMigration, migrations.StorageFeesMigration},
 		[]ledger.Reporter{},
 		complete.DefaultPathFinderVersion,
 		filePath)

@@ -19,7 +19,7 @@ func TestAccounts_Create(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
-		// storage_used + exists + code + key count
+		// storage_used + exists + key count
 		require.Equal(t, len(ledger.RegisterTouches), 3)
 	})
 

@@ -2,7 +2,6 @@ package fvm_test
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"strconv"
 	"testing"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
@@ -50,8 +48,7 @@ func vmTest(
 
 		ctx := fvm.NewContext(zerolog.Nop(), opts...)
 
-		mapLedger := state.NewMapLedger()
-		ledger := delta.NewView(mapLedger.Get)
+		ledger := state.NewMapLedger()
 
 		err = vm.Run(
 			ctx,
