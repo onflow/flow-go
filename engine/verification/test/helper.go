@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mock"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -227,11 +227,11 @@ func SetupMockExeNode(t *testing.T,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	chainID flow.ChainID,
-	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
+	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *mocknetwork.Engine) {
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity, chainID)
-	exeEngine := new(network.Engine)
+	exeEngine := new(mocknetwork.Engine)
 
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
@@ -304,7 +304,7 @@ func SetupMockConsensusNode(t *testing.T,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	completeER utils.CompleteExecutionResult,
-	chainID flow.ChainID) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
+	chainID flow.ChainID) (*mock2.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
@@ -324,7 +324,7 @@ func SetupMockConsensusNode(t *testing.T,
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
 	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity, chainID)
-	conEngine := new(network.Engine)
+	conEngine := new(mocknetwork.Engine)
 
 	// map form verIds --> result approval ID
 	resultApprovalSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
@@ -396,8 +396,8 @@ func SetupMockConsensusNode(t *testing.T,
 // SetupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
 func SetupMockVerifierEng(t testing.TB,
 	vChunks []*verification.VerifiableChunkData,
-	completeER *utils.CompleteExecutionResult) (*network.Engine, *sync.WaitGroup) {
-	eng := new(network.Engine)
+	completeER *utils.CompleteExecutionResult) (*mocknetwork.Engine, *sync.WaitGroup) {
+	eng := new(mocknetwork.Engine)
 
 	// keep track of which verifiable chunks we have received
 	receivedChunks := make(map[flow.Identifier]struct{})

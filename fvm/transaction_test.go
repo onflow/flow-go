@@ -39,10 +39,6 @@ func (m mockRuntime) ParseAndCheckProgram(code []byte, runtimeInterface runtime.
 	panic("should not be used")
 }
 
-func (m mockRuntime) SetCoverageReport(coverageReport *runtime.CoverageReport) {
-	panic("should not be used")
-}
-
 func prepare(executeTxResult error) (error, *bytes.Buffer) {
 
 	buffer := &bytes.Buffer{}

@@ -219,7 +219,7 @@ func TestBootstrapWithSeal(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		block := unittest.GenesisFixture(participants)
-		block.Payload.Seals = []*flow.Seal{unittest.SealFixture()}
+		block.Payload.Seals = []*flow.Seal{unittest.Seal.Fixture()}
 		block.Header.PayloadHash = block.Payload.Hash()
 
 		result := unittest.ExecutionResultFixture()
@@ -228,7 +228,7 @@ func TestBootstrapWithSeal(t *testing.T) {
 		finalState, ok := result.FinalStateCommitment()
 		require.True(t, ok)
 
-		seal := unittest.SealFixture()
+		seal := unittest.Seal.Fixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
 		seal.FinalState = finalState
@@ -646,11 +646,11 @@ func TestExtendHighestSeal(t *testing.T) {
 		require.Nil(t, err)
 
 		// create seals for block2 and block3
-		seal2 := unittest.SealFixture(
-			unittest.SealWithBlockID(block2.ID()),
+		seal2 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block2.ID()),
 		)
-		seal3 := unittest.SealFixture(
-			unittest.SealWithBlockID(block3.ID()),
+		seal3 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block3.ID()),
 		)
 
 		// include the seals in block4
@@ -723,9 +723,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		)
 
 		// create the seal referencing block1 and including the setup event
-		seal1 := unittest.SealFixture(
-			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
+		seal1 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block1.ID()),
+			unittest.Seal.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
 		// block 2 contains the epoch setup service event
@@ -744,19 +744,19 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Equal(t, flow.EpochPhaseSetup, phase)
 
 		// we should NOT be able to query epoch 2 wrt block 1
-		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block1.ID()).Epochs().Next().InitialIdentities()
 		require.Error(t, err)
-		_, err = state.AtBlockID(block1.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block1.ID()).Epochs().Next().Clustering()
 		require.Error(t, err)
 
 		// we should be able to query epoch 2 wrt block 2
-		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block2.ID()).Epochs().Next().InitialIdentities()
 		assert.Nil(t, err)
-		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block2.ID()).Epochs().Next().Clustering()
 		assert.Nil(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
-		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block2.ID()).Epochs().Next().DKG()
 		require.Error(t, err)
 
 		// ensure an epoch phase transition when we finalize the event
@@ -770,9 +770,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			unittest.WithDKGFromParticipants(epoch2Participants),
 		)
 
-		seal2 := unittest.SealFixture(
-			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithServiceEvents(epoch2Commit.ServiceEvent()),
+		seal2 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block2.ID()),
+			unittest.Seal.WithServiceEvents(epoch2Commit.ServiceEvent()),
 		)
 
 		// block 3 contains the epoch commit service event
@@ -785,15 +785,15 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Nil(t, err)
 
 		// we should NOT be able to query epoch 2 commit info wrt block 2
-		_, err = state.AtBlockID(block2.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block2.ID()).Epochs().Next().DKG()
 		require.Error(t, err)
 
 		// now epoch 2 is fully ready, we can query anything we want about it wrt block 3 (or later)
-		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).InitialIdentities()
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().InitialIdentities()
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).Clustering()
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().Clustering()
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epochs().ByCounter(epoch2Setup.Counter).DKG()
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().DKG()
 		assert.Nil(t, err)
 
 		// how that the commit event has been emitted, we should be in the committed phase
@@ -896,15 +896,15 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		)
 
 		// create one seal containing the first setup event
-		seal1 := unittest.SealFixture(
-			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithServiceEvents(nextEpochSetup1.ServiceEvent()),
+		seal1 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block1.ID()),
+			unittest.Seal.WithServiceEvents(nextEpochSetup1.ServiceEvent()),
 		)
 
 		// create another seal containing the second setup event
-		seal2 := unittest.SealFixture(
-			unittest.SealWithBlockID(block2.ID()),
-			unittest.WithServiceEvents(nextEpochSetup2.ServiceEvent()),
+		seal2 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block2.ID()),
+			unittest.Seal.WithServiceEvents(nextEpochSetup2.ServiceEvent()),
 		)
 
 		// block 3 builds on block 1, contains setup event 1
@@ -965,9 +965,9 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 			)
-			seal := unittest.SealFixture(
-				unittest.SealWithBlockID(block1.ID()),
-				unittest.WithServiceEvents(setup.ServiceEvent()),
+			seal := unittest.Seal.Fixture(
+				unittest.Seal.WithBlockID(block1.ID()),
+				unittest.Seal.WithServiceEvents(setup.ServiceEvent()),
 			)
 			return setup, seal
 		}
@@ -1047,9 +1047,9 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 			)
-			seal := unittest.SealFixture(
-				unittest.SealWithBlockID(block1.ID()),
-				unittest.WithServiceEvents(setup.ServiceEvent()),
+			seal := unittest.Seal.Fixture(
+				unittest.Seal.WithBlockID(block1.ID()),
+				unittest.Seal.WithServiceEvents(setup.ServiceEvent()),
 			)
 			return setup, seal
 		}
@@ -1060,9 +1060,9 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				unittest.WithDKGFromParticipants(epoch2Participants),
 			)
 
-			seal := unittest.SealFixture(
-				unittest.SealWithBlockID(refBlockID),
-				unittest.WithServiceEvents(commit.ServiceEvent()),
+			seal := unittest.Seal.Fixture(
+				unittest.Seal.WithBlockID(refBlockID),
+				unittest.Seal.WithServiceEvents(commit.ServiceEvent()),
 			)
 			return commit, seal
 		}
@@ -1181,9 +1181,9 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		)
 
 		// create the seal referencing block1 and including the setup event
-		seal1 := unittest.SealFixture(
-			unittest.SealWithBlockID(block1.ID()),
-			unittest.WithServiceEvents(epoch2Setup.ServiceEvent()),
+		seal1 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block1.ID()),
+			unittest.Seal.WithServiceEvents(epoch2Setup.ServiceEvent()),
 		)
 
 		// block 2 contains the epoch setup service event
@@ -1369,11 +1369,11 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		require.Nil(t, err)
 
 		// create seals for block2 and block3
-		seal2 := unittest.SealFixture(
-			unittest.SealWithBlockID(block2.ID()),
+		seal2 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block2.ID()),
 		)
-		seal3 := unittest.SealFixture(
-			unittest.SealWithBlockID(block3.ID()),
+		seal3 := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block3.ID()),
 		)
 
 		// include the seals in block4
