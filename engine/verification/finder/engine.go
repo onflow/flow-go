@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -27,6 +28,7 @@ type Engine struct {
 	metrics                  module.VerificationMetrics
 	me                       module.Local
 	match                    network.Engine
+	state                    protocol.ReadOnlyState
 	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
 	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
 	readyReceipts            mempool.ReceiptDataPacks // used to keep the receipts ready for process
@@ -228,6 +230,28 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 	return err == nil
 }
 
+// stakedForResult checks whether this instance of verification node has staked at corresponding block height
+// of the ExecutionResult.
+// It returns true and nil if verification node has staked at the specified block height by ExecutionResult, and
+// returns false, and nil otherwise.
+// It returns false and error if it could not extract the stake of (verification node) node at the specified block.
+func (e *Engine) stakedForResult(result *flow.ExecutionResult) (bool, error) {
+	id, err := e.state.AtBlockID(result.BlockID).Identity(e.me.NodeID())
+	if err != nil {
+		return false, fmt.Errorf("could not retrieve identity of verification node at snapshot of block id: %x: %w)", result.BlockID, err)
+	}
+
+	if id.Role != flow.RoleVerification {
+		return false, fmt.Errorf("required verification role to process result, found: %s, block id: %x", id.Role.String(), result.BlockID)
+	}
+
+	if id.Stake == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 // processResult submits the result to the match engine.
 // originID is the identifier of the node that initially sends a receipt containing this result.
 // It returns true and nil if the result is submitted successfully to the match engine.
@@ -244,6 +268,7 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 			Msg("result already processed")
 		return false, nil
 	}
+
 	err := e.match.Process(originID, result)
 	if err != nil {
 		return false, fmt.Errorf("submission error to match engine: %w", err)
@@ -335,9 +360,19 @@ func (e *Engine) checkCachedReceipts() {
 			// adds receipt to pending or ready mempools depending on its processable status
 			ready := e.isProcessable(&rdp.Receipt.ExecutionResult)
 			if ready {
-				// block for the receipt is available,
-				// receipt is ready for process
-				ok := e.readyReceipts.Add(rdp)
+				// checks whether verification node is staked at snapshot of this result's block.
+				ok, err := e.stakedForResult(&rdp.Receipt.ExecutionResult)
+				if err != nil {
+					log.Debug().Err(err).Msg("could verify stake of verification node for result")
+					return
+				}
+
+				if !ok {
+					log.Debug().Msg("processing result is dropped by unstaked verification node")
+				}
+
+				// adds the receipt to the ready mempool
+				ok = e.readyReceipts.Add(rdp)
 				if !ok {
 					log.Debug().Msg("drops adding duplicate receipt to ready mempool")
 					return
