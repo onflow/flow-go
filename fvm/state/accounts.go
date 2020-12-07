@@ -14,12 +14,13 @@ import (
 )
 
 const (
-	keyExists         = "exists"
-	keyCode           = "code"
-	keyContractNames  = "contract_names"
-	keyPublicKeyCount = "public_key_count"
-	keyStorageUsed    = "storage_used"
-	uint64StorageSize = 8
+	keyExists          = "exists"
+	keyCode            = "code"
+	keyContractNames   = "contract_names"
+	keyPublicKeyCount  = "public_key_count"
+	keyStorageUsed     = "storage_used"
+	keyStorageCapacity = "storage_capacity"
+	uint64StorageSize  = 8
 )
 
 var (
@@ -104,8 +105,15 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return fmt.Errorf("account with address %s already exists", newAddress.Hex())
 	}
 
-	storageUsedByStorageUsed := uint64(RegisterSize(newAddress, false, keyStorageUsed, make([]byte, uint64StorageSize)))
-	err = a.setStorageUsed(newAddress, storageUsedByStorageUsed)
+	err = a.setStorageUsed(newAddress, uint64StorageSize) //set storage used to the size of storage used
+	if err != nil {
+		return err
+	}
+
+	// set storage capacity to 0.
+	// It must be set with the storage contract before the end of this transaction.
+	// TODO: for this PR set storage capacity to 100kB, remove this in the next PR to this feature branch
+	err = a.SetStorageCapacity(newAddress, 100000)
 	if err != nil {
 		return err
 	}
@@ -347,6 +355,23 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
 	usedBinary := utils.Uint64ToBinary(used)
 	return a.setValue(address, false, keyStorageUsed, usedBinary)
+}
+
+func (a *Accounts) GetStorageCapacity(account flow.Address) (uint64, error) {
+	storageCapacityRegister, err := a.getValue(account, false, keyStorageCapacity)
+	if err != nil {
+		return 0, err
+	}
+	storageCapacity, _, err := utils.ReadUint64(storageCapacityRegister)
+	if err != nil {
+		return 0, err
+	}
+	return storageCapacity, nil
+}
+
+func (a *Accounts) SetStorageCapacity(account flow.Address, capacity uint64) error {
+	capacityBinary := utils.Uint64ToBinary(capacity)
+	return a.setValue(account, false, keyStorageCapacity, capacityBinary)
 }
 
 func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {

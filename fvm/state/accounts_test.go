@@ -19,8 +19,8 @@ func TestAccounts_Create(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
-		// storage_used + exists + key count
-		require.Equal(t, len(ledger.RegisterTouches), 3)
+		// storage_used + storage_capacity + exists + code + key count
+		require.Equal(t, len(ledger.RegisterTouches), 4)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
