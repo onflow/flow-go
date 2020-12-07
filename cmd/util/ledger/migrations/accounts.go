@@ -102,7 +102,7 @@ func (l *led) Get(owner, controller, key string) (flow.RegisterValue, error) {
 }
 
 func (l *led) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	panic("")
+	panic("this method shouldn't be used here")
 }
 
 func (l *led) Delete(owner, controller, key string) {
