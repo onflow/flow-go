@@ -15,8 +15,8 @@ import (
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
-// TestCommiStoreAndRetrieve tests that a commit can be stored, retrieved and attempted to be stored again without an error
-func TestCommiStoreAndRetrieve(t *testing.T) {
+// TestCommitsStoreAndRetrieve tests that a commit can be stored, retrieved and attempted to be stored again without an error
+func TestCommitsStoreAndRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := badgerstorage.NewCommits(metrics, db)
