@@ -28,7 +28,7 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 		}
 		if len([]byte(id.Owner)) != flow.AddressLength {
 			// not an address
-			return nil
+			continue
 		}
 		if id.Key != "storage_used" {
 			continue
