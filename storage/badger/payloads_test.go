@@ -14,7 +14,7 @@ import (
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
-func TestStoreRetrievePayload(t *testing.T) {
+func TestPayloadStoreRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 
@@ -26,16 +26,29 @@ func TestStoreRetrievePayload(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture()
 
-		_, err := store.ByBlockID(blockID)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
-
 		// store payload
-		err = store.Store(blockID, expected)
+		err := store.Store(blockID, expected)
 		require.NoError(t, err)
 
 		// fetch payload
 		payload, err := store.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Equal(t, expected, payload)
+	})
+}
+
+func TestPayloadRetreiveWithoutStore(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+
+		index := badgerstorage.NewIndex(metrics, db)
+		seals := badgerstorage.NewSeals(metrics, db)
+		guarantees := badgerstorage.NewGuarantees(metrics, db)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals)
+
+		blockID := unittest.IdentifierFixture()
+
+		_, err := store.ByBlockID(blockID)
+		require.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }

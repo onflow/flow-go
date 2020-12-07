@@ -34,9 +34,5 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 		actual, err := store.ByID(expected.ID())
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
-
-		// re-insert the commit - should be idempotent
-		err = store.Store(expected)
-		require.NoError(t, err)
 	})
 }
