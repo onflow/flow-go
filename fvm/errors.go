@@ -215,21 +215,6 @@ func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithm
 }
 
-// An StorageCapacityExceededError indicates that a given key has an invalid hash algorithm.
-type StorageCapacityExceededError struct {
-	Address         flow.Address
-	StorageUsed     uint64
-	StorageCapacity uint64
-}
-
-func (e *StorageCapacityExceededError) Error() string {
-	return fmt.Sprintf("address %s storage %d is over capacity %d", e.Address, e.StorageUsed, e.StorageCapacity)
-}
-
-func (e *StorageCapacityExceededError) Code() uint32 {
-	return errCodeStorageCapacityExceeded
-}
-
 type ExecutionError struct {
 	Err runtime.Error
 }
