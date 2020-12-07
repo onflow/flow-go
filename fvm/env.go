@@ -247,9 +247,8 @@ func (e *hostEnv) Log(message string) {
 	e.logs = append(e.logs, message)
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) error {
+func (e *hostEnv) EmitEvent(event cadence.Event) {
 	e.events = append(e.events, event)
-	return nil
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
@@ -358,7 +357,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 		return runtimeBlockFromHeader(e.ctx.BlockHeader), true, nil
 	}
 
-	block, err := e.ctx.Blocks.ByHeight(height)
+	header, err := e.ctx.Blocks.ByHeightFrom(height, e.ctx.BlockHeader)
 	// TODO: remove dependency on storage
 	if errors.Is(err, storage.ErrNotFound) {
 		return runtime.Block{}, false, nil
@@ -368,7 +367,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return runtimeBlockFromHeader(block.Header), true, nil
+	return runtimeBlockFromHeader(header), true, nil
 }
 
 // Transaction Environment Functions

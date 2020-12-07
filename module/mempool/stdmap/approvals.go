@@ -4,7 +4,6 @@ package stdmap
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/model"
@@ -46,10 +45,7 @@ func NewApprovals(limit uint, opts ...OptionFunc) (*Approvals, error) {
 		approvalMapEntity := entity.(*model.ApprovalMapEntity)
 		mempool.size -= uint(len(approvalMapEntity.Approvals))
 	}
-	err := mempool.backend.RegisterEjectionCallback(adjustSizeOnEjection)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ejection callback with Approvals mempool's backend")
-	}
+	mempool.backend.RegisterEjectionCallbacks(adjustSizeOnEjection)
 
 	return mempool, nil
 }

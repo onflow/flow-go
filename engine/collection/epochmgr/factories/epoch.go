@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
@@ -112,12 +111,6 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	seed, err := epoch.Seed(indices.ProtocolCollectorClusterLeaderSelection(clusterIndex)...)
-	if err != nil {
-		err = fmt.Errorf("could not get leader selection seed: %w", err)
-		return
-	}
-
 	proposalEng, err := factory.proposal.Create(state, headers, payloads)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
@@ -131,17 +124,14 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 	hotstuff, err = factory.hotstuff.Create(
-		cluster.ChainID(),
-		cluster.Members(),
+		epoch,
+		cluster,
 		state,
 		headers,
 		payloads,
-		seed,
 		builder,
 		finalizer,
 		proposalEng,
-		cluster.RootBlock().Header,
-		cluster.RootQC(),
 	)
 	if err != nil {
 		err = fmt.Errorf("could not create hotstuff: %w", err)
