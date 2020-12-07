@@ -4,12 +4,13 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 // iterates through registers keeping a map of register sizes
 // reports on storage metrics
-type StorageReporter struct{
+type StorageReporter struct {
+	Log zerolog.Logger
 }
 
 func (r StorageReporter) Report(payload []ledger.Payload) error {
@@ -38,16 +39,16 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 		storageUsed[id.Owner] = u
 		average = average + (float64(u)-average)/(float64(i)+1.0)
 	}
-	log.Info().
+	r.Log.Info().
 		Msg("StorageReporter results")
-	log.Info().
+	r.Log.Info().
 		Float64("Average storage used", average)
-	log.Info().
+	r.Log.Info().
 		Msg("99th percentile accounts (assuming exponential distribution):")
 
 	for s, u := range storageUsed {
 		if float64(u) > exponentialPercentile99*average {
-			log.Info().
+			r.Log.Info().
 				Str("address", s).
 				Uint64("storage_used", u)
 		}
