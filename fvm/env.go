@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 
 	"github.com/onflow/cadence"
@@ -132,8 +133,8 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 	return e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
 }
 
-func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	return e.accounts.GetStorageCapacity(flow.BytesToAddress(address.Bytes()))
+func (e *hostEnv) GetStorageCapacity(_ common.Address) (value uint64, err error) {
+	return math.MaxUint64, nil
 }
 
 func (e *hostEnv) ResolveLocation(
