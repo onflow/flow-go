@@ -47,6 +47,7 @@ func New(
 	tracer module.Tracer,
 	net module.Network,
 	me module.Local,
+	state protocol.ReadOnlyState,
 	match network.Engine,
 	cachedReceipts mempool.ReceiptDataPacks,
 	pendingReceipts mempool.ReceiptDataPacks,
@@ -63,6 +64,7 @@ func New(
 		log:                      log.With().Str("engine", "finder").Logger(),
 		metrics:                  metrics,
 		me:                       me,
+		state:                    state,
 		match:                    match,
 		headerStorage:            headerStorage,
 		cachedReceipts:           cachedReceipts,
@@ -236,15 +238,18 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 // returns false, and nil otherwise.
 // It returns false and error if it could not extract the stake of (verification node) node at the specified block.
 func (e *Engine) stakedForResult(result *flow.ExecutionResult) (bool, error) {
+	// extracts identity of verification node at block height of result
 	id, err := e.state.AtBlockID(result.BlockID).Identity(e.me.NodeID())
 	if err != nil {
 		return false, fmt.Errorf("could not retrieve identity of verification node at snapshot of block id: %x: %w)", result.BlockID, err)
 	}
 
+	// checks this node is staked as a verification node
 	if id.Role != flow.RoleVerification {
 		return false, fmt.Errorf("required verification role to process result, found: %s, block id: %x", id.Role.String(), result.BlockID)
 	}
 
+	// checks stake of the verification node
 	if id.Stake == 0 {
 		return false, nil
 	}

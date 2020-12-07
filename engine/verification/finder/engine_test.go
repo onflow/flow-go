@@ -21,6 +21,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,8 +29,9 @@ import (
 // FinderEngineTestSuite contains the unit tests of Finder engine.
 type FinderEngineTestSuite struct {
 	suite.Suite
-	net *module.Network
-	me  *module.Local
+	net   *module.Network
+	me    *module.Local
+	state *protocol.State
 
 	// mock conduit for receiving receipts
 	receiptsConduit *mocknetwork.Conduit
@@ -79,6 +81,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.receiptsConduit = &mocknetwork.Conduit{}
 	suite.net = &module.Network{}
 	suite.me = &module.Local{}
+	suite.state = &protocol.State{}
 	suite.metrics = &module.VerificationMetrics{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.headerStorage = &storage.Headers{}
@@ -129,6 +132,7 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 		suite.tracer,
 		suite.net,
 		suite.me,
+		suite.state,
 		suite.matchEng,
 		suite.cachedReceipts,
 		suite.pendingReceipts,

@@ -270,6 +270,7 @@ func main() {
 				node.Tracer,
 				node.Network,
 				node.Me,
+				node.State,
 				matchEng,
 				cachedReceipts,
 				pendingReceipts,
