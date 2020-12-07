@@ -48,8 +48,8 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 	r.Log.Info().
 		Msgf("Max storage used %d", max)
 
-	bins := 50
-	binHeight := 50
+	bins := 150
+	binHeight := 40
 	w := float64(max) / float64(bins)
 	distribution := make([]float64, bins)
 
@@ -70,7 +70,7 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 				Msgf("High storage usage address: %s, used: %d", flow.BytesToAddress([]byte(s)), u)
 		}
 	}
-
+    maxBinAccounts := maxBin
 	maxBin = math.Log10(maxBin)
 
 	graph := make([]int, bins)
@@ -87,11 +87,11 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 	}
 
 	r.Log.Info().
-		Msgf("Logarithmic account storage distribution x[storage used] / y[log number of accounts (max = %d accounts)]:", maxBin)
+		Msgf("Logarithmic account storage distribution x[storage used] / y[log number of accounts (max = %d accounts)]:\n", maxBinAccounts)
 
 	var sb strings.Builder
-	for i := 0; i < bins; i++ {
-		for j := binHeight; j >= 0; j-- {
+	for j := binHeight; j >= 0; j-- {
+		for i := 0; i < bins; i++ {
 			if graph[i] >= j {
 				sb.WriteRune('#')
 			} else {
