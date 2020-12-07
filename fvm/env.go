@@ -297,7 +297,8 @@ func (e *hostEnv) VerifySignature(
 
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		panic(err)
+		// panic(err)
+		return false
 	}
 
 	return valid
