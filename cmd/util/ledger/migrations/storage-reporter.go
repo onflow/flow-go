@@ -5,6 +5,8 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
+	"math"
+	"strings"
 )
 
 // iterates through registers keeping a map of register sizes
@@ -16,10 +18,8 @@ type StorageReporter struct {
 func (r StorageReporter) Report(payload []ledger.Payload) error {
 	r.Log.Info().Msg("Running Storage Reporter")
 	storageUsed := make(map[string]uint64)
-	var average = 0.0
-	// assuming storage used is an exponential distribution.
-	// only 1% of accounts will be use then exponentialPercentile99 times average storage
-	var exponentialPercentile99 = 4.605170185988091368036
+	average := 0.0
+	max := uint64(0)
 
 	for i, p := range payload {
 		id, err := keyToRegisterId(p.Key)
@@ -39,17 +39,70 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 		}
 		storageUsed[id.Owner] = u
 		average = average + (float64(u)-average)/(float64(i)+1.0)
+		if u > max {
+			max = u
+		}
 	}
 	r.Log.Info().
 		Msgf("Average storage used %g", average)
 	r.Log.Info().
-		Msg("99th percentile accounts (assuming exponential distribution):")
+		Msgf("Max storage used %d", max)
+
+	bins := 50
+	binHeight := 50
+	w := float64(max) / float64(bins)
+	distribution := make([]float64, bins)
+
+	var maxBin = float64(0)
 
 	for s, u := range storageUsed {
-		if float64(u) > exponentialPercentile99*average {
+		var i = int(float64(u) / w)
+		if i >= bins {
+			i = bins - 1
+		}
+		distribution[i] = distribution[i] + 1
+
+		if maxBin < distribution[i] {
+			maxBin = distribution[i]
+		}
+		if i == bins-1 {
 			r.Log.Info().
-				Msgf("Address: %s Used: %d", s, u)
+				Msgf("High storage usage address: %s, used: %d", flow.BytesToAddress([]byte(s)), u)
 		}
 	}
+
+	maxBin = math.Log10(maxBin)
+
+	graph := make([]int, bins)
+
+	for i, d := range distribution {
+		var v float64
+		if d <= 0 {
+			v = 0
+		} else {
+			v = math.Log10(d)
+		}
+
+		graph[i] = int(math.Ceil((v / maxBin) * float64(binHeight)))
+	}
+
+	r.Log.Info().
+		Msgf("Logarithmic account storage distribution x[storage used] / y[log number of accounts (max = %d accounts)]:", maxBin)
+
+	var sb strings.Builder
+	for i := 0; i < bins; i++ {
+		for j := binHeight; j >= 0; j-- {
+			if graph[i] >= j {
+				sb.WriteRune('#')
+			} else {
+				sb.WriteRune('.')
+			}
+		}
+		sb.WriteRune('\n')
+	}
+
+	r.Log.Info().
+		Msg(sb.String())
+
 	return nil
 }
