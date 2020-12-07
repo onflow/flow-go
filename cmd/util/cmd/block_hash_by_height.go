@@ -21,7 +21,7 @@ var (
 	flagDatadir          string
 )
 
-// blockHashByHeight retreives the block hash by height
+// blockHashByHeight retrieves the block hash by height
 func blockHashByHeight(_ *cobra.Command, _ []string) {
 	db := common.InitStorage(flagDatadir)
 	cache := &metrics.NoopCollector{}
