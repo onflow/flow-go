@@ -41,15 +41,14 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 		average = average + (float64(u)-average)/(float64(i)+1.0)
 	}
 	r.Log.Info().
-		Float64("Average storage used", average)
+		Msgf("Average storage used %g", average)
 	r.Log.Info().
 		Msg("99th percentile accounts (assuming exponential distribution):")
 
 	for s, u := range storageUsed {
 		if float64(u) > exponentialPercentile99*average {
 			r.Log.Info().
-				Str("address", s).
-				Uint64("storage_used", u)
+				Msgf("Address: %s Used: %d", s, u)
 		}
 	}
 	return nil
