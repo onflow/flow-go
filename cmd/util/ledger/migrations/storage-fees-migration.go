@@ -12,7 +12,6 @@ const (
 	sizeOfStorageRegisters = 16
 )
 
-// Migration assumes that payload containd all existing registers.
 // iterates through registers keeping a map of register sizes
 // after it has reached the end it add storage used and storage capacity for each address
 func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
@@ -29,14 +28,10 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 
 	for s, u := range storageUsed {
 		u = u + sizeOfStorageRegisters
-		capacity := ((u / 500_000) + 2) * 500_000 // at least 500kb more than currently stored; 1MB if nothing stored
 
 		newPayload = append(newPayload, ledger.Payload{
 			Key:   makeKey(s, "storage_used"),
 			Value: utils.Uint64ToBinary(u),
-		}, ledger.Payload{
-			Key:   makeKey(s, "storage_capacity"),
-			Value: utils.Uint64ToBinary(capacity),
 		})
 	}
 	return newPayload, nil
