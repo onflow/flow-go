@@ -39,9 +39,7 @@ func (er ExecutionResult) FinalStateCommitment() (StateCommitment, bool) {
 		return nil, false
 	}
 	s := er.Chunks[er.Chunks.Len()-1].EndState
-	// TODO: empty state commitment should not be considered valid
-	// return s, len(s) > 0
-	return s, true
+	return s, len(s) > 0
 }
 
 // InitialStateCommit returns a commitment to the execution state used as input
@@ -56,7 +54,5 @@ func (er ExecutionResult) InitialStateCommit() (StateCommitment, bool) {
 		return nil, false
 	}
 	s := er.Chunks[0].StartState
-	// TODO: empty state commitment should not be considered valid
-	// return s, len(s) > 0
-	return s, true
+	return s, len(s) > 0
 }
