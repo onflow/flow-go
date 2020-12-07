@@ -8,10 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const (
-	sizeOfStorageRegisters = 16
-)
-
 // iterates through registers keeping a map of register sizes
 // after it has reached the end it add storage used and storage capacity for each address
 func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
@@ -27,7 +23,11 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 	}
 
 	for s, u := range storageUsed {
-		u = u + sizeOfStorageRegisters
+		storageUsedByStorageUsed := fvm.RegisterSize(
+			flow.BytesToAddress([]byte(s)),
+			false, "storage_used",
+			make([]byte, 8))
+		u = u + uint64(storageUsedByStorageUsed)
 
 		newPayload = append(newPayload, ledger.Payload{
 			Key:   makeKey(s, "storage_used"),
@@ -64,7 +64,9 @@ func process(p ledger.Payload, used map[string]uint64) error {
 		// not an address
 		return nil
 	}
-
+	if _, ok := used[id.Owner]; !ok {
+		used[id.Owner] = 0
+	}
 	used[id.Owner] = used[id.Owner] + uint64(registerSize(id, p))
 	return nil
 }
