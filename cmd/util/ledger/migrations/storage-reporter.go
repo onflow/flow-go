@@ -14,6 +14,7 @@ type StorageReporter struct {
 }
 
 func (r StorageReporter) Report(payload []ledger.Payload) error {
+	r.Log.Info().Msg("Running Storage Reporter")
 	storageUsed := make(map[string]uint64)
 	var average = 0.0
 	// assuming storage used is an exponential distribution.
@@ -39,8 +40,6 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 		storageUsed[id.Owner] = u
 		average = average + (float64(u)-average)/(float64(i)+1.0)
 	}
-	r.Log.Info().
-		Msg("StorageReporter results")
 	r.Log.Info().
 		Float64("Average storage used", average)
 	r.Log.Info().
