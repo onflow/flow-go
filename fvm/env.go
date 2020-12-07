@@ -247,9 +247,8 @@ func (e *hostEnv) Log(message string) {
 	e.logs = append(e.logs, message)
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) error {
+func (e *hostEnv) EmitEvent(event cadence.Event) {
 	e.events = append(e.events, event)
-	return nil
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
