@@ -557,6 +557,20 @@ func WithStake(stake uint64) func(*flow.Identity) {
 	}
 }
 
+// WithAddress sets the network address of identity fixture.
+func WithAddress(address string) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Address = address
+	}
+}
+
+// WithNetworkingKey sets the networking public key of identity fixture.
+func WithNetworkingKey(key crypto.PublicKey) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.NetworkPubKey = key
+	}
+}
+
 func RandomBytes(n int) []byte {
 	b := make([]byte, n)
 	read, err := crand.Read(b)
