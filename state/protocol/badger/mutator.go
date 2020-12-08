@@ -29,7 +29,7 @@ type MutableState struct {
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func BootstrapFollowerState(
+func NewFollowerState(
 	metrics module.ComplianceMetrics,
 	tracer module.Tracer,
 	db *badger.DB,
@@ -42,10 +42,9 @@ func BootstrapFollowerState(
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
 	consumer protocol.Consumer,
-	bootstrapInfo BootstrapInfo,
 ) (*FollowerState, error) {
-	partial, err := BootstrapState(metrics, tracer, db, headers, seals, index, payloads,
-		blocks, setups, commits, statuses, consumer, bootstrapInfo)
+	partial, err := NewState(metrics, tracer, db, headers, seals, index, payloads,
+		blocks, setups, commits, statuses, consumer)
 
 	if err != nil {
 		return nil, err
@@ -57,7 +56,7 @@ func BootstrapFollowerState(
 	return followerState, nil
 }
 
-func BootstrapMutableState(
+func NewMutableState(
 	metrics module.ComplianceMetrics,
 	tracer module.Tracer,
 	db *badger.DB,
@@ -71,10 +70,9 @@ func BootstrapMutableState(
 	statuses storage.EpochStatuses,
 	consumer protocol.Consumer,
 	results storage.ExecutionResults,
-	bootstrapInfo BootstrapInfo,
 ) (*MutableState, error) {
-	partial, err := BootstrapFollowerState(metrics, tracer, db, headers, seals, index, payloads,
-		blocks, setups, commits, statuses, consumer, bootstrapInfo)
+	partial, err := NewFollowerState(metrics, tracer, db, headers, seals, index, payloads,
+		blocks, setups, commits, statuses, consumer)
 
 	if err != nil {
 		return nil, err
@@ -555,7 +553,7 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 	return nil
 }
 
-func (m *MutableState) Finalize(blockID flow.Identifier) error {
+func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 
 	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorFinalize)
 	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorFinalize)
@@ -873,7 +871,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
 // NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
-func (m *MutableState) MarkValid(blockID flow.Identifier) error {
+func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 	header, err := m.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header for %x: %w", blockID, err)

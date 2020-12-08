@@ -5,6 +5,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"path/filepath"
 	"time"
 
@@ -83,6 +85,24 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
+		CreateState(func(fnb *cmd.FlowNodeBuilder) (protocol.MutableState, error) {
+			state, err := badger.NewMutableState(
+				fnb.Metrics.Compliance,
+				fnb.Tracer,
+				fnb.DB,
+				fnb.Storage.Headers,
+				fnb.Storage.Seals,
+				fnb.Storage.Index,
+				fnb.Storage.Payloads,
+				fnb.Storage.Blocks,
+				fnb.Storage.Setups,
+				fnb.Storage.Commits,
+				fnb.Storage.Statuses,
+				fnb.ProtocolEvents,
+				fnb.Storage.Results,
+			)
+			return state, err
+		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")

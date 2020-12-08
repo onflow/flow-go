@@ -32,15 +32,9 @@ type State struct {
 	cfg      Config
 }
 
-type BootstrapInfo struct {
-	root   *flow.Block
-	result *flow.ExecutionResult
-	seal   *flow.Seal
-}
-
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func BootstrapState(
+func NewState(
 	metrics module.ComplianceMetrics,
 	tracer module.Tracer,
 	db *badger.DB,
@@ -53,7 +47,6 @@ func BootstrapState(
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
 	consumer protocol.Consumer,
-	bootstrapInfo BootstrapInfo,
 ) (*State, error) {
 
 	s := &State{
@@ -78,18 +71,11 @@ func BootstrapState(
 		cfg:      DefaultConfig(),
 	}
 
-	err := s.Bootstrap(bootstrapInfo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to bootstrap with root block: %v, %w", bootstrapInfo.root.ID(), err)
-	}
-
 	return s, nil
 }
 
-func (s *State) Bootstrap(info BootstrapInfo) error {
+func (s *State) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
 	return operation.RetryOnConflict(s.db.Update, func(tx *badger.Txn) error {
-
-		root, result, seal := info.root, info.result, info.seal
 
 		// NEW: bootstrapping from an arbitrary states requires an execution result and block seal
 		// as input; we need to verify them against each other and against the root block
