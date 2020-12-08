@@ -270,9 +270,9 @@ func (suite *FinderEngineTestSuite) TestCachedToPending() {
 		suite.matchEng)
 }
 
-// TestCachedToPending evaluates that having a cached receipt with its
+// TestCachedToReady_Staked evaluates that having a cached receipt with its
 // block available results it moved to the ready mempool.
-func (suite *FinderEngineTestSuite) TestCachedToReady_Unstaked() {
+func (suite *FinderEngineTestSuite) TestCachedToReady_Staked() {
 	e := suite.TestNewFinderEngine()
 
 	// mocks a cached receipt
