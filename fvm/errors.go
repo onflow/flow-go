@@ -25,8 +25,6 @@ const (
 
 	errCodeInvalidHashAlgorithm = 10
 
-	errCodeStorageCapacityExceeded = 11
-
 	errCodeExecution = 100
 )
 
