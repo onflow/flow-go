@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -77,9 +78,9 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	// Step 2: Subscribe to a Flow topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
-	ch := make(chan string, count)
+	ch := make(chan flow.Identifier, count)
 	for _, n := range nodes {
-		m := n.name
+		m := n.id
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(suite.ctx)
@@ -116,19 +117,19 @@ func (suite *PubSubTestSuite) TestPubSub() {
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
-	recv := make(map[string]bool, count)
+	recv := make(map[flow.Identifier]bool, count)
 	for i := 0; i < count; i++ {
 		select {
 		case res := <-ch:
 			recv[res] = true
 		case <-time.After(3 * time.Second):
-			missing := make([]string, 0)
+			var missing flow.IdentifierList
 			for _, n := range nodes {
-				if _, found := recv[n.name]; !found {
-					missing = append(missing, n.name)
+				if _, found := recv[n.id]; !found {
+					missing = append(missing, n.id)
 				}
 			}
-			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
+			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing.Strings(), ","))
 			break
 		}
 	}
@@ -157,20 +158,12 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 
 	// creating nodes
 	for i := 1; i <= count; i++ {
-
-		name := fmt.Sprintf("node%d", i)
-		libp2pkey, key := generateNetworkingAndLibP2PKeys(suite.T())
+		_, key := generateNetworkingAndLibP2PKeys(suite.T())
 
 		noopMetrics := metrics.NewNoopCollector()
-		nodeID := NodeAddress{
-			Name:   name,
-			IP:     "0.0.0.0",             // localhost
-			Port:   "0",                   // random Port number
-			PubKey: libp2pkey.GetPublic(), // the networking public key
-		}
 
 		psOption := pubsub.WithDiscovery(d)
-		n, err := NewLibP2PNode(logger, nodeID, NewConnManager(logger, noopMetrics), key, false, rootBlockID, psOption)
+		n, err := NewLibP2PNode(logger, flow.Identifier{}, "0.0.0.0:0", NewConnManager(logger, noopMetrics), key, false, rootBlockID, psOption)
 		require.NoError(suite.T(), err)
 		n.SetStreamHandler(handlerFunc)
 
