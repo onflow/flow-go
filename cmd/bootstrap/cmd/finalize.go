@@ -178,7 +178,7 @@ func finalize(cmd *cobra.Command, args []string) {
 			log.Error().Err(err).Msg("could not copy private key files")
 		}
 	} else {
-		log.Info("skipping copy of private keys to output dir")
+		log.Info().Msg("skipping copy of private keys to output dir")
 	}
 	log.Info().Msg("")
 
