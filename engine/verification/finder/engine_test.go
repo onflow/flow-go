@@ -83,6 +83,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.net = &module.Network{}
 	suite.me = &module.Local{}
 	suite.state = &protocol.State{}
+	suite.snapshot = &protocol.Snapshot{}
 	suite.metrics = &module.VerificationMetrics{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.headerStorage = &storage.Headers{}
@@ -124,10 +125,16 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.me.On("NodeID").Return(suite.verIdentity.NodeID)
 }
 
+func WithIdentity(identity flow.Identity) func(*FinderEngineTestSuite) {
+	return func(testSuite *FinderEngineTestSuite) {
+		return
+	}
+}
+
 // TestNewFinderEngine tests the establishment of the network registration upon
 // creation of an instance of FinderEngine using the New method.
 // It also returns an instance of new engine to be used in the later tests.
-func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
+func (suite *FinderEngineTestSuite) TestNewFinderEngine(opts ...func(testSuite *FinderEngineTestSuite) *FinderEngineTestSuite) *finder.Engine {
 	e, err := finder.New(zerolog.Logger{},
 		suite.metrics,
 		suite.tracer,
@@ -292,6 +299,11 @@ func (suite *FinderEngineTestSuite) TestCachedToReady_Unstaked() {
 	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).
 		Return(nil).Once()
 
+	// mocks returning state snapshot of system at block height of result
+	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.snapshot)
+	// mocks identity of node as in the state snapshot
+	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
+
 	// mocks moving from cached to pending
 	moveWG := sync.WaitGroup{}
 	moveWG.Add(2)
@@ -301,13 +313,11 @@ func (suite *FinderEngineTestSuite) TestCachedToReady_Unstaked() {
 			moveWG.Done()
 		}).Return(true).Once()
 
-	//// adding to pending
-	//suite.readyReceipts.On("Add", suite.receiptDataPack).
-	//	Run(func(args testifymock.Arguments) {
-	//		moveWG.Done()
-	//	}).Return(true).Once()
-
-	suite.state.On("AtBlockID").Return()
+	// adding to pending
+	suite.readyReceipts.On("Add", suite.receiptDataPack).
+		Run(func(args testifymock.Arguments) {
+			moveWG.Done()
+		}).Return(true).Once()
 
 	// starts the engine
 	<-e.Ready()
