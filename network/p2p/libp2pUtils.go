@@ -7,9 +7,12 @@ import (
 	"net"
 
 	core "github.com/libp2p/go-libp2p-core"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -92,43 +95,95 @@ func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 	return filteredStreams
 }
 
-// PeerInfoFromID converts the flow.Identity to peer.AddrInfo.
+// networkingInfo returns ip, port, libp2p public key of the identity.
+func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
+	// split the node address into ip and port
+	ip, port, err := net.SplitHostPort(identity.Address)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("could not parse address %s: %w", identity.Address, err)
+	}
+
+	// convert the Flow key to a LibP2P key
+	lkey, err := publicKey(identity.NetworkPubKey)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
+	}
+
+	return ip, port, lkey, nil
+}
+
+// MultiAddressStr receives a node ip and port and returns
+// its corresponding Libp2p MultiAddressStr in string format
+// in current implementation IP part of the node address is
+// either an IP or a dns4.
+// https://docs.libp2p.io/concepts/addressing/
+func MultiAddressStr(ip, port string) string {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP != nil {
+		// returns parsed ip version of the multi-address
+		return fmt.Sprintf("/ip4/%s/tcp/%s", ip, port)
+	}
+	// could not parse it as an IP address and returns the dns version of the
+	// multi-address
+	return fmt.Sprintf("/dns4/%s/tcp/%s", ip, port)
+}
+
+// IPPortFromMultiAddress returns the IP/hostname and the port for the given multi-addresses
+// associated with a libp2p host
+func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error) {
+
+	var ipOrHostname, port string
+	var err error
+
+	for _, a := range addrs {
+		// try and get the dns4 hostname
+		ipOrHostname, err = a.ValueForProtocol(multiaddr.P_DNS4)
+		if err != nil {
+			// if dns4 hostname is not found, try and get the IP address
+			ipOrHostname, err = a.ValueForProtocol(multiaddr.P_IP4)
+			if err != nil {
+				continue // this may not be a TCP IP multiaddress
+			}
+		}
+
+		// if either IP address or hostname is found, look for the port number
+		port, err = a.ValueForProtocol(multiaddr.P_TCP)
+		if err != nil {
+			// an IPv4 or DNS4 based multiaddress should have a port number
+			return "", "", err
+		}
+
+		//there should only be one valid IPv4 address
+		return ipOrHostname, port, nil
+	}
+	return "", "", fmt.Errorf("ip address or hostname not found")
+}
+
+func generateProtocolID(rootBlockID string) protocol.ID {
+	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
+}
+
+// PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
 // flow.Identity           ---> peer.AddrInfo
 //    |-- Address          --->   |-- []multiaddr.Multiaddr
 //    |-- NetworkPublicKey --->   |-- ID
-func PeerInfoFromID(id flow.Identity) (peer.AddrInfo, error) {
-
-	nodeAddress, err := NodeAddressFromIdentity(id)
+func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
+	ip, port, key, err := networkingInfo(identity)
 	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
+		return peer.AddrInfo{}, fmt.Errorf("could not get translate identity to networking info %s: %w", identity.NodeID.String(), err)
 	}
 
-	addr, err := GetPeerInfo(nodeAddress)
+	addr := MultiAddressStr(ip, port)
+	maddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("failed to convert flow Identity %s to peer.AddrInfo: %w", id.String(), err)
+		return peer.AddrInfo{}, err
 	}
 
-	return addr, nil
-}
-
-// NodeAddressFromIdentity returns the libp2p.NodeAddress for the given flow.identity
-func NodeAddressFromIdentity(flowIdentity flow.Identity) (NodeAddress, error) {
-
-	// split the node address into ip and port
-	ip, port, err := net.SplitHostPort(flowIdentity.Address)
+	id, err := peer.IDFromPublicKey(key)
 	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not parse address %s: %w", flowIdentity.Address, err)
+		return peer.AddrInfo{}, fmt.Errorf("could not extract libp2p id from key:%w", err)
 	}
-
-	// convert the Flow key to a LibP2P key
-	lkey, err := publicKey(flowIdentity.NetworkPubKey)
-	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
-	}
-
-	// create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
-
-	return nodeAddress, nil
+	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
+	return pInfo, err
 }
