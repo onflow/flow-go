@@ -24,6 +24,9 @@ import (
 
 type FollowerState struct {
 	State
+	index    storage.Index
+	payloads storage.Payloads
+	consumer protocol.Consumer
 }
 
 type MutableState struct {
@@ -47,15 +50,18 @@ func NewFollowerState(
 	statuses storage.EpochStatuses,
 	consumer protocol.Consumer,
 ) (*FollowerState, error) {
-	partial, err := NewState(metrics, tracer, db, headers, seals, index, payloads,
-		blocks, setups, commits, statuses, consumer)
+	partial, err := NewState(metrics, tracer, db, headers, seals, blocks,
+		setups, commits, statuses)
 
 	if err != nil {
 		return nil, err
 	}
 
 	followerState := &FollowerState{
-		State: *partial,
+		State:    *partial,
+		index:    index,
+		payloads: payloads,
+		consumer: consumer,
 	}
 	return followerState, nil
 }
