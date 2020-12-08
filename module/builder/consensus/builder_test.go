@@ -511,6 +511,22 @@ func (bs *BuilderSuite) TestPayloadSealAllValid() {
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
+// Test maxSealLimit is enforced
+func (bs *BuilderSuite) TestPayloadSealLimit() {
+
+	// use valid chain of seals in mempool
+	bs.pendingSeals = bs.irsMap
+
+	// change maxSealCount to one less than the number of items in the mempool
+	limit := uint(len(bs.irsMap) - 1)
+	bs.build.cfg.maxSealCount = limit
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+	bs.Assert().Equal(bs.chain[:limit], bs.assembled.Seals, "should have excluded seals above maxSealCount")
+}
+
 // TestPayloadSealOnlyFork checks that the builder only includes seals corresponding
 // to blocks on the current fork (and _not_ seals for sealable blocks on other forks)
 func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
@@ -541,6 +557,25 @@ func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 }
 
+// Test that seals for blocks that already have seals on the fork are rejected
+func (bs *BuilderSuite) TestPayloadSealDuplicate() {
+
+	// pretend that the first n blocks are already sealed
+	n := 4
+	lastSeal := bs.chain[n-1]
+	// trick the builder into thinking this is the last seal on the fork
+	mockSealDB := &storage.Seals{}
+	mockSealDB.On("ByBlockID", mock.Anything).Return(lastSeal, nil)
+	bs.build.seals = mockSealDB
+
+	// submit all the seals (containing n duplicates)
+	bs.pendingSeals = bs.irsMap
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.chain[n:], bs.assembled.Seals, "should have rejected duplicate seals")
+}
+
 func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 
 	// remove the seal at the start
@@ -552,7 +587,7 @@ func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().Empty(bs.assembled.Seals, "should have not included any chains from cutoff chain")
+	bs.Assert().Empty(bs.assembled.Seals, "should not have included any seals from cutoff chain")
 }
 
 func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
@@ -573,8 +608,6 @@ func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
 // from the mempool.
 func (bs *BuilderSuite) TestPayloadReceiptUnknownBlock() {
 
-	bs.pendingReceipts = []*flow.ExecutionReceipt{}
-
 	// create a valid receipt for an unknown block
 	pendingReceiptUnknownBlock := unittest.ExecutionReceiptFixture()
 	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceiptUnknownBlock)
@@ -585,26 +618,109 @@ func (bs *BuilderSuite) TestPayloadReceiptUnknownBlock() {
 	bs.Assert().ElementsMatch(flow.GetIDs(bs.pendingReceipts), bs.remRecIDs, "should remove receipts with unknown blocks")
 }
 
-// Receipts for sealed blocks should not be reinserted
-func (bs *BuilderSuite) TestPayloadReceiptSealedBlock() {
+// Receipts for blocks that are not on the fork should be skipped but not
+// removed from the mempool
+func (bs *BuilderSuite) TestPayloadReceiptForBlockNotInFork() {
 
-	bs.pendingReceipts = []*flow.ExecutionReceipt{}
+	// create a valid receipt for a known, unsealed block, not on the fork
+	first := bs.headers[bs.firstID]
+	firstHeight := first.Height
+	pendingReceipt := unittest.ExecutionReceiptFixture()
+	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{Height: firstHeight + 1000}
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
 
-	// create a valid receipt for a known but sealed block
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when receipts correspond to blocks not on the fork")
+	bs.Assert().Empty(bs.remRecIDs, "should not remove receipts that are for blocks not on the fork")
+}
+
+// Receipts for sealed and finalized blocks on this fork should not be
+// reinserted
+func (bs *BuilderSuite) TestPayloadReceiptSealedAndFinalizedBlock() {
+
+	// create a valid receipt for the first block, which is sealed and finalized
 	sealedBlock := bs.blocks[bs.firstID]
 	pendingReceiptSealedBlock := unittest.ReceiptForBlockFixture(sealedBlock)
 	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceiptSealedBlock)
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
-	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are for sealed blocks")
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are for sealed finalized blocks")
+}
+
+// Receipts for sealed and pending blocks on this fork should not be reinserted
+func (bs *BuilderSuite) TestPayloadReceiptSealedAndPendingBlock() {
+
+	// create a seal for the first pending block
+	pendingBlock := bs.blocks[bs.pendingBlockIDs[0]]
+	pendingBlockResult := bs.resultForBlock[pendingBlock.ID()]
+	pendingBlockEndState, _ := pendingBlockResult.FinalStateCommitment()
+	pendingBlockSeal := &flow.Seal{
+		BlockID:    pendingBlock.ID(),
+		ResultID:   pendingBlockResult.ID(),
+		FinalState: pendingBlockEndState,
+	}
+
+	// trick the builder into thinking this is the last seal on the fork
+	mockSealDB := &storage.Seals{}
+	mockSealDB.On("ByBlockID", mock.Anything).Return(pendingBlockSeal, nil)
+	bs.build.seals = mockSealDB
+
+	// try inserting a receipt for this sealed and pending block
+	pendingReceipt := unittest.ReceiptForBlockFixture(pendingBlock)
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are for sealed pending blocks")
+}
+
+//
+// [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [F4] <- [A0] <- [A1] <- [A2] <- [A3] <- [A4]
+//                                               |
+//                                               +  <- [B0] <- [B1] <- [B2] <- [B3] <- [B4]
+//
+// Last sealed block on fork A: F0
+// Last sealed block on fork B: `first`
+//
+// This scenario occurs if:
+// - No block between F0 and F4 contains a seal for F0
+// - No block between B0 and B4 contains a seal for F0
+// - There is a block between A0 and A4 that contains a seal for F0
+//
+// Here we set it up by mocking the calls to sealDB.ByBlockID such that the
+// last sealed block at A4 is F0, and the last sealed block at B4 is `first`.
+//
+// We test that we can Extend fork B with a receipt for block F0
+func (bs *BuilderSuite) TestPayloadReceiptSealsOtherFork() {
+
+	// create B fork
+	var forkHead *flow.Block
+	forkHead = bs.blocks[bs.finalID]
+	for i := 0; i < 5; i++ {
+		forkHead = bs.createAndRecordBlock(forkHead)
+	}
+
+	mockSealDB := &storage.Seals{}
+	// set last seal on A fork to F0
+	mockSealDB.On("ByBlockID", bs.parentID).Return(bs.irsList[0].Seal, nil)
+	// set last seal on B fork to `first`
+	mockSealDB.On("ByBlockID", forkHead.ID()).Return(bs.lastSeal, nil)
+	bs.build.seals = mockSealDB
+
+	// Add a receipt for F0 in mempool and try to extend B fork
+	pendingReceipt := unittest.ReceiptForBlockFixture(bs.blocks[bs.finalizedBlockIDs[0]])
+	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
+
+	_, err := bs.build.BuildOn(forkHead.ID(), bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().ElementsMatch(bs.pendingReceipts, bs.assembled.Receipts, "should still include receipt if the corresponding block was sealed in another fork")
 }
 
 // Receipts that are already included in finalized blocks should not be
 // reinserted and should be removed from the mempool.
 func (bs *BuilderSuite) TestPayloadReceiptInFinalizedBlock() {
-
-	bs.pendingReceipts = []*flow.ExecutionReceipt{}
 
 	// try to reinsert a receipt that is already in a finalized block
 	finalBlock := bs.blocks[bs.finalID]
@@ -620,7 +736,6 @@ func (bs *BuilderSuite) TestPayloadReceiptInFinalizedBlock() {
 // Receipts that are already included in pending blocks should not be reinserted
 // but should stay in the mempool.
 func (bs *BuilderSuite) TestPayloadReceiptInPendingBlock() {
-	bs.pendingReceipts = []*flow.ExecutionReceipt{}
 
 	// try to reinsert a receipt that is already in a pending block
 	pendingBlock := bs.blocks[bs.pendingBlockIDs[0]]
@@ -631,24 +746,6 @@ func (bs *BuilderSuite) TestPayloadReceiptInPendingBlock() {
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when pending receipts are already included in pending blocks")
 	bs.Assert().Empty(bs.remRecIDs, "should not remove receipts that are already in pending blocks")
-}
-
-// Receipts for blocks that are not on the fork should be skipped but not
-// removed from the mempool
-func (bs *BuilderSuite) TestPayloadReceiptForBlockNotInFork() {
-	bs.pendingReceipts = []*flow.ExecutionReceipt{}
-
-	// create a valid receipt for a known, unsealed block, not on the fork
-	first := bs.headers[bs.firstID]
-	firstHeight := first.Height
-	pendingReceipt := unittest.ExecutionReceiptFixture()
-	bs.headers[pendingReceipt.ExecutionResult.BlockID] = &flow.Header{Height: firstHeight + 1000}
-	bs.pendingReceipts = append(bs.pendingReceipts, pendingReceipt)
-
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
-	bs.Require().NoError(err)
-	bs.Assert().Empty(bs.assembled.Receipts, "should have no receipts in payload when receipts correspond to blocks not on the fork")
-	bs.Assert().Empty(bs.remRecIDs, "should not remove receipts that are for blocks not on the fork")
 }
 
 // Valid receipts should be inserted in the payload, sorted by block height.

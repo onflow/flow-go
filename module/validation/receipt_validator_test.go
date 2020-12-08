@@ -83,7 +83,22 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
 	s.Require().Error(err, "should reject invalid identity")
 }
 
-func (s *ReceiptValidationSuite) TestReceiptTooFewChunksChunks() {
+func (s *ReceiptValidationSuite) TestReceiptInvalidSignature() {
+	valSubgrph := s.ValidSubgraphFixture()
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	s.verifier.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(false, nil).Once()
+
+	err := s.receiptValidator.Validate(receipt)
+	s.Require().Error(err, "should reject invalid signature")
+}
+
+func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	valSubgrph := s.ValidSubgraphFixture()
 	chunks := valSubgrph.Result.Chunks
 	valSubgrph.Result.Chunks = chunks[0 : len(chunks)-2] // drop the last chunk

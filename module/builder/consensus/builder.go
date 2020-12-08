@@ -436,7 +436,13 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// block
 	nextSealHeight := sealed.Height + 1
 	nextSeal, ok := filteredSeals[nextSealHeight]
+	var count uint = 0
 	for ok {
+
+		// don't include more than maxSealCount seals
+		if count >= b.cfg.maxSealCount {
+			break
+		}
 
 		//  enforce that execution results form chain
 		nextResultToBeSealed := nextSeal.IncorporatedResult.Result
@@ -451,6 +457,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		last = nextSeal.Seal
 		chain = append(chain, nextSeal.Seal)
 		nextSealHeight++
+		count++
 		nextSeal, ok = filteredSeals[nextSealHeight]
 	}
 
@@ -503,9 +510,8 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 	// height of the block that contains it.
 	lookup := make(map[flow.Identifier]uint64)
 
-	// Walk backwards through the fork, from parent to last sealed block
-	// (excluded), and keep track of the receipts that are contained in those
-	// blocks.
+	// loop through the fork backwards, from parent to last sealed, and keep
+	// track of blocks and receipts visited on the way.
 	ancestorID := parentID
 	for {
 
