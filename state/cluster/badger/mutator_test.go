@@ -62,7 +62,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 	suite.state, err = NewState(suite.db, tracer, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
-	suite.mutator = suite.state.Mutate()
+	suite.mutator = suite.state
 	consumer := events.NewNoop()
 
 	suite.protoState, err = protocol.NewState(metrics, tracer, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
@@ -86,7 +86,7 @@ func (suite *MutatorSuite) Bootstrap() {
 	root, result, seal := unittest.BootstrapFixture(participants)
 	// ensure we don't enter a new epoch for tests that build many blocks
 	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
-	err := suite.protoState.Mutate().Bootstrap(root, result, seal)
+	err := suite.protoState.Bootstrap(root, result, seal)
 	suite.Require().Nil(err)
 	suite.protoGenesis = root.Header
 
@@ -324,9 +324,9 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 		next := unittest.BlockWithParentFixture(parent)
 		next.Payload.Guarantees = nil
 		next.SetPayload(*next.Payload)
-		err := suite.protoState.Mutate().Extend(&next)
+		err := suite.protoState.Extend(&next)
 		suite.Require().Nil(err)
-		err = suite.protoState.Mutate().Finalize(next.ID())
+		err = suite.protoState.Finalize(next.ID())
 		suite.Require().Nil(err)
 		parent = next.Header
 	}

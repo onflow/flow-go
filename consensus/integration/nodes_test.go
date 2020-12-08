@@ -139,7 +139,7 @@ func createNode(
 	state, err := protocol.NewState(metrics, tracer, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
 	require.NoError(t, err)
 
-	err = state.Mutate().Bootstrap(root, result, seal)
+	err = state.Bootstrap(root, result, seal)
 	require.NoError(t, err)
 
 	localID := identity.ID()

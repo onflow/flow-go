@@ -40,7 +40,7 @@ func TestFinalizer(t *testing.T) {
 
 		state, err := cluster.NewState(db, tracer, genesis.Header.ChainID, headers, payloads)
 		require.NoError(t, err)
-		mutator := state.Mutate()
+		mutator := state
 
 		pool := stdmap.NewTransactions(1000)
 

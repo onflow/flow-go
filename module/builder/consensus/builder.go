@@ -26,7 +26,7 @@ type Builder struct {
 	metrics  module.MempoolMetrics
 	tracer   module.Tracer
 	db       *badger.DB
-	state    protocol.State
+	state    protocol.FollowerState
 	seals    storage.Seals
 	headers  storage.Headers
 	index    storage.Index
@@ -39,7 +39,7 @@ type Builder struct {
 func NewBuilder(
 	metrics module.MempoolMetrics,
 	db *badger.DB,
-	state protocol.State,
+	state protocol.FollowerState,
 	headers storage.Headers,
 	seals storage.Seals,
 	index storage.Index,

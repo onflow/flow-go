@@ -29,7 +29,7 @@ func TestHead(t *testing.T) {
 
 		identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		root, result, seal := unittest.BootstrapFixture(identities)
-		err := state.Mutate().Bootstrap(root, result, seal)
+		err := state.Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
 		header := root.Header
@@ -59,7 +59,7 @@ func TestIdentities(t *testing.T) {
 
 		identities := unittest.IdentityListFixture(20, unittest.WithAllRoles())
 		root, result, seal := unittest.BootstrapFixture(identities)
-		err := state.Mutate().Bootstrap(root, result, seal)
+		err := state.Bootstrap(root, result, seal)
 		require.Nil(t, err)
 
 		t.Run("no filter", func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestClusters(t *testing.T) {
 		for i := 0; i < nClusters; i++ {
 			commit.ClusterQCs[i] = unittest.QuorumCertificateFixture()
 		}
-		err := state.Mutate().Bootstrap(root, result, seal)
+		err := state.Bootstrap(root, result, seal)
 		require.NoError(t, err)
 
 		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
@@ -138,7 +138,7 @@ func TestSeed(t *testing.T) {
 
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 			root, result, seal := unittest.BootstrapFixture(identities)
-			err := state.Mutate().Bootstrap(root, result, seal)
+			err := state.Bootstrap(root, result, seal)
 			require.NoError(t, err)
 
 			_, err = state.Final().(*bprotocol.Snapshot).Seed(1, 2, 3, 4)
@@ -155,14 +155,14 @@ func TestSeed(t *testing.T) {
 			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 			root, result, seal := unittest.BootstrapFixture(identities)
 
-			err := state.Mutate().Bootstrap(root, result, seal)
+			err := state.Bootstrap(root, result, seal)
 			require.NoError(t, err)
 
 			// add child
 			unvalidatedChild := unittest.BlockWithParentFixture(root.Header)
 			unvalidatedChild.Payload.Guarantees = nil
 			unvalidatedChild.Header.PayloadHash = unvalidatedChild.Payload.Hash()
-			err = state.Mutate().Extend(&unvalidatedChild)
+			err = state.Extend(&unvalidatedChild)
 			assert.Nil(t, err)
 
 			_, err = state.Final().(*bprotocol.Snapshot).Seed(1, 2, 3, 4)
@@ -184,7 +184,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 
 		identities := unittest.CompleteIdentitySet()
 		root, result, seal := unittest.BootstrapFixture(identities)
-		err := state.Mutate().Bootstrap(root, result, seal)
+		err := state.Bootstrap(root, result, seal)
 		require.Nil(t, err)
 
 		epoch1Counter := seal.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
@@ -282,7 +282,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 		identities := unittest.CompleteIdentitySet()
 		root, result, seal := unittest.BootstrapFixture(identities)
-		err := state.Mutate().Bootstrap(root, result, seal)
+		err := state.Bootstrap(root, result, seal)
 		require.Nil(t, err)
 
 		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
@@ -383,7 +383,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 		root, result, seal := unittest.BootstrapFixture(epoch1Identities)
-		err := state.Mutate().Bootstrap(root, result, seal)
+		err := state.Bootstrap(root, result, seal)
 		require.Nil(t, err)
 
 		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
@@ -506,7 +506,7 @@ func TestSnapshot_PostSporkIdentities(t *testing.T) {
 		root, result, seal := unittest.BootstrapFixture(expected, func(block *flow.Block) {
 			block.Header.ParentID = unittest.IdentifierFixture()
 		})
-		err := state.Mutate().Bootstrap(root, result, seal)
+		err := state.Bootstrap(root, result, seal)
 		require.Nil(t, err)
 
 		actual, err := state.Final().Identities(filter.Any)

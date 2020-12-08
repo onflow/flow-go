@@ -473,7 +473,7 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 		Payload: proposal.Payload,
 	}
 
-	err := e.clusterState.Mutate().Extend(block)
+	err := e.clusterState.Extend(block)
 	// if the error is a known invalid extension of the cluster state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {

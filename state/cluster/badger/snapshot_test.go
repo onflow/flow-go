@@ -60,7 +60,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	suite.state, err = NewState(suite.db, tracer, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
-	suite.mutator = suite.state.Mutate()
+	suite.mutator = suite.state
 	consumer := events.NewNoop()
 
 	// just bootstrap with a genesis block, we'll use this as reference
@@ -68,7 +68,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	genesis, result, seal := unittest.BootstrapFixture(participants)
-	err = suite.protoState.Mutate().Bootstrap(genesis, result, seal)
+	err = suite.protoState.Bootstrap(genesis, result, seal)
 	suite.Require().Nil(err)
 
 	suite.Bootstrap()
