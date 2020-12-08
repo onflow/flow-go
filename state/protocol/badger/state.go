@@ -15,21 +15,18 @@ import (
 )
 
 type State struct {
-	metrics  module.ComplianceMetrics
-	tracer   module.Tracer
-	db       *badger.DB
-	headers  storage.Headers
-	seals    storage.Seals
-	index    storage.Index
-	payloads storage.Payloads
-	blocks   storage.Blocks
-	epoch    struct {
+	metrics module.ComplianceMetrics
+	tracer  module.Tracer
+	db      *badger.DB
+	headers storage.Headers
+	seals   storage.Seals
+	blocks  storage.Blocks
+	epoch   struct {
 		setups   storage.EpochSetups
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
-	consumer protocol.Consumer
-	cfg      Config
+	cfg Config
 }
 
 // NewState initializes a new state backed by a badger database, applying the
@@ -40,24 +37,18 @@ func NewState(
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
-	index storage.Index,
-	payloads storage.Payloads,
 	blocks storage.Blocks,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-	consumer protocol.Consumer,
 ) (*State, error) {
-
 	s := &State{
-		metrics:  metrics,
-		tracer:   tracer,
-		db:       db,
-		headers:  headers,
-		seals:    seals,
-		index:    index,
-		payloads: payloads,
-		blocks:   blocks,
+		metrics: metrics,
+		tracer:  tracer,
+		db:      db,
+		headers: headers,
+		seals:   seals,
+		blocks:  blocks,
 		epoch: struct {
 			setups   storage.EpochSetups
 			commits  storage.EpochCommits
@@ -67,8 +58,7 @@ func NewState(
 			commits:  commits,
 			statuses: statuses,
 		},
-		consumer: consumer,
-		cfg:      DefaultConfig(),
+		cfg: DefaultConfig(),
 	}
 
 	return s, nil
