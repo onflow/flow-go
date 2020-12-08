@@ -46,7 +46,6 @@ func TestClusterPayloadRetrieveWithoutStore(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 
-		// storing again should error with key already exists
 		_, err := store.ByBlockID(blockID)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})

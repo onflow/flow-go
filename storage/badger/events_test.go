@@ -1,14 +1,12 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
@@ -52,18 +50,22 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 		store := badgerstorage.NewEvents(db)
 
 		blockID := unittest.IdentifierFixture()
-		// txID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
 
 		// retrieve by blockID
-		_, err := store.ByBlockID(blockID)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		events, err := store.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.True(t, len(events) == 0)
 
-		// // retrieve by blockID and event type
-		// _, err = store.ByBlockIDEventType(blockID, flow.EventAccountCreated)
-		// assert.True(t, errors.Is(err, storage.ErrNotFound))
+		// retrieve by blockID and event type
+		events, err = store.ByBlockIDEventType(blockID, flow.EventAccountCreated)
+		require.NoError(t, err)
+		require.True(t, len(events) == 0)
 
-		// // retrieve by blockID and transaction id
-		// _, err = store.ByBlockIDTransactionID(blockID, txID)
-		// assert.True(t, errors.Is(err, storage.ErrNotFound))
+		// retrieve by blockID and transaction id
+		events, err = store.ByBlockIDTransactionID(blockID, txID)
+		require.NoError(t, err)
+		require.True(t, len(events) == 0)
+
 	})
 }
