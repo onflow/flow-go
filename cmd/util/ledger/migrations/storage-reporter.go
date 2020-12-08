@@ -1,12 +1,14 @@
 package migrations
 
 import (
+	"math"
+	"strings"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
-	"math"
-	"strings"
 )
 
 // iterates through registers keeping a map of register sizes
@@ -22,7 +24,7 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 	max := uint64(0)
 
 	for i, p := range payload {
-		id, err := keyToRegisterId(p.Key)
+		id, err := keyToRegisterID(p.Key)
 		if err != nil {
 			return err
 		}
