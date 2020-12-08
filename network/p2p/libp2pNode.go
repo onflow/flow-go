@@ -440,13 +440,13 @@ func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	allowlist := make([]peer.AddrInfo, len(identities))
 	var err error
 	for i, identity := range identities {
-		whiteList[i], err = PeerAddressInfo(*identity)
+		allowlist[i], err = PeerAddressInfo(*identity)
 		if err != nil {
 			return fmt.Errorf("could not generate address info: %w", err)
 		}
 	}
 
-	n.connGater.update(whiteList)
+	n.connGater.update(allowlist)
 	return nil
 }
 
