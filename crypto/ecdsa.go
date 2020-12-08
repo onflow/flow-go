@@ -134,20 +134,6 @@ func (a *ecdsaAlgo) signatureFormatCheck(sig Signature) bool {
 	return true
 }
 
-// GeneratePOP returns a proof of possession (PoP) for the receiver private key
-// using the given hasher.
-func (sk *PrKeyECDSA) GeneratePOP(h hash.Hasher) (Signature, error) {
-	// sign the public key
-	return sk.Sign(sk.PublicKey().Encode(), h)
-}
-
-// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
-// using the given hasher.
-func (pk *PubKeyECDSA) VerifyPOP(s Signature, h hash.Hasher) (bool, error) {
-	// verify the signature against the public key
-	return pk.Verify(s, pk.Encode(), h)
-}
-
 var one = new(big.Int).SetInt64(1)
 
 // goecdsaGenerateKey generates a public and private key pair

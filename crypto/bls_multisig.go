@@ -31,6 +31,41 @@ import (
 // #include "bls_include.h"
 import "C"
 
+// prefix for all application tags (any non PoP tag)
+const applicationTagPrefix = "APP"
+
+// prefix only for the PoP tag
+const popTagPrefix = "POP"
+
+// the PoP hasher, used to generate and verify PoPs
+var popKMAC = internalBLSKMAC(popTagPrefix)
+
+// BLSGeneratePOP returns a proof of possession (PoP) for the receiver private key.
+//
+// The KMAC hasher used in the function is guaranted to be orthogonal to all hashers used
+// for signatures or SPoCK proofs. This means a specific domain tag is used to generate PoP
+// and is not used by any other application.
+func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
+	_, ok := sk.(*PrKeyBLSBLS12381)
+	if !ok {
+		return nil, fmt.Errorf("key is not a BLS key")
+	}
+	// sign the public key
+	return sk.Sign(sk.PublicKey().Encode(), popKMAC)
+}
+
+// BLSVerifyPOP verifies a proof of possession (PoP) for the receiver public key.
+//
+// The function uses the same KMAC hasher used to generate the PoP.
+func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
+	_, ok := pk.(*PubKeyBLSBLS12381)
+	if !ok {
+		return false, fmt.Errorf("key is not a BLS key")
+	}
+	// verify the signature against the public key
+	return pk.Verify(s, pk.Encode(), popKMAC)
+}
+
 // AggregateBLSSignatures aggregate multiple BLS signatures into one.
 //
 // Signatures could be generated from the same or distinct messages, they

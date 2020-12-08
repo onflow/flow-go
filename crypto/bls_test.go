@@ -70,8 +70,13 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 
 	t.Run("NewBLSKMAC sanity check", func(t *testing.T) {
 		// test the parameter lengths of "NewBLSKMAC" are in the correct range
-		_, err := hash.NewKMAC_128([]byte(blsCipherSuite), []byte(blsKMACFunction), minHashSizeBLSBLS12381)
-		assert.NoError(t, err)
+		// h is nil if the kamc inputs are invalid
+		h := internalBLSKMAC("test")
+		assert.NotNil(t, h)
+
+		// test the application and PoP prefixes are different and have the same length
+		assert.NotEqual(t, applicationTagPrefix, popTagPrefix)
+		assert.Equal(t, len(applicationTagPrefix), len(popTagPrefix))
 	})
 }
 
@@ -111,8 +116,42 @@ func TestBLSUtils(t *testing.T) {
 
 // BLS Proof of Possession test
 func TestBLSPOP(t *testing.T) {
-	kmac := NewBLSKMAC("POP test tag")
-	testPOP(t, BLSBLS12381, kmac)
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+	// make sure the length is larger than minimum lengths of all the signaure algos
+	seedMinLength := 48
+	seed := make([]byte, seedMinLength)
+	input := make([]byte, 100)
+
+	loops := 10
+	for j := 0; j < loops; j++ {
+		n, err := mrand.Read(seed)
+		require.Equal(t, n, seedMinLength)
+		require.NoError(t, err)
+		sk, err := GeneratePrivateKey(BLSBLS12381, seed)
+		require.NoError(t, err)
+		_, err = mrand.Read(input)
+		require.NoError(t, err)
+		s, err := BLSGeneratePOP(sk)
+		require.NoError(t, err)
+		pk := sk.PublicKey()
+
+		// test a valid PoP
+		result, err := BLSVerifyPOP(pk, s)
+		require.NoError(t, err)
+		assert.True(t, result, fmt.Sprintf(
+			"Verification should succeed:\n signature:%s\n private key:%s", s, sk))
+
+		// test with a valid but different key
+		seed[0] ^= 1
+		wrongSk, err := GeneratePrivateKey(BLSBLS12381, seed)
+		require.NoError(t, err)
+		result, err = BLSVerifyPOP(wrongSk.PublicKey(), s)
+		require.NoError(t, err)
+		assert.False(t, result, fmt.Sprintf(
+			"Verification should fail:\n signature:%s\n private key:%s", s, sk))
+	}
 }
 
 // BLS multi-signature

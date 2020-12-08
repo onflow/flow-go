@@ -50,6 +50,32 @@ type blsBLS12381Algo struct {
 //  BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
 
+// NewBLSKMAC returns a new KMAC128 instance with the right parameters
+// chosen for BLS signatures and verifications.
+//
+// It expands the message into 1024 bits (required for the optimal SwU hash to curve).
+// tag is the domain separation tag, it is recommended to use a different tag for each signature domain.
+// The returned KMAC is customized by the tag and is guaranteed to be different than the KAMC used
+// to generate proofs of possession.
+func NewBLSKMAC(tag string) hash.Hasher {
+	// application tag is guaranteed to be different than the tag used
+	// to generate proofs of possession.
+	appTag := applicationTagPrefix + tag
+	return internalBLSKMAC(appTag)
+}
+
+// returns a customized KMAC instance for BLS
+func internalBLSKMAC(tag string) hash.Hasher {
+	// postfix the tag with the BLS ciphersuite
+	key := []byte(tag + blsCipherSuite)
+	// blsKMACFunction is the customizer used for KMAC in BLS
+	const blsKMACFunction = "H2C"
+	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
+	// (tested by TestBLSBLS12381Hasher)
+	kmac, _ := hash.NewKMAC_128(key, []byte(blsKMACFunction), minHashSizeBLSBLS12381)
+	return kmac
+}
+
 // Sign signs an array of bytes using the private key
 //
 // Signature is compressed [zcash]
@@ -80,22 +106,6 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)))
 	return s, nil
-}
-
-// blsKMACFunction is the customizer used for KMAC in BLS
-const blsKMACFunction = "H2C"
-
-// NewBLSKMAC returns a new KMAC128 instance with the right parameters
-// chosen for BLS signatures and verifications.
-// It expands the message into 1024 bits (required for the optimal SwU hash to curve)
-// tag is the domain separation tag, it is recommended to use a different tag for each signature domain
-func NewBLSKMAC(tag string) hash.Hasher {
-	// postfix the tag with the BLS ciphersuite
-	kmacTag := []byte(tag + blsCipherSuite)
-	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
-	// (tested by TestBLSBLS12381Hasher)
-	kmac, _ := hash.NewKMAC_128(kmacTag, []byte(blsKMACFunction), minHashSizeBLSBLS12381)
-	return kmac
 }
 
 // Verify verifies a signature of a byte array using the public key and the input hasher.
@@ -157,24 +167,6 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	// error is not checked as it is guaranteed to be nil; len(seed)<maxScalarSize
 	mapToZr(&sk.scalar, seed)
 	return sk, nil
-}
-
-// GeneratePOP returns a proof of possession (PoP) for the receiver private key
-// using the given hasher.
-//
-// The hasher must be independant from the hashers used for signatures
-// or SPoCK proofs. In the case of KMAC, this means a specific domain tag must
-// be used for PoP and not used for other domains.
-func (sk *PrKeyBLSBLS12381) GeneratePOP(kmac hash.Hasher) (Signature, error) {
-	// sign the public key
-	return sk.Sign(sk.PublicKey().Encode(), kmac)
-}
-
-// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
-// using the given hasher.
-func (pk *PubKeyBLSBLS12381) VerifyPOP(s Signature, kmac hash.Hasher) (bool, error) {
-	// verify the signature against the public key
-	return pk.Verify(s, pk.Encode(), kmac)
 }
 
 // decodePrivateKey decodes a slice of bytes into a private key.

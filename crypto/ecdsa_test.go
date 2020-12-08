@@ -202,19 +202,6 @@ func TestScalarMult(t *testing.T) {
 	})
 }
 
-// ECDSA Proof of Possession test
-func TestECDSAPOP(t *testing.T) {
-	ecdsaCurves := []SigningAlgorithm{
-		ECDSAP256,
-		ECDSASecp256k1,
-	}
-	for _, curve := range ecdsaCurves {
-		t.Logf("Testing ECDSA for curve %s", curve)
-		halg := hash.NewSHA3_256()
-		testPOP(t, curve, halg)
-	}
-}
-
 func TestSignatureFormatCheck(t *testing.T) {
 	curves := []SigningAlgorithm{
 		ECDSAP256,
