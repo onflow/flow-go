@@ -18,6 +18,12 @@ import (
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
+// FollowerState implements a lighter version of protocol state
+// Follows chain updates and performs checks using info that
+// is available in headers. It allows
+// us to execute fork-aware queries against ambiguous protocol state, while
+// still checking that the given block is a valid extension of the protocol
+// state
 type FollowerState struct {
 	State
 	index    storage.Index
@@ -25,12 +31,15 @@ type FollowerState struct {
 	consumer protocol.Consumer
 }
 
+// MutableState implements a complete version of protocol state.
+// Performs extensive checks for validity of incoming blocks.
+// Compared to FollowerState makes more checks before extending chain.
 type MutableState struct {
 	FollowerState
 	validator module.ReceiptValidator
 }
 
-// NewState initializes a new state backed by a badger database, applying the
+// NewFollowerState initializes a new follower state backed by a badger database, applying the
 // optional configuration parameters.
 func NewFollowerState(
 	metrics module.ComplianceMetrics,
@@ -62,6 +71,8 @@ func NewFollowerState(
 	return followerState, nil
 }
 
+// NewMutableState initializes a new full state backed by a badger database, applying the
+// optional configuration parameters.
 func NewMutableState(
 	metrics module.ComplianceMetrics,
 	tracer module.Tracer,
@@ -94,6 +105,8 @@ func NewMutableState(
 	return mutableState, nil
 }
 
+// Implementation of header extending for FollowerState, checks header
+// validity with data what is available.
 func (m *FollowerState) Extend(candidate *flow.Block) error {
 
 	blockID := candidate.ID()
@@ -121,6 +134,8 @@ func (m *FollowerState) Extend(candidate *flow.Block) error {
 	return nil
 }
 
+// Implementation of block extending for MutableState, checks vailidity of blocks, seal, receipts,
+// before extending the chain.
 func (m *MutableState) Extend(candidate *flow.Block) error {
 
 	blockID := candidate.ID()
