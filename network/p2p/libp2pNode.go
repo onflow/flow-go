@@ -437,7 +437,7 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (time.Duration,
 // UpdateAllowList allows the peer allow list to be updated.
 func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	// generates peer address information for all identities
-	whiteList := make([]peer.AddrInfo, len(identities))
+	allowlist := make([]peer.AddrInfo, len(identities))
 	var err error
 	for i, identity := range identities {
 		whiteList[i], err = PeerAddressInfo(*identity)
