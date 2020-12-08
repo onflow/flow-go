@@ -177,10 +177,10 @@ func finalize(cmd *cobra.Command, args []string) {
 		if err != nil {
 			log.Error().Err(err).Msg("could not copy private key files")
 		}
-		log.Info().Msg("")
 	} else {
 		log.Info("skipping copy of private keys to output dir")
 	}
+	log.Info().Msg("")
 
 	// print count of all nodes
 	roleCounts := nodeCountByRole(stakingNodes)
