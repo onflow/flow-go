@@ -178,6 +178,8 @@ func finalize(cmd *cobra.Command, args []string) {
 			log.Error().Err(err).Msg("could not copy private key files")
 		}
 		log.Info().Msg("")
+	} else {
+		log.Info("skipping copy of private keys to output dir")
 	}
 
 	// print count of all nodes
