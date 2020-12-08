@@ -29,9 +29,10 @@ import (
 // FinderEngineTestSuite contains the unit tests of Finder engine.
 type FinderEngineTestSuite struct {
 	suite.Suite
-	net   *module.Network
-	me    *module.Local
-	state *protocol.State
+	net      *module.Network
+	me       *module.Local
+	state    *protocol.State
+	snapshot *protocol.Snapshot
 
 	// mock conduit for receiving receipts
 	receiptsConduit *mocknetwork.Conduit
@@ -209,7 +210,7 @@ func (suite *FinderEngineTestSuite) TestCachedToPending() {
 	suite.blockIDsCache.On("All").
 		Return(flow.IdentifierList{})
 
-	// mocks a receipt in ready mempool
+	// mocks no receipt in ready mempool
 	suite.readyReceipts.On("All").
 		Return([]*verification.ReceiptDataPack{})
 
@@ -260,6 +261,70 @@ func (suite *FinderEngineTestSuite) TestCachedToPending() {
 		suite.metrics,
 		suite.receiptIDsByResult,
 		suite.matchEng)
+}
+
+// TestCachedToPending evaluates that having a cached receipt with its
+// block available results it moved to the ready mempool.
+func (suite *FinderEngineTestSuite) TestCachedToReady_Unstaked() {
+	e := suite.TestNewFinderEngine()
+
+	// mocks a cached receipt
+	suite.cachedReceipts.On("All").
+		Return([]*verification.ReceiptDataPack{suite.receiptDataPack})
+
+	// mocks no new finalized block
+	suite.blockIDsCache.On("All").
+		Return(flow.IdentifierList{})
+
+	// mocks no receipt in ready mempool
+	suite.readyReceipts.On("All").
+		Return([]*verification.ReceiptDataPack{})
+
+	// mocks result has not yet processed
+	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false).Once()
+
+	// mocks block associated with receipt is available
+	suite.headerStorage.On("ByBlockID", suite.block.ID()).
+		Return(suite.block.Header, nil).Once()
+
+	// mocks adding receipt id to mapping mempool based on its result
+	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).
+		Return(nil).Once()
+
+	// mocks moving from cached to pending
+	moveWG := sync.WaitGroup{}
+	moveWG.Add(2)
+	// removing from cached
+	suite.cachedReceipts.On("Rem", suite.receiptDataPack.Receipt.ID()).
+		Run(func(args testifymock.Arguments) {
+			moveWG.Done()
+		}).Return(true).Once()
+
+	//// adding to pending
+	//suite.readyReceipts.On("Add", suite.receiptDataPack).
+	//	Run(func(args testifymock.Arguments) {
+	//		moveWG.Done()
+	//	}).Return(true).Once()
+
+	suite.state.On("AtBlockID").Return()
+
+	// starts the engine
+	<-e.Ready()
+
+	// waits a timeout for finder engine to process receipt
+	unittest.AssertReturnsBefore(suite.T(), moveWG.Wait, suite.assertTimeOut)
+
+	// stops the engine
+	<-e.Done()
+
+	testifymock.AssertExpectationsForObjects(suite.T(),
+		suite.cachedReceipts,
+		suite.blockIDsCache,
+		suite.metrics,
+		suite.receiptIDsByResult,
+		suite.matchEng)
+	suite.readyReceipts.AssertNotCalled(suite.T(), "Add")
 }
 
 // TestPendingToReady evaluates that having a pending receipt with its
