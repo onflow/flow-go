@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"time"
 
 	"github.com/onflow/cadence/runtime"
@@ -76,6 +78,24 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
+		CreateState(func(fnb *cmd.FlowNodeBuilder) (protocol.MutableState, error) {
+			state, err := badger.NewMutableState(
+				fnb.Metrics.Compliance,
+				fnb.Tracer,
+				fnb.DB,
+				fnb.Storage.Headers,
+				fnb.Storage.Seals,
+				fnb.Storage.Index,
+				fnb.Storage.Payloads,
+				fnb.Storage.Blocks,
+				fnb.Storage.Setups,
+				fnb.Storage.Commits,
+				fnb.Storage.Statuses,
+				fnb.ProtocolEvents,
+				fnb.Storage.Results,
+			)
+			return state, err
+		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")

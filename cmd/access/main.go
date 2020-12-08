@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -32,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	badger "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
@@ -67,6 +69,23 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
+		CreateState(func(fnb *cmd.FlowNodeBuilder) (protocol.MutableState, error) {
+			state, err := badger.NewFollowerState(
+				fnb.Metrics.Compliance,
+				fnb.Tracer,
+				fnb.DB,
+				fnb.Storage.Headers,
+				fnb.Storage.Seals,
+				fnb.Storage.Index,
+				fnb.Storage.Payloads,
+				fnb.Storage.Blocks,
+				fnb.Storage.Setups,
+				fnb.Storage.Commits,
+				fnb.Storage.Statuses,
+				fnb.ProtocolEvents,
+			)
+			return state, err
+		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")

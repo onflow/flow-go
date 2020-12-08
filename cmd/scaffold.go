@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -29,7 +30,7 @@ import (
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	//protocol "github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
@@ -119,7 +120,7 @@ type FlowNodeBuilder struct {
 	DB                *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
-	State             *protocol.State
+	State             protocol.MutableState
 	Middleware        *p2p.Middleware
 	Network           *p2p.Network
 	MsgValidators     []network.MessageValidator
@@ -131,6 +132,7 @@ type FlowNodeBuilder struct {
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
+	createStateFn     func(*FlowNodeBuilder) (protocol.MutableState, error)
 
 	// root state information
 	RootBlock   *flow.Block
@@ -411,23 +413,12 @@ func (fnb *FlowNodeBuilder) initStorage() {
 
 func (fnb *FlowNodeBuilder) initState() {
 
-	distributor := events.NewDistributor()
-	mutatorFactory := protocol.NewMutatorFactory(fnb.Storage.Results)
-	state, err := protocol.NewState(
-		fnb.Metrics.Compliance,
-		fnb.Tracer,
-		fnb.DB,
-		fnb.Storage.Headers,
-		fnb.Storage.Seals,
-		fnb.Storage.Index,
-		fnb.Storage.Payloads,
-		fnb.Storage.Blocks,
-		fnb.Storage.Setups,
-		fnb.Storage.Commits,
-		fnb.Storage.Statuses,
-		distributor,
-		mutatorFactory,
-	)
+	if fnb.createStateFn == nil {
+		fnb.Logger.Fatal().Msg("could not initialize flow state, broken builder")
+	}
+
+	fnb.ProtocolEvents = events.NewDistributor()
+	state, err := fnb.createStateFn(fnb)
 
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
@@ -558,7 +549,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		Msg("last finalized block")
 
 	fnb.State = state
-	fnb.ProtocolEvents = distributor
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
@@ -664,6 +654,11 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) (mod
 		name: name,
 	})
 
+	return fnb
+}
+
+func (fnb *FlowNodeBuilder) CreateState(f func(builder *FlowNodeBuilder) (protocol.MutableState, error)) *FlowNodeBuilder {
+	fnb.createStateFn = f
 	return fnb
 }
 
