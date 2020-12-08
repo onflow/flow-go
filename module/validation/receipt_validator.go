@@ -12,13 +12,13 @@ import (
 )
 
 type receiptValidator struct {
-	state    protocol.ReadOnlyState
+	state    protocol.State
 	index    storage.Index
 	results  storage.ExecutionResults
 	verifier module.Verifier
 }
 
-func NewReceiptValidator(state protocol.ReadOnlyState, index storage.Index, results storage.ExecutionResults, verifier module.Verifier) *receiptValidator {
+func NewReceiptValidator(state protocol.State, index storage.Index, results storage.ExecutionResults, verifier module.Verifier) *receiptValidator {
 	rv := &receiptValidator{
 		state:    state,
 		index:    index,

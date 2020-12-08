@@ -95,7 +95,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	root, result, seal := unittest.BootstrapFixture(participants)
-	err = state.Mutate().Bootstrap(root, result, seal)
+	err = state.Bootstrap(root, result, seal)
 	require.NoError(t, err)
 
 	for _, option := range options {

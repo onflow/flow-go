@@ -75,7 +75,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	suite.state, err = clusterkv.NewState(suite.db, tracer, suite.chainID, suite.headers, suite.payloads)
 	suite.Require().Nil(err)
-	suite.mutator = suite.state.Mutate()
+	suite.mutator = suite.state
 
 	suite.protoState = putil.ProtocolState(suite.T(), suite.db)
 
@@ -99,7 +99,7 @@ func (suite *BuilderSuite) Bootstrap() {
 	root, result, seal := unittest.BootstrapFixture(identities)
 	// ensure we don't enter a new epoch for tests that build many blocks
 	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
-	err := suite.protoState.Mutate().Bootstrap(root, result, seal)
+	err := suite.protoState.Bootstrap(root, result, seal)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain
@@ -508,9 +508,9 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		block.Payload.Guarantees = nil
 		block.Payload.Seals = nil
 		block.Header.PayloadHash = block.Payload.Hash()
-		err = suite.protoState.Mutate().Extend(&block)
+		err = suite.protoState.Extend(&block)
 		suite.Require().Nil(err)
-		err = suite.protoState.Mutate().Finalize(block.ID())
+		err = suite.protoState.Finalize(block.ID())
 		suite.Require().Nil(err)
 		head = block.Header
 	}
@@ -842,7 +842,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		suite.state, err = clusterkv.NewState(suite.db, tracer, suite.chainID, suite.headers, suite.payloads)
 		assert.Nil(b, err)
-		suite.mutator = suite.state.Mutate()
+		suite.mutator = suite.state
 
 		err = suite.mutator.Bootstrap(suite.genesis)
 		assert.Nil(b, err)

@@ -28,7 +28,7 @@ type Builder struct {
 	metrics  module.MempoolMetrics
 	tracer   module.Tracer
 	db       *badger.DB
-	state    protocol.State
+	state    protocol.FollowerState
 	seals    storage.Seals
 	headers  storage.Headers
 	index    storage.Index
@@ -43,7 +43,7 @@ type Builder struct {
 func NewBuilder(
 	metrics module.MempoolMetrics,
 	db *badger.DB,
-	state protocol.State,
+	state protocol.FollowerState,
 	headers storage.Headers,
 	seals storage.Seals,
 	index storage.Index,
@@ -141,7 +141,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
 
-	err = b.state.Mutate().Extend(proposal)
+	err = b.state.Extend(proposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}

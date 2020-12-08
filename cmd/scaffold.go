@@ -458,7 +458,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.MustNot(err).Msg("could not load root seal")
 
 		// bootstrap the protocol state with the loaded data
-		err = state.Mutate().Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
+		err = state.Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 
 		fnb.Logger.Info().

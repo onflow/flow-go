@@ -302,7 +302,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
-	err := e.state.Mutate().HeaderExtend(block)
+	err := e.state.HeaderExtend(block)
 	// if the error is a known invalid extension of the protocol state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {

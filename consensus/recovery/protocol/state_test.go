@@ -23,25 +23,25 @@ func TestSaveBlockAsReplica(t *testing.T) {
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		b0, result, seal := unittest.BootstrapFixture(participants)
 
-		err := state.Mutate().Bootstrap(b0, result, seal)
+		err := state.Bootstrap(b0, result, seal)
 		require.NoError(t, err)
 
 		b1 := unittest.BlockWithParentFixture(b0.Header)
 		b1.SetPayload(flow.Payload{})
 
-		err = state.Mutate().Extend(&b1)
+		err = state.Extend(&b1)
 		require.NoError(t, err)
 
 		b2 := unittest.BlockWithParentFixture(b1.Header)
 		b2.SetPayload(flow.Payload{})
 
-		err = state.Mutate().Extend(&b2)
+		err = state.Extend(&b2)
 		require.NoError(t, err)
 
 		b3 := unittest.BlockWithParentFixture(b2.Header)
 		b3.SetPayload(flow.Payload{})
 
-		err = state.Mutate().Extend(&b3)
+		err = state.Extend(&b3)
 		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()

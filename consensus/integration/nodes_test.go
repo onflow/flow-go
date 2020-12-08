@@ -143,7 +143,7 @@ func createNode(
 		commitsDB, statusesDB, consumer, mutatorFactory)
 	require.NoError(t, err)
 
-	err = state.Mutate().Bootstrap(root, result, seal)
+	err = state.Bootstrap(root, result, seal)
 	require.NoError(t, err)
 
 	localID := identity.ID()
