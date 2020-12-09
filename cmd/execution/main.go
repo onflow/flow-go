@@ -376,6 +376,7 @@ func main() {
 				results,
 				txResults,
 				node.RootChainID,
+				scriptsEnabled,
 			)
 			return rpcEng, nil
 		}).Run()
