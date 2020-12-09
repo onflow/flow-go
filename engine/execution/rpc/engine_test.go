@@ -140,7 +140,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.Run("request with empty block IDs", func() {
 
 		// create an API request with empty block ids
-		req := concoctReq(string(flow.EventAccountCreated), nil)
 		req := createRequest(string(flow.EventAccountCreated), nil)
 
 		_, err := handler.GetEventsForBlockIDs(context.Background(), req)
