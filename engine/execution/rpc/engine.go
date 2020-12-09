@@ -44,7 +44,10 @@ func New(
 	events storage.Events,
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
-	chainID flow.ChainID) *Engine {
+	chainID flow.ChainID,
+	scriptsEnabled bool,
+	queriesEnabled bool,
+) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	if config.MaxMsgSize == 0 {
@@ -61,6 +64,8 @@ func New(
 			events:             events,
 			exeResults:         exeResults,
 			transactionResults: txResults,
+			scriptsEnabled:     scriptsEnabled,
+			queriesEnabled:     queriesEnabled,
 		},
 		server: grpc.NewServer(
 			grpc.MaxRecvMsgSize(config.MaxMsgSize),
@@ -114,6 +119,8 @@ type handler struct {
 	events             storage.Events
 	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults
+	scriptsEnabled     bool
+	queriesEnabled     bool
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -127,6 +134,10 @@ func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *execution.ExecuteScriptAtBlockIDRequest,
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
+
+	if !h.scriptsEnabled {
+		return nil, status.Error(codes.Unimplemented, "script executions are disabled")
+	}
 
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -145,8 +156,14 @@ func (h *handler) ExecuteScriptAtBlockID(
 	return res, nil
 }
 
-func (h *handler) GetEventsForBlockIDs(_ context.Context,
-	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
+func (h *handler) GetEventsForBlockIDs(
+	_ context.Context,
+	req *execution.GetEventsForBlockIDsRequest,
+) (*execution.GetEventsForBlockIDsResponse, error) {
+
+	if !h.queriesEnabled {
+		return nil, status.Error(codes.Unimplemented, "event queries are disabled")
+	}
 
 	// validate request
 	blockIDs := req.GetBlockIds()
@@ -195,6 +212,10 @@ func (h *handler) GetTransactionResult(
 	_ context.Context,
 	req *execution.GetTransactionResultRequest,
 ) (*execution.GetTransactionResultResponse, error) {
+
+	if !h.queriesEnabled {
+		return nil, status.Error(codes.Unimplemented, "transaction result queries are disabled")
+	}
 
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
@@ -266,6 +287,10 @@ func (h *handler) GetAccountAtBlockID(
 	req *execution.GetAccountAtBlockIDRequest,
 ) (*execution.GetAccountAtBlockIDResponse, error) {
 
+	if !h.scriptsEnabled {
+		return nil, status.Error(codes.Unimplemented, "account queries are disabled")
+	}
+
 	blockID := req.GetBlockId()
 	blockFlowID, err := convert.BlockID(blockID)
 	if err != nil {
@@ -296,5 +321,4 @@ func (h *handler) GetAccountAtBlockID(
 	}
 
 	return res, nil
-
 }

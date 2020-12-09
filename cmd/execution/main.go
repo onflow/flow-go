@@ -75,6 +75,8 @@ func main() {
 		syncFast              bool
 		syncThreshold         int
 		extensiveLog          bool
+		scriptsEnabled        bool
+		queriesEnabled        bool
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -93,6 +95,8 @@ func main() {
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
 			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
+			flags.BoolVar(&scriptsEnabled, "scripts-enabled", true, "whether to enable script executions and account queries")
+			flags.BoolVar(&queriesEnabled, "queries-enabled", true, "whether to enable event and transaction queries")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -365,7 +369,18 @@ func main() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
+			rpcEng := rpc.New(
+				node.Logger,
+				rpcConf,
+				ingestionEng,
+				node.Storage.Blocks,
+				events,
+				results,
+				txResults,
+				node.RootChainID,
+				scriptsEnabled,
+				queriesEnabled,
+			)
 			return rpcEng, nil
 		}).Run()
 }
