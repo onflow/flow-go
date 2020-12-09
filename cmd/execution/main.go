@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/badger"
 	"io"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/badger"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
@@ -42,12 +43,14 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 func main() {
 
 	var (
+		followerState         protocol.MutableState
 		ledgerStorage         *ledger.Ledger
 		events                *storage.Events
 		txResults             *storage.TransactionResults
@@ -79,24 +82,6 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
-		CreateState(func(fnb *cmd.FlowNodeBuilder) (protocol.MutableState, error) {
-			state, err := badger.NewMutableState(
-				fnb.Metrics.Compliance,
-				fnb.Tracer,
-				fnb.DB,
-				fnb.Storage.Headers,
-				fnb.Storage.Seals,
-				fnb.Storage.Index,
-				fnb.Storage.Payloads,
-				fnb.Storage.Blocks,
-				fnb.Storage.Setups,
-				fnb.Storage.Commits,
-				fnb.Storage.Statuses,
-				fnb.ProtocolEvents,
-				fnb.Storage.Results,
-			)
-			return state, err
-		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
@@ -112,6 +97,22 @@ func main() {
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
 			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			followerState, err = badger.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -287,7 +288,7 @@ func main() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -326,7 +327,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				followerState,
 				pendingBlocks,
 				followerCore,
 				syncCore,

@@ -5,10 +5,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/badger"
 	"path/filepath"
 	"time"
+
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/badger"
 
 	"github.com/spf13/pflag"
 
@@ -44,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -70,6 +72,7 @@ func main() {
 		chunkAlpha                             uint
 
 		err            error
+		mutableState   protocol.MutableState
 		privateDKGData *bootstrap.DKGParticipantPriv
 		guarantees     mempool.Guarantees
 		results        mempool.IncorporatedResults
@@ -85,24 +88,6 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
-		CreateState(func(fnb *cmd.FlowNodeBuilder) (protocol.MutableState, error) {
-			state, err := badger.NewMutableState(
-				fnb.Metrics.Compliance,
-				fnb.Tracer,
-				fnb.DB,
-				fnb.Storage.Headers,
-				fnb.Storage.Seals,
-				fnb.Storage.Index,
-				fnb.Storage.Payloads,
-				fnb.Storage.Blocks,
-				fnb.Storage.Setups,
-				fnb.Storage.Commits,
-				fnb.Storage.Statuses,
-				fnb.ProtocolEvents,
-				fnb.Storage.Results,
-			)
-			return state, err
-		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
@@ -121,6 +106,22 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 			flags.BoolVar(&requireOneApproval, "require-one-approval", false, "require one approval per chunk when sealing execution results")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			mutableState, err = badger.NewFullConsensusState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -267,7 +268,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				mutableState,
 				prov,
 				proposals,
 				syncCore,
@@ -281,7 +282,7 @@ func main() {
 			build = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
-				node.State,
+				mutableState,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
@@ -299,7 +300,7 @@ func main() {
 			finalize := finalizer.NewFinalizer(
 				node.DB,
 				node.Storage.Headers,
-				node.State,
+				mutableState,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,

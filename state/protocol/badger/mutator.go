@@ -4,9 +4,10 @@ package badger
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/module/validation"
+
+	"github.com/onflow/flow-go/storage"
+
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/dgraph-io/badger/v2"
@@ -25,84 +26,57 @@ import (
 // still checking that the given block is a valid extension of the protocol
 // state
 type FollowerState struct {
-	State
+	*State
 	index    storage.Index
 	payloads storage.Payloads
+	tracer   module.Tracer
 	consumer protocol.Consumer
+	cfg      Config
 }
 
 // MutableState implements a complete version of protocol state.
 // Performs extensive checks for validity of incoming blocks.
 // Compared to FollowerState makes more checks before extending chain.
 type MutableState struct {
-	FollowerState
-	validator module.ReceiptValidator
+	*FollowerState
 }
 
 // NewFollowerState initializes a new follower state backed by a badger database, applying the
 // optional configuration parameters.
 func NewFollowerState(
-	metrics module.ComplianceMetrics,
-	tracer module.Tracer,
-	db *badger.DB,
-	headers storage.Headers,
-	seals storage.Seals,
+	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	blocks storage.Blocks,
-	setups storage.EpochSetups,
-	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
+	tracer module.Tracer,
 	consumer protocol.Consumer,
 ) (*FollowerState, error) {
-	partial, err := NewState(metrics, tracer, db, headers, seals, blocks,
-		setups, commits, statuses)
-
-	if err != nil {
-		return nil, err
-	}
-
 	followerState := &FollowerState{
-		State:    *partial,
+		State:    state,
 		index:    index,
 		payloads: payloads,
+		tracer:   tracer,
 		consumer: consumer,
+		cfg:      DefaultConfig(),
 	}
 	return followerState, nil
 }
 
 // NewMutableState initializes a new full state backed by a badger database, applying the
 // optional configuration parameters.
-func NewMutableState(
-	metrics module.ComplianceMetrics,
-	tracer module.Tracer,
-	db *badger.DB,
-	headers storage.Headers,
-	seals storage.Seals,
+func NewFullConsensusState(
+	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	blocks storage.Blocks,
-	setups storage.EpochSetups,
-	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
+	tracer module.Tracer,
 	consumer protocol.Consumer,
-	results storage.ExecutionResults,
 ) (*MutableState, error) {
-	partial, err := NewFollowerState(metrics, tracer, db, headers, seals, index, payloads,
-		blocks, setups, commits, statuses, consumer)
-
+	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
-
-	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
-
-	mutableState := &MutableState{
-		FollowerState: *partial,
-		validator:     validation.NewReceiptValidator(partial, partial.index, results, signatureVerifier),
-	}
-
-	return mutableState, nil
+	return &MutableState{
+		FollowerState: followerState,
+	}, nil
 }
 
 // Implementation of header extending for FollowerState, checks header
@@ -134,7 +108,7 @@ func (m *FollowerState) Extend(candidate *flow.Block) error {
 	return nil
 }
 
-// Implementation of block extending for MutableState, checks vailidity of blocks, seal, receipts,
+// Implementation of block extending for MutableState, checks validity of blocks, seal, receipts,
 // before extending the chain.
 func (m *MutableState) Extend(candidate *flow.Block) error {
 
@@ -378,7 +352,7 @@ func (m *MutableState) sealExtend(candidate *flow.Block, lastSealUpToParent *flo
 	// get the parent's block seal, which constitutes the beginning of the
 	// sealing chain; if no seals are part of the payload, it will also be used
 	// for the candidate block, which remains at the same sealed state
-	last, err := m.state.seals.ByBlockID(header.ParentID)
+	last, err := m.seals.ByBlockID(header.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
@@ -391,18 +365,18 @@ func (m *MutableState) sealExtend(candidate *flow.Block, lastSealUpToParent *flo
 
 	// get the last sealed block; we use its height to iterate forwards through
 	// the finalized blocks which still need sealing
-	sealed, err := m.state.headers.ByBlockID(last.BlockID)
+	sealed, err := m.headers.ByBlockID(last.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
 	}
 
 	var finalizedHeight uint64
-	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	err = m.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 	var finalID flow.Identifier
-	err = m.state.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
+	err = m.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
@@ -417,7 +391,7 @@ func (m *MutableState) sealExtend(candidate *flow.Block, lastSealUpToParent *flo
 		if len(byBlock) == 0 {
 			return last, nil
 		}
-		header, err := m.state.headers.ByHeight(height)
+		header, err := m.headers.ByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block for sealed height (%d): %w", height, err)
 		}
@@ -442,7 +416,7 @@ func (m *MutableState) sealExtend(candidate *flow.Block, lastSealUpToParent *flo
 	var pendingIDs []flow.Identifier
 	for ancestorID != finalID && ancestorID != last.BlockID {
 		pendingIDs = append(pendingIDs, ancestorID)
-		ancestor, err := m.state.headers.ByBlockID(ancestorID)
+		ancestor, err := m.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
@@ -450,7 +424,7 @@ func (m *MutableState) sealExtend(candidate *flow.Block, lastSealUpToParent *flo
 	}
 
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
-		// as we are iterating the pendings blocks, if there is no more seal left,
+		// as we are iterating the pending blocks, if there is no more seal left,
 		// we exit earlier with the last seal
 		if len(byBlock) == 0 {
 			return last, nil
@@ -659,7 +633,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// this height, as it becomes immutable.
 	// 2) Forward the last finalized height to its height as well. We now have
 	// a new last finalized height.
-	// 3) Forward the last seled height to the height of the block its last
+	// 3) Forward the last sealed height to the height of the block its last
 	// seal sealed. This could actually stay the same if it has no seals in its
 	// payload, in which case the parent's seal is the same.
 
