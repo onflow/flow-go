@@ -20,19 +20,19 @@ type Snapshot struct {
 	enc EncodableSnapshot
 }
 
-func (s *Snapshot) Head() (*flow.Header, error) {
+func (s Snapshot) Head() (*flow.Header, error) {
 	return s.enc.Head, nil
 }
 
-func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
+func (s Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	return s.enc.QuorumCertificate, nil
 }
 
-func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (s Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return s.enc.Identities.Filter(selector), nil
 }
 
-func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+func (s Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, ok := s.enc.Identities.ByNodeID(nodeID)
 	if !ok {
 		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
@@ -40,28 +40,28 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return identity, nil
 }
 
-func (s *Snapshot) Commit() (flow.StateCommitment, error) {
+func (s Snapshot) Commit() (flow.StateCommitment, error) {
 	return s.enc.Commit, nil
 }
 
-func (s *Snapshot) Pending() ([]flow.Identifier, error) {
+func (s Snapshot) Pending() ([]flow.Identifier, error) {
 	// canonical snapshots don't have any pending blocks
 	return nil, nil
 }
 
-func (s *Snapshot) Phase() (flow.EpochPhase, error) {
+func (s Snapshot) Phase() (flow.EpochPhase, error) {
 	return s.enc.Phase, nil
 }
 
-func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
+func (s Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	return seed.FromParentSignature(indices, s.enc.QuorumCertificate.SigData)
 }
 
-func (s *Snapshot) Epochs() protocol.EpochQuery {
+func (s Snapshot) Epochs() protocol.EpochQuery {
 	return Epochs{s.enc.Epochs}
 }
 
-func (s *Snapshot) Encodable() EncodableSnapshot {
+func (s Snapshot) Encodable() EncodableSnapshot {
 	return s.enc
 }
 
