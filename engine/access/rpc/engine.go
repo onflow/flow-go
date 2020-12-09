@@ -71,12 +71,19 @@ func New(log zerolog.Logger,
 	}
 
 	// create a GRPC server to serve GRPC clients
-	grpcServer := grpc.NewServer(
+	grpcOpts := []*grpc.ServerOption{
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
-		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
-	)
+	}
+	if rpcMetricsEnabled {
+		grpcOpts = append(
+			grpcOpts,
+			grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+			grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+		)
+	}
+
+	grpcServer := grpc.NewServer(grpcOpts...)
 
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
