@@ -51,7 +51,6 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 	})
 }
 
-
 func TestAccounts_GetPublicKey(t *testing.T) {
 
 	t.Run("non-existent key index", func(t *testing.T) {
