@@ -60,6 +60,7 @@ func main() {
 		readyReceipts       *stdmap.ReceiptDataPacks   // used in finder engine
 		blockIDsCache       *stdmap.Identifiers        // used in finder engine
 		processedResultsIDs *stdmap.Identifiers        // used in finder engine
+		discardedResultIDs  *stdmap.Identifiers        // used in finder engine
 		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
 		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
 		chunkIDsByResult    *stdmap.IdentifierMap      // used in match engine
@@ -211,6 +212,18 @@ func main() {
 			}
 			return nil
 		}).
+		Module("discarded results ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			processedResultsIDs, err = stdmap.NewIdentifiers(receiptLimit)
+			if err != nil {
+				return err
+			}
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceDiscardedResultID, discardedResultIDs.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
+		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
 			pendingBlocks = buffer.NewPendingBlocks()
@@ -277,6 +290,7 @@ func main() {
 				readyReceipts,
 				headerStorage,
 				processedResultsIDs,
+				discardedResultIDs,
 				receiptIDsByBlock,
 				receiptIDsByResult,
 				blockIDsCache,
