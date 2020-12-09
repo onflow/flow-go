@@ -302,6 +302,9 @@ func (suite *FinderEngineTestSuite) TestCachedToReady_Staked() {
 	// mocks result has not yet processed
 	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
 		Return(false).Once()
+	// mocks result has not been previously discarded
+	suite.discardedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false).Once()
 
 	// mocks block associated with receipt is available
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).
