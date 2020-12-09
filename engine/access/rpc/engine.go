@@ -73,6 +73,8 @@ func New(log zerolog.Logger,
 	grpcServer := grpc.NewServer(
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
+		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 	)
 
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
