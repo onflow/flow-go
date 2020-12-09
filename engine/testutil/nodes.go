@@ -579,6 +579,15 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
+	if node.DiscardedResultIDs == nil {
+		node.DiscardedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.DiscardedResultIDs.Size)
+		require.Nil(t, err)
+	}
+
 	if node.BlockIDsCache == nil {
 		node.BlockIDsCache, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
@@ -671,6 +680,7 @@ func VerificationNode(t testing.TB,
 			node.ReadyReceipts,
 			node.Headers,
 			node.ProcessedResultIDs,
+			node.DiscardedResultIDs,
 			node.PendingReceiptIDsByBlock,
 			node.ReceiptIDsByResult,
 			node.BlockIDsCache,

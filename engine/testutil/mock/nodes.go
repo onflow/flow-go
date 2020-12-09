@@ -181,6 +181,7 @@ type VerificationNode struct {
 	PendingReceipts          mempool.ReceiptDataPacks
 	PendingResults           mempool.ResultDataPacks
 	ProcessedResultIDs       mempool.Identifiers
+	DiscardedResultIDs       mempool.Identifiers
 	BlockIDsCache            mempool.Identifiers
 	PendingReceiptIDsByBlock mempool.IdentifierMap
 	ReceiptIDsByResult       mempool.IdentifierMap
