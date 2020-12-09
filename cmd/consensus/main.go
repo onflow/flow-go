@@ -36,6 +36,7 @@ import (
 	chmodule "github.com/onflow/flow-go/module/chunks"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
+	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/ejectors"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -55,6 +56,8 @@ func main() {
 		sealLimit                              uint
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
+		maxSealPerBlock                        uint
+		maxGuaranteePerBlock                   uint
 		hotstuffTimeout                        time.Duration
 		hotstuffMinTimeout                     time.Duration
 		hotstuffTimeoutIncreaseFactor          float64
@@ -88,6 +91,8 @@ func main() {
 			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
+			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
+			flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
 			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
 			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
@@ -131,7 +136,11 @@ func main() {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
 			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
-			seals = stdmap.NewIncorporatedResultSeals(sealLimit, stdmap.WithEject(ejector.Eject))
+			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit), stdmap.WithEject(ejector.Eject))
+			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
+			if err != nil {
+				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
+			}
 			return nil
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -261,6 +270,8 @@ func main() {
 				node.Tracer,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
+				builder.WithMaxSealCount(maxSealPerBlock),
+				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
