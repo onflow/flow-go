@@ -16,7 +16,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// should be able to convert from protocol.Snapshot
+// TestFromSnapshot tests that we are able to convert a database-backed snapshot
+// to a memory-backed snapshot.
 func TestFromSnapshot(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
@@ -126,7 +127,6 @@ func testEncodeDecode(t *testing.T, snap *inmem.Snapshot) {
 
 // checks that 2 snapshots are equivalent by converting to a serializable
 // representation and comparing the serializations
-// TODO check equality manually
 func snapshotsEqual(t *testing.T, snap1, snap2 protocol.Snapshot) bool {
 	enc1, err := inmem.FromSnapshot(snap1)
 	require.Nil(t, err)
