@@ -19,7 +19,7 @@ var (
 	// ErrEpochNotCommitted is a sentinel error returned when the epoch has
 	// not been committed and information is queried that is only accessible
 	// in the EpochCommitted phase.
-	ErrEpochNotCommitted = fmt.Errorf("EpochCommit has not been received yet")
+	ErrEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
 )
 
 type IdentityNotFoundError struct {
