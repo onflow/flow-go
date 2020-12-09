@@ -61,6 +61,7 @@ func New(log zerolog.Logger,
 	transactionMetrics module.TransactionMetrics,
 	collectionGRPCPort uint,
 	retryEnabled bool,
+	rpcMetricsEnabled bool,
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -110,13 +111,16 @@ func New(log zerolog.Logger,
 		access.NewHandler(backend, chainID.Chain()),
 	)
 
+	if rpcMetricsEnabled {
+		// Not interested in legacy metrics, so initialize here
+		grpc_prometheus.Register(grpcServer)
+	}
+
 	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
 	legacyaccessproto.RegisterAccessAPIServer(
 		eng.grpcServer,
 		legacyaccess.NewHandler(backend, chainID.Chain()),
 	)
-
-	grpc_prometheus.Register(grpcServer)
 
 	return eng
 }
