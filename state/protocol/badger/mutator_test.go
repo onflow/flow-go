@@ -718,6 +718,7 @@ func TestExtendSealNoIncorporatedResult(t *testing.T) {
 // top of the last known seal on the branch.
 func TestExtendSealNotConnected(t *testing.T) {
 
+	// B <- B1 <- B2 <- B3{R(B1), R(B2)} <- B4{S(R(B2))}
 	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
 
 		block, result, seal := unittest.BootstrapFixture(participants)
@@ -793,6 +794,7 @@ func TestExtendSealDuplicate(t *testing.T) {
 		// create seal for block1
 		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
 
+		// B <- B1 <- B2{R(B1)} <- B3{S(R(B1))} <- B4{S(R(B1))}
 		t.Run("Duplicate seal in separate block", func(t *testing.T) {
 			// insert block3 with a seal for block1
 			block3 := unittest.BlockWithParentFixture(block2.Header)
@@ -815,6 +817,7 @@ func TestExtendSealDuplicate(t *testing.T) {
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
+		// B <- B1 <- B2{R(B1)} <- B3{S(R(B1)), S(R(B1))}
 		t.Run("Duplicate seal in same payload", func(t *testing.T) {
 			// insert block3 with 2 identical seals for block1
 			block3 := unittest.BlockWithParentFixture(block2.Header)
@@ -889,7 +892,7 @@ func TestExtendHighestSeal(t *testing.T) {
 }
 
 // Test that Extend will refuse payloads that contain duplicate receipts, where
-// duplicates can be in another block on the fork, or withing the payload.
+// duplicates can be in another block on the fork, or within the payload.
 func TestExtendReceiptsDuplicate(t *testing.T) {
 
 	util.RunWithProtocolStateAndMutatorFactory(t, mockMutatorFactory(), func(db *badger.DB, state *protocol.State) {
@@ -905,6 +908,7 @@ func TestExtendReceiptsDuplicate(t *testing.T) {
 
 		receipt := unittest.ReceiptForBlockFixture(&block2)
 
+		// B1 <- B2 <- B3{R(B2)} <- B4{R(B2)}
 		t.Run("duplicate receipt in different block", func(t *testing.T) {
 			block3 := unittest.BlockWithParentFixture(block2.Header)
 			block3.SetPayload(flow.Payload{
@@ -922,6 +926,7 @@ func TestExtendReceiptsDuplicate(t *testing.T) {
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
+		// B1 <- B2 <- B3{R(B2), R(B2)}
 		t.Run("duplicate receipt in same block", func(t *testing.T) {
 			block3 := unittest.BlockWithParentFixture(block2.Header)
 			block3.SetPayload(flow.Payload{
