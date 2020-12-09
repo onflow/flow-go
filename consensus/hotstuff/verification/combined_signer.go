@@ -103,7 +103,11 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	}
 
 	// check if we have sufficient threshold signature shares
-	if !crypto.EnoughShares(signature.RandomBeaconThreshold(int(dkg.Size())), len(votes)) {
+	enoughShares, err := crypto.EnoughShares(signature.RandomBeaconThreshold(int(dkg.Size())), len(votes))
+	if err != nil {
+		return nil, fmt.Errorf("could not check the threshold: %w", err)
+	}
+	if !enoughShares {
 		return nil, ErrInsufficientShares
 	}
 

@@ -22,6 +22,10 @@ type ThresholdVerifier struct {
 //   m<=t for unforgeability
 //   n-m>=t+1 for robustness
 func RandomBeaconThreshold(size int) int {
+	// avoid initializing the thershold to 0 when n=2
+	if size == 2 {
+		return 1
+	}
 	return (size - 1) / 2
 }
 
@@ -80,7 +84,11 @@ func (tp *ThresholdProvider) Sign(msg []byte) (crypto.Signature, error) {
 func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
 
 	// check that we have sufficient shares to reconstruct the threshold signature
-	if !crypto.EnoughShares(RandomBeaconThreshold(int(size)), len(shares)) {
+	enoughShares, err := crypto.EnoughShares(RandomBeaconThreshold(int(size)), len(shares))
+	if err != nil {
+		return nil, fmt.Errorf("error in combine: %w", err)
+	}
+	if !enoughShares {
 		return nil, fmt.Errorf("not enough signature shares (size: %d, shares: %d)", size, len(shares))
 	}
 
