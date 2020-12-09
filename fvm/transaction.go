@@ -99,7 +99,14 @@ func (i *TransactionInvocator) Process(
 
 	location := runtime.TransactionLocation(proc.ID[:])
 
-	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	err = vm.Runtime.ExecuteTransaction(runtime.Script{
+		Source:    proc.Transaction.Script,
+		Arguments: proc.Transaction.Arguments,
+	}, runtime.Context{
+		Interface:         env,
+		Location:          location,
+		PredeclaredValues: []runtime.ValueDeclaration{},
+	})
 
 	if err != nil {
 		i.topshotSafetyErrorCheck(err)

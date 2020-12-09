@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fxamacker/cbor/v2"
+
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,7 +20,6 @@ const (
 	keyContractNames   = "contract_names"
 	keyPublicKeyCount  = "public_key_count"
 	keyStorageUsed     = "storage_used"
-	keyStorageCapacity = "storage_capacity"
 	uint64StorageSize  = 8
 )
 
@@ -33,12 +33,12 @@ func keyPublicKey(index uint64) string {
 }
 
 type Accounts struct {
-	ledger                  Ledger
+	ledger Ledger
 }
 
 func NewAccounts(ledger Ledger) *Accounts {
 	return &Accounts{
-		ledger:                  ledger,
+		ledger: ledger,
 	}
 }
 
@@ -105,15 +105,8 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return fmt.Errorf("account with address %s already exists", newAddress.Hex())
 	}
 
-	err = a.setStorageUsed(newAddress, uint64StorageSize) //set storage used to the size of storage used
-	if err != nil {
-		return err
-	}
-
-	// set storage capacity to 0.
-	// It must be set with the storage contract before the end of this transaction.
-	// TODO: for this PR set storage capacity to 100kB, remove this in the next PR to this feature branch
-	err = a.SetStorageCapacity(newAddress, 100000)
+	storageUsedByStorageUsed := uint64(RegisterSize(newAddress, false, keyStorageUsed, make([]byte, uint64StorageSize)))
+	err = a.setStorageUsed(newAddress, storageUsedByStorageUsed)
 	if err != nil {
 		return err
 	}
@@ -357,23 +350,6 @@ func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
 	return a.setValue(address, false, keyStorageUsed, usedBinary)
 }
 
-func (a *Accounts) GetStorageCapacity(account flow.Address) (uint64, error) {
-	storageCapacityRegister, err := a.getValue(account, false, keyStorageCapacity)
-	if err != nil {
-		return 0, err
-	}
-	storageCapacity, _, err := utils.ReadUint64(storageCapacityRegister)
-	if err != nil {
-		return 0, err
-	}
-	return storageCapacity, nil
-}
-
-func (a *Accounts) SetStorageCapacity(account flow.Address, capacity uint64) error {
-	capacityBinary := utils.Uint64ToBinary(capacity)
-	return a.setValue(account, false, keyStorageCapacity, capacityBinary)
-}
-
 func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
 	return a.getValue(address, false, key)
 }
@@ -569,55 +545,3 @@ func (l *contractNames) remove(contractName string) {
 	}
 	*l = append((*l)[:i], (*l)[i+1:]...)
 }
-//
-//func CreateStorageCapacityFromResourceResolver() func(*Accounts, flow.Address) (uint64, error) {
-//
-//	return func(a *Accounts, address flow.Address) (uint64, error) {
-//		key := fmt.Sprintf("%s\x1F%s", "storage", "storageCapacity") // StorageCapacity resource key. Its the /storage/storageCapacity path
-//		resource, err := a.GetValue(address, key)
-//		if err != nil {
-//			return 0, fmt.Errorf("could not load storage capacity resource: %w", err)
-//		}
-//
-//		storedData, version := interpreter.StripMagic(resource)
-//		commonAddress := common.BytesToAddress(address.Bytes())
-//		storedValue, err := interpreter.DecodeValue(storedData, &commonAddress, []string{key}, version)
-//		if err != nil {
-//			return 0, nil
-//		}
-//
-//		composite, ok := storedValue.(*interpreter.CompositeValue)
-//		if !ok {
-//			return 0, nil
-//		}
-//
-//		// where do I get the storageFeesAddress?
-//		//expectedTypeID := fmt.Sprintf("A.%s.StorageFees.StorageCapacity", storageFeesAddress.Hex())
-//		//if string(composite.TypeID) != expectedTypeID {
-//		//	return 0, nil
-//		//}
-//
-//		holderAddressValue, ok := composite.Fields["address"]
-//		if !ok {
-//			return 0, nil
-//		}
-//		holderAddress, ok := holderAddressValue.(interpreter.AddressValue)
-//		if !ok {
-//			return 0, nil
-//		}
-//		if holderAddress.ToAddress().Hex() != commonAddress.Hex() {
-//			return 0, nil
-//		}
-//
-//		capacityValue, ok := composite.Fields["storageCapacity"]
-//		if !ok {
-//			return 0, nil
-//		}
-//		capacity, ok := capacityValue.(interpreter.UInt64Value)
-//		if !ok {
-//			return 0, nil
-//		}
-//
-//		return uint64(capacity), nil
-//	}
-//}

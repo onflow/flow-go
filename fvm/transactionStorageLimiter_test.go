@@ -2,12 +2,12 @@ package fvm_test
 
 import (
 	"encoding/binary"
-	"github.com/onflow/flow-go/fvm/state"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 

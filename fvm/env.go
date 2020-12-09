@@ -38,12 +38,17 @@ type hostEnv struct {
 	rng            *rand.Rand
 }
 
-func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
+func (e *hostEnv) SetComputationUsed(used uint64) error {
+	// TODO
+	return nil
+}
+
+func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
 	if err != nil {
 		panic(fmt.Errorf("cannot create hasher: %w", err))
 	}
-	return hasher.ComputeHash(data)
+	return hasher.ComputeHash(data), nil
 }
 
 func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
@@ -139,7 +144,7 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
-) []runtime.ResolvedLocation {
+) ([]runtime.ResolvedLocation, error) {
 
 	addressLocation, isAddress := location.(runtime.AddressLocation)
 
@@ -152,7 +157,7 @@ func (e *hostEnv) ResolveLocation(
 				Location:    location,
 				Identifiers: identifiers,
 			},
-		}
+		}, nil
 	}
 
 	// if the location is an address,
@@ -163,14 +168,14 @@ func (e *hostEnv) ResolveLocation(
 		address := flow.Address(addressLocation.Address)
 		contractNames, err := e.accounts.GetContractNames(address)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		// if there are no contractNames deployed,
 		// then return no resolved locations
 
 		if len(contractNames) == 0 {
-			return nil
+			return nil, nil
 		}
 
 		identifiers = make([]ast.Identifier, len(contractNames))
@@ -197,7 +202,7 @@ func (e *hostEnv) ResolveLocation(
 		}
 	}
 
-	return resolvedLocations
+	return resolvedLocations, nil
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
@@ -243,22 +248,23 @@ func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) erro
 	return e.ctx.ASTCache.SetProgram(location, program)
 }
 
-func (e *hostEnv) Log(message string) {
+func (e *hostEnv) Log(message string) error {
 	e.logs = append(e.logs, message)
+	return nil
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) {
+func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	e.events = append(e.events, event)
+	return nil
 }
 
-func (e *hostEnv) GenerateUUID() uint64 {
+func (e *hostEnv) GenerateUUID() (uint64, error) {
 	uuid, err := e.uuidGenerator.GenerateUUID()
 	if err != nil {
-		// TODO - Return error once Cadence interface accommodates it
-		panic(fmt.Errorf("cannot get UUID: %w", err))
+		return 0, fmt.Errorf("cannot get UUID: %w", err)
 	}
 
-	return uuid
+	return uuid, nil
 }
 
 func (e *hostEnv) GetComputationLimit() uint64 {
@@ -288,7 +294,7 @@ func (e *hostEnv) VerifySignature(
 	rawPublicKey []byte,
 	rawSigAlgo string,
 	rawHashAlgo string,
-) bool {
+) (bool, error) {
 	valid, err := verifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
@@ -300,11 +306,10 @@ func (e *hostEnv) VerifySignature(
 	)
 
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		panic(err)
+		return false, err
 	}
 
-	return valid
+	return valid, nil
 }
 
 func (e *hostEnv) HighLevelStorageEnabled() bool {
@@ -318,24 +323,24 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 // Block Environment Functions
 
 // GetCurrentBlockHeight returns the current block height.
-func (e *hostEnv) GetCurrentBlockHeight() uint64 {
+func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	if e.ctx.BlockHeader == nil {
-		panic("GetCurrentBlockHeight is not supported by this environment")
+		return 0, fmt.Errorf("GetCurrentBlockHeight is not supported by this environment")
 	}
 
-	return e.ctx.BlockHeader.Height
+	return e.ctx.BlockHeader.Height, nil
 }
 
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
-func (e *hostEnv) UnsafeRandom() uint64 {
+func (e *hostEnv) UnsafeRandom() (uint64, error) {
 	if e.rng == nil {
 		panic("UnsafeRandom is not supported by this environment")
 	}
 
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
-	return binary.LittleEndian.Uint64(buf)
+	return binary.LittleEndian.Uint64(buf), nil
 }
 
 func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
@@ -448,12 +453,12 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 	return e.accounts.DeleteContract(name, accountAddress)
 }
 
-func (e *hostEnv) GetSigningAccounts() []runtime.Address {
+func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	if e.transactionEnv == nil {
-		panic("GetSigningAccounts is not supported by this environment")
+		return nil, fmt.Errorf("GetSigningAccounts is not supported by this environment")
 	}
 
-	return e.transactionEnv.GetSigningAccounts()
+	return e.transactionEnv.GetSigningAccounts(), nil
 }
 
 // Transaction Environment
