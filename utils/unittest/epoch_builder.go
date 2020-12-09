@@ -62,30 +62,30 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// prepare default values for the service events based on the current state
 	identities, err := builder.state.Final().Identities(filter.Any)
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	epoch := builder.state.Final().Epochs().Current()
 	counter, err := epoch.Counter()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	finalView, err := epoch.FinalView()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 
 	// retrieve block A
 	A, err := builder.state.Final().Head()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 
 	// check that block A satisfies initial condition
 	phase, err := builder.state.Final().Phase()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseStaking, phase)
 
 	// retrieve the sealed height to determine what seals to include in B
 	sealed, err := builder.state.Sealed().Head()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 
 	var seals []*flow.Seal
 	for height := sealed.Height + 1; height <= A.Height; height++ {
 		next, err := builder.state.AtHeight(height).Head()
-		require.Nil(builder.t, err)
+		require.NoError(builder.t, err)
 		seals = append(seals, Seal.Fixture(Seal.WithBlockID(next.ID())))
 	}
 
@@ -93,10 +93,12 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	B := BlockWithParentFixture(A)
 	B.SetPayload(flow.Payload{Seals: seals})
 	err = builder.state.Mutate().Extend(&B)
-	require.Nil(builder.t, err)
-	// finalize block B
+	require.NoError(builder.t, err)
+	// finalize and validate block B
 	err = builder.state.Mutate().Finalize(B.ID())
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
+	err = builder.state.Mutate().MarkValid(B.ID())
+	require.NoError(builder.t, err)
 
 	// defaults for the EpochSetup event
 	setupDefaults := []func(*flow.EpochSetup){
@@ -117,10 +119,12 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seals: []*flow.Seal{sealForB},
 	})
 	err = builder.state.Mutate().Extend(&C)
-	require.Nil(builder.t, err)
-	// finalize block C
+	require.NoError(builder.t, err)
+	// finalize and validate block C
 	err = builder.state.Mutate().Finalize(C.ID())
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
+	err = builder.state.Mutate().MarkValid(C.ID())
+	require.NoError(builder.t, err)
 
 	// defaults for the EpochCommit event
 	commitDefaults := []func(*flow.EpochCommit){
@@ -140,10 +144,12 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seals: []*flow.Seal{sealForC},
 	})
 	err = builder.state.Mutate().Extend(&D)
-	require.Nil(builder.t, err)
-	// finalize block D
+	require.NoError(builder.t, err)
+	// finalize and validate block D
 	err = builder.state.Mutate().Finalize(D.ID())
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
+	err = builder.state.Mutate().MarkValid(D.ID())
+	require.NoError(builder.t, err)
 
 	return builder
 }
@@ -154,13 +160,13 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 func (builder *EpochBuilder) CompleteEpoch() {
 
 	phase, err := builder.state.Final().Phase()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
 	finalView, err := builder.state.Final().Epochs().Current().FinalView()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 
 	final, err := builder.state.Final().Head()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 
 	// A is the first block of the next epoch (see diagram in BuildEpoch)
 	A := BlockWithParentFixture(final)
@@ -168,7 +174,9 @@ func (builder *EpochBuilder) CompleteEpoch() {
 	A.Header.View = finalView + (rand.Uint64() % 4) + 1
 	A.SetPayload(flow.EmptyPayload())
 	err = builder.state.Mutate().Extend(&A)
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	err = builder.state.Mutate().Finalize(A.ID())
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
+	err = builder.state.Mutate().MarkValid(A.ID())
+	require.NoError(builder.t, err)
 }

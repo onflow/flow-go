@@ -5,11 +5,13 @@ package badger
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
@@ -53,11 +55,15 @@ func (es *SetupEpoch) Clustering() (flow.ClusterList, error) {
 }
 
 func (es *SetupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
-	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
+	return nil, protocol.ErrEpochNotCommitted
 }
 
 func (es *SetupEpoch) DKG() (protocol.DKG, error) {
-	return nil, fmt.Errorf("EpochCommit event not yet received in fork")
+	return nil, protocol.ErrEpochNotCommitted
+}
+
+func (es *SetupEpoch) RandomSource() ([]byte, error) {
+	return es.setupEvent.RandomSource, nil
 }
 
 func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
@@ -99,19 +105,22 @@ func (es *CommittedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 	epochCounter := es.setupEvent.Counter
 
-	inf := Cluster{
-		index:     index,
-		counter:   epochCounter,
-		members:   members,
-		rootBlock: cluster.CanonicalRootBlock(epochCounter, members),
-		rootQC:    rootQC,
-	}
-
-	return &inf, nil
+	cluster, err := inmem.ClusterFromEncodable(inmem.EncodableCluster{
+		Index:     index,
+		Counter:   epochCounter,
+		Members:   members,
+		RootBlock: cluster.CanonicalRootBlock(epochCounter, members),
+		RootQC:    rootQC,
+	})
+	return cluster, err
 }
 
 func (es *CommittedEpoch) DKG() (protocol.DKG, error) {
-	return &DKG{commitEvent: es.commitEvent}, nil
+	dkg, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
+		GroupKey:     encodable.RandomBeaconPubKey{es.commitEvent.DKGGroupKey},
+		Participants: es.commitEvent.DKGParticipants,
+	})
+	return dkg, err
 }
 
 func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
@@ -124,46 +133,3 @@ func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommi
 }
 
 // ****************************************
-
-// InvalidEpoch represents an epoch that does not exist.
-// Neither the EpochSetup nor EpochCommitted events for the epoch have been
-// emitted as of the point at which the epoch was queried.
-type InvalidEpoch struct {
-	err error
-}
-
-func (u *InvalidEpoch) Counter() (uint64, error) {
-	return 0, u.err
-}
-
-func (u *InvalidEpoch) FirstView() (uint64, error) {
-	return 0, u.err
-}
-
-func (u *InvalidEpoch) FinalView() (uint64, error) {
-	return 0, u.err
-}
-
-func (u *InvalidEpoch) InitialIdentities() (flow.IdentityList, error) {
-	return nil, u.err
-}
-
-func (u *InvalidEpoch) Clustering() (flow.ClusterList, error) {
-	return nil, u.err
-}
-
-func (u *InvalidEpoch) Cluster(uint) (protocol.Cluster, error) {
-	return nil, u.err
-}
-
-func (u *InvalidEpoch) DKG() (protocol.DKG, error) {
-	return nil, u.err
-}
-
-func (u *InvalidEpoch) Seed(...uint32) ([]byte, error) {
-	return nil, u.err
-}
-
-func NewInvalidEpoch(err error) *InvalidEpoch {
-	return &InvalidEpoch{err: err}
-}

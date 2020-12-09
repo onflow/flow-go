@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -313,15 +314,15 @@ func (q *EpochQuery) Current() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return NewInvalidEpoch(err)
+		return invalid.NewEpoch(err)
 	}
 	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
-		return NewInvalidEpoch(err)
+		return invalid.NewEpoch(err)
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
-		return NewInvalidEpoch(err)
+		return invalid.NewEpoch(err)
 	}
 
 	return NewCommittedEpoch(setup, commit)
@@ -332,21 +333,21 @@ func (q *EpochQuery) Next() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return NewInvalidEpoch(err)
+		return invalid.NewEpoch(err)
 	}
 	phase, err := status.Phase()
 	if err != nil {
-		return NewInvalidEpoch(err)
+		return invalid.NewEpoch(err)
 	}
 	// if we are in the staking phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking {
-		return NewInvalidEpoch(protocol.ErrNextEpochNotSetup)
+		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	}
 
 	// if we are in setup phase, return a SetupEpoch
 	nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
 	if err != nil {
-		return NewInvalidEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
+		return invalid.NewEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
 	}
 	if phase == flow.EpochPhaseSetup {
 		return NewSetupEpoch(nextSetup)
@@ -355,7 +356,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	// if we are in committed phase, return a CommittedEpoch
 	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
 	if err != nil {
-		return NewInvalidEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
+		return invalid.NewEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
 	}
 	return NewCommittedEpoch(nextSetup, nextCommit)
 }
@@ -367,88 +368,25 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return NewInvalidEpoch(err)
+		return invalid.NewEpoch(err)
 	}
 	first, err := q.snap.state.headers.ByBlockID(status.FirstBlockID)
 	if err != nil {
-		return NewInvalidEpoch(err)
+		return invalid.NewEpoch(err)
 	}
 
 	// CASE 1: we are in the first epoch after the root block, in which case
 	// we return a sentinel error
 	root, err := q.snap.state.Params().Root()
 	if err != nil {
-		return NewInvalidEpoch(err)
+		return invalid.NewEpoch(err)
 	}
 	if first.ID() == root.ID() {
-		return NewInvalidEpoch(protocol.ErrNoPreviousEpoch)
+		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 
 	// CASE 2: we are in any other epoch, return the current epoch w.r.t. the
 	// parent block of the first block in this epoch, which must be in the
 	// previous epoch
 	return q.snap.state.AtBlockID(first.ParentID).Epochs().Current()
-}
-
-// InvalidSnapshot represents a snapshot referencing an invalid block, or for
-// which an error occurred while resolving the reference block.
-type InvalidSnapshot struct {
-	err error
-}
-
-func NewInvalidSnapshot(err error) *InvalidSnapshot {
-	return &InvalidSnapshot{err: err}
-}
-
-func (u *InvalidSnapshot) Head() (*flow.Header, error) {
-	return nil, u.err
-}
-
-func (u *InvalidSnapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
-	return nil, u.err
-}
-
-func (u *InvalidSnapshot) Phase() (flow.EpochPhase, error) {
-	return 0, u.err
-}
-
-func (u *InvalidSnapshot) Identities(_ flow.IdentityFilter) (flow.IdentityList, error) {
-	return nil, u.err
-}
-
-func (u *InvalidSnapshot) Identity(_ flow.Identifier) (*flow.Identity, error) {
-	return nil, u.err
-}
-
-func (u *InvalidSnapshot) Commit() (flow.StateCommitment, error) {
-	return nil, u.err
-}
-
-func (u *InvalidSnapshot) Pending() ([]flow.Identifier, error) {
-	return nil, u.err
-}
-
-func (u *InvalidSnapshot) Seed(_ ...uint32) ([]byte, error) {
-	return nil, u.err
-}
-
-// InvalidEpochQuery is an epoch query for an invalid snapshot.
-type InvalidEpochQuery struct {
-	err error
-}
-
-func (u *InvalidSnapshot) Epochs() protocol.EpochQuery {
-	return &InvalidEpochQuery{err: u.err}
-}
-
-func (u *InvalidEpochQuery) Current() protocol.Epoch {
-	return NewInvalidEpoch(u.err)
-}
-
-func (u *InvalidEpochQuery) Next() protocol.Epoch {
-	return NewInvalidEpoch(u.err)
-}
-
-func (u *InvalidEpochQuery) Previous() protocol.Epoch {
-	return NewInvalidEpoch(u.err)
 }
