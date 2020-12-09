@@ -77,7 +77,7 @@ func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) *Tran
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, serviceAddress))).
 			AddAuthorizer(accountAddress),
-		uint32(0),
+		0,
 	)
 }
 

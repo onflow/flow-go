@@ -265,7 +265,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 
 	e.totalEventByteSize += uint64(len(payload))
 	if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
-		return &MaxEventSizeLimitExceededError{
+		return &EventLimitExceededError{
 			TotalByteSize: e.totalEventByteSize,
 			Limit:         e.ctx.EventCollectionByteSizeLimit,
 		}

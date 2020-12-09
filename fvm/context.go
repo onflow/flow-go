@@ -175,7 +175,7 @@ func WithRestrictedDeployment(enabled bool) Option {
 	}
 }
 
-// WithCadenceLogging enables or disables cadence logging for a
+// WithCadenceLogging enables or disables Cadence logging for a
 // virtual machine context.
 func WithCadenceLogging(enabled bool) Option {
 	return func(ctx Context) Context {
