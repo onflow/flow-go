@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -112,6 +113,8 @@ func New(log zerolog.Logger,
 		eng.grpcServer,
 		legacyaccess.NewHandler(backend, chainID.Chain()),
 	)
+
+	grpc_prometheus.Register(grpcServer)
 
 	return eng
 }
