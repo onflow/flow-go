@@ -71,7 +71,7 @@ func New(log zerolog.Logger,
 	}
 
 	// create a GRPC server to serve GRPC clients
-	grpcOpts := []*grpc.ServerOption{
+	grpcOpts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
