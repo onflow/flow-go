@@ -71,7 +71,7 @@ const (
 	// DKG and Threshold Signatures
 
 	// DKGMinSize is the minimum size of a group participating in a DKG protocol
-	DKGMinSize int = 1
+	DKGMinSize int = 2
 	// DKGMaxSize is the minimum size of a group participating in a DKG protocol
 	DKGMaxSize int = 254
 	// SeedMinLenDKG is the minumum seed length required to participate in a DKG protocol
