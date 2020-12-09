@@ -282,6 +282,7 @@ func (suite *FinderEngineTestSuite) TestCachedToPending() {
 
 // TestCachedToReady_Staked evaluates that on a staked verification node
 // having a cached receipt with its block available results it moved to the ready mempool.
+// By default verification identity of suite is staked for verification role.
 func (suite *FinderEngineTestSuite) TestCachedToReady_Staked() {
 	// creates a finder engine
 	// by default finder engine is bootstrapped on an staked verification node
@@ -352,68 +353,76 @@ func (suite *FinderEngineTestSuite) TestCachedToReady_Staked() {
 	suite.readyReceipts.AssertNotCalled(suite.T(), "Add")
 }
 
-//// TestCachedToReady_Staked evaluates that on a staked verification node
-//// having a cached receipt with its block available results it moved to the ready mempool.
-//func (suite *FinderEngineTestSuite) TestCachedToReady_Unstaked() {
-//	e := suite.TestNewFinderEngine()
-//
-//	// mocks a cached receipt
-//	suite.cachedReceipts.On("All").
-//		Return([]*verification.ReceiptDataPack{suite.receiptDataPack})
-//
-//	// mocks no new finalized block
-//	suite.blockIDsCache.On("All").
-//		Return(flow.IdentifierList{})
-//
-//	// mocks no receipt in ready mempool
-//	suite.readyReceipts.On("All").
-//		Return([]*verification.ReceiptDataPack{})
-//
-//	// mocks result has not yet processed
-//	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
-//		Return(false).Once()
-//
-//	// mocks block associated with receipt is available
-//	suite.headerStorage.On("ByBlockID", suite.block.ID()).
-//		Return(suite.block.Header, nil).Once()
-//
-//	// mocks returning state snapshot of system at block height of result
-//	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.snapshot)
-//	// mocks identity of node as in the state snapshot
-//	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
-//
-//	// mocks removing receipt from
-//	moveWG := sync.WaitGroup{}
-//	moveWG.Add(2)
-//	// removing from cached
-//	suite.cachedReceipts.On("Rem", suite.receiptDataPack.Receipt.ID()).
-//		Run(func(args testifymock.Arguments) {
-//			moveWG.Done()
-//		}).Return(true).Once()
-//
-//	// adding to pending
-//	suite.readyReceipts.On("Add", suite.receiptDataPack).
-//		Run(func(args testifymock.Arguments) {
-//			moveWG.Done()
-//		}).Return(true).Once()
-//
-//	// starts the engine
-//	<-e.Ready()
-//
-//	// waits a timeout for finder engine to process receipt
-//	unittest.AssertReturnsBefore(suite.T(), moveWG.Wait, suite.assertTimeOut)
-//
-//	// stops the engine
-//	<-e.Done()
-//
-//	testifymock.AssertExpectationsForObjects(suite.T(),
-//		suite.cachedReceipts,
-//		suite.blockIDsCache,
-//		suite.metrics,
-//		suite.receiptIDsByResult,
-//		suite.matchEng)
-//	suite.readyReceipts.AssertNotCalled(suite.T(), "Add")
-//}
+// TestCachedToReady_Staked evaluates that on an unstaked verification node
+// having a cached receipt with its block available results it discard the receipt, and
+// marking its result id as discarded.
+func (suite *FinderEngineTestSuite) TestCachedToReady_Unstaked() {
+	// creates an unstaked verification identity
+	unstakedVerIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification),
+		unittest.WithStake(0))
+	// creates finder engine for unstaked verification node
+	e := suite.TestNewFinderEngine(WithIdentity(unstakedVerIdentity))
+
+	// mocks a cached receipt
+	suite.cachedReceipts.On("All").
+		Return([]*verification.ReceiptDataPack{suite.receiptDataPack})
+
+	// mocks no new finalized block
+	suite.blockIDsCache.On("All").
+		Return(flow.IdentifierList{})
+
+	// mocks no receipt in ready mempool
+	suite.readyReceipts.On("All").
+		Return([]*verification.ReceiptDataPack{})
+
+	// mocks result has not yet processed
+	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false).Once()
+	suite.discardedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false).Once()
+
+	// mocks block associated with receipt is available
+	suite.headerStorage.On("ByBlockID", suite.block.ID()).
+		Return(suite.block.Header, nil).Once()
+
+	// mocks returning state snapshot of system at block height of result
+	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.snapshot)
+	// mocks identity of node as in the state snapshot
+	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
+
+	// mocks removing receipt from cached receipts and adding its result id to discarded mempool.
+	moveWG := sync.WaitGroup{}
+	moveWG.Add(2)
+	// removing from cached
+	suite.cachedReceipts.On("Rem", suite.receiptDataPack.Receipt.ID()).
+		Run(func(args testifymock.Arguments) {
+			moveWG.Done()
+		}).Return(true).Once()
+
+	// adding to pending
+	suite.discardedResultIDs.On("Add", suite.receiptDataPack.Receipt.ExecutionResult.ID()).
+		Run(func(args testifymock.Arguments) {
+			moveWG.Done()
+		}).Return(true).Once()
+
+	// starts the engine
+	<-e.Ready()
+
+	// waits a timeout for finder engine to process receipt
+	unittest.AssertReturnsBefore(suite.T(), moveWG.Wait, suite.assertTimeOut)
+
+	// stops the engine
+	<-e.Done()
+
+	testifymock.AssertExpectationsForObjects(suite.T(),
+		suite.cachedReceipts,
+		suite.blockIDsCache,
+		suite.metrics,
+		suite.receiptIDsByResult,
+		suite.matchEng)
+	suite.readyReceipts.AssertNotCalled(suite.T(), "Add")
+	suite.receiptIDsByResult.AssertNotCalled(suite.T(), "Append")
+}
 
 // TestPendingToReady evaluates that having a pending receipt with its
 // block becomes available results it moved to the ready mempool.
