@@ -180,8 +180,6 @@ func generateLibP2PNode(t *testing.T,
 	id flow.Identity,
 	key crypto.PrivateKey) *p2p.Node {
 
-	// creates libp2p host and node
-	nodeAddress := p2p.NodeAddress{Name: id.NodeID.String(), IP: "0.0.0.0", Port: "0"}
 	noopMetrics := metrics.NewNoopCollector()
 
 	// create PubSub options for libp2p to use
@@ -195,7 +193,8 @@ func generateLibP2PNode(t *testing.T,
 	}
 
 	libP2PNode, err := p2p.NewLibP2PNode(logger,
-		nodeAddress,
+		id.NodeID,
+		"0.0.0.0:0",
 		p2p.NewConnManager(logger, noopMetrics),
 		key,
 		true,
