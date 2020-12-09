@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -26,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -114,8 +114,7 @@ func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("node%d", i)
-		key, err := generateNetworkingKey(name)
-		require.NoError(suite.T(), err)
+		key, _ := generateNetworkingAndLibP2PKeys(suite.T())
 
 		// creates node-i address
 		address := NodeAddress{
@@ -153,16 +152,16 @@ func (suite *LibP2PNodeTestSuite) TestAddPeers() {
 	}
 
 	// Checks if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
+	assert.Len(suite.T(), nodes[0].host.Peerstore().Peers(), count)
 
 	// Checks whether the first node is connected to the rest
-	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
+	for _, peer := range nodes[0].host.Peerstore().Peers() {
 		// A node is also a peer to itself but not marked as connected, hence skip checking that.
-		if nodes[0].libP2PHost.ID().String() == peer.String() {
+		if nodes[0].host.ID().String() == peer.String() {
 			continue
 		}
 		assert.Eventuallyf(suite.T(), func() bool {
-			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
+			return network.Connected == nodes[0].host.Network().Connectedness(peer)
 		}, 2*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
 	}
 }
@@ -182,16 +181,16 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 	}
 
 	// check if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].libP2PHost.Peerstore().Peers(), count)
+	assert.Len(suite.T(), nodes[0].host.Peerstore().Peers(), count)
 
 	// check whether the first node is connected to the rest
-	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
+	for _, peer := range nodes[0].host.Peerstore().Peers() {
 		// A node is also a peer to itself but not marked as connected, hence skip checking that.
-		if nodes[0].libP2PHost.ID().String() == peer.String() {
+		if nodes[0].host.ID().String() == peer.String() {
 			continue
 		}
 		assert.Eventually(suite.T(), func() bool {
-			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
+			return network.Connected == nodes[0].host.Network().Connectedness(peer)
 		}, 2*time.Second, tickForAssertEventually)
 	}
 
@@ -200,7 +199,7 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, p))
 		pInfo, err := GetPeerInfo(p)
 		assert.NoError(suite.T(), err)
-		assert.Equal(suite.T(), network.NotConnected, nodes[0].libP2PHost.Network().Connectedness(pInfo.ID))
+		assert.Equal(suite.T(), network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
 }
 
@@ -217,7 +216,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 
 	flowProtocolID := generateProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(suite.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
+	require.Equal(suite.T(), 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
@@ -227,9 +226,9 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 		require.NoError(suite.T(), err)
 		require.NotNil(suite.T(), anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(suite.T(), i+1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(suite.T(), i+1, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 		// assert that the same connection is reused
-		require.Len(suite.T(), nodes[0].libP2PHost.Network().Conns(), 1)
+		require.Len(suite.T(), nodes[0].host.Network().Conns(), 1)
 		streams = append(streams, anotherStream)
 	}
 
@@ -244,7 +243,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 		}()
 		wg.Wait()
 		// assert that the stream count within libp2p decremented
-		require.Equal(suite.T(), i, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(suite.T(), i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 	}
 }
 
@@ -583,25 +582,28 @@ func (suite *LibP2PNodeTestSuite) CreateNodes(count int, handler network.StreamH
 	for i := 0; i < count; i++ {
 
 		name := fmt.Sprintf("node%d", i+1)
-		pkey, err := generateNetworkingKey(name)
+		key := generateNetworkingKey(suite.T())
 		require.NoError(suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := suite.CreateNode(name, pkey, "0.0.0.0", "0", rootBlockID, handler, allowList)
+		n, nodeID := suite.CreateNode(name, key, "0.0.0.0", "0", rootBlockID, handler, allowList)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
 	return nodes, nodeAddrs
 }
 
-func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
+func (suite *LibP2PNodeTestSuite) CreateNode(name string, key fcrypto.PrivateKey, ip string, port string, rootID string,
 	handler network.StreamHandler, allowList bool) (*Node, NodeAddress) {
-	n := &Node{}
+
+	libP2PKey, err := privKey(key)
+	require.NoError(suite.T(), err)
+
 	nodeID := NodeAddress{
 		Name:   name,
 		IP:     ip,
 		Port:   port,
-		PubKey: key.GetPublic(),
+		PubKey: libP2PKey.GetPublic(),
 	}
 
 	var handlerFunc network.StreamHandler
@@ -614,8 +616,10 @@ func (suite *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip
 	}
 
 	noopMetrics := metrics.NewNoopCollector()
-	err := n.Start(suite.ctx, nodeID, suite.logger, key, handlerFunc, rootID, allowList, nil, noopMetrics)
+	n, err := NewLibP2PNode(suite.logger, nodeID, NewConnManager(suite.logger, noopMetrics), key, allowList, rootID)
 	require.NoError(suite.T(), err)
+	n.SetStreamHandler(handlerFunc)
+
 	require.Eventuallyf(suite.T(), func() bool {
 		ip, p, err := n.GetIPPort()
 		return err == nil && ip != "" && p != ""
@@ -641,21 +645,32 @@ func (suite *LibP2PNodeTestSuite) StopNode(node *Node) {
 	<-done
 }
 
-// generateNetworkingKey generates a ECDSA key pair using the given seed
-func generateNetworkingKey(seed string) (crypto.PrivKey, error) {
-	seedB := make([]byte, 100)
-	copy(seedB, seed)
-	var r io.Reader = bytes.NewReader(seedB)
-	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.ECDSA, 0, r)
-	return prvKey, err
+// generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
+func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
+	seed := unittest.SeedFixture(48)
+	key, err := fcrypto.GeneratePrivateKey(fcrypto.ECDSASecp256k1, seed)
+	require.NoError(t, err)
+	return key
+}
+
+// generateNetworkingAndLibP2PKeys is a test helper that generates a ECDSA flow key pairs, and translate it to
+// libp2p key pairs. It returns both generated pairs of keys.
+func generateNetworkingAndLibP2PKeys(t *testing.T) (crypto.PrivKey, fcrypto.PrivateKey) {
+	// generates flow key
+	key := generateNetworkingKey(t)
+
+	// translates flow key into libp2p key
+	libP2Pkey, err := privKey(key)
+	require.NoError(t, err)
+
+	return libP2Pkey, key
 }
 
 // newSilentNode returns a TCP listener and a node which never replies
 func newSilentNode(t *testing.T) (net.Listener, NodeAddress) {
 
 	name := "silent"
-	key, err := generateNetworkingKey(name)
-	require.NoError(t, err)
+	key, _ := generateNetworkingAndLibP2PKeys(t)
 
 	lst, err := net.Listen("tcp4", ":0")
 	if err != nil {
@@ -679,6 +694,7 @@ func newSilentNode(t *testing.T) (net.Listener, NodeAddress) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	nodeAddress := NodeAddress{
 		Name:   name,
 		IP:     ip,
