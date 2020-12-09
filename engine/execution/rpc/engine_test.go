@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	realingestion "github.com/onflow/flow-go/engine/execution/ingestion"
 	ingestion "github.com/onflow/flow-go/engine/execution/ingestion/mock"
 	"github.com/onflow/flow-go/model/flow"
 	realstorage "github.com/onflow/flow-go/storage"
@@ -89,9 +90,11 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		exeResults:         suite.exeResults,
 		transactionResults: suite.txResults,
 		chain:              flow.Mainnet,
+		scriptsEnabled:     true,
+		queriesEnabled:     true,
 	}
 
-	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
+	createRequest := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
 		return &execution.GetEventsForBlockIDsRequest{
 			Type:     errType,
 			BlockIds: blockIDs,
@@ -102,7 +105,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.Run("happy path", func() {
 
 		// create a valid API request
-		req := concoctReq(string(flow.EventAccountCreated), blockIDs)
+		req := createRequest(string(flow.EventAccountCreated), blockIDs)
 
 		// execute the GetEventsForBlockIDs call
 		resp, err := handler.GetEventsForBlockIDs(context.Background(), req)
@@ -121,7 +124,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.Run("request with empty event type", func() {
 
 		// create an API request with empty even type
-		req := concoctReq("", blockIDs)
+		req := createRequest("", blockIDs)
 
 		_, err := handler.GetEventsForBlockIDs(context.Background(), req)
 
@@ -137,7 +140,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.Run("request with empty block IDs", func() {
 
 		// create an API request with empty block ids
-		req := concoctReq(string(flow.EventAccountCreated), nil)
+		req := createRequest(string(flow.EventAccountCreated), nil)
 
 		_, err := handler.GetEventsForBlockIDs(context.Background(), req)
 
@@ -158,7 +161,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.exeResults.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
 
 		// create an API request with the invalid block id
-		req := concoctReq(string(flow.EventAccountCreated), [][]byte{id[:]})
+		req := createRequest(string(flow.EventAccountCreated), [][]byte{id[:]})
 
 		_, err := handler.GetEventsForBlockIDs(context.Background(), req)
 
@@ -181,15 +184,18 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		Address: serviceAddress,
 	}
 
-	mockEngine := new(ingestion.IngestRPC)
-
 	// create the handler
-	handler := &handler{
-		engine: mockEngine,
-		chain:  flow.Mainnet,
+	createHandler := func(engine realingestion.IngestRPC, scriptsEnabled bool) *handler {
+		handler := &handler{
+			engine:         engine,
+			chain:          flow.Mainnet,
+			scriptsEnabled: scriptsEnabled,
+			queriesEnabled: true,
+		}
+		return handler
 	}
 
-	createReq := func(id []byte, address []byte) *execution.GetAccountAtBlockIDRequest {
+	createRequest := func(id []byte, address []byte) *execution.GetAccountAtBlockIDRequest {
 		return &execution.GetAccountAtBlockIDRequest{
 			Address: address,
 			BlockId: id,
@@ -199,9 +205,12 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	suite.Run("happy path with valid request", func() {
 
 		// setup mock expectations
+		mockEngine := new(ingestion.IngestRPC)
 		mockEngine.On("GetAccount", mock.Anything, serviceAddress, id).Return(&serviceAccount, nil).Once()
 
-		req := createReq(id[:], serviceAddress.Bytes())
+		handler := createHandler(mockEngine, true)
+
+		req := createRequest(id[:], serviceAddress.Bytes())
 
 		resp, err := handler.GetAccountAtBlockID(context.Background(), req)
 
@@ -215,7 +224,10 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 
 	suite.Run("invalid request with nil block id", func() {
 
-		req := createReq(nil, serviceAddress.Bytes())
+		mockEngine := new(ingestion.IngestRPC)
+		handler := createHandler(mockEngine, true)
+
+		req := createRequest(nil, serviceAddress.Bytes())
 
 		_, err := handler.GetAccountAtBlockID(context.Background(), req)
 
@@ -224,11 +236,29 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 
 	suite.Run("invalid request with nil root address", func() {
 
-		req := createReq(id[:], nil)
+		mockEngine := new(ingestion.IngestRPC)
+		handler := createHandler(mockEngine, true)
+
+		req := createRequest(id[:], nil)
 
 		_, err := handler.GetAccountAtBlockID(context.Background(), req)
 
 		suite.Require().Error(err)
+	})
+
+	// failure path - method should fail if script executions are disabled
+	suite.Run("request with script executions disabled", func() {
+
+		req := createRequest(id[:], serviceAddress.Bytes())
+
+		mockEngine := new(ingestion.IngestRPC)
+		handler := createHandler(mockEngine, false)
+
+		_, err := handler.GetAccountAtBlockID(context.Background(), req)
+
+		// check that an UNIMPLEMENTED error was received
+		suite.Require().Error(err)
+		suite.Assert().Equal(codes.Unimplemented, status.Code(err))
 	})
 }
 
@@ -257,21 +287,23 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.blocks.On("ByID", block.ID()).Return(&block, true)
 
 	// create the handler
-	createHandler := func(txResults *storage.TransactionResults) *handler {
+	createHandler := func(txResults *storage.TransactionResults, queriesEnabled bool) *handler {
 		handler := &handler{
 			blocks:             suite.blocks,
 			events:             suite.events,
 			transactionResults: txResults,
 			chain:              flow.Mainnet,
+			scriptsEnabled:     true,
+			queriesEnabled:     queriesEnabled,
 		}
 		return handler
 	}
 
-	// concoctReq creates a GetEventsForBlockIDTransactionIDRequest
-	concoctReq := func(bID []byte, tID []byte) *execution.GetTransactionResultRequest {
+	// createRequest creates a GetEventsForBlockIDTransactionIDRequest
+	createRequest := func(blockID []byte, transactionID []byte) *execution.GetTransactionResultRequest {
 		return &execution.GetTransactionResultRequest{
-			BlockId:       bID,
-			TransactionId: tID,
+			BlockId:       blockID,
+			TransactionId: transactionID,
 		}
 	}
 
@@ -299,10 +331,10 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 		txResults.On("ByBlockIDTransactionID", bID, txID).Return(&txResult, nil).Once()
 
-		handler := createHandler(txResults)
+		handler := createHandler(txResults, true)
 
 		// create a valid API request
-		req := concoctReq(bID[:], txID[:])
+		req := createRequest(bID[:], txID[:])
 
 		// execute the GetTransactionResult call
 		actualResult, err := handler.GetTransactionResult(context.Background(), req)
@@ -336,10 +368,10 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 		txResults.On("ByBlockIDTransactionID", bID, txID).Return(&txResult, nil).Once()
 
-		handler := createHandler(txResults)
+		handler := createHandler(txResults, true)
 
 		// create a valid API request
-		req := concoctReq(bID[:], txID[:])
+		req := createRequest(bID[:], txID[:])
 
 		// execute the GetEventsForBlockIDTransactionID call
 		actualResult, err := handler.GetTransactionResult(context.Background(), req)
@@ -359,14 +391,14 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.Run("request with nil tx ID", func() {
 
 		// create an API request with transaction ID as nil
-		req := concoctReq(bID[:], nil)
+		req := createRequest(bID[:], nil)
 
 		// expect a call to lookup transaction result by block ID and transaction ID, return an error
 		txResults := new(storage.TransactionResults)
 
 		txResults.On("ByBlockIDTransactionID", bID, nil).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
 
-		handler := createHandler(txResults)
+		handler := createHandler(txResults, true)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 
@@ -382,13 +414,13 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.Run("request with nil block ID", func() {
 
 		// create an API request with a nil block id
-		req := concoctReq(nil, txID[:])
+		req := createRequest(nil, txID[:])
 
 		txResults := new(storage.TransactionResults)
 
 		txResults.On("ByBlockIDTransactionID", nil, txID).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
 
-		handler := createHandler(txResults)
+		handler := createHandler(txResults, true)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 
@@ -406,13 +438,13 @@ func (suite *Suite) TestGetTransactionResult() {
 		wrongTxID := unittest.IdentifierFixture()
 
 		// create an API request with the invalid transaction ID
-		req := concoctReq(bID[:], wrongTxID[:])
+		req := createRequest(bID[:], wrongTxID[:])
 
 		// expect a storage call for the invalid tx ID but return an error
 		txResults := new(storage.TransactionResults)
 		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, status.Error(codes.Internal, "")).Once()
 
-		handler := createHandler(txResults)
+		handler := createHandler(txResults, true)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 
@@ -422,5 +454,21 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// check that one storage call was made
 		suite.events.AssertExpectations(suite.T())
+	})
+
+	// failure path - method should fail if queries are disabled
+	suite.Run("request with queries disabled", func() {
+
+		req := createRequest(bID[:], txID[:])
+
+		txResults := new(storage.TransactionResults)
+
+		handler := createHandler(txResults, false)
+
+		_, err := handler.GetTransactionResult(context.Background(), req)
+
+		// check that an UNIMPLEMENTED error was received
+		suite.Require().Error(err)
+		suite.Assert().Equal(codes.Unimplemented, status.Code(err))
 	})
 }
