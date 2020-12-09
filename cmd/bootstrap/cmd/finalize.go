@@ -41,7 +41,7 @@ type PartnerStakes map[flow.Identifier]uint64
 var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
-	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon 
+	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon
 	keys and generating the root block, QC, execution result and block seal.`,
 	Run: finalize,
 }
@@ -106,6 +106,13 @@ func finalize(cmd *cobra.Command, args []string) {
 	internalNodes := assembleInternalNodes()
 	log.Info().Msg("")
 
+	log.Info().Msg("copying internal private keys to output folder")
+	err := copyDir(flagInternalNodePrivInfoDir, filepath.Join(flagOutdir, model.DirPrivateRoot))
+	if err != nil {
+		log.Error().Err(err).Msg("could not copy private key files")
+	}
+	log.Info().Msg("")
+
 	log.Info().Msg("checking constraints on consensus/cluster nodes")
 	checkConstraints(partnerNodes, internalNodes)
 	log.Info().Msg("")
@@ -168,13 +175,6 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing root execution result and block seal")
 	constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
-	log.Info().Msg("")
-
-	log.Info().Msg("copying internal private keys to output folder")
-	err := copyDir(flagInternalNodePrivInfoDir, filepath.Join(flagOutdir, model.DirPrivateRoot))
-	if err != nil {
-		log.Error().Err(err).Msg("could not copy private key files")
-	}
 	log.Info().Msg("")
 
 	// print count of all nodes
