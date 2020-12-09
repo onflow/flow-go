@@ -28,7 +28,6 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tx *flow.TransactionBody,
 	accounts *state.Accounts,
 ) error {
-	// TODO RAMTIN commit changes on state
 	proposalKey := tx.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
@@ -67,6 +66,8 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	if err != nil {
 		return err
 	}
+
+	st.Commit()
 
 	return nil
 }

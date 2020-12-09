@@ -25,20 +25,19 @@ func (v *TransactionSignatureVerifier) Process(
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-	accounts := state.NewAccounts(st)
-
-	return v.verifyTransactionSignatures(proc.Transaction, accounts)
+	return v.verifyTransactionSignatures(proc.Transaction, st)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx *flow.TransactionBody,
-	accounts *state.Accounts,
+	st *state.State,
 ) (err error) {
+
+	accounts := state.NewAccounts(st)
+
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
-
-	// TODO RAMTIN commit state
 
 	var payloadWeights map[flow.Address]int
 	var proposalKeyVerifiedInPayload bool
@@ -92,6 +91,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
+	st.Commit()
 	return nil
 }
 

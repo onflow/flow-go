@@ -28,7 +28,6 @@ func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
 
-// TODO RAMTIN change this to storage
 type Accounts struct {
 	state *State
 }

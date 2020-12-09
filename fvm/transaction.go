@@ -39,8 +39,6 @@ type TransactionProcedure struct {
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
 	for _, p := range ctx.TransactionProcessors {
-		// TODO RAMTIN change ledger with state
-		// TODO RAMTIN (process should be called with the state, so they all share the same state)
 		err := p.Process(vm, ctx, proc, st)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {

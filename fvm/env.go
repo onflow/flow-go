@@ -103,7 +103,6 @@ func (e *hostEnv) getLogs() []string {
 	return e.logs
 }
 
-// TODO RAMTIN - replace these with state
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	v, _ := e.st.Read(
 		string(owner),
