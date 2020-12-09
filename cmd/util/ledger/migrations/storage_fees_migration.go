@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"github.com/onflow/flow-go/engine/execution/state"
 	fvm "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -15,7 +14,7 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 	newPayload := make([]ledger.Payload, len(payload))
 
 	for i, p := range payload {
-		err := process(p, storageUsed)
+		err := incrementStorageUsed(p, storageUsed)
 		if err != nil {
 			return nil, err
 		}
@@ -23,6 +22,7 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 	}
 
 	for s, u := range storageUsed {
+		// this is the storage used by the storage_used register we are about to add
 		storageUsedByStorageUsed := fvm.RegisterSize(
 			flow.BytesToAddress([]byte(s)),
 			false, "storage_used",
@@ -30,33 +30,19 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 		u = u + uint64(storageUsedByStorageUsed)
 
 		newPayload = append(newPayload, ledger.Payload{
-			Key:   makeKey(s, "storage_used"),
+			Key: registerIDToKey(flow.RegisterID{
+				Owner:      s,
+				Controller: "",
+				Key:        "storage_used",
+			}),
 			Value: utils.Uint64ToBinary(u),
 		})
 	}
 	return newPayload, nil
 }
 
-func makeKey(owner string, key string) ledger.Key {
-	newKey := ledger.Key{}
-	newKey.KeyParts = make([]ledger.KeyPart, 3)
-	newKey.KeyParts[0] = ledger.KeyPart{
-		Type:  state.KeyPartOwner,
-		Value: []byte(owner),
-	}
-	newKey.KeyParts[1] = ledger.KeyPart{
-		Type:  state.KeyPartController,
-		Value: []byte(""),
-	}
-	newKey.KeyParts[2] = ledger.KeyPart{
-		Type:  state.KeyPartKey,
-		Value: []byte(key),
-	}
-	return newKey
-}
-
-func process(p ledger.Payload, used map[string]uint64) error {
-	id, err := keyToRegisterId(p.Key)
+func incrementStorageUsed(p ledger.Payload, used map[string]uint64) error {
+	id, err := keyToRegisterID(p.Key)
 	if err != nil {
 		return err
 	}
