@@ -18,11 +18,10 @@ import (
 
 type State struct {
 	metrics module.ComplianceMetrics
-	tracer  module.Tracer
 	db      *badger.DB
 	headers storage.Headers
-	seals   storage.Seals
 	blocks  storage.Blocks
+	seals   storage.Seals
 	epoch   struct {
 		setups   storage.EpochSetups
 		commits  storage.EpochCommits
@@ -70,7 +69,6 @@ func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 
 func Bootstrap(
 	metrics module.ComplianceMetrics,
-	tracer module.Tracer,
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -78,7 +76,7 @@ func Bootstrap(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-	stateRoot StateRoot,
+	stateRoot *StateRoot,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
@@ -87,7 +85,7 @@ func Bootstrap(
 	if isBootstrapped {
 		return nil, fmt.Errorf("expected empty database")
 	}
-	state := newState(metrics, tracer, db, headers, seals, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, blocks, setups, commits, statuses)
 
 	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
 		// 1) insert the root block with its payload into the state and index it
@@ -188,7 +186,6 @@ func Bootstrap(
 
 func OpenState(
 	metrics module.ComplianceMetrics,
-	tracer module.Tracer,
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -204,16 +201,54 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(metrics, tracer, db, headers, seals, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, blocks, setups, commits, statuses)
 
-	// read StateRoot from database:
-	rootHeader, err := state.Params().Root()
+	// read root block from database:
+	var rootHeight uint64
+	err = db.View(operation.RetrieveRootHeight(&rootHeight))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed read root header from opened database: %w", err)
+		return nil, nil, fmt.Errorf("failed retrieve root height: %w", err)
 	}
-	rootPayload :=
+	rootBlock, err := blocks.ByHeight(rootHeight)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed retrieve root block: %w", err)
+	}
 
-	return state, , nil
+	// read root execution result
+	var resultID flow.Identifier
+	err = db.View(operation.LookupExecutionResult(rootBlock.ID(), &resultID))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed retrieve root block's execution result ID: %w", err)
+	}
+	var result flow.ExecutionResult
+	err = db.View(operation.RetrieveExecutionResult(resultID, &result))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed retrieve root block's execution result: %w", err)
+	}
+
+	// read root seal
+	seal, err := seals.ByBlockID(rootBlock.ID())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed retrieve root block's seal: %w", err)
+	}
+
+	// read root seal
+	epochStatus, err := statuses.ByBlockID(rootBlock.ID())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed retrieve root block's epoch status: %w", err)
+	}
+	epochSetup, err := setups.ByID(epochStatus.CurrentEpoch.CommitID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed retrieve root epochs's setup event: %w", err)
+	}
+
+	// construct state Root
+	stateRoot, err := NewStateRoot(rootBlock, &result, seal, epochSetup.FirstView)
+	if err != nil {
+		return nil, nil, fmt.Errorf("constructing state root failed: %w", err)
+	}
+
+	return state, stateRoot, nil
 }
 
 // newState initializes a new state backed by the provided a badger database,
@@ -222,7 +257,6 @@ func OpenState(
 // is expected to contain a an already bootstrapped state or not
 func newState(
 	metrics module.ComplianceMetrics,
-	tracer module.Tracer,
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -233,7 +267,6 @@ func newState(
 ) *State {
 	return &State{
 		metrics: metrics,
-		tracer:  tracer,
 		db:      db,
 		headers: headers,
 		seals:   seals,

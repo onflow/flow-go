@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol"
 	"strings"
+
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/badger"
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -33,7 +35,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
-	badger "github.com/onflow/flow-go/state/protocol/badger"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
@@ -47,6 +49,7 @@ func main() {
 		collectionGRPCPort           uint
 		pingEnabled                  bool
 		nodeInfoFile                 string
+		followerState                protocol.MutableState
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
 		followerEng                  *followereng.Engine
@@ -70,23 +73,6 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
-		CreateState(func(fnb *cmd.FlowNodeBuilder) (protocol.MutableState, error) {
-			state, err := badger.NewFollowerState(
-				fnb.Metrics.Compliance,
-				fnb.Tracer,
-				fnb.DB,
-				fnb.Storage.Headers,
-				fnb.Storage.Seals,
-				fnb.Storage.Index,
-				fnb.Storage.Payloads,
-				fnb.Storage.Blocks,
-				fnb.Storage.Setups,
-				fnb.Storage.Commits,
-				fnb.Storage.Statuses,
-				fnb.ProtocolEvents,
-			)
-			return state, err
-		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
@@ -102,6 +88,22 @@ func main() {
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			followerState, err = badger.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
@@ -219,7 +221,7 @@ func main() {
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -258,7 +260,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				followerState,
 				conCache,
 				followerCore,
 				syncCore,
