@@ -46,6 +46,7 @@ func New(
 	txResults storage.TransactionResults,
 	chainID flow.ChainID,
 	scriptsEnabled bool,
+	queriesEnabled bool,
 ) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -64,6 +65,7 @@ func New(
 			exeResults:         exeResults,
 			transactionResults: txResults,
 			scriptsEnabled:     scriptsEnabled,
+			queriesEnabled:     queriesEnabled,
 		},
 		server: grpc.NewServer(
 			grpc.MaxRecvMsgSize(config.MaxMsgSize),
@@ -118,6 +120,7 @@ type handler struct {
 	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults
 	scriptsEnabled     bool
+	queriesEnabled     bool
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -157,6 +160,10 @@ func (h *handler) GetEventsForBlockIDs(
 	_ context.Context,
 	req *execution.GetEventsForBlockIDsRequest,
 ) (*execution.GetEventsForBlockIDsResponse, error) {
+
+	if !h.queriesEnabled {
+		return nil, status.Error(codes.Unimplemented, "event queries are disabled")
+	}
 
 	// validate request
 	blockIDs := req.GetBlockIds()
@@ -205,6 +212,10 @@ func (h *handler) GetTransactionResult(
 	_ context.Context,
 	req *execution.GetTransactionResultRequest,
 ) (*execution.GetTransactionResultResponse, error) {
+
+	if !h.queriesEnabled {
+		return nil, status.Error(codes.Unimplemented, "transaction result queries are disabled")
+	}
 
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
