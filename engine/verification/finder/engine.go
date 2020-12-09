@@ -34,6 +34,7 @@ type Engine struct {
 	readyReceipts            mempool.ReceiptDataPacks // used to keep the receipts ready for process
 	headerStorage            storage.Headers          // used to check block existence before verifying
 	processedResultIDs       mempool.Identifiers      // used to keep track of the processed results
+	discardedResultIDs       mempool.Identifiers      // used to keep track of discarded results while node was not staked for epoch
 	blockIDsCache            mempool.Identifiers      // used as a cache to keep track of new finalized blocks
 	pendingReceiptIDsByBlock mempool.IdentifierMap    // used as a mapping to keep track of receipts associated with a block
 	receiptIDsByResult       mempool.IdentifierMap    // used as a mapping to keep track of receipts with the same result
@@ -54,6 +55,7 @@ func New(
 	readyReceipts mempool.ReceiptDataPacks,
 	headerStorage storage.Headers,
 	processedResultIDs mempool.Identifiers,
+	discardedResultIDs mempool.Identifiers,
 	pendingReceiptIDsByBlock mempool.IdentifierMap,
 	receiptsIDsByResult mempool.IdentifierMap,
 	blockIDsCache mempool.Identifiers,
@@ -71,6 +73,7 @@ func New(
 		pendingReceipts:          pendingReceipts,
 		readyReceipts:            readyReceipts,
 		processedResultIDs:       processedResultIDs,
+		discardedResultIDs:       discardedResultIDs,
 		pendingReceiptIDsByBlock: pendingReceiptIDsByBlock,
 		receiptIDsByResult:       receiptsIDsByResult,
 		blockIDsCache:            blockIDsCache,
@@ -356,9 +359,13 @@ func (e *Engine) checkCachedReceipts() {
 				return
 			}
 
-			// checks if the result has already been handled
+			// checks if the result has already been processed or discarded
 			if e.processedResultIDs.Has(resultID) {
 				log.Debug().Msg("drops handling already processed result")
+				return
+			}
+			if e.discardedResultIDs.Has(resultID) {
+				log.Debug().Msg("drops handling already discarded result")
 				return
 			}
 
@@ -373,7 +380,11 @@ func (e *Engine) checkCachedReceipts() {
 				}
 
 				if !ok {
-					log.Debug().Msg("processing result is dropped by unstaked verification node")
+					added := e.discardedResultIDs.Add(resultID)
+					log.Debug().
+						Bool("added_to_discard_pool", added).
+						Msg("processing result is dropped by unstaked verification node")
+					return
 				}
 
 				// adds the receipt to the ready mempool
