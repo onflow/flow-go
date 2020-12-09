@@ -63,7 +63,7 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
-	state    *protocol.State
+	state    *protocol.MutableState
 	mutator  *protocol.Mutator
 	headerDB *storage.Headers
 	sealDB   *storage.Seals

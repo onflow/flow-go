@@ -4,9 +4,12 @@ package badger
 
 import (
 	"fmt"
+
+	"github.com/onflow/flow-go/storage"
+
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/dgraph-io/badger/v2"
@@ -29,6 +32,7 @@ type FollowerState struct {
 	index    storage.Index
 	payloads storage.Payloads
 	consumer protocol.Consumer
+	cfg      Config
 }
 
 // MutableState implements a complete version of protocol state.
@@ -36,7 +40,6 @@ type FollowerState struct {
 // Compared to FollowerState makes more checks before extending chain.
 type MutableState struct {
 	FollowerState
-	validator module.ReceiptValidator
 }
 
 // NewFollowerState initializes a new follower state backed by a badger database, applying the
