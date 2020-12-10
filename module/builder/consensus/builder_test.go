@@ -64,7 +64,6 @@ type BuilderSuite struct {
 
 	// mocked dependencies
 	state    *protocol.MutableState
-	mutator  *protocol.Mutator
 	headerDB *storage.Headers
 	sealDB   *storage.Seals
 	indexDB  *storage.Index
@@ -253,9 +252,7 @@ func (bs *BuilderSuite) SetupTest() {
 	}
 
 	bs.state = &protocol.MutableState{}
-	bs.mutator = &protocol.Mutator{}
-	bs.state.On("Mutate").Return(bs.mutator)
-	bs.mutator.On("Extend", mock.Anything).Run(func(args mock.Arguments) {
+	bs.state.On("Extend", mock.Anything).Run(func(args mock.Arguments) {
 		block := args.Get(0).(*flow.Block)
 		bs.Assert().Equal(bs.sentinel, block.Header.View)
 		bs.assembled = block.Payload

@@ -394,6 +394,11 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 
 	// make sure we fail to extend the state
 	*cs.state = protocol.MutableState{}
+	cs.state.On("Final").Return(
+		func() protint.Snapshot {
+			return cs.snapshot
+		},
+	)
 	cs.state.On("Extend", mock.Anything).Return(errors.New("dummy error"))
 
 	// it should be processed without error

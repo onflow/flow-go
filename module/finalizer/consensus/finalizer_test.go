@@ -174,9 +174,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	final.Height = uint64(rand.Uint32())
 
 	// create a mock protocol state to check finalize calls
-	mutator := &mockprot.Mutator{}
 	state := &mockprot.MutableState{}
-	state.On("Mutate").Return(mutator)
 
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
@@ -208,7 +206,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	})
 
 	// make sure that nothing was finalized
-	mutator.AssertExpectations(t)
+	state.AssertExpectations(t)
 
 	// make sure no cleanup was done
 	assert.Empty(t, list)
