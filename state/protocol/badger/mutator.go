@@ -714,7 +714,7 @@ func (m *Mutator) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 		for i, seal := range payload.Seals {
 			header, err := m.state.headers.ByBlockID(seal.BlockID)
 			if err != nil {
-				return nil, fmt.Errorf("could not retrieve the header %v for seal: %w", seal.BlockID, err)
+				return nil, state.NewInvalidExtensionErrorf("could not retrieve the header %v for seal: %w", seal.BlockID, err)
 			}
 
 			if i == 0 || header.Height > highestHeader.Height {

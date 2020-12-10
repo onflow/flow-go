@@ -34,3 +34,18 @@ func TestIncorporatedResultID(t *testing.T) {
 	assert.Equal(t, id1, id2)
 	assert.Equal(t, cs1, cs2)
 }
+
+// Test that the same result incorporated (from a different receipt) in the
+// same block produces the same IncorporatedResult (with same ID).
+func TestIDCollusion(t *testing.T) {
+	incorporatedBlockID := unittest.IdentifierFixture()
+	executionResult := unittest.ExecutionResultFixture()
+
+	ir1 := flow.NewIncorporatedResult(incorporatedBlockID, executionResult)
+	ir2 := flow.NewIncorporatedResult(incorporatedBlockID, executionResult)
+
+	id1 := ir1.ID()
+	id2 := ir2.ID()
+
+	assert.Equal(t, id1, id2)
+}
