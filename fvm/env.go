@@ -256,8 +256,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
-		// TODO maybe we should return an error instead of panic
-		panic(fmt.Errorf("failed to json encode a cadence event: %w", err))
+		return fmt.Errorf("failed to json encode a cadence event: %w", err)
 	}
 
 	e.totalEventByteSize += uint64(len(payload))
