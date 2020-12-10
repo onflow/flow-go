@@ -117,7 +117,9 @@ func (es *CommittedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 
 func (es *CommittedEpoch) DKG() (protocol.DKG, error) {
 	dkg, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
-		GroupKey:     encodable.RandomBeaconPubKey{es.commitEvent.DKGGroupKey},
+		GroupKey: encodable.RandomBeaconPubKey{
+			PublicKey: es.commitEvent.DKGGroupKey,
+		},
 		Participants: es.commitEvent.DKGParticipants,
 	})
 	return dkg, err
