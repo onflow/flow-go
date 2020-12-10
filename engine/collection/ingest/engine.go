@@ -156,8 +156,17 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	log.Info().Msg("transaction message received")
 
-	// using the transaction's reference block, determine which cluster we're in
-	refEpoch := e.state.AtBlockID(tx.ReferenceBlockID).Epochs().Current()
+	// get the state snapshot w.r.t. the reference block
+	refSnapshot := e.state.AtBlockID(tx.ReferenceBlockID)
+	// fail fast if this is an unknown reference
+	_, err := refSnapshot.Head()
+	if err != nil {
+		return fmt.Errorf("could not get reference block: %w", err)
+	}
+
+	// using the transaction's reference block, determine which cluster we're in.
+	// if we don't know the reference block, we will fail when attempting to query the epoch.
+	refEpoch := refSnapshot.Epochs().Current()
 
 	counter, err := refEpoch.Counter()
 	if err != nil {
@@ -189,6 +198,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
 
+	// if we are not yet a member of any cluster, for example if we are joining
+	// the network in the next epoch, we will return an error here
 	localCluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
 		return fmt.Errorf("node is not assigned to any cluster in this epoch: %d", counter)
