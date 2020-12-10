@@ -126,7 +126,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
 	}
 
-	if publicKey == nil {
+	if len(publicKey) == 0 {
 		return flow.AccountPublicKey{}, ErrAccountPublicKeyNotFound
 	}
 
@@ -142,10 +142,6 @@ func (a *Accounts) getPublicKeyCount(address flow.Address) (uint64, error) {
 	countBytes, err := a.getValue(address, true, keyPublicKeyCount)
 	if err != nil {
 		return 0, newLedgerGetError(keyPublicKeyCount, address, err)
-	}
-
-	if countBytes == nil {
-		return 0, nil
 	}
 
 	countInt := new(big.Int).SetBytes(countBytes)
@@ -166,25 +162,9 @@ func (a *Accounts) setPublicKeyCount(address flow.Address, count uint64) error {
 }
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
-	var countBytes []byte
-	countBytes, err = a.getValue(address, true, keyPublicKeyCount)
+	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
-		return nil, newLedgerGetError(keyPublicKeyCount, address, err)
-	}
-
-	var count uint64
-
-	if countBytes == nil {
-		count = 0
-	} else {
-		countInt := new(big.Int).SetBytes(countBytes)
-		if !countInt.IsUint64() {
-			return nil, fmt.Errorf(
-				"retrieved public key account count bytes (hex-encoded): %x do not represent valid uint64",
-				countBytes,
-			)
-		}
-		count = countInt.Uint64()
+		return nil, fmt.Errorf("failed to get public key count of account: %w", err)
 	}
 
 	publicKeys = make([]flow.AccountPublicKey, count)
