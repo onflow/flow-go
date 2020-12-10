@@ -51,6 +51,84 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 	})
 }
 
+func TestAccounts_GetPublicKey(t *testing.T) {
+
+	t.Run("non-existent key index", func(t *testing.T) {
+
+		address := flow.HexToAddress("01")
+
+		for _, ledgerValue := range [][]byte{{}, nil} {
+
+			ledger := state.NewMapLedger()
+
+			ledger.Set(
+				string(address.Bytes()), string(address.Bytes()), "public_key_0",
+				ledgerValue,
+			)
+
+			accounts := state.NewAccounts(ledger)
+
+			err := accounts.Create(nil, address)
+			require.NoError(t, err)
+
+			_, err = accounts.GetPublicKey(address, 0)
+			require.Equal(t, state.ErrAccountPublicKeyNotFound, err)
+		}
+	})
+}
+
+func TestAccounts_GetPublicKeyCount(t *testing.T) {
+
+	t.Run("non-existent key count", func(t *testing.T) {
+
+		address := flow.HexToAddress("01")
+
+		for _, ledgerValue := range [][]byte{{}, nil} {
+
+			ledger := state.NewMapLedger()
+			ledger.Set(
+				string(address.Bytes()), string(address.Bytes()), "public_key_count",
+				ledgerValue,
+			)
+
+			accounts := state.NewAccounts(ledger)
+
+			err := accounts.Create(nil, address)
+			require.NoError(t, err)
+
+			count, err := accounts.GetPublicKeyCount(address)
+			require.NoError(t, err)
+			require.Equal(t, uint64(0), count)
+		}
+	})
+}
+
+func TestAccounts_GetPublicKeys(t *testing.T) {
+
+	t.Run("non-existent key count", func(t *testing.T) {
+
+		address := flow.HexToAddress("01")
+
+		for _, ledgerValue := range [][]byte{{}, nil} {
+
+			ledger := state.NewMapLedger()
+			ledger.Set(
+				string(address.Bytes()), string(address.Bytes()), "public_key_count",
+				ledgerValue,
+			)
+
+			accounts := state.NewAccounts(ledger)
+
+			err := accounts.Create(nil, address)
+			require.NoError(t, err)
+
+			keys, err := accounts.GetPublicKeys(address)
+			require.NoError(t, err)
+			require.Empty(t, keys)
+		}
+	})
+}
+
 // Some old account could be created without key count register
 // we recreate it in a test
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
