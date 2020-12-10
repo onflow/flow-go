@@ -1,6 +1,7 @@
 package collection_test
 
 import (
+	"github.com/onflow/flow-go/state/protocol/events"
 	"math/rand"
 	"os"
 	"testing"
@@ -19,8 +20,8 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
 	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
-	putil "github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/state/protocol"
+	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -45,7 +46,7 @@ type BuilderSuite struct {
 	mutator cluster.Mutator
 
 	// protocol state for reference blocks for transactions
-	protoState *protocol.State
+	protoState protocol.MutableState
 
 	pool    *stdmap.Transactions
 	builder *builder.Builder
@@ -68,19 +69,32 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, _, _, _, blocks, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := sutil.StorageLayer(suite.T(), suite.db)
+	consumer := events.NewNoop()
 	suite.headers = headers
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = clusterkv.NewState(suite.db, tracer, suite.chainID, suite.headers, suite.payloads)
 	suite.Require().Nil(err)
-	suite.mutator = suite.state
+	suite.mutator = suite.state.Mutate()
 
-	suite.protoState = putil.ProtocolState(suite.T(), suite.db)
+	// just bootstrap with a genesis block, we'll use this as reference
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	root, result, seal := unittest.BootstrapFixture(participants)
+	// ensure we don't enter a new epoch for tests that build many blocks
+	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 
-	suite.Bootstrap()
+	stateRoot, err := pbadger.NewStateRoot(root, result, seal, 0)
+	require.NoError(suite.T(), err)
 
+	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+	require.NoError(suite.T(), err)
+
+	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer)
+	require.NoError(suite.T(), err)
+
+	suite.bootstrap(stateRoot.Block())
 	suite.builder = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
 }
 
@@ -92,18 +106,9 @@ func (suite *BuilderSuite) TearDownTest() {
 	suite.Assert().Nil(err)
 }
 
-func (suite *BuilderSuite) Bootstrap() {
-
-	// just bootstrap with a genesis block, we'll use this as reference
-	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	root, result, seal := unittest.BootstrapFixture(identities)
-	// ensure we don't enter a new epoch for tests that build many blocks
-	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
-	err := suite.protoState.Bootstrap(root, result, seal)
-	suite.Require().Nil(err)
-
+func (suite *BuilderSuite) bootstrap(root *flow.Block) {
 	// bootstrap cluster chain
-	err = suite.mutator.Bootstrap(suite.genesis)
+	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Nil(err)
 
 	// add some transactions to transaction pool
@@ -842,7 +847,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		suite.state, err = clusterkv.NewState(suite.db, tracer, suite.chainID, suite.headers, suite.payloads)
 		assert.Nil(b, err)
-		suite.mutator = suite.state
+		suite.mutator = suite.state.Mutate()
 
 		err = suite.mutator.Bootstrap(suite.genesis)
 		assert.Nil(b, err)

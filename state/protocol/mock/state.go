@@ -46,20 +46,6 @@ func (_m *State) AtHeight(height uint64) protocol.Snapshot {
 	return r0
 }
 
-// Bootstrap provides a mock function with given fields: root, result, seal
-func (_m *State) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
-	ret := _m.Called(root, result, seal)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Block, *flow.ExecutionResult, *flow.Seal) error); ok {
-		r0 = rf(root, result, seal)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Final provides a mock function with given fields:
 func (_m *State) Final() protocol.Snapshot {
 	ret := _m.Called()

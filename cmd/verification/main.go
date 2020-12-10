@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/badger"
 	"time"
 
 	"github.com/onflow/cadence/runtime"
@@ -30,6 +29,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol/badger"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
@@ -53,6 +54,7 @@ const (
 
 func main() {
 	var (
+		followerState       protocol.MutableState
 		err                 error
 		receiptLimit        uint                       // size of execution-receipt/result related mempools
 		chunkAlpha          uint                       // number of verifiers assigned per chunk
@@ -78,28 +80,26 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
-		CreateState(func(fnb *cmd.FlowNodeBuilder) (protocol.MutableState, error) {
-			state, err := badger.NewMutableState(
-				fnb.Metrics.Compliance,
-				fnb.Tracer,
-				fnb.DB,
-				fnb.Storage.Headers,
-				fnb.Storage.Seals,
-				fnb.Storage.Index,
-				fnb.Storage.Payloads,
-				fnb.Storage.Blocks,
-				fnb.Storage.Setups,
-				fnb.Storage.Commits,
-				fnb.Storage.Statuses,
-				fnb.ProtocolEvents,
-				fnb.Storage.Results,
-			)
-			return state, err
-		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			followerState, err = badger.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
@@ -309,7 +309,7 @@ func main() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -348,7 +348,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				followerState,
 				pendingBlocks,
 				followerCore,
 				syncCore,

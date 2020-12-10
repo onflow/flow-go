@@ -90,7 +90,7 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	if errors.Is(err, storage.ErrNotFound) {
 		// no existing cluster state, bootstrap with root block for epoch
-		err = state.Bootstrap(cluster.RootBlock())
+		err = state.Mutate().Bootstrap(cluster.RootBlock())
 		if err != nil {
 			err = fmt.Errorf("could not bootstrap cluster state: %w", err)
 			return

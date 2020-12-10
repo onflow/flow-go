@@ -49,7 +49,7 @@ type Node struct {
 	compliance *compliance.Engine
 	sync       *synceng.Engine
 	hot        *hotstuff.EventLoop
-	state      *protocol.State
+	state      *protocol.MutableState
 	headers    *storage.Headers
 	net        *Network
 }
@@ -136,10 +136,13 @@ func createNode(
 	statusesDB := storage.NewEpochStatuses(metrics, db)
 	consumer := events.NewNoop()
 
-	state, err := protocol.NewState(metrics, tracer, db, headersDB, sealsDB, indexDB, payloadsDB, blocksDB, setupsDB, commitsDB, statusesDB, consumer)
+	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
 	require.NoError(t, err)
 
-	err = state.Bootstrap(root, result, seal)
+	state, err := protocol.Bootstrap(metrics, db, headersDB, sealsDB, blocksDB, setupsDB, commitsDB, statusesDB, stateRoot)
+	require.NoError(t, err)
+
+	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer)
 	require.NoError(t, err)
 
 	localID := identity.ID()
@@ -190,7 +193,7 @@ func createNode(
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, state, headersDB, sealsDB, indexDB, guarantees, seals, tracer)
+	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, guarantees, seals, tracer)
 
 	signer := &Signer{identity.ID()}
 
@@ -204,7 +207,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, headersDB, state)
+	final := finalizer.NewFinalizer(db, headersDB, fullState)
 
 	// initialize the persister
 	persist := persister.New(db, rootHeader.ChainID)
@@ -216,7 +219,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the compliance engine
-	comp, err := compliance.New(log, metrics, tracer, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, state, prov, cache, syncCore)
+	comp, err := compliance.New(log, metrics, tracer, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, fullState, prov, cache, syncCore)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
@@ -235,7 +238,7 @@ func createNode(
 
 	node.compliance = comp
 	node.sync = sync
-	node.state = state
+	node.state = fullState
 	node.hot = hot
 	node.headers = headersDB
 	node.net = net

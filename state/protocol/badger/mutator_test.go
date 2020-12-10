@@ -37,14 +37,12 @@ func init() {
 var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 
 func TestBootstrapValid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
-
+	root, result, seal := unittest.BootstrapFixture(participants)
+	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.NoError(t, err)
+	util.RunWithBootstrapState(t, stateRoot, func(db *badger.DB, state *protocol.State) {
 		var finalized uint64
-		err = db.View(operation.RetrieveFinalizedHeight(&finalized))
+		err := db.View(operation.RetrieveFinalizedHeight(&finalized))
 		require.NoError(t, err)
 
 		var sealed uint64
@@ -63,9 +61,11 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.LookupBlockSeal(genesisID, &sealID))
 		require.NoError(t, err)
 
+		seal := stateRoot.Seal()
 		err = db.View(operation.RetrieveSeal(sealID, seal))
 		require.NoError(t, err)
 
+		block := stateRoot.Block()
 		require.Equal(t, block.Header.Height, finalized)
 		require.Equal(t, block.Header.Height, sealed)
 		require.Equal(t, block.ID(), genesisID)
@@ -75,275 +75,224 @@ func TestBootstrapValid(t *testing.T) {
 }
 
 func TestBootstrapDuplicateID(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
+	participants := flow.IdentityList{
+		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+	}
+	root, result, seal := unittest.BootstrapFixture(participants)
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapZeroStake(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
+	participants := flow.IdentityList{
+		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
+		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+	}
+	root, result, seal := unittest.BootstrapFixture(participants)
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapNoCollection(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	participants := flow.IdentityList{
+		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+	}
 
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
+	root, result, seal := unittest.BootstrapFixture(participants)
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapNoConsensus(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	participants := flow.IdentityList{
+		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+	}
 
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
+	root, result, seal := unittest.BootstrapFixture(participants)
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapNoExecution(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	participants := flow.IdentityList{
+		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+	}
 
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
+	root, result, seal := unittest.BootstrapFixture(participants)
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapNoVerification(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	participants := flow.IdentityList{
+		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+	}
 
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		}
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
+	root, result, seal := unittest.BootstrapFixture(participants)
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapExistingAddress(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	participants := flow.IdentityList{
+		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+		{NodeID: flow.Identifier{0x02}, Address: "a1", Role: flow.RoleConsensus, Stake: 2},
+		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+	}
 
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a1", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
+	root, result, seal := unittest.BootstrapFixture(participants)
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapNonZeroParent(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants, func(block *flow.Block) {
-			block.Header.Height = 13
-			block.Header.ParentID = unittest.IdentifierFixture()
-		})
-
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
+	root, result, seal := unittest.BootstrapFixture(participants, func(block *flow.Block) {
+		block.Header.Height = 13
+		block.Header.ParentID = unittest.IdentifierFixture()
 	})
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.NoError(t, err)
 }
 
 func TestBootstrapNonEmptyCollections(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants, func(block *flow.Block) {
-			block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(1)
-		})
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
+	root, result, seal := unittest.BootstrapFixture(participants, func(block *flow.Block) {
+		block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(1)
 	})
+	_, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapWithSeal(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	block := unittest.GenesisFixture(participants)
+	block.Payload.Seals = []*flow.Seal{unittest.Seal.Fixture()}
+	block.Header.PayloadHash = block.Payload.Hash()
 
-		block := unittest.GenesisFixture(participants)
-		block.Payload.Seals = []*flow.Seal{unittest.Seal.Fixture()}
-		block.Header.PayloadHash = block.Payload.Hash()
+	result := unittest.ExecutionResultFixture()
+	result.BlockID = block.ID()
 
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
+	finalState, ok := result.FinalStateCommitment()
+	require.True(t, ok)
 
-		finalState, ok := result.FinalStateCommitment()
-		require.True(t, ok)
+	seal := unittest.Seal.Fixture()
+	seal.BlockID = block.ID()
+	seal.ResultID = result.ID()
+	seal.FinalState = finalState
 
-		seal := unittest.Seal.Fixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = finalState
-
-		err := state.Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
+	_, err := protocol.NewStateRoot(block, result, seal, 0)
+	require.Error(t, err)
 }
 
 func TestBootstrapMissingServiceEvents(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	t.Run("missing setup", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		seal.ServiceEvents = seal.ServiceEvents[1:]
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
+	})
 
-		t.Run("missing setup", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			seal.ServiceEvents = seal.ServiceEvents[1:]
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
-
-		t.Run("missing commit", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			seal.ServiceEvents = seal.ServiceEvents[:1]
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
+	t.Run("missing commit", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		seal.ServiceEvents = seal.ServiceEvents[:1]
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
 	})
 }
 
 func TestBootstrapInvalidEpochSetup(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	t.Run("invalid final view", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		// set an invalid final view for the first epoch
+		setup.FinalView = root.Header.View
 
-		t.Run("invalid final view", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-			// set an invalid final view for the first epoch
-			setup.FinalView = root.Header.View
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
+	})
 
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
+	t.Run("invalid cluster assignments", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		// create an invalid cluster assignment (node appears in multiple clusters)
+		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
+		setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
 
-		t.Run("invalid cluster assignments", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-			// create an invalid cluster assignment (node appears in multiple clusters)
-			collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
-			setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
+	})
 
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
+	t.Run("empty seed", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		setup.RandomSource = nil
 
-		t.Run("empty seed", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-			setup.RandomSource = nil
-
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
 	})
 }
 
 func TestBootstrapInvalidEpochCommit(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	t.Run("inconsistent counter", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// use a different counter for the commit
+		commit.Counter = setup.Counter + 1
 
-		t.Run("inconsistent counter", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-			commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
-			// use a different counter for the commit
-			commit.Counter = setup.Counter + 1
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
+	})
 
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
+	t.Run("inconsistent cluster QCs", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// add an extra QC to commit
+		commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
 
-		t.Run("inconsistent cluster QCs", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
-			// add an extra QC to commit
-			commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
+	})
 
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
+	t.Run("missing dkg group key", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		commit.DKGGroupKey = nil
 
-		t.Run("missing dkg group key", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
-			commit.DKGGroupKey = nil
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
+	})
 
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
+	t.Run("inconsistent DKG participants", func(t *testing.T) {
+		root, result, seal := unittest.BootstrapFixture(participants)
+		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// add an invalid DKG participant
+		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
+		commit.DKGParticipants[collector.NodeID] = flow.DKGParticipant{
+			KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
+			Index:    1,
+		}
 
-		t.Run("inconsistent DKG participants", func(t *testing.T) {
-			root, result, seal := unittest.BootstrapFixture(participants)
-			commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
-			// add an invalid DKG participant
-			collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
-			commit.DKGParticipants[collector.NodeID] = flow.DKGParticipant{
-				KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
-				Index:    1,
-			}
-
-			err := state.Bootstrap(root, result, seal)
-			require.Error(t, err)
-		})
+		_, err := protocol.NewStateRoot(root, result, seal, 0)
+		require.Error(t, err)
 	})
 }
 
 func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
@@ -353,18 +302,21 @@ func TestExtendValid(t *testing.T) {
 		consumer := new(mockprotocol.Consumer)
 		distributor.AddConsumer(consumer)
 
-		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
-		require.Nil(t, err)
-
 		block, result, seal := unittest.BootstrapFixture(participants)
-		err = state.Bootstrap(block, result, seal)
+		stateRoot, err := protocol.NewStateRoot(block, result, seal, 0)
+		require.NoError(t, err)
+
+		state, err := protocol.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		require.NoError(t, err)
+
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer)
 		require.NoError(t, err)
 
 		extend := unittest.BlockWithParentFixture(block.Header)
 		extend.Payload.Guarantees = nil
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.Extend(&extend)
+		err = fullState.Extend(&extend)
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
@@ -372,26 +324,21 @@ func TestExtendValid(t *testing.T) {
 		require.Equal(t, seal.FinalState, finalCommit)
 
 		consumer.On("BlockFinalized", extend.Header).Once()
-		err = state.Finalize(extend.ID())
+		err = fullState.Finalize(extend.ID())
 		require.Nil(t, err)
 		consumer.AssertExpectations(t)
 	})
 }
 
 func TestExtendSealedBoundary(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		root, result, seal := unittest.BootstrapFixture(participants)
-		t.Logf("root: %x\n", root.ID())
-
-		err := state.Bootstrap(root, result, seal)
-		require.NoError(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 
 		finalCommit, err := state.Final().Commit()
 		require.NoError(t, err)
-		require.Equal(t, seal.FinalState, finalCommit, "original commit should be root commit")
+		require.Equal(t, stateRoot.Seal().FinalState, finalCommit, "original commit should be root commit")
 
-		first := unittest.BlockWithParentFixture(root.Header)
+		first := unittest.BlockWithParentFixture(stateRoot.Block().Header)
 		first.SetPayload(flow.Payload{})
 
 		extend := &flow.Seal{
@@ -405,24 +352,24 @@ func TestExtendSealedBoundary(t *testing.T) {
 			Seals: []*flow.Seal{extend},
 		})
 
-		err = state.Mutate().Extend(&first)
+		err = state.Extend(&first)
 		require.NoError(t, err)
 
-		err = state.Mutate().Extend(&second)
-		require.NoError(t, err)
-
-		finalCommit, err = state.Final().Commit()
-		require.NoError(t, err)
-		require.Equal(t, seal.FinalState, finalCommit, "commit should not change before finalizing")
-
-		err = state.Mutate().Finalize(first.ID())
+		err = state.Extend(&second)
 		require.NoError(t, err)
 
 		finalCommit, err = state.Final().Commit()
 		require.NoError(t, err)
-		require.Equal(t, seal.FinalState, finalCommit, "commit should not change after finalizing non-sealing block")
+		require.Equal(t, stateRoot.Seal().FinalState, finalCommit, "commit should not change before finalizing")
 
-		err = state.Mutate().Finalize(second.ID())
+		err = state.Finalize(first.ID())
+		require.NoError(t, err)
+
+		finalCommit, err = state.Final().Commit()
+		require.NoError(t, err)
+		require.Equal(t, stateRoot.Seal().FinalState, finalCommit, "commit should not change after finalizing non-sealing block")
+
+		err = state.Finalize(second.ID())
 		require.NoError(t, err)
 
 		finalCommit, err = state.Final().Commit()
@@ -432,12 +379,8 @@ func TestExtendSealedBoundary(t *testing.T) {
 }
 
 func TestExtendMissingParent(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
-
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
@@ -446,7 +389,7 @@ func TestExtendMissingParent(t *testing.T) {
 		extend.Header.ParentID = unittest.BlockFixture().ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.Extend(&extend)
+		err := state.Extend(&extend)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -459,21 +402,17 @@ func TestExtendMissingParent(t *testing.T) {
 }
 
 func TestExtendHeightTooSmall(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
-
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
 		extend.Header.Height = 1
 		extend.Header.View = 1
-		extend.Header.ParentID = block.Header.ID()
+		extend.Header.ParentID = stateRoot.Block().Header.ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.Extend(&extend)
+		err := state.Extend(&extend)
 		require.NoError(t, err)
 
 		// create another block with the same height and view, that is coming after
@@ -493,7 +432,10 @@ func TestExtendHeightTooSmall(t *testing.T) {
 }
 
 func TestExtendHeightTooLarge(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	root, result, seal := unittest.BootstrapFixture(participants)
+	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 
 		root := unittest.GenesisFixture(participants)
 
@@ -508,11 +450,8 @@ func TestExtendHeightTooLarge(t *testing.T) {
 }
 
 func TestExtendBlockNotConnected(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 
 		// add 2 blocks, the second finalizing/sealing the state of the first
 		extend := unittest.BlockFixture()
@@ -520,10 +459,10 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		extend.Payload.Seals = nil
 		extend.Header.Height = 1
 		extend.Header.View = 1
-		extend.Header.ParentID = block.Header.ID()
+		extend.Header.ParentID = stateRoot.Block().Header.ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.Extend(&extend)
+		err := state.Extend(&extend)
 		require.NoError(t, err)
 
 		err = state.Finalize(extend.ID())
@@ -531,7 +470,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 
 		// create a fork at view/height 1 and try to connect it to root
 		extend.Header.Timestamp = extend.Header.Timestamp.Add(time.Second)
-		extend.Header.ParentID = block.Header.ID()
+		extend.Header.ParentID = stateRoot.Block().Header.ID()
 
 		err = state.Extend(&extend)
 		require.Error(t, err)
@@ -545,21 +484,18 @@ func TestExtendBlockNotConnected(t *testing.T) {
 }
 
 func TestExtendSealNotConnected(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Mutate().Bootstrap(block, result, seal)
-		require.NoError(t, err)
-
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
+		root := stateRoot.Block()
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
 		extend.Header.Height = 1
 		extend.Header.View = 1
-		extend.Header.ParentID = block.Header.ID()
+		extend.Header.ParentID = root.Header.ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.Mutate().Extend(&extend)
+		err := state.Extend(&extend)
 		require.NoError(t, err)
 
 		// create seal for the block
@@ -573,10 +509,10 @@ func TestExtendSealNotConnected(t *testing.T) {
 		sealing.Payload.Seals = []*flow.Seal{second}
 		sealing.Header.Height = 2
 		sealing.Header.View = 2
-		sealing.Header.ParentID = block.Header.ID()
+		sealing.Header.ParentID = root.Header.ID()
 		sealing.Header.PayloadHash = sealing.Payload.Hash()
 
-		err = state.Mutate().Extend(&sealing)
+		err = state.Extend(&sealing)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -589,54 +525,49 @@ func TestExtendSealNotConnected(t *testing.T) {
 }
 
 func TestExtendWrongIdentity(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
-
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 		extend := unittest.BlockFixture()
 		extend.Header.Height = 1
 		extend.Header.View = 1
-		extend.Header.ParentID = block.ID()
+		extend.Header.ParentID = stateRoot.Block().ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 		extend.Payload.Guarantees = nil
 
-		err = state.Extend(&extend)
+		err := state.Extend(&extend)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
 }
 
 func TestExtendInvalidChainID(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		root := unittest.GenesisFixture(participants)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
+		root := stateRoot.Block()
 		block := unittest.BlockWithParentFixture(root.Header)
 		block.SetPayload(flow.Payload{})
 		// use an invalid chain ID
 		block.Header.ChainID = root.Header.ChainID + "-invalid"
 
-		err := state.Mutate().Extend(&block)
+		err := state.Extend(&block)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
 }
 
 func TestExtendHighestSeal(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	stateRoot := fixtureStateRoot(t)
+	block1 := stateRoot.Block()
+	block1.Payload.Guarantees = nil
+	block1.Header.PayloadHash = block1.Payload.Hash()
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 		// bootstrap the root block
-		block1, result, seal := unittest.BootstrapFixture(participants)
-		block1.Payload.Guarantees = nil
-		block1.Header.PayloadHash = block1.Payload.Hash()
-		err := state.Bootstrap(block1, result, seal)
-		require.NoError(t, err)
 
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.Payload.Guarantees = nil
 		block2.Header.PayloadHash = block2.Payload.Hash()
-		err = state.Extend(&block2)
+		err := state.Extend(&block2)
 		require.Nil(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
@@ -675,25 +606,12 @@ func TestExtendHighestSeal(t *testing.T) {
 // event, then a commit event, then finalizing the first block of the next epoch.
 // Also tests that appropriate epoch transition events are fired.
 func TestExtendEpochTransitionValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-
-		metrics := metrics.NewNoopCollector()
-		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses := storeutil.StorageLayer(t, db)
-
-		// create a event consumer to test epoch transition events
-		distributor := events.NewDistributor()
-		consumer := new(mockprotocol.Consumer)
-		consumer.On("BlockFinalized", mock.Anything)
-		distributor.AddConsumer(consumer)
-
-		state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
-		require.Nil(t, err)
-
-		// first bootstrap with the initial epoch
-		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
-		err = state.Bootstrap(root, rootResult, rootSeal)
-		require.Nil(t, err)
+	// create a event consumer to test epoch transition events
+	consumer := new(mockprotocol.Consumer)
+	consumer.On("BlockFinalized", mock.Anything)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolStateAndConsumer(t, stateRoot, consumer, func(db *badger.DB, state *protocol.MutableState) {
+		root, rootSeal := stateRoot.Block(), stateRoot.Seal()
 
 		// we should begin the epoch in the staking phase
 		phase, err := state.AtBlockID(root.ID()).Phase()
@@ -817,7 +735,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block4.SetPayload(flow.Payload{})
 		block4.Header.View = epoch1FinalView
 
-		err = state.Mutate().Extend(&block4)
+		err = state.Extend(&block4)
 		require.Nil(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
@@ -863,17 +781,14 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //        \-->BLOCK2-->BLOCK4
 //
 func TestExtendConflictingEpochEvents(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		// first bootstrap with the initial epoch
-		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(root, rootResult, rootSeal)
-		require.Nil(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
+		root, rootSeal := stateRoot.Block(), stateRoot.Seal()
 
 		// add two conflicting blocks for each service event to reference
 		block1 := unittest.BlockWithParentFixture(root.Header)
 		block1.SetPayload(flow.Payload{})
-		err = state.Extend(&block1)
+		err := state.Extend(&block1)
 		require.Nil(t, err)
 
 		block2 := unittest.BlockWithParentFixture(root.Header)
@@ -936,17 +851,13 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 
 // extending protocol state with an invalid epoch setup service event should cause an error
 func TestExtendEpochSetupInvalid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		// first bootstrap with the initial epoch
-		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(root, rootResult, rootSeal)
-		require.Nil(t, err)
-
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
+		root, rootSeal := stateRoot.Block(), stateRoot.Seal()
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(root.Header)
 		block1.SetPayload(flow.Payload{})
-		err = state.Extend(&block1)
+		err := state.Extend(&block1)
 		require.Nil(t, err)
 		err = state.Finalize(block1.ID())
 		require.Nil(t, err)
@@ -1017,17 +928,14 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 // extending protocol state with an invalid epoch commit service event should cause an error
 func TestExtendEpochCommitInvalid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		// first bootstrap with the initial epoch
-		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(root, rootResult, rootSeal)
-		require.Nil(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
+		root, rootSeal := stateRoot.Block(), stateRoot.Seal()
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(root.Header)
 		block1.SetPayload(flow.Payload{})
-		err = state.Extend(&block1)
+		err := state.Extend(&block1)
 		require.Nil(t, err)
 		err = state.Finalize(block1.ID())
 		require.Nil(t, err)
@@ -1151,17 +1059,14 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 // if we reach the first block of the next epoch before both setup and commit
 // service events are finalized, the chain should halt
 func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		// first bootstrap with the initial epoch
-		root, rootResult, rootSeal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(root, rootResult, rootSeal)
-		require.Nil(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
+		root, rootSeal := stateRoot.Block(), stateRoot.Seal()
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(root.Header)
 		block1.SetPayload(flow.Payload{})
-		err = state.Extend(&block1)
+		err := state.Extend(&block1)
 		require.Nil(t, err)
 		err = state.Finalize(block1.ID())
 		require.Nil(t, err)
@@ -1206,18 +1111,15 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 }
 
 func TestHeaderExtendValid(t *testing.T) {
-
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.FollowerState) {
+		block, seal := stateRoot.Block(), stateRoot.Seal()
 
 		extend := unittest.BlockWithParentFixture(block.Header)
 		extend.Payload.Guarantees = nil
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.HeaderExtend(&extend)
+		err := state.Extend(&extend)
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
@@ -1227,12 +1129,8 @@ func TestHeaderExtendValid(t *testing.T) {
 }
 
 func TestHeaderExtendMissingParent(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
-
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.FollowerState) {
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
@@ -1241,7 +1139,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		extend.Header.ParentID = unittest.BlockFixture().ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.HeaderExtend(&extend)
+		err := state.Extend(&extend)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -1254,11 +1152,9 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 }
 
 func TestHeaderExtendHeightTooSmall(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.FollowerState) {
+		block := stateRoot.Block()
 
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
@@ -1268,7 +1164,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		extend.Header.ParentID = block.Header.ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.HeaderExtend(&extend)
+		err := state.Extend(&extend)
 		require.NoError(t, err)
 
 		// create another block that points to the previous block `extend` as parent
@@ -1291,26 +1187,24 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 }
 
 func TestHeaderExtendHeightTooLarge(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		root := unittest.GenesisFixture(participants)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.FollowerState) {
+		root := stateRoot.Block()
 
 		block := unittest.BlockWithParentFixture(root.Header)
 		block.SetPayload(flow.Payload{})
 		// set an invalid height
 		block.Header.Height = root.Header.Height + 2
 
-		err := state.HeaderExtend(&block)
+		err := state.Extend(&block)
 		require.Error(t, err)
 	})
 }
 
 func TestHeaderExtendBlockNotConnected(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(block, result, seal)
-		require.NoError(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.FollowerState) {
+		block := stateRoot.Block()
 
 		// add 2 blocks, where:
 		// first block is added and then finalized;
@@ -1324,7 +1218,7 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		extend.Header.ParentID = block.Header.ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = state.Extend(&extend)
+		err := state.Extend(&extend)
 		require.NoError(t, err)
 
 		err = state.Finalize(extend.ID())
@@ -1334,7 +1228,7 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		extend.Header.Timestamp = extend.Header.Timestamp.Add(time.Second)
 		extend.Header.ParentID = block.Header.ID()
 
-		err = state.HeaderExtend(&extend)
+		err = state.Extend(&extend)
 		require.Error(t, err)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
@@ -1347,25 +1241,23 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 }
 
 func TestHeaderExtendHighestSeal(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-		// bootstrap the root block
-		block1, result, seal := unittest.BootstrapFixture(participants)
-		block1.Payload.Guarantees = nil
-		block1.Header.PayloadHash = block1.Payload.Hash()
-		err := state.Bootstrap(block1, result, seal)
-		require.NoError(t, err)
-
+	stateRoot := fixtureStateRoot(t)
+	block1 := stateRoot.Block()
+	// bootstrap the root block
+	block1.Payload.Guarantees = nil
+	block1.Header.PayloadHash = block1.Payload.Hash()
+	util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.FollowerState) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.Payload.Guarantees = nil
 		block2.Header.PayloadHash = block2.Payload.Hash()
-		err = state.HeaderExtend(&block2)
+		err := state.Extend(&block2)
 		require.Nil(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.Payload.Guarantees = nil
 		block3.Header.PayloadHash = block3.Payload.Hash()
-		err = state.HeaderExtend(&block3)
+		err = state.Extend(&block3)
 		require.Nil(t, err)
 
 		// create seals for block2 and block3
@@ -1385,7 +1277,7 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 			Seals: []*flow.Seal{seal3, seal2},
 		})
 		block4.Header.PayloadHash = block4.Payload.Hash()
-		err = state.HeaderExtend(&block4)
+		err = state.Extend(&block4)
 		require.Nil(t, err)
 
 		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
@@ -1397,20 +1289,16 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 func TestMakeValid(t *testing.T) {
 	t.Run("should trigger BlockProcessable with parent block", func(t *testing.T) {
 		consumer := &mockprotocol.Consumer{}
-
-		util.RunWithProtocolStateAndConsumer(t, consumer, func(db *badger.DB, state *protocol.State) {
-			// bootstrap the root block
-			block1, result, seal := unittest.BootstrapFixture(participants)
-			block1.Payload.Guarantees = nil
-			block1.Header.PayloadHash = block1.Payload.Hash()
-			err := state.Bootstrap(block1, result, seal)
-			require.NoError(t, err)
-
+		stateRoot := fixtureStateRoot(t)
+		block1 := stateRoot.Block()
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+		util.RunWithFullProtocolStateAndConsumer(t, stateRoot, consumer, func(db *badger.DB, state *protocol.MutableState) {
 			// create block2 and block3
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.Payload.Guarantees = nil
 			block2.Header.PayloadHash = block2.Payload.Hash()
-			err = state.Extend(&block2)
+			err := state.Extend(&block2)
 			require.Nil(t, err)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
@@ -1441,10 +1329,9 @@ func TestMakeValid(t *testing.T) {
 
 // If block A is finalized and contains a seal to block B, then B is the last sealed block
 func TestSealed(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-		genesis, result, seal := unittest.BootstrapFixture(participants)
-		err := state.Bootstrap(genesis, result, seal)
-		require.NoError(t, err)
+	stateRoot := fixtureStateRoot(t)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
+		genesis := stateRoot.Block()
 
 		// A <- B <- C <- D <- E <- F <- G
 		blockA := unittest.BlockWithParentAndSeal(genesis.Header, nil)
@@ -1471,8 +1358,8 @@ func TestSealed(t *testing.T) {
 	})
 }
 
-func saveBlock(t *testing.T, block *flow.Block, finalizes *flow.Block, state *protocol.State) {
-	err := state.HeaderExtend(block)
+func saveBlock(t *testing.T, block *flow.Block, finalizes *flow.Block, state *protocol.MutableState) {
+	err := state.Extend(block)
 	require.NoError(t, err)
 
 	if finalizes != nil {
@@ -1482,4 +1369,15 @@ func saveBlock(t *testing.T, block *flow.Block, finalizes *flow.Block, state *pr
 
 	err = state.MarkValid(block.Header.ID())
 	require.NoError(t, err)
+}
+
+func fixtureStateRoot(t *testing.T) *protocol.StateRoot {
+	return fixtureStateRootWithParticipants(t, participants)
+}
+
+func fixtureStateRootWithParticipants(t *testing.T, participants flow.IdentityList) *protocol.StateRoot {
+	root, result, seal := unittest.BootstrapFixture(participants)
+	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
+	require.NoError(t, err)
+	return stateRoot
 }

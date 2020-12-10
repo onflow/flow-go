@@ -252,7 +252,7 @@ func (bs *BuilderSuite) SetupTest() {
 		return nil
 	}
 
-	bs.state = &protocol.State{}
+	bs.state = &protocol.MutableState{}
 	bs.mutator = &protocol.Mutator{}
 	bs.state.On("Mutate").Return(bs.mutator)
 	bs.mutator.On("Extend", mock.Anything).Run(func(args mock.Arguments) {

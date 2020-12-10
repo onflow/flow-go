@@ -57,7 +57,7 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
-			err = mutator.Bootstrap(genesis)
+			err = mutator.Mutate().Bootstrap(genesis)
 			assert.Nil(t, err)
 		}
 

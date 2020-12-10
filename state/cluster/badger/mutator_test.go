@@ -17,7 +17,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol"
+	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -35,7 +36,7 @@ type MutatorSuite struct {
 	chainID flow.ChainID
 
 	// protocol state for reference blocks for transactions
-	protoState   *protocol.State
+	protoState   protocol.MutableState
 	protoGenesis *flow.Header
 
 	state   cluster.State
@@ -62,11 +63,29 @@ func (suite *MutatorSuite) SetupTest() {
 
 	suite.state, err = NewState(suite.db, tracer, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
-	suite.mutator = suite.state
+	suite.mutator = suite.state.Mutate()
 	consumer := events.NewNoop()
 
-	suite.protoState, err = protocol.NewState(metrics, tracer, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
+	// just bootstrap with a genesis block, we'll use this as reference
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	root, result, seal := unittest.BootstrapFixture(participants)
+	// ensure we don't enter a new epoch for tests that build many blocks
+	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+
+	stateRoot, err := pbadger.NewStateRoot(root, result, seal, 0)
 	require.NoError(suite.T(), err)
+
+	suite.protoGenesis = stateRoot.Block().Header
+
+	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+	require.NoError(suite.T(), err)
+
+	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer)
+	require.NoError(suite.T(), err)
+
+	// Bootstrap bootstraps the cluster chain
+	err = suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Nil(err)
 }
 
 // runs after each test finishes
@@ -74,24 +93,6 @@ func (suite *MutatorSuite) TearDownTest() {
 	err := suite.db.Close()
 	suite.Assert().Nil(err)
 	err = os.RemoveAll(suite.dbdir)
-	suite.Assert().Nil(err)
-}
-
-// Bootstrap bootstraps the cluster chain. Useful for conciseness in test cases
-// working an already bootstrapped state.
-func (suite *MutatorSuite) Bootstrap() {
-
-	// just bootstrap with a genesis block, we'll use this as reference
-	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	root, result, seal := unittest.BootstrapFixture(participants)
-	// ensure we don't enter a new epoch for tests that build many blocks
-	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
-	err := suite.protoState.Bootstrap(root, result, seal)
-	suite.Require().Nil(err)
-	suite.protoGenesis = root.Header
-
-	// bootstrap cluster chain
-	err = suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Nil(err)
 }
 
@@ -179,16 +180,11 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 }
 
 func (suite *MutatorSuite) TestBootstrap_Successful() {
-
-	// bootstrap
-	err := suite.mutator.Bootstrap(suite.genesis)
-	suite.Assert().Nil(err)
-
-	err = suite.db.View(func(tx *badger.Txn) error {
+	err := suite.db.View(func(tx *badger.Txn) error {
 
 		// should insert collection
 		var collection flow.LightCollection
-		err = operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), &collection)(tx)
+		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), &collection)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
@@ -228,8 +224,6 @@ func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
 }
 
 func (suite *MutatorSuite) TestExtend_InvalidChainID() {
-	suite.Bootstrap()
-
 	block := suite.Block()
 	// change the chain ID
 	block.Header.ChainID = flow.ChainID(fmt.Sprintf("%s-invalid", block.Header.ChainID))
@@ -239,8 +233,6 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 }
 
 func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
-	suite.Bootstrap()
-
 	block := suite.Block()
 	// change the block number
 	block.Header.Height = block.Header.Height - 1
@@ -250,8 +242,6 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 }
 
 func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
-	suite.Bootstrap()
-
 	// build one block on top of genesis
 	block1 := suite.Block()
 	err := suite.mutator.Extend(&block1)
@@ -271,8 +261,6 @@ func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 }
 
 func (suite *MutatorSuite) TestExtend_Success() {
-	suite.Bootstrap()
-
 	block := suite.Block()
 	err := suite.mutator.Extend(&block)
 	suite.Assert().Nil(err)
@@ -292,8 +280,6 @@ func (suite *MutatorSuite) TestExtend_Success() {
 }
 
 func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
-	suite.Bootstrap()
-
 	block := suite.Block()
 	// set an empty collection as the payload
 	block.SetPayload(suite.Payload())
@@ -303,8 +289,6 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 
 // an unknown reference block is invalid
 func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
-	suite.Bootstrap()
-
 	block := suite.Block()
 	// set a random reference block ID
 	payload := model.EmptyPayload(unittest.IdentifierFixture())
@@ -315,8 +299,6 @@ func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
 
 // a collection with an expired reference block is a VALID extensino of chain state
 func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
-	suite.Bootstrap()
-
 	// build enough blocks so that using genesis as a reference block causes
 	// the collection to be expired
 	parent := suite.protoGenesis
@@ -339,8 +321,6 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 }
 
 func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
-	suite.Bootstrap()
-
 	// TODO skipping as this isn't implemented yet
 	suite.T().Skip()
 
@@ -352,8 +332,6 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
 }
 
 func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
-	suite.Bootstrap()
-
 	tx1 := suite.Tx()
 
 	// create a block extending genesis containing tx1
@@ -376,8 +354,6 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 }
 
 func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
-	suite.Bootstrap()
-
 	tx1 := suite.Tx()
 
 	// create a block extending genesis containing tx1
@@ -404,8 +380,6 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 }
 
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
-	suite.Bootstrap()
-
 	tx1 := suite.Tx()
 
 	// create a block extending genesis containing tx1

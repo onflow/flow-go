@@ -18,14 +18,11 @@ import (
 // as a consensus follower, when a block is received and saved,
 // if it's not finalized yet, this block should be returned by latest
 func TestSaveBlockAsReplica(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-		b0, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Bootstrap(b0, result, seal)
-		require.NoError(t, err)
-
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	b0, result, seal := unittest.BootstrapFixture(participants)
+	stateRoot, err := protocol.NewStateRoot(b0, result, seal, 0)
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 		b1 := unittest.BlockWithParentFixture(b0.Header)
 		b1.SetPayload(flow.Payload{})
 

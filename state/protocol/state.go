@@ -33,15 +33,6 @@ type State interface {
 	// the protocol state, and can thus represent an ambiguous state that was or
 	// will never be finalized.
 	AtBlockID(blockID flow.Identifier) Snapshot
-
-	// TODO remove
-	// Bootstrap initializes the persistent protocol state with the given block,
-	// execution state and block seal. In order to successfully bootstrap, the
-	// execution result needs to refer to the provided block and the block seal
-	// needs to refer to the provided block and execution result. The identities
-	// in the block payload will be used as the initial set of staked node
-	// identities.
-	//Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error
 }
 
 type MutableState interface {
