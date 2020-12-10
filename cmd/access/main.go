@@ -12,8 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
@@ -45,6 +44,7 @@ func main() {
 		receiptLimit                 uint
 		collectionGRPCPort           uint
 		pingEnabled                  bool
+		nodeInfoFile                 string
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
 		followerEng                  *followereng.Engine
@@ -82,6 +82,7 @@ func main() {
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
+			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
@@ -206,22 +207,16 @@ func main() {
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 			merger := signature.NewCombiner()
 
-			// initialize and pre-generate leader selections from the seed
-			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
-			if err != nil {
-				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
-			}
-
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
+			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(committee, staking, beacon, merger)
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
@@ -230,7 +225,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, ingestEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, ingestEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize follower core: %w", err)
 			}
@@ -279,6 +274,7 @@ func main() {
 				pingMetrics,
 				pingEnabled,
 				node.Middleware,
+				nodeInfoFile,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create ping engine: %w", err)

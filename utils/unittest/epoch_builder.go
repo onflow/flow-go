@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -85,7 +86,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	for height := sealed.Height + 1; height <= A.Height; height++ {
 		next, err := builder.state.AtHeight(height).Head()
 		require.Nil(builder.t, err)
-		seals = append(seals, SealFixture(SealWithBlockID(next.ID())))
+		seals = append(seals, Seal.Fixture(Seal.WithBlockID(next.ID())))
 	}
 
 	// build block B, sealing up to and including block A
@@ -108,9 +109,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// C contains a seal for block B and the EpochSetup event
 	setup := EpochSetupFixture(append(setupDefaults, builder.setupOpts...)...)
 	C := BlockWithParentFixture(B.Header)
-	sealForB := SealFixture(
-		SealWithBlockID(B.ID()),
-		WithServiceEvents(setup.ServiceEvent()),
+	sealForB := Seal.Fixture(
+		Seal.WithBlockID(B.ID()),
+		Seal.WithServiceEvents(setup.ServiceEvent()),
 	)
 	C.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{sealForB},
@@ -131,9 +132,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// D contains a seal for block C and the EpochCommit event
 	commit := EpochCommitFixture(append(commitDefaults, builder.commitOpts...)...)
 	D := BlockWithParentFixture(C.Header)
-	sealForC := SealFixture(
-		SealWithBlockID(C.ID()),
-		WithServiceEvents(commit.ServiceEvent()),
+	sealForC := Seal.Fixture(
+		Seal.WithBlockID(C.ID()),
+		Seal.WithServiceEvents(commit.ServiceEvent()),
 	)
 	D.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{sealForC},
@@ -163,7 +164,8 @@ func (builder *EpochBuilder) CompleteEpoch() {
 
 	// A is the first block of the next epoch (see diagram in BuildEpoch)
 	A := BlockWithParentFixture(final)
-	A.Header.View = finalView + 1
+	// first view is not necessarily exactly final view of previous epoch
+	A.Header.View = finalView + (rand.Uint64() % 4) + 1
 	A.SetPayload(flow.EmptyPayload())
 	err = builder.state.Mutate().Extend(&A)
 	require.Nil(builder.t, err)

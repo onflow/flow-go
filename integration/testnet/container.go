@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	defaultRegistry = "gcr.io/dl-flow"
+	defaultRegistry = "gcr.io/flow-container-registry"
 
 	checkContainerTimeout = time.Second * 10
 	checkContainerPeriod  = time.Millisecond * 50

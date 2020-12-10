@@ -84,3 +84,11 @@ func HasRole(roles ...flow.Role) flow.IdentityFilter {
 		return ok
 	}
 }
+
+// IsVotingConsensusCommitteeMember is a identity filter for all members of
+// the consensus committee allowed to vote.
+var IsVotingConsensusCommitteeMember = And(
+	HasRole(flow.RoleConsensus),
+	HasStake(true),
+	Not(Ejected),
+)
