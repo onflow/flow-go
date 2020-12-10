@@ -12,7 +12,7 @@ import (
 type Ledger interface {
 	Set(owner, controller, key string, value flow.RegisterValue) error
 	Get(owner, controller, key string) (flow.RegisterValue, error)
-	Touch(owner, controller, key string)
+	Touch(owner, controller, key string) error
 	Delete(owner, controller, key string)
 	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
 }
