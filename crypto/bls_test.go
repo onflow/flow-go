@@ -252,17 +252,8 @@ func TestAggregateSignatures(t *testing.T) {
 
 	// test the empty list case
 	t.Run("empty list", func(t *testing.T) {
-		aggSk, err := AggregateBLSPrivateKeys(sks[:0])
-		assert.NoError(t, err)
-		expectedSig, err = aggSk.Sign(input, kmac)
-		aggSig, err = AggregateBLSSignatures(sigs[:0])
-		assert.NoError(t, err)
-		assert.Equal(t, aggSig, expectedSig,
-			fmt.Sprintf("wrong empty list key %s", sks))
-		valid, err := VerifyBLSSignatureOneMessage(pks[:0], aggSig, input, kmac)
+		_, err = AggregateBLSSignatures(sigs[:0])
 		assert.Error(t, err)
-		assert.False(t, valid,
-			fmt.Sprintf("verification should fail with empty list key %s", sks))
 	})
 }
 
@@ -305,14 +296,12 @@ func TestAggregatePubKeys(t *testing.T) {
 
 	// aggregate an empty list
 	t.Run("empty list", func(t *testing.T) {
-		aggSk, err := AggregateBLSPrivateKeys(sks[:0])
-		assert.NoError(t, err)
-		expectedPk := aggSk.PublicKey()
-		aggPk, err := AggregateBLSPublicKeys(pks[:0])
-		assert.NoError(t, err)
-		assert.True(t, expectedPk.Equals(aggPk),
-			fmt.Sprintf("incorrect generator %s, should be %s",
-				aggPk, expectedPk))
+		// private keys
+		_, err := AggregateBLSPrivateKeys(sks[:0])
+		assert.Error(t, err)
+		// public keys
+		_, err = AggregateBLSPublicKeys(pks[:0])
+		assert.Error(t, err)
 	})
 }
 
@@ -336,7 +325,7 @@ func TestRemovePubKeys(t *testing.T) {
 	aggPk, err := AggregateBLSPublicKeys(pks)
 	require.NoError(t, err)
 
-	// random number of keys to remove
+	// random number of keys to remove (at least one key is left)
 	pkToRemoveNum := mrand.Intn(pkNum)
 	expectedPatrialPk, err := AggregateBLSPublicKeys(pks[pkToRemoveNum:])
 	require.NoError(t, err)
@@ -369,32 +358,32 @@ func TestRemovePubKeys(t *testing.T) {
 
 	// specific test to remove all keys
 	t.Run("remove all keys", func(t *testing.T) {
-		partialPk, err := RemoveBLSPublicKeys(aggPk, pks)
+		neutralPk, err := RemoveBLSPublicKeys(aggPk, pks)
 		require.NoError(t, err)
-		expectedPatrialPk, err := AggregateBLSPublicKeys([]PublicKey{})
+		// neutral public key is expected
+		randomPk := randomSK(t, seed).PublicKey()
+		randomPkPlusNeutralPk, err := AggregateBLSPublicKeys([]PublicKey{randomPk, neutralPk})
 		require.NoError(t, err)
 
-		BLSkey, ok := expectedPatrialPk.(*PubKeyBLSBLS12381)
+		BLSRandomPk, ok := randomPk.(*PubKeyBLSBLS12381)
 		require.True(t, ok)
 
-		assert.True(t, BLSkey.Equals(partialPk),
+		assert.True(t, BLSRandomPk.Equals(randomPkPlusNeutralPk),
 			fmt.Sprintf("incorrect key %s, should be infinity point, keys are %s",
-				partialPk, pks))
+				neutralPk, pks))
 	})
 
 	// specific test with an empty slice of keys to remove
 	t.Run("remove empty list", func(t *testing.T) {
-		partialPk, err := RemoveBLSPublicKeys(aggPk, pks)
-		require.NoError(t, err)
-		expectedPatrialPk, err := AggregateBLSPublicKeys([]PublicKey{})
+		partialPk, err := RemoveBLSPublicKeys(aggPk, []PublicKey{})
 		require.NoError(t, err)
 
-		BLSkey, ok := expectedPatrialPk.(*PubKeyBLSBLS12381)
+		aggBLSkey, ok := aggPk.(*PubKeyBLSBLS12381)
 		require.True(t, ok)
 
-		assert.True(t, BLSkey.Equals(partialPk),
-			fmt.Sprintf("incorrect key %s, should be %s, keys are %s",
-				partialPk, BLSkey, pks))
+		assert.True(t, aggBLSkey.Equals(partialPk),
+			fmt.Sprintf("incorrect key %s, should be %s",
+				partialPk, aggBLSkey))
 	})
 }
 
