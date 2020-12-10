@@ -67,9 +67,9 @@ func newDKGCommon(size int, threshold int, currentIndex int,
 			size-1, size)
 	}
 
-	if threshold >= size || threshold < DKGMinSize-1 {
-		return nil, fmt.Errorf("The threshold must be between 1 and %d, got %d",
-			size-1, threshold)
+	if threshold >= size || threshold < MinimumThreshold {
+		return nil, fmt.Errorf("The threshold must be between %d and %d, got %d",
+			MinimumThreshold, size-1, threshold)
 	}
 
 	return &dkgCommon{

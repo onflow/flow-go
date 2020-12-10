@@ -69,19 +69,19 @@ type thresholdSigner struct {
 
 // NewThresholdSigner creates a new instance of Threshold signer using BLS.
 // hash is the hashing algorithm to be used.
-// size is the number of participants, it must be in the range [ThresholdMinSize..ThresholdMaxSize]
-// threshold is the threshold value, it must be in the range [1..size-1]
+// size is the number of participants, it must be in the range [ThresholdSignMinSize..ThresholdSignMaxSize]
+// threshold is the threshold value, it must be in the range [MinimumThreshold..size-1]
 func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
-	if size < ThresholdMinSize || size > ThresholdMaxSize {
-		return nil, fmt.Errorf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)
+	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
+		return nil, fmt.Errorf("size should be between %d and %d", ThresholdSignMinSize, ThresholdSignMaxSize)
 	}
 	if currentIndex >= size || currentIndex < 0 {
 		return nil, fmt.Errorf("The current index must be between 0 and %d, got %d",
 			size-1, currentIndex)
 	}
-	if threshold >= size || threshold < ThresholdMinSize-1 {
-		return nil, fmt.Errorf("The threshold must be between 1 and %d, got %d",
-			size-1, threshold)
+	if threshold >= size || threshold < MinimumThreshold {
+		return nil, fmt.Errorf("The threshold must be between %d and %d, got %d",
+			MinimumThreshold, size-1, threshold)
 	}
 
 	// set BLS settings
@@ -325,8 +325,8 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // ReconstructThresholdSignature is a stateless api that takes a list of
 // signatures and their signers's indices and returns the threshold signature.
 //
-// size is the number of participants, it must be in the range [ThresholdMinSize..ThresholdMaxSize].
-// threshold is the threshold value, it must be in the range [1..size-1].
+// size is the number of participants, it must be in the range [ThresholdSignMinSize..ThresholdSignMaxSize].
+// threshold is the threshold value, it must be in the range [MinimumThreshold..size-1].
 // The function does not check the validity of the shares, and does not check
 // the validity of the resulting signature.
 // ReconstructThresholdSignature returns:
@@ -340,12 +340,13 @@ func ReconstructThresholdSignature(size int, threshold int,
 	// set BLS settings
 	blsInstance.reInit()
 
-	if size < ThresholdMinSize || size > ThresholdMaxSize {
+	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d",
-			ThresholdMinSize, ThresholdMaxSize)
+			ThresholdSignMinSize, ThresholdSignMaxSize)
 	}
-	if threshold >= size || threshold < ThresholdMinSize-1 {
-		return nil, fmt.Errorf("The threshold must be between 1 and %d, got %d", size-1, threshold)
+	if threshold >= size || threshold < MinimumThreshold {
+		return nil, fmt.Errorf("The threshold must be between %d and %d, got %d",
+			MinimumThreshold, size-1, threshold)
 	}
 
 	if len(shares) != len(signers) {
@@ -392,7 +393,7 @@ func ReconstructThresholdSignature(size int, threshold int,
 // and a shares number and returns true if the shares number is enough
 // to reconstruct a threshold signature.
 func EnoughShares(threshold int, sharesNumber int) (bool, error) {
-	if threshold < ThresholdMinSize-1 {
+	if threshold < MinimumThreshold {
 		return false, fmt.Errorf("The threshold must be larger than 1, got %d", threshold)
 	}
 	return sharesNumber > threshold, nil
@@ -402,13 +403,13 @@ func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 // threshold signature scheme with a trusted dealer.
 func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
-	if size < ThresholdMinSize || size > ThresholdMaxSize {
+	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, nil, nil, fmt.Errorf("size should be between %d and %d, got %d",
-			ThresholdMinSize, ThresholdMaxSize, size)
+			ThresholdSignMinSize, ThresholdSignMaxSize, size)
 	}
-	if threshold >= size || threshold < ThresholdMinSize-1 {
-		return nil, nil, nil, fmt.Errorf("The threshold must be between 1 and %d, got %d",
-			size-1, threshold)
+	if threshold >= size || threshold < MinimumThreshold {
+		return nil, nil, nil, fmt.Errorf("The threshold must be between %d and %d, got %d",
+			MinimumThreshold, size-1, threshold)
 	}
 
 	// set BLS settings
