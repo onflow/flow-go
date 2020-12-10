@@ -655,12 +655,9 @@ func (bs *BuilderSuite) TestPayloadReceiptSealedAndPendingBlock() {
 	// create a seal for the first pending block
 	pendingBlock := bs.blocks[bs.pendingBlockIDs[0]]
 	pendingBlockResult := bs.resultForBlock[pendingBlock.ID()]
-	pendingBlockEndState, _ := pendingBlockResult.FinalStateCommitment()
-	pendingBlockSeal := &flow.Seal{
-		BlockID:    pendingBlock.ID(),
-		ResultID:   pendingBlockResult.ID(),
-		FinalState: pendingBlockEndState,
-	}
+	pendingBlockSeal := unittest.Seal.Fixture(
+		unittest.Seal.WithResult(pendingBlockResult),
+	)
 
 	// trick the builder into thinking this is the last seal on the fork
 	mockSealDB := &storage.Seals{}
