@@ -54,13 +54,12 @@ func New(
 		access.NewProtocolStateBlocks(state),
 		chain,
 		access.TransactionValidationOptions{
-			Expiry:                       flow.DefaultTransactionExpiry,
-			ExpiryBuffer:                 config.ExpiryBuffer,
-			AllowUnknownReferenceBlockID: config.AllowUnknownReference,
-			MaxGasLimit:                  flow.DefaultMaxGasLimit,
-			MaxAddressIndex:              config.MaxAddressIndex,
-			CheckScriptsParse:            config.CheckScriptsParse,
-			MaxTxSizeLimit:               flow.DefaultMaxTxSizeLimit,
+			Expiry:            flow.DefaultTransactionExpiry,
+			ExpiryBuffer:      config.ExpiryBuffer,
+			MaxGasLimit:       flow.DefaultMaxGasLimit,
+			MaxAddressIndex:   config.MaxAddressIndex,
+			CheckScriptsParse: config.CheckScriptsParse,
+			MaxTxSizeLimit:    flow.DefaultMaxTxSizeLimit,
 		},
 	)
 
