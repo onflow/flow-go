@@ -98,7 +98,7 @@ func peerInfosFromIDs(ids flow.IdentityList) (map[flow.Identifier]peer.AddrInfo,
 	validIDs := make(map[flow.Identifier]peer.AddrInfo)
 	invalidIDs := make(map[flow.Identifier]error)
 	for _, id := range ids {
-		peerInfo, err := PeerInfoFromID(*id)
+		peerInfo, err := PeerAddressInfo(*id)
 		if err != nil {
 			invalidIDs[id.NodeID] = err
 			continue
