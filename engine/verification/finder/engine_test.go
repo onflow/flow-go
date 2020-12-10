@@ -350,7 +350,8 @@ func (suite *FinderEngineTestSuite) TestCachedToReady_Staked() {
 		suite.metrics,
 		suite.receiptIDsByResult,
 		suite.matchEng)
-	suite.readyReceipts.AssertNotCalled(suite.T(), "Add")
+	suite.pendingReceipts.AssertNotCalled(suite.T(), "Add")
+	suite.discardedResultIDs.AssertNotCalled(suite.T(), "Add")
 }
 
 // TestCachedToReady_Staked evaluates that on an unstaked verification node
@@ -426,7 +427,7 @@ func (suite *FinderEngineTestSuite) TestCachedToReady_Unstaked() {
 
 // TestPendingToReady evaluates that having a pending receipt with its
 // block becomes available results it moved to the ready mempool.
-func (suite *FinderEngineTestSuite) TestPendingToReady() {
+func (suite *FinderEngineTestSuite) TestPendingToReady_Staked() {
 	e := suite.TestNewFinderEngine()
 
 	// mocks no cached receipt
@@ -484,6 +485,8 @@ func (suite *FinderEngineTestSuite) TestPendingToReady() {
 		suite.receiptIDsByBlock,
 		suite.readyReceipts,
 		suite.pendingReceipts)
+	suite.pendingReceipts.AssertNotCalled(suite.T(), "Add")
+	suite.discardedResultIDs.AssertNotCalled(suite.T(), "Add")
 }
 
 // TestProcessReady_HappyPath evaluates that having a receipt in the ready mempool
@@ -635,10 +638,18 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_DuplicateReady() {
 	// mocks result has not yet processed
 	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
 		Return(false).Once()
+	// mocks result has not been discarded
+	suite.discardedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false).Once()
 
 	// mocks block associated with receipt is available
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).
 		Return(&flow.Header{}, nil).Once()
+
+	// mocks returning state snapshot of system at block height of result
+	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.snapshot)
+	// mocks identity of node as in the state snapshot
+	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
 
 	// mocks adding receipt to the ready receipts mempool returns a false result
 	// (i.e., a duplicate exists)
@@ -690,6 +701,9 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_DuplicatePending() {
 
 	// mocks result has not yet processed
 	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false).Once()
+	// mocks result has not been discarded
+	suite.discardedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
 		Return(false).Once()
 
 	// mocks block associated with receipt is not available
