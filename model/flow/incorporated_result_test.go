@@ -37,7 +37,7 @@ func TestIncorporatedResultID(t *testing.T) {
 
 // Test that the same result incorporated (from a different receipt) in the
 // same block produces the same IncorporatedResult (with same ID).
-func TestIDCollusion(t *testing.T) {
+func TestIDCollision(t *testing.T) {
 	incorporatedBlockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture()
 
