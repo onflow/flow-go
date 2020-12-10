@@ -83,7 +83,7 @@ func (suite *Suite) SetupTest() {
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
 	suite.clusters, err = flow.NewClusterList(assignments, collectors)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	suite.root = unittest.GenesisFixture(suite.identities)
 	suite.final = suite.root
@@ -119,7 +119,7 @@ func (suite *Suite) SetupTest() {
 	suite.conf = DefaultConfig()
 	chain := flow.Testnet.Chain()
 	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 }
 
 func (suite *Suite) TestInvalidTransaction() {
@@ -205,7 +205,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		suite.Run("subjective check with max index", func() {
 			invalid, err := flow.Testnet.Chain().AddressAtIndex(suite.conf.MaxAddressIndex + 1)
-			suite.Require().Nil(err)
+			suite.Require().NoError(err)
 			tx := unittest.TransactionBodyFixture()
 			tx.ReferenceBlockID = suite.root.ID()
 			tx.Authorizers[0] = invalid
@@ -248,11 +248,11 @@ func (suite *Suite) TestRoutingLocalCluster() {
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 
 	// should be added to local mempool for the current epoch
 	counter, err := suite.epochQuery.Current().Counter()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -278,11 +278,11 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 
 	// should not be added to local mempool
 	counter, err := suite.epochQuery.Current().Counter()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -306,11 +306,11 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
 	err := suite.engine.Process(sender.NodeID, &tx)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 
 	// should be added to local mempool for current epoch
 	counter, err := suite.epochQuery.Current().Counter()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -338,7 +338,7 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 
 	// should not be added to local mempool
 	counter, err := suite.epochQuery.Current().Counter()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -373,7 +373,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch2Local.NodeIDs()[0], epoch2Local.NodeIDs()[1]).Return(nil).Once()
 
 	err := suite.engine.ProcessLocal(&tx)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 
 	// should add to local mempool for epoch 2 only
 	suite.Assert().True(suite.pools.ForEpoch(2).Has(tx.ID()))
@@ -390,7 +390,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
 	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
@@ -428,7 +428,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
 	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
