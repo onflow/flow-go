@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 
 	"github.com/onflow/cadence"
@@ -105,23 +106,19 @@ func (e *hostEnv) getLogs() []string {
 }
 
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
-	v, _ := e.ledger.Get(
-
-		string(owner),
-		"", // TODO: Remove empty controller key
+	v, _ := e.accounts.GetValue(
+		flow.BytesToAddress(owner),
 		string(key),
 	)
 	return v, nil
 }
 
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
-	e.ledger.Set(
-		string(owner),
-		"", // TODO: Remove empty controller key
+	return e.accounts.SetValue(
+		flow.BytesToAddress(owner),
 		string(key),
 		value,
 	)
-	return nil
 }
 
 func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
@@ -134,11 +131,11 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 }
 
 func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
-	return 0, nil
+	return e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
 }
 
-func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	return 0, nil
+func (e *hostEnv) GetStorageCapacity(_ common.Address) (value uint64, err error) {
+	return math.MaxUint64, nil
 }
 
 func (e *hostEnv) ResolveLocation(
