@@ -112,7 +112,7 @@ func WithGasLimit(limit uint64) Option {
 // WithEventCollectionSizeLimit sets the event collection byte size limit for a virtual machine context.
 func WithEventCollectionSizeLimit(limit uint64) Option {
 	return func(ctx Context) Context {
-		ctx.GasLimit = limit
+		ctx.EventCollectionByteSizeLimit = limit
 		return ctx
 	}
 }

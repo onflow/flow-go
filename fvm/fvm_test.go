@@ -2,6 +2,7 @@ package fvm_test
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"testing"
@@ -1143,6 +1144,98 @@ func TestWithServiceAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// transaction should succeed on non-bootstrapped ledger
+		assert.NoError(t, tx.Err)
+	})
+}
+
+func TestEventLimits(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+	chain := flow.Mainnet.Chain()
+	vm := fvm.New(rt)
+
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvocator(zerolog.Nop()),
+		),
+	)
+
+	ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+	testContract := `
+	access(all) contract TestContract {
+		access(all) event LargeEvent(value: Int256, str: String, list: [UInt256], dic: {String: String})
+		access(all) fun EmitEvent() {
+			var s: Int256 = 1024102410241024
+			var i = 0
+
+			while i < 20 {
+				emit LargeEvent(value: s, str: s.toString(), list:[], dic:{s.toString():s.toString()})
+				i = i + 1
+			}
+		}
+	}
+	`
+
+	deployingContractScriptTemplate := `
+		transaction {
+			prepare(signer: AuthAccount) {
+				let code = "%s".decodeHex()
+				signer.contracts.add(
+					name: "TestContract",
+					code: code
+				)
+		}
+	}
+	`
+
+	ctx = fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithEventCollectionSizeLimit(2),
+		fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvocator(zerolog.Nop()),
+		),
+	)
+
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract))))).
+		SetPayer(chain.ServiceAddress()).
+		AddAuthorizer(chain.ServiceAddress())
+
+	tx := fvm.Transaction(txBody, 0)
+	err := vm.Run(ctx, tx, ledger)
+	require.NoError(t, err)
+
+	txBody = flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`
+		import TestContract from 0x%s
+			transaction {
+			prepare(acct: AuthAccount) {}
+			execute {
+				TestContract.EmitEvent()
+			}
+		}`, chain.ServiceAddress()))).
+		AddAuthorizer(chain.ServiceAddress())
+
+	t.Run("With limits", func(t *testing.T) {
+		txBody.Payer = unittest.RandomAddressFixture()
+		tx := fvm.Transaction(txBody, 0)
+		err := vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		// transaction should fail due to event size limit
+		assert.Error(t, tx.Err)
+	})
+
+	t.Run("With service account as payer", func(t *testing.T) {
+		txBody.Payer = chain.ServiceAddress()
+		tx := fvm.Transaction(txBody, 0)
+		err := vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		// transaction should not fail due to event size limit
 		assert.NoError(t, tx.Err)
 	})
 }
