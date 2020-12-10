@@ -235,14 +235,12 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 	return err == nil
 }
 
-// stakedForResult checks whether this instance of verification node has staked at corresponding block height
-// of the ExecutionResult.
-// It returns true and nil if verification node has staked at the specified block height by ExecutionResult, and
-// returns false, and nil otherwise.
+// stakedAtBlockID checks whether this instance of verification node has staked at specified block ID.
+// It returns true and nil if verification node has staked at specified block ID, and returns false, and nil otherwise.
 // It returns false and error if it could not extract the stake of (verification node) node at the specified block.
-func (e *Engine) stakedForResult(result *flow.ExecutionResult) (bool, error) {
+func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 	// extracts identity of verification node at block height of result
-	id, err := e.state.AtBlockID(result.BlockID).Identity(e.me.NodeID())
+	id, err := e.state.AtBlockID(blockID).Identity(e.me.NodeID())
 	if err != nil {
 		return false, fmt.Errorf("could not retrieve identity of verification node at snapshot of block id: %x: %w)", result.BlockID, err)
 	}
@@ -373,7 +371,7 @@ func (e *Engine) checkCachedReceipts() {
 			ready := e.isProcessable(&rdp.Receipt.ExecutionResult)
 			if ready {
 				// checks whether verification node is staked at snapshot of this result's block.
-				ok, err := e.stakedForResult(&rdp.Receipt.ExecutionResult)
+				ok, err := e.stakedAtBlockID(rdp.Receipt.ExecutionResult.BlockID)
 				if err != nil {
 					log.Debug().Err(err).Msg("could verify stake of verification node for result")
 					return
