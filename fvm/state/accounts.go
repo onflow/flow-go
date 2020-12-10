@@ -138,7 +138,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 	return decodedPublicKey, nil
 }
 
-func (a *Accounts) getPublicKeyCount(address flow.Address) (uint64, error) {
+func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 	countBytes, err := a.getValue(address, true, keyPublicKeyCount)
 	if err != nil {
 		return 0, newLedgerGetError(keyPublicKeyCount, address, err)
@@ -162,7 +162,7 @@ func (a *Accounts) setPublicKeyCount(address flow.Address, count uint64) error {
 }
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
-	count, err := a.getPublicKeyCount(address)
+	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public key count of account: %w", err)
 	}
@@ -215,7 +215,7 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 }
 
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
-	count, err := a.getPublicKeyCount(address)
+	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
 		return err
 	}
