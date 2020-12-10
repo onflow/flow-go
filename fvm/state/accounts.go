@@ -162,7 +162,7 @@ func (a *Accounts) setPublicKeyCount(address flow.Address, count uint64) error {
 }
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
-	count, err := a.GetPublicKeyCount(address)
+	count, err := a.getPublicKeyCount(address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public key count of account: %w", err)
 	}
