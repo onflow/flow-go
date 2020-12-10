@@ -71,7 +71,7 @@ func (s State) Read(owner, controller, key string) (flow.RegisterValue, error) {
 
 	// check draft first
 	if p, ok := s.draft[fullKey(owner, controller, key)]; ok {
-		err := s.ledger.Touch(owner, controller, key)
+		_, err := s.ledger.Get(owner, controller, key)
 		if err != nil {
 			return nil, &LedgerFailure{err}
 		}
