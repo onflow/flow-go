@@ -154,19 +154,6 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		Hex("ref_block_id", tx.ReferenceBlockID[:]).
 		Logger()
 
-	// TODO log the reference block and final height for debug purposes
-	{
-		final, err := e.state.Final().Head()
-		if err != nil {
-			return fmt.Errorf("could not get final height: %w", err)
-		}
-		log = log.With().Uint64("final_height", final.Height).Logger()
-		ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
-		if err == nil {
-			log = log.With().Uint64("ref_block_height", ref.Height).Logger()
-		}
-	}
-
 	log.Info().Msg("transaction message received")
 
 	// using the transaction's reference block, determine which cluster we're in
