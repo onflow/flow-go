@@ -114,9 +114,6 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 
 	stubnet := stub.NewNetwork(state, me, hub)
 
-	tracer, err = trace.NewTracer(log, "test")
-	require.NoError(t, err)
-
 	return testmock.GenericNode{
 		Log:            log,
 		Metrics:        metrics,
@@ -270,6 +267,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.True(t, ok)
 
 	followerState, err := protocol.NewFollowerState(protoState, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
+	require.NoError(t, err)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
 

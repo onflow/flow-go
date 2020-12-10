@@ -6,31 +6,14 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-type createState func(
-	metrics module.ComplianceMetrics,
-	tracer module.Tracer,
-	db *badger.DB,
-	headers storage.Headers,
-	seals storage.Seals,
-	index storage.Index,
-	payloads storage.Payloads,
-	blocks storage.Blocks,
-	setups storage.EpochSetups,
-	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
-	consumer protocol.Consumer,
-) (*pbadger.State, error)
 
 func RunWithBootstrapState(t testing.TB, stateRoot *pbadger.StateRoot, f func(*badger.DB, *pbadger.State)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {

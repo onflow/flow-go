@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"github.com/stretchr/testify/require"
 	"math"
 	"math/rand"
 	"os"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"

@@ -1,7 +1,6 @@
 package collection_test
 
 import (
-	"github.com/onflow/flow-go/state/protocol/events"
 	"math/rand"
 	"os"
 	"testing"
@@ -22,6 +21,7 @@ import (
 	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/events"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
