@@ -141,9 +141,17 @@ func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
 func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
 	assert.NotNil(s.T(), vch)
+
 	col := unittest.CollectionFixture(0)
+
+	vch.Chunk.NumberOfTransactions = uint64(col.Len())
+	vch.Chunk.EndState = vch.Chunk.StartState
+
+	vch.ChunkDataPack.ChunkID = vch.Chunk.ID()
+	vch.ChunkDataPack.CollectionID = col.ID()
+
 	vch.Collection = &col
-	vch.EndState = vch.ChunkDataPack.StartState
+
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
@@ -178,8 +186,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	id1 := flow.NewRegisterID("00", "", "")
 	value1 := []byte{'a'}
 
-	id2Bytes := make([]byte, 32)
-	id2Bytes[0] = byte(5)
 	id2 := flow.NewRegisterID("05", "", "")
 	value2 := []byte{'b'}
 	UpdatedValue2 := []byte{'B'}
@@ -231,17 +237,20 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		// Chunk setup
 		chunk := flow.Chunk{
 			ChunkBody: flow.ChunkBody{
-				CollectionIndex: 0,
-				StartState:      startState,
-				BlockID:         blockID,
+				CollectionIndex:      0,
+				StartState:           startState,
+				BlockID:              blockID,
+				NumberOfTransactions: uint64(coll.Len()),
 			},
-			Index: 0,
+			Index:    0,
+			EndState: endState,
 		}
 
 		chunkDataPack := flow.ChunkDataPack{
-			ChunkID:    chunk.ID(),
-			StartState: startState,
-			Proof:      proof,
+			ChunkID:      chunk.ID(),
+			StartState:   startState,
+			Proof:        proof,
+			CollectionID: coll.ID(),
 		}
 
 		// ExecutionResult setup
@@ -259,7 +268,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 			Result:        &result,
 			Collection:    &coll,
 			ChunkDataPack: &chunkDataPack,
-			EndState:      endState,
 		}
 	})
 

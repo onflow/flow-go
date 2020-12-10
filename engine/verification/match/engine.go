@@ -1,6 +1,7 @@
 package match
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -424,6 +425,7 @@ func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, execut
 func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	chunkDataPack *flow.ChunkDataPack,
 	collection *flow.Collection) error {
+
 	start := time.Now()
 
 	chunkID := chunkDataPack.ChunkID
@@ -448,9 +450,24 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	}
 
 	if sender.Role != flow.RoleExecution {
-		return engine.NewInvalidInputError("receives chunk data pack from a non-execution node")
+		return engine.NewInvalidInputError("received chunk data pack from a non-execution node")
 	}
 
+	// Check that the collection corresponds to the DataPack's CollectionID
+	if collection.ID() != chunkDataPack.CollectionID {
+		// NOTE: the execution nodes set the CollectionID of the system chunk's
+		// DataPack to Zero (cf. engin/execution/ingestion/ingestion.go saveExecutionResult).
+		// But Zero is not the natural ID for an empty collection, as computed
+		// by the ID function (cf. model/flow/collection.go). So we have to
+		// account for this special case.
+		if !(chunkDataPack.CollectionID == flow.ZeroID && collection.Len() == 0) {
+			return engine.NewInvalidInputErrorf("data pack's CollectionID (%s) does not match the provided Collection (%s)",
+				chunkDataPack.CollectionID,
+				collection.ID())
+		}
+	}
+
+	// Get the previously stored ChunkStatus object containing the Chunk
 	status, exists := e.pendingChunks.ByID(chunkID)
 	if !exists {
 		return engine.NewInvalidInputErrorf("chunk does not exist, chunkID: %v", chunkID)
@@ -459,9 +476,16 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	// TODO: verify the collection ID matches with the collection guarantee in the block payload
 
 	// remove first to ensure concurrency issue
-	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
+	removed := e.pendingChunks.Rem(chunkID)
 	if !removed {
 		return engine.NewInvalidInputErrorf("chunk has not been removed, chunkID: %v", chunkID)
+	}
+
+	// verify DataPack's StartState against Chunk
+	if !bytes.Equal(chunkDataPack.StartState, status.Chunk.StartState) {
+		return engine.NewInvalidInputErrorf("data pack's StartState (%v) does not match chunk's StartState (%v)",
+			chunkDataPack.StartState,
+			status.Chunk.StartState)
 	}
 
 	resultID := status.ExecutionResultID
@@ -477,32 +501,15 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 		return engine.NewInvalidInputErrorf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID)
 	}
 
-	// computes the end state of the chunk
-	var isSystemChunk bool
-	var endState flow.StateCommitment
-	if int(status.Chunk.Index) == len(result.ExecutionResult.Chunks)-1 {
-		// last chunk in a result is the system chunk and takes final state commitment
-		finalState, ok := result.ExecutionResult.FinalStateCommitment()
-		if !ok {
-			return fmt.Errorf("could not get final state: no chunks found")
-		}
+	// the system chunk is the last chunk
+	isSystemChunk := int(status.Chunk.Index) == len(result.ExecutionResult.Chunks)-1
 
-		isSystemChunk = true
-		endState = finalState
-	} else {
-		// any chunk except last takes the subsequent chunk's start state
-		isSystemChunk = false
-		endState = result.ExecutionResult.Chunks[status.Chunk.Index+1].StartState
-	}
-
-	// matches the chunk as a non-system chunk
 	err = e.matchChunk(
 		isSystemChunk,
 		status.Chunk,
 		result.ExecutionResult,
 		collection,
-		chunkDataPack,
-		endState)
+		chunkDataPack)
 
 	blockID := result.ExecutionResult.BlockID
 	if err != nil {
@@ -564,8 +571,7 @@ func (e *Engine) matchChunk(
 	chunk *flow.Chunk,
 	result *flow.ExecutionResult,
 	collection *flow.Collection,
-	chunkDataPack *flow.ChunkDataPack,
-	endState flow.StateCommitment) error {
+	chunkDataPack *flow.ChunkDataPack) error {
 
 	blockID := result.ExecutionResultBody.BlockID
 
@@ -583,7 +589,6 @@ func (e *Engine) matchChunk(
 		Result:        result,
 		Collection:    collection,
 		ChunkDataPack: chunkDataPack,
-		EndState:      endState,
 	}
 
 	err = e.verifier.ProcessLocal(vchunk)
