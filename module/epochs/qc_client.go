@@ -7,10 +7,10 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go-sdk/client"
-
 	jsonCadence "github.com/onflow/cadence/encoding/json"
+
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/client"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
