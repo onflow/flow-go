@@ -470,22 +470,29 @@ func (e *Engine) checkPendingReceipts() {
 	}
 }
 
-// pendingToReady moves all receipts associated with receiptIDs from pending to ready mempools.
+// pendingToReady receives a list of receipt identifiers and moves all their corresponding receipts
+// from pending to ready mempools.
 // blockID is the block identifier that all receipts are pointing to.
 func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Identifier) {
-	// moves receipts from pending to ready
 	for _, receiptID := range receiptIDs {
 		// retrieves receipt from pending mempool
 		rdp, ok := e.pendingReceipts.Get(receiptID)
+		log := e.log.With().
+			Hex("block_id", logging.ID(blockID)).
+			Hex("receipt_id", logging.ID(receiptID)).
+			Logger()
 		if !ok {
-			e.log.Debug().
-				Hex("receipt_id", logging.ID(receiptID)).
-				Msg("could not retrieve receipt from pending receipts mempool")
+			log.Debug().Msg("could not retrieve receipt from pending receipts mempool")
 			continue
 		}
 
+		resultID := rdp.Receipt.ExecutionResult.ID()
+		log = log.With().
+			Hex("result_id", logging.ID(resultID)).
+			Logger()
+
 		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-		// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
+		// for opentracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
 		func() {
 			var span opentracing.Span
 			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
@@ -495,7 +502,6 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			ok = e.pendingReceipts.Rem(receiptID)
 			if !ok {
 				e.log.Debug().
-					Hex("receipt_id", logging.ID(receiptID)).
 					Msg("could not remove receipt from pending receipts mempool")
 				return
 			}
@@ -504,21 +510,18 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			ok = e.readyReceipts.Add(rdp)
 			if !ok {
 				e.log.Debug().
-					Hex("receipt_id", logging.ID(receiptID)).
 					Msg("could not add receipt to ready mempool")
-				return
 			}
 
 			e.log.Debug().
-				Hex("receipt_id", logging.ID(receiptID)).
-				Hex("block_id", logging.ID(blockID)).
 				Msg("pending receipt moved to ready successfully")
 		}()
 	}
 }
 
-// discardPendingReceipts receives a list of receipt ids referring to block id, and removes
+// discardPendingReceipts receives a list of receipt ids, and removes
 // all receipts from the pending receipts mempool and marks their execution result as discarded.
+// blockID is the block identifier that all receipts are pointing to.
 //
 // finder engine discards a receipt if it is not staked at block id of that receipt.
 func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID flow.Identifier) {
