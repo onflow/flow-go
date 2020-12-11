@@ -2,7 +2,6 @@ package badger_test
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -39,6 +38,6 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 
 		// test storing same epoch setup
 		err = operation.RetryOnConflict(db.Update, store.StoreTx(expected))
-		require.True(t, strings.Contains(err.Error(), "key already exists"))
+		require.True(t, errors.Is(err, storage.ErrAlreadyExists))
 	})
 }

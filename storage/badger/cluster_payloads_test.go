@@ -2,7 +2,6 @@ package badger_test
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -35,7 +34,7 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 
 		// storing again should error with key already exists
 		err = store.Store(blockID, expected)
-		require.True(t, strings.Contains(err.Error(), "key already exists"))
+		require.True(t, errors.Is(err, storage.ErrAlreadyExists))
 	})
 }
 
