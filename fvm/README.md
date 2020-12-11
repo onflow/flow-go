@@ -23,7 +23,8 @@ tx := flow.NewTransactionBody().
 ctx := fvm.NewContext()
 ledger := state.NewMapLedger()
 
-txProc := fvm.Transaction(tx)
+txIndex := uint32(0)
+txProc := fvm.Transaction(tx, txIndex)
 
 err := vm.Run(ctx, txProc, ledger)
 if err != nil {
@@ -48,8 +49,9 @@ A transaction procedure can be created from a `flow.TransactionBody`:
 
 ```go
 var tx flow.TransactionBody
+var txIndex uint32
 
-i := fvm.Transaction(tx)
+i := fvm.Transaction(tx, txIndex)
 ```
 
 A transaction procedure has the following steps:

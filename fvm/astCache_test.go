@@ -46,7 +46,7 @@ func TestTransactionASTCache(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	// Run the Use import (FT Vault resource) transaction
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, 0)
 
 	err = vm.Run(ctx, tx, ledger)
 	require.NoError(t, err)
@@ -224,7 +224,7 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 
 		// Run the Use import (FT Vault resource) transaction
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -294,9 +294,9 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		for _, txBody := range txs {
+		for j, txBody := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, uint32(j))
 
 			err := vm.Run(ctx, tx, ledger)
 			assert.NoError(b, err)
@@ -365,9 +365,9 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		for _, txBody := range txs {
+		for j, txBody := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, uint32(j))
 
 			err := vm.Run(ctx, tx, ledger)
 			assert.NoError(b, err)
