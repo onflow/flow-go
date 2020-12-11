@@ -44,26 +44,26 @@ func TestConcurrency(t *testing.T) {
 			senderCount: 5,
 			chunksNum:   2,
 		},
-		//{
-		//	erCount:     5,
-		//	senderCount: 1,
-		//	chunksNum:   2,
-		//},
-		//{
-		//	erCount:     5,
-		//	senderCount: 5,
-		//	chunksNum:   2,
-		//},
-		//{
-		//	erCount:     1,
-		//	senderCount: 1,
-		//	chunksNum:   10,
-		//},
-		//{
-		//	erCount:     2,
-		//	senderCount: 5,
-		//	chunksNum:   4,
-		//},
+		{
+			erCount:     5,
+			senderCount: 1,
+			chunksNum:   2,
+		},
+		{
+			erCount:     5,
+			senderCount: 5,
+			chunksNum:   2,
+		},
+		{
+			erCount:     1,
+			senderCount: 1,
+			chunksNum:   10,
+		},
+		{
+			erCount:     2,
+			senderCount: 5,
+			chunksNum:   4,
+		},
 	}
 
 	for _, blockFirst := range []bool{true, false} {
@@ -140,7 +140,6 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	results := make([]flow.ExecutionResult, erCount)
 	for i := 0; i < erCount; i++ {
 		completeER := utils.CompleteExecutionResultFixture(t, chunksNum, chainID.Chain(), parent)
-		parent = completeER.Block.Header
 		ers[i] = completeER
 		results[i] = completeER.Receipt.ExecutionResult
 	}
@@ -170,8 +169,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 					// Note: this is done by the follower
 					// this block should be done in a thread-safe way
 					blockStorageLock.Lock()
-					if _, err := verNode.Blocks.ByID(completeER.Receipt.ExecutionResult.BlockID); err != nil {
-						err = verNode.State.Mutate().Extend(completeER.Block)
+					if _, err := verNode.Blocks.ByID(block.ID()); err != nil {
+						err = verNode.State.Mutate().Extend(block)
 						require.NoError(t, err)
 					}
 					blockStorageLock.Unlock()
