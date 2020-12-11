@@ -5,14 +5,13 @@ package badger
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/module/validation"
-
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"

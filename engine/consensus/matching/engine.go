@@ -217,7 +217,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Logger()
 
 	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok || len(resultFinalState) < 1 { // discard receipt
+	if !ok { // discard receipt
 		log.Error().Msg("execution receipt without FinalStateCommit received")
 		return engine.NewInvalidInputErrorf("execution receipt without FinalStateCommit: %x", receipt.ID())
 	}
@@ -229,21 +229,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return engine.NewInvalidInputErrorf("execution receipt without InitialStateCommit: %x", receipt.ID())
 	}
 	log = log.With().Hex("initial_state", resultInitialState).Logger()
-
-	// CAUTION INCOMPLETE
-	// For many other messages, we check that the message's origin (as established by the
-	// networking layer) is equal to the message's creator as reported by the message itself.
-	// Thereby we rely on the networking layer for enforcing message integrity via the
-	// networking key.
-	// Unfortunately, this shortcut is _not_ applicable here for the following reason.
-	// Execution Nodes sync state between each other and have the ability to skip computing
-	// blocks. They could build on top of other nodes' execution results. When an Execution
-	// Node receives a request for a block it hasn't itself computed, it will forward
-	// receipts from other nodes (which it potentially used to continue its own computation).
-	// Therefore, message origin and message creator are not necessarily the same
-	// for Execution Receipts (in case an Exec Node forwards a receipt from a different node).
-
-	// TODO: check the ExecutionReceipt's cryptographic integrity using the staking key
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later.
@@ -490,7 +475,13 @@ func (e *Engine) checkSealing() {
 		}
 
 		// mark the result cleared for mempool cleanup
-		sealedResultIDs = append(sealedResultIDs, incorporatedResult.ID())
+		// TODO: for Phase 2a, we set the value of IncorporatedResult.IncorporatedBlockID
+		// to the block the result is for. Therefore, it must be possible to
+		// incorporate the result and seal it on one fork and subsequently on a
+		// different fork incorporate same result and seal it. So we need to
+		// keep it in the mempool for now. This will be changed in phase 3.
+		// sealedResultIDs = append(sealedResultIDs, incorporatedResult.ID())
+
 		sealedBlockIDs = append(sealedBlockIDs, incorporatedResult.Result.BlockID)
 	}
 

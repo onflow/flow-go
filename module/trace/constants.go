@@ -41,11 +41,9 @@ const (
 
 	// Builder
 	CONBuildOn                        = "con.builder"
-	CONBuildOnSetup                   = "con.builder.setup"
-	CONBuildOnUnfinalizedLookup       = "con.builder.unfinalizedLookup"
-	CONBuildOnFinalizedLookup         = "con.builder.finalizedLookup"
 	CONBuildOnCreatePayloadGuarantees = "con.builder.createPayload.guarantees"
 	CONBuildOnCreatePayloadSeals      = "con.builder.createPayload.seals"
+	CONBuildOnCreatePayloadReceipts   = "con.builder.createPayload.receipts"
 	CONBuildOnCreateHeader            = "con.builder.createHeader"
 	CONBuildOnDBInsert                = "con.builder.dbInsert"
 

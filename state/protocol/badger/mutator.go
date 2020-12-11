@@ -566,6 +566,7 @@ func IsValidSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) (
 // receiptExtend checks the compliance of the receipt payload.
 //   * Receipts should pertain to blocks on the fork
 //   * Receipts should not appear more than once on a fork
+//   * Receipts should pass the ReceiptValidator check
 //   * No seal has been included for the respective block in this particular fork
 // We require the receipts to be sorted by block height (within a payload).
 func (m *Mutator) receiptExtend(candidate *flow.Block) error {
@@ -592,9 +593,9 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	// use it to identify receipts that are for blocks not in the fork.
 	forkBlocks := make(map[flow.Identifier]*flow.Header)
 
-	// Create a lookup table of all the receipts that are already in blocks.
-	// This will be used to identify duplicate receipts.
-	lookup := make(map[flow.Identifier]struct{})
+	// Create a lookup table of all the receipts that are already included in
+	// blocks on the fork.
+	forkLookup := make(map[flow.Identifier]struct{})
 
 	// loop through the fork backwards, from parent to last sealed, and keep
 	// track of blocks and receipts visited on the way.
@@ -621,7 +622,7 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 
 		// keep track of all receipts we iterate over
 		for _, recID := range index.ReceiptIDs {
-			lookup[recID] = struct{}{}
+			forkLookup[recID] = struct{}{}
 		}
 
 		ancestorID = ancestor.ParentID
@@ -635,11 +636,13 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	// check each receipt included in the payload for duplication
 	for _, receipt := range payload.Receipts {
 
-		// if the receipt was already included before, error
-		_, duplicated := lookup[receipt.ID()]
+		// error if the receipt was already included in an other block on the
+		// fork
+		_, duplicated := forkLookup[receipt.ID()]
 		if duplicated {
 			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
 		}
+		forkLookup[receipt.ID()] = struct{}{}
 
 		// if the receipt is not for a block on this fork, error
 		header, ok := forkBlocks[receipt.ExecutionResult.BlockID]
@@ -658,7 +661,7 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 				return state.NewInvalidExtensionErrorf("payload includes invalid receipt %v: %w", receipt.ID(), err)
 			}
 
-			return fmt.Errorf("payload validation unexpected error %w", err)
+			return fmt.Errorf("unexpected payload validation error %w", err)
 		}
 
 		// check receipts are sorted by block height
@@ -700,7 +703,7 @@ func (m *Mutator) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 		for i, seal := range payload.Seals {
 			header, err := m.state.headers.ByBlockID(seal.BlockID)
 			if err != nil {
-				return nil, fmt.Errorf("could not retrieve the header %v for seal: %w", seal.BlockID, err)
+				return nil, state.NewInvalidExtensionErrorf("could not retrieve the header %v for seal: %w", seal.BlockID, err)
 			}
 
 			if i == 0 || header.Height > highestHeader.Height {

@@ -4,8 +4,6 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -15,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -94,24 +91,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	b.tracer.StartSpan(parentID, trace.CONBuildOn)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
 
-	b.tracer.StartSpan(parentID, trace.CONBuildOnSetup)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnSetup)
-
-	var finalized uint64
-	err := b.db.View(operation.RetrieveFinalizedHeight(&finalized))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
-	}
-	var finalID flow.Identifier
-	err = b.db.View(operation.LookupBlockHeight(finalized, &finalID))
-	if err != nil {
-		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
-	}
-
-	b.tracer.FinishSpan(parentID, trace.CONBuildOnSetup)
-
 	// get the collection guarantees to insert in the payload
-	insertableGuarantees, err := b.getInsertableGuarantees(parentID, finalID, finalized)
+	insertableGuarantees, err := b.getInsertableGuarantees(parentID)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +104,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// get the receipts to insert in the payload
-	insertableReceipts, err := b.getInsertableReceipts(parentID, finalID, finalized)
+	insertableReceipts, err := b.getInsertableReceipts(parentID)
 	if err != nil {
 		return nil, err
 	}
@@ -153,53 +134,16 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 // be inserted in the next payload. It looks in the collection mempool and
 // applies the following filters:
 //
-// 1) If it was already included in the finalized part of the chain, remove it
-//    from the memory pool and skip.
+// 1) If it was already included in the fork, skip.
 //
-// 2) If it references an unknown block, remove it from the memory pool and
-//    skip.
+// 2) If it references an unknown block, skip.
 //
-// 3) If the reference block has an expired height, also remove it from the
-//    memory pool and skip.
+// 3) If the referenced block has an expired height, skip.
 //
-// 4) If it was already included in the pending part of the chain, skip, but
-//    keep in memory pool for now.
-//
-// 5) Otherwise, this guarantee can be included in the payload.
-func (b *Builder) getInsertableGuarantees(parentID flow.Identifier,
-	finalID flow.Identifier,
-	finalHeight uint64) ([]*flow.CollectionGuarantee, error) {
-
-	// STEP ONE: Create a lookup of all previously used guarantees on the part
-	// of the chain that we are building on. We do this separately for pending
-	// and finalized ancestors, so we can differentiate what to do about it.
-
-	b.tracer.StartSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
-
-	ancestorID := parentID
-	pendingLookup := make(map[flow.Identifier]struct{})
-	for ancestorID != finalID {
-		ancestor, err := b.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
-		}
-		if ancestor.Height <= finalHeight {
-			return nil, fmt.Errorf("should always build on last finalized block")
-		}
-		index, err := b.index.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
-		}
-		for _, collID := range index.CollectionIDs {
-			pendingLookup[collID] = struct{}{}
-		}
-		ancestorID = ancestor.ParentID
-	}
-
-	b.tracer.FinishSpan(parentID, trace.CONBuildOnUnfinalizedLookup)
-	b.tracer.StartSpan(parentID, trace.CONBuildOnFinalizedLookup)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnFinalizedLookup)
+// 4) Otherwise, this guarantee can be included in the payload.
+func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
 
 	// we look back only as far as the expiry limit for the current height we
 	// are building for; any guarantee with a reference block before that can
@@ -225,38 +169,42 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier,
 		limit = rootHeight
 	}
 
-	ancestorID = finalID
-	finalLookup := make(map[flow.Identifier]struct{})
+	// blockLookup keeps track of the blocks from limit to parent
+	blockLookup := make(map[flow.Identifier]struct{})
+
+	// receiptLookup keeps track of the receipts contained in blocks between
+	// limit and parent
+	receiptLookup := make(map[flow.Identifier]struct{})
+
+	// loop through the fork backwards, from parent to limit, and keep track of
+	// blocks and collections visited on the way
+	ancestorID := parentID
 	for {
+
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
+
+		blockLookup[ancestorID] = struct{}{}
+
 		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
+
 		for _, collID := range index.CollectionIDs {
-			finalLookup[collID] = struct{}{}
+			receiptLookup[collID] = struct{}{}
 		}
+
 		if ancestor.Height <= limit {
 			break
 		}
+
 		ancestorID = ancestor.ParentID
 	}
 
-	b.tracer.FinishSpan(parentID, trace.CONBuildOnFinalizedLookup)
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
-
-	// STEP TWO: Go through the guarantees in our memory pool.
-	// 1) If it was already included on the finalized part of the chain, remove
-	// it from the memory pool and skip.
-	// 2) If the reference block has an expired height, also remove it from the
-	// memory pool and skip.
-	// 3) If it was already included on the pending part of the chain, skip, but
-	// keep in memory pool for now.
-	// 4) Otherwise, this guarantee can be included in the payload.
+	// go through mempool and collect valid collections
 	var guarantees []*flow.CollectionGuarantee
 	for _, guarantee := range b.guarPool.All() {
 		// add at most <maxGuaranteeCount> number of collection guarantees in a new block proposal
@@ -267,33 +215,21 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier,
 		}
 
 		collID := guarantee.ID()
-		_, duplicated := finalLookup[collID]
-		if duplicated {
-			_ = b.guarPool.Rem(collID)
-			continue
-		}
-		ref, err := b.headers.ByBlockID(guarantee.ReferenceBlockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			_ = b.guarPool.Rem(collID)
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("could not get reference block: %w", err)
-		}
-		if ref.Height < limit {
-			_ = b.guarPool.Rem(collID)
-			continue
-		}
-		_, duplicated = pendingLookup[collID]
+
+		// skip collections that are already included in a block on the fork
+		_, duplicated := receiptLookup[collID]
 		if duplicated {
 			continue
 		}
+
+		// skip collections for blocks that are not within the limit
+		_, ok := blockLookup[guarantee.ReferenceBlockID]
+		if !ok {
+			continue
+		}
+
 		guarantees = append(guarantees, guarantee)
 	}
-
-	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
-
-	b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
 
 	return guarantees, nil
 }
@@ -335,10 +271,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// this fork.
 	filteredSeals := make(map[uint64]*flow.IncorporatedResultSeal)
 
-	// We consider two seals as inconsistent, if they refer to the same block
-	// and have different start or end states
-	encounteredInconsistentSealsForSameBlock := false
-
 	// Walk backwards along the fork, from parent to last sealed, inspect the
 	// payloads' ExecutionResults, and check for matching IncorporatedResultSeals
 	// in the mempool.
@@ -378,54 +310,14 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 				continue
 			}
 
-			if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
-				return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
-			}
-			if len(irSeal.Seal.FinalState) < 1 {
-				// respective Execution Result should have been rejected by matching engine
-				return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
-			}
-
 			header, err := b.headers.ByBlockID(incorporatedResult.Result.BlockID)
 			if err != nil {
 				return nil, fmt.Errorf("could not get block for id (%x): %w", incorporatedResult.Result.BlockID, err)
 			}
-
-			// Check for other inconsistent seal
-			irSeal2, found := filteredSeals[header.Height]
-			if found && irSeal.Seal.BlockID != irSeal2.Seal.BlockID {
-
-				sc1json, err := json.Marshal(irSeal)
-				if err != nil {
-					return nil, err
-				}
-				sc2json, err := json.Marshal(irSeal2)
-				if err != nil {
-					return nil, err
-				}
-
-				// check whether seals are inconsistent:
-				if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
-					!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
-					fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-					encounteredInconsistentSealsForSameBlock = true
-				} else {
-					fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-				}
-
-			} else {
-				filteredSeals[header.Height] = irSeal
-			}
-
+			filteredSeals[header.Height] = irSeal
 		}
 
 		ancestorID = ancestor.Header.ParentID
-	}
-
-	// return immediately if there are no seals to collect or if we found
-	// inconsistent seals.
-	if len(filteredSeals) == 0 || encounteredInconsistentSealsForSameBlock {
-		return nil, nil
 	}
 
 	// now we need to collect only the seals that form a valid chain on top of
@@ -436,7 +328,13 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// block
 	nextSealHeight := sealed.Height + 1
 	nextSeal, ok := filteredSeals[nextSealHeight]
+	var count uint = 0
 	for ok {
+
+		// don't include more than maxSealCount seals
+		if count >= b.cfg.maxSealCount {
+			break
+		}
 
 		//  enforce that execution results form chain
 		nextResultToBeSealed := nextSeal.IncorporatedResult.Result
@@ -451,6 +349,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		last = nextSeal.Seal
 		chain = append(chain, nextSeal.Seal)
 		nextSealHeight++
+		count++
 		nextSeal, ok = filteredSeals[nextSealHeight]
 	}
 
@@ -461,27 +360,16 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 // inserted in the next payload. It looks in the receipts mempool and applies
 // the following filter:
 //
-// 1) If it corresponds to an unknown block, remove it from the mempool and
-//    skip.
+// 1) If it doesn't correspond to an unsealed block on the fork, skip it.
 //
-// 2) If the corresponding block was already sealed, remove it from the mempool
-//    and skip.
+// 2) If it was already included in the fork, skip it.
 //
-// 3) If it was already included in the finalized part of the chain, remove it
-//    from the memory pool and skip.
-//
-// 4) If it was already included in the pending part of the chain, skip, but
-//    keep in memory pool for now.
-//
-// 5) If the receipt corresponds to a block that is not on this fork, skip, but
-//    but keep in mempool for now.
-//
-// 6) Otherwise, this receipt can be included in the payload.
+// 3) Otherwise, this receipt can be included in the payload.
 //
 // Receipts have to be ordered by block height.
-func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
-	finalID flow.Identifier,
-	finalHeight uint64) ([]*flow.ExecutionReceipt, error) {
+func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork. This block is not necessarily finalized.
@@ -494,32 +382,24 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
 	}
 
-	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
-	// use it to skip receipts that are not for blocks in the fork.
-	forkBlocks := make(map[flow.Identifier]struct{})
+	// unsealedBlocks is used to keep the IDs of the blocks we iterate through.
+	// We use it to skip receipts that are not for unsealed blocks in the fork.
+	unsealedBlocks := make(map[flow.Identifier]*flow.Header)
 
-	// lookup is a lookup table of all the receipts that are contained in
-	// unsealed blocks along the fork. The map tracks the receipt ID and the
-	// height of the block that contains it.
-	lookup := make(map[flow.Identifier]uint64)
+	// includedReceipts is a set of all receipts that are contained in unsealed blocks along the fork.
+	includedReceipts := make(map[flow.Identifier]struct{})
 
-	// Walk backwards through the fork, from parent to last sealed block
-	// (excluded), and keep track of the receipts that are contained in those
-	// blocks.
+	// loop through the fork backwards, from parent to last sealed, and keep
+	// track of blocks and receipts visited on the way (excluding last sealed block).
 	ancestorID := parentID
-	for {
+	sealedID := sealed.ID()
+	for ancestorID != sealedID {
 
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-
-		// stop when we encounter the last sealed block
-		if ancestor.Height <= sealed.Height {
-			break
-		}
-
-		forkBlocks[ancestorID] = struct{}{}
+		unsealedBlocks[ancestorID] = ancestor
 
 		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
@@ -527,7 +407,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 		}
 
 		for _, recID := range index.ReceiptIDs {
-			lookup[recID] = ancestor.Height
+			includedReceipts[recID] = struct{}{}
 		}
 
 		ancestorID = ancestor.ParentID
@@ -539,42 +419,15 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier,
 	receipts := make(map[uint64][]*flow.ExecutionReceipt) // [height] -> []receipt
 	for _, receipt := range b.recPool.All() {
 
-		// if block is unknown, remove from mempool and continue
-		h, err := b.headers.ByBlockID(receipt.ExecutionResult.BlockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			_ = b.recPool.Rem(receipt.ID())
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("could not get reference block: %w", err)
-		}
-
-		// check whether receipt is for block at or below the sealed and
-		// finalized height
-		if h.Height <= sealed.Height {
-			// Block has either already been sealed and finalized  _or_
-			// block is a _sibling_ of a sealed and finalized block.
-			// In either case, we don't need to seal the block anymore
-			// and therefore can discard any ExecutionResults for it.
-			continue
-		}
-
 		// skip receipts that are already included in a block on this fork
-		containingBlockHeight, ok := lookup[receipt.ID()]
+		_, ok := includedReceipts[receipt.ID()]
 		if ok {
-			// if the block that contains the receipt is finalized, remove the
-			// receipt from the mempool
-			if containingBlockHeight <= finalHeight {
-				_ = b.recPool.Rem(receipt.ID())
-			}
-			// if the block is not finalized, skip the receipt but don't remove
-			// it from the mempool
 			continue
 		}
 
-		// skip the receipt if it is not for a block on this fork, but don't
-		// remove it from the mempool
-		if _, ok := forkBlocks[receipt.ExecutionResult.BlockID]; !ok {
+		// skip the receipt if it is not for a block on this fork
+		h, ok := unsealedBlocks[receipt.ExecutionResult.BlockID]
+		if !ok {
 			continue
 		}
 
