@@ -237,8 +237,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	}
 
 	// no execution receipt should be pending for a block
+	// also no receipt should be discarded for an staked verification node
 	require.True(t, verNode.PendingReceiptIDsByBlock.Size() == 0)
 	require.True(t, verNode.ReceiptIDsByResult.Size() == 0)
+	require.True(t, verNode.DiscardedResultIDs.Size() == 0)
 
 	// no block should remain cached
 	require.True(t, verNode.CachedReceipts.Size() == 0)
