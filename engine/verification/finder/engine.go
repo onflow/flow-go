@@ -544,7 +544,6 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 			continue
 		}
 
-		// marks result id of receipt as discarded.
 		resultID := rdp.Receipt.ExecutionResult.ID()
 		log = log.With().
 			Hex("result_id", logging.ID(resultID)).
@@ -557,11 +556,12 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
 			defer span.Finish()
 
+			// marks result id of receipt as discarded.
 			if !e.discardedResultIDs.Has(resultID) {
 				added := e.discardedResultIDs.Add(resultID)
 				log.Debug().
 					Bool("added_to_discard_pool", added).
-					Msg("processing result is dropped by unstaked verification node")
+					Msg("execution result marks discarded")
 			}
 
 			// removes receipt from pending receipt
@@ -569,6 +569,7 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 			if !removed {
 				log.Debug().
 					Msg("could not remove dropped receipt from pending receipts mempool")
+				return
 			}
 			log.Debug().
 				Msg("dropped receipt removed from pending receipts mempool")
