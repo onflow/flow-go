@@ -44,26 +44,26 @@ func TestConcurrency(t *testing.T) {
 			senderCount: 5,
 			chunksNum:   2,
 		},
-		{
-			erCount:     5,
-			senderCount: 1,
-			chunksNum:   2,
-		},
-		{
-			erCount:     5,
-			senderCount: 5,
-			chunksNum:   2,
-		},
-		{
-			erCount:     1,
-			senderCount: 1,
-			chunksNum:   10,
-		},
-		{
-			erCount:     2,
-			senderCount: 5,
-			chunksNum:   4,
-		},
+		//{
+		//	erCount:     5,
+		//	senderCount: 1,
+		//	chunksNum:   2,
+		//},
+		//{
+		//	erCount:     5,
+		//	senderCount: 5,
+		//	chunksNum:   2,
+		//},
+		//{
+		//	erCount:     1,
+		//	senderCount: 1,
+		//	chunksNum:   10,
+		//},
+		//{
+		//	erCount:     2,
+		//	senderCount: 5,
+		//	chunksNum:   4,
+		//},
 	}
 
 	for _, blockFirst := range []bool{true, false} {
@@ -106,20 +106,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
-	// create `erCount` execution receipt fixtures that will be concurrently delivered
-	ers := make([]utils.CompleteExecutionResult, erCount)
-	results := make([]flow.ExecutionResult, erCount)
-	for i := 0; i < erCount; i++ {
-		er := utils.LightExecutionResultFixture(chunksNum)
-		ers[i] = er
-		results[i] = er.Receipt.ExecutionResult
-	}
-
 	// set up mock matching engine that asserts each receipt is submitted exactly once.
 	requestInterval := 1 * time.Second
 	processInterval := 1 * time.Second
 	failureThreshold := uint(2)
-	matchEng, matchEngWG := SetupMockMatchEng(t, exeID, results)
+	matchEng := &mocknetwork.Engine{}
 
 	assignment := utils.NewMockAssigner(verID.NodeID, IsAssigned)
 
@@ -140,6 +131,21 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 		collector,
 		collector,
 		testutil.WithMatchEngine(matchEng))
+
+	// create `erCount` execution receipt fixtures that will be concurrently delivered
+	parent, err := verNode.State.AtHeight(0).Head()
+	require.NoError(t, err)
+
+	ers := make([]utils.CompleteExecutionResult, erCount)
+	results := make([]flow.ExecutionResult, erCount)
+	for i := 0; i < erCount; i++ {
+		completeER := utils.CompleteExecutionResultFixture(t, chunksNum, chainID.Chain(), parent)
+		parent = completeER.Block.Header
+		ers[i] = completeER
+		results[i] = completeER.Receipt.ExecutionResult
+	}
+
+	matchEngWG := SetupMockMatchEng(t, matchEng, exeID, results)
 
 	// starts finder engine of verification node
 	// the rest are not involved in this test
@@ -164,9 +170,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 					// Note: this is done by the follower
 					// this block should be done in a thread-safe way
 					blockStorageLock.Lock()
-					// we don't check for error as it definitely returns error when we
-					// have duplicate blocks, however, this is not the concern for this test
-					_ = verNode.Blocks.Store(block)
+					if _, err := verNode.Blocks.ByID(completeER.Receipt.ExecutionResult.BlockID); err != nil {
+						err = verNode.State.Mutate().Extend(completeER.Block)
+						require.NoError(t, err)
+					}
 					blockStorageLock.Unlock()
 
 					// casts block into a Hotstuff block for notifier
@@ -251,9 +258,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 // - that a set of execution results are delivered to it.
 // - that each execution result is delivered only once.
 // SetupMockMatchEng returns the mock engine and a wait group that unblocks when all results are received.
-func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionResult) (*mocknetwork.Engine, *sync.WaitGroup) {
-	eng := new(mocknetwork.Engine)
-
+func SetupMockMatchEng(t testing.TB, eng *mocknetwork.Engine, exeID *flow.Identity, ers []flow.ExecutionResult) *sync.WaitGroup {
 	// keeps track of which execution results it has received
 	receivedResults := make(map[flow.Identifier]struct{})
 	var (
@@ -306,7 +311,7 @@ func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionR
 		}).
 		Return(nil)
 
-	return eng, &wg
+	return &wg
 }
 
 // IsAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
