@@ -190,15 +190,9 @@ func (bs *BuilderSuite) SetupTest() {
 	first := bs.createAndRecordBlock(nil)
 	bs.firstID = first.ID()
 	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
-	firstSealedState, ok := firstResult.FinalStateCommitment()
-	if !ok {
-		panic("missing first execution result's final state commitment")
-	}
-	bs.lastSeal = &flow.Seal{
-		BlockID:    first.ID(),
-		ResultID:   firstResult.ID(),
-		FinalState: firstSealedState,
-	}
+	bs.lastSeal = unittest.Seal.Fixture(
+		unittest.Seal.WithResult(firstResult),
+	)
 	bs.resultForBlock[firstResult.BlockID] = firstResult
 
 	// insert the finalized blocks between first and final
@@ -629,7 +623,7 @@ func (bs *BuilderSuite) TestPayloadReceiptSealsOtherFork() {
 	}
 
 	mockSealDB := &storage.Seals{}
-	// set last seal on A fork to F0
+	// set last seal on A fork to F0 (block A's id is  bs.parentID)
 	mockSealDB.On("ByBlockID", bs.parentID).Return(bs.irsList[0].Seal, nil)
 	// set last seal on B fork to `first`
 	mockSealDB.On("ByBlockID", forkHead.ID()).Return(bs.lastSeal, nil)

@@ -633,10 +633,6 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 	// its block height is greater or equal than the previous receipt.
 	var prevReceiptHeight uint64 = 0
 
-	// payloadLookup is used to eliminate receipts that are duplicated within
-	// the payload
-	payloadLookup := make(map[flow.Identifier]struct{})
-
 	// check each receipt included in the payload for duplication
 	for _, receipt := range payload.Receipts {
 
@@ -646,14 +642,7 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 		if duplicated {
 			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
 		}
-
-		// error if the receipt appears more than once in the payload
-		_, duplicated = payloadLookup[receipt.ID()]
-		if duplicated {
-			return state.NewInvalidExtensionErrorf("payload included duplicate receipt (%x)", receipt.ID())
-		}
-
-		payloadLookup[receipt.ID()] = struct{}{}
+		forkLookup[receipt.ID()] = struct{}{}
 
 		// if the receipt is not for a block on this fork, error
 		header, ok := forkBlocks[receipt.ExecutionResult.BlockID]
@@ -672,7 +661,7 @@ func (m *Mutator) receiptExtend(candidate *flow.Block) error {
 				return state.NewInvalidExtensionErrorf("payload includes invalid receipt %v: %w", receipt.ID(), err)
 			}
 
-			return fmt.Errorf("payload validation unexpected error %w", err)
+			return fmt.Errorf("unexpected payload validation error %w", err)
 		}
 
 		// check receipts are sorted by block height

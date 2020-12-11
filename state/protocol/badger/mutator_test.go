@@ -1145,10 +1145,18 @@ func TestExtendReceiptsValid(t *testing.T) {
 		err = state.Mutate().Extend(&block4)
 		require.Nil(t, err)
 
+		receipt3a := unittest.ReceiptForBlockFixture(&block3)
+		receipt3b := unittest.ReceiptForBlockFixture(&block3)
+		var altResult flow.ExecutionResult = receipt3b.ExecutionResult // copy
+		altResult.Signatures = unittest.SignaturesFixture(1)
+		receipt3c := unittest.ExecutionReceiptFixture(unittest.WithResult(&altResult))
+
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceipt{
-				unittest.ReceiptForBlockFixture(&block3),
+				receipt3a,
+				receipt3b,
+				receipt3c,
 				unittest.ReceiptForBlockFixture(&block4),
 			},
 		})
