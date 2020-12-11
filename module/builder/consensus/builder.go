@@ -386,26 +386,19 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	// We use it to skip receipts that are not for unsealed blocks in the fork.
 	unsealedBlocks := make(map[flow.Identifier]*flow.Header)
 
-	// lookup is a lookup table of all the receipts that are contained in
-	// unsealed blocks along the fork. The map tracks the receipt ID and the
-	// height of the block that contains it.
-	lookup := make(map[flow.Identifier]uint64)
+	// includedReceipts is a set of all receipts that are contained in unsealed blocks along the fork.
+	includedReceipts := make(map[flow.Identifier]struct{})
 
 	// loop through the fork backwards, from parent to last sealed, and keep
-	// track of blocks and receipts visited on the way.
+	// track of blocks and receipts visited on the way (excluding last sealed block).
 	ancestorID := parentID
-	for {
+	sealedID := sealed.ID()
+	for ancestorID != sealedID {
 
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-
-		// stop when we encounter the last sealed block
-		if ancestor.Height <= sealed.Height {
-			break
-		}
-
 		unsealedBlocks[ancestorID] = ancestor
 
 		index, err := b.index.ByBlockID(ancestorID)
@@ -414,7 +407,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 		}
 
 		for _, recID := range index.ReceiptIDs {
-			lookup[recID] = ancestor.Height
+			includedReceipts[recID] = struct{}{}
 		}
 
 		ancestorID = ancestor.ParentID
@@ -427,7 +420,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	for _, receipt := range b.recPool.All() {
 
 		// skip receipts that are already included in a block on this fork
-		_, ok := lookup[receipt.ID()]
+		_, ok := includedReceipts[receipt.ID()]
 		if ok {
 			continue
 		}

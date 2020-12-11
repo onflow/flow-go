@@ -623,7 +623,7 @@ func (bs *BuilderSuite) TestPayloadReceiptSealsOtherFork() {
 	}
 
 	mockSealDB := &storage.Seals{}
-	// set last seal on A fork to F0
+	// set last seal on A fork to F0 (block A's id is  bs.parentID)
 	mockSealDB.On("ByBlockID", bs.parentID).Return(bs.irsList[0].Seal, nil)
 	// set last seal on B fork to `first`
 	mockSealDB.On("ByBlockID", forkHead.ID()).Return(bs.lastSeal, nil)
