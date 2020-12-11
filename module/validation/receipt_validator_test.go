@@ -30,18 +30,21 @@ func (s *ReceiptValidationSuite) SetupTest() {
 }
 
 func (s *ReceiptValidationSuite) TestReceiptValid() {
+	executor := s.Identities[s.ExeID]
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
+	receiptID := receipt.ID()
 	s.verifier.On("Verify",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(true, nil).Once()
+		receiptID[:],
+		receipt.ExecutorSignature,
+		executor.StakingPubKey).Return(true, nil).Once()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().NoError(err, "should successfully validate receipt")
+	s.verifier.AssertExpectations(s.T())
 }
 
 func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
@@ -49,11 +52,6 @@ func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(unittest.IdentityFixture().NodeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
-
-	s.verifier.On("Verify",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(true, nil).Once()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid identity")
@@ -68,7 +66,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
 	s.verifier.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Twice()
+		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check stake first
 
 	// replace stake with invalid one
 	s.Identities[s.ExeID].Stake = 0
@@ -81,21 +79,25 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
 
 	err = s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid identity")
+	s.verifier.AssertExpectations(s.T())
 }
 
 func (s *ReceiptValidationSuite) TestReceiptInvalidSignature() {
+	executor := s.Identities[s.ExeID]
+
 	valSubgrph := s.ValidSubgraphFixture()
-	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(executor.NodeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
 	s.verifier.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(false, nil).Once()
+		executor.StakingPubKey).Return(false, nil).Once()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid signature")
+	s.verifier.AssertExpectations(s.T())
 }
 
 func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {

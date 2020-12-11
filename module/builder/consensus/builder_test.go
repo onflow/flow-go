@@ -190,15 +190,9 @@ func (bs *BuilderSuite) SetupTest() {
 	first := bs.createAndRecordBlock(nil)
 	bs.firstID = first.ID()
 	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
-	firstSealedState, ok := firstResult.FinalStateCommitment()
-	if !ok {
-		panic("missing first execution result's final state commitment")
-	}
-	bs.lastSeal = &flow.Seal{
-		BlockID:    first.ID(),
-		ResultID:   firstResult.ID(),
-		FinalState: firstSealedState,
-	}
+	bs.lastSeal = unittest.Seal.Fixture(
+		unittest.Seal.WithResult(firstResult),
+	)
 	bs.resultForBlock[firstResult.BlockID] = firstResult
 
 	// insert the finalized blocks between first and final
