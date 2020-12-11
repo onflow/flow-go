@@ -195,7 +195,7 @@ func (suite *Suite) TestRestartInSetupPhase() {
 		}).Once()
 
 	// start up the engine
-	<-suite.engine.Ready()
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
 	suite.Assert().Eventually(func() bool {
 		return called
 	}, time.Second, time.Millisecond)
@@ -215,9 +215,23 @@ func (suite *Suite) TestStartAsUnstakedNode() {
 	// we are in setup phase
 	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
 
+	// should call voter with next epoch
+	var called bool
+	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			called = true
+		}).Once()
+
 	// start the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
 
+	// should have submitted vote
+	suite.Assert().Eventually(func() bool {
+		return called
+	}, time.Second, time.Millisecond)
+	suite.voter.AssertExpectations(suite.T())
+	// should have no epoch components
 	assert.Len(suite.T(), suite.engine.epochs, 0, "should have 0 epoch components")
 }
 
