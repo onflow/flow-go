@@ -100,7 +100,7 @@ func TestConcurrency(t *testing.T) {
 // This test successfully is passed if each unique execution result is passed to Match engine by the Finder engine
 // in verification node. It also checks the result is marked as processed, and the receipts with process results are
 // cleaned up.
-func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFirst bool, verID *flow.Identity) {
+func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFirst bool, isStaked bool) {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	// to demarcate the logs
 	t.Logf("TestConcurrencyStarted: %d-receipts/%d-senders/%d-chunks", erCount, senderCount, chunksNum)
@@ -117,8 +117,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	epoch1VerID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	epoch2VerID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-	identities := flow.IdentityList{colID, conID, exeID, verID}
+	identities := flow.IdentityList{colID, conID, exeID, epoch1VerID}
 
 	// set up mock matching engine that asserts each receipt is submitted exactly once.
 	requestInterval := 1 * time.Second
@@ -146,8 +148,14 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 		collector,
 		testutil.WithMatchEngine(matchEng))
 
+	epochBuilder := unittest.NewEpochBuilder(t, verNode.State)
+	epochBuilder.
+		UsingSetupOpts(unittest.WithParticipants(epoch2VerID)).
+		BuildEpoch().
+		CompleteEpoch()
+
 	// create `erCount` execution receipt fixtures that will be concurrently delivered
-	parent, err := verNode.State.AtHeight(0).Head()
+	parent, err := verNode.State.AtHeight(2).Head()
 	require.NoError(t, err)
 
 	ers := make([]utils.CompleteExecutionResult, erCount)
