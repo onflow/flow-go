@@ -501,7 +501,7 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			// removes receipt from pending mempool
 			ok = e.pendingReceipts.Rem(receiptID)
 			if !ok {
-				e.log.Debug().
+				log.Debug().
 					Msg("could not remove receipt from pending receipts mempool")
 				return
 			}
@@ -509,11 +509,10 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			// adds receipt to ready mempoool
 			ok = e.readyReceipts.Add(rdp)
 			if !ok {
-				e.log.Debug().
+				log.Debug().
 					Msg("could not add receipt to ready mempool")
 			}
-
-			e.log.Debug().
+			log.Debug().
 				Msg("pending receipt moved to ready successfully")
 		}()
 	}
@@ -542,21 +541,30 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 		log = log.With().
 			Hex("result_id", logging.ID(resultID)).
 			Logger()
-		if !e.discardedResultIDs.Has(resultID) {
-			added := e.discardedResultIDs.Add(resultID)
-			log.Debug().
-				Bool("added_to_discard_pool", added).
-				Msg("processing result is dropped by unstaked verification node")
-		}
 
-		// removes receipt from pending receipt
-		removed := e.pendingReceipts.Rem(receiptID)
-		if !removed {
+		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
+		// for opentracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
+		func() {
+			var span opentracing.Span
+			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
+			defer span.Finish()
+
+			if !e.discardedResultIDs.Has(resultID) {
+				added := e.discardedResultIDs.Add(resultID)
+				log.Debug().
+					Bool("added_to_discard_pool", added).
+					Msg("processing result is dropped by unstaked verification node")
+			}
+
+			// removes receipt from pending receipt
+			removed := e.pendingReceipts.Rem(receiptID)
+			if !removed {
+				log.Debug().
+					Msg("could not remove dropped receipt from pending receipts mempool")
+			}
 			log.Debug().
-				Msg("could not remove dropped receipt from pending receipts mempool")
-		}
-		log.Debug().
-			Msg("dropped receipt removed from pending receipts mempool")
+				Msg("dropped receipt removed from pending receipts mempool")
+		}()
 	}
 }
 
