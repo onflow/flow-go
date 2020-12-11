@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
@@ -53,6 +54,18 @@ func (factory *EpochComponentsFactory) Create(
 	hotstuff module.HotStuff,
 	err error,
 ) {
+
+	// if we are not a staked participant in this epoch, return a sentinel
+	identities, err := epoch.InitialIdentities()
+	if err != nil {
+		err = fmt.Errorf("could not get initial identities for epoch: %w", err)
+		return
+	}
+	_, exists := identities.ByNodeID(factory.me.NodeID())
+	if !exists {
+		err = epochmgr.ErrUnstakedForEpoch
+		return
+	}
 
 	// determine this node's cluster for the epoch
 	clusters, err := epoch.Clustering()
