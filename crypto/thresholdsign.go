@@ -23,7 +23,7 @@ import (
 // signature.
 // Although the API allows using arbitrary values of (t),
 // the threshold signature scheme is secure in the presence of up to (t)
-// malicious participants for only (t) values less than n/2.
+// malicious participants when (t < n/2).
 // In Flow, the input threshold value (t) is set to
 // t = floor((n-1)/2) to optimize for unforgeability and robustness.
 

@@ -23,7 +23,7 @@ import (
 
 // (t) is the threshold parameter. Although the API allows using arbitrary values of (t),
 // the DKG protocol is secure in the presence of up to (t) malicious participants
-// only for (t) values less than n/2.
+// when (t < n/2).
 // Joint-Feldman is the protocol implemented in Flow, (t) being set to the maximum value
 // t = floor((n-1)/2) to optimize for unforgeability and robustness of the threshold
 // signature scheme using the output keys.
@@ -56,7 +56,7 @@ type JointFeldmanState struct {
 //
 // size if the total number of nodes (n).
 // threshold is the threshold parameter (t). the DKG protocol is secure in the
-// presence of up to (t) malicious participants only for (t) values less than n/2.
+// presence of up to (t) malicious participants when (t < n/2).
 // currentIndex is the index of the node creating the new DKG instance.
 // processor is the DKGProcessor instance required to connect the node to the
 // communication channels.

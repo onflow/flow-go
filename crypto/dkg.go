@@ -10,6 +10,7 @@ package crypto
 // These protocols mainly generate a BLS key pair and share the secret key
 // among (n) participants in a way that any (t+1) key shares allow reconstructing
 // the initial key (and also reconstructing a BLS threshold signature under the initial key).
+// While up to (t) participants do not get any information on the initial secret key.
 // We refer to the initial key pair by group private and group public key.
 // (t) is the threshold parameter.
 // Flow uses DKG with the value t = floor((n-1)/2) to optimize for unforgeability and robustness
