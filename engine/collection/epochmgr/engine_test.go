@@ -209,7 +209,7 @@ func (suite *Suite) TestRestartInSetupPhase() {
 //
 // These nodes must kick off the root QC voter but should not attempt to
 // participate in cluster consensus in the current epoch.
-func (suite *Suite) TestStartAsStakingNode() {
+func (suite *Suite) TestStartAsUnstakedNode() {
 	suite.MockAsUnstakedNode()
 
 	// we are in setup phase
