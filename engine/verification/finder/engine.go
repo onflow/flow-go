@@ -242,12 +242,12 @@ func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 	// extracts identity of verification node at block height of result
 	id, err := e.state.AtBlockID(blockID).Identity(e.me.NodeID())
 	if err != nil {
-		return false, fmt.Errorf("could not retrieve identity of verification node at snapshot of block id: %x: %w)", result.BlockID, err)
+		return false, fmt.Errorf("could not retrieve identity of verification node at snapshot of block id: %x: %w)", blockID, err)
 	}
 
 	// checks this node is staked as a verification node
 	if id.Role != flow.RoleVerification {
-		return false, fmt.Errorf("required verification role to process result, found: %s, block id: %x", id.Role.String(), result.BlockID)
+		return false, fmt.Errorf("node not staked as verification role at block id, role found: %s, block id: %x", id.Role.String(), blockID)
 	}
 
 	// checks stake of the verification node
@@ -451,48 +451,109 @@ func (e *Engine) checkPendingReceipts() {
 				Msg("could not remove receipt id from receipt-ids-by-block mempool for block")
 		}
 
+		// checks whether verification node is staked at snapshot of this block id/
+		ok, err := e.stakedAtBlockID(blockID)
+		if err != nil {
+			e.log.Debug().
+				Err(err).
+				Hex("block_id", logging.ID(blockID)).
+				Msg("could verify stake of verification node for result")
+			return
+		}
+
+		if !ok {
+			e.discard(receiptIDs)
+		}
+
 		// moves receipts from pending to ready
-		for _, receiptID := range receiptIDs {
-			// retrieves receipt from pending mempool
-			rdp, ok := e.pendingReceipts.Get(receiptID)
+		e.pendingToReady(receiptIDs, blockID)
+	}
+}
+
+// pendingToReady moves all receipts associated with receiptIDs from pending to ready mempools.
+// blockID is the block identifier that all receipts are pointing to.
+func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Identifier) {
+	// moves receipts from pending to ready
+	for _, receiptID := range receiptIDs {
+		// retrieves receipt from pending mempool
+		rdp, ok := e.pendingReceipts.Get(receiptID)
+		if !ok {
+			e.log.Debug().
+				Hex("receipt_id", logging.ID(receiptID)).
+				Msg("could not retrieve receipt from pending receipts mempool")
+			continue
+		}
+
+		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
+		// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
+		func() {
+			var span opentracing.Span
+			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
+			defer span.Finish()
+
+			// removes receipt from pending mempool
+			ok = e.pendingReceipts.Rem(receiptID)
 			if !ok {
 				e.log.Debug().
 					Hex("receipt_id", logging.ID(receiptID)).
-					Msg("could not retrieve receipt from pending receipts mempool")
-				continue
+					Msg("could not remove receipt from pending receipts mempool")
+				return
 			}
 
-			// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-			// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
-			func() {
-				var span opentracing.Span
-				span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
-				defer span.Finish()
-
-				// removes receipt from pending mempool
-				ok = e.pendingReceipts.Rem(receiptID)
-				if !ok {
-					e.log.Debug().
-						Hex("receipt_id", logging.ID(receiptID)).
-						Msg("could not remove receipt from pending receipts mempool")
-					return
-				}
-
-				// adds receipt to ready mempoool
-				ok = e.readyReceipts.Add(rdp)
-				if !ok {
-					e.log.Debug().
-						Hex("receipt_id", logging.ID(receiptID)).
-						Msg("could not add receipt to ready mempool")
-					return
-				}
-
+			// adds receipt to ready mempoool
+			ok = e.readyReceipts.Add(rdp)
+			if !ok {
 				e.log.Debug().
 					Hex("receipt_id", logging.ID(receiptID)).
-					Hex("block_id", logging.ID(blockID)).
-					Msg("pending receipt moved to ready successfully")
-			}()
+					Msg("could not add receipt to ready mempool")
+				return
+			}
+
+			e.log.Debug().
+				Hex("receipt_id", logging.ID(receiptID)).
+				Hex("block_id", logging.ID(blockID)).
+				Msg("pending receipt moved to ready successfully")
+		}()
+	}
+}
+
+// discardPendingReceipts receives a list of receipt ids referring to block id, and removes
+// all receipts from the pending receipts mempool and marks their execution result as discarded.
+//
+// finder engine discards a receipt if it is not staked at block id of that receipt.
+func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID flow.Identifier) {
+	for _, receiptID := range receiptIDs {
+		log := e.log.With().
+			Hex("block_id", logging.ID(blockID)).
+			Hex("receipt_id", logging.ID(receiptID)).
+			Logger()
+		// retrieves receipt from pending mempool
+		rdp, ok := e.pendingReceipts.Get(receiptID)
+		if !ok {
+			log.Debug().Msg("could not retrieve receipt from pending receipts mempool")
+			continue
 		}
+
+		// marks result id of receipt as discarded.
+		resultID := rdp.Receipt.ExecutionResult.ID()
+		log = log.With().
+			Hex("result_id", logging.ID(resultID)).
+			Logger()
+		if !e.discardedResultIDs.Has(resultID) {
+			added := e.discardedResultIDs.Add(resultID)
+			log.Debug().
+				Bool("added_to_discard_pool", added).
+				Msg("processing result is dropped by unstaked verification node")
+		}
+
+		// removes receipt from pending receipt
+		removed := e.pendingReceipts.Rem(receiptID)
+		if !removed {
+			log.Debug().
+				Msg("could not remove dropped receipt from pending receipts mempool")
+		}
+		log.Debug().
+			Msg("dropped receipt removed from pending receipts mempool")
 	}
 }
 
