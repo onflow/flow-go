@@ -85,19 +85,6 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 	return vote, nil
 }
 
-// check if there are enough shares for the threshold signature reconstruction
-func enoughThresholdShares(size int, votes int) (bool, error) {
-	// isolate the case with one node
-	if size == 1 {
-		return votes > 0, nil
-	}
-	enoughShares, err := crypto.EnoughShares(signature.RandomBeaconThreshold(size), votes)
-	if err != nil {
-		return false, fmt.Errorf("could not check the threshold: %w", err)
-	}
-	return enoughShares, nil
-}
-
 // CreateQC will create a quorum certificate with a combined aggregated signature and
 // threshold signature for the given votes.
 func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
@@ -116,7 +103,10 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	}
 
 	// check if we have sufficient threshold signature shares
-	enoughShares, err := enoughThresholdShares(int(dkg.Size()), len(votes))
+	enoughShares, err := signature.EnoughThresholdShares(int(dkg.Size()), len(votes))
+	if err != nil {
+		return nil, fmt.Errorf("error in createQC: %w", err)
+	}
 	if !enoughShares {
 		return nil, ErrInsufficientShares
 	}

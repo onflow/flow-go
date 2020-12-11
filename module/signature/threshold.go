@@ -79,7 +79,7 @@ func (tp *ThresholdProvider) Sign(msg []byte) (crypto.Signature, error) {
 }
 
 // check if there are enough shares for the threshold signature reconstruction
-func enoughThresholdShares(size int, shares int) (bool, error) {
+func EnoughThresholdShares(size int, shares int) (bool, error) {
 	// isolate the case with one node
 	if size == 1 {
 		return shares > 0, nil
@@ -97,7 +97,7 @@ func enoughThresholdShares(size int, shares int) (bool, error) {
 func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
 
 	// check that we have sufficient shares to reconstruct the threshold signature
-	enoughShares, err := enoughThresholdShares(int(size), len(shares))
+	enoughShares, err := EnoughThresholdShares(int(size), len(shares))
 	if err != nil {
 		return nil, fmt.Errorf("error in combine: %w", err)
 	}
@@ -112,7 +112,7 @@ func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indic
 	}
 
 	// try to reconstruct the threshold signature using the given shares & indices
-	if size == 1 {
+	if size == 1 { // isolate the one-node case, not supported by the crypto API
 		return shares[0], nil
 	}
 	thresSig, err := crypto.ReconstructThresholdSignature(int(size), RandomBeaconThreshold(int(size)), shares, converted)

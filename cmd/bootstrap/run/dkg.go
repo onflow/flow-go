@@ -22,7 +22,7 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 
 	// separate the case whith one node
 	if n == 1 {
-		sk, pk, pkGroup, err := ThresholdSignKeyGenOneNode(seeds[0])
+		sk, pk, pkGroup, err := thresholdSignKeyGenOneNode(seeds[0])
 		if err != nil {
 			return model.DKGData{}, fmt.Errorf("run dkg failed: %w", err)
 		}
@@ -192,7 +192,7 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 func RunFastKG(n int, seed []byte) (model.DKGData, error) {
 
 	if n == 1 {
-		sk, pk, pkGroup, err := ThresholdSignKeyGenOneNode(seed)
+		sk, pk, pkGroup, err := thresholdSignKeyGenOneNode(seed)
 		if err != nil {
 			return model.DKGData{}, fmt.Errorf("fast KeyGen failed: %w", err)
 		}
@@ -220,7 +220,8 @@ func RunFastKG(n int, seed []byte) (model.DKGData, error) {
 	return dkgData, nil
 }
 
-func ThresholdSignKeyGenOneNode(seed []byte) ([]crypto.PrivateKey, []crypto.PublicKey, crypto.PublicKey, error) {
+// simulates DKG with one single node
+func thresholdSignKeyGenOneNode(seed []byte) ([]crypto.PrivateKey, []crypto.PublicKey, crypto.PublicKey, error) {
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("KeyGen with one node failed: %w", err)
