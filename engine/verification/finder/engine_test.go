@@ -455,6 +455,11 @@ func (suite *FinderEngineTestSuite) TestPendingToReady_Staked() {
 	suite.pendingReceipts.On("Get", suite.receipt.ID()).
 		Return(suite.receiptDataPack, true).Once()
 
+	// mocks returning state snapshot of system at block height of result
+	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.snapshot)
+	// mocks identity of node as in the state snapshot
+	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
+
 	// mocks moving from pending to ready
 	moveWG := sync.WaitGroup{}
 	moveWG.Add(2)
