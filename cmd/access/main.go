@@ -44,6 +44,7 @@ func main() {
 		receiptLimit                 uint
 		collectionGRPCPort           uint
 		pingEnabled                  bool
+		nodeInfoFile                 string
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
 		followerEng                  *followereng.Engine
@@ -81,6 +82,7 @@ func main() {
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
+			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
@@ -272,6 +274,7 @@ func main() {
 				pingMetrics,
 				pingEnabled,
 				node.Middleware,
+				nodeInfoFile,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create ping engine: %w", err)

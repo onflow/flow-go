@@ -837,6 +837,7 @@ func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
 			BlockID:         blockID,
 		},
+		EndState: unittest.StateCommitmentFixture(),
 	}
 	return chunk
 }
