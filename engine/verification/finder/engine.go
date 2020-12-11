@@ -367,114 +367,98 @@ func (e *Engine) checkCachedReceipts() {
 				return
 			}
 
-			// adds receipt to pending or ready mempools depending on its processable status
 			ready := e.isProcessable(&rdp.Receipt.ExecutionResult)
-			if ready {
-				// checks whether verification node is staked at snapshot of this result's block.
-				ok, err := e.stakedAtBlockID(rdp.Receipt.ExecutionResult.BlockID)
-				if err != nil {
-					log.Debug().Err(err).Msg("could verify stake of verification node for result")
-					return
-				}
-
-				if !ok {
-					added := e.discardedResultIDs.Add(resultID)
-					log.Debug().
-						Bool("added_to_discard_pool", added).
-						Msg("processing result is dropped by unstaked verification node")
-					return
-				}
-
-				// adds the receipt to the ready mempool
-				ok = e.readyReceipts.Add(rdp)
-				if !ok {
-					log.Debug().Msg("drops adding duplicate receipt to ready mempool")
-					return
-				}
-			} else {
-				// block for the receipt is not available
-				// receipt moves to pending mempool
-				ok := e.pendingReceipts.Add(rdp)
-				if !ok {
-					log.Debug().Msg("drops adding duplicate receipt to pending mempool")
-					return
-				}
-
-				// marks receipt pending for its block ID
-				err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
-				if err != nil {
-					e.log.Error().
-						Err(err).
-						Hex("block_id", logging.ID(rdp.Receipt.ExecutionResult.BlockID)).
-						Hex("receipt_id", logging.ID(receiptID)).
-						Msg("could not append receipt to receipt-ids-by-block mempool")
-				}
-			}
-
-			// records the execution receipt id based on its result id
-			err := e.receiptIDsByResult.Append(resultID, receiptID)
-			if err != nil {
-				log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
+			if !ready {
+				// adds receipt to pending mempool
+				e.addToPending(rdp)
 				return
 			}
 
-			log.Info().
-				Bool("ready", ready).
-				Msg("cached execution receipt moved to proper mempool")
+			// adds receipt to ready mempool
+			e.addToReady(rdp)
 		}()
 	}
 }
 
-// checkReceipts iterates over the new cached finalized blocks. It moves
-// their corresponding receipt from pending to ready mempools.
-func (e *Engine) checkPendingReceipts() {
-	for _, blockID := range e.blockIDsCache.All() {
-		// removes blockID from new blocks mempool
-		ok := e.blockIDsCache.Rem(blockID)
-		log := e.log.With().
-			Hex("block_id", logging.ID(blockID)).
-			Logger()
-		if !ok {
-			log.Debug().Msg("could not remove block ID from cache")
-		}
+// addToReady encapsulates the logic around adding a ReceiptDataPack to ready receipts mempool.
+// The ReceiptDataPack is however discarded it if finder engine is not staked at its block id.
+func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) {
+	receiptID := receiptDataPack.Receipt.ID()
+	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
+	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
+	log := e.log.With().
+		Str("engine", "finder").
+		Hex("origin_id", logging.ID(receiptDataPack.OriginID)).
+		Hex("block_id", logging.ID(blockID)).
+		Hex("receipt_id", logging.ID(receiptID)).
+		Hex("result_id", logging.ID(resultID)).Logger()
 
-		// retrieves all receipts that are pending for this block
-		receiptIDs, ok := e.pendingReceiptIDsByBlock.Get(blockID)
-		if !ok {
-			// no pending receipt for this block
-			log.Debug().Msg("no pending receipt for block")
-			continue
-		}
-		log.Debug().
-			Int("receipt_num", len(receiptIDs)).
-			Msg("retrieved receipt ids pending for block")
-
-		// removes list of receipt ids for this block
-		ok = e.pendingReceiptIDsByBlock.Rem(blockID)
-		if !ok {
-			log.Debug().
-				Msg("could not remove receipt id from receipt-ids-by-block mempool for block")
-		}
-
-		// checks whether verification node is staked at snapshot of this block id/
-		ok, err := e.stakedAtBlockID(blockID)
-		if err != nil {
-			e.log.Debug().
-				Err(err).
-				Msg("could verify stake of verification node for result")
-			continue
-		}
-
-		if !ok {
-			// node is not staked at block id
-			// discards all pending receipts for this block id.
-			e.discardPendingReceipts(receiptIDs, blockID)
-			continue
-		}
-
-		// moves receipts from pending to ready
-		e.pendingToReady(receiptIDs, blockID)
+	// checks whether verification node is staked at snapshot of this result's block.
+	ok, err := e.stakedAtBlockID(blockID)
+	if err != nil {
+		log.Debug().Err(err).Msg("could verify stake of verification node for result")
+		return
 	}
+
+	if !ok {
+		added := e.discardedResultIDs.Add(resultID)
+		log.Debug().
+			Bool("added_to_discard_pool", added).
+			Msg("execution result marks discarded")
+		return
+	}
+
+	// adds the receipt to the ready mempool
+	ok = e.readyReceipts.Add(receiptDataPack)
+	if !ok {
+		log.Debug().Msg("drops adding duplicate receipt to ready mempool")
+		return
+	}
+
+	// records the execution receipt id based on its result id
+	err = e.receiptIDsByResult.Append(resultID, receiptID)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
+		return
+	}
+
+	log.Info().Msg("cached execution receipt added to ready mempool")
+}
+
+// addToPending encapsulates the logic around adding a ReceiptDataPack to ready receipts mempool.
+func (e *Engine) addToPending(receiptDataPack *verification.ReceiptDataPack) {
+	receiptID := receiptDataPack.Receipt.ID()
+	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
+	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
+	log := e.log.With().
+		Str("engine", "finder").
+		Hex("origin_id", logging.ID(receiptDataPack.OriginID)).
+		Hex("block_id", logging.ID(blockID)).
+		Hex("receipt_id", logging.ID(receiptID)).
+		Hex("result_id", logging.ID(resultID)).Logger()
+
+	ok := e.pendingReceipts.Add(receiptDataPack)
+	if !ok {
+		log.Debug().Msg("drops adding duplicate receipt to pending mempool")
+		return
+	}
+
+	// marks receipt pending for its block ID
+	err := e.pendingReceiptIDsByBlock.Append(blockID, receiptID)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("could not append receipt to receipt-ids-by-block mempool")
+	}
+
+	// records the execution receipt id based on its result id
+	err = e.receiptIDsByResult.Append(resultID, receiptID)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
+		return
+	}
+
+	log.Info().Msg("cached execution receipt added to pending mempool")
 }
 
 // pendingToReady receives a list of receipt identifiers and moves all their corresponding receipts
@@ -574,6 +558,58 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 			log.Debug().
 				Msg("dropped receipt removed from pending receipts mempool")
 		}()
+	}
+}
+
+// checkReceipts iterates over the new cached finalized blocks. It moves
+// their corresponding receipt from pending to ready mempools.
+func (e *Engine) checkPendingReceipts() {
+	for _, blockID := range e.blockIDsCache.All() {
+		// removes blockID from new blocks mempool
+		ok := e.blockIDsCache.Rem(blockID)
+		log := e.log.With().
+			Hex("block_id", logging.ID(blockID)).
+			Logger()
+		if !ok {
+			log.Debug().Msg("could not remove block ID from cache")
+		}
+
+		// retrieves all receipts that are pending for this block
+		receiptIDs, ok := e.pendingReceiptIDsByBlock.Get(blockID)
+		if !ok {
+			// no pending receipt for this block
+			log.Debug().Msg("no pending receipt for block")
+			continue
+		}
+		log.Debug().
+			Int("receipt_num", len(receiptIDs)).
+			Msg("retrieved receipt ids pending for block")
+
+		// removes list of receipt ids for this block
+		ok = e.pendingReceiptIDsByBlock.Rem(blockID)
+		if !ok {
+			log.Debug().
+				Msg("could not remove receipt id from receipt-ids-by-block mempool for block")
+		}
+
+		// checks whether verification node is staked at snapshot of this block id/
+		ok, err := e.stakedAtBlockID(blockID)
+		if err != nil {
+			e.log.Debug().
+				Err(err).
+				Msg("could verify stake of verification node for result")
+			continue
+		}
+
+		if !ok {
+			// node is not staked at block id
+			// discards all pending receipts for this block id.
+			e.discardPendingReceipts(receiptIDs, blockID)
+			continue
+		}
+
+		// moves receipts from pending to ready
+		e.pendingToReady(receiptIDs, blockID)
 	}
 }
 
