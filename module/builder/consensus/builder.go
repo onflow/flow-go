@@ -4,7 +4,6 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -272,10 +271,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// this fork.
 	filteredSeals := make(map[uint64]*flow.IncorporatedResultSeal)
 
-	// We consider two seals as inconsistent, if they refer to the same block
-	// and have different start or end states
-	encounteredInconsistentSealsForSameBlock := false
-
 	// Walk backwards along the fork, from parent to last sealed, inspect the
 	// payloads' ExecutionResults, and check for matching IncorporatedResultSeals
 	// in the mempool.
@@ -315,54 +310,14 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 				continue
 			}
 
-			if len(irSeal.IncorporatedResult.Result.Chunks) < 1 {
-				return nil, fmt.Errorf("ExecutionResult without chunks: %v", irSeal.IncorporatedResult.Result.ID())
-			}
-			if len(irSeal.Seal.FinalState) < 1 {
-				// respective Execution Result should have been rejected by matching engine
-				return nil, fmt.Errorf("seal with empty state commitment: %v", irSeal.ID())
-			}
-
 			header, err := b.headers.ByBlockID(incorporatedResult.Result.BlockID)
 			if err != nil {
 				return nil, fmt.Errorf("could not get block for id (%x): %w", incorporatedResult.Result.BlockID, err)
 			}
-
-			// Check for other inconsistent seal
-			irSeal2, found := filteredSeals[header.Height]
-			if found && irSeal.Seal.BlockID != irSeal2.Seal.BlockID {
-
-				sc1json, err := json.Marshal(irSeal)
-				if err != nil {
-					return nil, err
-				}
-				sc2json, err := json.Marshal(irSeal2)
-				if err != nil {
-					return nil, err
-				}
-
-				// check whether seals are inconsistent:
-				if !bytes.Equal(irSeal.Seal.FinalState, irSeal2.Seal.FinalState) ||
-					!bytes.Equal(irSeal.IncorporatedResult.Result.Chunks[0].StartState, irSeal2.IncorporatedResult.Result.Chunks[0].StartState) {
-					fmt.Printf("ERROR: inconsistent seals for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-					encounteredInconsistentSealsForSameBlock = true
-				} else {
-					fmt.Printf("WARNING: multiple seals with different IDs for the same block %v: %s and %s", irSeal.Seal.BlockID, string(sc1json), string(sc2json))
-				}
-
-			} else {
-				filteredSeals[header.Height] = irSeal
-			}
-
+			filteredSeals[header.Height] = irSeal
 		}
 
 		ancestorID = ancestor.Header.ParentID
-	}
-
-	// return immediately if there are no seals to collect or if we found
-	// inconsistent seals.
-	if len(filteredSeals) == 0 || encounteredInconsistentSealsForSameBlock {
-		return nil, nil
 	}
 
 	// now we need to collect only the seals that form a valid chain on top of
@@ -413,6 +368,8 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 //
 // Receipts have to be ordered by block height.
 func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
+	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork. This block is not necessarily finalized.

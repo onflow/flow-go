@@ -40,12 +40,7 @@ func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResu
 // ID implements flow.Entity.ID for IncorporatedResult to make it capable of
 // being stored directly in mempools and storage.
 func (ir *IncorporatedResult) ID() Identifier {
-	return ComputeIncorporatedResultID(ir.IncorporatedBlockID, ir.Result.ID())
-}
-
-// ComputeIncorporatedResultID computes the ID of an IncorporatedResult
-func ComputeIncorporatedResultID(incorporatedBlockID Identifier, resultID Identifier) Identifier {
-	return MakeID([2]Identifier{incorporatedBlockID, resultID})
+	return MakeID([2]Identifier{ir.IncorporatedBlockID, ir.Result.ID()})
 }
 
 // CheckSum implements flow.Entity.CheckSum for IncorporatedResult to make it
