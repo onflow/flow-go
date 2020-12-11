@@ -431,23 +431,28 @@ func (e *Engine) checkPendingReceipts() {
 	for _, blockID := range e.blockIDsCache.All() {
 		// removes blockID from new blocks mempool
 		ok := e.blockIDsCache.Rem(blockID)
+		log := e.log.With().
+			Hex("block_id", logging.ID(blockID)).
+			Logger()
 		if !ok {
-			e.log.Debug().
-				Hex("block_id", logging.ID(blockID)).
-				Msg("could not remove block ID from cache")
+			log.Debug().Msg("could not remove block ID from cache")
 		}
 
 		// retrieves all receipts that are pending for this block
 		receiptIDs, ok := e.pendingReceiptIDsByBlock.Get(blockID)
 		if !ok {
 			// no pending receipt for this block
+			log.Debug().Msg("no pending receipt for block")
 			continue
 		}
+		log.Debug().
+			Int("receipt_num", len(receiptIDs)).
+			Msg("retrieved receipt ids pending for block")
+
 		// removes list of receipt ids for this block
 		ok = e.pendingReceiptIDsByBlock.Rem(blockID)
 		if !ok {
-			e.log.Debug().
-				Hex("block_id", logging.ID(blockID)).
+			log.Debug().
 				Msg("could not remove receipt id from receipt-ids-by-block mempool for block")
 		}
 
@@ -456,13 +461,15 @@ func (e *Engine) checkPendingReceipts() {
 		if err != nil {
 			e.log.Debug().
 				Err(err).
-				Hex("block_id", logging.ID(blockID)).
 				Msg("could verify stake of verification node for result")
-			return
+			continue
 		}
 
 		if !ok {
-			e.discard(receiptIDs)
+			// node is not staked at block id
+			// discards all pending receipts for this block id.
+			e.discardPendingReceipts(receiptIDs, blockID)
+			continue
 		}
 
 		// moves receipts from pending to ready
@@ -511,6 +518,7 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			if !ok {
 				log.Debug().
 					Msg("could not add receipt to ready mempool")
+				return
 			}
 			log.Debug().
 				Msg("pending receipt moved to ready successfully")
