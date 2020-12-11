@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -53,9 +54,11 @@ type Suite struct {
 	suite.Suite
 
 	// engine dependencies
+	log   zerolog.Logger
 	me    *module.Local
 	state *protocol.State
 	snap  *protocol.Snapshot
+	pools *epochs.TransactionPools
 
 	// qc voter dependencies
 	signer  *hotstuff.Signer
@@ -74,7 +77,7 @@ type Suite struct {
 
 func (suite *Suite) SetupTest() {
 
-	log := zerolog.New(ioutil.Discard)
+	suite.log = zerolog.New(ioutil.Discard)
 	suite.me = new(module.Local)
 	suite.state = new(protocol.State)
 	suite.snap = new(protocol.Snapshot)
@@ -113,10 +116,10 @@ func (suite *Suite) SetupTest() {
 	suite.AddEpoch(suite.counter)
 	suite.AddEpoch(suite.counter + 1)
 
-	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
+	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
 
 	var err error
-	suite.engine, err = New(log, suite.me, suite.state, pools, suite.voter, suite.factory, suite.heights)
+	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
 	suite.Require().Nil(err)
 }
 
@@ -165,6 +168,20 @@ func (suite *Suite) ComponentsForEpoch(epoch realprotocol.Epoch) *mockComponents
 	return components
 }
 
+// MockAsUnstakedNode mocks the factory to return a sentinel indicating
+// we are not a staked node in the epoch
+func (suite *Suite) MockAsUnstakedNode() {
+
+	suite.factory = new(epochmgr.EpochComponentsFactory)
+	suite.factory.
+		On("Create", mock.Anything).
+		Return(nil, nil, nil, nil, ErrUnstakedForEpoch)
+
+	var err error
+	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
+	suite.Require().Nil(err)
+}
+
 // if we start up during the setup phase, we should kick off the root QC voter
 func (suite *Suite) TestRestartInSetupPhase() {
 
@@ -184,6 +201,24 @@ func (suite *Suite) TestRestartInSetupPhase() {
 	}, time.Second, time.Millisecond)
 
 	suite.voter.AssertExpectations(suite.T())
+}
+
+// When a collection node joins the network at an epoch boundary, they must
+// start running during the EpochSetup phase in the epoch before they become
+// a staked member so they submit their cluster QC vote.
+//
+// These nodes must kick off the root QC voter but should not attempt to
+// participate in cluster consensus in the current epoch.
+func (suite *Suite) TestStartAsStakingNode() {
+	suite.MockAsUnstakedNode()
+
+	// we are in setup phase
+	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
+
+	// start the engine
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
+
+	assert.Len(suite.T(), suite.engine.epochs, 0, "should have 0 epoch components")
 }
 
 // should kick off root QC voter on setup phase start event
