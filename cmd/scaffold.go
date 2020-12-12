@@ -427,11 +427,11 @@ func (fnb *FlowNodeBuilder) initState() {
 		// but the protocol state is not updated, so they don't match
 		// when this happens during a spork, we could try deleting the protocol state database.
 		// TODO: revisit this check when implementing Epoch
-		rootBlockHeader, err := loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		rootBlock, err := loadRootBlock(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root block")
-		if rootBlockHeader.ID() != stateRoot.Block().ID() {
+		if rootBlock.ID() != stateRoot.Block().ID() {
 			fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
-				rootBlockHeader.ID(),
+				rootBlock.ID(),
 				fnb.RootBlock.ID())
 		}
 		fnb.RootBlock = stateRoot.Block()
@@ -505,25 +505,26 @@ func (fnb *FlowNodeBuilder) initState() {
 			Msg("genesis state bootstrapped")
 	}
 
-	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
-	fnb.MustNot(err).Msg("could not parse node identifier")
-
-	rootBlockHeader, err := fnb.State.Params().Root()
-	fnb.MustNot(err).Msg("could not get root block from protocol state")
-
-	self, err := fnb.State.Final().Identity(myID)
-	// there are two cases that will cause the following error:
+	// Verify that my ID (as given in the configuration) is known to the network
+	// (i.e. protocol state). There are two cases that will cause the following error:
 	// 1) used the wrong node id, which is not part of the identity list of the finalized state
 	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
+	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
+	fnb.MustNot(err).Msg("could not parse node identifier")
+	self, err := fnb.State.Final().Identity(myID)
 	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
 
+	// Verify that my role (as given in the configuration) is consistent with the protocol state.
+	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
+	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.nodeRole {
+		rootBlockHeader, err := fnb.State.Params().Root()
+		fnb.MustNot(err).Msg("could not get root block from protocol state")
 		if rootBlockHeader.ChainID == flow.Mainnet {
 			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
 				self.Role.String(),
 				fnb.BaseConfig.nodeRole)
 		} else {
-			// This allows ghost node to run as any role when not on mainnet
 			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
 				self.Role.String(),
 				fnb.BaseConfig.nodeRole)
@@ -543,12 +544,10 @@ func (fnb *FlowNodeBuilder) initState() {
 
 	lastFinalized, err := fnb.State.Final().Head()
 	fnb.MustNot(err).Msg("could not get last finalized state")
-
 	fnb.Logger.Info().
 		Hex("block_id", logging.Entity(lastFinalized)).
 		Uint64("height", lastFinalized.Height).
 		Msg("last finalized block")
-
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
