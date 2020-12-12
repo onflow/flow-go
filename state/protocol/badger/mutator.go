@@ -19,12 +19,16 @@ import (
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
-// FollowerState implements a lighter version of protocol state
-// Follows chain updates and performs checks using info that
-// is available in headers. It allows
-// us to execute fork-aware queries against ambiguous protocol state, while
-// still checking that the given block is a valid extension of the protocol
-// state
+// FollowerState implements a lighter version of a mutable protocol state.
+// When extending the state, it performs hardly any checks on the block payload.
+// Instead, the FollowerState relies on the consensus nodes to run the full
+// payload check. Consequently, a block B should only be considered valid, if
+// a child block with a valid header is known. The child block's header
+// includes quorum certificate, which proves that a supermajority of consensus
+// nodes consider block B a valid.
+// The FollowerState allows non-consensus nodes to execute fork-aware queries
+// against the protocol state, while minimizing the amount of payload checks
+// the non-consensus nodes have to perform.
 type FollowerState struct {
 	*State
 	index    storage.Index
@@ -34,15 +38,14 @@ type FollowerState struct {
 	cfg      Config
 }
 
-// MutableState implements a complete version of protocol state.
-// Performs extensive checks for validity of incoming blocks.
-// Compared to FollowerState makes more checks before extending chain.
+// MutableState implements a mutable protocol state. When extending the
+// state with a new block, it checks the _entire_ block payload.
 type MutableState struct {
 	*FollowerState
 }
 
-// NewFollowerState initializes a new follower state backed by a badger database, applying the
-// optional configuration parameters.
+// NewFollowerState initializes a light-weight version of a mutable protocol
+// state. This implementation is suitable only for NON-Consensus nodes.
 func NewFollowerState(
 	state *State,
 	index storage.Index,
@@ -61,8 +64,10 @@ func NewFollowerState(
 	return followerState, nil
 }
 
-// NewMutableState initializes a new full state backed by a badger database, applying the
-// optional configuration parameters.
+// NewFullConsensusState initializes a new mutable protocol state backed by a
+// badger database. When extending the state with a new block, it checks the
+// _entire_ block payload. Consensus nodes should use the FullConsensusState,
+// while other node roles can use the lighter FollowerState.
 func NewFullConsensusState(
 	state *State,
 	index storage.Index,

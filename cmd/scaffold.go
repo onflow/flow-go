@@ -543,7 +543,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("could not initialize local")
 
 	lastFinalized, err := fnb.State.Final().Head()
-	fnb.MustNot(err).Msg("could not get last finalized state")
+	fnb.MustNot(err).Msg("could not get last finalized block header")
 	fnb.Logger.Info().
 		Hex("block_id", logging.Entity(lastFinalized)).
 		Uint64("height", lastFinalized.Height).
