@@ -500,6 +500,12 @@ func WithMatchEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
+func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
+	return func(node *testmock.VerificationNode) {
+		node.GenericNode = genericNode
+	}
+}
+
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
@@ -516,12 +522,15 @@ func VerificationNode(t testing.TB,
 	opts ...VerificationOpt) testmock.VerificationNode {
 
 	var err error
-	node := testmock.VerificationNode{
-		GenericNode: GenericNode(t, hub, identity, identities, chainID),
-	}
+	var node testmock.VerificationNode
 
 	for _, apply := range opts {
 		apply(&node)
+	}
+
+	if node.GenericNode == nil {
+		gn := GenericNode(t, hub, identity, identities, chainID)
+		node.GenericNode = &gn
 	}
 
 	if node.CachedReceipts == nil {

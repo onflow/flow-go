@@ -175,7 +175,7 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
-	GenericNode
+	*GenericNode
 	CachedReceipts           mempool.ReceiptDataPacks
 	ReadyReceipts            mempool.ReceiptDataPacks
 	PendingReceipts          mempool.ReceiptDataPacks
