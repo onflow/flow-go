@@ -27,7 +27,7 @@ func NewStateRoot(block *flow.Block, result *flow.ExecutionResult, seal *flow.Se
 	}, nil
 }
 
-// Validate checks internal consistency of state root
+// validate checks internal consistency of state root
 func validate(block *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, epochFirstView uint64) error {
 	if result.BlockID != block.ID() {
 		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, block.ID())
