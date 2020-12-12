@@ -71,6 +71,7 @@ func (s State) Read(owner, controller, key string) (flow.RegisterValue, error) {
 
 	// check draft first
 	if p, ok := s.draft[fullKey(owner, controller, key)]; ok {
+		// just call the ledger get for tracking touches
 		_, err := s.ledger.Get(owner, controller, key)
 		if err != nil {
 			return nil, &LedgerFailure{err}
