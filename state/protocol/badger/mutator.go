@@ -5,16 +5,14 @@ package badger
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/storage"
-
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
@@ -313,10 +311,10 @@ func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 }
 
 // sealExtend checks the compliance of the payload seals and returns the last
-// valid seal on the fork up to and including `candidate`. Payload seals should
-// form a valid chain on top of the last seal as of the parent of `candidate`,
-// and should only correspond to blocks and execution results incorporated on
-// the current fork.
+// valid seal on the fork up to and including `candidate`. To be valid, we
+// require that seals
+// 1) form a valid chain on top of the last seal as of the parent of `candidate` and
+// 2) correspond to blocks and execution results incorporated on the current fork.
 //
 // Note that we don't explicitly check that sealed results satisfy the sub-graph
 // check. Nevertheless, correctness in this regard is guaranteed because:
@@ -335,12 +333,10 @@ func (m *MutableState) sealExtend(candidate *flow.Block, lastSealUpToParent *flo
 	header := candidate.Header
 	payload := candidate.Payload
 
-	last := lastSealUpToParent
-
 	// if there is no seal in the block payload, use the last sealed block of
 	// the parent block as the last sealed block of the given block.
 	if len(payload.Seals) == 0 {
-		return last, nil
+		return lastSealUpToParent, nil
 	}
 
 	// map each seal to the block it is sealing for easy lookup; we will need to
