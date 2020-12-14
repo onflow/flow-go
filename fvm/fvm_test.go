@@ -95,7 +95,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
 
 	t.Run("Success", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -111,7 +111,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -144,7 +144,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -202,7 +202,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		require.Len(t, tx.Events, 1)
-		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].EventType.ID())
+		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].Type)
 	})
 }
 
@@ -216,7 +216,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
@@ -240,7 +240,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -264,7 +264,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -293,7 +293,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -317,7 +317,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
@@ -389,7 +389,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -423,7 +423,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
 
 	var tests = []struct {
 		label    string
@@ -470,7 +470,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -529,7 +529,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody)
+				tx := fvm.Transaction(txBody, 0)
 
 				err = vm.Run(ctx, tx, ledger)
 				require.NoError(t, err)
@@ -577,7 +577,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody)
+				tx := fvm.Transaction(txBody, 0)
 
 				err = vm.Run(ctx, tx, ledger)
 				require.NoError(t, err)
@@ -604,7 +604,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
 
 	t.Run("script success", func(t *testing.T) {
 		code := []byte(`
@@ -674,7 +674,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
 
 	blocks := new(fvmmock.Blocks)
 
@@ -710,7 +710,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(blockCtx, tx, ledger)
 		assert.NoError(t, err)
@@ -771,7 +771,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_ = vm.Run(blockCtx, fvm.Transaction(tx), ledger)
+			_ = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger)
 		})
 	})
 
@@ -805,7 +805,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
 
 	sequenceNumber := uint64(0)
 
@@ -830,7 +830,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute the transaction
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -838,10 +838,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		assert.Len(t, tx.Events, 2)
-		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].EventType.ID())
+		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].Type)
 
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-		address := flow.BytesToAddress(tx.Events[0].Fields[0].(cadence.Address).Bytes())
+		data, err := jsoncdc.Decode(tx.Events[0].Payload)
+		require.NoError(t, err)
+		address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
 		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
 	}
@@ -901,7 +903,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	header := flow.Header{Height: 42}
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithBlockHeader(&header))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithBlockHeader(&header), fvm.WithCadenceLogging(true))
 
 	t.Run("works as transaction", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -920,7 +922,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		assert.NoError(t, err)
@@ -956,7 +958,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 	require.NoError(t, err)
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, 0)
 
 	err = vm.Run(ctx, tx, ledger)
 	assert.NoError(t, err)
@@ -964,8 +966,13 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	assert.NoError(t, tx.Err)
 
 	require.Len(t, tx.Events, 1)
-	require.Equal(t, string(flow.EventAccountCreated), tx.Events[0].EventType.TypeID)
-	assert.Equal(t, flow.HexToAddress("05"), flow.Address(tx.Events[0].Fields[0].(cadence.Address)))
+	require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
+
+	data, err := jsoncdc.Decode(tx.Events[0].Payload)
+	require.NoError(t, err)
+	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+
+	assert.Equal(t, flow.HexToAddress("05"), address)
 }
 
 func TestSignatureVerification(t *testing.T) {
@@ -1248,7 +1255,7 @@ func TestWithServiceAccount(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	t.Run("With service account enabled", func(t *testing.T) {
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctxA, tx, ledger)
 		require.NoError(t, err)
@@ -1260,12 +1267,104 @@ func TestWithServiceAccount(t *testing.T) {
 	t.Run("With service account disabled", func(t *testing.T) {
 		ctxB := fvm.NewContextFromParent(ctxA, fvm.WithServiceAccount(false))
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctxB, tx, ledger)
 		require.NoError(t, err)
 
 		// transaction should succeed on non-bootstrapped ledger
+		assert.NoError(t, tx.Err)
+	})
+}
+
+func TestEventLimits(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+	chain := flow.Mainnet.Chain()
+	vm := fvm.New(rt)
+
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvocator(zerolog.Nop()),
+		),
+	)
+
+	ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+	testContract := `
+	access(all) contract TestContract {
+		access(all) event LargeEvent(value: Int256, str: String, list: [UInt256], dic: {String: String})
+		access(all) fun EmitEvent() {
+			var s: Int256 = 1024102410241024
+			var i = 0
+
+			while i < 20 {
+				emit LargeEvent(value: s, str: s.toString(), list:[], dic:{s.toString():s.toString()})
+				i = i + 1
+			}
+		}
+	}
+	`
+
+	deployingContractScriptTemplate := `
+		transaction {
+			prepare(signer: AuthAccount) {
+				let code = "%s".decodeHex()
+				signer.contracts.add(
+					name: "TestContract",
+					code: code
+				)
+		}
+	}
+	`
+
+	ctx = fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithEventCollectionSizeLimit(2),
+		fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvocator(zerolog.Nop()),
+		),
+	)
+
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract))))).
+		SetPayer(chain.ServiceAddress()).
+		AddAuthorizer(chain.ServiceAddress())
+
+	tx := fvm.Transaction(txBody, 0)
+	err := vm.Run(ctx, tx, ledger)
+	require.NoError(t, err)
+
+	txBody = flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`
+		import TestContract from 0x%s
+			transaction {
+			prepare(acct: AuthAccount) {}
+			execute {
+				TestContract.EmitEvent()
+			}
+		}`, chain.ServiceAddress()))).
+		AddAuthorizer(chain.ServiceAddress())
+
+	t.Run("With limits", func(t *testing.T) {
+		txBody.Payer = unittest.RandomAddressFixture()
+		tx := fvm.Transaction(txBody, 0)
+		err := vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		// transaction should fail due to event size limit
+		assert.Error(t, tx.Err)
+	})
+
+	t.Run("With service account as payer", func(t *testing.T) {
+		txBody.Payer = chain.ServiceAddress()
+		tx := fvm.Transaction(txBody, 0)
+		err := vm.Run(ctx, tx, ledger)
+		require.NoError(t, err)
+
+		// transaction should not fail due to event size limit
 		assert.NoError(t, tx.Err)
 	})
 }

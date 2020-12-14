@@ -94,6 +94,7 @@ func initAccountTransaction(payerAddress, accountAddress, serviceAddress flow.Ad
 			AddAuthorizer(accountAddress).
 			AddAuthorizer(payerAddress).
 			AddArgument(arg),
+		0,
 	)
 }
 

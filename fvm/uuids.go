@@ -18,7 +18,6 @@ func NewUUIDGenerator(uuids *state.UUIDs) *UUIDGenerator {
 func (u *UUIDGenerator) GenerateUUID() (uint64, error) {
 	uuid, err := u.uuids.GetUUID()
 	if err != nil {
-		// TODO - Return error once Cadence interface accommodates it
 		return 0, fmt.Errorf("cannot get UUID: %w", err)
 	}
 

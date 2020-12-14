@@ -169,7 +169,7 @@ func CreateAccountsWithSimpleAddresses(
 
 	serviceAddress := chain.ServiceAddress()
 
-	for _, privateKey := range privateKeys {
+	for i, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
 		cadAccountKey := BytesToCadenceArray(encAccountKey)
@@ -180,7 +180,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(serviceAddress)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, uint32(i))
 		err := vm.Run(ctx, tx, ledger)
 		if err != nil {
 			return nil, err
@@ -193,8 +193,12 @@ func CreateAccountsWithSimpleAddresses(
 		var addr flow.Address
 
 		for _, event := range tx.Events {
-			if event.EventType.ID() == string(flow.EventAccountCreated) {
-				addr = event.Fields[0].ToGoValue().([8]byte)
+			if event.Type == flow.EventAccountCreated {
+				data, err := jsoncdc.Decode(event.Payload)
+				if err != nil {
+					return nil, errors.New("error decoding events")
+				}
+				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 				break
 			}
 

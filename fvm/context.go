@@ -14,11 +14,13 @@ type Context struct {
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
+	EventCollectionByteSizeLimit     uint64
 	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
+	CadenceLoggingEnabled            bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
@@ -50,7 +52,9 @@ func newContext(ctx Context, opts ...Option) Context {
 
 const AccountKeyWeightThreshold = 1000
 
-const defaultGasLimit = 100000
+const defaultGasLimit = 100_000
+
+const defaultEventCollectionByteSizeLimit = 128_000 // 128KB
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
@@ -59,10 +63,12 @@ func defaultContext(logger zerolog.Logger) Context {
 		Blocks:                           nil,
 		Metrics:                          nil,
 		GasLimit:                         defaultGasLimit,
+		EventCollectionByteSizeLimit:     defaultEventCollectionByteSizeLimit,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
+		CadenceLoggingEnabled:            false,
 		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
@@ -107,6 +113,14 @@ func WithGasLimit(limit uint64) Option {
 	}
 }
 
+// WithEventCollectionSizeLimit sets the event collection byte size limit for a virtual machine context.
+func WithEventCollectionSizeLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.EventCollectionByteSizeLimit = limit
+		return ctx
+	}
+}
+
 // WithBlockHeader sets the block header for a virtual machine context.
 //
 // The VM uses the header to provide current block information to the Cadence runtime,
@@ -139,7 +153,7 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 	}
 }
 
-// WithTransactionSignatureVerifier sets the transaction processors for a
+// WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.
 func WithTransactionProcessors(processors ...TransactionProcessor) Option {
 	return func(ctx Context) Context {
@@ -161,6 +175,15 @@ func WithServiceAccount(enabled bool) Option {
 func WithRestrictedDeployment(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedDeploymentEnabled = enabled
+		return ctx
+	}
+}
+
+// WithCadenceLogging enables or disables Cadence logging for a
+// virtual machine context.
+func WithCadenceLogging(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.CadenceLoggingEnabled = enabled
 		return ctx
 	}
 }

@@ -363,6 +363,7 @@ func deployContractTransaction(address flow.Address, contract []byte, contractNa
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, contractName, hex.EncodeToString(contract)))).
 			AddAuthorizer(address),
+		0,
 	)
 }
 
@@ -372,6 +373,7 @@ func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte
 			SetScript([]byte(fmt.Sprintf(deployFlowTokenTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(flowToken).
 			AddAuthorizer(service),
+		0,
 	)
 }
 
@@ -381,6 +383,7 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 			SetScript([]byte(fmt.Sprintf(deployFlowFeesTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(flowFees).
 			AddAuthorizer(service),
+		0,
 	)
 }
 
@@ -389,6 +392,7 @@ func deployStorageFeesTransaction(service flow.Address, contract []byte) *Transa
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployStorageFeesTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(service),
+		0,
 	)
 }
 
@@ -406,6 +410,7 @@ func mintFlowTokenTransaction(
 			SetScript([]byte(fmt.Sprintf(mintFlowTokenTransactionTemplate, fungibleToken, flowToken))).
 			AddArgument(initialSupplyArg).
 			AddAuthorizer(service),
+		0,
 	)
 }
 
@@ -429,6 +434,7 @@ func setupFeesTransaction(
 			AddArgument(addressCreationFeeArg).
 			AddArgument(minimumStorageReservationArg).
 			AddAuthorizer(service),
+		0,
 	)
 }
 
@@ -442,6 +448,7 @@ func setupStorageForServiceAccountsTransaction(
 			AddAuthorizer(fungibleToken).
 			AddAuthorizer(flowToken).
 			AddAuthorizer(feeContract),
+		0,
 	)
 }
 
