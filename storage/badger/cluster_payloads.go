@@ -56,7 +56,7 @@ func (cp *ClusterPayloads) retrieveTx(blockID flow.Identifier) func(*badger.Txn)
 		if err != nil {
 			return nil, err
 		}
-		return val.(*cluster.Payload), err
+		return val.(*cluster.Payload), nil
 	}
 }
 
