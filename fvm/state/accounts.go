@@ -112,7 +112,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 	}
 
 	// mark that this account exists
-	err = a.state.Update(string(newAddress.Bytes()), "", keyExists, []byte{1})
+	err = a.setValue(newAddress, false, keyExists, []byte{1})
 	if err != nil {
 		return fmt.Errorf("failed to update the ledger: %w", err)
 	}
