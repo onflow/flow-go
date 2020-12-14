@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const TopShotContractAddress = "0b2a3299cc857e29"
+// const TopShotContractAddress = "0b2a3299cc857e29"
 
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
 	return &TransactionProcedure{
@@ -81,7 +81,7 @@ func (i *TransactionInvocator) Process(
 	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
 
 	if err != nil {
-		i.topshotSafetyErrorCheck(err)
+		i.safetyErrorCheck(err)
 		return err
 	}
 
@@ -91,22 +91,22 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-// topshotSafetyErrorCheck is additional check introduced to help chase erroneous execution results
+// safetyErrorCheck is additional check introduced to help chase erroneous execution results
 // which caused unexpected network fork. TopShot is first full-fledged game running on Flow, and
 // checking failures in this contract indicate the unexpected computation happening.
 // This is a temporary measure.
-func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
-	fmt.Println("ERROR", err)
+func (i *TransactionInvocator) safetyErrorCheck(err error) {
+	fmt.Println("~Cadence Execution ERROR:", err)
 	e := err.Error()
-	if strings.Contains(e, TopShotContractAddress) && strings.Contains(e, "checking") {
+	if strings.Contains(e, "checking") {
 		re, isRuntime := err.(runtime.Error)
 		if !isRuntime {
-			i.logger.Err(err).Msg("found checking error for TopShot contract but exception is not RuntimeError")
+			i.logger.Err(err).Msg("found checking error for a contract but exception is not RuntimeError")
 			return
 		}
 		ee, is := re.Err.(*runtime.ParsingCheckingError)
 		if !is {
-			i.logger.Err(err).Msg("found checking error for TopShot contract but exception is not ExtendedParsingCheckingError")
+			i.logger.Err(err).Msg("found checking error for a contract but exception is not ExtendedParsingCheckingError")
 			return
 		}
 
@@ -115,6 +115,6 @@ func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
 		spew.Config.DisableMethods = true
 		dump := spew.Sdump(ee)
 
-		i.logger.Error().Str("extended_error", dump).Msg("TopShot contract checking failed")
+		i.logger.Error().Str("extended_error", dump).Msg("A contract checking failed")
 	}
 }
