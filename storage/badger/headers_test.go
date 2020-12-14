@@ -39,7 +39,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 	})
 }
 
-func TestHeaderxRetrieveWithoutStore(t *testing.T) {
+func TestHeaderRetrieveWithoutStore(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		headers := badgerstorage.NewHeaders(metrics, db)
