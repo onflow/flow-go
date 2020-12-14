@@ -242,7 +242,7 @@ func (a *Accounts) getContract(contractName string, address flow.Address) ([]byt
 		return nil, newLedgerGetError(contractName, address, err)
 	}
 
-	fmt.Printf("TEMP LOGGING: a contract returned for %s.%s: %s...%s (len: %d)\n", address.String(), contractName, len(contract), contract[:30], contract[len(contract)-20:])
+	fmt.Printf("TEMP LOGGING: a contract returned for %s.%s: %s...%s (len: %d)\n", address.String(), contractName, contract[:30], contract[len(contract)-20:], len(contract))
 
 	return contract, nil
 }
