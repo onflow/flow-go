@@ -587,10 +587,10 @@ func TestRemoveAccountKey(t *testing.T) {
 				before, err := vm.GetAccount(ctx, address, ledger)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
+
 				for i, keyIndex := range []int{-1, keyCount, keyCount + 1} {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
-					assert.Len(t, before.Keys, keyCount)
 
 					txBody := flow.NewTransactionBody().
 						SetScript([]byte(removeAccountKeyTransaction)).

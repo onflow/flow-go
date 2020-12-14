@@ -157,15 +157,14 @@ func CreateAccountsWithSimpleAddresses(
 
 	var accounts []flow.Address
 
-	script := []byte(fmt.Sprintf(`
-		  import FlowServiceAccount from 0x%s
-	
-		  transaction(publicKey: [UInt8]) {
-			prepare(signer: AuthAccount) {
-			  let acct = AuthAccount(payer: signer)
-			  acct.addPublicKey(publicKey)
-			}
-		  }`, chain.ServiceAddress()))
+	script := []byte(`
+	  transaction(publicKey: [UInt8]) {
+	    prepare(signer: AuthAccount) {
+	  	  let acct = AuthAccount(payer: signer)
+	  	  acct.addPublicKey(publicKey)
+	    }
+	  }
+	`)
 
 	serviceAddress := chain.ServiceAddress()
 
