@@ -121,6 +121,7 @@ func TestStateSyncFlow(t *testing.T) {
 }
 
 func withNodes(t *testing.T, f func(hub *stub.Hub, en1, en2 *testmock.ExecutionNode)) {
+	t.Skip("disable state syncing")
 	hub := stub.NewNetworkHub()
 
 	chainID := flow.Mainnet
