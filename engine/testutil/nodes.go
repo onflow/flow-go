@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -51,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/network/stub"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	flowstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -65,35 +68,20 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		}
 	}
 
+	// creates logger, metrics collector and tracer.
 	log := unittest.Logger().With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
-
-	dbDir := unittest.TempDir(t)
-	db := unittest.BadgerDB(t, dbDir)
-
-	metrics := metrics.NewNoopCollector()
 	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
+	metrics := metrics.NewNoopCollector()
 
-	guarantees := storage.NewGuarantees(metrics, db)
-	seals := storage.NewSeals(metrics, db)
-	headers := storage.NewHeaders(metrics, db)
-	index := storage.NewIndex(metrics, db)
-	payloads := storage.NewPayloads(db, index, guarantees, seals)
-	blocks := storage.NewBlocks(db, headers, payloads)
-	setups := storage.NewEpochSetups(metrics, db)
-	commits := storage.NewEpochCommits(metrics, db)
-	distributor := events.NewDistributor()
-	statuses := storage.NewEpochStatuses(metrics, db)
-
-	state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
-	require.NoError(t, err)
+	stateFixture := CompleteStateFixture(t, log, metrics, tracer)
 
 	root, result, seal := unittest.BootstrapFixture(participants)
-	err = state.Mutate().Bootstrap(root, result, seal)
+	err = stateFixture.State.Mutate().Bootstrap(root, result, seal)
 	require.NoError(t, err)
 
 	for _, option := range options {
-		option(state)
+		option(stateFixture.State)
 	}
 
 	// Generates test signing oracle for the nodes
@@ -112,28 +100,73 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	me, err := local.New(identity, sk)
 	require.NoError(t, err)
 
-	stubnet := stub.NewNetwork(state, me, hub)
-
-	tracer, err = trace.NewTracer(log, "test")
-	require.NoError(t, err)
+	stubnet := stub.NewNetwork(stateFixture.State, me, hub)
 
 	return testmock.GenericNode{
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
+		DB:             stateFixture.DB,
+		Headers:        stateFixture.Headers,
+		Guarantees:     stateFixture.Guarantees,
+		Seals:          stateFixture.Seals,
+		Payloads:       stateFixture.Payloads,
+		Blocks:         stateFixture.Blocks,
+		Index:          stateFixture.Index,
+		State:          stateFixture.State,
+		Me:             me,
+		Net:            stubnet,
+		DBDir:          stateFixture.DBDir,
+		ChainID:        chainID,
+		ProtocolEvents: stateFixture.ProtocolEvents,
+	}
+}
+
+// StateFixture is a test helper struct that encapsulates a flow protocol state
+// as well as all of its backend dependencies.
+type StateFixture struct {
+	DB             *badger.DB
+	Headers        flowstorage.Headers
+	Seals          flowstorage.Seals
+	Payloads       flowstorage.Payloads
+	Blocks         flowstorage.Blocks
+	Index          flowstorage.Index
+	State          *protocol.State
+	Guarantees     flowstorage.Guarantees
+	DBDir          string
+	ProtocolEvents *events.Distributor
+}
+
+// CompleteStateFixture is a test helper that creates and returns a StateFixture for sake of unit testing.
+func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.NoopCollector, tracer module.Tracer) *StateFixture {
+	dbDir := unittest.TempDir(t)
+	db := unittest.BadgerDB(t, dbDir)
+	tracer, err := trace.NewTracer(log, "test")
+	seals := storage.NewSeals(metric, db)
+	headers := storage.NewHeaders(metric, db)
+	index := storage.NewIndex(metric, db)
+	guarantees := storage.NewGuarantees(metric, db)
+	payloads := storage.NewPayloads(db, index, guarantees, seals)
+	blocks := storage.NewBlocks(db, headers, payloads)
+	setups := storage.NewEpochSetups(metric, db)
+	commits := storage.NewEpochCommits(metric, db)
+	distributor := events.NewDistributor()
+	statuses := storage.NewEpochStatuses(metric, db)
+
+	state, err := protocol.NewState(metric, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+	require.NoError(t, err)
+
+	return &StateFixture{
 		DB:             db,
 		Headers:        headers,
-		Guarantees:     guarantees,
 		Seals:          seals,
 		Payloads:       payloads,
 		Blocks:         blocks,
 		Index:          index,
 		State:          state,
-		Me:             me,
-		Net:            stubnet,
 		DBDir:          dbDir,
-		ChainID:        chainID,
-		ProtocolEvents: distributor,
+		Guarantees:     guarantees,
+		ProtocolEvents: nil,
 	}
 }
 
