@@ -113,7 +113,7 @@ func initStates(db *badger.DB, executionStateDir string) (protocol.State, state.
 	transactions := storagebadger.NewTransactions(metrics, db)
 	collections := storagebadger.NewCollections(db, transactions)
 
-	ledgerStorage, err := ledger.NewLedger(executionStateDir, 100, metrics, zerolog.Nop(), nil)
+	ledgerStorage, err := ledger.NewLedger(executionStateDir, 100, metrics, zerolog.Nop(), nil, ledger.DefaultPathFinderVersion)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not init ledger: %w", err)
 	}
