@@ -562,20 +562,20 @@ func Test_SPOCKGeneration(t *testing.T) {
 	})
 }
 
-func TestShouldTriggerStateSync(t *testing.T) {
-	require.True(t, shouldTriggerStateSync(1, 2, 2))
-	require.False(t, shouldTriggerStateSync(1, 1, 2))
-	require.True(t, shouldTriggerStateSync(1, 3, 2))
-	require.True(t, shouldTriggerStateSync(1, 4, 2))
-
-	// there are only 9 sealed and unexecuted blocks between height 20 and 28,
-	// haven't reach the threshold 10 yet, so should not trigger
-	require.False(t, shouldTriggerStateSync(20, 28, 10))
-
-	// there are 10 sealed and unexecuted blocks between height 20 and 29,
-	// reached the threshold 10, so should trigger
-	require.True(t, shouldTriggerStateSync(20, 29, 10))
-}
+// func TestShouldTriggerStateSync(t *testing.T) {
+// 	require.True(t, shouldTriggerStateSync(1, 2, 2))
+// 	require.False(t, shouldTriggerStateSync(1, 1, 2))
+// 	require.True(t, shouldTriggerStateSync(1, 3, 2))
+// 	require.True(t, shouldTriggerStateSync(1, 4, 2))
+//
+// 	// there are only 9 sealed and unexecuted blocks between height 20 and 28,
+// 	// haven't reach the threshold 10 yet, so should not trigger
+// 	require.False(t, shouldTriggerStateSync(20, 28, 10))
+//
+// 	// there are 10 sealed and unexecuted blocks between height 20 and 29,
+// 	// reached the threshold 10, so should trigger
+// 	require.True(t, shouldTriggerStateSync(20, 29, 10))
+// }
 
 func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.ExecutionState) *Engine {
 	log := unittest.Logger()
