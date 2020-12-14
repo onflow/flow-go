@@ -64,13 +64,7 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the seal ID for the heighest sealed block in this fork
-		err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
-			err := operation.IndexBlockSeal(blockID, expectedSeal.ID())(tx)
-			if err != nil {
-				return fmt.Errorf("could not index candidate seal: %w", err)
-			}
-			return nil
-		})
+		err = operation.RetryOnConflict(db.Update, operation.IndexBlockSeal(blockID, expectedSeal.ID()))
 		require.NoError(t, err)
 
 		// retrieve latest seal
