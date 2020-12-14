@@ -3,6 +3,7 @@ package fvm_test
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"testing"
@@ -27,9 +28,27 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func vmTest(
+type vmTest struct {
+	bootstrapOptions []fvm.BootstrapProcedureOption
+	contextOptions   []fvm.Option
+}
+
+func newVMTest() vmTest {
+	return vmTest{}
+}
+
+func (vmt vmTest) withBootstrapProcedureOptions(opts ...fvm.BootstrapProcedureOption) vmTest {
+	vmt.bootstrapOptions = append(vmt.bootstrapOptions, opts...)
+	return vmt
+}
+
+func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
+	vmt.contextOptions = append(vmt.contextOptions, opts...)
+	return vmt
+}
+
+func (vmt vmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger),
-	opts ...fvm.Option,
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		rt := runtime.NewInterpreterRuntime()
@@ -46,18 +65,20 @@ func vmTest(
 			fvm.WithASTCache(cache),
 		}
 
-		opts = append(baseOpts, opts...)
+		opts := append(baseOpts, vmt.contextOptions...)
 
 		ctx := fvm.NewContext(zerolog.Nop(), opts...)
 
 		mapLedger := state.NewMapLedger()
 		ledger := delta.NewView(mapLedger.Get)
 
-		err = vm.Run(
-			ctx,
-			fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
-			ledger,
-		)
+		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		}
+
+		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
+
+		err = vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), ledger)
 		require.NoError(t, err)
 
 		f(t, vm, chain, ctx, ledger)
@@ -460,25 +481,12 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 }
 
 func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
-	t.Run("Storing too much data fails", vmTest(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
-			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+	b := make([]byte, 100000) // 100k bytes
+	_, err := rand.Read(b)
+	require.NoError(t, err)
+	longString := base64.StdEncoding.EncodeToString(b) // 1.3 times 100k bytes
 
-			// Create an account private key.
-			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-			require.NoError(t, err)
-
-			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-			accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
-			require.NoError(t, err)
-
-			b := make([]byte, 100000) // 100k bytes
-			_, err = rand.Read(b)
-			require.NoError(t, err)
-			longString := base64.StdEncoding.EncodeToString(b)
-			txBody := testutil.CreateContractDeploymentTransaction(
-				"Container",
-				fmt.Sprintf(`
+	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
 					pub var longString: String
@@ -486,27 +494,96 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 						self.longString = "%s"
 					}
 				}
-			}
-			`, longString),
-				accounts[0],
-				chain)
+			}`, longString)
 
-			txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-			txBody.SetPayer(chain.ServiceAddress())
+	bootstrapOptions := []fvm.BootstrapProcedureOption{
+		fvm.WithAccountCreationFee(10000000),
+		fvm.WithMinimumStorageReservation(10000000),
+	}
 
-			err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
-			require.NoError(t, err)
+	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
+				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
-			err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-			require.NoError(t, err)
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
 
-			tx := fvm.Transaction(txBody)
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+				require.NoError(t, err)
 
-			err = vm.Run(ctx, tx, ledger)
-			require.NoError(t, err)
+				txBody := testutil.CreateContractDeploymentTransaction(
+					"Container",
+					script,
+					accounts[0],
+					chain)
 
-			assert.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
-		}))
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBody.SetPayer(chain.ServiceAddress())
+
+				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody)
+
+				err = vm.Run(ctx, tx, ledger)
+				require.NoError(t, err)
+
+				assert.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+			}))
+	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
+				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+				require.NoError(t, err)
+
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(fmt.Sprintf(`
+					import FlowStorageFees from %s
+					import FlowToken from %s
+	
+					transaction {
+					  prepare(signer: AuthAccount, service: AuthAccount) {
+						signer.contracts.add(name: "%s", code: "%s".decodeHex())
+						
+						let vaultRef = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+						// purchase additional storage
+						FlowStorageFees.getStorageReservationReceiver(signer.address).deposit(from: <- (vaultRef.withdraw(amount: 1.0) as! @FlowToken.Vault))
+					  }
+					}`, chain.ServiceAddress().HexWithPrefix(),
+						"0x7e60df042a9c0868", // <- FlowToken address from bootstrapping
+						"Container",
+						hex.EncodeToString([]byte(script))))).
+					AddAuthorizer(accounts[0]).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					SetPayer(chain.ServiceAddress())
+
+				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody)
+
+				err = vm.Run(ctx, tx, ledger)
+				require.NoError(t, err)
+
+				require.NoError(t, tx.Err)
+			}))
 }
 
 var createAccountScript = []byte(`
@@ -972,7 +1049,7 @@ func TestSignatureVerification(t *testing.T) {
 		return testutil.BytesToCadenceArray(signature)
 	}
 
-	t.Run("Single key", vmTest(
+	t.Run("Single key", newVMTest().run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
 			privateKey, publicKey := createKey()
 			signableMessage, message := createMessage("foo")
@@ -1062,7 +1139,7 @@ func TestSignatureVerification(t *testing.T) {
 		},
 	))
 
-	t.Run("Multiple keys", vmTest(
+	t.Run("Multiple keys", newVMTest().run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
 			privateKeyA, publicKeyA := createKey()
 			privateKeyB, publicKeyB := createKey()

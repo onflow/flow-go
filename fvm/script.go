@@ -78,14 +78,7 @@ func (i ScriptInvocator) Process(
 
 	location := runtime.ScriptLocation(proc.ID[:])
 
-	value, err := vm.Runtime.ExecuteScript(runtime.Script{
-		Source:    proc.Script,
-		Arguments: proc.Arguments,
-	}, runtime.Context{
-		Interface:         env,
-		Location:          location,
-		PredeclaredValues: []runtime.ValueDeclaration{},
-	})
+	value, err := vm.Runtime.ExecuteScript(proc.Script, proc.Arguments, env, location)
 	if err != nil {
 		return err
 	}

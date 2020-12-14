@@ -75,7 +75,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
 		},
-		StorageCapacityResolver: CreateResourceStorageCapacityResolver(flow.Mainnet.Chain().ServiceAddress()),
+		StorageCapacityResolver: ResourceStorageCapacityResolver,
 		Logger:                  logger,
 	}
 }

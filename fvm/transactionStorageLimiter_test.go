@@ -1,13 +1,13 @@
 package fvm_test
 
 import (
-	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -23,10 +23,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
-				return 100, nil
-			},
-			LimitAccountStorage: true,
+			StorageCapacityResolver: storageCapacityResolver,
+			LimitAccountStorage:     true,
 		}, nil, ledger)
 
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
@@ -42,10 +40,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
-				return 100, nil
-			},
-			LimitAccountStorage: true,
+			StorageCapacityResolver: storageCapacityResolver,
+			LimitAccountStorage:     true,
 		}, nil, ledger)
 
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
@@ -61,10 +57,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
-				return 100, nil
-			},
-			LimitAccountStorage: true,
+			StorageCapacityResolver: storageCapacityResolver,
+			LimitAccountStorage:     true,
 		}, nil, ledger)
 
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
@@ -80,15 +74,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
-				return 100, nil
-			},
-			LimitAccountStorage: true,
+			StorageCapacityResolver: storageCapacityResolver,
+			LimitAccountStorage:     true,
 		}, nil, ledger)
 
 		require.NoError(t, err)
-		// three touches per account: get exists, get capacity, get used
-		require.Equal(t, 3, ledger.GetCalls[owner])
+		// two touches per account: get exists, get used
+		require.Equal(t, 2, ledger.GetCalls[owner])
 	})
 	t.Run("two registers change on different accounts, only check capacity once per account", func(t *testing.T) {
 		owner1 := string(flow.HexToAddress("1").Bytes())
@@ -97,23 +89,21 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			[]string{owner1, owner1, owner2, owner2},
 			[]OwnerKeyValue{
 				storageUsed(owner1, 99),
-				accountExists(owner2),
-				storageUsed(owner2, 999),
+				accountExists(owner1),
+				storageUsed(owner2, 99),
 				accountExists(owner2),
 			})
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
-				return 100, nil
-			},
-			LimitAccountStorage: true,
+			StorageCapacityResolver: storageCapacityResolver,
+			LimitAccountStorage:     true,
 		}, nil, ledger)
 
 		require.NoError(t, err)
-		// three touches per account: get exists, get capacity, get used
-		require.Equal(t, 3, ledger.GetCalls[owner1])
-		require.Equal(t, 3, ledger.GetCalls[owner2])
+		// two touches per account: get exists, get used
+		require.Equal(t, 2, ledger.GetCalls[owner1])
+		require.Equal(t, 2, ledger.GetCalls[owner2])
 	})
 	t.Run("non account registers are ignored", func(t *testing.T) {
 		owner := ""
@@ -126,10 +116,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
-				return 100, nil
-			},
-			LimitAccountStorage: true,
+			StorageCapacityResolver: storageCapacityResolver,
+			LimitAccountStorage:     true,
 		}, nil, ledger)
 
 		require.NoError(t, err)
@@ -144,10 +132,8 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		d := &fvm.TransactionStorageLimiter{}
 
 		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: func(_ state.Ledger, _ flow.Address) (uint64, error) {
-				return 100, nil
-			},
-			LimitAccountStorage: true,
+			StorageCapacityResolver: storageCapacityResolver,
+			LimitAccountStorage:     true,
 		}, nil, ledger)
 
 		require.NoError(t, err)
@@ -189,9 +175,7 @@ func newMockLedger(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) M
 		if !exists {
 			storageValues[okv.Owner] = make(map[string]flow.RegisterValue)
 		}
-		buf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(buf, okv.Value)
-		storageValues[okv.Owner][okv.Key] = buf
+		storageValues[okv.Owner][okv.Key] = utils.Uint64ToBinary(okv.Value)
 	}
 	updatedRegisters := make([]flow.RegisterID, len(updatedKeys))
 	for i, key := range updatedKeys {
@@ -218,4 +202,8 @@ func (l MockLedger) Touch(_, _, _ string)  {}
 func (l MockLedger) Delete(_, _, _ string) {}
 func (l MockLedger) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 	return l.UpdatedRegisterKeys, []flow.RegisterValue{}
+}
+
+func storageCapacityResolver(_ state.Ledger, _ flow.Address, _ fvm.Context) (uint64, error) {
+	return 100, nil
 }

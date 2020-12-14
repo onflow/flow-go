@@ -22,13 +22,11 @@ func (d *TransactionStorageLimiter) Process(
 	}
 
 	storageCapacityResolver := ctx.StorageCapacityResolver
-
 	accounts := state.NewAccounts(ledger)
 
 	registerIds, _ := ledger.RegisterUpdates()
 
 	checked := map[string]struct{}{}
-
 	for _, id := range registerIds {
 		owner := id.Owner
 
@@ -52,10 +50,11 @@ func (d *TransactionStorageLimiter) Process(
 			continue
 		}
 
-		capacity, err := storageCapacityResolver(ledger, address)
+		capacity, err := storageCapacityResolver(ledger, address, ctx)
 		if err != nil {
 			return err
 		}
+
 		usage, err := accounts.GetStorageUsed(address)
 		if err != nil {
 			return err
@@ -63,7 +62,7 @@ func (d *TransactionStorageLimiter) Process(
 
 		if usage > capacity {
 			return &StorageCapacityExceededError{
-				Address:         flow.HexToAddress(owner),
+				Address:         address,
 				StorageUsed:     usage,
 				StorageCapacity: capacity,
 			}

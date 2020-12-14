@@ -15,12 +15,12 @@ import (
 )
 
 const (
-	keyExists          = "exists"
-	keyCode            = "code"
-	keyContractNames   = "contract_names"
-	keyPublicKeyCount  = "public_key_count"
-	keyStorageUsed     = "storage_used"
-	uint64StorageSize  = 8
+	keyExists         = "exists"
+	keyCode           = "code"
+	keyContractNames  = "contract_names"
+	keyPublicKeyCount = "public_key_count"
+	keyStorageUsed    = "storage_used"
+	uint64StorageSize = 8
 )
 
 var (

@@ -43,12 +43,12 @@ func (e *hostEnv) SetComputationUsed(used uint64) error {
 	return nil
 }
 
-func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
+func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
 	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
 	if err != nil {
 		panic(fmt.Errorf("cannot create hasher: %w", err))
 	}
-	return hasher.ComputeHash(data), nil
+	return hasher.ComputeHash(data)
 }
 
 func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
@@ -138,13 +138,13 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 }
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	return e.ctx.StorageCapacityResolver(e.ledger, flow.BytesToAddress(address.Bytes()))
+	return e.ctx.StorageCapacityResolver(e.ledger, flow.BytesToAddress(address.Bytes()), e.ctx)
 }
 
 func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
-) ([]runtime.ResolvedLocation, error) {
+) []runtime.ResolvedLocation {
 
 	addressLocation, isAddress := location.(runtime.AddressLocation)
 
@@ -157,7 +157,7 @@ func (e *hostEnv) ResolveLocation(
 				Location:    location,
 				Identifiers: identifiers,
 			},
-		}, nil
+		}
 	}
 
 	// if the location is an address,
@@ -168,14 +168,14 @@ func (e *hostEnv) ResolveLocation(
 		address := flow.Address(addressLocation.Address)
 		contractNames, err := e.accounts.GetContractNames(address)
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
 
 		// if there are no contractNames deployed,
 		// then return no resolved locations
 
 		if len(contractNames) == 0 {
-			return nil, nil
+			return nil
 		}
 
 		identifiers = make([]ast.Identifier, len(contractNames))
@@ -202,7 +202,7 @@ func (e *hostEnv) ResolveLocation(
 		}
 	}
 
-	return resolvedLocations, nil
+	return resolvedLocations
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
@@ -248,23 +248,21 @@ func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) erro
 	return e.ctx.ASTCache.SetProgram(location, program)
 }
 
-func (e *hostEnv) Log(message string) error {
+func (e *hostEnv) Log(message string) {
 	e.logs = append(e.logs, message)
-	return nil
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) error {
+func (e *hostEnv) EmitEvent(event cadence.Event) {
 	e.events = append(e.events, event)
-	return nil
 }
 
-func (e *hostEnv) GenerateUUID() (uint64, error) {
+func (e *hostEnv) GenerateUUID() uint64 {
 	uuid, err := e.uuidGenerator.GenerateUUID()
 	if err != nil {
-		return 0, fmt.Errorf("cannot get UUID: %w", err)
+		panic(fmt.Errorf("cannot get UUID: %w", err))
 	}
 
-	return uuid, nil
+	return uuid
 }
 
 func (e *hostEnv) GetComputationLimit() uint64 {
@@ -294,7 +292,7 @@ func (e *hostEnv) VerifySignature(
 	rawPublicKey []byte,
 	rawSigAlgo string,
 	rawHashAlgo string,
-) (bool, error) {
+) bool {
 	valid, err := verifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
@@ -306,10 +304,10 @@ func (e *hostEnv) VerifySignature(
 	)
 
 	if err != nil {
-		return false, err
+		return false
 	}
 
-	return valid, nil
+	return valid
 }
 
 func (e *hostEnv) HighLevelStorageEnabled() bool {
@@ -323,24 +321,24 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 // Block Environment Functions
 
 // GetCurrentBlockHeight returns the current block height.
-func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
+func (e *hostEnv) GetCurrentBlockHeight() uint64 {
 	if e.ctx.BlockHeader == nil {
-		return 0, fmt.Errorf("GetCurrentBlockHeight is not supported by this environment")
+		panic(fmt.Errorf("GetCurrentBlockHeight is not supported by this environment"))
 	}
 
-	return e.ctx.BlockHeader.Height, nil
+	return e.ctx.BlockHeader.Height
 }
 
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
-func (e *hostEnv) UnsafeRandom() (uint64, error) {
+func (e *hostEnv) UnsafeRandom() uint64 {
 	if e.rng == nil {
 		panic("UnsafeRandom is not supported by this environment")
 	}
 
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
-	return binary.LittleEndian.Uint64(buf), nil
+	return binary.LittleEndian.Uint64(buf)
 }
 
 func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
@@ -453,12 +451,12 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 	return e.accounts.DeleteContract(name, accountAddress)
 }
 
-func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
+func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 	if e.transactionEnv == nil {
-		return nil, fmt.Errorf("GetSigningAccounts is not supported by this environment")
+		panic(fmt.Errorf("GetSigningAccounts is not supported by this environment"))
 	}
 
-	return e.transactionEnv.GetSigningAccounts(), nil
+	return e.transactionEnv.GetSigningAccounts()
 }
 
 // Transaction Environment
