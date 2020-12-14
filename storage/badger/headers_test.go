@@ -2,7 +2,6 @@ package badger_test
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/onflow/flow-go/storage/badger/operation"
