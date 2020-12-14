@@ -171,6 +171,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// copy files only if the directories differ
+	log.Info().Str("private_dir", flagInternalNodePrivInfoDir).Str("output_dir", flagOutdir).Msg("attempting to copy private key files")
 	if flagInternalNodePrivInfoDir != flagOutdir {
 		log.Info().Msg("copying internal private keys to output folder")
 		err := copyDir(flagInternalNodePrivInfoDir, filepath.Join(flagOutdir, model.DirPrivateRoot))
