@@ -74,9 +74,10 @@ const (
 	PushApprovals    = "push-approvals"
 
 	// Channels for actively requesting missing entities
-	RequestCollections       = "request-collections"
-	RequestChunks            = "request-chunks"
-	RequestReceiptsByBlockID = "request-receipts-by-block-id"
+	RequestCollections         = "request-collections"
+	RequestChunks              = "request-chunks"
+	RequestReceiptsByBlockID   = "request-receipts-by-block-id"
+	RequestApprovalsByResultID = "request-approvals-by-result-id"
 
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
@@ -85,9 +86,10 @@ const (
 	ReceiveReceipts     = PushReceipts
 	ReceiveApprovals    = PushApprovals
 
-	ProvideCollections       = RequestCollections
-	ProvideChunks            = RequestChunks
-	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
+	ProvideCollections         = RequestCollections
+	ProvideChunks              = RequestChunks
+	ProvideReceiptsByBlockID   = RequestReceiptsByBlockID
+	ProvideApprovalsByResultID = RequestApprovalsByResultID
 )
 
 // initializeChannelIdMap initializes an instance of channelIdMap and populates it with the channel IDs and their
@@ -122,6 +124,7 @@ func initializeChannelIdMap() {
 	channelIdMap[RequestCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
 	channelIdMap[RequestChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
 	channelIdMap[RequestReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+	channelIdMap[RequestApprovalsByResultID] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	// Channel aliases to make the code more readable / more robust to errors
 	channelIdMap[ReceiveGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
@@ -134,6 +137,7 @@ func initializeChannelIdMap() {
 	channelIdMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
 	channelIdMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
 	channelIdMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+	channelIdMap[ProvideApprovalsByResultID] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	channelIdMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
 	channelIdMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}

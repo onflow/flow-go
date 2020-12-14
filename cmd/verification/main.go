@@ -12,7 +12,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/provider"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
@@ -20,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
@@ -354,6 +357,23 @@ func main() {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 			return sync, nil
+		}).
+		Component("approval provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			retrieve := func(resultID flow.Identifier) (flow.Entity, error) {
+				node.Logger.Debug().Msgf("approval request (resultID %s)", resultID)
+				return flow.ResultApproval{}, nil
+			}
+			eng, err := provider.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.ProvideApprovalsByResultID,
+				filter.HasRole(flow.RoleConsensus),
+				retrieve,
+			)
+			return eng, err
 		}).
 		Run()
 }

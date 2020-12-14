@@ -68,19 +68,20 @@ func main() {
 		requireOneApproval                     bool
 		chunkAlpha                             uint
 
-		err            error
-		privateDKGData *bootstrap.DKGParticipantPriv
-		guarantees     mempool.Guarantees
-		results        mempool.IncorporatedResults
-		receipts       mempool.Receipts
-		approvals      mempool.Approvals
-		seals          mempool.IncorporatedResultSeals
-		prov           *provider.Engine
-		requesterEng   *requester.Engine
-		syncCore       *synchronization.Core
-		comp           *compliance.Engine
-		conMetrics     module.ConsensusMetrics
-		mainMetrics    module.HotstuffMetrics
+		err               error
+		privateDKGData    *bootstrap.DKGParticipantPriv
+		guarantees        mempool.Guarantees
+		results           mempool.IncorporatedResults
+		receipts          mempool.Receipts
+		approvals         mempool.Approvals
+		seals             mempool.IncorporatedResultSeals
+		prov              *provider.Engine
+		receiptRequester  *requester.Engine
+		approvalRequester *requester.Engine
+		syncCore          *synchronization.Core
+		comp              *compliance.Engine
+		conMetrics        module.ConsensusMetrics
+		mainMetrics       module.HotstuffMetrics
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -158,7 +159,7 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			requesterEng, err = requester.New(
+			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -168,6 +169,20 @@ func main() {
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
 				// requester.WithBatchThreshold(100),
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			approvalRequester, err = requester.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.RequestApprovalsByResultID,
+				filter.HasRole(flow.RoleVerification),
+				func() flow.Entity { return &flow.ResultApproval{} },
 			)
 			if err != nil {
 				return nil, err
@@ -190,7 +205,8 @@ func main() {
 				node.Network,
 				node.State,
 				node.Me,
-				requesterEng,
+				receiptRequester,
+				approvalRequester,
 				node.Storage.Results,
 				node.Storage.Headers,
 				node.Storage.Index,
@@ -202,7 +218,10 @@ func main() {
 				validator,
 				requireOneApproval,
 			)
-			requesterEng.WithHandle(match.HandleReceipt)
+
+			receiptRequester.WithHandle(match.HandleReceipt)
+			approvalRequester.WithHandle(match.HandleApproval)
+
 			return match, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -383,9 +402,13 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// created with matching engine
-			return requesterEng, nil
+			return receiptRequester, nil
+		}).
+		Component("approval requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// created with matching engine
+			return approvalRequester, nil
 		}).
 		Run()
 }

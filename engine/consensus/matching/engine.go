@@ -39,7 +39,8 @@ type Engine struct {
 	metrics                 module.ConsensusMetrics         // used to track consensus metrics
 	state                   protocol.State                  // used to access the  protocol state
 	me                      module.Local                    // used to access local node information
-	requester               module.Requester                // used to request missing execution receipts by block ID
+	receiptRequester        module.Requester                // used to request missing execution receipts by block ID
+	approvalRequester       module.Requester                // used to request missing result approvals
 	resultsDB               storage.ExecutionResults        // used to check previous results are known
 	headersDB               storage.Headers                 // used to check sealed headers
 	indexDB                 storage.Index                   // used to check payloads for results
@@ -66,7 +67,8 @@ func New(
 	net module.Network,
 	state protocol.State,
 	me module.Local,
-	requester module.Requester,
+	receiptRequester module.Requester,
+	approvalRequester module.Requester,
 	resultsDB storage.ExecutionResults,
 	headersDB storage.Headers,
 	indexDB storage.Index,
@@ -89,7 +91,8 @@ func New(
 		metrics:                 conMetrics,
 		state:                   state,
 		me:                      me,
-		requester:               requester,
+		receiptRequester:        receiptRequester,
+		approvalRequester:       approvalRequester,
 		resultsDB:               resultsDB,
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
@@ -181,6 +184,20 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	err := e.process(originID, receipt)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not process receipt")
+	}
+}
+
+// HandleApproval pipes explicitly requested approvals to the process function.
+// Approvals can come from this function or the receipt provider setup in the
+// engine constructor.
+func (e *Engine) HandleApproval(originID flow.Identifier, approval flow.Entity) {
+	e.log.Debug().Msg("received approval from requester engine")
+
+	// TODO: wrap following call to e.process into e.unit.Launch (?)
+	// to parallelize engines in terms of threading
+	err := e.process(originID, approval)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not process approval")
 	}
 }
 
@@ -408,11 +425,6 @@ func (e *Engine) checkSealing() {
 		return
 	}
 
-	// skip if no results can be sealed yet
-	if len(sealableResults) == 0 {
-		return
-	}
-
 	// don't overflow the seal mempool
 	space := e.seals.Limit() - e.seals.Size()
 	if len(sealableResults) > int(space) {
@@ -503,9 +515,15 @@ func (e *Engine) checkSealing() {
 	}
 
 	// request execution receipts for unsealed finalized blocks
-	err = e.requestPending()
+	err = e.requestPendingReceipts()
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not request pending block results")
+	}
+
+	// request result approvals for pending incorporated results
+	err = e.requestPendingApprovals()
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not request pending result approvals")
 	}
 
 	// record duration of check sealing
@@ -846,8 +864,9 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 }
 
-// requestPending requests the execution receipts of unsealed finalized blocks.
-func (e *Engine) requestPending() error {
+// requestPendingReceipts requests the execution receipts of unsealed finalized
+// blocks.
+func (e *Engine) requestPendingReceipts() error {
 
 	// last sealed block
 	sealed, err := e.state.Sealed().Head()
@@ -908,7 +927,9 @@ func (e *Engine) requestPending() error {
 		blockID := header.ID()
 		if _, ok := knownResultForBlock[blockID]; !ok {
 			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
+			continue
 		}
+
 	}
 
 	// request missing execution results, if sealed height is low enough
@@ -916,8 +937,41 @@ func (e *Engine) requestPending() error {
 		Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
 		Msg("requesting receipts")
 	for _, blockID := range missingBlocksOrderedByHeight {
-		e.requester.EntityByID(blockID, filter.Any)
+		e.receiptRequester.EntityByID(blockID, filter.Any)
 	}
 
+	return nil
+}
+
+// requestPendingApprovals requests result approvals for unsealed finalized
+// blocks.
+// TODO: review trigger condition
+func (e *Engine) requestPendingApprovals() error {
+	// last sealed block
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not get sealed height: %w", err)
+	}
+
+	// last finalized block
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized height: %w", err)
+	}
+
+	// only request if number of unsealed finalized blocks exceeds the threshold
+	log := e.log.With().
+		Uint64("finalized_height", final.Height).
+		Uint64("sealed_height", sealed.Height).
+		Uint("request_receipt_threshold", e.requestReceiptThreshold).
+		Logger()
+	if uint(final.Height-sealed.Height) < e.requestReceiptThreshold {
+		log.Debug().Msg("skip requesting approvals as number of unsealed finalized blocks is below threshold")
+		return nil
+	}
+
+	for _, r := range e.incorporatedResults.All() {
+		e.approvalRequester.EntityByID(r.Result.ID(), filter.Any)
+	}
 	return nil
 }

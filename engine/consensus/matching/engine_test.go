@@ -80,7 +80,7 @@ func (ms *MatchingSuite) SetupTest() {
 		mempool:                 metrics,
 		metrics:                 metrics,
 		state:                   ms.State,
-		requester:               ms.requester,
+		receiptRequester:        ms.requester,
 		resultsDB:               ms.ResultsDB,
 		headersDB:               ms.HeadersDB,
 		indexDB:                 ms.IndexDB,
@@ -753,7 +753,7 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 	}
 	ms.SealsPL.On("All").Return([]*flow.IncorporatedResultSeal{}).Maybe()
 
-	err := ms.matching.requestPending()
+	err := ms.matching.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
 	ms.requester.AssertExpectations(ms.T()) // asserts that requester.EntityByID(<blockID>, filter.Any) was called
 }
