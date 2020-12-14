@@ -96,7 +96,7 @@ func (i *TransactionInvocator) Process(
 // checking failures in this contract indicate the unexpected computation happening.
 // This is a temporary measure.
 func (i *TransactionInvocator) safetyErrorCheck(err error) {
-	fmt.Println("~Cadence Execution ERROR:", err)
+	fmt.Println("TEMP LOGGING: Cadence Execution ERROR:", err)
 	e := err.Error()
 	if strings.Contains(e, "checking") {
 		re, isRuntime := err.(runtime.Error)

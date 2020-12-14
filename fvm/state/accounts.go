@@ -233,12 +233,16 @@ func contractKey(contractName string) string {
 }
 
 func (a *Accounts) getContract(contractName string, address flow.Address) ([]byte, error) {
+
+	fmt.Printf("TEMP LOGGING: get contract called for %s.%s \n", address.String(), contractName)
 	contract, err := a.getValue(address,
 		true,
 		contractKey(contractName))
 	if err != nil {
 		return nil, newLedgerGetError(contractName, address, err)
 	}
+
+	fmt.Printf("TEMP LOGGING: a contract returned for %s.%s: %s...%s (len: %d)\n", address.String(), contractName, len(contract), contract[:30], contract[len(contract)-20:])
 
 	return contract, nil
 }
