@@ -162,16 +162,16 @@ func logBlocks(log zerolog.Logger, blocks ...*flow.Block) {
 
 func sendBlockToEN(t *testing.T, block *flow.Block, finalizes *flow.Block, en *testmock.ExecutionNode) {
 	// simulating block finalization
-	err := en.State.Mutate().HeaderExtend(block)
+	err := en.MutableState.Extend(block)
 	require.NoError(t, err)
 
 	if finalizes != nil {
-		err = en.State.Mutate().Finalize(finalizes.ID())
+		err = en.MutableState.Finalize(finalizes.ID())
 		require.NoError(t, err)
 	}
 
 	// calling MarkValid will trigger the call to BlockProcessable
-	err = en.State.Mutate().MarkValid(block.Header.ID())
+	err = en.MutableState.MarkValid(block.Header.ID())
 	require.NoError(t, err)
 }
 

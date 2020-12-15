@@ -61,8 +61,7 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
-	state    *protocol.State
-	mutator  *protocol.Mutator
+	state    *protocol.MutableState
 	headerDB *storage.Headers
 	sealDB   *storage.Seals
 	indexDB  *storage.Index
@@ -242,10 +241,8 @@ func (bs *BuilderSuite) SetupTest() {
 		return nil
 	}
 
-	bs.state = &protocol.State{}
-	bs.mutator = &protocol.Mutator{}
-	bs.state.On("Mutate").Return(bs.mutator)
-	bs.mutator.On("Extend", mock.Anything).Run(func(args mock.Arguments) {
+	bs.state = &protocol.MutableState{}
+	bs.state.On("Extend", mock.Anything).Run(func(args mock.Arguments) {
 		block := args.Get(0).(*flow.Block)
 		bs.Assert().Equal(bs.sentinel, block.Header.View)
 		bs.assembled = block.Payload

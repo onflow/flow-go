@@ -14,13 +14,13 @@ import (
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
 	t          *testing.T
-	state      protocol.State
+	state      protocol.MutableState
 	blocks     map[flow.Identifier]*flow.Block
 	setupOpts  []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
 	commitOpts []func(*flow.EpochCommit) // options to apply to the EpochCommit event
 }
 
-func NewEpochBuilder(t *testing.T, state protocol.State) *EpochBuilder {
+func NewEpochBuilder(t *testing.T, state protocol.MutableState) *EpochBuilder {
 
 	builder := &EpochBuilder{
 		t:      t,
@@ -120,10 +120,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: prevReceipts,
 		Seals:    sealsForPrev,
 	})
-	err = builder.state.Mutate().Extend(&B)
+	err = builder.state.Extend(&B)
 	require.Nil(builder.t, err)
 	// finalize block B
-	err = builder.state.Mutate().Finalize(B.ID())
+	err = builder.state.Finalize(B.ID())
 	require.Nil(builder.t, err)
 	// cache block B
 	builder.blocks[B.ID()] = &B
@@ -143,10 +143,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: []*flow.ExecutionReceipt{receiptB},
 		Seals:    sealsForA,
 	})
-	err = builder.state.Mutate().Extend(&C)
+	err = builder.state.Extend(&C)
 	require.Nil(builder.t, err)
 	// finalize block C
-	err = builder.state.Mutate().Finalize(C.ID())
+	err = builder.state.Finalize(C.ID())
 	require.Nil(builder.t, err)
 	// cache block C
 	builder.blocks[C.ID()] = &C
@@ -173,10 +173,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: []*flow.ExecutionReceipt{receiptC},
 		Seals:    []*flow.Seal{sealForB},
 	})
-	err = builder.state.Mutate().Extend(&D)
+	err = builder.state.Extend(&D)
 	require.Nil(builder.t, err)
 	// finalize block D
-	err = builder.state.Mutate().Finalize(D.ID())
+	err = builder.state.Finalize(D.ID())
 	require.Nil(builder.t, err)
 	// cache block D
 	builder.blocks[D.ID()] = &D
@@ -193,10 +193,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: []*flow.ExecutionReceipt{receiptD},
 		Seals:    []*flow.Seal{sealForC},
 	})
-	err = builder.state.Mutate().Extend(&E)
+	err = builder.state.Extend(&E)
 	require.Nil(builder.t, err)
 	// finalize block E
-	err = builder.state.Mutate().Finalize(E.ID())
+	err = builder.state.Finalize(E.ID())
 	require.Nil(builder.t, err)
 	// cache block E
 	builder.blocks[E.ID()] = &E
@@ -222,10 +222,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: []*flow.ExecutionReceipt{receiptE},
 		Seals:    []*flow.Seal{sealForD},
 	})
-	err = builder.state.Mutate().Extend(&F)
+	err = builder.state.Extend(&F)
 	require.Nil(builder.t, err)
 	// finalize block F
-	err = builder.state.Mutate().Finalize(F.ID())
+	err = builder.state.Finalize(F.ID())
 	require.Nil(builder.t, err)
 	// cache block F
 	builder.blocks[F.ID()] = &F
@@ -264,9 +264,9 @@ func (builder *EpochBuilder) CompleteEpoch() {
 			),
 		},
 	})
-	err = builder.state.Mutate().Extend(&A)
+	err = builder.state.Extend(&A)
 	require.Nil(builder.t, err)
-	err = builder.state.Mutate().Finalize(A.ID())
+	err = builder.state.Finalize(A.ID())
 	require.Nil(builder.t, err)
 
 	builder.blocks[A.ID()] = &A
