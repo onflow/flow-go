@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -54,11 +55,8 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	defaultMaxStateKeySize              = 16_000     // ~16KB
-	defaultMaxStateValueSize            = 32_000_000 // ~32MB
-	defaultMaxStateInteractionSize      = 64_000_000 // ~64MB
-	defaultGasLimit                     = 100_000    // 100K
-	defaultEventCollectionByteSizeLimit = 128_000    // 128KB
+	DefaultGasLimit                     = 100_000 // 100K
+	DefaultEventCollectionByteSizeLimit = 128_000 // 128KB
 )
 
 func defaultContext(logger zerolog.Logger) Context {
@@ -67,11 +65,11 @@ func defaultContext(logger zerolog.Logger) Context {
 		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
-		GasLimit:                         defaultGasLimit,
-		MaxStateKeySize:                  defaultMaxStateKeySize,
-		MaxStateValueSize:                defaultMaxStateValueSize,
-		MaxStateInteractionSize:          defaultMaxStateInteractionSize,
-		EventCollectionByteSizeLimit:     defaultEventCollectionByteSizeLimit,
+		GasLimit:                         DefaultGasLimit,
+		MaxStateKeySize:                  state.DefaultMaxKeySize,
+		MaxStateValueSize:                state.DefaultMaxValueSize,
+		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,

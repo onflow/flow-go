@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	defaultMaxKeySize         = 16_000     // ~16KB
-	defaultMaxValueSize       = 32_000_000 // ~32MB
-	defaultMaxInteractionSize = 64_000_000 // ~64MB
+	DefaultMaxKeySize         = 16_000     // ~16KB
+	DefaultMaxValueSize       = 32_000_000 // ~32MB
+	DefaultMaxInteractionSize = 64_000_000 // ~64MB
 )
 
 type StateOption func(st *State) *State
@@ -25,9 +25,9 @@ func defaultState(ledger Ledger) *State {
 		ledger:                ledger,
 		interactionUsed:       uint64(0),
 		draft:                 make(map[string]payload, 0),
-		maxKeySizeAllowed:     defaultMaxKeySize,
-		maxValueSizeAllowed:   defaultMaxValueSize,
-		maxInteractionAllowed: defaultMaxInteractionSize,
+		maxKeySizeAllowed:     DefaultMaxKeySize,
+		maxValueSizeAllowed:   DefaultMaxValueSize,
+		maxInteractionAllowed: DefaultMaxInteractionSize,
 	}
 }
 

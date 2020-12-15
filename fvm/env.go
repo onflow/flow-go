@@ -48,7 +48,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 
 func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
 	accounts := state.NewAccounts(st)
-	generator, err := state.NewLedgerBoundAddressGenerator(st, ctx.Chain)
+	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
