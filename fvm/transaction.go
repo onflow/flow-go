@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
@@ -96,8 +95,8 @@ func (i *TransactionInvocator) Process(
 // checking failures in this contract indicate the unexpected computation happening.
 // This is a temporary measure.
 func (i *TransactionInvocator) safetyErrorCheck(err error) {
-	fmt.Println("TEMP LOGGING: Cadence Execution ERROR:", err)
 	e := err.Error()
+	i.logger.Info().Str("error", e).Msg("TEMP LOGGING: Cadence Execution ERROR")
 	if strings.Contains(e, "checking") {
 		re, isRuntime := err.(runtime.Error)
 		if !isRuntime {
@@ -115,6 +114,6 @@ func (i *TransactionInvocator) safetyErrorCheck(err error) {
 		spew.Config.DisableMethods = true
 		dump := spew.Sdump(ee)
 
-		i.logger.Error().Str("extended_error", dump).Msg("A contract checking failed")
+		i.logger.Error().Str("extended_error", dump).Msg("contract checking failed")
 	}
 }
