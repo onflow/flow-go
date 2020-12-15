@@ -45,5 +45,5 @@ type LedgerFailure struct {
 }
 
 func (e *LedgerFailure) Error() string {
-	return fmt.Sprintf("ledger returns unsuccessful: %w", e.err)
+	return fmt.Sprintf("ledger returns unsuccessful: %s", e.err.Error())
 }
