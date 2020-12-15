@@ -58,6 +58,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// GenericNode is a test helper that creates and returns a generic node.
+// The generic node is used as the core data structure to create other types of flow nodes.
 func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID,
 	options ...func(*protocol.State)) testmock.GenericNode {
 	var i int
@@ -74,6 +76,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 	metrics := metrics.NewNoopCollector()
 
+	// creates state fixture and bootstrap it.
 	stateFixture := CompleteStateFixture(t, log, metrics, tracer)
 	StateBootstrapFixture(t, participants, stateFixture.State)
 
@@ -81,7 +84,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		option(stateFixture.State)
 	}
 
-	return GenericNodeWithStateFixture(t, hub, identity, log, metrics, tracer, stateFixture, chainID)
+	return GenericNodeWithStateFixture(t, stateFixture, hub, identity, log, metrics, tracer, chainID)
 }
 
 // StateBootstrapFixture is a test helper that bootstraps state with list of participants.
@@ -91,12 +94,12 @@ func StateBootstrapFixture(t testing.TB, participants flow.IdentityList, state *
 	require.NoError(t, err)
 }
 
-func GenericNodeWithStateFixture(t testing.TB, hub *stub.Hub,
+// GenericNodeWithStateFixture is a test helper that creates a generic node with specified state fixture.
+func GenericNodeWithStateFixture(t testing.TB, stateFixture *StateFixture, hub *stub.Hub,
 	identity *flow.Identity,
 	log zerolog.Logger,
 	metrics *metrics.NoopCollector,
 	tracer module.Tracer,
-	stateFixture *StateFixture,
 	chainID flow.ChainID) testmock.GenericNode {
 
 	// Generates test signing oracle for the nodes
