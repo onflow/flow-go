@@ -48,7 +48,7 @@ func prepare(executeTxResult error) (error, *bytes.Buffer) {
 	runtime := mockRuntime{executeTxResult: executeTxResult}
 	vm := New(runtime)
 
-	proc := Transaction(&flow.TransactionBody{})
+	proc := Transaction(&flow.TransactionBody{}, 0)
 
 	ledger := state.NewMapLedger()
 
@@ -174,7 +174,7 @@ func TestTopShotSafety(t *testing.T) {
 			Authorizers:        nil,
 			PayloadSignatures:  nil,
 			EnvelopeSignatures: nil,
-		})
+		}, 0)
 
 		topShotContractAddress := flow.HexToAddress(TopShotContractAddress)
 
