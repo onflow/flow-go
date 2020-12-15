@@ -56,7 +56,7 @@ func prepare(executeTxResult error) (error, *bytes.Buffer) {
 
 	st := state.NewState(ledger, state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-		state.WithMaxInteractionAllowed(context.MaxStateInteractionSize))
+		state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize))
 
 	err := txInvocator.Process(vm, context, proc, st)
 
@@ -202,7 +202,7 @@ func TestTopShotSafety(t *testing.T) {
 
 		st := state.NewState(ledger, state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionAllowed(context.MaxStateInteractionSize))
+			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize))
 
 		err = txInvocator.Process(vm, context, proc, st)
 		require.Error(t, err)

@@ -56,8 +56,8 @@ func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-// WithMaxInteractionAllowed sets limit on total byte interaction with ledger
-func WithMaxInteractionAllowed(limit uint64) func(st *State) *State {
+// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
+func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	return func(st *State) *State {
 		st.maxInteractionAllowed = limit
 		return st

@@ -31,7 +31,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger) 
 	st := state.NewState(ledger,
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionAllowed(ctx.MaxStateInteractionSize))
+		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
 	return proc.Run(vm, ctx, st)
 }
@@ -41,7 +41,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 	st := state.NewState(ledger,
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionAllowed(ctx.MaxStateInteractionSize))
+		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
 	account, err := getAccount(vm, ctx, st, ctx.Chain, address)
 	if err != nil {
