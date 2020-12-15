@@ -558,6 +558,23 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
+	// if the receipt is for a sealed block, then no need to broadcast it.
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("could not get sealed block before broadcasting")
+	}
+
+	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
+	broadcasted := false
+	if !isExecutedBlockSealed {
+		err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+		if err != nil {
+			e.log.Err(err).Msg("critical: failed to broadcast the receipt")
+		} else {
+			broadcasted = true
+		}
+	}
+
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
@@ -567,6 +584,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("final_state", finalState).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Bool("sealed", isExecutedBlockSealed).
+		Bool("broadcasted", broadcasted).
 		Msg("block executed")
 
 	err = e.onBlockExecuted(executableBlock, finalState)
@@ -1028,11 +1047,6 @@ func (e *Engine) handleComputationResult(
 	}()
 	if err != nil {
 		return nil, nil, err
-	}
-
-	err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not send broadcast order: %w", err)
 	}
 
 	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
