@@ -278,7 +278,6 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Ledger) err
 	case "wrongEndState":
 		// add updates to the ledger
 		_ = led.Set("00", "", "", []byte{'F'})
-		require.NoError(t, err)
 		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
 		// add updates to the ledger
