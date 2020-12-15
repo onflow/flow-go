@@ -11,8 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// const TopShotContractAddress = "0b2a3299cc857e29"
-
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
 	return &TransactionProcedure{
 		ID:          tx.ID(),
