@@ -161,6 +161,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		deltas,
 		10,
 		false,
+		100,
 	)
 	require.NoError(t, err)
 
@@ -630,6 +631,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		deltas,
 		10,
 		false,
+		100,
 	)
 
 	require.NoError(t, err)

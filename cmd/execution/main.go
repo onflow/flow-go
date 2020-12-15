@@ -77,6 +77,7 @@ func main() {
 		extensiveLog          bool
 		scriptsEnabled        bool
 		queriesEnabled        bool
+		forceFetchThreshold   int
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -97,6 +98,7 @@ func main() {
 			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
 			flags.BoolVar(&scriptsEnabled, "scripts-enabled", true, "whether to enable script executions and account queries")
 			flags.BoolVar(&queriesEnabled, "queries-enabled", true, "whether to enable event and transaction queries")
+			flags.IntVar(&forceFetchThreshold, "force-fetch-threshold", 50, "a threshold for the number of unexecuted blocks in a queue to trigger force fetching collection for the first unexecuted block")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -255,6 +257,7 @@ func main() {
 				deltas,
 				syncThreshold,
 				syncFast,
+				forceFetchThreshold,
 			)
 
 			// TODO: we should solve these mutual dependencies better

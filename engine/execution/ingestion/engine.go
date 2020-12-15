@@ -40,29 +40,30 @@ type Engine struct {
 	psEvents.Noop              // satisfy protocol events consumer interface
 	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
 
-	unit               *engine.Unit
-	log                zerolog.Logger
-	me                 module.Local
-	request            module.Requester // used to request collections
-	state              protocol.State
-	receiptHasher      hash.Hasher // used as hasher to sign the execution receipt
-	blocks             storage.Blocks
-	collections        storage.Collections
-	events             storage.Events
-	transactionResults storage.TransactionResults
-	computationManager computation.ComputationManager
-	providerEngine     provider.ProviderEngine
-	mempool            *Mempool
-	execState          state.ExecutionState
-	metrics            module.ExecutionMetrics
-	tracer             module.Tracer
-	extensiveLogging   bool
-	spockHasher        hash.Hasher
-	syncThreshold      int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
-	syncFilter         flow.IdentityFilter // specify the filter to sync state from
-	syncConduit        network.Conduit     // sending state syncing requests
-	syncDeltas         mempool.Deltas      // storing the synced state deltas
-	syncFast           bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
+	unit                *engine.Unit
+	log                 zerolog.Logger
+	me                  module.Local
+	request             module.Requester // used to request collections
+	state               protocol.State
+	receiptHasher       hash.Hasher // used as hasher to sign the execution receipt
+	blocks              storage.Blocks
+	collections         storage.Collections
+	events              storage.Events
+	transactionResults  storage.TransactionResults
+	computationManager  computation.ComputationManager
+	providerEngine      provider.ProviderEngine
+	mempool             *Mempool
+	execState           state.ExecutionState
+	metrics             module.ExecutionMetrics
+	tracer              module.Tracer
+	extensiveLogging    bool
+	spockHasher         hash.Hasher
+	syncThreshold       int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
+	syncFilter          flow.IdentityFilter // specify the filter to sync state from
+	syncConduit         network.Conduit     // sending state syncing requests
+	syncDeltas          mempool.Deltas      // storing the synced state deltas
+	syncFast            bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
+	forceFetchThreshold uint64
 }
 
 func New(
@@ -85,34 +86,36 @@ func New(
 	syncDeltas mempool.Deltas,
 	syncThreshold int,
 	syncFast bool,
+	forceFetchThreshold int,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:               engine.NewUnit(),
-		log:                log,
-		me:                 me,
-		request:            request,
-		state:              state,
-		receiptHasher:      utils.NewExecutionReceiptHasher(),
-		spockHasher:        utils.NewSPOCKHasher(),
-		blocks:             blocks,
-		collections:        collections,
-		events:             events,
-		transactionResults: transactionResults,
-		computationManager: executionEngine,
-		providerEngine:     providerEngine,
-		mempool:            mempool,
-		execState:          execState,
-		metrics:            metrics,
-		tracer:             tracer,
-		extensiveLogging:   extLog,
-		syncFilter:         syncFilter,
-		syncThreshold:      syncThreshold,
-		syncDeltas:         syncDeltas,
-		syncFast:           syncFast,
+		unit:                engine.NewUnit(),
+		log:                 log,
+		me:                  me,
+		request:             request,
+		state:               state,
+		receiptHasher:       utils.NewExecutionReceiptHasher(),
+		spockHasher:         utils.NewSPOCKHasher(),
+		blocks:              blocks,
+		collections:         collections,
+		events:              events,
+		transactionResults:  transactionResults,
+		computationManager:  executionEngine,
+		providerEngine:      providerEngine,
+		mempool:             mempool,
+		execState:           execState,
+		metrics:             metrics,
+		tracer:              tracer,
+		extensiveLogging:    extLog,
+		syncFilter:          syncFilter,
+		syncThreshold:       syncThreshold,
+		syncDeltas:          syncDeltas,
+		syncFast:            syncFast,
+		forceFetchThreshold: uint64(forceFetchThreshold),
 	}
 
 	// move to state syncing engine
@@ -453,6 +456,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		return nil
 	}
 
+	firstUnexecuted := queue.Head.Item.(*entity.ExecutableBlock)
 	firstUnexecutedHeight := queue.Head.Item.Height()
 	// disable state syncing for now
 	// if checkStateSync {
@@ -485,6 +489,27 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		if !ok {
 			lg.Error().Msgf("an unexecuted parent block is missing in the queue")
 		}
+
+		// if the parent block hasn't been executed, we check if there are too many
+		// unexecuted blocks in this queue. If yes, try requesting the collection for the first unexecuted
+		// block
+		tooManyUnexecutedBlock := block.Header.Height-firstUnexecutedHeight >= e.forceFetchThreshold
+		if tooManyUnexecutedBlock {
+			err = e.matchOrRequestCollections(executableBlock, blockByCollection)
+			if err != nil {
+				return fmt.Errorf("cannot send collection requests for first unexecuted: %w", err)
+			}
+			collectionID := flow.ZeroID
+			if len(firstUnexecuted.Block.Payload.Guarantees) > 0 {
+				collectionID = firstUnexecuted.Block.Payload.Guarantees[0].ID()
+			}
+			lg.Info().
+				Int("collections", len(firstUnexecuted.Block.Payload.Guarantees)).
+				Hex("collection_id", collectionID[:]).
+				Uint64("first_unexecuted", firstUnexecutedHeight).
+				Msg("fetching collection for first unexecuted block")
+		}
+
 	} else {
 		// if there is exception, then crash
 		lg.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
