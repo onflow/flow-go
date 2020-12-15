@@ -1,6 +1,8 @@
 package state
 
 import (
+	"sync"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -13,7 +15,9 @@ const (
 type StateOption func(st *State) *State
 type State struct {
 	ledger                Ledger
+	lock                  sync.Mutex
 	draft                 map[string]payload
+	readCache             map[string]payload
 	interactionUsed       uint64
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
@@ -25,6 +29,7 @@ func defaultState(ledger Ledger) *State {
 		ledger:                ledger,
 		interactionUsed:       uint64(0),
 		draft:                 make(map[string]payload, 0),
+		readCache:             make(map[string]payload, 0),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
@@ -65,6 +70,9 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 }
 
 func (s *State) Read(owner, controller, key string) (flow.RegisterValue, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if err := s.checkSize(owner, controller, key, []byte{}); err != nil {
 		return nil, err
 	}
@@ -79,16 +87,42 @@ func (s *State) Read(owner, controller, key string) (flow.RegisterValue, error) 
 		return p.value, nil
 	}
 
+	// return from draft
+	if p, ok := s.draft[fullKey(owner, controller, key)]; ok {
+		// just call the ledger get for tracking touches
+		_, err := s.ledger.Get(owner, controller, key)
+		if err != nil {
+			return nil, &LedgerFailure{err}
+		}
+		return p.value, nil
+	}
+
+	// return from read cache
+	if p, ok := s.readCache[fullKey(owner, controller, key)]; ok {
+		// just call the ledger get for tracking touches
+		_, err := s.ledger.Get(owner, controller, key)
+		if err != nil {
+			return nil, &LedgerFailure{err}
+		}
+		return p.value, nil
+	}
+
+	// read from ledger
 	value, err := s.ledger.Get(owner, controller, key)
 	if err != nil {
 		return nil, &LedgerFailure{err}
 	}
 
-	// TODO smarter read measuring
+	// update read catch
+	s.readCache[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
+
 	return value, s.updateInteraction(owner, controller, key, value, []byte{})
 }
 
 func (s *State) Update(owner, controller, key string, value flow.RegisterValue) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if err := s.checkSize(owner, controller, key, value); err != nil {
 		return err
 	}
@@ -98,6 +132,9 @@ func (s *State) Update(owner, controller, key string, value flow.RegisterValue) 
 }
 
 func (s *State) Commit() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	for _, p := range s.draft {
 
 		oldValue, err := s.ledger.Get(p.owner, p.controller, p.key)
@@ -114,6 +151,8 @@ func (s *State) Commit() error {
 			return err
 		}
 
+		// update read cache
+		s.readCache[fullKey(p.owner, p.controller, p.key)] = p
 	}
 
 	// reset draft
@@ -123,12 +162,21 @@ func (s *State) Commit() error {
 }
 
 func (s *State) Rollback() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	s.draft = make(map[string]payload, 0)
 	return nil
 }
 
 func (s *State) Ledger() Ledger {
 	return s.ledger
+}
+
+func (s *State) InteractionUsed() uint64 {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.interactionUsed
 }
 
 func (s *State) updateInteraction(owner, controller, key string, oldValue, newValue flow.RegisterValue) error {
@@ -160,10 +208,6 @@ func (s *State) checkSize(owner, controller, key string, value flow.RegisterValu
 			Limit: s.maxKeySizeAllowed}
 	}
 	return nil
-}
-
-func (s *State) InteractionUsed() uint64 {
-	return s.interactionUsed
 }
 
 type payload struct {

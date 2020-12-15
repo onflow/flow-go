@@ -94,11 +94,11 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.NoError(t, err)
 
 	// read - interaction 21
-	_, err = st.Read("123", "234", "345")
+	_, err = st.Read("234", "345", "456")
 	require.Equal(t, st.InteractionUsed(), uint64(21))
 	require.Error(t, err)
 
-	st = state.NewState(ledger, state.WithMaxInteractionSizeAllowed(11))
+	st = state.NewState(ledger, state.WithMaxInteractionSizeAllowed(9))
 
 	// update - 0
 	err = st.Update("1", "2", "3", []byte{'A'})
@@ -110,12 +110,17 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(4))
 
-	// read - interaction 8
+	// read - interaction 4 (already in read cache)
 	_, err = st.Read("1", "2", "3")
 	require.NoError(t, err)
-	require.Equal(t, st.InteractionUsed(), uint64(8))
+	require.Equal(t, st.InteractionUsed(), uint64(4))
 
-	// read - interaction 12
-	_, err = st.Read("1", "2", "3")
+	// read - interaction 7
+	_, err = st.Read("2", "3", "4")
+	require.NoError(t, err)
+	require.Equal(t, st.InteractionUsed(), uint64(7))
+
+	// read - interaction 10
+	_, err = st.Read("3", "4", "5")
 	require.Error(t, err)
 }
