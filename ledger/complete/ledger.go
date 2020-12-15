@@ -79,6 +79,8 @@ func NewLedger(dbDir string,
 
 	// pause records to prevent double logging trie removals
 	w.PauseRecord()
+	defer w.UnpauseRecord()
+
 	err = w.ReplayOnForest(forest)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)

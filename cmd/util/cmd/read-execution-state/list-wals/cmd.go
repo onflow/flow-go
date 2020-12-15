@@ -1,8 +1,7 @@
-package cmd
+package list_tries
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -15,32 +14,24 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
-var (
-	flagExecutionStateDir string
-)
+var flagExecutionStateDir string
 
 var Cmd = &cobra.Command{
-	Use:   "read-ledger-wals",
-	Short: "Reads ledger write-a-head(WAL) logs ",
+	Use:   "list-wals",
+	Short: "lists ledger write-a-head(WAL) logs",
 	Run:   run,
 }
 
-func init() {
-
+func Init() *cobra.Command {
 	Cmd.PersistentFlags().StringVar(&flagExecutionStateDir, "execution-state-dir", "",
 		"Execution Node state dir (where WAL logs are written")
 	_ = Cmd.MarkPersistentFlagRequired("execution-state-dir")
 
+	return Cmd
 }
 
-func Execute() {
-	if err := Cmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
-func readWals() {
+func run(*cobra.Command, []string) {
+	startTime := time.Now()
 
 	w, err := wal.NewWAL(
 		nil,
@@ -71,16 +62,6 @@ func readWals() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while replaying execution state")
 	}
-
-}
-
-func run(*cobra.Command, []string) {
-
-	log.Info().Msg("reading")
-
-	startTime := time.Now()
-
-	readWals()
 
 	duration := time.Since(startTime)
 
