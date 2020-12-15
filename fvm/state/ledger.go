@@ -57,8 +57,9 @@ func (m MapLedger) Touch(owner, controller, key string) error {
 	return nil
 }
 
-func (m MapLedger) Delete(owner, controller, key string) {
+func (m MapLedger) Delete(owner, controller, key string) error {
 	delete(m.RegisterTouches, fullKey(owner, controller, key))
+	return nil
 }
 
 func (m MapLedger) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
