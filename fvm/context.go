@@ -17,10 +17,12 @@ type Context struct {
 	MaxStateKeySize                  uint64
 	MaxStateValueSize                uint64
 	MaxStateInteractionSize          uint64
+	EventCollectionByteSizeLimit     uint64
 	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
+	CadenceLoggingEnabled            bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
@@ -52,10 +54,11 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	defaultMaxStateKeySize         = 16_000     // ~16KB
-	defaultMaxStateValueSize       = 32_000_000 // ~32MB
-	defaultMaxStateInteractionSize = 64_000_000 // ~64MB
-	defaultGasLimit                = 100_000    // 100K
+	defaultMaxStateKeySize              = 16_000     // ~16KB
+	defaultMaxStateValueSize            = 32_000_000 // ~32MB
+	defaultMaxStateInteractionSize      = 64_000_000 // ~64MB
+	defaultGasLimit                     = 100_000    // 100K
+	defaultEventCollectionByteSizeLimit = 128_000    // 128KB
 )
 
 func defaultContext(logger zerolog.Logger) Context {
@@ -68,10 +71,12 @@ func defaultContext(logger zerolog.Logger) Context {
 		MaxStateKeySize:                  defaultMaxStateKeySize,
 		MaxStateValueSize:                defaultMaxStateValueSize,
 		MaxStateInteractionSize:          defaultMaxStateInteractionSize,
+		EventCollectionByteSizeLimit:     defaultEventCollectionByteSizeLimit,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
+		CadenceLoggingEnabled:            false,
 		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
@@ -139,6 +144,14 @@ func WithMaxStateInteractionSize(limit uint64) Option {
 	}
 }
 
+// WithEventCollectionSizeLimit sets the event collection byte size limit for a virtual machine context.
+func WithEventCollectionSizeLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.EventCollectionByteSizeLimit = limit
+		return ctx
+	}
+}
+
 // WithBlockHeader sets the block header for a virtual machine context.
 //
 // The VM uses the header to provide current block information to the Cadence runtime,
@@ -171,7 +184,7 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 	}
 }
 
-// WithTransactionSignatureVerifier sets the transaction processors for a
+// WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.
 func WithTransactionProcessors(processors ...TransactionProcessor) Option {
 	return func(ctx Context) Context {
@@ -193,6 +206,15 @@ func WithServiceAccount(enabled bool) Option {
 func WithRestrictedDeployment(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedDeploymentEnabled = enabled
+		return ctx
+	}
+}
+
+// WithCadenceLogging enables or disables Cadence logging for a
+// virtual machine context.
+func WithCadenceLogging(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.CadenceLoggingEnabled = enabled
 		return ctx
 	}
 }

@@ -24,7 +24,7 @@ type ScriptProcedure struct {
 	Arguments [][]byte
 	Value     cadence.Value
 	Logs      []string
-	Events    []cadence.Event
+	Events    []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
@@ -85,7 +85,7 @@ func (i ScriptInvocator) Process(
 
 	proc.Value = value
 	proc.Logs = env.getLogs()
-	proc.Events = env.getEvents()
+	proc.Events = env.Events()
 
 	return nil
 }
