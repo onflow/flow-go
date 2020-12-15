@@ -8,28 +8,28 @@ import (
 
 const keyAddressState = "account_address_state"
 
-// LedgerBoundAddressGenerator is a decorator for an address generator.
+// StateBoundAddressGenerator is a decorator for an address generator.
 // It uses the underlying generator it gets from the chain.
 // The only change is that when next address is called the state is updated as well.
-type LedgerBoundAddressGenerator struct {
+type StateBoundAddressGenerator struct {
 	generator flow.AddressGenerator
 	state     *State
 }
 
-func NewLedgerBoundAddressGenerator(state *State, chain flow.Chain) (*LedgerBoundAddressGenerator, error) {
+func NewStateBoundAddressGenerator(state *State, chain flow.Chain) (*StateBoundAddressGenerator, error) {
 	stateBytes, err := state.Read("", "", keyAddressState)
 	if err != nil {
 		return nil, err
 	}
 
 	addressGenerator := chain.BytesToAddressGenerator(stateBytes)
-	return &LedgerBoundAddressGenerator{
+	return &StateBoundAddressGenerator{
 		state:     state,
 		generator: addressGenerator,
 	}, nil
 }
 
-func (g *LedgerBoundAddressGenerator) NextAddress() (flow.Address, error) {
+func (g *StateBoundAddressGenerator) NextAddress() (flow.Address, error) {
 	address, err := g.generator.NextAddress()
 	if err != nil {
 		return address, err
@@ -44,10 +44,10 @@ func (g *LedgerBoundAddressGenerator) NextAddress() (flow.Address, error) {
 	return address, nil
 }
 
-func (g *LedgerBoundAddressGenerator) CurrentAddress() flow.Address {
+func (g *StateBoundAddressGenerator) CurrentAddress() flow.Address {
 	return g.generator.CurrentAddress()
 }
 
-func (g *LedgerBoundAddressGenerator) Bytes() []byte {
+func (g *StateBoundAddressGenerator) Bytes() []byte {
 	return g.generator.Bytes()
 }
