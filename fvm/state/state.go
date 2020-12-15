@@ -1,6 +1,7 @@
 package state
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -140,8 +141,21 @@ func (s *State) Commit() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	for _, p := range s.draft {
+	// TODO right now we sort keys to minimize
+	// the impact on the spock, but later we might
+	// expose interactionFingerprint as a separate
+	// parameters, this preserve number of reads and
+	// order of reads as extra layer of entropy
 
+	keys := make([]string, 0)
+	for k := range s.draft {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		p := s.draft[k]
 		oldValue, err := s.ledger.Get(p.owner, p.controller, p.key)
 		if err != nil {
 			return err
