@@ -64,7 +64,7 @@ func WithMaxInteractionAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-func (s State) Read(owner, controller, key string) (flow.RegisterValue, error) {
+func (s *State) Read(owner, controller, key string) (flow.RegisterValue, error) {
 	if err := s.checkSize(owner, controller, key, []byte{}); err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (s State) Read(owner, controller, key string) (flow.RegisterValue, error) {
 	return value, s.updateInteraction(owner, controller, key, value)
 }
 
-func (s State) Update(owner, controller, key string, value flow.RegisterValue) error {
+func (s *State) Update(owner, controller, key string, value flow.RegisterValue) error {
 	if err := s.checkSize(owner, controller, key, value); err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (s *State) Ledger() Ledger {
 	return s.ledger
 }
 
-func (s State) updateInteraction(owner, controller, key string, oldValue flow.RegisterValue) error {
+func (s *State) updateInteraction(owner, controller, key string, oldValue flow.RegisterValue) error {
 	keySize := uint64(len(owner) + len(controller) + len(key))
 	valueSize := uint64(len(oldValue))
 	s.interactionUsed += keySize + valueSize
@@ -128,7 +128,7 @@ func (s State) updateInteraction(owner, controller, key string, oldValue flow.Re
 	return nil
 }
 
-func (s State) checkSize(owner, controller, key string, value flow.RegisterValue) error {
+func (s *State) checkSize(owner, controller, key string, value flow.RegisterValue) error {
 	keySize := uint64(len(owner) + len(controller) + len(key))
 	valueSize := uint64(len(value))
 	if keySize > s.maxKeySizeAllowed {
@@ -146,7 +146,7 @@ func (s State) checkSize(owner, controller, key string, value flow.RegisterValue
 	return nil
 }
 
-func (s State) InteractionUsed() uint64 {
+func (s *State) InteractionUsed() uint64 {
 	return s.interactionUsed
 }
 
