@@ -74,7 +74,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			st := state.NewState(ledger)
 			accounts := state.NewAccounts(st)
 
-			err := accounts.Create(nil, address)
+			err = accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			_, err = accounts.GetPublicKey(address, 0)
@@ -101,7 +101,7 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 			st := state.NewState(ledger)
 			accounts := state.NewAccounts(st)
 
-			err := accounts.Create(nil, address)
+			err = accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			count, err := accounts.GetPublicKeyCount(address)
@@ -129,7 +129,7 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 			st := state.NewState(ledger)
 			accounts := state.NewAccounts(st)
 
-			err := accounts.Create(nil, address)
+			err = accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			keys, err := accounts.GetPublicKeys(address)
