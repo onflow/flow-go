@@ -13,8 +13,13 @@ const (
 )
 
 type StateOption func(st *State) *State
+
 type State struct {
-	ledger                Ledger
+	ledger Ledger
+	// reason for using mutex instead of channel
+	// state doesn't have to be thread safe and right now
+	// is only used in a single thread but a mutex has been added
+	// here to prevent accidental multi-thread use in the future
 	lock                  sync.Mutex
 	draft                 map[string]payload
 	readCache             map[string]payload

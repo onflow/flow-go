@@ -153,7 +153,7 @@ func (l *led) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 	panic("this method shouldn't be used here")
 }
 
-func (l *led) Delete(owner, controller, key string) {
+func (l *led) Delete(owner, controller, key string) error {
 	fk := fullKey(owner, controller, key)
 	delete(l.payloads, fk)
 }
