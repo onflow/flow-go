@@ -83,15 +83,8 @@ func (s State) Read(owner, controller, key string) (flow.RegisterValue, error) {
 	if err != nil {
 		return nil, &LedgerFailure{err}
 	}
-	// update interaction
-	keySize := uint64(len(owner) + len(controller) + len(key))
-	valueSize := uint64(len(value))
-	err = s.updateInteraction(keySize, valueSize, 0)
-	if err != nil {
-		return nil, &LedgerFailure{err}
-	}
 
-	return value, nil
+	return value, s.updateInteraction(owner, controller, key, value)
 }
 
 func (s State) Update(owner, controller, key string, value flow.RegisterValue) error {
@@ -99,8 +92,8 @@ func (s State) Update(owner, controller, key string, value flow.RegisterValue) e
 		return err
 	}
 	s.draft[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
-	// TODO add interaction update
-	return nil
+
+	return s.updateInteraction(owner, controller, key, value)
 }
 
 func (s *State) Commit() error {
@@ -123,8 +116,10 @@ func (s *State) Ledger() Ledger {
 	return s.ledger
 }
 
-func (s State) updateInteraction(keySize, oldValueSize, newValueSize uint64) error {
-	s.interactionUsed += keySize + oldValueSize + newValueSize
+func (s State) updateInteraction(owner, controller, key string, oldValue flow.RegisterValue) error {
+	keySize := uint64(len(owner) + len(controller) + len(key))
+	valueSize := uint64(len(oldValue))
+	s.interactionUsed += keySize + valueSize
 	if s.interactionUsed > s.maxInteractionAllowed {
 		return &StateInteractionLimitExceededError{
 			Used:  s.interactionUsed,
