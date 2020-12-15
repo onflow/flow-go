@@ -156,7 +156,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 func (suite *TopologyTestSuite) topologyScenario(me flow.Identifier,
 	subMngr network.SubscriptionManager,
 	ids flow.IdentityList,
-	state protocol.ReadOnlyState) flow.IdentityList {
+	state protocol.State) flow.IdentityList {
 
 	logger := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 

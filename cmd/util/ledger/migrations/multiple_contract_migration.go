@@ -61,21 +61,6 @@ func MultipleContractMigration(payloads []ledger.Payload) ([]ledger.Payload, err
 	return migratedPayloads, nil
 }
 
-func keyToRegisterId(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 3 ||
-		key.KeyParts[0].Type != state.KeyPartOwner ||
-		key.KeyParts[1].Type != state.KeyPartController ||
-		key.KeyParts[2].Type != state.KeyPartKey {
-		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
-	}
-
-	return flow.NewRegisterID(
-		string(key.KeyParts[0].Value),
-		string(key.KeyParts[1].Value),
-		string(key.KeyParts[2].Value),
-	), nil
-}
-
 func createContractNamesKey(originalKey ledger.Key) ledger.Key {
 	return ledger.Key{
 		KeyParts: []ledger.KeyPart{
@@ -114,7 +99,7 @@ func contractsRegister(contractsKey ledger.Key, contractNames []string) (ledger.
 const deferredValueOfContractValuePrefix = "contract\x1f"
 
 func migrateNonContractValue(p ledger.Payload, contractValueMappings map[string]string) ([]ledger.Payload, error) {
-	registerID, err := keyToRegisterId(p.Key)
+	registerID, err := keyToRegisterID(p.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +174,7 @@ func migrateContractValues(payloads []ledger.Payload) ([]ledger.Payload, map[str
 	errors := make([]error, 0)
 
 	for _, p := range payloads {
-		registerID, err := keyToRegisterId(p.Key)
+		registerID, err := keyToRegisterID(p.Key)
 		if err != nil {
 			// dont fail fast... try to collect errors so multiple errors can be addressed at once
 			errors = append(errors, err)
