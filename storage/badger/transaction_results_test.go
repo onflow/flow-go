@@ -1,6 +1,7 @@
 package badger_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -9,8 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 func TestStoringTransactionResults(t *testing.T) {
@@ -60,5 +63,17 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			require.Nil(t, err)
 			assert.Equal(t, txResult, *actual)
 		}
+	})
+}
+
+func TestReadingNotStoreTransaction(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		store := bstorage.NewTransactionResults(db)
+
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+
+		_, err := store.ByBlockIDTransactionID(blockID, txID)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
