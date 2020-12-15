@@ -67,7 +67,10 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		return err
 	}
 
-	st.Commit()
+	err = st.Commit()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

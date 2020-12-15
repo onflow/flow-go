@@ -86,7 +86,10 @@ func (i *TransactionInvocator) Process(
 	}
 
 	// commit changes
-	st.Commit()
+	err = st.Commit()
+	if err != nil {
+		return err
+	}
 
 	proc.Events = env.getEvents()
 	proc.Logs = env.getLogs()

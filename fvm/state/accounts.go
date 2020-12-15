@@ -351,11 +351,9 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 	}
 
 	if isController {
-		a.state.Update(string(address.Bytes()), string(address.Bytes()), key, value)
-	} else {
-		a.state.Update(string(address.Bytes()), "", key, value)
+		return a.state.Update(string(address.Bytes()), string(address.Bytes()), key, value)
 	}
-	return nil
+	return a.state.Update(string(address.Bytes()), "", key, value)
 }
 
 func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -419,10 +417,10 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 // TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		a.state.Read(string(address.Bytes()), string(address.Bytes()), key)
-	} else {
-		a.state.Read(string(address.Bytes()), "", key)
+		_, _ = a.state.Read(string(address.Bytes()), string(address.Bytes()), key)
+		return
 	}
+	_, _ = a.state.Read(string(address.Bytes()), "", key)
 }
 
 func (a *Accounts) TouchContract(contractName string, address flow.Address) {

@@ -91,8 +91,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	st.Commit()
-	return nil
+	return st.Commit()
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

@@ -27,7 +27,8 @@ func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
-	st.Commit()
+	err = st.Commit()
+	require.NoError(t, err)
 	stateBytes, err := ledger.Get("", "", "account_address_state")
 	require.NoError(t, err)
 
@@ -45,7 +46,9 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
-	st.Commit()
+	err = st.Commit()
+	require.NoError(t, err)
+
 	stateBytes, err := ledger.Get("", "", "account_address_state")
 	require.NoError(t, err)
 

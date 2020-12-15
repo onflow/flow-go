@@ -21,7 +21,8 @@ func TestState_DraftFunctionality(t *testing.T) {
 	require.Equal(t, v, value)
 
 	// commit
-	st.Commit()
+	err = st.Commit()
+	require.NoError(t, err)
 	v, err = st.Read("address", "controller", "key")
 	require.NoError(t, err)
 	require.Equal(t, v, value)
