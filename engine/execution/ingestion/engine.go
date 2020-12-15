@@ -490,35 +490,36 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 			lg.Error().Msgf("an unexecuted parent block is missing in the queue")
 		}
 
-		// if the parent block hasn't been executed, we check if there are too many
-		// unexecuted blocks in this queue. If yes, try requesting the collection for the first unexecuted
-		// block
-		tooManyUnexecutedBlock := block.Header.Height-firstUnexecutedHeight >= e.forceFetchThreshold
-		if tooManyUnexecutedBlock {
-			err = e.matchOrRequestCollections(executableBlock, blockByCollection)
-			if err != nil {
-				return fmt.Errorf("cannot send collection requests for first unexecuted: %w", err)
-			}
-			collectionID := flow.ZeroID
-			if len(firstUnexecuted.Block.Payload.Guarantees) > 0 {
-				collectionID = firstUnexecuted.Block.Payload.Guarantees[0].ID()
-			}
-			lg.Info().
-				Int("collections", len(firstUnexecuted.Block.Payload.Guarantees)).
-				Hex("collection_id", collectionID[:]).
-				Uint64("first_unexecuted", firstUnexecutedHeight).
-				Msg("fetching collection for first unexecuted block")
-		}
-
 	} else {
 		// if there is exception, then crash
 		lg.Fatal().Err(err).Msg("unexpected error while accessing storage, shutting down")
 	}
 
-	// check if we have all the collections for the block, and request them if there is missing.
-	err = e.matchOrRequestCollections(executableBlock, blockByCollection)
-	if err != nil {
-		return fmt.Errorf("cannot send collection requests: %w", err)
+	// if the parent block hasn't been executed, we check if there are too many
+	// unexecuted blocks in this queue. If yes, try requesting the collection for the first unexecuted
+	// block instead of the new block.
+	// we will request the new block once its parent has been executed
+	tooManyUnexecutedBlock := block.Header.Height-firstUnexecutedHeight >= e.forceFetchThreshold
+	if tooManyUnexecutedBlock {
+		err = e.matchOrRequestCollections(executableBlock, blockByCollection)
+		if err != nil {
+			return fmt.Errorf("cannot send collection requests for first unexecuted: %w", err)
+		}
+		collectionID := flow.ZeroID
+		if len(firstUnexecuted.Block.Payload.Guarantees) > 0 {
+			collectionID = firstUnexecuted.Block.Payload.Guarantees[0].ID()
+		}
+		lg.Info().
+			Int("collections", len(firstUnexecuted.Block.Payload.Guarantees)).
+			Hex("collection_id", collectionID[:]).
+			Uint64("first_unexecuted", firstUnexecutedHeight).
+			Msg("fetching collection for first unexecuted block")
+	} else {
+		// check if we have all the collections for the block, and request them if there is missing.
+		err = e.matchOrRequestCollections(executableBlock, blockByCollection)
+		if err != nil {
+			return fmt.Errorf("cannot send collection requests: %w", err)
+		}
 	}
 
 	// execute the block if the block is ready to be executed
