@@ -184,7 +184,7 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 		State:          state,
 		DBDir:          dbDir,
 		Guarantees:     guarantees,
-		ProtocolEvents: nil,
+		ProtocolEvents: distributor,
 	}
 }
 

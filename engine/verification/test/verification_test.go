@@ -155,7 +155,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
-	unittest.RequireReturnsBefore(t, conWG.Wait, 5*time.Second, "consensus nodes process")
+	unittest.RequireReturnsBefore(t, conWG.Wait, 10*time.Second, "consensus nodes process")
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
