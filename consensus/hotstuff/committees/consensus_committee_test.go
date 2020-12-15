@@ -28,7 +28,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 	epochCounter := uint64(2)
 
 	// create mocks
-	state := new(protocolmock.ReadOnlyState)
+	state := new(protocolmock.State)
 	snapshot := new(protocolmock.Snapshot)
 
 	prevEpoch := newMockEpoch(
@@ -128,7 +128,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(32))
 
 	// create mocks
-	state := new(protocolmock.ReadOnlyState)
+	state := new(protocolmock.State)
 	snapshot := new(protocolmock.Snapshot)
 
 	state.On("Final").Return(snapshot)
