@@ -83,7 +83,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 }
 
 func (a *Accounts) Exists(address flow.Address) (bool, error) {
-	exists, err := a.state.Read(string(address.Bytes()), "", keyExists)
+	exists, err := a.getValue(address, false, keyExists)
 	if err != nil {
 		return false, newLedgerGetError(keyExists, address, err)
 	}
@@ -120,9 +120,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 }
 
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
-	publicKey, err := a.state.Read(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
-	)
+	publicKey, err := a.getValue(address, true, keyPublicKey(keyIndex))
 	if err != nil {
 		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
 	}
@@ -140,9 +138,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 }
 
 func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
-	countBytes, err := a.state.Read(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
-	)
+	countBytes, err := a.getValue(address, true, keyPublicKeyCount)
 	if err != nil {
 		return 0, newLedgerGetError(keyPublicKeyCount, address, err)
 	}
@@ -161,15 +157,7 @@ func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 func (a *Accounts) setPublicKeyCount(address flow.Address, count uint64) error {
 	newCount := new(big.Int).SetUint64(count)
 
-	err := a.state.Update(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount,
-		newCount.Bytes(),
-	)
-	if err != nil {
-		// TODO return the error instead of panic
-		panic(fmt.Errorf("failed to update the ledger: %w", err))
-	}
-	return nil
+	return a.setValue(address, true, keyPublicKeyCount, newCount.Bytes())
 }
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
@@ -206,16 +194,9 @@ func (a *Accounts) SetPublicKey(
 		return nil, fmt.Errorf("failed to encode public key: %w", err)
 	}
 
-	err = a.state.Update(
-		string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex),
-		encodedPublicKey,
-	)
+	err = a.setValue(address, true, keyPublicKey(keyIndex), encodedPublicKey)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to update ledger: %w", err)
-	}
-
-	return encodedPublicKey, nil
+	return encodedPublicKey, err
 }
 
 func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.AccountPublicKey) error {
@@ -250,8 +231,8 @@ func contractKey(contractName string) string {
 }
 
 func (a *Accounts) getContract(contractName string, address flow.Address) ([]byte, error) {
-	contract, err := a.state.Read(string(address.Bytes()),
-		string(address.Bytes()),
+	contract, err := a.getValue(address,
+		true,
 		contractKey(contractName))
 	if err != nil {
 		return nil, newLedgerGetError(contractName, address, err)
@@ -271,7 +252,7 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	}
 
 	var prevContract []byte
-	prevContract, err = a.state.Read(string(address.Bytes()), string(address.Bytes()), contractKey(contractName))
+	prevContract, err = a.getValue(address, true, contractKey(contractName))
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous contract: %w", err)
 	}
@@ -281,10 +262,11 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 		return nil
 	}
 
-	err = a.state.Update(string(address.Bytes()), string(address.Bytes()), contractKey(contractName), contract)
+	err = a.setValue(address, true, contractKey(contractName), contract)
 	if err != nil {
-		return fmt.Errorf("failed to update the ledger: %w", err)
+		return err
 	}
+
 	return nil
 }
 
@@ -310,7 +292,7 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 	newContractNames := buf.Bytes()
 
 	var prevContractNames []byte
-	prevContractNames, err = a.state.Read(string(address.Bytes()), string(address.Bytes()), keyContractNames)
+	prevContractNames, err = a.getValue(address, true, keyContractNames)
 	if err != nil {
 		return fmt.Errorf("cannot retrieve current contract names: %w", err)
 	}
@@ -318,11 +300,6 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 	// skip updating if the new contract names equal the old
 	if bytes.Equal(prevContractNames, newContractNames) {
 		return nil
-	}
-
-	err = a.state.Update(string(address.Bytes()), string(address.Bytes()), keyContractNames, newContractNames)
-	if err != nil {
-		return fmt.Errorf("failed to update the ledger: %w", err)
 	}
 
 	return a.setValue(address, true, keyContractNames, newContractNames)
@@ -439,6 +416,7 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 }
 
 // TODO replace with touch
+// TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
 		a.state.Read(string(address.Bytes()), string(address.Bytes()), key)
@@ -453,14 +431,9 @@ func (a *Accounts) TouchContract(contractName string, address flow.Address) {
 		panic(err)
 	}
 	if contractNames.Has(contractName) {
-		// TODO change me to touch
-		_, err = a.state.Read(string(address.Bytes()),
-			string(address.Bytes()),
+		a.touch(address,
+			true,
 			contractKey(contractName))
-		if err != nil {
-			// TODO return error
-			panic(fmt.Errorf("failed to read the ledger: %w", err))
-		}
 	}
 }
 
@@ -470,7 +443,7 @@ func (a *Accounts) GetContractNames(address flow.Address) ([]string, error) {
 }
 
 func (a *Accounts) getContractNames(address flow.Address) (contractNames, error) {
-	encContractNames, err := a.state.Read(string(address.Bytes()), string(address.Bytes()), keyContractNames)
+	encContractNames, err := a.getValue(address, true, keyContractNames)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
 	}
