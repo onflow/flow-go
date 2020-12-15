@@ -156,6 +156,7 @@ func (l *led) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 func (l *led) Delete(owner, controller, key string) error {
 	fk := fullKey(owner, controller, key)
 	delete(l.payloads, fk)
+	return nil
 }
 
 func (l *led) Touch(owner, controller, key string) error {
