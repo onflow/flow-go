@@ -220,8 +220,10 @@ func TestView_MergeView(t *testing.T) {
 		})
 
 		chView := v.NewChild()
-		chView.Set(registerID1, "", "", flow.RegisterValue("apple"))
-		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err := chView.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		assert.NoError(t, err)
+		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		assert.NoError(t, err)
 
 		v.MergeView(chView)
 
@@ -265,7 +267,8 @@ func TestView_MergeView(t *testing.T) {
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		assert.NoError(t, err)
 		v.MergeView(chView)
 
 		b1, err := v.Get(registerID1, "", "")
@@ -286,7 +289,8 @@ func TestView_MergeView(t *testing.T) {
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		chView.Set(registerID1, "", "", flow.RegisterValue("orange"))
+		err = chView.Set(registerID1, "", "", flow.RegisterValue("orange"))
+		assert.NoError(t, err)
 		v.MergeView(chView)
 
 		b, err := v.Get(registerID1, "", "")
@@ -305,7 +309,8 @@ func TestView_MergeView(t *testing.T) {
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		chView.Set(registerID1, "", "", flow.RegisterValue("orange"))
+		err = chView.Set(registerID1, "", "", flow.RegisterValue("orange"))
+		assert.NoError(t, err)
 		v.MergeView(chView)
 
 		b, err := v.Get(registerID1, "", "")
@@ -322,7 +327,8 @@ func TestView_MergeView(t *testing.T) {
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		chView.Delete(registerID1, "", "")
+		err = chView.Delete(registerID1, "", "")
+		assert.NoError(t, err)
 		v.MergeView(chView)
 
 		b, err := v.Get(registerID1, "", "")
@@ -343,7 +349,8 @@ func TestView_MergeView(t *testing.T) {
 
 		expSpock2 := hash.NewSHA3_256()
 		chView := v.NewChild()
-		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		assert.NoError(t, err)
 		err = hashIt(expSpock2, []byte("carrot"))
 		assert.NoError(t, err)
 		assert.Equal(t, chView.SpockSecret(), []uint8(expSpock2.SumHash()))
@@ -365,8 +372,10 @@ func TestView_MergeView(t *testing.T) {
 		assert.NoError(t, err)
 
 		chView := v.NewChild()
-		chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
-		chView.Set(registerID3, "", "", flow.RegisterValue("milk"))
+		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		assert.NoError(t, err)
+		err = chView.Set(registerID3, "", "", flow.RegisterValue("milk"))
+		assert.NoError(t, err)
 
 		v.MergeView(chView)
 
@@ -453,8 +462,10 @@ func TestView_AllRegisters(t *testing.T) {
 		err = v.Set("d", "", "", flow.RegisterValue("d_value"))
 		assert.NoError(t, err)
 
-		v.Touch("e", "", "")
-		v.Touch("f", "", "")
+		err = v.Touch("e", "", "")
+		assert.NoError(t, err)
+		err = v.Touch("f", "", "")
+		assert.NoError(t, err)
 
 		allRegs := v.Interactions().AllRegisters()
 		assert.Len(t, allRegs, 6)

@@ -33,8 +33,8 @@ func defaultState(ledger Ledger) *State {
 	return &State{
 		ledger:                ledger,
 		interactionUsed:       uint64(0),
-		draft:                 make(map[string]payload, 0),
-		readCache:             make(map[string]payload, 0),
+		draft:                 make(map[string]payload),
+		readCache:             make(map[string]payload),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
@@ -161,7 +161,7 @@ func (s *State) Commit() error {
 	}
 
 	// reset draft
-	s.draft = make(map[string]payload, 0)
+	s.draft = make(map[string]payload)
 
 	return nil
 }
@@ -170,7 +170,7 @@ func (s *State) Rollback() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.draft = make(map[string]payload, 0)
+	s.draft = make(map[string]payload)
 	return nil
 }
 
