@@ -3,8 +3,9 @@ package state_test
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 func TestState_DraftFunctionality(t *testing.T) {
@@ -37,7 +38,8 @@ func TestState_DraftFunctionality(t *testing.T) {
 	require.Equal(t, v, value2)
 
 	// rollback
-	st.Rollback()
+	err = st.Rollback()
+	require.NoError(t, err)
 	v, err = st.Read("address", "controller", "key")
 	require.NoError(t, err)
 	require.Equal(t, v, value)

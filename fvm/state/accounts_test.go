@@ -65,10 +65,11 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 
 			ledger := state.NewMapLedger()
 
-			ledger.Set(
+			err := ledger.Set(
 				string(address.Bytes()), string(address.Bytes()), "public_key_0",
 				ledgerValue,
 			)
+			require.NoError(t, err)
 
 			st := state.NewState(ledger)
 			accounts := state.NewAccounts(st)
@@ -91,10 +92,11 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 		for _, ledgerValue := range [][]byte{{}, nil} {
 
 			ledger := state.NewMapLedger()
-			ledger.Set(
+			err := ledger.Set(
 				string(address.Bytes()), string(address.Bytes()), "public_key_count",
 				ledgerValue,
 			)
+			require.NoError(t, err)
 
 			st := state.NewState(ledger)
 			accounts := state.NewAccounts(st)
@@ -118,10 +120,11 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 		for _, ledgerValue := range [][]byte{{}, nil} {
 
 			ledger := state.NewMapLedger()
-			ledger.Set(
+			err := ledger.Set(
 				string(address.Bytes()), string(address.Bytes()), "public_key_count",
 				ledgerValue,
 			)
+			require.NoError(t, err)
 
 			st := state.NewState(ledger)
 			accounts := state.NewAccounts(st)
@@ -148,10 +151,12 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	ledger.Delete(
+	err = ledger.Delete(
 		string(address.Bytes()),
 		string(address.Bytes()),
 		"public_key_count")
+
+	require.NoError(t, err)
 
 	require.NotPanics(t, func() {
 		_, _ = accounts.Get(address)

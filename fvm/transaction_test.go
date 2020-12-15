@@ -195,8 +195,10 @@ func TestTopShotSafety(t *testing.T) {
 		encodedName, err := encodeContractNames([]string{"TopShot"})
 		require.NoError(t, err)
 
-		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "contract_names", encodedName)
-		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "code.TopShot", []byte(topShotCode))
+		err = ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "contract_names", encodedName)
+		require.NoError(t, err)
+		err = ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "code.TopShot", []byte(topShotCode))
+		require.NoError(t, err)
 
 		context := NewContext(log)
 

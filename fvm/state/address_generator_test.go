@@ -37,7 +37,9 @@ func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 
 func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	ledger := state.NewMapLedger()
-	ledger.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
+	err := ledger.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
+	require.NoError(t, err)
+
 	chain := flow.MonotonicEmulator.Chain()
 	st := state.NewState(ledger)
 	generator, err := state.NewStateBoundAddressGenerator(st, chain)
