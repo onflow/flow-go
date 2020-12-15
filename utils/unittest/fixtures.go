@@ -1003,6 +1003,29 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	return setup
 }
 
+func EpochStatusFixture() *flow.EpochStatus {
+	return &flow.EpochStatus{
+		FirstBlockID: IdentifierFixture(),
+		CurrentEpoch: flow.EventIDs{
+			SetupID:  IdentifierFixture(),
+			CommitID: IdentifierFixture(),
+		},
+		NextEpoch: flow.EventIDs{
+			SetupID:  IdentifierFixture(),
+			CommitID: IdentifierFixture(),
+		},
+	}
+}
+
+func IndexFixture() *flow.Index {
+	return &flow.Index{
+		NodeIDs:       IdentifierListFixture(5),
+		CollectionIDs: IdentifierListFixture(5),
+		SealIDs:       IdentifierListFixture(5),
+		ReceiptIDs:    IdentifierListFixture(5),
+	}
+}
+
 func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCommit) {
 	return func(commit *flow.EpochCommit) {
 		lookup := make(map[flow.Identifier]flow.DKGParticipant)
