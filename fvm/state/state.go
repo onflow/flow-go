@@ -84,26 +84,41 @@ func (s *State) Read(owner, controller, key string) (flow.RegisterValue, error) 
 		return nil, &LedgerFailure{err}
 	}
 
-	return value, s.updateInteraction(owner, controller, key, value)
+	// TODO smarter read measuring
+	return value, s.updateInteraction(owner, controller, key, value, []byte{})
 }
 
 func (s *State) Update(owner, controller, key string, value flow.RegisterValue) error {
 	if err := s.checkSize(owner, controller, key, value); err != nil {
 		return err
 	}
-	s.draft[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
 
-	return s.updateInteraction(owner, controller, key, value)
+	s.draft[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
+	return nil
 }
 
 func (s *State) Commit() error {
-	// send all of the key values to the set
 	for _, p := range s.draft {
-		err := s.ledger.Set(p.owner, p.controller, p.key, p.value)
+
+		oldValue, err := s.ledger.Get(p.owner, p.controller, p.key)
 		if err != nil {
-			return &LedgerFailure{err}
+			return err
 		}
+		// update interaction
+		err = s.updateInteraction(p.owner, p.controller, p.key, oldValue, p.value)
+		if err != nil {
+			return err
+		}
+		err = s.ledger.Set(p.owner, p.controller, p.key, p.value)
+		if err != nil {
+			return err
+		}
+
 	}
+
+	// reset draft
+	s.draft = make(map[string]payload, 0)
+
 	return nil
 }
 
@@ -116,10 +131,11 @@ func (s *State) Ledger() Ledger {
 	return s.ledger
 }
 
-func (s *State) updateInteraction(owner, controller, key string, oldValue flow.RegisterValue) error {
+func (s *State) updateInteraction(owner, controller, key string, oldValue, newValue flow.RegisterValue) error {
 	keySize := uint64(len(owner) + len(controller) + len(key))
-	valueSize := uint64(len(oldValue))
-	s.interactionUsed += keySize + valueSize
+	oldValueSize := uint64(len(oldValue))
+	newValueSize := uint64(len(newValue))
+	s.interactionUsed += keySize + oldValueSize + newValueSize
 	if s.interactionUsed > s.maxInteractionAllowed {
 		return &StateInteractionLimitExceededError{
 			Used:  s.interactionUsed,
