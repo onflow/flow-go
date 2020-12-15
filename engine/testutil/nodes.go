@@ -58,8 +58,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) testmock.GenericNode {
-
+func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID,
+	options ...func(*protocol.State)) testmock.GenericNode {
 	var i int
 	var participant *flow.Identity
 	for i, participant = range participants {
@@ -75,14 +75,29 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	metrics := metrics.NewNoopCollector()
 
 	stateFixture := CompleteStateFixture(t, log, metrics, tracer)
-
-	root, result, seal := unittest.BootstrapFixture(participants)
-	err = stateFixture.State.Mutate().Bootstrap(root, result, seal)
-	require.NoError(t, err)
+	StateBootstrapFixture(t, participants, stateFixture.State)
 
 	for _, option := range options {
 		option(stateFixture.State)
 	}
+
+	return GenericNodeWithStateFixture(t, hub, identity, log, metrics, tracer, stateFixture, chainID)
+}
+
+// StateBootstrapFixture is a test helper that bootstraps state with list of participants.
+func StateBootstrapFixture(t testing.TB, participants flow.IdentityList, state *protocol.State) {
+	root, result, seal := unittest.BootstrapFixture(participants)
+	err := state.Mutate().Bootstrap(root, result, seal)
+	require.NoError(t, err)
+}
+
+func GenericNodeWithStateFixture(t testing.TB, hub *stub.Hub,
+	identity *flow.Identity,
+	log zerolog.Logger,
+	metrics *metrics.NoopCollector,
+	tracer module.Tracer,
+	stateFixture *StateFixture,
+	chainID flow.ChainID) testmock.GenericNode {
 
 	// Generates test signing oracle for the nodes
 	// Disclaimer: it should not be used for practical applications
