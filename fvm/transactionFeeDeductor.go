@@ -26,7 +26,7 @@ func (d *TransactionFeeDeductor) deductFees(
 	tx *flow.TransactionBody,
 	st *state.State,
 ) error {
-	// TODO fix me
+
 	return vm.invokeMetaTransaction(
 		ctx,
 		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress()),
