@@ -442,9 +442,7 @@ func (e *Engine) addToPending(receiptDataPack *verification.ReceiptDataPack) {
 	// marks receipt pending for its block ID
 	err := e.pendingReceiptIDsByBlock.Append(blockID, receiptID)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("could not append receipt to receipt-ids-by-block mempool")
+		log.Debug().Err(err).Msg("could not append receipt to receipt-ids-by-block mempool")
 	}
 
 	// records the execution receipt id based on its result id
