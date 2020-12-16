@@ -55,6 +55,12 @@ func (factory *EpochComponentsFactory) Create(
 	err error,
 ) {
 
+	counter, err := epoch.Counter()
+	if err != nil {
+		err = fmt.Errorf("could not get epoch counter: %w", err)
+		return
+	}
+
 	// if we are not a staked participant in this epoch, return a sentinel
 	identities, err := epoch.InitialIdentities()
 	if err != nil {
@@ -63,7 +69,7 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	_, exists := identities.ByNodeID(factory.me.NodeID())
 	if !exists {
-		err = epochmgr.ErrUnstakedForEpoch
+		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrUnstakedForEpoch, factory.me.NodeID(), counter)
 		return
 	}
 
@@ -111,11 +117,6 @@ func (factory *EpochComponentsFactory) Create(
 	}
 
 	// get the transaction pool for the epoch
-	counter, err := epoch.Counter()
-	if err != nil {
-		err = fmt.Errorf("could not get epoch counter: %w", err)
-		return
-	}
 	pool := factory.pools.ForEpoch(counter)
 
 	builder, finalizer, err := factory.builder.Create(headers, payloads, pool)
