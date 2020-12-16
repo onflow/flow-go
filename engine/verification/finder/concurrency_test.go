@@ -205,7 +205,6 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 				// sendBlock makes the block associated with the receipt available to the follower engine of the verification node.
 				sendBlock := func() {
 					// Note: this is done by the follower.
-					// this block should be done in a thread-safe way.
 					mutatorLock.Lock()
 					if _, err := verNode.Blocks.ByID(block.ID()); err != nil {
 						err = verNode.State.Extend(block)
