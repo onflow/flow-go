@@ -7,10 +7,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO we started with high numbers here and we might
+// tune (reduce) them when we have more data
 const (
-	DefaultMaxKeySize         = 16_000     // ~16KB
-	DefaultMaxValueSize       = 32_000_000 // ~32MB
-	DefaultMaxInteractionSize = 64_000_000 // ~64MB
+	DefaultMaxKeySize         = 16_000      // ~16KB
+	DefaultMaxValueSize       = 64_000_000  // ~64MB
+	DefaultMaxInteractionSize = 256_000_000 // ~256MB
 )
 
 type StateOption func(st *State) *State
