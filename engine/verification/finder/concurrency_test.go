@@ -267,23 +267,25 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 	// stops finder engine of verification node
 	<-verNode.FinderEngine.Done()
 
-	// evaluates proper resource cleanup
-	for _, receipt := range receipts {
-		if staked {
-			// staked verification node should mark all distinct execution results as processed
-			assert.True(suite.T(), verNode.ProcessedResultIDs.Has(receipt.Receipt.ExecutionResult.ID()))
+	if staked {
+		// staked verification node should mark all distinct execution results as processed
+		for _, result := range results {
+			assert.True(suite.T(), verNode.ProcessedResultIDs.Has(result.ID()))
 		}
-
-		// no execution receipt should reside in cached, pending, or ready mempools of finder engine
-		require.False(suite.T(), verNode.CachedReceipts.Has(receipt.Receipt.ID()))
-		require.False(suite.T(), verNode.PendingReceipts.Has(receipt.Receipt.ID()))
-		require.False(suite.T(), verNode.ReadyReceipts.Has(receipt.Receipt.ID()))
 	}
+
+	// evaluates proper resource cleanup
+	//
+	// no execution receipt should reside in cached, pending, or ready mempools of finder engine
+	require.True(suite.T(), verNode.CachedReceipts.Size() == 0)
+	require.True(suite.T(), verNode.PendingReceipts.Size() == 0)
+	require.True(suite.T(), verNode.ReadyReceipts.Size() == 0)
 
 	// no execution receipt should be pending for a block, and no block should remain cached.
 	require.True(suite.T(), verNode.PendingReceiptIDsByBlock.Size() == 0)
 	require.True(suite.T(), verNode.ReceiptIDsByResult.Size() == 0)
 	require.True(suite.T(), verNode.CachedReceipts.Size() == 0)
+
 	if staked {
 		// staked finder engine should not discard any result
 		require.True(suite.T(), verNode.DiscardedResultIDs.Size() == 0)
