@@ -84,8 +84,6 @@ func main() {
 				"maximum per-transaction gas limit")
 			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
 				"whether we check that inbound transactions are parse-able")
-			flags.BoolVar(&ingestConf.AllowUnknownReference, "ingest-allow-unknown-reference", true,
-				"whether we ingest transactions referencing an unknown block")
 			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
 				"expiry buffer for inbound transactions")
 			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
