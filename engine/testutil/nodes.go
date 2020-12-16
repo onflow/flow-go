@@ -128,7 +128,6 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Blocks:         stateFixture.Blocks,
 		Index:          stateFixture.Index,
 		State:          stateFixture.State,
-		RState:         stateFixture.RState,
 		Me:             me,
 		Net:            stubnet,
 		DBDir:          stateFixture.DBDir,
@@ -146,14 +145,13 @@ type StateFixture struct {
 	Payloads       flowstorage.Payloads
 	Blocks         flowstorage.Blocks
 	Index          flowstorage.Index
-	State          *badgerstate.MutableState
-	RState         *badgerstate.State
+	State          protocol.MutableState
 	Guarantees     flowstorage.Guarantees
 	DBDir          string
 	ProtocolEvents *events.Distributor
 }
 
-// CompleteStateFixture is a test helper that creates and returns a StateFixture for sake of unit testing.
+// CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
 func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.NoopCollector, tracer module.Tracer,
 	participants flow.IdentityList) *StateFixture {
 	dbDir := unittest.TempDir(t)
@@ -190,7 +188,6 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 		Blocks:         blocks,
 		Index:          index,
 		State:          mutableState,
-		RState:         state,
 		DBDir:          dbDir,
 		Guarantees:     guarantees,
 		ProtocolEvents: distributor,
@@ -325,7 +322,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.DB)
 	receipts := storage.NewExecutionReceipts(node.DB, results)
 
-	followerState, err := badgerstate.NewFollowerState(node.State.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
+	protoState, ok := node.State.(*badgerstate.MutableState)
+	require.True(t, ok)
+
+	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
 	require.NoError(t, err)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
