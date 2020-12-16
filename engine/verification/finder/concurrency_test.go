@@ -97,7 +97,9 @@ func (suite *ConcurrencyTestSuite) TestConcurrency() {
 		},
 	}
 
+	// runs each test case in block-first and receipt-first mode.
 	for _, blockFirst := range []bool{true, false} {
+		// runs each test case in staked and unstaked verification node.
 		for _, staked := range []bool{true, false} {
 			for _, tc := range testcases {
 				suite.T().Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks/%t-block-first/%t-staked",
