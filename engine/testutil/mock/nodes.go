@@ -53,7 +53,8 @@ type GenericNode struct {
 	Seals          storage.Seals
 	Payloads       storage.Payloads
 	Blocks         storage.Blocks
-	State          protocol.State
+	State          protocol.MutableState
+	RState         protocol.State
 	Index          storage.Index
 	Me             module.Local
 	Net            *stub.Network

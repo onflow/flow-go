@@ -116,7 +116,7 @@ func VerificationHappyPath(t *testing.T,
 		require.Equal(t, root, rootBlock)
 
 		// extends state of node by block of `completeER`.
-		err = node.State.Mutate().Extend(completeER.Block)
+		err = node.State.Extend(completeER.Block)
 		assert.Nil(t, err)
 	}
 

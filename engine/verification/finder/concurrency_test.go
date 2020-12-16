@@ -205,7 +205,7 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 					// this block should be done in a thread-safe way.
 					mutatorLock.Lock()
 					if _, err := verNode.Blocks.ByID(block.ID()); err != nil {
-						err = verNode.State.Mutate().Extend(block)
+						err = verNode.State.Extend(block)
 						require.NoError(suite.T(), err)
 					}
 					mutatorLock.Unlock()
@@ -383,13 +383,13 @@ func (suite *ConcurrencyTestSuite) bootstrapSystem(staked bool) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// bootstraps the system
-	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.log, suite.collector, suite.tracer)
-	testutil.StateBootstrapFixture(suite.T(), identities, stateFixture.State)
+	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.log, suite.collector, suite.tracer, identities)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch
 		verID = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 		identities = identities.Union(flow.IdentityList{verID})
+
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), stateFixture.State)
 		epochBuilder.
 			UsingSetupOpts(unittest.WithParticipants(identities)).

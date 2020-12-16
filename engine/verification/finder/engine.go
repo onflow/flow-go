@@ -28,7 +28,7 @@ type Engine struct {
 	metrics                  module.VerificationMetrics
 	me                       module.Local
 	match                    network.Engine
-	state                    protocol.ReadOnlyState
+	state                    protocol.State
 	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
 	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
 	readyReceipts            mempool.ReceiptDataPacks // used to keep the receipts ready for process
@@ -48,7 +48,7 @@ func New(
 	tracer module.Tracer,
 	net module.Network,
 	me module.Local,
-	state protocol.ReadOnlyState,
+	state protocol.State,
 	match network.Engine,
 	cachedReceipts mempool.ReceiptDataPacks,
 	pendingReceipts mempool.ReceiptDataPacks,

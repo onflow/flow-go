@@ -107,7 +107,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	result := &completeER.Receipt.ExecutionResult
 
 	// stores block of execution result in state and mutate state accordingly
-	err = verNode.State.Mutate().Extend(completeER.Block)
+	err = verNode.State.Extend(completeER.Block)
 	require.NoError(t, err)
 
 	// mocks chunk assignment
