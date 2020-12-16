@@ -285,6 +285,7 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 	require.True(suite.T(), verNode.PendingReceiptIDsByBlock.Size() == 0)
 	require.True(suite.T(), verNode.ReceiptIDsByResult.Size() == 0)
 	require.True(suite.T(), verNode.CachedReceipts.Size() == 0)
+	require.True(suite.T(), verNode.BlockIDsCache.Size() == 0)
 
 	if staked {
 		// staked finder engine should not discard any result
