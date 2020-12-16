@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
-	state2 "github.com/onflow/flow-go/engine/execution/state"
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/finder"
@@ -346,7 +346,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	err = bootstrapper.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
 	require.NoError(t, err)
 
-	execState := state2.NewExecutionState(
+	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, results, receipts, node.DB, node.Tracer,
 	)
 
