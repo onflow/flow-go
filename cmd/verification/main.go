@@ -232,7 +232,7 @@ func main() {
 			return nil
 		}).
 		Module("discarded results ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			processedResultsIDs, err = stdmap.NewIdentifiers(receiptLimit)
+			discardedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
 			if err != nil {
 				return err
 			}
