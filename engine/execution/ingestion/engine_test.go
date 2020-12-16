@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"fmt"
 	mathRand "math/rand"
 	"sync"
 	"testing"
@@ -123,6 +124,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		require.Truef(t, ok, "Could not find nodeID %v in identityList", nodeID)
 		return identity
 	}, nil)
+	snapshot.On("Commit").Return(nil, fmt.Errorf("not avaialble"))
 
 	txResults.EXPECT().BatchStore(gomock.Any(), gomock.Any()).AnyTimes()
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
@@ -353,6 +355,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		})
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.state.On("AtBlockID", blockA.Block.ID()).Return(ctx.snapshot)
 		ctx.snapshot.On("Head").Return(blockA.Block.Header, nil)
 
 		ctx.assertSuccessfulBlockComputation(blockA, unittest.IdentifierFixture())
@@ -411,6 +414,8 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		// make sure the seal height won't trigger state syncing, so that all blocks
 		// will be executed.
 		ctx.state.On("Sealed").Return(ctx.snapshot)
+		// this is to ensure Commit() will return error
+		ctx.state.On("AtBlockID", mock.Anything).Return(ctx.snapshot)
 		ctx.snapshot.On("Head").Return(blocks["A"].Block.Header, nil)
 
 		// once block A is computed, it should trigger B and C being sent to compute,
