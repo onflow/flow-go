@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -33,7 +34,7 @@ type ConcurrencyTestSuite struct {
 	log          zerolog.Logger
 	tracer       module.Tracer
 	collector    *metrics.NoopCollector
-	stateFixture *testutil.StateFixture
+	stateFixture *mock.StateFixture
 }
 
 // TestFinderEngine executes all FinderEngineTestSuite tests.

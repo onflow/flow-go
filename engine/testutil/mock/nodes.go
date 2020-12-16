@@ -41,6 +41,21 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// StateFixture is a test helper struct that encapsulates a flow protocol state
+// as well as all of its backend dependencies.
+type StateFixture struct {
+	DB             *badger.DB
+	Headers        storage.Headers
+	Seals          storage.Seals
+	Payloads       storage.Payloads
+	Blocks         storage.Blocks
+	Index          storage.Index
+	State          protocol.MutableState
+	Guarantees     storage.Guarantees
+	DBDir          string
+	ProtocolEvents *events.Distributor
+}
+
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
 	Log            zerolog.Logger

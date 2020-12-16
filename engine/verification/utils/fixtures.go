@@ -77,6 +77,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 			unittest.GenesisTokenSupply,
 			chain,
 		)
+		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
 

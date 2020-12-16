@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -54,7 +53,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
-	flowstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -90,7 +88,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 
 // GenericNodeWithStateFixture is a test helper that creates a generic node with specified state fixture.
 func GenericNodeWithStateFixture(t testing.TB,
-	stateFixture *StateFixture,
+	stateFixture *testmock.StateFixture,
 	hub *stub.Hub,
 	identity *flow.Identity,
 	log zerolog.Logger,
@@ -136,27 +134,11 @@ func GenericNodeWithStateFixture(t testing.TB,
 	}
 }
 
-// StateFixture is a test helper struct that encapsulates a flow protocol state
-// as well as all of its backend dependencies.
-type StateFixture struct {
-	DB             *badger.DB
-	Headers        flowstorage.Headers
-	Seals          flowstorage.Seals
-	Payloads       flowstorage.Payloads
-	Blocks         flowstorage.Blocks
-	Index          flowstorage.Index
-	State          protocol.MutableState
-	Guarantees     flowstorage.Guarantees
-	DBDir          string
-	ProtocolEvents *events.Distributor
-}
-
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
 func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.NoopCollector, tracer module.Tracer,
-	participants flow.IdentityList) *StateFixture {
+	participants flow.IdentityList) *testmock.StateFixture {
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
-	tracer, err := trace.NewTracer(log, "test")
 	seals := storage.NewSeals(metric, db)
 	headers := storage.NewHeaders(metric, db)
 	index := storage.NewIndex(metric, db)
@@ -171,16 +153,15 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 
 	root, result, seal := unittest.BootstrapFixture(participants)
 	stateRoot, err := badgerstate.NewStateRoot(root, result, seal, 0)
+	require.NoError(t, err)
 
-	// state, err := badgerstate.NewState(metric, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
-	// err := state.Mutate().Bootstrap(root, result, seal)
 	state, err := badgerstate.Bootstrap(metric, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
 	require.NoError(t, err)
 
 	mutableState, err := badgerstate.NewFullConsensusState(state, index, payloads, tracer, consumer)
 	require.NoError(t, err)
 
-	return &StateFixture{
+	return &testmock.StateFixture{
 		DB:             db,
 		Headers:        headers,
 		Seals:          seals,
