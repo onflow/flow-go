@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
+	badger2 "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 )
@@ -53,7 +54,7 @@ type GenericNode struct {
 	Seals          storage.Seals
 	Payloads       storage.Payloads
 	Blocks         storage.Blocks
-	State          protocol.MutableState
+	State          *badger2.MutableState
 	RState         protocol.State
 	Index          storage.Index
 	Me             module.Local

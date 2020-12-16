@@ -146,8 +146,8 @@ type StateFixture struct {
 	Payloads       flowstorage.Payloads
 	Blocks         flowstorage.Blocks
 	Index          flowstorage.Index
-	State          protocol.MutableState
-	RState         protocol.State
+	State          *badgerstate.MutableState
+	RState         *badgerstate.State
 	Guarantees     flowstorage.Guarantees
 	DBDir          string
 	ProtocolEvents *events.Distributor
@@ -190,6 +190,7 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 		Blocks:         blocks,
 		Index:          index,
 		State:          mutableState,
+		RState:         state,
 		DBDir:          dbDir,
 		Guarantees:     guarantees,
 		ProtocolEvents: distributor,
@@ -324,10 +325,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.DB)
 	receipts := storage.NewExecutionReceipts(node.DB, results)
 
-	protoState, ok := node.RState.(*badgerstate.State)
-	require.True(t, ok)
-
-	followerState, err := badgerstate.NewFollowerState(protoState, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
+	followerState, err := badgerstate.NewFollowerState(node.State.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
 	require.NoError(t, err)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
@@ -440,7 +438,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Net,
 		node.Me,
-		followerState,
+		node.State,
 		node.Blocks,
 		followerEng,
 		syncCore,
