@@ -425,7 +425,7 @@ func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) {
 	log.Info().Msg("cached execution receipt added to ready mempool")
 }
 
-// addToPending encapsulates the logic around adding a ReceiptDataPack to ready receipts mempool.
+// addToPending encapsulates the logic around adding a ReceiptDataPack to pending receipts mempool.
 func (e *Engine) addToPending(receiptDataPack *verification.ReceiptDataPack) {
 	receiptID := receiptDataPack.Receipt.ID()
 	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
