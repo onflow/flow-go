@@ -75,7 +75,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	hub := stub.NewNetworkHub()
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithStake(1000))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	conIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 	conIdentity := conIdentities[0]
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
