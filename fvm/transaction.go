@@ -85,6 +85,8 @@ func (i *TransactionInvocator) Process(
 		return err
 	}
 
+	i.logger.Info().Msgf("interaction used by a transaction script (%d)", st.InteractionUsed())
+
 	// commit changes
 	err = st.Commit()
 	if err != nil {
