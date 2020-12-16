@@ -122,14 +122,14 @@ func (suite *ConcurrencyTestSuite) TestConcurrency() {
 //
 // If staked is true, the verification node is staked for the current epoch, otherwise not.
 //
-// In case of staked verification node, this test successfully is passed if each unique execution result is passed to
-// Match engine by the Finder engine in verification node. It also checks the result is marked as processed,
+// In case of staked verification node, this test successfully passes if each unique execution result is passed "only once" to
+// match engine by the finder engine in verification node. It also checks the result is marked as processed,
 // and the receipts with process results are cleaned up.
 //
-// In case of an unstaked verification node, this test successfully is passed if no execution result is passed from Finder to Match engine, no
-// result is marked as processed, and rather all results marked as discarded.
+// In case of an unstaked verification node, this test successfully passes if no execution result is passed from finder to match engine, no
+// result is marked as processed, and rather all results are marked as discarded.
 //
-// In both cases of staked and unstaked tests, it also evaluates that the cached-pending-ready pipeline of Finder engine is
+// In both cases of staked and unstaked tests, it also evaluates that the cached-pending-ready pipeline of finder engine is
 // cleaned up completely.
 func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, chunkCount int, blockFirst bool, staked bool) {
 	// to demarcate the logs
