@@ -184,8 +184,6 @@ github.com/docker/cli v0.0.0-20191105005515-99c5edceb48d h1:SknEFm9d070Wn2GeX8dy
 github.com/docker/cli v0.0.0-20191105005515-99c5edceb48d/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/distribution v2.6.0-rc.1.0.20171207180435-f4118485915a+incompatible h1:2YJcZ66ScSWjLY7lifaPjEav51u0EThWBHpfveH6p0g=
 github.com/docker/distribution v2.6.0-rc.1.0.20171207180435-f4118485915a+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
-github.com/docker/distribution v2.7.1+incompatible h1:a5mlkVzth6W5A4fOsS3D2EO5BUmsJpcB+cRlLU7cSug=
-github.com/docker/distribution v2.7.1+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
 github.com/docker/docker v1.4.2-0.20180625184442-8e610b2b55bf/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8 h1:vyqIlE9fpJ+cdE95qkW9ihHas6QT87AFLE72W5bGUEY=
 github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
@@ -795,7 +793,6 @@ github.com/onflow/flow-ft/lib/go/contracts v0.2.1-0.20201002112420-010719813062/
 github.com/onflow/flow-go-sdk v0.4.0/go.mod h1:MHn8oQCkBNcl2rXdYSm9VYYK4ogwEpyrdM/XK/czdlM=
 github.com/onflow/flow-go-sdk v0.12.2 h1:ukIAek19pwYoHmSSYeaJ729vCA+04VEv6tCRlxwiWRI=
 github.com/onflow/flow-go-sdk v0.12.2/go.mod h1:jWwkpCkhxzeGmCs7oV6ydx50svez/PYUuhg8Y7dY0Ko=
-github.com/onflow/flow-go/integration v0.0.0-20201215184431-a2a77eac69ff/go.mod h1:QAZIgG4z1h5un6gydp9x7Ld7ULYlUUlTw9VT1xgsg/M=
 github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200601215056-34a11def1d6b/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.1.8 h1:jBR8aXEL0MOh3gVJmCr0KYXmtG3JUBhzADonKkYE6oI=
 github.com/onflow/flow/protobuf/go/flow v0.1.8/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
@@ -818,8 +815,6 @@ github.com/onsi/gomega v1.9.0/go.mod h1:Ho0h+IUsWyvy1OpqCwxlQ/21gkhVunqlU8fDGcoT
 github.com/opencontainers/go-digest v0.0.0-20180430190053-c9281466c8b2/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/go-digest v1.0.0-rc1 h1:WzifXhOVOEOuFYOJAW6aQqW0TooG2iki3E3Ii+WN7gQ=
 github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
-github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
-github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.0.1 h1:JMemWkRwHx4Zj+fVxWoMCFm/8sYGGrUVojFA6h/TRcI=
 github.com/opencontainers/image-spec v1.0.1/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
 github.com/opencontainers/runc v0.0.0-20190115041553-12f6a991201f/go.mod h1:qT5XzbpPznkRYVz/mWwUaVBUv2rmF59PVA73FjuZG0U=
