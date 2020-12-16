@@ -251,7 +251,7 @@ func (bc *BaseChainSuite) SetupChain() {
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.ReceiptsPL = &mempool.Receipts{}
-	bc.ReceiptsPL.On("Size").Return(uint(0)) // only for metrics
+	bc.ReceiptsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SEALS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.PendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
