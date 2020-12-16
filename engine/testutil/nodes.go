@@ -638,7 +638,7 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.DiscardedResultIDs.Size)
+		err = mempoolCollector.Register(metrics.ResourceDiscardedResultID, node.DiscardedResultIDs.Size)
 		require.Nil(t, err)
 	}
 
