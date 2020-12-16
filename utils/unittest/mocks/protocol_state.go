@@ -25,6 +25,7 @@ type ProtocolState struct {
 	children  map[flow.Identifier][]flow.Identifier
 	heights   map[uint64]*flow.Block
 	finalized uint64
+	sealed    uint64
 	root      *flow.Block
 	result    *flow.ExecutionResult
 	seal      *flow.Seal
@@ -109,6 +110,21 @@ func (ps *ProtocolState) Final() protocol.Snapshot {
 	return snapshot
 }
 
+func (ps *ProtocolState) Sealed() protocol.Snapshot {
+	ps.Lock()
+	defer ps.Unlock()
+
+	fmt.Println("sealed height: ", ps.sealed)
+	sealed, ok := ps.heights[ps.sealed]
+	if !ok {
+		return nil
+	}
+
+	snapshot := new(protocolmock.Snapshot)
+	snapshot.On("Head").Return(sealed.Header, nil)
+	return snapshot
+}
+
 func pending(ps *ProtocolState, blockID flow.Identifier) []flow.Identifier {
 	var pendingIDs []flow.Identifier
 	pendingIDs, ok := ps.children[blockID]
@@ -139,6 +155,7 @@ func (m *ProtocolState) Bootstrap(root *flow.Block, result *flow.ExecutionResult
 	m.seal = seal
 	m.heights[root.Header.Height] = root
 	m.finalized = root.Header.Height
+	m.sealed = root.Header.Height
 	return nil
 }
 
@@ -190,10 +207,27 @@ func (m *ProtocolState) Finalize(blockID flow.Identifier) error {
 			return fmt.Errorf("parent does not exist for block at height: %v, parentID: %v", cur.Header.Height, cur.Header.ParentID)
 		}
 		m.heights[height] = cur
+
+		// update last sealed height
+		lastSeal, ok := last(cur.Payload.Seals)
+		if ok {
+			sealed := m.blocks[lastSeal.BlockID]
+			m.sealed = sealed.Header.Height
+		}
+
 		cur = parent
+
 	}
 
 	m.finalized = block.Header.Height
 
 	return nil
+}
+
+func last(seals []*flow.Seal) (*flow.Seal, bool) {
+	if len(seals) == 0 {
+		return nil, false
+	}
+
+	return seals[len(seals)-1], true
 }
