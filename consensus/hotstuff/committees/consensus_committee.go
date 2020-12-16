@@ -18,12 +18,12 @@ var errSelectionNotComputed = fmt.Errorf("leader selection for epoch not yet com
 // committee persists across epochs.
 type Consensus struct {
 	mu      sync.RWMutex
-	state   protocol.ReadOnlyState             // the protocol state
+	state   protocol.State                     // the protocol state
 	me      flow.Identifier                    // the node ID of this node
 	leaders map[uint64]*leader.LeaderSelection // pre-computed leader selection for each epoch
 }
 
-func NewConsensusCommittee(state protocol.ReadOnlyState, me flow.Identifier) (*Consensus, error) {
+func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 
 	com := &Consensus{
 		state:   state,
