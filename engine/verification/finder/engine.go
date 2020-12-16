@@ -175,7 +175,6 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	resultID := receipt.ExecutionResult.ID()
 
 	log := e.log.With().
-		Str("engine", "finder").
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).Logger()
@@ -345,7 +344,6 @@ func (e *Engine) checkCachedReceipts() {
 			resultID := rdp.Receipt.ExecutionResult.ID()
 
 			log := e.log.With().
-				Str("engine", "finder").
 				Hex("origin_id", logging.ID(rdp.OriginID)).
 				Hex("receipt_id", logging.ID(receiptID)).
 				Hex("result_id", logging.ID(resultID)).Logger()
@@ -387,7 +385,6 @@ func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) {
 	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
 	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
 	log := e.log.With().
-		Str("engine", "finder").
 		Hex("origin_id", logging.ID(receiptDataPack.OriginID)).
 		Hex("block_id", logging.ID(blockID)).
 		Hex("receipt_id", logging.ID(receiptID)).
@@ -431,7 +428,6 @@ func (e *Engine) addToPending(receiptDataPack *verification.ReceiptDataPack) {
 	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
 	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
 	log := e.log.With().
-		Str("engine", "finder").
 		Hex("origin_id", logging.ID(receiptDataPack.OriginID)).
 		Hex("block_id", logging.ID(blockID)).
 		Hex("receipt_id", logging.ID(receiptID)).
