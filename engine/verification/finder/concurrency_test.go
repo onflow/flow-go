@@ -253,12 +253,12 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 	unittest.RequireReturnsBefore(suite.T(), senderWG.Wait, time.Duration(senderCount*chunkCount*receiptCount*5)*time.Second,
 		"finder engine process")
 
-	if staked {
-		// staked verification node should pass each execution result only once to match engine.
-		// waits for all distinct execution results sent to matching engine of verification node
-		unittest.RequireReturnsBefore(suite.T(), matchEngWG.Wait, time.Duration(senderCount*chunkCount*receiptCount*5)*time.Second,
-			"match engine process")
-	}
+	// staked verification node should pass each execution result only once to match engine.
+	// waits for all distinct execution results sent to matching engine of verification node.
+	//
+	// Note: in unstaked mode, matchEngWG wait group has zero counter, so this should pass immediately.
+	unittest.RequireReturnsBefore(suite.T(), matchEngWG.Wait, time.Duration(senderCount*chunkCount*receiptCount*5)*time.Second,
+		"match engine process")
 
 	// sleeps to make sure that the cleaning of processed execution receipts
 	// happens. This sleep is necessary since we are evaluating cleanup right after the sleep.
@@ -326,8 +326,10 @@ func SetupMockMatchEng(t testing.TB,
 		mu sync.Mutex
 	)
 
-	// expects `len(result)` many distinct execution results
-	wg.Add(len(results))
+	if staked {
+		// in staked mode, it expects `len(result)` many distinct execution results
+		wg.Add(len(results))
+	}
 
 	eng.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
