@@ -69,6 +69,7 @@ func main() {
 		pendingResults      *stdmap.ResultDataPacks    // used in match engine
 		pendingChunks       *match.Chunks              // used in match engine
 		headerStorage       *storage.Headers           // used in match and finder engines
+		approvalStorage     *storage.ResultApprovals   // used by approval provider
 		syncCore            *synchronization.Core      // used in follower engine
 		pendingBlocks       *buffer.PendingBlocks      // used in follower engine
 		finderEng           *finder.Engine             // the finder engine
@@ -230,6 +231,10 @@ func main() {
 			headerStorage = storage.NewHeaders(node.Metrics.Cache, node.DB)
 			return nil
 		}).
+		Module("approval storage", func(node *cmd.FlowNodeBuilder) error {
+			approvalStorage = storage.NewResultApprovals(node.Metrics.Cache, node.DB)
+			return nil
+		}).
 		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
@@ -242,8 +247,17 @@ func main() {
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
-			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
-				chunkVerifier)
+
+			verifierEng, err = verifier.New(
+				node.Logger,
+				collector,
+				node.Tracer,
+				node.Network,
+				node.State,
+				node.Me,
+				chunkVerifier,
+				approvalStorage)
+
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -359,9 +373,10 @@ func main() {
 			return sync, nil
 		}).
 		Component("approval provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// XXX should be custom by chunk
 			retrieve := func(resultID flow.Identifier) (flow.Entity, error) {
 				node.Logger.Debug().Msgf("approval request (resultID %s)", resultID)
-				return flow.ResultApproval{}, nil
+				return approvalStorage.ByChunk(resultID, 0)
 			}
 			eng, err := provider.New(
 				node.Logger,

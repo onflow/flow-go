@@ -113,6 +113,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		chainID,
 		collector,
 		collector)
+
 	// inject block
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)

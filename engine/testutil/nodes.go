@@ -663,13 +663,16 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 
+		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
+
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,
 			node.Tracer,
 			node.Net,
 			node.State,
 			node.Me,
-			chunkVerifier)
+			chunkVerifier,
+			approvalStorage)
 		require.Nil(t, err)
 	}
 

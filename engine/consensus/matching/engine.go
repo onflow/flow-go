@@ -425,6 +425,11 @@ func (e *Engine) checkSealing() {
 		return
 	}
 
+	// skip if no results can be sealed yet
+	if len(sealableResults) == 0 {
+		return
+	}
+
 	// don't overflow the seal mempool
 	space := e.seals.Limit() - e.seals.Size()
 	if len(sealableResults) > int(space) {
@@ -970,8 +975,10 @@ func (e *Engine) requestPendingApprovals() error {
 		return nil
 	}
 
+	log.Info().Msg("requesting approvals")
 	for _, r := range e.incorporatedResults.All() {
 		e.approvalRequester.EntityByID(r.Result.ID(), filter.Any)
 	}
+
 	return nil
 }
