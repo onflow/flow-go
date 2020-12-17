@@ -85,8 +85,7 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 	return myFanout, nil
 }
 
-// subsetChannel returns a random subset of the identity list that is passed. `shouldHave` represents set of
-// identities that should be included in the returned subset.
+// subsetChannel returns a random subset of the identity list that is passed.
 // Returned identities should all subscribed to the specified `channel`.
 // Note: this method should not include identity of its executor.
 func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel string) (flow.IdentityList, error) {
