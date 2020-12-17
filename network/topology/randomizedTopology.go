@@ -57,7 +57,8 @@ func NewRandomizedTopology(nodeID flow.Identifier, edgeProb float64, state proto
 // of this instance. A node directly communicates with its fanout IdentityList on epidemic dissemination
 // of the messages (i.e., publish and multicast).
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
-// connected graph of nodes that enables them talking to each other.
+// connected graph of nodes that enables them talking to each other. This should be done with a very high probability
+// in randomized topology.
 func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	myChannelIDs := r.subMngr.GetChannelIDs()
 	if len(myChannelIDs) == 0 {
