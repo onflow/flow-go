@@ -33,8 +33,9 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.10.3
+	github.com/onflow/cadence v0.10.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.3.1-0.20201122012505-4061d358b8db
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.5.0
 	github.com/onflow/flow-go-sdk v0.12.2
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
@@ -66,3 +67,7 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
 replace github.com/onflow/flow-go/crypto => ./crypto
+
+
+// TODO: temp to test transactions templates for QC
+replace github.com/onflow/flow-core-contracts/lib/go/templates => ../flow-core-contracts/lib/go/templates

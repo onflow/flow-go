@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"
@@ -16,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol"
+	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -33,7 +34,7 @@ type SnapshotSuite struct {
 	genesis *model.Block
 	chainID flow.ChainID
 
-	protoState *protocol.State
+	protoState protocol.State
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -55,20 +56,21 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, _, _, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = NewState(suite.db, tracer, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
-	consumer := events.NewNoop()
 
-	// just bootstrap with a genesis block, we'll use this as reference
-	suite.protoState, err = protocol.NewState(metrics, tracer, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
-	suite.Assert().Nil(err)
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	genesis, result, seal := unittest.BootstrapFixture(participants)
-	err = suite.protoState.Mutate().Bootstrap(genesis, result, seal)
+	stateRoot, err := pbadger.NewStateRoot(genesis, result, seal, 0)
+	require.NoError(suite.T(), err)
+
+	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+	require.NoError(suite.T(), err)
+
 	suite.Require().Nil(err)
 
 	suite.Bootstrap()

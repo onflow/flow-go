@@ -14,12 +14,12 @@ import (
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
 	t          *testing.T
-	state      protocol.State
+	state      protocol.MutableState
 	setupOpts  []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
 	commitOpts []func(*flow.EpochCommit) // options to apply to the EpochCommit event
 }
 
-func NewEpochBuilder(t *testing.T, state protocol.State) *EpochBuilder {
+func NewEpochBuilder(t *testing.T, state protocol.MutableState) *EpochBuilder {
 
 	builder := &EpochBuilder{
 		t:     t,
@@ -92,10 +92,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// build block B, sealing up to and including block A
 	B := BlockWithParentFixture(A)
 	B.SetPayload(flow.Payload{Seals: seals})
-	err = builder.state.Mutate().Extend(&B)
+	err = builder.state.Extend(&B)
 	require.Nil(builder.t, err)
 	// finalize block B
-	err = builder.state.Mutate().Finalize(B.ID())
+	err = builder.state.Finalize(B.ID())
 	require.Nil(builder.t, err)
 
 	// defaults for the EpochSetup event
@@ -116,10 +116,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	C.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{sealForB},
 	})
-	err = builder.state.Mutate().Extend(&C)
+	err = builder.state.Extend(&C)
 	require.Nil(builder.t, err)
 	// finalize block C
-	err = builder.state.Mutate().Finalize(C.ID())
+	err = builder.state.Finalize(C.ID())
 	require.Nil(builder.t, err)
 
 	// defaults for the EpochCommit event
@@ -139,10 +139,10 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	D.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{sealForC},
 	})
-	err = builder.state.Mutate().Extend(&D)
+	err = builder.state.Extend(&D)
 	require.Nil(builder.t, err)
 	// finalize block D
-	err = builder.state.Mutate().Finalize(D.ID())
+	err = builder.state.Finalize(D.ID())
 	require.Nil(builder.t, err)
 
 	return builder
@@ -167,8 +167,8 @@ func (builder *EpochBuilder) CompleteEpoch() {
 	// first view is not necessarily exactly final view of previous epoch
 	A.Header.View = finalView + (rand.Uint64() % 4) + 1
 	A.SetPayload(flow.EmptyPayload())
-	err = builder.state.Mutate().Extend(&A)
+	err = builder.state.Extend(&A)
 	require.Nil(builder.t, err)
-	err = builder.state.Mutate().Finalize(A.ID())
+	err = builder.state.Finalize(A.ID())
 	require.Nil(builder.t, err)
 }

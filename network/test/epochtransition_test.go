@@ -35,7 +35,7 @@ type MutableIdentityTableSuite struct {
 	mws          []*p2p.Middleware
 	idRefreshers []*p2p.NodeIDRefresher
 	engines      []*MeshEngine
-	state        *mockprotocol.ReadOnlyState
+	state        *mockprotocol.State
 	snapshot     *mockprotocol.Snapshot
 	ids          flow.IdentityList
 	logger       zerolog.Logger
@@ -58,7 +58,7 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 
 	// setup state related mocks
 	final := unittest.BlockHeaderFixture()
-	suite.state = new(mockprotocol.ReadOnlyState)
+	suite.state = new(mockprotocol.State)
 	suite.snapshot = new(mockprotocol.Snapshot)
 	suite.snapshot.On("Head").Return(&final, nil)
 	suite.snapshot.On("Phase").Return(flow.EpochPhaseCommitted, nil)
@@ -68,7 +68,7 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot, nil)
 
 	// all nodes use the same state mock
-	states := make([]*mockprotocol.ReadOnlyState, nodeCount)
+	states := make([]*mockprotocol.State, nodeCount)
 	for i := 0; i < nodeCount; i++ {
 		states[i] = suite.state
 	}
