@@ -36,6 +36,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storagekv "github.com/onflow/flow-go/storage/badger"
 )
@@ -57,8 +59,9 @@ func main() {
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
 
-		ingestConf  ingest.Config
-		ingressConf ingress.Config
+		followerState protocol.MutableState
+		ingestConf    ingest.Config
+		ingressConf   ingress.Config
 
 		pools          *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer *buffer.PendingBlocks       // pending block cache for follower
@@ -81,8 +84,6 @@ func main() {
 				"maximum per-transaction gas limit")
 			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
 				"whether we check that inbound transactions are parse-able")
-			flags.BoolVar(&ingestConf.AllowUnknownReference, "ingest-allow-unknown-reference", true,
-				"whether we ingest transactions referencing an unknown block")
 			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
 				"expiry buffer for inbound transactions")
 			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
@@ -117,6 +118,22 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			followerState, err = badgerState.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
+		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
 			pools = epochpool.NewTransactionPools(create)
@@ -142,7 +159,7 @@ func main() {
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -194,7 +211,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				followerState,
 				followerBuffer,
 				followerCore,
 				mainChainSyncCore,

@@ -16,7 +16,7 @@ import (
 // involved in each topic.
 type TopicBasedTopology struct {
 	me      flow.Identifier             // used to keep identifier of the node
-	state   protocol.ReadOnlyState      // used to keep a read only protocol state
+	state   protocol.State              // used to keep a read only protocol state
 	subMngr network.SubscriptionManager // used to keep track topics the node subscribed to
 	logger  zerolog.Logger
 	seed    int64
@@ -25,7 +25,7 @@ type TopicBasedTopology struct {
 // NewTopicBasedTopology returns an instance of the TopicBasedTopology.
 func NewTopicBasedTopology(nodeID flow.Identifier,
 	logger zerolog.Logger,
-	state protocol.ReadOnlyState,
+	state protocol.State,
 	subMngr network.SubscriptionManager) (*TopicBasedTopology, error) {
 	seed, err := intSeedFromID(nodeID)
 	if err != nil {

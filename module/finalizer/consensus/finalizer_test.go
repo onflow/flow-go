@@ -27,7 +27,7 @@ func LogCleanup(list *[]flow.Identifier) func(flow.Identifier) error {
 func TestNewFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		headers := &mockstor.Headers{}
-		state := &mockprot.State{}
+		state := &mockprot.MutableState{}
 		fin := NewFinalizer(db, headers, state)
 		assert.Equal(t, fin.db, db)
 		assert.Equal(t, fin.headers, headers)
@@ -58,15 +58,13 @@ func TestMakeFinalValidChain(t *testing.T) {
 	}
 
 	// create a mock protocol state to check finalize calls
-	mutator := &mockprot.Mutator{}
-	state := &mockprot.State{}
-	state.On("Mutate").Return(mutator)
+	state := &mockprot.MutableState{}
 
 	// make sure we get a finalize call for the blocks that we want to
 	cutoff := total - 3
 	var lastID flow.Identifier
 	for i := 0; i < cutoff; i++ {
-		mutator.On("Finalize", pending[i].ID()).Return(nil)
+		state.On("Finalize", pending[i].ID()).Return(nil)
 		lastID = pending[i].ID()
 	}
 
@@ -106,7 +104,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 	})
 
 	// make sure that finalize was called on protocol state for all desired blocks
-	mutator.AssertExpectations(t)
+	state.AssertExpectations(t)
 
 	// make sure that cleanup was called for all of them too
 	assert.ElementsMatch(t, list, flow.GetIDs(pending[:cutoff]))
@@ -125,9 +123,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	pending.Height = final.Height
 
 	// create a mock protocol state to check finalize calls
-	mutator := &mockprot.Mutator{}
-	state := &mockprot.State{}
-	state.On("Mutate").Return(mutator)
+	state := &mockprot.MutableState{}
 
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
@@ -163,7 +159,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	})
 
 	// make sure that nothing was finalized
-	mutator.AssertExpectations(t)
+	state.AssertExpectations(t)
 
 	// make sure no cleanup was done
 	assert.Empty(t, list)
@@ -178,9 +174,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	final.Height = uint64(rand.Uint32())
 
 	// create a mock protocol state to check finalize calls
-	mutator := &mockprot.Mutator{}
-	state := &mockprot.State{}
-	state.On("Mutate").Return(mutator)
+	state := &mockprot.MutableState{}
 
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
@@ -212,7 +206,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	})
 
 	// make sure that nothing was finalized
-	mutator.AssertExpectations(t)
+	state.AssertExpectations(t)
 
 	// make sure no cleanup was done
 	assert.Empty(t, list)

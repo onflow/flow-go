@@ -23,6 +23,7 @@ type Engine struct {
 	pingEnabled  bool
 	pingInterval time.Duration
 	middleware   *p2p.Middleware
+	nodeInfo     map[flow.Identifier]string // additional details about a node such as operator name
 }
 
 func New(
@@ -32,7 +33,9 @@ func New(
 	metrics module.PingMetrics,
 	pingEnabled bool,
 	mw *p2p.Middleware,
+	nodeInfoFile string,
 ) (*Engine, error) {
+
 	eng := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "ping").Logger(),
@@ -42,6 +45,22 @@ func New(
 		pingEnabled:  pingEnabled,
 		pingInterval: time.Minute,
 		middleware:   mw,
+	}
+
+	// if a node info file is provided, it is read and the additional node information is reported as part of the ping metric
+	if nodeInfoFile != "" {
+		nodeInfo, err := readExtraNodeInfoJSON(nodeInfoFile)
+		if err != nil {
+			log.Error().Err(err).Str("node_info_file", nodeInfoFile).Msg("failed to read node info file")
+		} else {
+			eng.nodeInfo = nodeInfo
+			log.Debug().Str("node_info_file", nodeInfoFile).Msg("using node info file")
+		}
+	} else {
+		// initialize nodeInfo with an empty map
+		eng.nodeInfo = make(map[flow.Identifier]string)
+		// the node info file is not mandatory and should not stop the Ping engine from running
+		log.Trace().Msg("no node info file specified")
 	}
 
 	return eng, nil
@@ -85,10 +104,12 @@ func (e *Engine) startPing() {
 	}
 }
 
-// send ping to a given node and report the reachable result to metrics
+// pingNode pings the given peer and updates the metrics with the result and the additional node information
 func (e *Engine) pingNode(peer *flow.Identity) {
-	reachable := e.pingAddress(peer.ID())
-	e.metrics.NodeReachable(peer, reachable)
+	id := peer.ID()
+	reachable := e.pingAddress(id)
+	info := e.nodeInfo[id]
+	e.metrics.NodeReachable(peer, info, reachable)
 }
 
 // pingAddress sends a ping request to the given address, and block until either receive

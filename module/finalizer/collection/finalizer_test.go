@@ -40,7 +40,7 @@ func TestFinalizer(t *testing.T) {
 
 		state, err := cluster.NewState(db, tracer, genesis.Header.ChainID, headers, payloads)
 		require.NoError(t, err)
-		mutator := state.Mutate()
+		mutator := state
 
 		pool := stdmap.NewTransactions(1000)
 
@@ -57,7 +57,7 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
-			err = mutator.Bootstrap(genesis)
+			err = mutator.Mutate().Bootstrap(genesis)
 			assert.Nil(t, err)
 		}
 

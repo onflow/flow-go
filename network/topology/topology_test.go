@@ -213,7 +213,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(constructorFunc
 func (suite *TopologyTestSuite) topologyScenario(constructorFunc TopologyConstructorFunc, me flow.Identifier,
 	subMngr network.SubscriptionManager,
 	ids flow.IdentityList,
-	state protocol.ReadOnlyState) flow.IdentityList {
+	state protocol.State) flow.IdentityList {
 
 	// creates topology of the node
 	top, err := constructorFunc(me, state, subMngr)
