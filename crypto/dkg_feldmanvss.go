@@ -253,10 +253,14 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	}
 
 	// read the node private share
-	C.bn_read_bin((*C.bn_st)(&s.x),
+	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
-	)
+	) != valid {
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("invalid share value %x", data))
+		return
+	}
 
 	s.xReceived = true
 	if s.vAReceived {

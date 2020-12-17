@@ -295,10 +295,14 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 		return
 	}
 	// read the node private share
-	C.bn_read_bin((*C.bn_st)(&s.x),
+	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
-	)
+	) != valid {
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("invalid share value %x", data))
+		return
+	}
 	s.xReceived = true
 	if s.vAReceived {
 		result := s.verifyShare()
@@ -334,8 +338,11 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 			"verification received was already received")
 		return
 	}
+	s.vAReceived = true
+
 	if len(data) != verifVectorSize*(s.threshold+1) {
-		s.processor.FlagMisbehavior(int(origin),
+		s.disqualified = true
+		s.processor.Disqualify(int(origin),
 			fmt.Sprintf("invalid verification vector size, expects %d, got %d",
 				verifVectorSize*(s.threshold+1), len(data)))
 		return
@@ -344,7 +351,8 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	s.vA = make([]pointG2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
-		s.processor.FlagMisbehavior(int(origin),
+		s.disqualified = true
+		s.processor.Disqualify(int(origin),
 			fmt.Sprintf("reading the verification vector failed:%s", err))
 		return
 	}
@@ -352,7 +360,6 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	s.y = make([]pointG2, s.size)
 	s.computePublicKeys()
 
-	s.vAReceived = true
 	// check the (already) registered complaints
 	for complainer, c := range s.complaints {
 		if c.received && c.answerReceived {
@@ -405,7 +412,8 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 	}
 
 	if len(data) != complaintSize {
-		s.processor.FlagMisbehavior(int(origin),
+		s.disqualified = true
+		s.processor.Disqualify(int(origin),
 			fmt.Sprintf("invalid complaint size, expects %d, got %d",
 				complaintSize, len(data)))
 		return
@@ -465,14 +473,16 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	}
 
 	if len(data) == 0 {
-		s.processor.FlagMisbehavior(int(origin), "complaint answer is empty")
+		s.disqualified = true
+		s.processor.Disqualify(int(origin), "complaint answer is empty")
 		return
 	}
 
 	// first byte encodes the complainee
 	complainer := index(data[0])
 	if int(complainer) >= s.size {
-		s.processor.FlagMisbehavior(int(origin),
+		s.disqualified = true
+		s.processor.Disqualify(int(origin),
 			fmt.Sprintf("complainer value is invalid, should be less that %d, got %d",
 				s.size, int(complainer)))
 		return
@@ -494,10 +504,15 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 			return
 		}
 		// read the complainer private share
-		C.bn_read_bin((*C.bn_st)(&s.complaints[complainer].answer),
+		if C.bn_read_Zr_bin((*C.bn_st)(&s.complaints[complainer].answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLSBLS12381,
-		)
+		) != valid {
+			s.disqualified = true
+			s.processor.Disqualify(int(s.leaderIndex),
+				fmt.Sprintf("invalid complaint answer value %x", data))
+			return
+		}
 		return
 	}
 	// complaint is not new in the map
@@ -511,16 +526,24 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	c.answerReceived = true
 	if len(data) != complainAnswerSize {
 		s.disqualified = true
+		s.processor.Disqualify(int(s.leaderIndex),
+			fmt.Sprintf("invalid complaint answer length, expected %d, got %d",
+				complainAnswerSize, len(data)))
 		return
 	}
 
 	// first flag check is a sanity check
 	if c.received {
 		// read the complainer private share
-		C.bn_read_bin((*C.bn_st)(&c.answer),
+		if C.bn_read_Zr_bin((*C.bn_st)(&c.answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLSBLS12381,
-		)
+		) != valid {
+			s.disqualified = true
+			s.processor.Disqualify(int(s.leaderIndex),
+				fmt.Sprintf("invalid complaint answer value %x", data))
+			return
+		}
 		s.disqualified = s.checkComplaint(complainer, c)
 		if s.disqualified {
 			s.processor.Disqualify(int(s.leaderIndex),
