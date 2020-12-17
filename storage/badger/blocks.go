@@ -20,6 +20,7 @@ type Blocks struct {
 	payloads *Payloads
 }
 
+// NewBlocks ...
 func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{
 		db:       db,
@@ -29,6 +30,7 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
+// StoreTx ...
 func (b *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		err := b.headers.storeTx(block.Header)(tx)
@@ -61,16 +63,19 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 	}
 }
 
+// Store ...
 func (b *Blocks) Store(block *flow.Block) error {
 	return operation.RetryOnConflict(b.db.Update, b.StoreTx(block))
 }
 
+// ByID ...
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
 	return b.retrieveTx(blockID)(tx)
 }
 
+// ByHeight ...
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	var blockID flow.Identifier
 	err := b.db.View(operation.LookupBlockHeight(height, &blockID))
@@ -80,6 +85,7 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
+// ByCollectionID ...
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
 	err := b.db.View(operation.LookupCollectionBlock(collID, &blockID))
@@ -89,6 +95,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
+// IndexBlockForCollections ...
 func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	for _, collID := range collIDs {
 		err := operation.RetryOnConflict(b.db.Update, operation.SkipDuplicates(operation.IndexCollectionBlock(collID, blockID)))
@@ -123,6 +130,7 @@ func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
 	})
 }
 
+// GetLastFullBlockHeight ...
 func (b *Blocks) GetLastFullBlockHeight() (uint64, error) {
 	var h uint64
 	err := b.db.View(operation.RetrieveLastCompleteBlockHeight(&h))

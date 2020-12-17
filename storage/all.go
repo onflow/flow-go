@@ -18,4 +18,5 @@ type All struct {
 	Transactions       Transactions
 	TransactionResults TransactionResults
 	Collections        Collections
+	Events             Events
 }

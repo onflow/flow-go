@@ -63,8 +63,7 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
-	state    *protocol.State
-	mutator  *protocol.Mutator
+	state    *protocol.MutableState
 	headerDB *storage.Headers
 	sealDB   *storage.Seals
 	indexDB  *storage.Index
@@ -112,7 +111,11 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 
 		incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(previousResult),
-			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
+			// For sealing phase 2, the value for IncorporatedBlockID is the block the result pertains to (here parentBlock).
+			// In later development phases, we will change the logic such that IncorporatedBlockID references the
+			// block which actually incorporates the result:
+			//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 		)
 		result := unittest.ExecutionResultFixture(
 			unittest.WithBlock(&block),
@@ -140,21 +143,11 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 // IncorporatedResultSeal, which ties the seal to the incorporated result it
 // seals, is also recorded for future access.
 func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
-
-	finalState, _ := incorporatedResult.Result.FinalStateCommitment()
-
-	seal := &flow.Seal{
-		BlockID:    incorporatedResult.Result.BlockID,
-		ResultID:   incorporatedResult.Result.ID(),
-		FinalState: finalState,
-	}
-	bs.chain = append(bs.chain, seal)
-
-	incorporatedResultSeal := &flow.IncorporatedResultSeal{
-		IncorporatedResult: incorporatedResult,
-		Seal:               seal,
-	}
-
+	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
+		unittest.IncorporatedResultSeal.WithResult(incorporatedResult.Result),
+		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatedResult.IncorporatedBlockID),
+	)
+	bs.chain = append(bs.chain, incorporatedResultSeal.Seal)
 	bs.irsMap[incorporatedResultSeal.ID()] = incorporatedResultSeal
 	bs.irsList = append(bs.irsList, incorporatedResultSeal)
 }
@@ -258,10 +251,8 @@ func (bs *BuilderSuite) SetupTest() {
 		return nil
 	}
 
-	bs.state = &protocol.State{}
-	bs.mutator = &protocol.Mutator{}
-	bs.state.On("Mutate").Return(bs.mutator)
-	bs.mutator.On("Extend", mock.Anything).Run(func(args mock.Arguments) {
+	bs.state = &protocol.MutableState{}
+	bs.state.On("Extend", mock.Anything).Run(func(args mock.Arguments) {
 		block := args.Get(0).(*flow.Block)
 		bs.Assert().Equal(bs.sentinel, block.Header.View)
 		bs.assembled = block.Payload
@@ -524,23 +515,34 @@ func (bs *BuilderSuite) TestPayloadSealAllValid() {
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
-func (bs *BuilderSuite) TestPayloadSealSomeValid() {
-
-	bs.pendingSeals = bs.irsMap
-
-	// add some invalid seals to the mempool
+// TestPayloadSealOnlyFork checks that the builder only includes seals corresponding
+// to blocks on the current fork (and _not_ seals for sealable blocks on other forks)
+func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
+	// in the test setup, we already created a single fork
+	//  [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+	// Where block
+	//   * [first] is sealed and finalized
+	//   * [F0] ... [F3] are finalized but _not_ sealed
+	//   * [A0] ... [A3] are _not_ finalized and _not_ sealed
+	// We now create an additional fork:  [F3] <- [B0] <- [B1] <- ... <- [B7]
+	var forkHead *flow.Block
+	forkHead = bs.blocks[bs.finalID]
 	for i := 0; i < 8; i++ {
-		invalid := &flow.IncorporatedResultSeal{
-			IncorporatedResult: unittest.IncorporatedResultFixture(),
-			Seal:               unittest.SealFixture(),
-		}
-		bs.pendingSeals[invalid.ID()] = invalid
+		forkHead = bs.createAndRecordBlock(forkHead)
+		// Method createAndRecordBlock adds a seal for every block into the mempool.
 	}
 
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.pendingSeals = bs.irsMap
+	_, err := bs.build.BuildOn(forkHead.ID(), bs.setter)
 	bs.Require().NoError(err)
+
+	// expected seals: [F0] <- ... <- [F3] <- [B0] <- ... <- [B7]
+	// Note: bs.chain contains seals for blocks  F0 ... F3 then A0 ... A3 and then B0 ... B7
+	bs.Assert().Equal(12, len(bs.assembled.Seals), "unexpected number of seals")
+	bs.Assert().ElementsMatch(bs.chain[:4], bs.assembled.Seals[:4], "should have included only valid chain of seals")
+	bs.Assert().ElementsMatch(bs.chain[len(bs.chain)-8:], bs.assembled.Seals[4:], "should have included only valid chain of seals")
+
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
 }
 
 func (bs *BuilderSuite) TestPayloadSealCutoffChain() {

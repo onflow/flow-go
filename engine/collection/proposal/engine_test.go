@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
@@ -29,11 +29,10 @@ type Suite struct {
 
 	// protocol state
 	proto struct {
-		state    *protocol.State
+		state    *protocol.MutableState
 		snapshot *protocol.Snapshot
 		query    *protocol.EpochQuery
 		epoch    *protocol.Epoch
-		mutator  *protocol.Mutator
 	}
 	// cluster state
 	cluster struct {
@@ -45,7 +44,7 @@ type Suite struct {
 
 	me           *module.Local
 	net          *module.Network
-	conduit      *network.Conduit
+	conduit      *mocknetwork.Conduit
 	transactions *storage.Transactions
 	headers      *storage.Headers
 	payloads     *storage.ClusterPayloads
@@ -68,13 +67,11 @@ func (suite *Suite) SetupTest() {
 	me := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	// mock out protocol state
-	suite.proto.state = new(protocol.State)
+	suite.proto.state = new(protocol.MutableState)
 	suite.proto.snapshot = new(protocol.Snapshot)
 	suite.proto.query = new(protocol.EpochQuery)
 	suite.proto.epoch = new(protocol.Epoch)
-	suite.proto.mutator = new(protocol.Mutator)
 	suite.proto.state.On("Final").Return(suite.proto.snapshot)
-	suite.proto.state.On("Mutate").Return(suite.proto.mutator)
 	suite.proto.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
 	suite.proto.snapshot.On("Epochs").Return(suite.proto.query)
@@ -100,7 +97,7 @@ func (suite *Suite) SetupTest() {
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.net = new(module.Network)
-	suite.conduit = new(network.Conduit)
+	suite.conduit = new(mocknetwork.Conduit)
 	suite.net.On("Register", engine.ChannelConsensusCluster(clusterID), mock.Anything).Return(suite.conduit, nil)
 	suite.conduit.On("Close").Return(nil).Maybe()
 

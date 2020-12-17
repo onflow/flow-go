@@ -958,7 +958,7 @@ func stateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 		func(nodeID flow.Identifier) error {
 			_, found := identities[nodeID]
 			if !found {
-				return realproto.IdentityNotFoundErr{NodeID: nodeID}
+				return realproto.IdentityNotFoundError{NodeID: nodeID}
 			}
 			return nil
 		},
@@ -1055,14 +1055,15 @@ func (ms *MatchingSuite) validSubgraphFixture() subgraphFixture {
 
 // addSubgraphFixtureToMempools adds add entities in subgraph to mempools and persistent storage mocks
 func (ms *MatchingSuite) addSubgraphFixtureToMempools(subgraph subgraphFixture) {
-	ms.blocks[subgraph.ParentBlock.ID()] = subgraph.ParentBlock
-	ms.blocks[subgraph.Block.ID()] = subgraph.Block
-	ms.persistedResults[subgraph.PreviousResult.ID()] = subgraph.PreviousResult
-	ms.persistedResults[subgraph.Result.ID()] = subgraph.Result
-	ms.pendingResults[subgraph.IncorporatedResult.ID()] = subgraph.IncorporatedResult
 
 	ms.assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
 	for index := uint64(0); index < uint64(len(subgraph.IncorporatedResult.Result.Chunks)); index++ {
 		ms.approvalsPL.On("ByChunk", subgraph.IncorporatedResult.Result.ID(), index).Return(subgraph.Approvals[index]).Maybe()
 	}
+
+	ms.blocks[subgraph.ParentBlock.ID()] = subgraph.ParentBlock
+	ms.blocks[subgraph.Block.ID()] = subgraph.Block
+	ms.persistedResults[subgraph.PreviousResult.ID()] = subgraph.PreviousResult
+	ms.persistedResults[subgraph.Result.ID()] = subgraph.Result
+	ms.pendingResults[subgraph.IncorporatedResult.ID()] = subgraph.IncorporatedResult
 }
