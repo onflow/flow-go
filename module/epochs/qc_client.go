@@ -7,9 +7,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
-	jsonCadence "github.com/onflow/cadence/encoding/json"
-
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 
@@ -69,17 +69,17 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// TODO: what are these?
-	keyIndex := 0
-	account := sdk.Account{}
+	// keyIndex := 0
+	// account := sdk.Account{}
 
 	// sign transaction
-	err = ``tx.SignPayload(account.Address, keyIndex, c.me)
-	if err != nil {
-		return fmt.Errorf("could not sign transaction: %w", err)
-	}
+	// err = tx.SignPayload(account.Address, keyIndex)
+	// if err != nil {
+	// 	return fmt.Errorf("could not sign transaction: %w", err)
+	// }
 
 	// submit signed transaction to node
-	txHash, err := c.submitTx(tx)
+	_, err = c.submitTx(tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
@@ -99,7 +99,7 @@ func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 	// convert to cadence values
 	arguments := []cadence.Value{}
 	for _, arg := range args {
-		val, err := jsonCadence.Decode(arg)
+		val, err := jsoncdc.Decode(arg)
 		if err != nil {
 			return false, fmt.Errorf("could not deocde arguments: %w", err)
 		}
