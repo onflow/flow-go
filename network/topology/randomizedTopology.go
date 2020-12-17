@@ -92,11 +92,12 @@ func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel string)
 	// excludes node itself
 	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.me)))
 
+	// samples a random graph based on whether channel is cluster-based or not.
 	if _, ok := engine.IsClusterChannelID(channel); ok {
 		return r.clusterChannelHandler(sampleSpace)
-	} else {
-		return r.nonClusterChannelHandler(sampleSpace, channel)
 	}
+	return r.nonClusterChannelHandler(sampleSpace, channel)
+
 }
 
 // sampleFanout receives two lists: all and shouldHave. It then samples a connected fanout
