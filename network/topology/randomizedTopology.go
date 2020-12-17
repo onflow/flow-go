@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// RandomizedTopology is a generates a random topology per channel.
+// RandomizedTopology generates a random topology per channel.
 // By random topology we mean a node is connected to any other co-channel nodes with some
 // edge probability.
 type RandomizedTopology struct {
