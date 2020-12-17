@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
-FROM golang:1.13 AS build-setup
+FROM golang:1.13-buster AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install cmake zip sudo
@@ -54,7 +54,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 RUN chmod a+x /app/app
 
 ## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/base as production
+FROM gcr.io/distroless/base-debian10 as production
 
 COPY --from=build-production /app/app /bin/app
 
@@ -70,7 +70,7 @@ RUN --mount=type=ssh \
 
 RUN chmod a+x /app/app
 
-FROM golang:1.13 as debug
+FROM golang:1.13-buster as debug
 
 RUN go get -u github.com/go-delve/delve/cmd/dlv
 
@@ -91,7 +91,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 RUN chmod a+x /app/app
 
 ## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/base as production-transit-nocgo
+FROM gcr.io/distroless/base-debian10 as production-transit-nocgo
 
 COPY --from=build-transit-production-nocgo /app/app /bin/app
 
