@@ -796,3 +796,58 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_Processed() {
 		suite.matchEng,
 		suite.headerStorage)
 }
+
+// TestHandleReceipt_Discarded evaluates that checking a cached receipt with a discarded result
+// is dropped without attempting to add it to any of ready and pending mempools.
+func (suite *FinderEngineTestSuite) TestHandleReceipt_Discarded() {
+	e := suite.TestNewFinderEngine()
+
+	// mocks no new finalized block
+	suite.blockIDsCache.On("All").
+		Return(flow.IdentifierList{})
+
+	// mocks no new ready receipt
+	suite.readyReceipts.On("All").
+		Return([]*verification.ReceiptDataPack{})
+
+	// mocks a receipt in cache
+	suite.cachedReceipts.On("All").
+		Return([]*verification.ReceiptDataPack{suite.receiptDataPack})
+	suite.cachedReceipts.On("Rem", suite.receiptDataPack.ID()).
+		Return(true)
+
+	// mocks result not processed but discarded
+	checkWG := sync.WaitGroup{}
+	checkWG.Add(1)
+	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false).Once()
+	suite.discardedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Run(func(args testifymock.Arguments) {
+			checkWG.Done()
+		}).Return(true).Once()
+
+	// starts engine
+	<-e.Ready()
+
+	unittest.AssertReturnsBefore(suite.T(), checkWG.Wait, 5*time.Second)
+
+	// terminates engine
+	<-e.Done()
+
+	// should not be any attempt on adding receipt to any of mempools
+	suite.readyReceipts.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.pendingReceipts.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.processedResultIDs.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.discardedResultIDs.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+
+	// should not be any attempt on sending result to match engine
+	suite.matchEng.AssertNotCalled(suite.T(), "Process", testifymock.Anything, testifymock.Anything)
+
+	testifymock.AssertExpectationsForObjects(suite.T(),
+		suite.cachedReceipts,
+		suite.blockIDsCache,
+		suite.pendingReceipts,
+		suite.readyReceipts,
+		suite.processedResultIDs,
+		suite.matchEng,
+		suite.headerStorage)
+}
