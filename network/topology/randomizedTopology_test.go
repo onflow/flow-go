@@ -15,8 +15,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// RandomizedTopologyTestSuite tests the bare minimum requirements of a
-// topology that is needed for our network.
+// RandomizedTopologyTestSuite tests encapsulates tests around the randomized topology.
 type RandomizedTopologyTestSuite struct {
 	suite.Suite
 	state    protocol.State    // represents a mocked protocol state
