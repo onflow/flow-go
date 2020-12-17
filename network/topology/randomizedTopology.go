@@ -16,14 +16,14 @@ import (
 // edge probability.
 type RandomizedTopology struct {
 	me      flow.Identifier             // used to keep identifier of the node
-	state   protocol.ReadOnlyState      // used to keep a read only protocol state
+	state   protocol.State              // used to keep a read only protocol state
 	subMngr network.SubscriptionManager // used to keep track topics the node subscribed to
 	chance  uint64                      // used to translate connectedness probability into a number in [0, 100]
 	rng     random.Rand                 // used as a stateful random number generator to sample edges
 }
 
 // NewRandomizedTopology returns an instance of the RandomizedTopology.
-func NewRandomizedTopology(nodeID flow.Identifier, edgeProb float64, state protocol.ReadOnlyState,
+func NewRandomizedTopology(nodeID flow.Identifier, edgeProb float64, state protocol.State,
 	subMngr network.SubscriptionManager) (*RandomizedTopology, error) {
 	// edge probability should be a positive value between 0 and 1. However,
 	// we like it to be strictly greater than zero. Also, at the current scale of

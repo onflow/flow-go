@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type TopologyConstructorFunc func(flow.Identifier, protocol.ReadOnlyState, network.SubscriptionManager) (network.Topology, error)
+type TopologyConstructorFunc func(flow.Identifier, protocol.State, network.SubscriptionManager) (network.Topology, error)
 
 // TopologyTestSuite tests the end-to-end connectedness of topology
 type TopologyTestSuite struct {
@@ -38,13 +38,13 @@ func TestTopologyTestSuite(t *testing.T) {
 func (suite *TopologyTestSuite) SetupTest() {
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
-	suite.linearFanoutTop = func(identifier flow.Identifier, state protocol.ReadOnlyState, manager network.SubscriptionManager) (network.Topology,
+	suite.linearFanoutTop = func(identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) (network.Topology,
 		error) {
 
 		return topology.NewTopicBasedTopology(identifier, suite.logger, state, manager)
 	}
 
-	suite.randomizedTop = func(identifier flow.Identifier, state protocol.ReadOnlyState, manager network.SubscriptionManager) (network.Topology,
+	suite.randomizedTop = func(identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) (network.Topology,
 		error) {
 		return topology.NewRandomizedTopology(identifier, 0.01, state, manager)
 	}
