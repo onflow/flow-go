@@ -73,7 +73,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	account := sdk.Account{}
 
 	// sign transaction
-	err = tx.SignPayload(account.Address, keyIndex, c.me)
+	err = ``tx.SignPayload(account.Address, keyIndex, c.me)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
