@@ -100,18 +100,19 @@ func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel string)
 
 }
 
-// sampleFanout receives two lists: all and shouldHave. It then samples a connected fanout
-// for the caller that includes the shouldHave set. Independent invocations of this method over
-// different nodes, should create a connected graph.
+// sampleFanout samples a connected fanout for ids.
+// Independent invocations of this method over different nodes, should create a connected graph.
 // Fanout is the set of nodes that this instance should get connected to in order to create a
 // connected graph.
-func (r RandomizedTopology) sampleFanout(all flow.IdentityList) (flow.IdentityList, error) {
-	if len(all) == 0 {
+func (r RandomizedTopology) sampleFanout(ids flow.IdentityList) (flow.IdentityList, error) {
+	if len(ids) == 0 {
 		return nil, fmt.Errorf("empty identity list")
 	}
 
 	fanout := flow.IdentityList{}
-	for _, id := range all {
+	for _, id := range ids {
+		// tosses a biased coin and adds id to fanout accordingly.
+		// biased coin follows the edge probability distribution.
 		if r.tossBiasedBit() {
 			fanout = append(fanout, id)
 		}
@@ -120,26 +121,10 @@ func (r RandomizedTopology) sampleFanout(all flow.IdentityList) (flow.IdentityLi
 	return fanout, nil
 }
 
-// clusterPeers returns the list of other nodes within the same cluster as this node.
-func (r RandomizedTopology) clusterPeers() (flow.IdentityList, error) {
-	currentEpoch := r.state.Final().Epochs().Current()
-	clusterList, err := currentEpoch.Clustering()
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract cluster list %w", err)
-	}
-
-	myCluster, _, found := clusterList.ByNodeID(r.me)
-	if !found {
-		return nil, fmt.Errorf("failed to find the cluster for node ID %s", r.me.String())
-	}
-
-	return myCluster, nil
-}
-
 // clusterChannelHandler returns a connected graph fanout of peers in the same cluster as executor of this instance.
 func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.IdentityList, error) {
 	// extracts cluster peer ids to which the node belongs to.
-	clusterPeers, err := r.clusterPeers()
+	clusterPeers, err := clusterPeers(r.me, r.state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", r.me.String(), err)
 	}
@@ -158,7 +143,6 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 }
 
 // clusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
-// The returned sample contains `shouldHave` ones that also subscribed to `channel`.
 func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, channel string) (flow.IdentityList, error) {
 	if _, ok := engine.IsClusterChannelID(channel); ok {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
@@ -177,9 +161,8 @@ func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, chan
 // tossBiasedBit returns true with probability equal `r.chance/100`, and returns false otherwise.
 func (r *RandomizedTopology) tossBiasedBit() bool {
 	draw := r.rng.UintN(100)
-	if draw < r.chance {
-		return true
-	} else {
+	if draw > r.chance {
 		return false
 	}
+	return true
 }

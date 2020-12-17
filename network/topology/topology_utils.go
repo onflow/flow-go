@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // FanoutFunc represents a function type that receiving total number of nodes
@@ -47,4 +48,20 @@ func byteSeedFromID(id flow.Identifier) ([]byte, error) {
 	}
 
 	return h.ComputeHash(encodedId), nil
+}
+
+// clusterPeers returns the list of other nodes within the same cluster as specified identifier.
+func clusterPeers(id flow.Identifier, state protocol.State) (flow.IdentityList, error) {
+	currentEpoch := state.Final().Epochs().Current()
+	clusterList, err := currentEpoch.Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract cluster list %w", err)
+	}
+
+	myCluster, _, found := clusterList.ByNodeID(id)
+	if !found {
+		return nil, fmt.Errorf("failed to find the cluster for node ID %s", id.String())
+	}
+
+	return myCluster, nil
 }

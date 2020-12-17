@@ -183,28 +183,18 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 
 }
 
-// clusterPeers returns the list of other nodes within the same cluster as this node.
-func (t TopicBasedTopology) clusterPeers() (flow.IdentityList, error) {
-	currentEpoch := t.state.Final().Epochs().Current()
-	clusterList, err := currentEpoch.Clustering()
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract cluster list %w", err)
-	}
-
-	myCluster, _, found := clusterList.ByNodeID(t.me)
-	if !found {
-		return nil, fmt.Errorf("failed to find the cluster for node ID %s", t.me.String())
-	}
-
-	return myCluster, nil
-}
-
 // clusterChannelHandler returns a connected graph fanout of peers in the same cluster as executor of this instance.
 func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentityList) (flow.IdentityList, error) {
 	// extracts cluster peer ids to which the node belongs to.
-	clusterPeers, err := t.clusterPeers()
+	clusterPeers, err := clusterPeers(t.me, t.state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", t.me.String(), err)
+	}
+
+	// checks all cluster peers belong to the passed ids list
+	nonMembers := clusterPeers.Filter(filter.Not(filter.In(ids)))
+	if len(nonMembers) > 0 {
+		return nil, fmt.Errorf("cluster peers not belonged to sample space: %v", nonMembers)
 	}
 
 	// samples a connected graph topology from the cluster peers
