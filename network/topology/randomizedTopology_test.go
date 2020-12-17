@@ -25,12 +25,12 @@ type RandomizedTopologyTestSuite struct {
 	edgeProb float64
 }
 
-// TestRandomizedTopologyTestSuite starts all the tests in this test suite
+// TestRandomizedTopologyTestSuite starts all the tests in this test suite.
 func TestRandomizedTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(RandomizedTopologyTestSuite))
 }
 
-// SetupTest initiates the test setups prior to each test
+// SetupTest initiates the test setups prior to each test.
 func (suite *RandomizedTopologyTestSuite) SetupTest() {
 	// generates 1000 nodes including 100 collection nodes in 3 clusters.
 	nClusters := 3
@@ -51,7 +51,7 @@ func (suite *RandomizedTopologyTestSuite) SetupTest() {
 	suite.subMngr = MockSubscriptionManager(suite.T(), suite.all)
 }
 
-// TestUnhappyInitialization concerns initializing randomized topology with unhappy inputs
+// TestUnhappyInitialization concerns initializing randomized topology with unhappy inputs.
 func (suite *RandomizedTopologyTestSuite) TestUnhappyInitialization() {
 	// initializing with zero edge probability should return an err
 	_, err := NewRandomizedTopology(suite.all[0].NodeID, 0, suite.state, suite.subMngr[0])
@@ -78,20 +78,20 @@ func (suite *RandomizedTopologyTestSuite) TestUnhappyInitialization() {
 //
 // It also checks the topology against non-inclusion of the node itself in its own topology.
 //
-// Note: currently we are using a uniform probability, hence there are
-// C(n, (n+1)/2) many unique topologies for the same topic across different nodes. Even for small numbers
-// like n = 300, the potential outcomes are large enough (i.e., 10e88) so that the uniqueness is guaranteed.
+// Note: currently we are using a uniform edge probability, hence there are
+// 2^(n * (n-1)) many unique topologies for the same topic across different nodes.
+// Even for small numbers like n = 10, the potential outcomes are large enough (i.e., 10e30) so that the uniqueness is guaranteed.
 // This test however, performs a very weak uniqueness test by checking the uniqueness among consecutive topologies.
+//
+// With the edge probability in place, it is also very unlikely that any two arbitrary nodes end up the same
+// size topology.
 func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 	var previous, current []string
 
-	// for each topic samples 100 topologies
-	// all topologies for a topic should be the same
 	topics := engine.ChannelIDsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
 	for i, identity := range suite.all {
-		// extracts all topics node (i) subscribed to
 		if identity.Role != flow.RoleConsensus {
 			continue
 		}
@@ -117,7 +117,7 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 			continue
 		}
 
-		// assert that a different seed generates a different topology
+		// assert a different seed generates a different topology
 		require.NotEqual(suite.T(), previous, current)
 	}
 }
@@ -137,6 +137,8 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 		// samples subset of topology
 		subset, err := top.subsetChannel(suite.all, channelID)
 		require.NoError(suite.T(), err)
+
+		uniquenessCheck(suite.T(), subset)
 
 		channelIDAdjMap[id.NodeID] = subset
 	}
@@ -168,24 +170,19 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 		channelIDAdjMap[id.NodeID] = subset
 	}
 
-	// check that each of the collection clusters forms a connected graph
 	for _, cluster := range suite.clusters {
 		connectedByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
 	}
 }
 
-// TestLinearFanout_EmptyAllSet evaluates that trying to sample a connected graph when `all`
+// TestSampleFanout_EmptyAllSet evaluates that trying to sample a connected graph when `all`
 // is empty returns an error.
-func (suite *RandomizedTopologyTestSuite) TestLinearFanout_EmptyAllSet() {
+func (suite *RandomizedTopologyTestSuite) TestSampleFanout_EmptyAllSet() {
 	// creates a topology for the node
 	top, err := NewRandomizedTopology(suite.all[0].NodeID, suite.edgeProb, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
 	// sampling with empty `all`
-	_, err = top.sampleFanout(flow.IdentityList{})
-	require.Error(suite.T(), err)
-
-	// sampling with empty all
 	_, err = top.sampleFanout(flow.IdentityList{})
 	require.Error(suite.T(), err)
 
@@ -195,7 +192,7 @@ func (suite *RandomizedTopologyTestSuite) TestLinearFanout_EmptyAllSet() {
 }
 
 // TestSampleFanoutConnectedness evaluates that sampleFanout with default edge probability of this suite provides
-// a connected graph,
+// a connected graph.
 func (suite *RandomizedTopologyTestSuite) TestSampleFanoutConnectedness() {
 	adjMap := make(map[flow.Identifier]flow.IdentityList)
 	for i, id := range suite.all {
@@ -212,5 +209,5 @@ func (suite *RandomizedTopologyTestSuite) TestSampleFanoutConnectedness() {
 		adjMap[id.NodeID] = sample
 	}
 
-	Connected(suite.T(), adjMap, suite.all, filter.In(suite.all))
+	Connected(suite.T(), adjMap, suite.all, filter.Any)
 }

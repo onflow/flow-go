@@ -30,17 +30,15 @@ type TopicAwareTopologyTestSuite struct {
 	fanout   uint // represents maximum number of connections this peer allows to have
 }
 
-// TestTopicAwareTopologyTestSuite starts all the tests in this test suite
+// TestTopicAwareTopologyTestSuite starts all the tests in this test suite.
 func TestTopicAwareTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(TopicAwareTopologyTestSuite))
 }
 
-// SetupTest initiates the test setups prior to each test
+// SetupTest initiates the test setups prior to each test.
 func (suite *TopicAwareTopologyTestSuite) SetupTest() {
-	// we consider fanout as maximum number of connections the node allows to have
-	// TODO: optimize value of fanout.
+	// generates 1000 nodes including 100 collection nodes in 3 clusters.
 	suite.fanout = 100
-
 	nClusters := 3
 	nCollectors := 100
 	nTotal := 1000
