@@ -171,7 +171,7 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 
 	// check that each of the collection clusters forms a connected graph
 	for _, cluster := range suite.clusters {
-		checkConnectednessByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
+		connectedByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
 	}
 }
 
@@ -213,5 +213,5 @@ func (suite *RandomizedTopologyTestSuite) TestSampleFanoutConnectedness() {
 		adjMap[id.NodeID] = sample
 	}
 
-	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
+	Connected(suite.T(), adjMap, suite.all, filter.In(suite.all))
 }

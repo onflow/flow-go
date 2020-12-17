@@ -200,7 +200,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(constructorFunc
 		}
 
 		// checks end-to-end connectedness of the topology
-		topology.CheckGraphConnected(suite.T(), adjMap, ids, filter.Any)
+		topology.Connected(suite.T(), adjMap, ids, filter.Any)
 	}
 
 	if suite.printTrace() {

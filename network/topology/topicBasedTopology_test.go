@@ -222,7 +222,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 
 	// check that each of the collection clusters forms a connected graph
 	for _, cluster := range suite.clusters {
-		checkConnectednessByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
+		connectedByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
 	}
 }
 
@@ -349,7 +349,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Unconditionally() {
 		adjMap[id.NodeID] = sample
 	}
 
-	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
+	Connected(suite.T(), adjMap, suite.all, filter.In(suite.all))
 }
 
 // TestConnectedness_Conditionally evaluates that samples returned by the sampleConnectedGraph with
@@ -374,7 +374,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_Conditionally() {
 		adjMap[id.NodeID] = sample
 	}
 
-	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.In(suite.all))
+	Connected(suite.T(), adjMap, suite.all, filter.In(suite.all))
 }
 
 // TestSubsetRoleConnectedness_Conditionally evaluates that subset returned by subsetRole with a non-empty `shouldHave` set
@@ -404,7 +404,7 @@ func (suite *TopicAwareTopologyTestSuite) TestSubsetRoleConnectedness_Conditiona
 	}
 
 	// evaluates connectedness of consensus nodes graph.
-	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.HasRole(flow.RoleConsensus))
+	Connected(suite.T(), adjMap, suite.all, filter.HasRole(flow.RoleConsensus))
 }
 
 // TestSubsetRoleConnectedness_Unconditionally evaluates that subset returned by subsetRole with an `shouldHave` set
@@ -424,5 +424,5 @@ func (suite *TopicAwareTopologyTestSuite) TestSubsetRoleConnectedness_Unconditio
 	}
 
 	// evaluates connectedness of consensus nodes graph.
-	CheckGraphConnected(suite.T(), adjMap, suite.all, filter.HasRole(flow.RoleConsensus))
+	Connected(suite.T(), adjMap, suite.all, filter.HasRole(flow.RoleConsensus))
 }

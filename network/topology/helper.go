@@ -42,13 +42,13 @@ func connectednessByChannelID(t *testing.T, adjMap map[flow.Identifier]flow.Iden
 	channelID string) {
 	roles, ok := engine.RolesByChannelID(channelID)
 	require.True(t, ok)
-	CheckGraphConnected(t, adjMap, ids, filter.HasRole(roles...))
+	Connected(t, adjMap, ids, filter.HasRole(roles...))
 }
 
-// CheckGraphConnected checks if the graph represented by the adjacency matrix is connected.
+// Connected checks if the graph represented by the adjacency matrix is connected.
 // It traverses the adjacency map starting from an arbitrary node and checks if all nodes that satisfy the filter
 // were visited.
-func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, f flow.IdentityFilter) {
+func Connected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, f flow.IdentityFilter) {
 	// filter the ids and find the expected node count
 	expectedIDs := ids.Filter(f)
 	expectedCount := len(expectedIDs)
@@ -158,7 +158,7 @@ func clusterChannelIDs(t *testing.T) []string {
 	return channels
 }
 
-// checkConnectednessByCluster is a test helper that checks `all` nodes belong to a cluster are connected.
-func checkConnectednessByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, all flow.IdentityList, cluster flow.IdentityList) {
-	CheckGraphConnected(t, adjMap, all, filter.In(cluster))
+// connectedByCluster is a test helper that checks `all` nodes belong to a cluster are connected.
+func connectedByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, all flow.IdentityList, cluster flow.IdentityList) {
+	Connected(t, adjMap, all, filter.In(cluster))
 }
