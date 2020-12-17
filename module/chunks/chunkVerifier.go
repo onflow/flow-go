@@ -46,8 +46,8 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 	}
 
 	transactions := make([]*fvm.TransactionProcedure, 0)
-	for _, txBody := range vc.Collection.Transactions {
-		tx := fvm.Transaction(txBody)
+	for i, txBody := range vc.Collection.Transactions {
+		tx := fvm.Transaction(txBody, uint32(i))
 		transactions = append(transactions, tx)
 	}
 
@@ -66,7 +66,7 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 
 	// transaction body of system chunk
 	txBody := fvm.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
 	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Result, vc.Header, transactions, vc.EndState)
@@ -139,7 +139,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
 
-		// tx := fvm.Transaction(txBody)
+		// tx := fvm.Transaction(txBody, uint32(i))
 
 		err := fcv.vm.Run(blockCtx, tx, txView)
 		if err != nil {

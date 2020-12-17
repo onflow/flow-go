@@ -557,6 +557,20 @@ func WithStake(stake uint64) func(*flow.Identity) {
 	}
 }
 
+// WithAddress sets the network address of identity fixture.
+func WithAddress(address string) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Address = address
+	}
+}
+
+// WithNetworkingKey sets the networking public key of identity fixture.
+func WithNetworkingKey(key crypto.PublicKey) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.NetworkPubKey = key
+	}
+}
+
 func RandomBytes(n int) []byte {
 	b := make([]byte, n)
 	read, err := crand.Read(b)
@@ -987,6 +1001,29 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 		apply(setup)
 	}
 	return setup
+}
+
+func EpochStatusFixture() *flow.EpochStatus {
+	return &flow.EpochStatus{
+		FirstBlockID: IdentifierFixture(),
+		CurrentEpoch: flow.EventIDs{
+			SetupID:  IdentifierFixture(),
+			CommitID: IdentifierFixture(),
+		},
+		NextEpoch: flow.EventIDs{
+			SetupID:  IdentifierFixture(),
+			CommitID: IdentifierFixture(),
+		},
+	}
+}
+
+func IndexFixture() *flow.Index {
+	return &flow.Index{
+		NodeIDs:       IdentifierListFixture(5),
+		CollectionIDs: IdentifierListFixture(5),
+		SealIDs:       IdentifierListFixture(5),
+		ReceiptIDs:    IdentifierListFixture(5),
+	}
 }
 
 func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCommit) {
