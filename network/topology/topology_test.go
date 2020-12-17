@@ -19,7 +19,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type factory func(flow.Identifier, protocol.State, network.SubscriptionManager) network.Topology
+// factory is an internal topology factory test helper.
+type factory func(*testing.T, flow.Identifier, protocol.State, network.SubscriptionManager) network.Topology
 
 // TopologyTestSuite tests the end-to-end connectedness of topology
 type TopologyTestSuite struct {
@@ -38,16 +39,17 @@ func TestTopologyTestSuite(t *testing.T) {
 func (suite *TopologyTestSuite) SetupTest() {
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
-	suite.linearFanoutTop = func(identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
+	suite.linearFanoutTop = func(t *testing.T, identifier flow.Identifier, state protocol.State,
+		manager network.SubscriptionManager) network.Topology {
 		top, err := topology.NewTopicBasedTopology(identifier, suite.logger, state, manager)
-		require.NoError(suite.T(), err)
+		require.NoError(t, err)
 
 		return top
 	}
 
-	suite.randomizedTop = func(identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
+	suite.randomizedTop = func(t *testing.T, identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
 		top, err := topology.NewRandomizedTopology(identifier, 0.01, state, manager)
-		require.NoError(suite.T(), err)
+		require.NoError(t, err)
 
 		return top
 	}
@@ -219,7 +221,7 @@ func (suite *TopologyTestSuite) topologyScenario(constructorFunc factory, me flo
 	state protocol.State) flow.IdentityList {
 
 	// creates topology of the node
-	top := constructorFunc(me, state, subMngr)
+	top := constructorFunc(suite.T(), me, state, subMngr)
 
 	// generates topology of node
 	myFanout, err := top.GenerateFanout(ids)
