@@ -85,7 +85,7 @@ func (i *TransactionInvocator) Process(
 		return err
 	}
 
-	i.logger.Info().Msgf("interaction used by a transaction script (%d)", st.InteractionUsed())
+	i.logger.Info().Msgf("(%d) ledger interaction were used by a transaction script (txhash: %s) ", st.InteractionUsed(), proc.ID.String())
 
 	// commit changes
 	err = st.Commit()
