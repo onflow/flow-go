@@ -46,7 +46,7 @@ func (suite *RandomizedTopologyTestSuite) SetupTest() {
 	suite.all = append(others, collectors...)
 
 	// mocks state for collector nodes topology
-	suite.state, suite.clusters = CreateMockStateForCollectionNodes(suite.T(),
+	suite.state, suite.clusters = MockStateForCollectionNodes(suite.T(),
 		suite.all.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
 
 	suite.subMngr = MockSubscriptionManager(suite.T(), suite.all)
@@ -142,7 +142,7 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 		channelIDAdjMap[id.NodeID] = subset
 	}
 
-	CheckConnectednessByChannelID(suite.T(), channelIDAdjMap, suite.all, channelID)
+	connectednessByChannelID(suite.T(), channelIDAdjMap, suite.all, channelID)
 }
 
 // TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a

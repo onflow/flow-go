@@ -18,10 +18,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// CreateMockStateForCollectionNodes is a test helper function that generate a mock state
+// MockStateForCollectionNodes is a test helper function that generate a mock state
 // clustering collection nodes into `clusterNum` clusters.
-func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList,
-	clusterNum uint) (protocol.State, flow.ClusterList) {
+func MockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, clusterNum uint) (protocol.State, flow.ClusterList) {
 	state := new(mockprotocol.State)
 	snapshot := new(mockprotocol.Snapshot)
 	epochQuery := new(mockprotocol.EpochQuery)
@@ -38,13 +37,8 @@ func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityL
 	return state, clusters
 }
 
-// CheckConnectedness verifies graph as a whole is connected.
-func CheckConnectedness(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList) {
-	CheckGraphConnected(t, adjMap, ids, filter.Any)
-}
-
-// CheckConnectednessByChannelID verifies that the subgraph of nodes subscribed to a channelID is connected.
-func CheckConnectednessByChannelID(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList,
+// connectednessByChannelID verifies that the subgraph of nodes subscribed to a channelID is connected.
+func connectednessByChannelID(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList,
 	channelID string) {
 	roles, ok := engine.RolesByChannelID(channelID)
 	require.True(t, ok)
@@ -55,7 +49,6 @@ func CheckConnectednessByChannelID(t *testing.T, adjMap map[flow.Identifier]flow
 // It traverses the adjacency map starting from an arbitrary node and checks if all nodes that satisfy the filter
 // were visited.
 func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, f flow.IdentityFilter) {
-
 	// filter the ids and find the expected node count
 	expectedIDs := ids.Filter(f)
 	expectedCount := len(expectedIDs)
@@ -137,7 +130,7 @@ func dfs(currentID flow.Identifier,
 	}
 }
 
-// uniquenessCheck is a test helper method that fails the test if all include any duplicate identity.
+// uniquenessCheck is a test helper method that fails the test if `ids` identity list include any duplicate identity.
 func uniquenessCheck(t *testing.T, ids flow.IdentityList) {
 	seen := make(map[flow.Identity]struct{})
 	for _, id := range ids {
@@ -152,25 +145,20 @@ func uniquenessCheck(t *testing.T, ids flow.IdentityList) {
 
 // clusterChannelIDs is a test helper method that returns all cluster-based channel ids.
 func clusterChannelIDs(t *testing.T) []string {
-	ccids := make([]string, 0)
+	channels := make([]string, 0)
 	for _, channelID := range engine.ChannelIDs() {
 		if _, ok := engine.IsClusterChannelID(channelID); !ok {
+			// skips if not a channel id
 			continue
 		}
-		ccids = append(ccids, channelID)
+		channels = append(channels, channelID)
 	}
 
-	require.NotEmpty(t, ccids)
-	return ccids
+	require.NotEmpty(t, channels, "empty cluster-based channel ids")
+	return channels
 }
 
-// checkConnectednessByCluster is a test helper that checks all nodes belong to a cluster are connected.
-func checkConnectednessByCluster(t *testing.T,
-	adjMap map[flow.Identifier]flow.IdentityList,
-	all flow.IdentityList,
-	cluster flow.IdentityList) {
-	CheckGraphConnected(t,
-		adjMap,
-		all,
-		filter.In(cluster))
+// checkConnectednessByCluster is a test helper that checks `all` nodes belong to a cluster are connected.
+func checkConnectednessByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, all flow.IdentityList, cluster flow.IdentityList) {
+	CheckGraphConnected(t, adjMap, all, filter.In(cluster))
 }

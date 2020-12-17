@@ -147,7 +147,7 @@ func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster 
 	ids = ids.Union(execution)
 
 	// mocks state for collector nodes topology
-	state, _ := topology.CreateMockStateForCollectionNodes(suite.T(),
+	state, _ := topology.MockStateForCollectionNodes(suite.T(),
 		ids.Filter(filter.HasRole(flow.RoleCollection)), uint(cluster))
 
 	subMngrs := topology.MockSubscriptionManager(suite.T(), ids)
@@ -200,7 +200,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(constructorFunc
 		}
 
 		// checks end-to-end connectedness of the topology
-		topology.CheckConnectedness(suite.T(), adjMap, ids)
+		topology.CheckGraphConnected(suite.T(), adjMap, ids, filter.Any)
 	}
 
 	if suite.printTrace() {
