@@ -124,6 +124,7 @@ func (c *ComputerWrap) ComputeBlock(
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
+	MutableState    protocol.MutableState
 	IngestionEngine *ingestion.Engine
 	ExecutionEngine *ComputerWrap
 	RequestEngine   *requester.Engine

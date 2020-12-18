@@ -140,12 +140,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// derive all node addresses from flow identities. Those node address will serve as the network whitelist
-	nodeAddrsWhiteList, err := nodeAddresses(idsMap)
-	if err != nil {
-		return fmt.Errorf("could not derive list of approved peer list: %w", err)
-	}
-	err = m.libP2PNode.UpdateAllowlist(nodeAddrsWhiteList...)
+	err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
 	if err != nil {
 		return fmt.Errorf("could not update approved peer list: %w", err)
 	}
@@ -237,16 +232,17 @@ func (m *Middleware) chooseMode(_ string, _ *message.Message, targetIDs ...flow.
 	}
 }
 
-// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 // direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 // as the router.
 //
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-	targetAddress, err := m.nodeAddressFromID(targetID)
+	// translates identifier to identity
+	targetIdentity, err := m.identity(targetID)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
 	if msg.Size() > m.maxUnicastMsgSize {
@@ -264,9 +260,9 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the the receiver
-	stream, err := m.libP2PNode.CreateStream(ctx, targetAddress)
+	stream, err := m.libP2PNode.CreateStream(ctx, targetIdentity)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s :%w", targetAddress.Name, err)
+		return fmt.Errorf("failed to create stream for %s :%w", targetID.String(), err)
 	}
 
 	// create a gogo protobuf writer
@@ -293,35 +289,34 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	return nil
 }
 
-// nodeAddressFromID returns the libp2p.NodeAddress for the given flow.id.
-func (m *Middleware) nodeAddressFromID(id flow.Identifier) (NodeAddress, error) {
-
+// identity returns corresponding identity of an identifier based on overlay identity list.
+func (m *Middleware) identity(identifier flow.Identifier) (flow.Identity, error) {
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
 	if err != nil {
-		return NodeAddress{}, fmt.Errorf("could not get identities: %w", err)
+		return flow.Identity{}, fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// retrieve the flow.Identity for the give flow.ID
-	flowIdentity, found := idsMap[id]
+	flowIdentity, found := idsMap[identifier]
 	if !found {
-		return NodeAddress{}, fmt.Errorf("could not get node identity for %s: %w", id.String(), err)
+		return flow.Identity{}, fmt.Errorf("could not get node identity for %s: %w", identifier.String(), err)
 	}
 
-	return NodeAddressFromIdentity(flowIdentity)
+	return flowIdentity, nil
 }
 
-func nodeAddresses(identityMap map[flow.Identifier]flow.Identity) ([]NodeAddress, error) {
-	var nodeAddrs []NodeAddress
+// identityList translates an identity map into an identity list.
+func identityList(identityMap map[flow.Identifier]flow.Identity) flow.IdentityList {
+	var identities flow.IdentityList
 	for _, identity := range identityMap {
-		nodeAddress, err := NodeAddressFromIdentity(identity)
-		if err != nil {
-			return nil, err
-		}
+		// casts identity into a local variable to
+		// avoid shallow copy of the loop variable
+		id := identity
+		identities = append(identities, &id)
 
-		nodeAddrs = append(nodeAddrs, nodeAddress)
 	}
-	return nodeAddrs, nil
+	return identities
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -431,12 +426,12 @@ func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 
 // Ping pings the target node and returns the ping RTT or an error
 func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
-	nodeAddress, err := m.nodeAddressFromID(targetID)
+	targetIdentity, err := m.identity(targetID)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
-	return m.libP2PNode.Ping(m.ctx, nodeAddress)
+	return m.libP2PNode.Ping(m.ctx, targetIdentity)
 }
 
 // UpdateAllowList fetches the most recent identity of the nodes from overlay
@@ -448,14 +443,8 @@ func (m *Middleware) UpdateAllowList() error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// derive all node addresses from flow identities
-	nodeAddrsAllowList, err := nodeAddresses(idsMap)
-	if err != nil {
-		return fmt.Errorf("could not derive list of approved peer list: %w", err)
-	}
-
 	// update libp2pNode's approve lists
-	err = m.libP2PNode.UpdateAllowlist(nodeAddrsAllowList...)
+	err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
 	if err != nil {
 		return fmt.Errorf("failed to update approved peer list: %w", err)
 	}
@@ -466,11 +455,7 @@ func (m *Middleware) UpdateAllowList() error {
 	return nil
 }
 
-// IsConnected returns true if this node is connected to the node with id nodeID
+// IsConnected returns true if this node is connected to the node with id nodeID.
 func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
-	nodeAddress, err := NodeAddressFromIdentity(identity)
-	if err != nil {
-		return false, err
-	}
-	return m.libP2PNode.IsConnected(nodeAddress)
+	return m.libP2PNode.IsConnected(identity)
 }
