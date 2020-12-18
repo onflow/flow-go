@@ -65,12 +65,6 @@ func prepare(executeTxResult error) (error, *bytes.Buffer) {
 
 func TestTopShotSafety(t *testing.T) {
 
-	t.Run("logs nothing for successful tx", func(t *testing.T) {
-		err, buffer := prepare(nil)
-		require.NoError(t, err)
-		require.Equal(t, 0, buffer.Len())
-	})
-
 	t.Run("logs for failing tx but not related to TopShot", func(t *testing.T) {
 
 		runtimeError := runtime.Error{
