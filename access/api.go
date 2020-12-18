@@ -58,6 +58,16 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 	}
 }
 
+func MessageToTransactionResult(message *access.TransactionResultResponse) *TransactionResult {
+
+	return &TransactionResult{
+		Status:       flow.TransactionStatus(message.Status),
+		StatusCode:   uint(message.StatusCode),
+		ErrorMessage: message.ErrorMessage,
+		Events:       convert.MessagesToEvents(message.Events),
+	}
+}
+
 // NetworkParameters contains the network-wide parameters for the Flow blockchain.
 type NetworkParameters struct {
 	ChainID flow.ChainID
