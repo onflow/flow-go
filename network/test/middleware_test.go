@@ -66,6 +66,8 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	}
 	for i, mw := range m.mws {
 		assert.NoError(m.T(), mw.Start(m.ov[i]))
+		err := mw.UpdateAllowList()
+		require.NoError(m.T(), err)
 	}
 }
 
@@ -293,7 +295,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 }
 
 // TestUnsubscribe tests that an engine can unsubscribe from a topic it was earlier subscribed to and stop receiving
-// messages
+// messages.
 func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 	first := 0

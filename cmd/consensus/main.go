@@ -36,11 +36,14 @@ import (
 	chmodule "github.com/onflow/flow-go/module/chunks"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
+	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/ejectors"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -67,6 +70,7 @@ func main() {
 		chunkAlpha                             uint
 
 		err            error
+		mutableState   protocol.MutableState
 		privateDKGData *bootstrap.DKGParticipantPriv
 		guarantees     mempool.Guarantees
 		results        mempool.IncorporatedResults
@@ -100,6 +104,22 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 			flags.BoolVar(&requireOneApproval, "require-one-approval", false, "require one approval per chunk when sealing execution results")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			mutableState, err = badgerState.NewFullConsensusState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -135,7 +155,11 @@ func main() {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
 			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
-			seals = stdmap.NewIncorporatedResultSeals(sealLimit, stdmap.WithEject(ejector.Eject))
+			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit), stdmap.WithEject(ejector.Eject))
+			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
+			if err != nil {
+				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
+			}
 			return nil
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -242,7 +266,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				mutableState,
 				prov,
 				proposals,
 				syncCore,
@@ -256,7 +280,7 @@ func main() {
 			build = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
-				node.State,
+				mutableState,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
@@ -274,7 +298,7 @@ func main() {
 			finalize := finalizer.NewFinalizer(
 				node.DB,
 				node.Storage.Headers,
-				node.State,
+				mutableState,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,
