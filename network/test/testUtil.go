@@ -108,7 +108,7 @@ func GenerateNetworks(t *testing.T,
 		// mocks state for collector nodes topology
 		// considers only a single cluster as higher cluster numbers are tested
 		// in collectionTopology_test
-		state, _ := topology.CreateMockStateForCollectionNodes(t,
+		state, _ := topology.MockStateForCollectionNodes(t,
 			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 		// creates topology instances for the nodes based on their roles
 		tops = GenerateTopologies(t, state, ids, sms, log)

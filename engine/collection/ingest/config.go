@@ -11,9 +11,6 @@ type Config struct {
 	ExpiryBuffer uint
 	// the maximum transaction gas limit
 	MaxGasLimit uint64
-	// whether or not we allow transactions that reference a block we have not
-	// validated or seen yet
-	AllowUnknownReference bool
 	// whether or not we check that transaction scripts are parse-able
 	CheckScriptsParse bool
 	// the maximum address index we accept
@@ -27,7 +24,6 @@ func DefaultConfig() Config {
 	return Config{
 		ExpiryBuffer:          flow.DefaultTransactionExpiryBuffer,
 		MaxGasLimit:           flow.DefaultMaxGasLimit,
-		AllowUnknownReference: false,
 		CheckScriptsParse:     true,
 		MaxAddressIndex:       1_000_000,
 		PropagationRedundancy: 2,
