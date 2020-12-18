@@ -7,20 +7,19 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 
-	stoerr "github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBlocks(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-
-		store := bstorage.NewBlocks(db, nil, nil)
+		store := badgerstorage.NewBlocks(db, nil, nil)
 
 		// check retrieval of non-existing key
 		_, err := store.GetLastFullBlockHeight()
 		assert.Error(t, err)
-		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// insert a value for height
 		var height1 = uint64(1234)
@@ -41,6 +40,5 @@ func TestBlocks(t *testing.T) {
 		actual, err = store.GetLastFullBlockHeight()
 		assert.NoError(t, err)
 		assert.Equal(t, height2, actual)
-
 	})
 }

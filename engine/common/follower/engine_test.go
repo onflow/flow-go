@@ -29,8 +29,7 @@ type Suite struct {
 	cleaner  *storage.Cleaner
 	headers  *storage.Headers
 	payloads *storage.Payloads
-	state    *protocol.State
-	mutator  *protocol.Mutator
+	state    *protocol.MutableState
 	snapshot *protocol.Snapshot
 	cache    *module.PendingBlockBuffer
 	follower *module.HotStuffFollower
@@ -47,8 +46,7 @@ func (suite *Suite) SetupTest() {
 	suite.cleaner = new(storage.Cleaner)
 	suite.headers = new(storage.Headers)
 	suite.payloads = new(storage.Payloads)
-	suite.state = new(protocol.State)
-	suite.mutator = new(protocol.Mutator)
+	suite.state = new(protocol.MutableState)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.cache = new(module.PendingBlockBuffer)
 	suite.follower = new(module.HotStuffFollower)
@@ -58,7 +56,6 @@ func (suite *Suite) SetupTest() {
 	suite.cleaner.On("RunGC").Return()
 	suite.headers.On("Store", mock.Anything).Return(nil)
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil)
-	suite.state.On("Mutate").Return(suite.mutator)
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.cache.On("PruneByHeight", mock.Anything).Return()
 	suite.cache.On("Size", mock.Anything).Return(uint(0))
@@ -123,7 +120,7 @@ func (suite *Suite) TestHandleProposal() {
 	// the parent is the last finalized state
 	suite.snapshot.On("Head").Return(parent.Header, nil).Once()
 	// we should be able to extend the state with the block
-	suite.mutator.On("HeaderExtend", &block).Return(nil).Once()
+	suite.state.On("Extend", &block).Return(nil).Once()
 	// we should be able to get the parent header by its ID
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Twice()
 	// we do not have any children cached
@@ -164,8 +161,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	// first time calling, assume it's not there
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// should extend state with new block
-	suite.mutator.On("HeaderExtend", &block).Return(nil).Once()
-	suite.mutator.On("HeaderExtend", &child).Return(nil).Once()
+	suite.state.On("Extend", &block).Return(nil).Once()
+	suite.state.On("Extend", &child).Return(nil).Once()
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once()
