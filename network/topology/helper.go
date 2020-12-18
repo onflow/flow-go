@@ -59,8 +59,14 @@ func Connected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids f
 	visited := make(map[flow.Identifier]bool)
 	dfs(startID, adjMap, visited, f)
 
-	// assert that expected number of nodes were visited by DFS
+	// requires that expected number of nodes were visited by DFS,
+	// and each expected identifier been visited, these conditions together
+	// evaluate a 1-1 correspondences between visited and expected identifiers
 	require.Equal(t, expectedCount, len(visited))
+	for _, id := range expectedIDs {
+		_, ok := visited[id.NodeID]
+		require.True(t, ok)
+	}
 }
 
 // MockSubscriptionManager returns a list of mocked subscription manages for the input
