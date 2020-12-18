@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,6 +37,8 @@ type backendTransactions struct {
 	retry                *Retry
 	collectionGRPCPort   uint
 	connFactory          ConnectionFactory
+
+	previousAccessNodes []accessproto.AccessAPIClient
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -173,11 +176,16 @@ func (b *backendTransactions) SendRawTransaction(
 	return b.trySendTransaction(ctx, tx)
 }
 
-func (b *backendTransactions) GetTransaction(_ context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
+func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
 	// look up transaction from storage
 	tx, err := b.transactions.ByID(txID)
-	if err != nil {
-		return nil, convertStorageError(err)
+	txErr := convertStorageError(err)
+	if txErr != nil {
+		if status.Code(txErr) == codes.NotFound {
+			return b.getHistoricalTransaction(ctx, txID)
+		}
+		// Other Error trying to retrieve the transaction, return with err
+		return nil, txErr
 	}
 
 	return tx, nil
@@ -189,8 +197,13 @@ func (b *backendTransactions) GetTransactionResult(
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	tx, err := b.transactions.ByID(txID)
-	if err != nil {
-		return nil, convertStorageError(err)
+	txErr := convertStorageError(err)
+	if txErr != nil {
+		if status.Code(txErr) == codes.NotFound {
+			// Tx not found. If we have historical Sporks setup, lets look through those as well
+			return b.getHistoricalTransactionResult(ctx, txID)
+		}
+		return nil, txErr
 	}
 
 	// get events for the transaction
@@ -315,6 +328,50 @@ func (b *backendTransactions) lookupTransactionResult(
 
 	// considered executed as long as some result is returned, even if it's an error message
 	return true, events, txStatus, message, nil
+}
+
+func (b *backendTransactions) getHistoricalTransaction(
+	ctx context.Context,
+	txID flow.Identifier,
+) (*flow.TransactionBody, error) {
+	for _, historicalNode := range b.previousAccessNodes {
+		txResp, err := historicalNode.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
+		if err == nil {
+			tx, err := convert.MessageToTransaction(txResp.Transaction, b.chainID.Chain())
+			// Found on a historical node. Report
+			return &tx, err
+		}
+		// Otherwise, if not found, just continue
+		if status.Code(err) == codes.NotFound {
+			continue
+		}
+		// TODO should we do something if the error isn't not found?
+	}
+	return nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", txID)
+}
+
+func (b *backendTransactions) getHistoricalTransactionResult(
+	ctx context.Context,
+	txID flow.Identifier,
+) (*access.TransactionResult, error) {
+	for _, historicalNode := range b.previousAccessNodes {
+		result, err := historicalNode.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
+		if err == nil {
+			// Found on a historical node. Report
+			if result.GetStatus() == entities.TransactionStatus_PENDING {
+				// This is on a historical node. No transactions from it will ever be
+				// executed, therefore we should consider this expired
+				result.Status = entities.TransactionStatus_EXPIRED
+			}
+			return access.MessageToTransactionResult(result), nil
+		}
+		// Otherwise, if not found, just continue
+		if status.Code(err) == codes.NotFound {
+			continue
+		}
+		// TODO should we do something if the error isn't not found?
+	}
+	return nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", txID)
 }
 
 func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBody) {

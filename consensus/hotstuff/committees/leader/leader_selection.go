@@ -1,46 +1,100 @@
-package committee
+package leader
 
 import (
+	"errors"
 	"fmt"
+	"math"
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months
+
+// InvalidViewError is returned when a requested view is outside the pre-computed range.
+type InvalidViewError struct {
+	requestedView uint64 // the requested view
+	firstView     uint64 // the first view we have pre-computed
+	finalView     uint64 // the final view we have pre-computed
+}
+
+func (err InvalidViewError) Error() string {
+	return fmt.Sprintf(
+		"requested view (%d) outside of valid range [%d-%d]",
+		err.requestedView, err.firstView, err.finalView,
+	)
+}
+
+// IsInvalidViwError returns whether or not the input error is an invalid view error.
+func IsInvalidViewError(err error) bool {
+	return errors.As(err, &InvalidViewError{})
+}
+
 // LeaderSelection caches the pre-generated leader selections for a certain number of
 // views starting from the epoch start view.
 type LeaderSelection struct {
-	// leaderIndexesForView caches leader selections that were pre-generated for a
-	// certain number of views.
-	leaderIndexesForView []int
+
+	// the ordered list of node IDs for all members of the current consensus committee
+	memberIDs flow.IdentifierList
+
+	// leaderIndexes caches pre-generated leader indices for the range
+	// of views specified at construction, typically for an epoch
+	//
+	// The first value in this slice corresponds to the leader index at view
+	// firstView, and so on
+	leaderIndexes []uint16
+
 	// The leader selection randomness varies for each epoch.
 	// Leader selection only returns the correct leader selection for the corresponding epoch.
-	// epochStartView specifies the start view of the current epoch
-	epochStartView uint64
+	// firstView specifies the start view of the current epoch
+	firstView uint64
 }
 
-// LeaderIndexForView returns the leader index for given view.
-// If the view is smaller than the epochStartView, an error will be returned.
-func (l LeaderSelection) LeaderIndexForView(view uint64) (int, error) {
-	if view < l.epochStartView {
-		return 0, fmt.Errorf("view (%v) is smaller than the epochStartView (%v)", view, l.epochStartView)
+func (l LeaderSelection) FirstView() uint64 {
+	return l.firstView
+}
+
+func (l LeaderSelection) FinalView() uint64 {
+	return l.firstView + uint64(len(l.leaderIndexes)) - 1
+}
+
+// LeaderForView returns the node ID of the leader for a given view.
+// Returns InvalidViewError if the view is outside the pre-computed range.
+func (l LeaderSelection) LeaderForView(view uint64) (flow.Identifier, error) {
+	if view < l.FirstView() {
+		return flow.ZeroID, l.newInvalidViewError(view)
+	}
+	if view > l.FinalView() {
+		return flow.ZeroID, l.newInvalidViewError(view)
 	}
 
-	index := int(view - l.epochStartView)
-	if index >= len(l.leaderIndexesForView) {
-		return 0, fmt.Errorf("view out of cached range: %v", view)
+	viewIndex := int(view - l.firstView)      // index of leader index from view
+	leaderIndex := l.leaderIndexes[viewIndex] // index of leader node ID from leader index
+	leaderID := l.memberIDs[leaderIndex]      // leader node ID from leader index
+	return leaderID, nil
+}
+
+func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
+	return InvalidViewError{
+		requestedView: view,
+		firstView:     l.FirstView(),
+		finalView:     l.FinalView(),
 	}
-	return l.leaderIndexesForView[index], nil
 }
 
 // ComputeLeaderSelectionFromSeed pre-generates a certain number of leader selections, and returns a
 // leader selection instance for querying the leader indexes for certain views.
-// epochStartView - the start view of the epoch, the generated leader selections start from this view.
+// firstView - the start view of the epoch, the generated leader selections start from this view.
 // seed - the random seed for leader selection
 // count - the number of leader selections to be pre-generated and cached.
 // identities - the identities that contain the stake info, which is used as weight for the chance of
 // 							the identity to be selected as leader.
-func ComputeLeaderSelectionFromSeed(epochStartView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
+func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
+
+	if count < 1 {
+		return nil, fmt.Errorf("number of views must be positive (got %d)", count)
+	}
+
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
 		weights = append(weights, id.Stake)
@@ -52,8 +106,9 @@ func ComputeLeaderSelectionFromSeed(epochStartView uint64, seed []byte, count in
 	}
 
 	return &LeaderSelection{
-		leaderIndexesForView: leaders,
-		epochStartView:       epochStartView,
+		memberIDs:     identities.NodeIDs(),
+		leaderIndexes: leaders,
+		firstView:     firstView,
 	}, nil
 }
 
@@ -62,7 +117,7 @@ func ComputeLeaderSelectionFromSeed(epochStartView uint64, seed []byte, count in
 // If an identity has 0 stake (weight is 0), it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
-func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, error) {
+func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16, error) {
 	// create random number generator from the seed
 	rng, err := random.NewRand(seed)
 	if err != nil {
@@ -71,6 +126,10 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 
 	if len(weights) == 0 {
 		return nil, fmt.Errorf("weights is empty")
+	}
+
+	if len(weights) >= math.MaxUint16 {
+		return nil, fmt.Errorf("number of possible leaders (%d) exceeds maximum (2^16-1)", len(weights))
 	}
 
 	// create an array of weight ranges for each identity.
@@ -90,15 +149,15 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 		return nil, fmt.Errorf("total weight must be greater than 0")
 	}
 
-	leaders := make([]int, 0, count)
+	leaders := make([]uint16, 0, count)
 	for i := 0; i < count; i++ {
 		// pick a random number from 0 (inclusive) to cumsum (exclusive). Or [0, cumsum)
 		randomness := rng.UintN(cumsum)
 
 		// binary search to find the leader index by the random number
-		leader := binarySearch(uint64(randomness), weightSums)
+		leader := binarySearch(randomness, weightSums)
 
-		leaders = append(leaders, leader)
+		leaders = append(leaders, uint16(leader))
 	}
 	return leaders, nil
 }

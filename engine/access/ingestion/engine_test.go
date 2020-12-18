@@ -33,10 +33,9 @@ type Suite struct {
 
 	// protocol state
 	proto struct {
-		state    *protocol.State
+		state    *protocol.MutableState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
-		mutator  *protocol.Mutator
 	}
 
 	me           *module.Local
@@ -60,7 +59,7 @@ func (suite *Suite) SetupTest() {
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
 	// mock out protocol state
-	suite.proto.state = new(protocol.State)
+	suite.proto.state = new(protocol.MutableState)
 	suite.proto.snapshot = new(protocol.Snapshot)
 	suite.proto.params = new(protocol.Params)
 	suite.proto.state.On("Identity").Return(obsIdentity, nil)
@@ -89,7 +88,7 @@ func (suite *Suite) SetupTest() {
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 
-	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
+	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, nil, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0, false)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,

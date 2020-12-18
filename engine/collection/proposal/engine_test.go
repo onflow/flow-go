@@ -29,11 +29,10 @@ type Suite struct {
 
 	// protocol state
 	proto struct {
-		state    *protocol.State
+		state    *protocol.MutableState
 		snapshot *protocol.Snapshot
 		query    *protocol.EpochQuery
 		epoch    *protocol.Epoch
-		mutator  *protocol.Mutator
 	}
 	// cluster state
 	cluster struct {
@@ -68,13 +67,11 @@ func (suite *Suite) SetupTest() {
 	me := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	// mock out protocol state
-	suite.proto.state = new(protocol.State)
+	suite.proto.state = new(protocol.MutableState)
 	suite.proto.snapshot = new(protocol.Snapshot)
 	suite.proto.query = new(protocol.EpochQuery)
 	suite.proto.epoch = new(protocol.Epoch)
-	suite.proto.mutator = new(protocol.Mutator)
 	suite.proto.state.On("Final").Return(suite.proto.snapshot)
-	suite.proto.state.On("Mutate").Return(suite.proto.mutator)
 	suite.proto.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
 	suite.proto.snapshot.On("Epochs").Return(suite.proto.query)

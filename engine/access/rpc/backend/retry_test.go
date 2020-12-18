@@ -40,7 +40,7 @@ func (suite *Suite) TestTransactionRetry() {
 	// txID := transactionBody.ID()
 	// blockID := block.ID()
 	// Setup Handler + Retry
-	backend := New(suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
+	backend := New(suite.state, suite.execClient, suite.colClient, nil, suite.blocks, suite.headers,
 		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil, false)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -98,7 +98,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	}
 
 	// Setup Handler + Retry
-	backend := New(suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
+	backend := New(suite.state, suite.execClient, suite.colClient, nil, suite.blocks, suite.headers,
 		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil, false)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry

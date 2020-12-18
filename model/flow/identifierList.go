@@ -36,3 +36,12 @@ func (il IdentifierList) Less(i, j int) bool {
 func (il IdentifierList) Swap(i, j int) {
 	il[j], il[i] = il[i], il[j]
 }
+
+func (il IdentifierList) Strings() []string {
+	var list []string
+	for _, id := range il {
+		list = append(list, id.String())
+	}
+
+	return list
+}
