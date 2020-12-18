@@ -48,7 +48,7 @@ func (suite *TopologyTestSuite) SetupTest() {
 	}
 
 	suite.randomizedTop = func(t *testing.T, identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
-		top, err := topology.NewRandomizedTopology(identifier, 0.01, state, manager)
+		top, err := topology.NewRandomizedTopology(identifier, 0.05, state, manager)
 		require.NoError(t, err)
 
 		return top
@@ -79,6 +79,18 @@ func (suite *TopologyTestSuite) TestLowScaleRandomized() {
 	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 200, 10, 100, 120, 5, 100, 4)
 }
 
+// TestBenchnet creates systems with
+// 2 access nodes
+// 50 collection nodes in 4 clusters
+// 50 consensus nodes
+// 2 execution nodes
+// 20 verification nodes
+// and builds a randomized topology for the systems.
+// For each system, it then checks the end-to-end connectedness of the topology graph.
+func (suite *TopologyTestSuite) TestBenchnetRandomized() {
+	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 2, 50, 50, 2, 20, 3)
+}
+
 // TestModerateScaleLinearFanout creates systems with
 // 20 access nodes
 // 200 collection nodes in 8 clusters
@@ -99,7 +111,7 @@ func (suite *TopologyTestSuite) TestModerateScaleLinearFanout() {
 // 100 verification nodes
 // and builds a stateful randomized topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *TopologyTestSuite) TestModerateScale() {
+func (suite *TopologyTestSuite) TestModerateScaleRandomized() {
 	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 20, 200, 240, 10, 200, 8)
 }
 
@@ -215,10 +227,8 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(constructorFunc
 
 // topologyScenario is a test helper that creates a StatefulTopologyManager with the LinearFanoutFunc,
 // it creates a TopicBasedTopology for the node and returns its fanout.
-func (suite *TopologyTestSuite) topologyScenario(constructorFunc factory, me flow.Identifier,
-	subMngr network.SubscriptionManager,
-	ids flow.IdentityList,
-	state protocol.State) flow.IdentityList {
+func (suite *TopologyTestSuite) topologyScenario(constructorFunc factory, me flow.Identifier, subMngr network.SubscriptionManager,
+	ids flow.IdentityList, state protocol.State) flow.IdentityList {
 
 	// creates topology of the node
 	top := constructorFunc(suite.T(), me, state, subMngr)
