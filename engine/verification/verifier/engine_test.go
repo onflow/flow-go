@@ -41,7 +41,8 @@ type VerifierEngineTestSuite struct {
 	sk        crypto.PrivateKey
 	hasher    hash.Hasher
 	chain     flow.Chain
-	con       *mocknetwork.Conduit            // mocks con for submitting result approvals
+	pushCon   *mocknetwork.Conduit // mocks con for submitting result approvals
+	pullCon   *mocknetwork.Conduit
 	metrics   *mockmodule.VerificationMetrics // mocks performance monitoring metrics
 	approvals *mockstorage.ResultApprovals
 }
@@ -56,7 +57,8 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = &protocol.Snapshot{}
-	suite.con = &mocknetwork.Conduit{}
+	suite.pushCon = &mocknetwork.Conduit{}
+	suite.pullCon = &mocknetwork.Conduit{}
 	suite.metrics = &mockmodule.VerificationMetrics{}
 	suite.chain = flow.Testnet.Chain()
 	suite.approvals = &mockstorage.ResultApprovals{}
@@ -65,7 +67,11 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.approvals.On("Index", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	suite.net.On("Register", engine.PushApprovals, testifymock.Anything).
-		Return(suite.con, nil).
+		Return(suite.pushCon, nil).
+		Once()
+
+	suite.net.On("Register", engine.ProvideApprovalsByChunk, testifymock.Anything).
+		Return(suite.pullCon, nil).
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
@@ -150,7 +156,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	// emission of result approval
 	suite.metrics.On("OnResultApproval").Return()
 
-	suite.con.
+	suite.pushCon.
 		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
@@ -173,7 +179,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	err := eng.Process(myID, vChunk)
 	suite.Assert().NoError(err)
 	suite.ss.AssertExpectations(suite.T())
-	suite.con.AssertExpectations(suite.T())
+	suite.pushCon.AssertExpectations(suite.T())
 
 }
 
@@ -191,7 +197,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	suite.metrics.On("OnVerifiableChunkReceived").Return()
 
 	// we shouldn't receive any result approval
-	suite.con.
+	suite.pushCon.
 		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {

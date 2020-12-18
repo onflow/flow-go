@@ -221,10 +221,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
-	// request approvals from verification nodes
-	approvalRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestApprovalsByResultID, filter.Any, func() flow.Entity { return &flow.ResultApproval{} })
-	require.Nil(t, err)
-
 	assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
@@ -243,7 +239,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		node.Me,
 		receiptRequester,
-		approvalRequester,
 		resultsDB,
 		node.Headers,
 		node.Index,

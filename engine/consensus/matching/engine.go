@@ -5,6 +5,7 @@ package matching
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -15,11 +16,13 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	chmodule "github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -40,7 +43,7 @@ type Engine struct {
 	state                   protocol.State                  // used to access the  protocol state
 	me                      module.Local                    // used to access local node information
 	receiptRequester        module.Requester                // used to request missing execution receipts by block ID
-	approvalRequester       module.Requester                // used to request missing result approvals
+	approvalConduit         network.Conduit                 // used to request missing approvals from verification nodes
 	resultsDB               storage.ExecutionResults        // used to check previous results are known
 	headersDB               storage.Headers                 // used to check sealed headers
 	indexDB                 storage.Index                   // used to check payloads for results
@@ -68,7 +71,6 @@ func New(
 	state protocol.State,
 	me module.Local,
 	receiptRequester module.Requester,
-	approvalRequester module.Requester,
 	resultsDB storage.ExecutionResults,
 	headersDB storage.Headers,
 	indexDB storage.Index,
@@ -92,7 +94,6 @@ func New(
 		state:                   state,
 		me:                      me,
 		receiptRequester:        receiptRequester,
-		approvalRequester:       approvalRequester,
 		resultsDB:               resultsDB,
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
@@ -124,6 +125,11 @@ func New(
 	_, err = net.Register(engine.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
+	}
+
+	e.approvalConduit, err = net.Register(engine.RequestApprovalsByChunk, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
 	return e, nil
@@ -187,20 +193,6 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	}
 }
 
-// HandleApproval pipes explicitly requested approvals to the process function.
-// Approvals can come from this function or the receipt provider setup in the
-// engine constructor.
-func (e *Engine) HandleApproval(originID flow.Identifier, approval flow.Entity) {
-	e.log.Debug().Msg("received approval from requester engine")
-
-	// TODO: wrap following call to e.process into e.unit.Launch (?)
-	// to parallelize engines in terms of threading
-	err := e.process(originID, approval)
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not process approval")
-	}
-}
-
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
@@ -217,6 +209,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		defer e.unit.Unlock()
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
+	case *messages.ApprovalResponse:
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		e.log.Debug().Msg("received approval response")
+		return e.onApproval(originID, &ev.Approval)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -950,7 +947,6 @@ func (e *Engine) requestPendingReceipts() error {
 
 // requestPendingApprovals requests result approvals for unsealed finalized
 // blocks.
-// TODO: review trigger condition
 func (e *Engine) requestPendingApprovals() error {
 	// last sealed block
 	sealed, err := e.state.Sealed().Head()
@@ -977,7 +973,37 @@ func (e *Engine) requestPendingApprovals() error {
 
 	log.Info().Msg("requesting approvals")
 	for _, r := range e.incorporatedResults.All() {
-		e.approvalRequester.EntityByID(r.Result.ID(), filter.Any)
+		resultID := r.Result.ID()
+
+		// Create a request for each chunk
+		// TODO: only send request for chunks that haven't collected enough
+		// approvals
+		for _, c := range r.Result.Chunks {
+
+			// prepare the request
+			req := &messages.ApprovalRequest{
+				Nonce:      rand.Uint64(),
+				ResultID:   resultID,
+				ChunkIndex: c.Index,
+			}
+
+			// prepare the list of verification nodes
+			// TODO: should be based on assignment
+			targetIDs, err := e.state.Final().Identities(filter.HasRole(flow.RoleVerification))
+			if err != nil {
+				return fmt.Errorf("could not get list of verififer nodes: %w", err)
+			}
+
+			log.Debug().Msg("XXX requesting approval")
+
+			// publish the approval request to the network
+			err = e.approvalConduit.Publish(req, targetIDs.NodeIDs()...)
+			if err != nil {
+				return fmt.Errorf("could not publish approval request for chunk (id=%s): %w", c.ID(), err)
+			}
+
+			log.Debug().Msg("XXX requested approval")
+		}
 	}
 
 	return nil

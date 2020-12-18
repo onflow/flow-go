@@ -53,7 +53,7 @@ func TestGetChannelIDByRole(t *testing.T) {
 	// - PushBlocks
 	// - PushReceipts
 	// - PushApprovals
-	// - ProvideApprovalsByResultID
+	// - ProvideApprovalsByChunk
 	// - ProvideChunks
 	// - TestNetwork
 	// - TestMetric
@@ -63,7 +63,7 @@ func TestGetChannelIDByRole(t *testing.T) {
 	assert.Contains(t, topics, PushBlocks)
 	assert.Contains(t, topics, PushReceipts)
 	assert.Contains(t, topics, PushApprovals)
-	assert.Contains(t, topics, ProvideApprovalsByResultID)
+	assert.Contains(t, topics, ProvideApprovalsByChunk)
 	assert.Contains(t, topics, RequestChunks)
 	assert.Contains(t, topics, TestMetrics)
 	assert.Contains(t, topics, TestNetwork)

@@ -68,20 +68,19 @@ func main() {
 		requireOneApproval                     bool
 		chunkAlpha                             uint
 
-		err               error
-		privateDKGData    *bootstrap.DKGParticipantPriv
-		guarantees        mempool.Guarantees
-		results           mempool.IncorporatedResults
-		receipts          mempool.Receipts
-		approvals         mempool.Approvals
-		seals             mempool.IncorporatedResultSeals
-		prov              *provider.Engine
-		receiptRequester  *requester.Engine
-		approvalRequester *requester.Engine
-		syncCore          *synchronization.Core
-		comp              *compliance.Engine
-		conMetrics        module.ConsensusMetrics
-		mainMetrics       module.HotstuffMetrics
+		err              error
+		privateDKGData   *bootstrap.DKGParticipantPriv
+		guarantees       mempool.Guarantees
+		results          mempool.IncorporatedResults
+		receipts         mempool.Receipts
+		approvals        mempool.Approvals
+		seals            mempool.IncorporatedResultSeals
+		prov             *provider.Engine
+		receiptRequester *requester.Engine
+		syncCore         *synchronization.Core
+		comp             *compliance.Engine
+		conMetrics       module.ConsensusMetrics
+		mainMetrics      module.HotstuffMetrics
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -174,20 +173,6 @@ func main() {
 				return nil, err
 			}
 
-			approvalRequester, err = requester.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				engine.RequestApprovalsByResultID,
-				filter.HasRole(flow.RoleVerification),
-				func() flow.Entity { return &flow.ResultApproval{} },
-			)
-			if err != nil {
-				return nil, err
-			}
-
 			assigner, err := chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
 			if err != nil {
 				return nil, fmt.Errorf("could not create public assignment: %w", err)
@@ -206,7 +191,6 @@ func main() {
 				node.State,
 				node.Me,
 				receiptRequester,
-				approvalRequester,
 				node.Storage.Results,
 				node.Storage.Headers,
 				node.Storage.Index,
@@ -220,7 +204,6 @@ func main() {
 			)
 
 			receiptRequester.WithHandle(match.HandleReceipt)
-			approvalRequester.WithHandle(match.HandleApproval)
 
 			return match, err
 		}).
@@ -405,10 +388,6 @@ func main() {
 		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// created with matching engine
 			return receiptRequester, nil
-		}).
-		Component("approval requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// created with matching engine
-			return approvalRequester, nil
 		}).
 		Run()
 }
