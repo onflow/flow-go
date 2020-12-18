@@ -2,31 +2,37 @@ package epochs
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // QCContractClient is a client to the QC Contract
 type QCContractClient struct {
-	accessAddress   string         // address of the access node
-	contractAddress string         // QuorumCertificate contract address
-	client          *client.Client // flow-go-sdk client to access node
-	me              module.Local   // local node
+	accessAddress     string         // address of the access node
+	qcContractAddress string         // QuorumCertificate contract address
+	client            *client.Client // flow-go-sdk client to access node
+
+	// node details
+	accountAddress  string
+	accountKeyIndex int
+	privateKey      crypto.PrivateKey
 }
 
 // NewQCContractClient returns a new client to the QC contract
-func NewQCContractClient(me module.Local, accessAddress string, qcContractAddress string) (*QCContractClient, error) {
+func NewQCContractClient(accessAddress, qcContractAddress, accountAddress string, accountKeyIndex int, privateKey crypto.PrivateKey) (*QCContractClient, error) {
 
 	// create a new instance of flow-go-sdk client
 	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
@@ -35,10 +41,12 @@ func NewQCContractClient(me module.Local, accessAddress string, qcContractAddres
 	}
 
 	return &QCContractClient{
-		me:              me,
-		accessAddress:   accessAddress,
-		contractAddress: qcContractAddress,
-		client:          flowClient,
+		accessAddress:     accessAddress,
+		qcContractAddress: qcContractAddress,
+		client:            flowClient,
+		accountAddress:    accountAddress,
+		accountKeyIndex:   accountKeyIndex,
+		privateKey:        privateKey,
 	}, nil
 }
 
@@ -55,33 +63,52 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// attach submit vote transaction template and build transaction
-	// TODO: requires `ENV`?
-	submitVoteScript := templates.GenerateSubmitVoteScript(templates.Environment{})
 	tx := sdk.NewTransaction().
-		SetScript(submitVoteScript).
+		SetScript(templates.GenerateSubmitVoteScript(c.getEnvironment())).
 		SetGasLimit(1000).
 		SetReferenceBlockID(latestBlock.ID)
 
 	// add signature data to the transaction and submit to node
-	err = tx.AddArgument(cadence.NewString(string(vote.SigData)))
+	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
 	if err != nil {
 		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
 	}
 
-	// TODO: what are these?
-	// keyIndex := 0
-	// account := sdk.Account{}
+	// get account details
+	account, err := c.client.GetAccount(ctx, sdk.BytesToAddress([]byte(c.accountAddress)))
+	if err != nil {
+		return fmt.Errorf("could not get account: %w", err)
+	}
 
 	// sign transaction
-	// err = tx.SignPayload(account.Address, keyIndex)
-	// if err != nil {
-	// 	return fmt.Errorf("could not sign transaction: %w", err)
-	// }
+	sk, err := sdkcrypto.DecodePrivateKey(sdkcrypto.ECDSA_P256, c.privateKey.Encode())
+	signer := sdkcrypto.NewInMemorySigner(sk, sdkcrypto.SHA2_256)
+	err = tx.SignPayload(account.Address, c.accountKeyIndex, signer)
+	if err != nil {
+		return fmt.Errorf("could not sign transaction: %w", err)
+	}
 
 	// submit signed transaction to node
-	_, err = c.submitTx(tx)
+	txHash, err := c.submitTx(tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
+	}
+
+	// wait for transaction to be sealed
+	result := &sdk.TransactionResult{Status: sdk.TransactionStatusUnknown}
+	for result.Status != sdk.TransactionStatusSealed {
+		result, err = c.client.GetTransactionResult(ctx, txHash)
+		if err != nil {
+			return fmt.Errorf("could not get transaction result: %w", err)
+		}
+
+		// if the transaction has expire we skip waiting for seal
+		if result.Status == sdk.TransactionStatusExpired {
+			break
+		}
+
+		// wait 1 second before trying again.
+		time.Sleep(time.Second)
 	}
 
 	return nil
@@ -91,23 +118,8 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 // cluster QC aggregator smart contract for the current epoch.
 func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 
-	// TODO: transaction for has voted is missing?
-
-	// args for voted
-	args := make([][]byte, 0)
-
-	// convert to cadence values
-	arguments := []cadence.Value{}
-	for _, arg := range args {
-		val, err := jsoncdc.Decode(arg)
-		if err != nil {
-			return false, fmt.Errorf("could not deocde arguments: %w", err)
-		}
-		arguments = append(arguments, val)
-	}
-
 	// execute script to read if voted
-	_, err := c.client.ExecuteScriptAtLatestBlock(ctx, []byte{}, arguments)
+	_, err := c.client.ExecuteScriptAtLatestBlock(ctx, templates.GenerateGetNodeHasVotedScript(c.getEnvironment()), nil)
 	if err != nil {
 		return false, fmt.Errorf("could not execute voted script: %w", err)
 	}
@@ -130,4 +142,11 @@ func (c *QCContractClient) submitTx(tx *sdk.Transaction) (sdk.Identifier, error)
 	}
 
 	return tx.ID(), nil
+}
+
+func (c *QCContractClient) getEnvironment() templates.Environment {
+	// environment to override transaction template contract addresses
+	return templates.Environment{
+		QuorumCertificateAddress: c.qcContractAddress,
+	}
 }
