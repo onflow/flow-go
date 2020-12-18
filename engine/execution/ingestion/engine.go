@@ -172,7 +172,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch resource := event.(type) {
+	switch event.(type) {
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
