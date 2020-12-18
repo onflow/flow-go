@@ -185,9 +185,10 @@ func (b *BootstrapProcedure) deployStorageFees(service, flowToken flow.Address) 
 		flowToken.HexWithPrefix(),
 	)
 
+	// deploy storage fees contract on the service account
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployStorageFeesTransaction(service, contract), // deploy storage fees on the service account
+		deployStorageFeesTransaction(service, contract),
 		b.ledger,
 	)
 	if err != nil {
@@ -351,8 +352,9 @@ transaction() {
         // take all the funds from the service account
         let tokenVault = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) ?? panic("Unable to borrow reference to the default token vault")
         
-        for a in authAccounts {
-            FlowStorageFees.setupAccountStorage(account: a, storageReservation: <- (tokenVault.withdraw(amount: FlowStorageFees.minimumStorageReservation) as! @FlowToken.Vault))
+        for account in authAccounts {
+            let storageReservation <- tokenVault.withdraw(amount: FlowStorageFees.minimumStorageReservation) as! @FlowToken.Vault
+            FlowStorageFees.setupAccountStorage(account: account, storageReservation: <-storageReservation)
         }
     }
 }

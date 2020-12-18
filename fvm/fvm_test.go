@@ -70,7 +70,7 @@ func (vmt vmTest) run(
 		ctx := fvm.NewContext(zerolog.Nop(), opts...)
 
 		mapLedger := state.NewMapLedger()
-		ledger := delta.NewView(mapLedger.Get)
+		view := delta.NewView(mapLedger.Get)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -78,10 +78,10 @@ func (vmt vmTest) run(
 
 		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
-		err = vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), ledger)
+		err = vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
 		require.NoError(t, err)
 
-		f(t, vm, chain, ctx, ledger)
+		f(t, vm, chain, ctx, view)
 	}
 }
 
@@ -560,7 +560,8 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 						
 						let vaultRef = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
 						// purchase additional storage
-						FlowStorageFees.getStorageReservationReceiver(signer.address).deposit(from: <- (vaultRef.withdraw(amount: 1.0) as! @FlowToken.Vault))
+						let payment <- vaultRef.withdraw(amount: 1.0) as! @FlowToken.Vault
+						FlowStorageFees.getStorageReservationReceiver(signer.address).deposit(from: <- payment)
 					  }
 					}`, chain.ServiceAddress().HexWithPrefix(),
 						"0x7e60df042a9c0868", // <- FlowToken address from bootstrapping

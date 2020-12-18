@@ -79,7 +79,10 @@ pub fun main(): UFix64 {
 }
 `
 
-func initAccountTransaction(payerAddress, accountAddress, serviceAddress flow.Address,
+func initAccountTransaction(
+	payerAddress flow.Address,
+	accountAddress flow.Address,
+	serviceAddress flow.Address,
 	restrictedAccountCreationEnabled bool,
 ) *TransactionProcedure {
 	arg, err := jsoncdc.Encode(cadence.NewBool(restrictedAccountCreationEnabled))
