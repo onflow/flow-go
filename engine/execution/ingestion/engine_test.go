@@ -352,8 +352,8 @@ func TestExecuteOneBlock(t *testing.T) {
 			wg.Done()
 		})
 
-		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blockA.Block.Header, nil)
+		// ctx.state.On("Sealed").Return(ctx.snapshot)
+		// ctx.snapshot.On("Head").Return(blockA.Block.Header, nil)
 
 		ctx.assertSuccessfulBlockComputation(blockA, unittest.IdentifierFixture())
 
@@ -410,8 +410,8 @@ func TestExecuteBlockInOrder(t *testing.T) {
 
 		// make sure the seal height won't trigger state syncing, so that all blocks
 		// will be executed.
-		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blocks["A"].Block.Header, nil)
+		// ctx.state.On("Sealed").Return(ctx.snapshot)
+		// ctx.snapshot.On("Head").Return(blocks["A"].Block.Header, nil)
 
 		// once block A is computed, it should trigger B and C being sent to compute,
 		// which in turn should trigger D

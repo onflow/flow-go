@@ -216,7 +216,6 @@ func main() {
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 				requester.WithBatchInterval(requestInterval),
-				requester.WithRetryAttempts(20), // missing a collection would cause the execution to halt, retry 20 times to reduce the chance of missing a collection
 			)
 
 			preferredExeFilter := filter.Any
