@@ -27,11 +27,12 @@ import (
 
 // Config defines the configurable options for the access node server
 type Config struct {
-	GRPCListenAddr string
-	HTTPListenAddr string
-	ExecutionAddr  string
-	CollectionAddr string
-	MaxMsgSize     int // In bytes
+	GRPCListenAddr        string
+	HTTPListenAddr        string
+	ExecutionAddr         string
+	CollectionAddr        string
+	HistoricalAccessAddrs string
+	MaxMsgSize            int // In bytes
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -50,6 +51,7 @@ func New(log zerolog.Logger,
 	config Config,
 	executionRPC execproto.ExecutionAPIClient,
 	collectionRPC accessproto.AccessAPIClient,
+	historicalAccessNodes []accessproto.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -79,6 +81,7 @@ func New(log zerolog.Logger,
 		state,
 		executionRPC,
 		collectionRPC,
+		historicalAccessNodes,
 		blocks,
 		headers,
 		collections,
