@@ -136,6 +136,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("gas limit exceeds the maximum allowed", func() {
 		tx := unittest.TransactionBodyFixture()
+		tx.Payer = unittest.RandomAddressFixture()
 		tx.ReferenceBlockID = suite.root.ID()
 		tx.GasLimit = flow.DefaultMaxGasLimit + 1
 
