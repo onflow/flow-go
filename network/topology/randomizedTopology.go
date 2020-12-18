@@ -161,5 +161,5 @@ func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, chan
 // tossBiasedBit returns true with probability equal `r.chance/100`, and returns false otherwise.
 func (r *RandomizedTopology) tossBiasedBit() bool {
 	draw := r.rng.UintN(100)
-	return draw <= r.chance
+	return draw < r.chance
 }
