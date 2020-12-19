@@ -127,9 +127,9 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 	checkConnectivity(suite.T(), newMiddleware, newIDs.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
 
 	// check that all the engines on this new epoch can talk to each other using any of the three networking primitives
-	sendMessagesAndVerify(suite.T(), newIDs, newEngines, nil, nil, suite.Publish)
-	sendMessagesAndVerify(suite.T(), newIDs, newEngines, nil, nil, suite.Multicast)
-	sendMessagesAndVerify(suite.T(), newIDs, newEngines, nil, nil, suite.Unicast)
+	suite.exchangeMessages(newIDs, newEngines, nil, nil, suite.Publish)
+	suite.exchangeMessages(newIDs, newEngines, nil, nil, suite.Multicast)
+	suite.exchangeMessages(newIDs, newEngines, nil, nil, suite.Unicast)
 }
 
 // TestNodeRemoved tests that when an existing node is removed from the identity
@@ -167,11 +167,11 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	// wait for all the connections and disconnections to occur at the network layer
 	time.Sleep(2 * time.Second)
 
-	// check that all remaining engines can still talk to each other and the removed ones can't
+	// check that all remaining engines can still talk to each other while the ones removed can't
 	// using any of the three networking primitives
-	sendMessagesAndVerify(suite.T(), newIDs, newEngines, removedIDs, removedEngines, suite.Publish)
-	sendMessagesAndVerify(suite.T(), newIDs, newEngines, removedIDs, removedEngines, suite.Multicast)
-	sendMessagesAndVerify(suite.T(), newIDs, newEngines, removedIDs, removedEngines, suite.Unicast)
+	suite.exchangeMessages(newIDs, newEngines, removedIDs, removedEngines, suite.Publish)
+	suite.exchangeMessages(newIDs, newEngines, removedIDs, removedEngines, suite.Multicast)
+	suite.exchangeMessages(newIDs, newEngines, removedIDs, removedEngines, suite.Unicast)
 }
 
 // checkConnectivity checks that the middleware of a node is directly connected
@@ -191,8 +191,8 @@ func checkConnectivity(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) 
 	}, 5*time.Second, time.Millisecond*100)
 }
 
-// sendMessagesAndVerify verifies that allowed engines can successfully exchange messages while disallowed engines can't
-func sendMessagesAndVerify(t *testing.T,
+// exchangeMessages verifies that allowed engines can successfully exchange messages while disallowed engines can't
+func (suite *MutableIdentityTableSuite) exchangeMessages(
 	allowedIDs flow.IdentityList,
 	allowedEngs []*MeshEngine,
 	disallowedIDs flow.IdentityList,
@@ -202,49 +202,36 @@ func sendMessagesAndVerify(t *testing.T,
 	count := len(allowedEngs)
 	expectedMsgCnt := count - 1
 
-	allIDs := append(allowedIDs, disallowedIDs...)
-	allEngs := append(allowedEngs, disallowedEngs...)
-
-	primitive := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
-
+	// send a message from each of the allowed engine to the other allowed engines
 	for i, allowedEng := range allowedEngs {
 
 		fromID := allowedIDs[i].NodeID
-		others := allowedIDs.Filter(filter.Not(filter.HasNodeID(allowedIDs[i].NodeID)))
+		targetIDs := allowedIDs.Filter(filter.Not(filter.HasNodeID(allowedIDs[i].NodeID)))
 
-		err := sendMessage(fromID, allowedEng, others, send)
-		require.NoError(t, err)
-		if strings.Contains(primitive, "Multicast") || strings.Contains(primitive, "Publish") {
-			require.NoError(t, err)
-		}
+		suite.sendMessage(fromID, allowedEng, targetIDs, send)
 	}
 
+	// send a message from each of the allowed engine to each of the disallowed engines
 	for i, allowedEng := range disallowedEngs {
 
 		fromID := allowedIDs[i].NodeID
 		targetIDs := disallowedIDs
 
-		err := sendMessage(fromID, allowedEng, targetIDs, send)
-		if strings.Contains(primitive, "Multicast") || strings.Contains(primitive, "Publish") {
-			require.NoError(t, err)
-		}
+		suite.sendMessage(fromID, allowedEng, targetIDs, send)
 	}
 
+	allIDs := append(allowedIDs, disallowedIDs...)
+	// send a message from each of the disallowed engine to both the allowed and disallowed engines
 	for i, disallowedEng := range disallowedEngs {
 
-		event := &message.TestMessage{
-			Text: fmt.Sprintf("hello from node %d using %s", i, send),
-		}
+		fromID := disallowedIDs[i].NodeID
+		targetIDs := allIDs.Filter(filter.Not(filter.HasNodeID(disallowedIDs[i].NodeID)))
 
-		others := allowedIDs.Filter(filter.Not(filter.HasNodeID(allIDs[i].NodeID))).NodeIDs()
-
-		if strings.Contains(primitive, "Multicast") || strings.Contains(primitive, "Publish") {
-			require.NoError(t, send(event, disallowedEng.con, others...))
-		}
+		suite.sendMessage(fromID, disallowedEng, targetIDs, send)
 	}
 
 	wg := sync.WaitGroup{}
-	// fires a goroutine for each allowed engine to listen to incoming messages
+	// fires a goroutine for each of the allowed engine to listen for incoming messages
 	for i := range allowedEngs {
 		wg.Add(expectedMsgCnt)
 		go func(e *MeshEngine) {
@@ -259,12 +246,12 @@ func sendMessagesAndVerify(t *testing.T,
 	time.Sleep(2 * time.Second)
 
 	// assert that all allowed engines received expectedMsgCnt number of messages
-	unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+	unittest.AssertReturnsBefore(suite.T(), wg.Wait, 5*time.Second)
 
-	// assert that none of the disallowed engine receive any message
+	// assert that the disallowed engines didn't receive any message
 	for _, eng := range disallowedEngs {
 		var msg string
-		unittest.RequireNeverReturnBefore(t, func() {
+		unittest.RequireNeverReturnBefore(suite.T(), func() {
 			<-eng.received
 			a := <-eng.event
 			msg = a.(string)
@@ -272,20 +259,25 @@ func sendMessagesAndVerify(t *testing.T,
 	}
 }
 
-func sendMessage(
+func (suite *MutableIdentityTableSuite) sendMessage(
 	fromID flow.Identifier,
 	fromEngine *MeshEngine,
 	toIDs flow.IdentityList,
-	send ConduitSendWrapperFunc) error {
+	send ConduitSendWrapperFunc) {
 
 	primitive := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
+	requireNoError := strings.Contains(primitive, "Unicast")
 
 	event := &message.TestMessage{
 		Text: fmt.Sprintf("hello from node %s using %s", fromID.String(), primitive),
 	}
 
 	err := send(event, fromEngine.con, toIDs.NodeIDs()...)
-	return err
+	if requireNoError {
+		require.NoError(suite.T(), err)
+		return
+	}
+	require.Error(suite.T(), err)
 }
 
 func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*p2p.Network) []*p2p.NodeIDRefresher {
