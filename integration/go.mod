@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/integration
 
-go 1.13
+go 1.15
 
 require (
 	github.com/dapperlabs/testingdock v0.4.3-0.20200626075145-ea23fc16bb90
