@@ -140,7 +140,8 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return errors.New("wrong input")
+		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
+			s.Size(), orig)
 	}
 
 	if len(msg) == 0 {
@@ -177,7 +178,8 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return errors.New("wrong input")
+		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
+			s.Size(), orig)
 	}
 	if index(node) == s.leaderIndex {
 		s.validKey = false
