@@ -142,9 +142,8 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	removedID := suite.ids[removeIndex]
 	removedEngines := suite.engines[removeIndex : removeIndex+1]
 
-	fmt.Printf("Removed ID: %s at index %d\n", removedID.NodeID, removeIndex)
+	fmt.Printf("Removed ID: %s at index %d\n", removedID.String(), removeIndex)
 
-	fmt.Printf("Removed ID: %s\n", removedEngines[0].originID)
 	// remove the identity at that index from the ids
 	newIDs := suite.ids.Filter(filter.Not(filter.HasNodeID(removedID.NodeID)))
 	removedIDs := suite.ids[removeIndex : removeIndex+1]
@@ -159,8 +158,12 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 		newEngines = append(newEngines, eng)
 	}
 
-	// update IDs for all the networks
+	// update IDs for all the networks except the one that was removed
+	// (since the evicted node may just continue with the old list)
 	for _, n := range suite.idRefreshers {
+		//if i == removeIndex {
+		//	continue
+		//}
 		n.OnIdentityTableChanged()
 	}
 
@@ -212,23 +215,24 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 	}
 
 	// send a message from each of the allowed engine to each of the disallowed engines
-	for i, allowedEng := range disallowedEngs {
+	//for i, allowedEng := range allowedEngs {
+	//
+	//	fromID := allowedIDs[i].NodeID
+	//	targetIDs := disallowedIDs
+	//
+	//	suite.sendMessage(fromID, allowedEng, targetIDs, send)
+	//}
 
-		fromID := allowedIDs[i].NodeID
-		targetIDs := disallowedIDs
-
-		suite.sendMessage(fromID, allowedEng, targetIDs, send)
-	}
-
-	allIDs := append(allowedIDs, disallowedIDs...)
-	// send a message from each of the disallowed engine to both the allowed and disallowed engines
-	for i, disallowedEng := range disallowedEngs {
-
-		fromID := disallowedIDs[i].NodeID
-		targetIDs := allIDs.Filter(filter.Not(filter.HasNodeID(disallowedIDs[i].NodeID)))
-
-		suite.sendMessage(fromID, disallowedEng, targetIDs, send)
-	}
+	// send a message from each of the disallowed engine to each of the allowed engines
+	//for i, disallowedEng := range disallowedEngs {
+	//
+	//	fromID := disallowedIDs[i].NodeID
+	//	targetIDs := allowedIDs
+	//
+	//	suite.sendMessage(fromID, disallowedEng, targetIDs, send)
+	//
+	//	fmt.Printf(">>>>>>>>>>>>>>>>> \n disallowed: %s\n", disallowedIDs[i].String())
+	//}
 
 	wg := sync.WaitGroup{}
 	// fires a goroutine for each of the allowed engine to listen for incoming messages
@@ -242,20 +246,14 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 		}(allowedEngs[i])
 	}
 
-	// sleep to allow message dissemination
-	time.Sleep(2 * time.Second)
-
 	// assert that all allowed engines received expectedMsgCnt number of messages
 	unittest.AssertReturnsBefore(suite.T(), wg.Wait, 5*time.Second)
 
 	// assert that the disallowed engines didn't receive any message
 	for _, eng := range disallowedEngs {
-		var msg string
 		unittest.RequireNeverReturnBefore(suite.T(), func() {
 			<-eng.received
-			a := <-eng.event
-			msg = a.(string)
-		}, time.Millisecond, fmt.Sprintf("%s engine should not have recevied message: %s", eng.originID.String(), msg))
+		}, time.Millisecond, fmt.Sprintf("%s engine should not have recevied message", eng.originID.String()))
 	}
 }
 
@@ -266,18 +264,18 @@ func (suite *MutableIdentityTableSuite) sendMessage(
 	send ConduitSendWrapperFunc) {
 
 	primitive := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
-	requireNoError := strings.Contains(primitive, "Unicast")
+	requireError := strings.Contains(primitive, "Unicast")
 
 	event := &message.TestMessage{
 		Text: fmt.Sprintf("hello from node %s using %s", fromID.String(), primitive),
 	}
 
 	err := send(event, fromEngine.con, toIDs.NodeIDs()...)
-	if requireNoError {
-		require.NoError(suite.T(), err)
+	if requireError {
+		require.Error(suite.T(), err)
 		return
 	}
-	require.Error(suite.T(), err)
+	require.NoError(suite.T(), err)
 }
 
 func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*p2p.Network) []*p2p.NodeIDRefresher {
