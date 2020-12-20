@@ -975,10 +975,32 @@ func (e *Engine) requestPendingApprovals() error {
 	for _, r := range e.incorporatedResults.All() {
 		resultID := r.Result.ID()
 
-		// Create a request for each chunk
-		// TODO: only send request for chunks that haven't collected enough
+		// Compute the chunk assigment. Chunk approvals will only be requested
+		// from verifiers that were assigned to the chunk. Note that the
+		// assigner keeps a cache of computed assignments, so this is not
+		// necessarily an expensive operation.
+		assignment, err := e.assigner.Assign(r.Result, r.IncorporatedBlockID)
+		if state.IsNoValidChildBlockError(err) {
+			continue
+		}
+		if err != nil {
+			// at this point, we know the block and a valid child block exists.
+			// Not being able to compute the assignment constitutes a fatal
+			// implementation bug:
+			return fmt.Errorf("could not determine chunk assignment: %w", err)
+		}
+
+		// send approval requests for chunks that haven't collected enough
 		// approvals
 		for _, c := range r.Result.Chunks {
+
+			// skip if we already have one valid approval for this chunk.
+			// TODO: this is the happy path. In the full protocol we will
+			// require more than one approval.
+			sigs, ok := r.GetChunkSignatures(c.Index)
+			if ok && sigs.Len() > 0 {
+				continue
+			}
 
 			// prepare the request
 			req := &messages.ApprovalRequest{
@@ -987,22 +1009,14 @@ func (e *Engine) requestPendingApprovals() error {
 				ChunkIndex: c.Index,
 			}
 
-			// prepare the list of verification nodes
-			// TODO: should be based on assignment
-			targetIDs, err := e.state.Final().Identities(filter.HasRole(flow.RoleVerification))
-			if err != nil {
-				return fmt.Errorf("could not get list of verififer nodes: %w", err)
-			}
-
-			log.Debug().Msg("XXX requesting approval")
+			// get the list of verification nodes assigned to this chunk
+			targetIDs := assignment.Verifiers(c)
 
 			// publish the approval request to the network
-			err = e.approvalConduit.Publish(req, targetIDs.NodeIDs()...)
+			err = e.approvalConduit.Publish(req, targetIDs...)
 			if err != nil {
 				return fmt.Errorf("could not publish approval request for chunk (id=%s): %w", c.ID(), err)
 			}
-
-			log.Debug().Msg("XXX requested approval")
 		}
 	}
 
