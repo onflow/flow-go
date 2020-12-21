@@ -250,11 +250,8 @@ func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 	}
 
 	// checks stake of the verification node
-	if id.Stake == 0 {
-		return false, nil
-	}
-
-	return true, nil
+	staked := id.Stake > 0
+	return staked, nil
 }
 
 // processResult submits the result to the match engine.
