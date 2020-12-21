@@ -312,20 +312,19 @@ func (e *Engine) onResultProcessed(ctx context.Context, resultID flow.Identifier
 	}
 
 	// removes indices of all receipts associated with processed result
-	ok = e.receiptIDsByResult.Rem(resultID)
-	if !ok {
-		log.Debug().Msg("could not remove processed result from receipt-ids-by-result")
-	}
+	removed := e.receiptIDsByResult.Rem(resultID)
+	log.Debug().
+		Bool("removed", removed).
+		Msg("removes processed result id from receipt-ids-by-result")
 
 	// drops all receipts with the same result
 	for _, receiptID := range receiptIDs {
 		// removes receipt from mempool
 		removed := e.readyReceipts.Rem(receiptID)
-		if removed {
-			log.Debug().
-				Hex("receipt_id", logging.ID(receiptID)).
-				Msg("receipt with processed result cleaned up")
-		}
+		log.Debug().
+			Bool("removed", removed).
+			Hex("receipt_id", logging.ID(receiptID)).
+			Msg("removes receipt with process result")
 	}
 }
 
@@ -349,11 +348,10 @@ func (e *Engine) checkCachedReceipts() {
 				Hex("result_id", logging.ID(resultID)).Logger()
 
 			// removes receipt from cache
-			ok := e.cachedReceipts.Rem(receiptID)
-			if !ok {
-				log.Debug().Msg("cached receipt has been removed")
-				return
-			}
+			removed := e.cachedReceipts.Rem(receiptID)
+			log.Debug().
+				Bool("removed", removed).
+				Msg("cached receipt has been removed")
 
 			// checks if the result has already been processed or discarded
 			if e.processedResultIDs.Has(resultID) {
@@ -483,23 +481,16 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
 			defer span.Finish()
 
-			// removes receipt from pending mempool
-			ok = e.pendingReceipts.Rem(receiptID)
-			if !ok {
-				log.Debug().
-					Msg("could not remove receipt from pending receipts mempool")
-				return
-			}
-
-			// adds receipt to ready mempoool
-			ok = e.readyReceipts.Add(rdp)
-			if !ok {
-				log.Debug().
-					Msg("could not add receipt to ready mempool")
-				return
-			}
+			// moves receipt from pending to ready mempool
+			removed := e.pendingReceipts.Rem(receiptID)
 			log.Debug().
-				Msg("pending receipt moved to ready successfully")
+				Bool("removed", removed).
+				Msg("removes receipt from pending receipts")
+
+			added := e.readyReceipts.Add(rdp)
+			log.Debug().
+				Bool("added", added).
+				Msg("adds receipt to ready receipts")
 		}()
 	}
 }
@@ -544,13 +535,9 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 
 			// removes receipt from pending receipt
 			removed := e.pendingReceipts.Rem(receiptID)
-			if !removed {
-				log.Debug().
-					Msg("could not remove dropped receipt from pending receipts mempool")
-				return
-			}
 			log.Debug().
-				Msg("dropped receipt removed from pending receipts mempool")
+				Bool("removed", removed).
+				Msg("removes receipt from pending receipts")
 		}()
 	}
 }
@@ -560,13 +547,14 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 func (e *Engine) checkPendingReceipts() {
 	for _, blockID := range e.blockIDsCache.All() {
 		// removes blockID from new blocks mempool
-		ok := e.blockIDsCache.Rem(blockID)
+		removed := e.blockIDsCache.Rem(blockID)
 		log := e.log.With().
 			Hex("block_id", logging.ID(blockID)).
 			Logger()
-		if !ok {
-			log.Debug().Msg("could not remove block ID from cache")
-		}
+
+		log.Debug().
+			Bool("removed", removed).
+			Msg("removes block id from cached block ids")
 
 		// retrieves all receipts that are pending for this block
 		receiptIDs, ok := e.pendingReceiptIDsByBlock.Get(blockID)
@@ -580,11 +568,10 @@ func (e *Engine) checkPendingReceipts() {
 			Msg("retrieved receipt ids pending for block")
 
 		// removes list of receipt ids for this block
-		ok = e.pendingReceiptIDsByBlock.Rem(blockID)
-		if !ok {
-			log.Debug().
-				Msg("could not remove receipt id from receipt-ids-by-block mempool for block")
-		}
+		removed = e.pendingReceiptIDsByBlock.Rem(blockID)
+		log.Debug().
+			Bool("removed", removed).
+			Msg("removes all receipt ids pending for block")
 
 		// checks whether verification node is staked at snapshot of this block id/
 		ok, err := e.stakedAtBlockID(blockID)
