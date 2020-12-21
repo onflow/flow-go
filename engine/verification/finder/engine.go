@@ -390,7 +390,7 @@ func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) {
 	// checks whether verification node is staked at snapshot of this result's block.
 	ok, err := e.stakedAtBlockID(blockID)
 	if err != nil {
-		log.Debug().Err(err).Msg("could verify stake of verification node for result")
+		log.Debug().Err(err).Msg("could not verify stake of verification node for result")
 		return
 	}
 
