@@ -45,15 +45,10 @@ import (
 // as well as all of its backend dependencies.
 type StateFixture struct {
 	DB             *badger.DB
-	Headers        storage.Headers
-	Seals          storage.Seals
-	Payloads       storage.Payloads
-	Blocks         storage.Blocks
-	Index          storage.Index
-	State          protocol.MutableState
-	Guarantees     storage.Guarantees
+	Storage        *storage.All
 	DBDir          string
 	ProtocolEvents *events.Distributor
+	State          protocol.MutableState
 }
 
 // GenericNode implements a generic in-process node for tests.

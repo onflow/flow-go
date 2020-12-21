@@ -119,13 +119,12 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Metrics:        metrics,
 		Tracer:         tracer,
 		DB:             stateFixture.DB,
-		Headers:        stateFixture.Headers,
-		Guarantees:     stateFixture.Guarantees,
-		Seals:          stateFixture.Seals,
-		Payloads:       stateFixture.Payloads,
-		Blocks:         stateFixture.Blocks,
-		Index:          stateFixture.Index,
 		State:          stateFixture.State,
+		Headers:        stateFixture.Storage.Headers,
+		Guarantees:     stateFixture.Storage.Guarantees,
+		Seals:          stateFixture.Storage.Seals,
+		Payloads:       stateFixture.Storage.Payloads,
+		Blocks:         stateFixture.Storage.Blocks,
 		Me:             me,
 		Net:            stubnet,
 		DBDir:          stateFixture.DBDir,
@@ -139,39 +138,25 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 	participants flow.IdentityList) *testmock.StateFixture {
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
-	seals := storage.NewSeals(metric, db)
-	headers := storage.NewHeaders(metric, db)
-	index := storage.NewIndex(metric, db)
-	guarantees := storage.NewGuarantees(metric, db)
-	payloads := storage.NewPayloads(db, index, guarantees, seals)
-	blocks := storage.NewBlocks(db, headers, payloads)
-	setups := storage.NewEpochSetups(metric, db)
-	commits := storage.NewEpochCommits(metric, db)
-	distributor := events.NewDistributor()
-	statuses := storage.NewEpochStatuses(metric, db)
+	s := storage.InitAll(metric, db)
 	consumer := events.NewNoop()
 
 	root, result, seal := unittest.BootstrapFixture(participants)
 	stateRoot, err := badgerstate.NewStateRoot(root, result, seal, 0)
 	require.NoError(t, err)
 
-	state, err := badgerstate.Bootstrap(metric, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, index, payloads, tracer, consumer)
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer)
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
 		DB:             db,
-		Headers:        headers,
-		Seals:          seals,
-		Payloads:       payloads,
-		Blocks:         blocks,
-		Index:          index,
-		State:          mutableState,
+		Storage:        s,
 		DBDir:          dbDir,
-		Guarantees:     guarantees,
-		ProtocolEvents: distributor,
+		ProtocolEvents: events.NewDistributor(),
+		State:          mutableState,
 	}
 }
 
@@ -246,7 +231,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
 
 	// receive collections
-	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,
+		node.Headers, node.Me, guarantees)
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
@@ -258,7 +244,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	requireApprovals := true
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Metrics, node.Net, node.State, node.Me, requesterEng, sealedResultsDB, node.Headers, node.Index, results, approvals, seals, assigner, requireApprovals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Metrics, node.Net, node.State, node.Me,
+		requesterEng, sealedResultsDB, node.Headers, node.Index, results, approvals, seals, assigner, requireApprovals)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{
