@@ -111,7 +111,7 @@ func VerificationHappyPath(t *testing.T,
 	for _, node := range verNodes {
 		// ensures all nodes have same root block
 		// this is necessary for state mutation.
-		rootBlock, err := node.State.AtHeight(0).Head()
+		rootBlock, err := node.State.Params().Root()
 		require.NoError(t, err)
 		require.Equal(t, root, rootBlock)
 
