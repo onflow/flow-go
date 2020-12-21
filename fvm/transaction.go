@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
@@ -75,11 +77,24 @@ func (i *TransactionInvocator) Process(
 
 	location := runtime.TransactionLocation(proc.ID[:])
 
-	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	var txErr error
+	func() {
+		txErr = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+		defer func() {
+			if r := recover(); r != nil {
+				if strings.Contains(string(debug.Stack()), "github.com/onflow/cadence/runtime/ast.(*Program).InterfaceDeclarations(...)") {
+					// Don't want to give away too much information here for now, e.g. stacktrace.
+					txErr = fmt.Errorf("Runtime Error: Invalid transaction")
+				} else {
+					panic(r)
+				}
+			}
+		}()
+	}()
 
-	if err != nil {
-		i.safetyErrorCheck(err)
-		return err
+	if txErr != nil {
+		i.safetyErrorCheck(txErr)
+		return txErr
 	}
 
 	proc.Events = env.getEvents()
