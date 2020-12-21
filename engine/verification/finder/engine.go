@@ -531,12 +531,10 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 			defer span.Finish()
 
 			// marks result id of receipt as discarded.
-			if !e.discardedResultIDs.Has(resultID) {
-				added := e.discardedResultIDs.Add(resultID)
-				log.Debug().
-					Bool("added_to_discard_pool", added).
-					Msg("execution result marks discarded")
-			}
+			added := e.discardedResultIDs.Add(resultID)
+			log.Debug().
+				Bool("added_to_discard_pool", added).
+				Msg("execution result marks discarded")
 
 			// removes receipt from pending receipt
 			removed := e.pendingReceipts.Rem(receiptID)
