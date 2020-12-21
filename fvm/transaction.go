@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"fmt"
 	"runtime/debug"
 	"strings"
 
@@ -79,17 +78,19 @@ func (i *TransactionInvocator) Process(
 
 	var txErr error
 	func() {
-		txErr = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
 		defer func() {
 			if r := recover(); r != nil {
+				i.logger.Info().Str("error", "Runtime Error: Invalid transaction").Msg(string(debug.Stack()))
+
 				if strings.Contains(string(debug.Stack()), "github.com/onflow/cadence/runtime/ast.(*Program).InterfaceDeclarations(...)") {
 					// Don't want to give away too much information here for now, e.g. stacktrace.
-					txErr = fmt.Errorf("Runtime Error: Invalid transaction")
+					txErr = new(InvalidTransactionGenericError)
 				} else {
 					panic(r)
 				}
 			}
 		}()
+		txErr = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
 	}()
 
 	if txErr != nil {

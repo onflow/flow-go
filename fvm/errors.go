@@ -28,6 +28,8 @@ const (
 	errCodeEventLimitExceededError = 20
 
 	errCodeExecution = 100
+
+	errCodeGeneric = 200
 )
 
 var ErrAccountNotFound = errors.New("account not found")
@@ -232,6 +234,18 @@ func (e *InvalidHashAlgorithmError) Error() string {
 
 func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithm
+}
+
+// An InvalidTransactionGenericError indicates that a given key has an invalid hash algorithm.
+type InvalidTransactionGenericError struct {
+}
+
+func (e *InvalidTransactionGenericError) Error() string {
+	return "Invalid Transaction"
+}
+
+func (e *InvalidTransactionGenericError) Code() uint32 {
+	return errCodeGeneric
 }
 
 type ExecutionError struct {

@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const TopShotContractAddress = "0b2a3299cc857e29"
+
 // Runtime is Cadence interface hence it would be hard to mock it
 // implementation for our needs is simple enough though
 type mockRuntime struct {
