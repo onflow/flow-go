@@ -483,8 +483,7 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			// removes receipt from pending mempool
 			ok = e.pendingReceipts.Rem(receiptID)
 			if !ok {
-				log.Debug().
-					Msg("could not remove receipt from pending receipts mempool")
+				log.Debug().Msg("could not remove receipt from pending receipts mempool")
 				return
 			}
 
