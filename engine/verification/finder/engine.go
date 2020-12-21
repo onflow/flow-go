@@ -250,11 +250,8 @@ func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 	}
 
 	// checks stake of the verification node
-	if id.Stake == 0 {
-		return false, nil
-	}
-
-	return true, nil
+	staked := id.Stake > 0
+	return staked, nil
 }
 
 // processResult submits the result to the match engine.
@@ -391,7 +388,7 @@ func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) {
 	// checks whether verification node is staked at snapshot of this result's block.
 	ok, err := e.stakedAtBlockID(blockID)
 	if err != nil {
-		log.Debug().Err(err).Msg("could verify stake of verification node for result")
+		log.Debug().Err(err).Msg("could not verify stake of verification node for result")
 		return
 	}
 
@@ -526,12 +523,10 @@ func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID 
 			defer span.Finish()
 
 			// marks result id of receipt as discarded.
-			if !e.discardedResultIDs.Has(resultID) {
-				added := e.discardedResultIDs.Add(resultID)
-				log.Debug().
-					Bool("added_to_discard_pool", added).
-					Msg("execution result marks discarded")
-			}
+			added := e.discardedResultIDs.Add(resultID)
+			log.Debug().
+				Bool("added_to_discard_pool", added).
+				Msg("execution result marks discarded")
 
 			// removes receipt from pending receipt
 			removed := e.pendingReceipts.Rem(receiptID)

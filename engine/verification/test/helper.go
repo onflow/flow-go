@@ -99,7 +99,7 @@ func VerificationHappyPath(t *testing.T,
 
 	// extracts root block (at height 0) to build a child block succeeding that.
 	// since all nodes bootstrapped with same fixture, their root block is same.
-	root, err := verNodes[0].State.AtHeight(0).Head()
+	root, err := verNodes[0].State.Params().Root()
 	require.NoError(t, err)
 
 	// creates a child block of root, with its corresponding execution result.
@@ -111,7 +111,7 @@ func VerificationHappyPath(t *testing.T,
 	for _, node := range verNodes {
 		// ensures all nodes have same root block
 		// this is necessary for state mutation.
-		rootBlock, err := node.State.AtHeight(0).Head()
+		rootBlock, err := node.State.Params().Root()
 		require.NoError(t, err)
 		require.Equal(t, root, rootBlock)
 

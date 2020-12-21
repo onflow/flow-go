@@ -100,7 +100,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	// generate a child block out of root block of state in verification node,
 	// and creates its corresponding execution result.
-	root, err := verNode.State.AtHeight(0).Head()
+	root, err := verNode.State.Params().Root()
 	require.NoError(t, err)
 
 	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain(), root)
