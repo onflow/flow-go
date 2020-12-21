@@ -65,8 +65,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1 := es.NewView(sc1)
 
-		view1.Set(registerID1, "", "", flow.RegisterValue("apple"))
-		view1.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = view1.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		assert.NoError(t, err)
+		err = view1.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		assert.NoError(t, err)
 
 		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
 		assert.NoError(t, err)
@@ -89,14 +91,16 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1 := es.NewView(sc1)
 
-		view1.Set(registerID1, "", "", []byte("apple"))
+		err = view1.Set(registerID1, "", "", []byte("apple"))
+		assert.NoError(t, err)
 
 		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
-		view2.Set(registerID1, "", "", []byte("orange"))
+		err = view2.Set(registerID1, "", "", []byte("orange"))
+		assert.NoError(t, err)
 
 		sc3, err := es.CommitDelta(context.Background(), view2.Delta(), sc2)
 		assert.NoError(t, err)
@@ -125,15 +129,18 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// set initial value
 		view1 := es.NewView(sc1)
-		view1.Set(registerID1, "", "", []byte("apple"))
-		view1.Set(registerID2, "", "", []byte("apple"))
+		err = view1.Set(registerID1, "", "", []byte("apple"))
+		assert.NoError(t, err)
+		err = view1.Set(registerID2, "", "", []byte("apple"))
+		assert.NoError(t, err)
 
 		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
-		view2.Delete(registerID1, "", "")
+		err = view2.Delete(registerID1, "", "")
+		assert.NoError(t, err)
 
 		sc3, err := es.CommitDelta(context.Background(), view2.Delta(), sc2)
 		assert.NoError(t, err)
@@ -162,8 +169,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// set initial value
 		view1 := es.NewView(sc1)
-		view1.Set(registerID1, "", "", flow.RegisterValue("apple"))
-		view1.Set(registerID2, "", "", flow.RegisterValue("apple"))
+		err = view1.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		assert.NoError(t, err)
+		err = view1.Set(registerID2, "", "", flow.RegisterValue("apple"))
+		assert.NoError(t, err)
 
 		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
 		assert.NoError(t, err)
