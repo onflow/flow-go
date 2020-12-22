@@ -2,6 +2,7 @@ package epochmgr
 
 import (
 	"io/ioutil"
+	"sync"
 	"testing"
 	"time"
 
@@ -216,23 +217,22 @@ func (suite *Suite) TestStartAsUnstakedNode() {
 	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
 
 	// should call voter with next epoch
-	var called bool
+	var wg sync.WaitGroup
+	wg.Add(1)
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			called = true
+			wg.Done() // indicate the method was called once
 		}).Once()
 
 	// start the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
 
 	// should have submitted vote
-	suite.Assert().Eventually(func() bool {
-		return called
-	}, time.Second, time.Millisecond)
+	unittest.AssertReturnsBefore(suite.T(), wg.Wait, time.Second)
 	suite.voter.AssertExpectations(suite.T())
 	// should have no epoch components
-	assert.Len(suite.T(), suite.engine.epochs, 0, "should have 0 epoch components")
+	assert.Empty(suite.T(), suite.engine.epochs, "should have 0 epoch components")
 }
 
 // should kick off root QC voter on setup phase start event
