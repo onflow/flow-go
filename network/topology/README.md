@@ -4,6 +4,10 @@ fanout set. The _fanout set_ of a node is a subset of other nodes in the system 
 interacts in the event of epidemic dissemination of information. The epidemic dissemination happens when a 
 node _multicasts_ or _broadcasts_ a message. The former refers to the event when a node sends a message
 targeted for a subgroup of nodes in the system, while the latter refers to the event when a node aims on sending
-a message to the entire system. 
+a message to the entire system.
 
-![all text](topology.png)
+
+<p align="center">
+  <img src="topology.png" alt="drawing" width="200"/>
+</p>
+
