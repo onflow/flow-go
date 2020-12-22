@@ -196,6 +196,8 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 		return fmt.Errorf("could not get epoch counter: %w", err)
 	}
 
+	// greatest block height in the previous epoch is one less than the first
+	// block in current epoch
 	lastEpochMaxHeight := first.Height - 1
 
 	log := e.log.With().
