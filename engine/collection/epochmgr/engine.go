@@ -260,6 +260,7 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 		Uint64("epoch_max_height", epochMaxHeight).
 		Uint64("epoch_counter", epochCounter).
 		Uint64("stop_at_height", stopAtHeight).
+		Str("step", "epoch_transition").
 		Logger()
 
 	log.Debug().Msgf("preparing to stop epoch components at height %d", stopAtHeight)
@@ -269,15 +270,15 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 			e.unit.Lock()
 			defer e.unit.Unlock()
 
-			log.Info().Msg("epoch transition: stopping components for previous epoch...")
+			log.Info().Msg("stopping components for previous epoch...")
 
 			err := e.stopEpochComponents(epochCounter - 1)
 			if err != nil {
-				e.log.Error().Err(err).Msgf("epoch transition: failed to stop components for epoch %d", epochCounter-1)
+				e.log.Error().Err(err).Msgf("failed to stop components for epoch %d", epochCounter-1)
 				return
 			}
 
-			log.Info().Msg("epoch transition: previous epoch components stopped successfully")
+			log.Info().Msg("previous epoch components stopped successfully")
 		})
 	})
 }
