@@ -514,8 +514,10 @@ func (suite *FinderEngineTestSuite) TestProcessReady_HappyPath() {
 	suite.readyReceipts.On("All").
 		Return([]*verification.ReceiptDataPack{suite.receiptDataPack})
 
-	// mocks result has not yet processed
+	// mocks result has neither yet processed and discarded
 	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false).Once()
+	suite.discardedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
 		Return(false).Once()
 
 	// mocks successful submission to match engine
@@ -581,9 +583,11 @@ func (suite *FinderEngineTestSuite) TestProcessReady_Retry() {
 	suite.readyReceipts.On("All").
 		Return([]*verification.ReceiptDataPack{suite.receiptDataPack})
 
-	// mocks result has not yet processed
+	// mocks result has neither yet processed and discarded
 	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
-		Return(false).Times(retries)
+		Return(false)
+	suite.discardedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false)
 
 	// mocks successful submission to match engine
 	matchWG := sync.WaitGroup{}

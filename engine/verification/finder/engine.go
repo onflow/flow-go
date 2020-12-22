@@ -264,10 +264,13 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 	defer span.Finish()
 
 	resultID := result.ID()
+	log := e.log.With().Hex("result_id", logging.ID(resultID)).Logger()
 	if e.processedResultIDs.Has(resultID) {
-		e.log.Debug().
-			Hex("result_id", logging.ID(resultID)).
-			Msg("result already processed")
+		log.Debug().Msg("result already processed")
+		return false, nil
+	}
+	if e.discardedResultIDs.Has(resultID) {
+		e.log.Debug().Msg("drops handling already discarded result")
 		return false, nil
 	}
 
@@ -276,9 +279,7 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 		return false, fmt.Errorf("submission error to match engine: %w", err)
 	}
 
-	e.log.Info().
-		Hex("result_id", logging.ID(resultID)).
-		Msg("result submitted to match engine")
+	log.Info().Msg("result submitted to match engine")
 
 	// monitoring: increases number of execution results sent
 	e.metrics.OnExecutionResultSent()
