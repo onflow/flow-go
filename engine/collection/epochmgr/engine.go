@@ -218,7 +218,7 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 	components, err := e.createEpochComponents(epoch)
 	// if we are not staked in this epoch, skip starting up cluster consensus
 	if errors.Is(err, ErrUnstakedForEpoch) {
-		e.prepareToStopEpochComponents(counter, lastEpochMaxHeight)
+		e.prepareToStopEpochComponents(counter-1, lastEpochMaxHeight)
 		return nil
 	}
 	if err != nil {
@@ -234,7 +234,7 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 	log.Info().Msg("epoch transition: new epoch components started successfully")
 
 	// set up callback to stop previous epoch
-	e.prepareToStopEpochComponents(counter, lastEpochMaxHeight)
+	e.prepareToStopEpochComponents(counter-1, lastEpochMaxHeight)
 
 	return nil
 }
@@ -272,9 +272,9 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 
 			log.Info().Msg("stopping components for previous epoch...")
 
-			err := e.stopEpochComponents(epochCounter - 1)
+			err := e.stopEpochComponents(epochCounter)
 			if err != nil {
-				e.log.Error().Err(err).Msgf("failed to stop components for epoch %d", epochCounter-1)
+				e.log.Error().Err(err).Msgf("failed to stop components for epoch %d", epochCounter)
 				return
 			}
 
