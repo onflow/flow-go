@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestAllReady tests that AllReady closes its returned Ready channel only once
+// all input ReadyDone instances close their Ready channel.
 func TestAllReady(t *testing.T) {
 	cases := []int{0, 1, 100}
 	for _, n := range cases {
@@ -20,6 +22,8 @@ func TestAllReady(t *testing.T) {
 	}
 }
 
+// TestAllDone tests that AllDone closes its returned Done channel only once
+// all input ReadyDone instances close their Done channel.
 func TestAllDone(t *testing.T) {
 	cases := []int{0, 1, 100}
 	for _, n := range cases {
