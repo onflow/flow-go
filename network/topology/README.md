@@ -43,3 +43,12 @@ with connectedness.
   <img src="topicBasedTopology.svg" alt="drawing" width="600"/>
 </p>
 
+### [RandomizedTopology](../../network/topology/randomizedTopology.go)
+
+The randomized-topology is similar to the topic-based topology, except that upon constructing a graph component for a topic, instead of choosing a 
+fixed-size fanout per node it selects the fanout of the node probabilistically using an _edge probability_ `p`. 
+For the set of nodes subscribed to a topic, each node has any other node in its fanout with the probability of `p`, hence, the expected fanout of 
+a node on the graph component of a topic is `p * x` where `x` is the number of nodes subscribed to the topic. Choosing a proper edge probability 
+(e.g., `0.05`) the randomized topology provides a connected graph with a very high probability (e.g., `1 - 10^-10`), while it needs drastically 
+smaller fanout per node. The randomized topology is not yet in effect, however, it is planned to replace the topic-based topology soon to support the 
+scalability of the network. 
