@@ -14,7 +14,8 @@ number of times the topology is constructed. The topology is constructed once at
 construction protocol should result in a connected graph with a very high probability over the life-time of Flow, which theoretically is
 infinitely-many epochs. In practice, we consider it as 2^30 many epochs. 
 
-The figure below shows an example of a topology graph of 7 nodes in the Flow network, which is a directed and connected graph. There is a path between
+The figure below shows an example of a topology graph with 7 nodes in the Flow network, which is a directed and connected graph. There is a path 
+between
 every two nodes and traversing the topology graph with BFS or DFS visits all the vertices. Also, the fanout set of each node is colored the same as
 the node itself, e.g., the fanout set of the red node is illustrated using red edges from it to other nodes of the network. Also, in this example,
 every node has a fanout size of 3.
@@ -38,7 +39,7 @@ components. Since the individual topic-based components are connected, the entir
 shows the general idea of building the topology graph of the system using connected components as it happens in the topic-based topology. The
 topic-based topology provides deterministic connectedness among the nodes subscribing to a topic by creating a fanout of `(x+1)/2` per node using the
 linear fanout function, where `x` is the number of nodes subscribed to the topic. In this way, the resulted graph component of the topic is guaranteed
-with connectedness.
+with connectedness. The topic-based topology is the topology in effect of Flow at the moment. 
 
 <p align="center">
   <img src="topicBasedTopology.svg" alt="drawing" width="600"/>
@@ -47,7 +48,7 @@ with connectedness.
 ### [RandomizedTopology](../../network/topology/randomizedTopology.go)
 
 The randomized-topology is similar to the topic-based topology, except that upon constructing a graph component for a topic, instead of choosing a 
-fixed-size fanout per node it selects the fanout of the node probabilistically using an _edge probability_ `p`. 
+fixed-size fanout per node, it selects the fanout of the node probabilistically using an _edge probability_, `p`. 
 For the set of nodes subscribed to a topic, each node has any other node in its fanout with the probability of `p`, hence, the expected fanout of 
 a node on the graph component of a topic is `p * x` where `x` is the number of nodes subscribed to the topic. Choosing a proper edge probability 
 (e.g., `0.05`) the randomized topology provides a connected graph with a very high probability (e.g., `1 - 2^-30`), while it needs drastically 
