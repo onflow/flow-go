@@ -12,8 +12,10 @@ high probability, where the probability is taken over the number of times the to
 once at the beginning of each epoch. Hence, it implies that the topology construction protocol should result a connected graph with a very
 high probability over the life-time of Flow, which theoretically is infinitely-many epochs.
 
+Figure below shows an example of topology graph of 7 nodes in Flow network, which is a directed and connected graph. There is a path between every 
+two node and traversing the topology graph with BFS or DFS visits all the vertices. Also, the fanout set of each node is colored the same 
+as the node itself, e.g., fanout set of the red node is illustrated using red edges from it to other nodes of the network. Also, in this example, 
+every node has a fanout size of 3. 
 
-<p align="center">
-  <img src="topology.png" alt="drawing" width="200"/>
-</p>
+![alt text](topology.svg)
 
