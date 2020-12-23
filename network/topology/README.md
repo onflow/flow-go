@@ -29,5 +29,5 @@ a deterministic topic-based topology, and a randomized topic-based topology.
 
 ### [TopicBasedTopology](../../network/topology/topicBasedTopology.go)
 <p align="center">
-  <img src="topicBasedTopology.svg" alt="drawing" width="500"/>
+  <img src="topicBasedTopology.svg" alt="drawing" width="600"/>
 </p>
