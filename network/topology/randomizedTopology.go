@@ -3,6 +3,8 @@ package topology
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,15 +17,16 @@ import (
 // By random topology we mean a node is connected to any other co-channel nodes with some
 // edge probability.
 type RandomizedTopology struct {
-	me      flow.Identifier             // used to keep identifier of the node
-	state   protocol.State              // used to keep a read only protocol state
-	subMngr network.SubscriptionManager // used to keep track topics the node subscribed to
-	chance  uint64                      // used to translate connectedness probability into a number in [0, 100]
-	rng     random.Rand                 // used as a stateful random number generator to sample edges
+	identifier flow.Identifier             // used to keep identifier of the node
+	state      protocol.State              // used to keep a read only protocol state
+	subMngr    network.SubscriptionManager // used to keep track topics the node subscribed to
+	chance     uint64                      // used to translate connectedness probability into a number in [0, 100]
+	rng        random.Rand                 // used as a stateful random number generator to sample edges
+	logger     zerolog.Logger
 }
 
 // NewRandomizedTopology returns an instance of the RandomizedTopology.
-func NewRandomizedTopology(nodeID flow.Identifier, edgeProb float64, state protocol.State,
+func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgeProb float64, state protocol.State,
 	subMngr network.SubscriptionManager) (*RandomizedTopology, error) {
 	// edge probability should be a positive value between 0 and 1. However,
 	// we like it to be strictly greater than zero. Also, at the current scale of
@@ -43,11 +46,12 @@ func NewRandomizedTopology(nodeID flow.Identifier, edgeProb float64, state proto
 	}
 
 	t := &RandomizedTopology{
-		me:      nodeID,
-		state:   state,
-		subMngr: subMngr,
-		chance:  uint64(100 * edgeProb),
-		rng:     rng,
+		identifier: nodeID,
+		state:      state,
+		subMngr:    subMngr,
+		chance:     uint64(100 * edgeProb),
+		rng:        rng,
+		logger:     logger.With().Str("component:", "topic-based-topology").Logger(),
 	}
 
 	return t, nil
@@ -90,7 +94,7 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 // Note: this method should not include identity of its executor.
 func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel string) (flow.IdentityList, error) {
 	// excludes node itself
-	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.me)))
+	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.identifier)))
 
 	// samples a random graph based on whether channel is cluster-based or not.
 	if _, ok := engine.IsClusterChannelID(channel); ok {
@@ -124,13 +128,13 @@ func (r RandomizedTopology) sampleFanout(ids flow.IdentityList) (flow.IdentityLi
 // clusterChannelHandler returns a connected graph fanout of peers in the same cluster as executor of this instance.
 func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.IdentityList, error) {
 	// extracts cluster peer ids to which the node belongs to.
-	clusterPeers, err := clusterPeers(r.me, r.state)
+	clusterPeers, err := clusterPeers(r.identifier, r.state)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", r.me.String(), err)
+		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", r.identifier.String(), err)
 	}
 
 	// excludes node itself from cluster
-	clusterPeers = clusterPeers.Filter(filter.Not(filter.HasNodeID(r.me)))
+	clusterPeers = clusterPeers.Filter(filter.Not(filter.HasNodeID(r.identifier)))
 
 	// checks all cluster peers belong to the passed ids list
 	nonMembers := clusterPeers.Filter(filter.Not(filter.In(ids)))
