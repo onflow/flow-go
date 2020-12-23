@@ -7,11 +7,12 @@ other nodes in the system by which the node interacts in the event of epidemic d
 node _multicasts_ or _broadcasts_ a message. The former refers to the event when a node sends a message targeted for a subgroup of nodes in the
 system, while the latter refers to the event when a node aims at sending a message to the entire system. Note that the communications over the fanout
 set are assumed unidirectional from the node to its fanout set. The distributed and independent invocations of topology protocol on nodes of Flow
-hence results in a _directed_ graph where the vertices are the Flow nodes, and the edges are the fanout set of the nodes. This directed graph is
+hence results in a _directed_ graph where the vertices are the Flow nodes, and the edges are the union of the fanout sets of the nodes. This directed 
+graph is
 called the _topology graph_. It is required that the topology graph is connected with a very high probability, where the probability is taken over the
 number of times the topology is constructed. The topology is constructed once at the beginning of each epoch. Hence, it implies that the topology
 construction protocol should result in a connected graph with a very high probability over the life-time of Flow, which theoretically is
-infinitely-many epochs.
+infinitely-many epochs. In practice, we consider it as 2^30 many epochs. 
 
 The figure below shows an example of a topology graph of 7 nodes in the Flow network, which is a directed and connected graph. There is a path between
 every two nodes and traversing the topology graph with BFS or DFS visits all the vertices. Also, the fanout set of each node is colored the same as
@@ -49,6 +50,6 @@ The randomized-topology is similar to the topic-based topology, except that upon
 fixed-size fanout per node it selects the fanout of the node probabilistically using an _edge probability_ `p`. 
 For the set of nodes subscribed to a topic, each node has any other node in its fanout with the probability of `p`, hence, the expected fanout of 
 a node on the graph component of a topic is `p * x` where `x` is the number of nodes subscribed to the topic. Choosing a proper edge probability 
-(e.g., `0.05`) the randomized topology provides a connected graph with a very high probability (e.g., `1 - 10^-10`), while it needs drastically 
+(e.g., `0.05`) the randomized topology provides a connected graph with a very high probability (e.g., `1 - 2^-30`), while it needs drastically 
 smaller fanout per node. The randomized topology is not yet in effect, however, it is planned to replace the topic-based topology soon to support the 
 scalability of the network. 
