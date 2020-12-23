@@ -17,5 +17,6 @@ two node and traversing the topology graph with BFS or DFS visits all the vertic
 as the node itself, e.g., fanout set of the red node is illustrated using red edges from it to other nodes of the network. Also, in this example, 
 every node has a fanout size of 3. 
 
-![alt text](topology.svg)
-
+<p align="center">
+  <img src="topology.svg" alt="drawing" width="200"/>
+</p>
