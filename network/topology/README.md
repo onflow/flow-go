@@ -1,4 +1,5 @@
 # Topology
+## Definitions
 In Flow, the term _topology_ captures the distributed protocol by which a node determines its
 fanout set. The _fanout set_ of a node is a subset of other nodes in the system by which the node 
 interacts in the event of epidemic dissemination of information. The epidemic dissemination happens when a 
@@ -19,4 +20,14 @@ every node has a fanout size of 3.
 
 <p align="center">
   <img src="topology.svg" alt="drawing" width="500"/>
+</p>
+
+### [Topology Interface](../../network/topology.go)
+At its interface, as a distributed algorithm, the topology receives the (whitelist) of nodes in the system, and
+generates and returns the fanout of the node. The current implementations of this topology interface are 
+a deterministic topic-based topology, and a randomized topic-based topology. 
+
+### [TopicBasedTopology](../../network/topology/topicBasedTopology.go)
+<p align="center">
+  <img src="topicBasedTopology.svg" alt="drawing" width="500"/>
 </p>
